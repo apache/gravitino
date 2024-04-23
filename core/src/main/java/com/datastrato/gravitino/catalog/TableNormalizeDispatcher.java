@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.catalog;
 
 import static com.datastrato.gravitino.catalog.CapabilityHelpers.applyCapabilities;
+import static com.datastrato.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
@@ -31,16 +32,18 @@ public class TableNormalizeDispatcher implements TableDispatcher {
 
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
-    Capability capability = dispatcher.getCatalogCapability(namespace);
-    Namespace standardizedNamespace =
-        applyCapabilities(namespace, Capability.Scope.TABLE, capability);
-    NameIdentifier[] identifiers = dispatcher.listTables(standardizedNamespace);
-    return applyCapabilities(identifiers, Capability.Scope.TABLE, capability);
+    // The constraints of the name spec may be more strict than underlying catalog,
+    // and for compatibility reasons, we only apply case-sensitive capabilities here.
+    Namespace caseSensitiveNs = applyCaseSensitive(namespace, Capability.Scope.TABLE, dispatcher);
+    NameIdentifier[] identifiers = dispatcher.listTables(caseSensitiveNs);
+    return applyCaseSensitive(identifiers, Capability.Scope.TABLE, dispatcher);
   }
 
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
-    return dispatcher.loadTable(normalizeNameIdentifier(ident));
+    // The constraints of the name spec may be more strict than underlying catalog,
+    // and for compatibility reasons, we only apply case-sensitive capabilities here.
+    return dispatcher.loadTable(applyCaseSensitive(ident, Capability.Scope.TABLE, dispatcher));
   }
 
   @Override
@@ -71,13 +74,17 @@ public class TableNormalizeDispatcher implements TableDispatcher {
       throws NoSuchTableException, IllegalArgumentException {
     Capability capability = dispatcher.getCatalogCapability(ident);
     return dispatcher.alterTable(
-        applyCapabilities(ident, Capability.Scope.TABLE, capability),
+        // The constraints of the name spec may be more strict than underlying catalog,
+        // and for compatibility reasons, we only apply case-sensitive capabilities here.
+        applyCaseSensitive(ident, Capability.Scope.TABLE, dispatcher),
         applyCapabilities(capability, changes));
   }
 
   @Override
   public boolean dropTable(NameIdentifier ident) {
-    return dispatcher.dropTable(normalizeNameIdentifier(ident));
+    // The constraints of the name spec may be more strict than underlying catalog,
+    // and for compatibility reasons, we only apply case-sensitive capabilities here.
+    return dispatcher.dropTable(applyCaseSensitive(ident, Capability.Scope.TABLE, dispatcher));
   }
 
   @Override
@@ -87,7 +94,9 @@ public class TableNormalizeDispatcher implements TableDispatcher {
 
   @Override
   public boolean tableExists(NameIdentifier ident) {
-    return dispatcher.tableExists(normalizeNameIdentifier(ident));
+    // The constraints of the name spec may be more strict than underlying catalog,
+    // and for compatibility reasons, we only apply case-sensitive capabilities here.
+    return dispatcher.tableExists(applyCaseSensitive(ident, Capability.Scope.TABLE, dispatcher));
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier ident) {

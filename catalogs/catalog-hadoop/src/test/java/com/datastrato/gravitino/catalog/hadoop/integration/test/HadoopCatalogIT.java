@@ -232,6 +232,17 @@ public class HadoopCatalogIT extends AbstractIT {
   }
 
   @Test
+  void testNameSpec() {
+    String illegalName = "/%~?*";
+
+    NameIdentifier nameIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, illegalName);
+
+    Assertions.assertThrows(
+        NoSuchFilesetException.class, () -> catalog.asFilesetCatalog().loadFileset(nameIdentifier));
+  }
+
+  @Test
   public void testLoadFileset() throws IOException {
     // create fileset
     String filesetName = "test_load_fileset";

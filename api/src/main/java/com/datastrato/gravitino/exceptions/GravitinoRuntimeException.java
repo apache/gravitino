@@ -27,7 +27,7 @@ public class GravitinoRuntimeException extends RuntimeException {
    */
   @FormatMethod
   public GravitinoRuntimeException(@FormatString String message, Object... args) {
-    super(String.format(message, args));
+    super(args.length == 0 ? message : String.format(message, args));
   }
 
   /**

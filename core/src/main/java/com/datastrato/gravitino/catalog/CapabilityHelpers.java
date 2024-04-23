@@ -79,6 +79,37 @@ public class CapabilityHelpers {
     return NameIdentifier.of(namespace, name);
   }
 
+  public static NameIdentifier[] applyCaseSensitive(
+      NameIdentifier[] idents, Capability.Scope scope, OperationDispatcher operationDispatcher) {
+    return Arrays.stream(idents)
+        .map(ident -> applyCaseSensitive(ident, scope, operationDispatcher))
+        .toArray(NameIdentifier[]::new);
+  }
+
+  public static NameIdentifier applyCaseSensitive(
+      NameIdentifier ident, Capability.Scope scope, OperationDispatcher operationDispatcher) {
+    Capability capabilities = operationDispatcher.getCatalogCapability(ident);
+    Namespace namespace = applyCaseSensitive(ident.namespace(), scope, operationDispatcher);
+
+    String name = applyCaseSensitiveOnName(scope, ident.name(), capabilities);
+    return NameIdentifier.of(namespace, name);
+  }
+
+  public static Namespace applyCaseSensitive(
+      Namespace namespace, Capability.Scope identScope, OperationDispatcher operationDispatcher) {
+    String metalake = namespace.level(0);
+    String catalog = namespace.level(1);
+    if (identScope == Capability.Scope.TABLE
+        || identScope == Capability.Scope.FILESET
+        || identScope == Capability.Scope.TOPIC) {
+      String schema = namespace.level(namespace.length() - 1);
+      Capability capabilities = operationDispatcher.getCatalogCapability(namespace);
+      schema = applyCaseSensitiveOnName(Capability.Scope.SCHEMA, schema, capabilities);
+      return Namespace.of(metalake, catalog, schema);
+    }
+    return namespace;
+  }
+
   public static Transform[] applyCapabilities(Transform[] transforms, Capability capabilities) {
     return Arrays.stream(transforms)
         .map(t -> applyCapabilities(t, capabilities))
