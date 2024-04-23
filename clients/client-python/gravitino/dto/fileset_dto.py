@@ -20,7 +20,7 @@ class FilesetDTO(Fileset, DataClassJsonMixin):
     _type: Fileset.Type = field(metadata=config(field_name='type'))
     _properties: Dict[str, str] = field(metadata=config(field_name='properties'))
     _storage_location: str = field(default=None, metadata=config(field_name='storageLocation'))
-    _audit: AuditDTO = field(default=None)
+    _audit: AuditDTO = field(default=None, metadata=config(field_name='audit'))
 
     def name(self) -> str:
         return self._name

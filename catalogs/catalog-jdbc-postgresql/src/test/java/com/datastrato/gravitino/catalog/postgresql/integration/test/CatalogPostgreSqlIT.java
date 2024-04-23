@@ -1157,6 +1157,74 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   }
 
   @Test
+  void testCreateSameTableInDifferentSchema() {
+    String schemaPrefix = GravitinoITUtils.genRandomName("postgresql_it_schema");
+    String schemaName1 = schemaPrefix + "1a";
+    String schemaName2 = schemaPrefix + "_a";
+    String schemaName3 = schemaPrefix + "__";
+
+    String[] dbs = {schemaName1, schemaName2, schemaName3};
+    for (int i = 0; i < dbs.length; i++) {
+      catalog
+          .asSchemas()
+          .createSchema(
+              NameIdentifier.of(metalakeName, catalogName, dbs[i]), dbs[i], Maps.newHashMap());
+    }
+
+    String tableName1 = "table1";
+    String tableName2 = "table2";
+    String tableName3 = "table3";
+    Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, false, null);
+    Column col2 = Column.of("col_2", Types.IntegerType.get(), "yes", false, false, null);
+    Column col3 = Column.of("col_3", Types.DateType.get(), "comment", false, false, null);
+    Column col4 = Column.of("col_4", Types.VarCharType.of(255), "code", false, false, null);
+    Column col5 = Column.of("col_5", Types.VarCharType.of(255), "config", false, false, null);
+    Column[] newColumns = new Column[] {col1, col2, col3, col4, col5};
+
+    String[] tables = {tableName1, tableName2, tableName3};
+
+    for (int i = 0; i < dbs.length; i++) {
+      for (int j = 0; j < tables.length; j++) {
+        catalog
+            .asTableCatalog()
+            .createTable(
+                NameIdentifier.of(metalakeName, catalogName, dbs[i], tables[j]),
+                newColumns,
+                dbs[i] + "." + tables[j],
+                Maps.newHashMap(),
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                new SortOrder[0],
+                new Index[0]);
+      }
+    }
+
+    // list table in schema
+    for (int i = 0; i < dbs.length; i++) {
+      NameIdentifier[] tableNames =
+          catalog.asTableCatalog().listTables(Namespace.of(metalakeName, catalogName, dbs[i]));
+      Assertions.assertEquals(3, tableNames.length);
+      String[] realNames =
+          Arrays.stream(tableNames).map(NameIdentifier::name).toArray(String[]::new);
+      Assertions.assertArrayEquals(tables, realNames);
+
+      final int idx = i;
+      for (String n : realNames) {
+        Table t =
+            Assertions.assertDoesNotThrow(
+                () ->
+                    catalog
+                        .asTableCatalog()
+                        .loadTable(NameIdentifier.of(metalakeName, catalogName, dbs[idx], n)));
+        Assertions.assertEquals(n, t.name());
+
+        // Test the table1 is the `1a`.`table1` not `_a`.`table1` or `__`.`table1`
+        Assertions.assertEquals(dbs[idx] + "." + n, t.comment());
+      }
+    }
+  }
+
+  @Test
   void testPostgreSQLSchemaNameCaseSensitive() {
     Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, false, null);
     Column col2 = Column.of("col_2", Types.VarCharType.of(255), "code", false, false, null);

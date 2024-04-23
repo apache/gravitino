@@ -93,6 +93,26 @@ public class CatalogIT extends AbstractIT {
   }
 
   @Test
+  public void testCreateCatalogWithoutProperties() {
+    String catalogName = GravitinoITUtils.genRandomName("catalog");
+    NameIdentifier catalogIdent = NameIdentifier.of(metalakeName, catalogName);
+    Assertions.assertFalse(metalake.catalogExists(catalogIdent));
+
+    Catalog catalog =
+        metalake.createCatalog(
+            catalogIdent, Catalog.Type.FILESET, "hadoop", "catalog comment", null);
+    Assertions.assertTrue(metalake.catalogExists(catalogIdent));
+
+    Assertions.assertEquals(catalogName, catalog.name());
+    Assertions.assertEquals(Catalog.Type.FILESET, catalog.type());
+    Assertions.assertEquals("hadoop", catalog.provider());
+    Assertions.assertEquals("catalog comment", catalog.comment());
+    Assertions.assertTrue(catalog.properties().isEmpty());
+
+    metalake.dropCatalog(catalogIdent);
+  }
+
+  @Test
   public void testListCatalogsInfo() {
     String relCatalogName = GravitinoITUtils.genRandomName("rel_catalog_");
     NameIdentifier relCatalogIdent = NameIdentifier.of(metalakeName, relCatalogName);

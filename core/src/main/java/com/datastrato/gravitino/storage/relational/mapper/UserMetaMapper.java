@@ -6,6 +6,7 @@
 package com.datastrato.gravitino.storage.relational.mapper;
 
 import com.datastrato.gravitino.storage.relational.po.UserPO;
+import java.util.List;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -20,11 +21,12 @@ import org.apache.ibatis.annotations.Update;
  * href="https://mybatis.org/mybatis-3/getting-started.html"></a>
  */
 public interface UserMetaMapper {
-  String TABLE_NAME = "user_meta";
+  String USER_TABLE_NAME = "user_meta";
+  String USER_ROLE_RELATION_TABLE_NAME = "user_role_rel";
 
   @Select(
       "SELECT user_id as userId FROM "
-          + TABLE_NAME
+          + USER_TABLE_NAME
           + " WHERE metalake_id = #{metalakeId} AND user_name = #{userName}"
           + " AND deleted_at = 0")
   Long selectUserIdByMetalakeIdAndName(
@@ -37,7 +39,7 @@ public interface UserMetaMapper {
           + " current_version as currentVersion, last_version as lastVersion,"
           + " deleted_at as deletedAt"
           + " FROM "
-          + TABLE_NAME
+          + USER_TABLE_NAME
           + " WHERE metalake_id = #{metalakeId} AND user_name = #{userName}"
           + " AND deleted_at = 0")
   UserPO selectUserMetaByMetalakeIdAndName(
@@ -45,7 +47,7 @@ public interface UserMetaMapper {
 
   @Insert(
       "INSERT INTO "
-          + TABLE_NAME
+          + USER_TABLE_NAME
           + "(user_id, user_name,"
           + " metalake_id, audit_info,"
           + " current_version, last_version, deleted_at)"
@@ -62,7 +64,7 @@ public interface UserMetaMapper {
 
   @Insert(
       "INSERT INTO "
-          + TABLE_NAME
+          + USER_TABLE_NAME
           + "(user_id, user_name,"
           + "metalake_id, audit_info,"
           + " current_version, last_version, deleted_at)"
@@ -86,21 +88,21 @@ public interface UserMetaMapper {
 
   @Update(
       "UPDATE "
-          + TABLE_NAME
+          + USER_TABLE_NAME
           + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
           + " WHERE user_id = #{userId} AND deleted_at = 0")
   void softDeleteUserMetaByUserId(@Param("userId") Long userId);
 
   @Update(
       "UPDATE "
-          + TABLE_NAME
+          + USER_TABLE_NAME
           + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
           + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0")
   void softDeleteUserMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
 
   @Update(
       "UPDATE "
-          + TABLE_NAME
+          + USER_TABLE_NAME
           + " SET user_name = #{newUserMeta.userName},"
           + " metalake_id = #{newUserMeta.metalakeId},"
           + " audit_info = #{newUserMeta.auditInfo},"
@@ -116,4 +118,18 @@ public interface UserMetaMapper {
           + " AND deleted_at = 0")
   Integer updateUserMeta(
       @Param("newUserMeta") UserPO newUserPO, @Param("oldUserMeta") UserPO oldUserPO);
+
+  @Select(
+      "SELECT us.user_id as userId, us.user_name as userName,"
+          + " us.metalake_id as metalakeId,"
+          + " us.audit_info as auditInfo, us.current_version as currentVersion,"
+          + " us.last_version as lastVersion, us.deleted_at as deletedAt"
+          + " FROM "
+          + USER_TABLE_NAME
+          + " us JOIN "
+          + USER_ROLE_RELATION_TABLE_NAME
+          + " re ON us.user_id = re.user_id"
+          + " WHERE re.role_id = #{roleId}"
+          + " AND us.deleted_at = 0 AND re.deleted_at = 0")
+  List<UserPO> listUsersByRoleId(@Param("roleId") Long roleId);
 }

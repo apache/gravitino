@@ -24,7 +24,8 @@ logger = logging.getLogger(__name__)
 
 
 class FilesetCatalog(BaseSchemaCatalog):
-    """Fileset catalog is a catalog implementation that supports fileset like metadata operations, for
+    """
+    Fileset catalog is a catalog implementation that supports fileset like metadata operations, for
     example, schemas and filesets list, creation, update and deletion. A Fileset catalog is under the metalake.
     """
 
@@ -57,7 +58,7 @@ class FilesetCatalog(BaseSchemaCatalog):
         entity_list_resp = EntityListResponse.from_json(resp.body, infer_missing=True)
         entity_list_resp.validate()
 
-        return entity_list_resp.idents
+        return entity_list_resp.identifiers()
 
     def load_fileset(self, ident) -> Fileset:
         """Load fileset metadata by {@link NameIdentifier} from the catalog.
@@ -77,7 +78,7 @@ class FilesetCatalog(BaseSchemaCatalog):
         fileset_resp = FilesetResponse.from_json(resp.body, infer_missing=True)
         fileset_resp.validate()
 
-        return fileset_resp.fileset
+        return fileset_resp.fileset()
 
     def create_fileset(self, ident: NameIdentifier, comment: str, type: Catalog.Type,
                        storage_location: str, properties: Dict[str, str]) -> Fileset:
@@ -111,7 +112,7 @@ class FilesetCatalog(BaseSchemaCatalog):
         fileset_resp = FilesetResponse.from_json(resp.body, infer_missing=True)
         fileset_resp.validate()
 
-        return fileset_resp.fileset
+        return fileset_resp.fileset()
 
     def alter_fileset(self, ident, *changes) -> Fileset:
         """Update a fileset metadata in the catalog.
@@ -137,7 +138,7 @@ class FilesetCatalog(BaseSchemaCatalog):
         fileset_resp = FilesetResponse.from_json(resp.body, infer_missing=True)
         fileset_resp.validate()
 
-        return fileset_resp.fileset
+        return fileset_resp.fileset()
 
     def drop_fileset(self, ident: NameIdentifier) -> bool:
         """Drop a fileset from the catalog.
@@ -173,12 +174,12 @@ class FilesetCatalog(BaseSchemaCatalog):
     @staticmethod
     def to_fileset_update_request(change: FilesetChange):
         if isinstance(change, FilesetChange.RenameFileset):
-            return FilesetUpdateRequest.RenameFilesetRequest(change.new_name)
+            return FilesetUpdateRequest.RenameFilesetRequest(change.new_name())
         elif isinstance(change, FilesetChange.UpdateFilesetComment):
-            return FilesetUpdateRequest.UpdateFilesetCommentRequest(change.new_comment)
+            return FilesetUpdateRequest.UpdateFilesetCommentRequest(change.new_comment())
         elif isinstance(change, FilesetChange.SetProperty):
-            return FilesetUpdateRequest.SetFilesetPropertyRequest(change.property, change.value)
+            return FilesetUpdateRequest.SetFilesetPropertyRequest(change.property(), change.value())
         elif isinstance(change, FilesetChange.RemoveProperty):
-            return FilesetUpdateRequest.RemoveFilesetPropertyRequest(change.property)
+            return FilesetUpdateRequest.RemoveFilesetPropertyRequest(change.property())
         else:
             raise ValueError(f"Unknown change type: {type(change).__name__}")

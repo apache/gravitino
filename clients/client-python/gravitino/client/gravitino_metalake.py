@@ -19,7 +19,6 @@ from gravitino.name_identifier import NameIdentifier
 from gravitino.namespace import Namespace
 from gravitino.utils import HTTPClient
 
-
 from typing import List, Dict
 
 logger = logging.getLogger(__name__)
@@ -48,15 +47,10 @@ class GravitinoMetalake(MetalakeDTO):
 
     API_METALAKES_CATALOGS_PATH = "api/metalakes/{}/catalogs/{}"
 
-    def __init__(self, name: str = None, comment: str = None, properties: Dict[str, str] = None, audit: AuditDTO = None,
-                 rest_client: HTTPClient = None):
-        super().__init__(name=name, comment=comment, properties=properties, audit=audit)
-        self.rest_client = rest_client
-
-    @classmethod
-    def build(cls, metalake: MetalakeDTO = None, client: HTTPClient = None):
-        return cls(name=metalake.name, comment=metalake.comment, properties=metalake.properties,
-                   audit=metalake.audit, rest_client=client)
+    def __init__(self, metalake: MetalakeDTO = None, client: HTTPClient = None):
+        super().__init__(_name=metalake.name(), _comment=metalake.comment(), _properties=metalake.properties(),
+                         _audit=metalake.audit_info())
+        self.rest_client = client
 
     def list_catalogs(self, namespace: Namespace) -> List[NameIdentifier]:
         """List all the catalogs under this metalake with specified namespace.
@@ -75,7 +69,7 @@ class GravitinoMetalake(MetalakeDTO):
         response = self.rest_client.get(url)
         entityList = EntityListResponse.from_json(response.body, infer_missing=True)
         entityList.validate()
-        return entityList.idents
+        return entityList.identifiers()
 
     def list_catalogs_info(self, namespace: Namespace) -> List[Catalog]:
         """List all the catalogs with their information under this metalake with specified namespace.
@@ -197,5 +191,5 @@ class GravitinoMetalake(MetalakeDTO):
 
             return drop_response.dropped()
         except Exception as e:
-            logger.warning(f"Failed to drop catalog {ident}: {e}")
+            logger.warning(f"Failed to drop catalog {ident}")
             return False
