@@ -105,6 +105,22 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
+    delete:
+      tags:
+        - partition
+      summary: Drop partition by name
+      operationId: dropPartition
+      description: Drops the specified partition
+      parameters:
+        - $ref: "#/components/parameters/purge"
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/DropResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
 
 components:
   parameters:
@@ -112,6 +128,15 @@ components:
       name: details
       in: query
       description: Include detailed information about the partitions
+      required: false
+      schema:
+        type: boolean
+        default: false
+
+    purge:
+      name: purge
+      in: query
+      description: Purge the partition data
       required: false
       schema:
         type: boolean
