@@ -128,7 +128,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
           icebergTableOps.listNamespace(IcebergTableOpsHelper.getIcebergNamespace()).namespaces();
 
       return namespaces.stream()
-          .map(icebergNamespace -> NameIdentifier.of(icebergNamespace.levels()))
+          .map(icebergNamespace -> NameIdentifier.of(namespace, icebergNamespace.toString()))
           .toArray(NameIdentifier[]::new);
     } catch (NoSuchNamespaceException e) {
       throw new NoSuchSchemaException(
@@ -481,16 +481,13 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       IcebergColumn[] icebergColumns =
           Arrays.stream(columns)
               .map(
-                  column -> {
-                    IcebergTableOpsHelper.validateColumnDefaultValue(
-                        column.name(), column.defaultValue());
-                    return IcebergColumn.builder()
-                        .withName(column.name())
-                        .withType(column.dataType())
-                        .withComment(column.comment())
-                        .withNullable(column.nullable())
-                        .build();
-                  })
+                  column ->
+                      IcebergColumn.builder()
+                          .withName(column.name())
+                          .withType(column.dataType())
+                          .withComment(column.comment())
+                          .withNullable(column.nullable())
+                          .build())
               .toArray(IcebergColumn[]::new);
 
       IcebergTable createdTable =

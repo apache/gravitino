@@ -10,11 +10,14 @@ import com.datastrato.gravitino.catalog.doris.converter.DorisTypeConverter;
 import com.datastrato.gravitino.catalog.doris.operation.DorisDatabaseOperations;
 import com.datastrato.gravitino.catalog.doris.operation.DorisTableOperations;
 import com.datastrato.gravitino.catalog.jdbc.JdbcCatalog;
+import com.datastrato.gravitino.catalog.jdbc.MySQLProtocolCompatibleCatalogOperations;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
+import com.datastrato.gravitino.connector.CatalogOperations;
+import java.util.Map;
 
 /** Implementation of a Doris catalog in Gravitino. */
 public class DorisCatalog extends JdbcCatalog {
@@ -22,6 +25,18 @@ public class DorisCatalog extends JdbcCatalog {
   @Override
   public String shortName() {
     return "jdbc-doris";
+  }
+
+  @Override
+  protected CatalogOperations newOps(Map<String, String> config) {
+    JdbcTypeConverter<String> jdbcTypeConverter = createJdbcTypeConverter();
+    return new MySQLProtocolCompatibleCatalogOperations(
+        createExceptionConverter(),
+        jdbcTypeConverter,
+        createJdbcDatabaseOperations(),
+        createJdbcTableOperations(),
+        createJdbcTablePropertiesMetadata(),
+        createJdbcColumnDefaultValueConverter());
   }
 
   @Override

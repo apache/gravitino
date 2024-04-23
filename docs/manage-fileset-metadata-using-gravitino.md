@@ -1,5 +1,5 @@
 ---
-title: "Manage fileset metadata using Gravitino"
+title: Manage fileset metadata using Gravitino
 slug: /manage-fileset-metadata-using-gravitino
 date: 2024-4-2
 keyword: Gravitino fileset metadata manage
@@ -9,30 +9,30 @@ license: Copyright 2024 Datastrato Pvt Ltd. This software is licensed under the 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-This page introduces how to manage fileset metadata by Gravitino. Fileset is a concept brought
-out in Gravitino, which is a collection of files and directories. Users can leverage
-fileset to manage non-tabular data like training datasets, raw data.
+This page introduces how to manage fileset metadata in Gravitino. Filesets 
+are a collection of files and directories. Users can leverage
+filesets to manage non-tabular data like training datasets and other raw data.
 
-Typically, a fileset is mapping to a directory on a file system like HDFS, S3, ADLS, GCS, etc.
-With fileset managed by Gravitino, the non-tabular data can be managed as assets together with
-tabular data and others in Gravitino with a unified way.
+Typically, a fileset is mapped to a directory on a file system like HDFS, S3, ADLS, GCS, etc.
+With the fileset managed by Gravitino, the non-tabular data can be managed as assets together with
+tabular data in Gravitino in a unified way.
 
-After fileset is created, users can easily access, manage the files/directories through
-Fileset's identifier, without needing to know the physical path of the managed datasets. Also, with
-unified access control mechanism, filesets can also be managed via the same role based access
-control mechanism without needing to set access controls to different storages.
+After a fileset is created, users can easily access, manage the files/directories through
+the fileset's identifier, without needing to know the physical path of the managed dataset. Also, with
+unified access control mechanism, filesets can be managed via the same role based access
+control mechanism without needing to set access controls across different storage systems.
 
 To use fileset, please make sure that:
 
- - Gravitino server is launched, and the host and port is [http://localhost:8090](http://localhost:8090).
- - Metalake has been created.
+ - Gravitino server has started, and the host and port is [http://localhost:8090](http://localhost:8090).
+ - A metalake has been created.
 
 ## Catalog operations
 
 ### Create a catalog
 
 :::tip
-For fileset catalog, you must specify the catalog `type` as `FILESET` when creating a catalog.
+For a fileset catalog, you must specify the catalog `type` as `FILESET` when creating the catalog.
 :::
 
 You can create a catalog by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs`
@@ -65,15 +65,15 @@ GravitinoClient gravitinoClient = GravitinoClient
 
 Map<String, String> properties = ImmutableMap.<String, String>builder()
     .put("location", "file:/tmp/root")
-    // Property "location" is optional, if specified all the managed fileset without
-    // specifying storage location will be stored under this location.
+    // Property "location" is optional. If specified, a managed fileset without
+    // a storage location will be stored under this location.
     .build();
 
 Catalog catalog = gravitinoClient.createCatalog(
     NameIdentifier.of("metalake", "catalog"),
     Type.FILESET,
-    "hadoop", // provider, Gravitino support only "hadoop" for now.
-    "This is a hadoop fileset catalog",
+    "hadoop", // provider, Gravitino only supports "hadoop" for now.
+    "This is a Hadoop fileset catalog",
     properties);
 // ...
 ```
@@ -89,37 +89,37 @@ Currently, Gravitino supports the following catalog providers:
 
 ### Load a catalog
 
-Please refer to [Load a catalog](./manage-relational-metadata-using-gravitino.md#load-a-catalog)
-from relational catalog for more details. For fileset catalog, the load operation is the same.
+Refer to [Load a catalog](./manage-relational-metadata-using-gravitino.md#load-a-catalog)
+in relational catalog for more details. For a fileset catalog, the load operation is the same.
 
 ### Alter a catalog
 
-Please refer to [Alter a catalog](./manage-relational-metadata-using-gravitino.md#alter-a-catalog)
-from relational catalog for more details. For fileset catalog, the alter operation is the same.
+Refer to [Alter a catalog](./manage-relational-metadata-using-gravitino.md#alter-a-catalog)
+in relational catalog for more details. For a fileset catalog, the alter operation is the same.
 
 ### Drop a catalog
 
-Please refer to [Drop a catalog](./manage-relational-metadata-using-gravitino.md#drop-a-catalog)
-from relational catalog for more details. For fileset catalog, the drop operation is the same.
+Refer to [Drop a catalog](./manage-relational-metadata-using-gravitino.md#drop-a-catalog)
+in relational catalog for more details. For a fileset catalog, the drop operation is the same.
 
 :::note
-Currently, Gravitino doesn't support dropping a catalog with schema and filesets under it. You have
+Currently, Gravitino doesn't support dropping a catalog with schemas and filesets under it. You have
 to drop all the schemas and filesets under the catalog before dropping the catalog.
 :::
 
 ### List all catalogs in a metalake
 
 Please refer to [List all catalogs in a metalake](./manage-relational-metadata-using-gravitino.md#list-all-catalogs-in-a-metalake)
-from relational catalog for more details. For fileset catalog, the list operation is the same.
+in relational catalog for more details. For a fileset catalog, the list operation is the same.
 
 ### List all catalogs' information in a metalake
 
 Please refer to [List all catalogs' information in a metalake](./manage-relational-metadata-using-gravitino.md#list-all-catalogs-information-in-a-metalake)
-from relational catalog for more details. For fileset catalog, the list operation is the same.
+in relational catalog for more details. For a fileset catalog, the list operation is the same.
 
 ## Schema operations
 
-`Schema` is a virtual namespace in fileset catalog, which is used to organize the filesets. It
+`Schema` is a virtual namespace in a fileset catalog, which is used to organize the fileset. It
 is similar to the concept of `schema` in relational catalog.
 
 :::tip
@@ -184,35 +184,35 @@ Currently, Gravitino supports the following schema property:
 ### Load a schema
 
 Please refer to [Load a schema](./manage-relational-metadata-using-gravitino.md#load-a-schema)
-from relational catalog for more details. For fileset catalog, the schema load operation is the
+in relational catalog for more details. For a fileset catalog, the schema load operation is the
 same.
 
 ### Alter a schema
 
 Please refer to [Alter a schema](./manage-relational-metadata-using-gravitino.md#alter-a-schema)
-from relational catalog for more details. For fileset catalog, the schema alter operation is the
+in relational catalog for more details. For a fileset catalog, the schema alter operation is the
 same.
 
 ### Drop a schema
 
 Please refer to [Drop a schema](./manage-relational-metadata-using-gravitino.md#drop-a-schema)
-from relational catalog for more details. For fileset catalog, the schema drop operation is the
+in relational catalog for more details. For a fileset catalog, the schema drop operation is the
 same.
 
-Note that the drop operation will also remove all the filesets as well as the managed files
+Note that the drop operation will also remove all of the filesets as well as the managed files
 under this schema path if `cascade` is set to `true`.
 
 ### List all schemas under a catalog
 
 Please refer to [List all schemas under a catalog](./manage-relational-metadata-using-gravitino.md#list-all-schemas-under-a-catalog)
-from relational catalog for more details. For fileset catalog, the schema list operation is the
+in relational catalog for more details. For a fileset catalog, the schema list operation is the
 same.
 
 ## Fileset operations
 
 :::tip
- - Users should create a metalake, a catalog and a schema before creating a fileset.
- - Current Gravitino only supports managing Hadoop Compatible File System (HCFS) locations.
+ - Users should create a metalake, a catalog, and a schema before creating a fileset.
+ - Currently, Gravitino only supports managing Hadoop Compatible File System (HCFS) locations.
 :::
 
 ### Create a fileset
@@ -265,32 +265,32 @@ filesetCatalog.createFileset(
 </TabItem>
 </Tabs>
 
-Currently, Gravitino supports two **types** of the fileset:
+Currently, Gravitino supports two **types** of filesets:
 
- - `MANAGED`: The storage location of the fileset is managed by Gravitino, when specified as
+ - `MANAGED`: The storage location of the fileset is managed by Gravitino when specified as
    `MANAGED`, the physical location of the fileset will be deleted when this fileset is dropped.
  - `EXTERNAL`: The storage location of the fileset is **not** managed by Gravitino, when
-   specified as `EXTERNAL`, the physical location of the fileset will **not** be deleted when
-   this fileset is dropped.
+   specified as `EXTERNAL`, the files of the fileset will **not** be deleted when
+   the fileset is dropped.
 
 **storageLocation**
 
-The `storageLocation` is the physical location of the fileset, user can specify this location
-when creating a fileset, or follow the rule of the catalog/schema location if not specified.
+The `storageLocation` is the physical location of the fileset. Users can specify this location
+when creating a fileset, or follow the rules of the catalog/schema location if not specified.
 
-For `MANAGED` fileset, the storage location is:
+For a `MANAGED` fileset, the storage location is:
 
-1. The one specified by user in the fileset creation.
-2. When catalog property `location` is specified but schema property `location` is not specified,
-   the storage location is `catalog location/schema name/fileset name` if not specified.
-3. When catalog property `location` is not specified but schema property `location` is specified,
-   the storage location is `schema location/fileset name` if not specified.
-4. When both catalog property `location` and schema property `location` are specified, the storage
-   location is `schema location/fileset name` if not specified.
-5. When both catalog property `location` and schema property `location` are not specified, user
+1. The one specified by the user during the fileset creation.
+2. When the catalog property `location` is specified but the schema property `location` isn't specified,
+   the storage location is `catalog location/schema name/fileset name`.
+3. When the catalog property `location` isn't specified but the schema property `location` is specified,
+   the storage location is `schema location/fileset name`.
+4. When both the catalog property `location` and the schema property `location` are specified, the storage
+   location is `schema location/fileset name`.
+5. When both the catalog property `location` and schema property `location` isn't specified, the user
    should specify the `storageLocation` in the fileset creation.
 
-For `EXTERNAL` fileset, users should specify `storageLocation` during fileset creation,
+For `EXTERNAL` fileset, users should specify `storageLocation` during the fileset creation,
 otherwise, Gravitino will throw an exception.
 
 ### Alter a fileset
@@ -340,15 +340,15 @@ Currently, Gravitino supports the following changes to a fileset:
 
 | Supported modification             | JSON                                                         | Java                                          |
 |------------------------------------|--------------------------------------------------------------|-----------------------------------------------|
-| Rename fileset                     | `{"@type":"rename","newName":"fileset_renamed"}`             | `FilesetChange.rename("fileset_renamed")`     |
-| Update comment                     | `{"@type":"updateComment","newComment":"new_comment"}`       | `FilesetChange.updateComment("new_comment")`  |
+| Rename a fileset                     | `{"@type":"rename","newName":"fileset_renamed"}`             | `FilesetChange.rename("fileset_renamed")`     |
+| Update a comment                     | `{"@type":"updateComment","newComment":"new_comment"}`       | `FilesetChange.updateComment("new_comment")`  |
 | Set a fileset property             | `{"@type":"setProperty","property":"key1","value":"value1"}` | `FilesetChange.setProperty("key1", "value1")` |
 | Remove a fileset property          | `{"@type":"removeProperty","property":"key1"}`               | `FilesetChange.removeProperty("key1")`        |
 
 ### Drop a fileset
 
 You can remove a fileset by sending a `DELETE` request to the `/api/metalakes/{metalake_name}
-/catalogs/{catalog_name}/schemas/{schema_name}/filesets/{fileset_name}` endpoint or just use the
+/catalogs/{catalog_name}/schemas/{schema_name}/filesets/{fileset_name}` endpoint or by using the
 Gravitino Java client. The following is an example of dropping a fileset:
 
 <Tabs>
@@ -378,14 +378,14 @@ filesetCatalog.dropFileset(NameIdentifier.of("metalake", "catalog", "schema", "f
 </TabItem>
 </Tabs>
 
-For `MANAGED` fileset, the physical location of the fileset will be deleted when this fileset is
+For a `MANAGED` fileset, the physical location of the fileset will be deleted when this fileset is
 dropped. For `EXTERNAL` fileset, only the metadata of the fileset will be removed.
 
 ### List filesets
 
 You can list all filesets in a schema by sending a `GET` request to the `/api/metalakes/
-{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/filesets` endpoint or just use the
-Gravitino Java client. The following is an example of list all the filesets in a schema:
+{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/filesets` endpoint or by using the
+Gravitino Java client. The following is an example of listing all the filesets in a schema:
 
 <Tabs>
 <TabItem value="shell" label="Shell">

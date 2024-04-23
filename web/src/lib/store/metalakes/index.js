@@ -28,6 +28,7 @@ import {
 import { getSchemasApi, getSchemaDetailsApi } from '@/lib/api/schemas'
 import { getTablesApi, getTableDetailsApi } from '@/lib/api/tables'
 import { getFilesetsApi, getFilesetDetailsApi } from '@/lib/api/filesets'
+import { getTopicsApi, getTopicDetailsApi } from '@/lib/api/topics'
 
 export const fetchMetalakes = createAsyncThunk('appMetalakes/fetchMetalakes', async (params, { getState }) => {
   const [err, res] = await to(getMetalakesApi())
@@ -136,7 +137,7 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
           children: []
         }
       })
-    } else if (pathArr.length === 4 && type !== 'fileset') {
+    } else if (pathArr.length === 4 && type === 'relational') {
       const [err, res] = await to(getTablesApi({ metalake, catalog, schema }))
 
       const { identifiers = [] } = res
@@ -177,6 +178,27 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
           path: `?${new URLSearchParams({ metalake, catalog, type, schema, fileset: filesetItem.name }).toString()}`,
           name: filesetItem.name,
           title: filesetItem.name,
+          isLeaf: true
+        }
+      })
+    } else if (pathArr.length === 4 && type === 'messaging') {
+      const [err, res] = await to(getTopicsApi({ metalake, catalog, schema }))
+
+      const { identifiers = [] } = res
+
+      if (err || !res) {
+        throw new Error(err)
+      }
+
+      result.data = identifiers.map(topicItem => {
+        return {
+          ...topicItem,
+          node: 'topic',
+          id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${topicItem.name}}}`,
+          key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${topicItem.name}}}`,
+          path: `?${new URLSearchParams({ metalake, catalog, type, schema, topic: topicItem.name }).toString()}`,
+          name: topicItem.name,
+          title: topicItem.name,
           isLeaf: true
         }
       })
@@ -470,10 +492,6 @@ export const fetchSchemas = createAsyncThunk(
       )
     }
 
-    if (getState().metalakes.metalakeTree.length === 0) {
-      dispatch(fetchCatalogs({ metalake }))
-    }
-
     dispatch(setExpandedNodes([`{{${metalake}}}`, `{{${metalake}}}{{${catalog}}}{{${type}}}`]))
 
     return { schemas, page, init }
@@ -545,10 +563,6 @@ export const fetchTables = createAsyncThunk(
       )
     }
 
-    if (getState().metalakes.metalakeTree.length === 0) {
-      dispatch(fetchCatalogs({ metalake }))
-    }
-
     dispatch(
       setExpandedNodes([
         `{{${metalake}}}`,
@@ -578,9 +592,93 @@ export const getTableDetails = createAsyncThunk(
 
     const { table: resTable } = res
 
-    if (getState().metalakes.metalakeTree.length === 0) {
-      dispatch(fetchCatalogs({ metalake }))
-    }
+    const { distribution, sortOrders = [], partitioning = [], indexes = [] } = resTable
+
+    const tableProps = [
+      {
+        type: 'partitioning',
+        icon: 'tabler:circle-letter-p-filled',
+        items: partitioning.map(i => {
+          let fields = i.fieldName || []
+          let sub = ''
+          let last = i.fieldName
+
+          switch (i.strategy) {
+            case 'bucket':
+              sub = `[${i.numBuckets}]`
+              fields = i.fieldNames
+              last = i.fieldNames.map(v => v[0]).join(',')
+              break
+            case 'truncate':
+              sub = `[${i.width}]`
+              break
+            case 'list':
+              fields = i.fieldNames
+              last = i.fieldNames.map(v => v[0]).join(',')
+              break
+            case 'function':
+              sub = `[${i.funcName}]`
+              fields = i.funcArgs.map(v => v.fieldName)
+              last = fields.join(',')
+              break
+            default:
+              break
+          }
+
+          return {
+            strategy: i.strategy,
+            numBuckets: i.numBuckets,
+            width: i.width,
+            funcName: i.funcName,
+            fields,
+            text: `${i.strategy}${sub}(${last})`
+          }
+        })
+      },
+      {
+        type: 'sortOrders',
+        icon: 'mdi:letter-s-circle',
+        items: sortOrders.map(i => {
+          return {
+            fields: i.sortTerm.fieldName,
+            dir: i.direction,
+            no: i.nullOrdering,
+            text: `${i.sortTerm.fieldName[0]} ${i.direction} ${i.nullOrdering}`
+          }
+        })
+      },
+      {
+        type: 'distribution',
+        icon: 'tabler:circle-letter-d-filled',
+        items: distribution.funcArgs.map(i => {
+          return {
+            fields: i.fieldName,
+            number: distribution.number,
+            strategy: distribution.strategy,
+            text:
+              distribution.strategy === ''
+                ? ``
+                : `${distribution.strategy}${
+                    distribution.number === 0 ? '' : `[${distribution.number}]`
+                  }(${i.fieldName.join(',')})`
+          }
+        })
+      },
+      {
+        type: 'indexes',
+        icon: 'mdi:letter-i-circle',
+        items: indexes.map(i => {
+          return {
+            fields: i.fieldNames,
+            name: i.name,
+            indexType: i.indexType,
+            text: `${i.name}(${i.fieldNames.map(v => v.join('.')).join(',')})`
+          }
+        })
+      }
+    ]
+
+    dispatch(setTableProps(tableProps))
 
     dispatch(
       setExpandedNodes([
@@ -643,10 +741,6 @@ export const fetchFilesets = createAsyncThunk(
       )
     }
 
-    if (getState().metalakes.metalakeTree.length === 0) {
-      dispatch(fetchCatalogs({ metalake }))
-    }
-
     dispatch(
       setExpandedNodes([
         `{{${metalake}}}`,
@@ -676,10 +770,6 @@ export const getFilesetDetails = createAsyncThunk(
 
     const { fileset: resFileset } = res
 
-    if (getState().metalakes.metalakeTree.length === 0) {
-      dispatch(fetchCatalogs({ metalake }))
-    }
-
     dispatch(
       setExpandedNodes([
         `{{${metalake}}}`,
@@ -692,17 +782,109 @@ export const getFilesetDetails = createAsyncThunk(
   }
 )
 
+export const fetchTopics = createAsyncThunk(
+  'appMetalakes/fetchTopics',
+  async ({ init, page, metalake, catalog, schema }, { getState, dispatch }) => {
+    if (init) {
+      dispatch(setTableLoading(true))
+    }
+
+    const [err, res] = await to(getTopicsApi({ metalake, catalog, schema }))
+    dispatch(setTableLoading(false))
+
+    if (init && (err || !res)) {
+      dispatch(resetTableData())
+      throw new Error(err)
+    }
+
+    const { identifiers = [] } = res
+
+    const topics = identifiers.map(topic => {
+      return {
+        ...topic,
+        node: 'topic',
+        id: `{{${metalake}}}{{${catalog}}}{{${'messaging'}}}{{${schema}}}{{${topic.name}}}`,
+        key: `{{${metalake}}}{{${catalog}}}{{${'messaging'}}}{{${schema}}}{{${topic.name}}}`,
+        path: `?${new URLSearchParams({
+          metalake,
+          catalog,
+          type: 'messaging',
+          schema,
+          topic: topic.name
+        }).toString()}`,
+        name: topic.name,
+        title: topic.name,
+        isLeaf: true
+      }
+    })
+
+    if (
+      init &&
+      getState().metalakes.loadedNodes.includes(`{{${metalake}}}{{${catalog}}}{{${'messaging'}}}{{${schema}}}`)
+    ) {
+      dispatch(
+        setIntoTreeNodes({
+          key: `{{${metalake}}}{{${catalog}}}{{${'messaging'}}}{{${schema}}}`,
+          data: topics,
+          tree: getState().metalakes.metalakeTree
+        })
+      )
+    }
+
+    dispatch(
+      setExpandedNodes([
+        `{{${metalake}}}`,
+        `{{${metalake}}}{{${catalog}}}{{${'messaging'}}}`,
+        `{{${metalake}}}{{${catalog}}}{{${'messaging'}}}{{${schema}}}`
+      ])
+    )
+
+    return { topics, page, init }
+  }
+)
+
+export const getTopicDetails = createAsyncThunk(
+  'appMetalakes/getTopicDetails',
+  async ({ init, metalake, catalog, schema, topic }, { getState, dispatch }) => {
+    dispatch(resetTableData())
+    if (init) {
+      dispatch(setTableLoading(true))
+    }
+    const [err, res] = await to(getTopicDetailsApi({ metalake, catalog, schema, topic }))
+    dispatch(setTableLoading(false))
+
+    if (err || !res) {
+      dispatch(resetTableData())
+      throw new Error(err)
+    }
+
+    const { topic: resTopic } = res
+
+    dispatch(
+      setExpandedNodes([
+        `{{${metalake}}}`,
+        `{{${metalake}}}{{${catalog}}}{{${'messaging'}}}`,
+        `{{${metalake}}}{{${catalog}}}{{${'messaging'}}}{{${schema}}}`
+      ])
+    )
+
+    return resTopic
+  }
+)
+
 export const appMetalakesSlice = createSlice({
   name: 'appMetalakes',
   initialState: {
     metalakes: [],
     filteredMetalakes: [],
     tableData: [],
+    tableProps: [],
     catalogs: [],
     schemas: [],
     tables: [],
     columns: [],
     filesets: [],
+    topics: [],
     metalakeTree: [],
     loadedNodes: [],
     selectedNodes: [],
@@ -749,11 +931,13 @@ export const appMetalakesSlice = createSlice({
       state.loadedNodes = []
 
       state.tableData = []
+      state.tableProps = []
       state.catalogs = []
       state.schemas = []
       state.tables = []
       state.columns = []
       state.filesets = []
+      state.topics = []
     },
     setTableLoading(state, action) {
       state.tableLoading = action.payload
@@ -776,6 +960,9 @@ export const appMetalakesSlice = createSlice({
     removeCatalogFromTree(state, action) {
       state.metalakeTree = state.metalakeTree.filter(i => i.key !== action.payload)
     },
+    setTableProps(state, action) {
+      state.tableProps = action.payload
+    },
     resetMetalakeStore(state, action) {}
   },
   extraReducers: builder => {
@@ -787,6 +974,7 @@ export const appMetalakesSlice = createSlice({
     })
     builder.addCase(setIntoTreeNodeWithFetch.fulfilled, (state, action) => {
       const { key, data, tree } = action.payload
+
       state.metalakeTree = updateTreeData(tree, key, data)
     })
     builder.addCase(setIntoTreeNodeWithFetch.rejected, (state, action) => {
@@ -874,6 +1062,22 @@ export const appMetalakesSlice = createSlice({
     builder.addCase(getFilesetDetails.rejected, (state, action) => {
       toast.error(action.error.message)
     })
+    builder.addCase(fetchTopics.fulfilled, (state, action) => {
+      state.topics = action.payload.topics
+      if (action.payload.init) {
+        state.tableData = action.payload.topics
+      }
+    })
+    builder.addCase(fetchTopics.rejected, (state, action) => {
+      toast.error(action.error.message)
+    })
+    builder.addCase(getTopicDetails.fulfilled, (state, action) => {
+      state.activatedDetails = action.payload
+      state.tableData = []
+    })
+    builder.addCase(getTopicDetails.rejected, (state, action) => {
+      toast.error(action.error.message)
+    })
   }
 })
 
@@ -893,7 +1097,8 @@ export const {
   setExpanded,
   setExpandedNodes,
   addCatalogToTree,
-  removeCatalogFromTree
+  removeCatalogFromTree,
+  setTableProps
 } = appMetalakesSlice.actions
 
 export default appMetalakesSlice.reducer

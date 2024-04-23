@@ -3,12 +3,30 @@
  * This software is licensed under the Apache License version 2.
  */
 
-export const providers = [
+export const filesetProviders = [
   {
     label: 'hadoop',
     value: 'hadoop',
     defaultProps: []
-  },
+  }
+]
+
+export const messagingProviders = [
+  {
+    label: 'kafka',
+    value: 'kafka',
+    defaultProps: [
+      {
+        key: 'bootstrap.servers',
+        value: '',
+        required: true,
+        description: 'The Kafka broker(s) to connect to, allowing for multiple brokers by comma-separating them'
+      }
+    ]
+  }
+]
+
+export const providers = [
   {
     label: 'hive',
     value: 'hive',
@@ -121,6 +139,34 @@ export const providers = [
       },
       {
         key: 'jdbc-database',
+        value: '',
+        required: true
+      }
+    ]
+  },
+  {
+    label: 'doris',
+    value: 'jdbc-doris',
+    defaultProps: [
+      {
+        key: 'jdbc-driver',
+        value: '',
+        required: true,
+        description: 'e.g. com.mysql.jdbc.Driver'
+      },
+      {
+        key: 'jdbc-url',
+        value: '',
+        required: true,
+        description: 'e.g. jdbc:mysql://localhost:9030'
+      },
+      {
+        key: 'jdbc-user',
+        value: '',
+        required: true
+      },
+      {
+        key: 'jdbc-password',
         value: '',
         required: true
       }

@@ -10,10 +10,15 @@ import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.FilesetVersionMapper;
+import com.datastrato.gravitino.storage.relational.mapper.GroupMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import com.datastrato.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.RoleMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.TableMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.TopicMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.UserMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.UserRoleRelMapper;
 import com.google.common.base.Preconditions;
 import java.sql.SQLException;
 import java.time.Duration;
@@ -86,6 +91,11 @@ public class SqlSessionFactoryHelper {
     configuration.addMapper(FilesetMetaMapper.class);
     configuration.addMapper(FilesetVersionMapper.class);
     configuration.addMapper(TopicMetaMapper.class);
+    configuration.addMapper(UserMetaMapper.class);
+    configuration.addMapper(RoleMetaMapper.class);
+    configuration.addMapper(UserRoleRelMapper.class);
+    configuration.addMapper(GroupMetaMapper.class);
+    configuration.addMapper(GroupRoleRelMapper.class);
 
     // Create the SqlSessionFactory object, it is a singleton object
     if (sqlSessionFactory == null) {

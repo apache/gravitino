@@ -105,13 +105,25 @@ message Topic {
 message User {
   uint64 id = 1;
   string name = 2;
-  repeated string roles = 3;
-  AuditInfo audit_info = 4;
+  repeated string role_names = 3;
+  repeated uint64 role_ids = 4;
+  AuditInfo audit_info = 5;
 }
 
 message Group {
   uint64 id = 1;
   string name = 2;
-  repeated string roles = 3;
-  AuditInfo audit_info = 4;
+  repeated string role_names = 3;
+  repeated uint64 role_ids = 4;
+  AuditInfo audit_info = 5;
+}
+
+message Role {
+  uint64 id = 1;
+  string name = 2;
+  repeated string privileges = 3;
+  string securable_object_full_name = 4;
+  string securable_object_type = 5;
+  map<string, string> properties = 6;
+  AuditInfo audit_info = 7;
 }

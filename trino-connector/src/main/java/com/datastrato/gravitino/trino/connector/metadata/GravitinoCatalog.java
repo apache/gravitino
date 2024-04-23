@@ -32,8 +32,8 @@ public class GravitinoCatalog {
     return catalog.name();
   }
 
-  public String getFullName() {
-    return metalake + "." + catalog.name();
+  public String getMetalake() {
+    return metalake;
   }
 
   public NameIdentifier geNameIdentifier() {

@@ -12,11 +12,16 @@ import { Link as MUILink, Breadcrumbs, Typography, Tooltip, styled } from '@mui/
 
 import Icon from '@/components/Icon'
 
-const Text = styled(Typography)(({ theme }) => ({
-  maxWidth: '120px',
+const TextWrapper = styled(Typography)(({ theme }) => ({
+  mixWidth: '120px',
   overflow: 'hidden',
-  textOverflow: 'ellipsis'
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap'
 }))
+
+const Text = props => {
+  return <TextWrapper component='span' {...props} />
+}
 
 const MetalakePath = props => {
   const searchParams = useSearchParams()
@@ -27,16 +32,18 @@ const MetalakePath = props => {
     type: searchParams.get('type'),
     schema: searchParams.get('schema'),
     table: searchParams.get('table'),
-    fileset: searchParams.get('fileset')
+    fileset: searchParams.get('fileset'),
+    topic: searchParams.get('topic')
   }
 
-  const { metalake, catalog, type, schema, table, fileset } = routeParams
+  const { metalake, catalog, type, schema, table, fileset, topic } = routeParams
 
   const metalakeUrl = `?metalake=${metalake}`
   const catalogUrl = `?metalake=${metalake}&catalog=${catalog}&type=${type}`
   const schemaUrl = `?metalake=${metalake}&catalog=${catalog}&type=${type}&schema=${schema}`
   const tableUrl = `?metalake=${metalake}&catalog=${catalog}&type=${type}&schema=${schema}&table=${table}`
   const filesetUrl = `?metalake=${metalake}&catalog=${catalog}&type=${type}&schema=${schema}&fileset=${fileset}`
+  const topicUrl = `?metalake=${metalake}&catalog=${catalog}&type=${type}&schema=${schema}&topic=${topic}`
 
   const handleClick = (event, path) => {
     path === `?${searchParams.toString()}` && event.preventDefault()
@@ -45,10 +52,26 @@ const MetalakePath = props => {
   return (
     <Breadcrumbs
       sx={{
+        width: 'calc(100% - 48px)',
+        overflow: 'hidden',
         mt: 0,
         '& a': { display: 'flex', alignItems: 'center' },
+        '& ol': {
+          flexWrap: 'nowrap'
+        },
+        '& ol > li.MuiBreadcrumbs-li': {
+          overflow: 'hidden',
+          display: 'inline-flex',
+          '& > a': {
+            width: '100%',
+            '& > svg': {
+              minWidth: 20
+            }
+          }
+        },
         '& ol > li:last-of-type': {
-          color: theme => `${theme.palette.text.primary} !important`
+          color: theme => `${theme.palette.text.primary} !important`,
+          overflow: 'hidden'
         }
       }}
     >
@@ -104,6 +127,14 @@ const MetalakePath = props => {
           >
             <Icon icon='bx:file' fontSize={20} />
             <Text>{fileset}</Text>
+          </MUILink>
+        </Tooltip>
+      )}
+      {topic && (
+        <Tooltip title={topic} placement='top'>
+          <MUILink component={Link} href={topicUrl} onClick={event => handleClick(event, topicUrl)} underline='hover'>
+            <Icon icon='bx:file' fontSize={20} />
+            <Text>{topic}</Text>
           </MUILink>
         </Tooltip>
       )}

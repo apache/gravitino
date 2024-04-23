@@ -6,13 +6,21 @@
 package com.datastrato.gravitino.client;
 
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Version;
 import com.datastrato.gravitino.dto.responses.MetalakeResponse;
 import com.datastrato.gravitino.dto.responses.VersionResponse;
+import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
+import com.datastrato.gravitino.json.JsonUtils;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.ImmutableMap;
+import com.google.errorprone.annotations.InlineMe;
 import java.io.Closeable;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collections;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,13 +45,61 @@ public abstract class GravitinoClientBase implements Closeable {
    *
    * @param uri The base URI for the Gravitino API.
    * @param authDataProvider The provider of the data which is used for authentication.
+   * @param checkVersion Whether to check the version of the Gravitino server.
+   * @param headers The base header of the Gravitino API.
    */
-  protected GravitinoClientBase(String uri, AuthDataProvider authDataProvider) {
-    this.restClient =
-        HTTPClient.builder(Collections.emptyMap())
-            .uri(uri)
-            .withAuthDataProvider(authDataProvider)
-            .build();
+  protected GravitinoClientBase(
+      String uri,
+      AuthDataProvider authDataProvider,
+      boolean checkVersion,
+      Map<String, String> headers) {
+    ObjectMapper mapper = JsonUtils.objectMapper();
+    mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+
+    if (checkVersion) {
+      this.restClient =
+          HTTPClient.builder(Collections.emptyMap())
+              .uri(uri)
+              .withAuthDataProvider(authDataProvider)
+              .withObjectMapper(mapper)
+              .withPreConnectHandler(this::checkVersion)
+              .withHeaders(headers)
+              .build();
+
+    } else {
+      this.restClient =
+          HTTPClient.builder(Collections.emptyMap())
+              .uri(uri)
+              .withAuthDataProvider(authDataProvider)
+              .withObjectMapper(mapper)
+              .withHeaders(headers)
+              .build();
+    }
+  }
+
+  /**
+   * Check the compatibility of the client with the target server.
+   *
+   * @throws GravitinoRuntimeException If the client version is greater than the server version.
+   */
+  public void checkVersion() {
+    GravitinoVersion serverVersion = serverVersion();
+    GravitinoVersion clientVersion = clientVersion();
+    if (clientVersion.compareTo(serverVersion) > 0) {
+      throw new GravitinoRuntimeException(
+          "Gravitino does not support the case that the client-side version is higher than the server-side version."
+              + "The client version is %s, and the server version %s",
+          clientVersion.version(), serverVersion.version());
+    }
+  }
+
+  /**
+   * Retrieves the version of the Gravitino client.
+   *
+   * @return A GravitinoVersion instance representing the version of the Gravitino client.
+   */
+  public GravitinoVersion clientVersion() {
+    return new GravitinoVersion(Version.getCurrentVersionDTO());
   }
 
   /**
@@ -72,7 +128,18 @@ public abstract class GravitinoClientBase implements Closeable {
    *
    * @return A GravitinoVersion instance representing the version of the Gravitino API.
    */
-  public GravitinoVersion getVersion() {
+  @Deprecated
+  @InlineMe(replacement = "this.serverVersion()")
+  public final GravitinoVersion getVersion() {
+    return serverVersion();
+  }
+
+  /**
+   * Retrieves the server version of the Gravitino server.
+   *
+   * @return A GravitinoVersion instance representing the server version of the Gravitino API.
+   */
+  public GravitinoVersion serverVersion() {
     VersionResponse resp =
         restClient.get(
             "api/version",
@@ -103,6 +170,10 @@ public abstract class GravitinoClientBase implements Closeable {
     protected String uri;
     /** The authentication provider. */
     protected AuthDataProvider authDataProvider;
+    /** The check version flag. */
+    protected boolean checkVersion = true;
+    /** The request base header for the Gravitino API. */
+    protected Map<String, String> headers = ImmutableMap.of();
 
     /**
      * The constructor for the Builder class.
@@ -120,6 +191,16 @@ public abstract class GravitinoClientBase implements Closeable {
      */
     public Builder<T> withSimpleAuth() {
       this.authDataProvider = new SimpleTokenProvider();
+      return this;
+    }
+
+    /**
+     * Optional, set a flag to verify the client is supported to connector the server
+     *
+     * @return This Builder instance for method chaining.
+     */
+    public Builder<T> withVersionCheckDisabled() {
+      this.checkVersion = false;
       return this;
     }
 
@@ -151,6 +232,19 @@ public abstract class GravitinoClientBase implements Closeable {
         throw new IllegalArgumentException("URI has the wrong format", ue);
       }
       this.authDataProvider = dataProvider;
+      return this;
+    }
+
+    /**
+     * Set base header for Gravitino Client.
+     *
+     * @param headers the base header.
+     * @return This Builder instance for method chaining.
+     */
+    public Builder<T> withHeaders(Map<String, String> headers) {
+      if (headers != null) {
+        this.headers = ImmutableMap.copyOf(headers);
+      }
       return this;
     }
 

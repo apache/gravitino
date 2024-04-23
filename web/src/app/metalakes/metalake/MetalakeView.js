@@ -9,7 +9,7 @@ import { useEffect } from 'react'
 
 import { Box } from '@mui/material'
 
-import { useAppDispatch } from '@/lib/hooks/useStore'
+import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
 import { useSearchParams } from 'next/navigation'
 import MetalakePageLeftBar from './MetalakePageLeftBar'
 import RightContent from './rightContent/RightContent'
@@ -19,19 +19,21 @@ import {
   fetchSchemas,
   fetchTables,
   fetchFilesets,
+  fetchTopics,
   getMetalakeDetails,
   getCatalogDetails,
   getSchemaDetails,
   getTableDetails,
   getFilesetDetails,
+  getTopicDetails,
   setSelectedNodes
 } from '@/lib/store/metalakes'
 
 const MetalakeView = () => {
   const dispatch = useAppDispatch()
   const searchParams = useSearchParams()
-
   const paramsSize = [...searchParams.keys()].length
+  const store = useAppSelector(state => state.metalakes)
 
   useEffect(() => {
     const routeParams = {
@@ -40,10 +42,11 @@ const MetalakeView = () => {
       type: searchParams.get('type'),
       schema: searchParams.get('schema'),
       table: searchParams.get('table'),
-      fileset: searchParams.get('fileset')
+      fileset: searchParams.get('fileset'),
+      topic: searchParams.get('topic')
     }
     if ([...searchParams.keys()].length) {
-      const { metalake, catalog, type, schema, table, fileset } = routeParams
+      const { metalake, catalog, type, schema, table, fileset, topic } = routeParams
 
       if (paramsSize === 1 && metalake) {
         dispatch(fetchCatalogs({ init: true, page: 'metalakes', metalake }))
@@ -51,25 +54,48 @@ const MetalakeView = () => {
       }
 
       if (paramsSize === 3 && catalog) {
+        if (!store.catalogs.length) {
+          dispatch(fetchCatalogs({ metalake }))
+        }
         dispatch(fetchSchemas({ init: true, page: 'catalogs', metalake, catalog, type }))
         dispatch(getCatalogDetails({ metalake, catalog, type }))
       }
 
       if (paramsSize === 4 && catalog && type && schema) {
-        if (type === 'fileset') {
-          dispatch(fetchFilesets({ init: true, page: 'schemas', metalake, catalog, schema }))
-        } else {
-          dispatch(fetchTables({ init: true, page: 'schemas', metalake, catalog, schema }))
+        if (!store.catalogs.length) {
+          dispatch(fetchCatalogs({ metalake }))
+          dispatch(fetchSchemas({ metalake, catalog, type }))
+        }
+        switch (type) {
+          case 'relational':
+            dispatch(fetchTables({ init: true, page: 'schemas', metalake, catalog, schema }))
+            break
+          case 'fileset':
+            dispatch(fetchFilesets({ init: true, page: 'schemas', metalake, catalog, schema }))
+            break
+          case 'messaging':
+            dispatch(fetchTopics({ init: true, page: 'schemas', metalake, catalog, schema }))
+            break
+          default:
+            break
         }
         dispatch(getSchemaDetails({ metalake, catalog, schema }))
       }
 
-      if (paramsSize === 5 && catalog && schema && table) {
-        dispatch(getTableDetails({ init: true, metalake, catalog, schema, table }))
-      }
-
-      if (paramsSize === 5 && catalog && schema && fileset) {
-        dispatch(getFilesetDetails({ init: true, metalake, catalog, schema, fileset }))
+      if (paramsSize === 5 && catalog && schema) {
+        if (!store.catalogs.length) {
+          dispatch(fetchCatalogs({ metalake }))
+          dispatch(fetchSchemas({ metalake, catalog, type }))
+        }
+        if (table) {
+          dispatch(getTableDetails({ init: true, metalake, catalog, schema, table }))
+        }
+        if (fileset) {
+          dispatch(getFilesetDetails({ init: true, metalake, catalog, schema, fileset }))
+        }
+        if (topic) {
+          dispatch(getTopicDetails({ init: true, metalake, catalog, schema, topic }))
+        }
       }
     }
 
@@ -81,7 +107,7 @@ const MetalakeView = () => {
                 routeParams.schema ? `{{${routeParams.schema}}}` : ''
               }${routeParams.table ? `{{${routeParams.table}}}` : ''}${
                 routeParams.fileset ? `{{${routeParams.fileset}}}` : ''
-              }`
+              }${routeParams.topic ? `{{${routeParams.topic}}}` : ''}`
             ]
           : []
       )

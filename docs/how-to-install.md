@@ -43,8 +43,14 @@ The Gravitino binary distribution package contains the following files:
     |   └── log4j2.properties       # log4j configuration for the Gravitino server.
     |── libs/                       # Gravitino server dependencies libraries.
     |── logs/                       # Gravitino server logs. Automatically created after the Gravitino server starts.
-    └── data/                       # Default directory for the Gravitino server to store data.
+    |── data/                       # Default directory for the Gravitino server to store data.
+    └── scripts/                    # Extra scripts for Gravitino.
 ```
+
+#### Initialize the RDBMS (Optional)
+
+If you want to use the relational backend storage, you need to initialize the RDBMS firstly. For
+the details on how to initialize the RDBMS, please check [How to use relational backend storage](./how-to-use-relational-backend-storage.md).
 
 #### Configure the Gravitino server
 

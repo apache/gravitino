@@ -23,7 +23,7 @@ public class TestPostgreSqlAbstractIT extends TestJdbcAbstractIT {
   public static final String DEFAULT_POSTGRES_IMAGE = "postgres:13";
 
   @BeforeAll
-  public static void startup() {
+  public static void startup() throws Exception {
     CONTAINER =
         new PostgreSQLContainer<>(DEFAULT_POSTGRES_IMAGE)
             .withDatabaseName(TEST_DB_NAME)

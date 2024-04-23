@@ -2,43 +2,40 @@
 Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
-from abc import abstractmethod, ABC
+from abc import abstractmethod
 from dataclasses import dataclass, field
 
-from dataclasses_json import config, DataClassJsonMixin
+from dataclasses_json import config
 
-from gravitino.meta_change import MetalakeChange
+from gravitino.api.metalake_change import MetalakeChange
+from gravitino.rest.rest_message import RESTRequest
 
 
 @dataclass
-class MetalakeUpdateRequestType(DataClassJsonMixin):
+class MetalakeUpdateRequestBase(RESTRequest):
     type: str = field(metadata=config(field_name='@type'))
 
     def __init__(self, type: str):
         self.type = type
 
-
-class MetalakeUpdateRequest:
-    """Represents an interface for Metalake update requests."""
-
-    @abstractmethod
-    def validate(self):
-        pass
-
     @abstractmethod
     def metalake_change(self):
         pass
 
+
+class MetalakeUpdateRequest:
+    """Represents an interface for Metalake update requests."""
+
     @dataclass
-    class RenameMetalakeRequest(MetalakeUpdateRequestType):
+    class RenameMetalakeRequest(MetalakeUpdateRequestBase):
         """Represents a request to rename a Metalake."""
 
-        newName: str = None
+        new_name: str = field(metadata=config(field_name='newName'))
         """The new name for the Metalake."""
 
-        def __init__(self, newName: str):
+        def __init__(self, new_name: str):
             super().__init__("rename")
-            self.newName = newName
+            self.new_name = new_name
 
         def validate(self):
             """Validates the fields of the request.
@@ -46,22 +43,22 @@ class MetalakeUpdateRequest:
             Raises:
                 IllegalArgumentException if the new name is not set.
             """
-            if not self.newName:
+            if not self.new_name:
                 raise ValueError('"newName" field is required and cannot be empty')
 
         def metalake_change(self):
-            return MetalakeChange.rename(self.newName)
+            return MetalakeChange.rename(self.new_name)
 
     @dataclass
-    class UpdateMetalakeCommentRequest(MetalakeUpdateRequestType):
+    class UpdateMetalakeCommentRequest(MetalakeUpdateRequestBase):
         """Represents a request to update the comment on a Metalake."""
 
-        newComment: str = None
+        new_comment: str = field(metadata=config(field_name='newComment'))
         """The new comment for the Metalake."""
 
-        def __init__(self, newComment: str):
+        def __init__(self, new_comment: str):
             super().__init__("updateComment")
-            self.newComment = newComment
+            self.new_comment = new_comment
 
         def validate(self):
             """Validates the fields of the request.
@@ -69,14 +66,14 @@ class MetalakeUpdateRequest:
             Raises:
                 IllegalArgumentException if the new comment is not set.
             """
-            if not self.newComment:
+            if not self.new_comment:
                 raise ValueError('"newComment" field is required and cannot be empty')
 
         def metalake_change(self):
-            return MetalakeChange.update_comment(self.newComment)
+            return MetalakeChange.update_comment(self.new_comment)
 
     @dataclass
-    class SetMetalakePropertyRequest(MetalakeUpdateRequestType):
+    class SetMetalakePropertyRequest(MetalakeUpdateRequestBase):
         """Represents a request to set a property on a Metalake."""
 
         property: str = None
@@ -105,7 +102,7 @@ class MetalakeUpdateRequest:
             return MetalakeChange.set_property(self.property, self.value)
 
     @dataclass
-    class RemoveMetalakePropertyRequest(MetalakeUpdateRequestType):
+    class RemoveMetalakePropertyRequest(MetalakeUpdateRequestBase):
         """Represents a request to remove a property from a Metalake."""
 
         property: str = None

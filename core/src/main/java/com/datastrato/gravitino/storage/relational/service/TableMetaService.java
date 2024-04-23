@@ -102,7 +102,7 @@ public class TableMetaService {
             }
           });
     } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLConstraintException(
+      ExceptionUtils.checkSQLException(
           re, Entity.EntityType.TABLE, tableEntity.nameIdentifier().toString());
       throw re;
     }
@@ -135,7 +135,7 @@ public class TableMetaService {
                   mapper.updateTableMeta(
                       POConverters.updateTablePOWithVersion(oldTablePO, newEntity), oldTablePO));
     } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLConstraintException(
+      ExceptionUtils.checkSQLException(
           re, Entity.EntityType.TABLE, newEntity.nameIdentifier().toString());
       throw re;
     }
@@ -161,6 +161,14 @@ public class TableMetaService {
         TableMetaMapper.class, mapper -> mapper.softDeleteTableMetasByTableId(tableId));
 
     return true;
+  }
+
+  public int deleteTableMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
+    return SessionUtils.doWithCommitAndFetchResult(
+        TableMetaMapper.class,
+        mapper -> {
+          return mapper.deleteTableMetasByLegacyTimeLine(legacyTimeLine, limit);
+        });
   }
 
   private void fillTablePOBuilderParentEntityId(TablePO.Builder builder, Namespace namespace) {

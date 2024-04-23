@@ -12,7 +12,6 @@ import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
-import com.datastrato.gravitino.connector.BasePropertiesMetadata;
 import com.datastrato.gravitino.connector.CatalogInfo;
 import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.PropertiesMetadata;
@@ -36,7 +35,6 @@ import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
@@ -225,7 +223,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
             // managed fileset, Gravitino will get and store the location based on the
             // catalog/schema's location and store it to the store.
             .withStorageLocation(filesetPath.toString())
-            .withProperties(addManagedFlagToProperties(properties))
+            .withProperties(properties)
             .withAuditInfo(
                 AuditInfo.builder()
                     .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
@@ -372,7 +370,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
             .withId(stringId.id())
             .withNamespace(ident.namespace())
             .withComment(comment)
-            .withProperties(addManagedFlagToProperties(properties))
+            .withProperties(properties)
             .withAuditInfo(
                 AuditInfo.builder()
                     .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
@@ -461,13 +459,13 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       Path schemaPath = getSchemaPath(ident.name(), properties);
       // Nothing to delete if the schema path is not set.
       if (schemaPath == null) {
-        return true;
+        return false;
       }
 
       FileSystem fs = schemaPath.getFileSystem(hadoopConf);
       // Nothing to delete if the schema path does not exist.
       if (!fs.exists(schemaPath)) {
-        return true;
+        return false;
       }
 
       if (fs.listStatus(schemaPath).length > 0 && !cascade) {
@@ -514,13 +512,6 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   @Override
   public void close() throws IOException {}
-
-  private Map<String, String> addManagedFlagToProperties(Map<String, String> properties) {
-    return ImmutableMap.<String, String>builder()
-        .putAll(properties)
-        .put(BasePropertiesMetadata.GRAVITINO_MANAGED_ENTITY, Boolean.TRUE.toString())
-        .build();
-  }
 
   private SchemaEntity updateSchemaEntity(
       NameIdentifier ident, SchemaEntity schemaEntity, SchemaChange... changes) {

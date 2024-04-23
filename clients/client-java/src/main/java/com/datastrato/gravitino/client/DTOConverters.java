@@ -9,9 +9,11 @@ import static com.datastrato.gravitino.dto.util.DTOConverters.toFunctionArg;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.MetalakeChange;
+import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
+import com.datastrato.gravitino.dto.authorization.SecurableObjectDTO;
 import com.datastrato.gravitino.dto.requests.CatalogUpdateRequest;
 import com.datastrato.gravitino.dto.requests.FilesetUpdateRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeUpdateRequest;
@@ -270,5 +272,12 @@ class DTOConverters {
       throw new IllegalArgumentException(
           "Unknown column change type: " + change.getClass().getSimpleName());
     }
+  }
+
+  static SecurableObjectDTO toSecurableObject(SecurableObject securableObject) {
+    return SecurableObjectDTO.builder()
+        .withFullName(securableObject.fullName())
+        .withType(securableObject.type())
+        .build();
   }
 }

@@ -18,10 +18,15 @@ import javax.ws.rs.NotSupportedException;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
+import org.apache.spark.sql.connector.expressions.ApplyTransform;
 import org.apache.spark.sql.connector.expressions.BucketTransform;
+import org.apache.spark.sql.connector.expressions.DaysTransform;
+import org.apache.spark.sql.connector.expressions.HoursTransform;
 import org.apache.spark.sql.connector.expressions.IdentityTransform;
+import org.apache.spark.sql.connector.expressions.MonthsTransform;
 import org.apache.spark.sql.connector.expressions.SortedBucketTransform;
 import org.apache.spark.sql.connector.expressions.Transform;
+import org.apache.spark.sql.connector.expressions.YearsTransform;
 import org.apache.spark.sql.types.DataType;
 import org.junit.jupiter.api.Assertions;
 
@@ -69,10 +74,17 @@ public class SparkTableInfo {
   void addPartition(Transform partition) {
     if (partition instanceof IdentityTransform) {
       partitionColumnNames.add(((IdentityTransform) partition).reference().fieldNames()[0]);
+      this.partitions.add(partition);
+    } else if (partition instanceof BucketTransform
+        || partition instanceof HoursTransform
+        || partition instanceof DaysTransform
+        || partition instanceof MonthsTransform
+        || partition instanceof YearsTransform
+        || (partition instanceof ApplyTransform && "truncate".equalsIgnoreCase(partition.name()))) {
+      this.partitions.add(partition);
     } else {
       throw new NotSupportedException("Doesn't support " + partition.name());
     }
-    this.partitions.add(partition);
   }
 
   static SparkTableInfo create(SparkBaseTable baseTable) {
@@ -95,13 +107,25 @@ public class SparkTableInfo {
             .collect(Collectors.toList());
     sparkTableInfo.comment = baseTable.properties().remove(ConnectorConstants.COMMENT);
     sparkTableInfo.tableProperties = baseTable.properties();
+    boolean supportsBucketPartition =
+        baseTable.getSparkTransformConverter().isSupportsBucketPartition();
     Arrays.stream(baseTable.partitioning())
         .forEach(
             transform -> {
               if (transform instanceof BucketTransform
                   || transform instanceof SortedBucketTransform) {
-                sparkTableInfo.setBucket(transform);
-              } else if (transform instanceof IdentityTransform) {
+                if (isBucketPartition(supportsBucketPartition, transform)) {
+                  sparkTableInfo.addPartition(transform);
+                } else {
+                  sparkTableInfo.setBucket(transform);
+                }
+              } else if (transform instanceof IdentityTransform
+                  || transform instanceof HoursTransform
+                  || transform instanceof DaysTransform
+                  || transform instanceof MonthsTransform
+                  || transform instanceof YearsTransform
+                  || (transform instanceof ApplyTransform
+                      && "truncate".equalsIgnoreCase(transform.name()))) {
                 sparkTableInfo.addPartition(transform);
               } else {
                 throw new NotSupportedException(
@@ -109,6 +133,10 @@ public class SparkTableInfo {
               }
             });
     return sparkTableInfo;
+  }
+
+  private static boolean isBucketPartition(boolean supportsBucketPartition, Transform transform) {
+    return supportsBucketPartition && !(transform instanceof SortedBucketTransform);
   }
 
   public List<SparkColumnInfo> getUnPartitionedColumns() {

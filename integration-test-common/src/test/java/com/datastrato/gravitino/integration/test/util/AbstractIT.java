@@ -5,7 +5,6 @@
 package com.datastrato.gravitino.integration.test.util;
 
 import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
-import static com.datastrato.gravitino.dto.util.DTOConverters.toDTO;
 import static com.datastrato.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
 import com.datastrato.gravitino.Config;
@@ -13,13 +12,10 @@ import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.config.ConfigConstants;
-import com.datastrato.gravitino.dto.rel.ColumnDTO;
-import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
 import com.datastrato.gravitino.integration.test.MiniGravitino;
 import com.datastrato.gravitino.integration.test.MiniGravitinoContext;
-import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Table;
-import com.datastrato.gravitino.rel.indexes.Index;
+import com.datastrato.gravitino.integration.test.container.ContainerSuite;
+import com.datastrato.gravitino.integration.test.container.MySQLContainer;
 import com.datastrato.gravitino.server.GravitinoServer;
 import com.datastrato.gravitino.server.ServerConfig;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
@@ -31,24 +27,23 @@ import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.MySQLContainer;
 
 @ExtendWith(PrintFuncNameExtension.class)
 public class AbstractIT {
+  protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+
   private static final Logger LOG = LoggerFactory.getLogger(AbstractIT.class);
   protected static GravitinoAdminClient client;
 
@@ -66,12 +61,11 @@ public class AbstractIT {
 
   protected static boolean ignoreIcebergRestService = true;
 
-  private static final String MYSQL_DOCKER_IMAGE_VERSION = "mysql:8.0";
   private static final String DOWNLOAD_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.26/mysql-connector-java-8.0.26.jar";
 
-  private static final String META_DATA = "metadata";
-  private static MySQLContainer<?> MYSQL_CONTAINER;
+  private static TestDatabaseName META_DATA;
+  private static MySQLContainer MYSQL_CONTAINER;
 
   protected static String serverUri;
 
@@ -120,7 +114,7 @@ public class AbstractIT {
   }
 
   private static void setMySQLBackend() {
-    String mysqlUrl = MYSQL_CONTAINER.getJdbcUrl();
+    String mysqlUrl = MYSQL_CONTAINER.getJdbcUrl(META_DATA);
     customConfigs.put(Configs.ENTITY_STORE_KEY, "relational");
     customConfigs.put(Configs.ENTITY_RELATIONAL_STORE_KEY, "JDBCBackend");
     customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY, mysqlUrl);
@@ -156,6 +150,13 @@ public class AbstractIT {
     }
   }
 
+  @ParameterizedTest
+  @CsvSource({
+    "embedded, jdbcBackend",
+    "embedded, kvBackend",
+    "deploy, jdbcBackend",
+    "deploy, kvBackend"
+  })
   @BeforeAll
   public static void startIntegrationTest() throws Exception {
     testMode =
@@ -167,12 +168,9 @@ public class AbstractIT {
 
     if ("true".equals(System.getenv("jdbcBackend"))) {
       // Start MySQL docker instance.
-      MYSQL_CONTAINER =
-          new MySQLContainer<>(MYSQL_DOCKER_IMAGE_VERSION)
-              .withDatabaseName(META_DATA)
-              .withUsername("root")
-              .withPassword("root");
-      MYSQL_CONTAINER.start();
+      META_DATA = TestDatabaseName.MYSQL_JDBC_BACKEND;
+      containerSuite.startMySQLContainer(META_DATA);
+      MYSQL_CONTAINER = containerSuite.getMySQLContainer();
 
       setMySQLBackend();
     }
@@ -239,10 +237,6 @@ public class AbstractIT {
     }
     customConfigs.clear();
     LOG.info("Tearing down Gravitino Server");
-
-    if (MYSQL_CONTAINER != null) {
-      MYSQL_CONTAINER.stop();
-    }
   }
 
   public static GravitinoAdminClient getGravitinoClient() {
@@ -263,63 +257,6 @@ public class AbstractIT {
     } catch (IOException e) {
       LOG.warn("Can't get git commit id for:", e);
       return "";
-    }
-  }
-
-  protected static void assertionsTableInfo(
-      String tableName,
-      String tableComment,
-      List<Column> columns,
-      Map<String, String> properties,
-      Index[] indexes,
-      Table table) {
-    Assertions.assertEquals(tableName, table.name());
-    Assertions.assertEquals(tableComment, table.comment());
-    Assertions.assertEquals(columns.size(), table.columns().length);
-    for (int i = 0; i < columns.size(); i++) {
-      assertColumn(columns.get(i), table.columns()[i]);
-    }
-    for (Map.Entry<String, String> entry : properties.entrySet()) {
-      Assertions.assertEquals(entry.getValue(), table.properties().get(entry.getKey()));
-    }
-    if (ArrayUtils.isNotEmpty(indexes)) {
-      Assertions.assertEquals(indexes.length, table.index().length);
-
-      Map<String, Index> indexByName =
-          Arrays.stream(indexes).collect(Collectors.toMap(Index::name, index -> index));
-
-      for (int i = 0; i < table.index().length; i++) {
-        Assertions.assertTrue(indexByName.containsKey(table.index()[i].name()));
-        Assertions.assertEquals(
-            indexByName.get(table.index()[i].name()).type(), table.index()[i].type());
-        for (int j = 0; j < table.index()[i].fieldNames().length; j++) {
-          for (int k = 0; k < table.index()[i].fieldNames()[j].length; k++) {
-            Assertions.assertEquals(
-                indexByName.get(table.index()[i].name()).fieldNames()[j][k],
-                table.index()[i].fieldNames()[j][k]);
-          }
-        }
-      }
-    }
-  }
-
-  protected static void assertColumn(Column expected, Column actual) {
-    if (!(actual instanceof ColumnDTO)) {
-      actual = toDTO(actual);
-    }
-    if (!(expected instanceof ColumnDTO)) {
-      expected = toDTO(expected);
-    }
-
-    Assertions.assertEquals(expected.name(), actual.name());
-    Assertions.assertEquals(expected.dataType(), actual.dataType());
-    Assertions.assertEquals(expected.nullable(), actual.nullable());
-    Assertions.assertEquals(expected.comment(), actual.comment());
-    Assertions.assertEquals(expected.autoIncrement(), actual.autoIncrement());
-    if (expected.defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET) && expected.nullable()) {
-      Assertions.assertEquals(LiteralDTO.NULL, actual.defaultValue());
-    } else {
-      Assertions.assertEquals(expected.defaultValue(), actual.defaultValue());
     }
   }
 }

@@ -11,11 +11,12 @@ class Namespace:
     "metalake1.catalog1.schema1" are all valid namespaces.
     """
 
-    EMPTY = None
-    DOT = "."
+    _DOT: str = "."
+
+    _levels: List[str] = []
 
     def __init__(self, levels: List[str]):
-        self.levels = levels
+        self._levels = levels
 
     @staticmethod
     def empty() -> 'Namespace':
@@ -36,14 +37,12 @@ class Namespace:
         Returns:
             A namespace with the given levels
         """
-        if levels is None:
-            raise ValueError("Cannot create a namespace with null levels")
+        Namespace.check(levels is not None, "Cannot create a namespace with null levels")
         if len(levels) == 0:
             return Namespace.empty()
 
         for level in levels:
-            if level is None or level == "":
-                raise ValueError("Cannot create a namespace with null or empty level")
+            Namespace.check(level is not None and level != "", "Cannot create a namespace with null or empty level")
 
         return Namespace(list(levels))
 
@@ -90,7 +89,7 @@ class Namespace:
             catalog: The catalog name
             schema: The schema name
 
-        Return:
+        Returns:
              A namespace for table
         """
         return Namespace.of(metalake, catalog, schema)
@@ -104,7 +103,7 @@ class Namespace:
             catalog: The catalog name
             schema: The schema name
 
-        Return:
+        Returns:
              A namespace for fileset
         """
         return Namespace.of(metalake, catalog, schema)
@@ -118,7 +117,7 @@ class Namespace:
             catalog: The catalog name
             schema: The schema name
 
-        Return:
+        Returns:
              A namespace for topic
         """
         return Namespace.of(metalake, catalog, schema)
@@ -131,8 +130,8 @@ class Namespace:
         Args:
             namespace: The metalake namespace
         """
-        if not namespace and not namespace.is_empty():
-            raise ValueError(f"Metalake namespace must be non-null and empty, the input namespace is {namespace}")
+        Namespace.check(namespace is not None and namespace.is_empty(),
+                        f"Metalake namespace must be non-null and empty, the input namespace is {namespace}")
 
     @staticmethod
     def check_catalog(namespace: 'Namespace') -> None:
@@ -142,8 +141,8 @@ class Namespace:
         Args:
             namespace: The catalog namespace
         """
-        if not namespace and namespace.length() != 1:
-            raise ValueError(f"Catalog namespace must be non-null and have 1 level, the input namespace is {namespace}")
+        Namespace.check(namespace is not None and namespace.length() == 1,
+                        f"Catalog namespace must be non-null and have 1 level, the input namespace is {namespace}")
 
     @staticmethod
     def check_schema(namespace: 'Namespace') -> None:
@@ -153,8 +152,8 @@ class Namespace:
         Args:
             namespace: The schema namespace
         """
-        if not namespace and namespace.length() != 2:
-            raise ValueError(f"Schema namespace must be non-null and have 2 levels, the input namespace is {namespace}")
+        Namespace.check(namespace is not None and namespace.length() == 2,
+                        f"Schema namespace must be non-null and have 2 levels, the input namespace is {namespace}")
 
     @staticmethod
     def check_table(namespace: 'Namespace') -> None:
@@ -164,8 +163,8 @@ class Namespace:
         Args:
             namespace: The table namespace
         """
-        if not namespace and namespace.length() != 3:
-            raise ValueError(f"Table namespace must be non-null and have 3 levels, the input namespace is {namespace}")
+        Namespace.check(namespace is not None and namespace.length() == 3,
+                        f"Table namespace must be non-null and have 3 levels, the input namespace is {namespace}")
 
     @staticmethod
     def check_fileset(namespace: 'Namespace') -> None:
@@ -175,9 +174,8 @@ class Namespace:
         Args:
             namespace: The fileset namespace
         """
-        if not namespace and namespace.length() != 3:
-            raise ValueError(
-                f"Fileset namespace must be non-null and have 3 levels, the input namespace is {namespace}")
+        Namespace.check(namespace is not None and namespace.length() == 3,
+                        f"Fileset namespace must be non-null and have 3 levels, the input namespace is {namespace}")
 
     @staticmethod
     def check_topic(namespace: 'Namespace') -> None:
@@ -187,16 +185,16 @@ class Namespace:
         Args:
             namespace: The topic namespace
         """
-        if not namespace and namespace.length() != 3:
-            raise ValueError(f"Topic namespace must be non-null and have 3 levels, the input namespace is {namespace}")
+        Namespace.check(namespace is not None and namespace.length() == 3,
+                        f"Topic namespace must be non-null and have 3 levels, the input namespace is {namespace}")
 
     def levels(self) -> List[str]:
         """Get the levels of the namespace.
 
-        Return:
+        Returns:
             The levels of the namespace
         """
-        return self.levels
+        return self._levels
 
     def level(self, pos: int) -> str:
         """Get the level at the given position.
@@ -204,39 +202,39 @@ class Namespace:
         Args:
             pos: The position of the level
 
-        Return:
+        Returns:
             The level at the given position
         """
-        if pos < 0 or pos >= len(self.levels):
+        if pos < 0 or pos >= len(self._levels):
             raise ValueError("Invalid level position")
-        return self.levels[pos]
+        return self._levels[pos]
 
     def length(self) -> int:
         """Get the length of the namespace.
 
-        Return:
+        Returns:
             The length of the namespace.
         """
-        return len(self.levels)
+        return len(self._levels)
 
     def is_empty(self) -> bool:
         """Check if the namespace is empty.
 
-        Return:
+        Returns:
             True if the namespace is empty, false otherwise.
         """
-        return len(self.levels) == 0
+        return len(self._levels) == 0
 
     def __eq__(self, other: 'Namespace') -> bool:
         if not isinstance(other, Namespace):
             return False
-        return self.levels == other.levels
+        return self._levels == other._levels
 
     def __hash__(self) -> int:
-        return hash(tuple(self.levels))
+        return hash(tuple(self._levels))
 
     def __str__(self) -> str:
-        return Namespace.DOT.join(self.levels)
+        return Namespace._DOT.join(self._levels)
 
     @staticmethod
     def check(expression: bool, message: str, *args) -> None:

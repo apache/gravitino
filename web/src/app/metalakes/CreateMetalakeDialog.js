@@ -45,7 +45,7 @@ const schema = yup.object().shape({
     .required()
     .matches(
       nameRegex,
-      'This field must start with a letter or underscore, and can only contain letters, numbers, and underscores'
+      'This field must start with a letter or underscore, and can only contain letters, numbers, dashes, and underscores'
     )
 })
 

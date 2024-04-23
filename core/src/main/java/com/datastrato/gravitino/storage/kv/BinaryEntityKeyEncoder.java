@@ -8,6 +8,7 @@ import static com.datastrato.gravitino.Entity.EntityType.CATALOG;
 import static com.datastrato.gravitino.Entity.EntityType.FILESET;
 import static com.datastrato.gravitino.Entity.EntityType.GROUP;
 import static com.datastrato.gravitino.Entity.EntityType.METALAKE;
+import static com.datastrato.gravitino.Entity.EntityType.ROLE;
 import static com.datastrato.gravitino.Entity.EntityType.SCHEMA;
 import static com.datastrato.gravitino.Entity.EntityType.TABLE;
 import static com.datastrato.gravitino.Entity.EntityType.TOPIC;
@@ -82,6 +83,8 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
           new String[] {USER.getShortName() + "/", "/", "/", "/"},
           GROUP,
           new String[] {GROUP.getShortName() + "/", "/", "/", "/"},
+          ROLE,
+          new String[] {ROLE.getShortName() + "/", "/", "/", "/"},
           TOPIC,
           new String[] {TOPIC.getShortName() + "/", "/", "/", "/"});
 

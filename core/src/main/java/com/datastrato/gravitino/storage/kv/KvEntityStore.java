@@ -8,6 +8,7 @@ package com.datastrato.gravitino.storage.kv;
 import static com.datastrato.gravitino.Configs.ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Entity.EntityType.GROUP;
 import static com.datastrato.gravitino.Entity.EntityType.METALAKE;
+import static com.datastrato.gravitino.Entity.EntityType.ROLE;
 import static com.datastrato.gravitino.Entity.EntityType.USER;
 import static com.datastrato.gravitino.storage.kv.BinaryEntityEncoderUtil.generateKeyForMapping;
 import static com.datastrato.gravitino.storage.kv.BinaryEntityEncoderUtil.getSubEntitiesPrefix;
@@ -134,7 +135,7 @@ public class KvEntityStore implements EntityStore {
                         .limit(Integer.MAX_VALUE)
                         .build()));
     for (Pair<byte[], byte[]> pairs : kvs) {
-      entities.add(serDe.deserialize(pairs.getRight(), e));
+      entities.add(serDe.deserialize(pairs.getRight(), e, namespace));
     }
     // TODO (yuqi), if the list is too large, we need to do pagination or streaming
     return entities;
@@ -176,7 +177,7 @@ public class KvEntityStore implements EntityStore {
             throw new NoSuchEntityException(NO_SUCH_ENTITY_MSG, ident.toString());
           }
 
-          E e = serDe.deserialize(value, type);
+          E e = serDe.deserialize(value, type, ident.namespace());
           E updatedE = updater.apply(e);
           if (updatedE.nameIdentifier().equals(ident)) {
             transactionalKvBackend.put(key, serDe.serialize(updatedE), true);
@@ -218,7 +219,7 @@ public class KvEntityStore implements EntityStore {
     if (value == null) {
       throw new NoSuchEntityException(NO_SUCH_ENTITY_MSG, ident.toString());
     }
-    return serDe.deserialize(value, e);
+    return serDe.deserialize(value, e, ident.namespace());
   }
 
   void deleteAuthorizationEntitiesIfNecessary(NameIdentifier ident, EntityType type)
@@ -228,7 +229,8 @@ public class KvEntityStore implements EntityStore {
     }
     byte[] encode = entityKeyEncoder.encode(ident, type, true);
 
-    String[] entityShortNames = new String[] {USER.getShortName(), GROUP.getShortName()};
+    String[] entityShortNames =
+        new String[] {USER.getShortName(), GROUP.getShortName(), ROLE.getShortName()};
     for (String name : entityShortNames) {
       byte[] prefix = replacePrefixTypeInfo(encode, name);
       transactionalKvBackend.deleteRange(
@@ -280,18 +282,16 @@ public class KvEntityStore implements EntityStore {
                 ident, subEntities);
           }
 
-          for (byte[] prefix : subEntityPrefix) {
-            transactionalKvBackend.deleteRange(
-                new KvRange.KvRangeBuilder()
-                    .start(prefix)
-                    .startInclusive(true)
-                    .end(Bytes.increment(Bytes.wrap(prefix)).get())
-                    .build());
-          }
+          // Remove id-name mapping;
+          unbindNameAndId(ident, entityType);
 
-          deleteAuthorizationEntitiesIfNecessary(ident, entityType);
           return transactionalKvBackend.delete(dataKey);
         });
+  }
+
+  private void unbindNameAndId(NameIdentifier ident, EntityType entityType) throws IOException {
+    String identNameToIdKey = generateKeyForMapping(ident, entityType, nameMappingService);
+    nameMappingService.unbindNameAndId(identNameToIdKey);
   }
 
   @Override

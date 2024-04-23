@@ -223,6 +223,19 @@ Creating a catalog requires these fields:
     |jdbc-database|e.g. `pg_database`                                   |
 
   </TabItem>
+    <TabItem value='doris' label='Doris'>
+    Follow the [JDBC Doris catalog](jdbc-doris-catalog) document
+
+    <Image img={require('./assets/webui/props-doris.png')} style={{ width: 480 }} />
+
+    |Key          |Description                                          |
+    |-------------|-----------------------------------------------------|
+    |jdbc-driver  |e.g. `com.mysql.jdbc.Driver`                         |
+    |jdbc-url     |e.g. `jdbc:mysql://localhost:9030`                   |
+    |jdbc-user    |The JDBC user name                                   |
+    |jdbc-password|The JDBC password                                    |
+
+  </TabItem>
 </Tabs>
 
 After verifying the values of these fields, clicking on the `CREATE` button creates a catalog.

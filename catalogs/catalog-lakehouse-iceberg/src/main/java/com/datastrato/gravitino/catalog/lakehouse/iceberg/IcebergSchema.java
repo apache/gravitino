@@ -38,12 +38,15 @@ public class IcebergSchema extends BaseSchema {
     protected IcebergSchema internalBuild() {
       IcebergSchema icebergSchema = new IcebergSchema();
       icebergSchema.name = name;
-      icebergSchema.comment =
-          null == comment
-              ? (null == properties
-                  ? null
-                  : properties.get(IcebergSchemaPropertiesMetadata.COMMENT))
-              : comment;
+      if (null == comment) {
+        if (null == properties) {
+          icebergSchema.comment = null;
+        } else {
+          icebergSchema.comment = properties.get(IcebergSchemaPropertiesMetadata.COMMENT);
+        }
+      } else {
+        icebergSchema.comment = comment;
+      }
       icebergSchema.properties = properties;
       icebergSchema.auditInfo = auditInfo;
       return icebergSchema;

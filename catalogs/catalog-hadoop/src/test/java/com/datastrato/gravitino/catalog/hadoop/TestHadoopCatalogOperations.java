@@ -20,7 +20,6 @@ import com.datastrato.gravitino.EntityStoreFactory;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
-import com.datastrato.gravitino.connector.BaseCatalogPropertiesMetadata;
 import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
@@ -126,11 +125,6 @@ public class TestHadoopCatalogOperations {
     Schema schema = createSchema(name, comment, null, null);
     Assertions.assertEquals(name, schema.name());
     Assertions.assertEquals(comment, schema.comment());
-    Map<String, String> props = schema.properties();
-    Assertions.assertTrue(
-        props.containsKey(BaseCatalogPropertiesMetadata.GRAVITINO_MANAGED_ENTITY));
-    Assertions.assertEquals(
-        "true", props.get(BaseCatalogPropertiesMetadata.GRAVITINO_MANAGED_ENTITY));
 
     Throwable exception =
         Assertions.assertThrows(
@@ -205,10 +199,6 @@ public class TestHadoopCatalogOperations {
       Assertions.assertEquals(comment, schema1.comment());
 
       Map<String, String> props = schema1.properties();
-      Assertions.assertTrue(
-          props.containsKey(BaseCatalogPropertiesMetadata.GRAVITINO_MANAGED_ENTITY));
-      Assertions.assertEquals(
-          "true", props.get(BaseCatalogPropertiesMetadata.GRAVITINO_MANAGED_ENTITY));
       Assertions.assertTrue(props.containsKey(StringIdentifier.ID_KEY));
 
       Throwable exception =
@@ -251,10 +241,6 @@ public class TestHadoopCatalogOperations {
       Assertions.assertEquals(comment, schema1.comment());
 
       Map<String, String> props = schema1.properties();
-      Assertions.assertTrue(
-          props.containsKey(BaseCatalogPropertiesMetadata.GRAVITINO_MANAGED_ENTITY));
-      Assertions.assertEquals(
-          "true", props.get(BaseCatalogPropertiesMetadata.GRAVITINO_MANAGED_ENTITY));
       Assertions.assertTrue(props.containsKey(StringIdentifier.ID_KEY));
 
       String newKey = "k1";
@@ -301,10 +287,6 @@ public class TestHadoopCatalogOperations {
       Assertions.assertEquals(comment, schema1.comment());
 
       Map<String, String> props = schema1.properties();
-      Assertions.assertTrue(
-          props.containsKey(BaseCatalogPropertiesMetadata.GRAVITINO_MANAGED_ENTITY));
-      Assertions.assertEquals(
-          "true", props.get(BaseCatalogPropertiesMetadata.GRAVITINO_MANAGED_ENTITY));
       Assertions.assertTrue(props.containsKey(StringIdentifier.ID_KEY));
 
       ops.dropSchema(id, false);
@@ -327,6 +309,10 @@ public class TestHadoopCatalogOperations {
       // Test drop non-empty schema with cascade = true
       ops.dropSchema(id, true);
       Assertions.assertFalse(fs.exists(schemaPath));
+
+      // Test drop empty schema
+      Assertions.assertFalse(ops.dropSchema(id, true));
+      Assertions.assertFalse(ops.dropSchema(id, false));
     }
   }
 

@@ -53,7 +53,7 @@ public class TopicMetaService {
           });
       // TODO: insert topic dataLayout version after supporting it
     } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLConstraintException(
+      ExceptionUtils.checkSQLException(
           re, Entity.EntityType.TOPIC, topicEntity.nameIdentifier().toString());
       throw re;
     }
@@ -97,7 +97,7 @@ public class TopicMetaService {
                   mapper.updateTopicMeta(
                       POConverters.updateTopicPOWithVersion(oldTopicPO, newEntity), oldTopicPO));
     } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLConstraintException(
+      ExceptionUtils.checkSQLException(
           re, Entity.EntityType.TOPIC, newEntity.nameIdentifier().toString());
       throw re;
     }
@@ -174,6 +174,14 @@ public class TopicMetaService {
         TopicMetaMapper.class, mapper -> mapper.softDeleteTopicMetasByTopicId(topicId));
 
     return true;
+  }
+
+  public int deleteTopicMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
+    return SessionUtils.doWithCommitAndFetchResult(
+        TopicMetaMapper.class,
+        mapper -> {
+          return mapper.deleteTopicMetasByLegacyTimeLine(legacyTimeLine, limit);
+        });
   }
 
   private Long getTopicIdBySchemaIdAndName(Long schemaId, String topicName) {
