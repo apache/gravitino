@@ -23,6 +23,9 @@ public interface Entity extends Serializable {
   /** The system reserved catalog name. */
   String SYSTEM_CATALOG_RESERVED_NAME = "system";
 
+  /** The securable object reserved entity name. */
+  String SECURABLE_ENTITY_RESERVED_NAME = "*";
+
   /** The authorization catalog name in the system metalake. */
   String AUTHORIZATION_CATALOG_NAME = "authorization";
 
@@ -31,6 +34,8 @@ public interface Entity extends Serializable {
 
   /** The group schema name in the system catalog. */
   String GROUP_SCHEMA_NAME = "group";
+  /** The role schema name in the system catalog. */
+  String ROLE_SCHEMA_NAME = "role";
 
   /** The admin schema name in the authorization catalog of the system metalake. */
   String ADMIN_SCHEMA_NAME = "admin";
@@ -47,6 +52,7 @@ public interface Entity extends Serializable {
     TOPIC("to", 6),
     USER("us", 7),
     GROUP("gr", 8),
+    ROLE("ro", 9),
 
     AUDIT("au", 65534);
 
@@ -89,6 +95,7 @@ public interface Entity extends Serializable {
         case TOPIC:
         case USER:
         case GROUP:
+        case ROLE:
           return ImmutableList.of(METALAKE, CATALOG, SCHEMA);
         case COLUMN:
           return ImmutableList.of(METALAKE, CATALOG, SCHEMA, TABLE);

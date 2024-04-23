@@ -11,16 +11,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.authorization.Privileges;
+import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
 import com.datastrato.gravitino.dto.authorization.GroupDTO;
+import com.datastrato.gravitino.dto.authorization.RoleDTO;
 import com.datastrato.gravitino.dto.authorization.UserDTO;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.SchemaDTO;
 import com.datastrato.gravitino.dto.rel.TableDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
+import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.rel.types.Types;
+import com.google.common.collect.Lists;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 
@@ -241,6 +246,7 @@ public class TestResponses {
     assertThrows(IllegalArgumentException.class, () -> user.validate());
   }
 
+  @Test
   void testGroupResponse() throws IllegalArgumentException {
     AuditDTO audit =
         AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
@@ -253,5 +259,26 @@ public class TestResponses {
   void testGroupResponseException() throws IllegalArgumentException {
     GroupResponse group = new GroupResponse();
     assertThrows(IllegalArgumentException.class, () -> group.validate());
+  }
+
+  @Test
+  void testRoleResponse() throws IllegalArgumentException {
+    AuditDTO audit =
+        AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    RoleDTO role =
+        RoleDTO.builder()
+            .withName("role1")
+            .withPrivileges(Lists.newArrayList(Privileges.UseCatalog.get()))
+            .withSecurableObject(DTOConverters.toDTO(SecurableObjects.ofCatalog("catalog")))
+            .withAudit(audit)
+            .build();
+    RoleResponse response = new RoleResponse(role);
+    response.validate(); // No exception thrown
+  }
+
+  @Test
+  void testRoleResponseException() throws IllegalArgumentException {
+    RoleResponse role = new RoleResponse();
+    assertThrows(IllegalArgumentException.class, () -> role.validate());
   }
 }

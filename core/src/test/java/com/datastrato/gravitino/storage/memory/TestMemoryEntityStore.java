@@ -21,9 +21,11 @@ import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.FilesetEntity;
+import com.datastrato.gravitino.meta.GroupEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
+import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.utils.Executable;
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -197,6 +199,24 @@ public class TestMemoryEntityStore {
             .withAuditInfo(auditInfo)
             .build();
 
+    UserEntity userEntity =
+        UserEntity.builder()
+            .withId(1L)
+            .withName("user")
+            .withNamespace(Namespace.of("metalake", "catalog", "db"))
+            .withAuditInfo(auditInfo)
+            .withRoleNames(null)
+            .build();
+
+    GroupEntity groupEntity =
+        GroupEntity.builder()
+            .withId(1L)
+            .withName("group")
+            .withNamespace(Namespace.of("metalake", "catalog", "db"))
+            .withAuditInfo(auditInfo)
+            .withRoleNames(null)
+            .build();
+
     InMemoryEntityStore store = new InMemoryEntityStore();
     store.initialize(Mockito.mock(Config.class));
     store.setSerDe(Mockito.mock(EntitySerDe.class));
@@ -206,6 +226,8 @@ public class TestMemoryEntityStore {
     store.put(schemaEntity);
     store.put(tableEntity);
     store.put(filesetEntity);
+    store.put(userEntity);
+    store.put(groupEntity);
 
     Metalake retrievedMetalake =
         store.get(metalake.nameIdentifier(), EntityType.METALAKE, BaseMetalake.class);
@@ -226,6 +248,14 @@ public class TestMemoryEntityStore {
     FilesetEntity retrievedFileset =
         store.get(filesetEntity.nameIdentifier(), EntityType.FILESET, FilesetEntity.class);
     Assertions.assertEquals(filesetEntity, retrievedFileset);
+
+    UserEntity retrievedUser =
+        store.get(userEntity.nameIdentifier(), EntityType.USER, UserEntity.class);
+    Assertions.assertEquals(userEntity, retrievedUser);
+
+    GroupEntity retrievedGroup =
+        store.get(groupEntity.nameIdentifier(), EntityType.GROUP, GroupEntity.class);
+    Assertions.assertEquals(groupEntity, retrievedGroup);
 
     store.delete(metalake.nameIdentifier(), EntityType.METALAKE);
     NameIdentifier id = metalake.nameIdentifier();

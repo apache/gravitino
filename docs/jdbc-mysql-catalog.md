@@ -33,20 +33,22 @@ Gravitino saves some system information in schema and table comment, like `(From
 
 ### Catalog properties
 
-You can pass to a MySQL data source any property that isn't defined by Gravitino by adding `gravitino.bypass` prefix as a catalog property. For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
+You can pass to a MySQL data source any property that isn't defined by Gravitino by adding `gravitino.bypass.` prefix as a catalog property. For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
 
 Check the relevant data source configuration in [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html)
 
+When you use the Gravitino with Trino. You can pass the Trino MySQL connector configuration using prefix `trino.bypass.`. For example, using `trino.bypass.join-pushdown.strategy` to pass the `join-pushdown.strategy` to the Gravitino MySQL catalog in Trino runtime.
+
 If you use a JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user` and `jdbc-password` to catalog properties.
 
-| Configuration item      | Description                                                                                             | Default value | Required | Since Version |
-|-------------------------|---------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `jdbc-url`              | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:3306`                     | (none)        | Yes      | 0.3.0         |
-| `jdbc-driver`           | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver`.  | (none)        | Yes      | 0.3.0         |
-| `jdbc-user`             | The JDBC user name.                                                                                     | (none)        | Yes      | 0.3.0         |
-| `jdbc-password`         | The JDBC password.                                                                                      | (none)        | Yes      | 0.3.0         |
-| `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                          | `2`           | No       | 0.3.0         |
-| `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                         | `10`          | No       | 0.3.0         |
+| Configuration item   | Description                                                                                            | Default value | Required | Since Version |
+|----------------------|--------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `jdbc-url`           | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:3306`                    | (none)        | Yes      | 0.3.0         |
+| `jdbc-driver`        | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver`. | (none)        | Yes      | 0.3.0         |
+| `jdbc-user`          | The JDBC user name.                                                                                    | (none)        | Yes      | 0.3.0         |
+| `jdbc-password`      | The JDBC password.                                                                                     | (none)        | Yes      | 0.3.0         |
+| `jdbc.pool.min-size` | The minimum number of connections in the pool. `2` by default.                                         | `2`           | No       | 0.3.0         |
+| `jdbc.pool.max-size` | The maximum number of connections in the pool. `10` by default.                                        | `10`          | No       | 0.3.0         |
 
 :::caution
 You must download the corresponding JDBC driver to the `catalogs/jdbc-mysql/libs` directory.
@@ -63,7 +65,7 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 - Gravitino's schema concept corresponds to the MySQL database.
 - Supports creating schema, but does not support setting comment.
 - Supports dropping schema.
-- Doesn't support cascade dropping schema.
+- Supports cascade dropping schema.
 
 ### Schema properties
 

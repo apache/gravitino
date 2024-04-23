@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.proto;
 
+import com.datastrato.gravitino.Namespace;
 import java.util.Optional;
 
 /** A class for serializing and deserializing AuditInfo objects. */
@@ -41,7 +42,7 @@ class AuditInfoSerDe implements ProtoSerDe<com.datastrato.gravitino.meta.AuditIn
    * @return The deserialized AuditInfo object.
    */
   @Override
-  public com.datastrato.gravitino.meta.AuditInfo deserialize(AuditInfo p) {
+  public com.datastrato.gravitino.meta.AuditInfo deserialize(AuditInfo p, Namespace namespace) {
     com.datastrato.gravitino.meta.AuditInfo.Builder builder =
         com.datastrato.gravitino.meta.AuditInfo.builder();
 

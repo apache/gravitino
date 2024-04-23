@@ -15,5 +15,11 @@ public class TestDorisExceptionConverter {
     Assertions.assertEquals(
         DorisExceptionConverter.CODE_DATABASE_EXISTS,
         DorisExceptionConverter.getErrorCodeFromMessage(msg));
+
+    msg =
+        "errCode = 2, detailMessage = Unknown table 'table_name' in default_cluster:database_name";
+    Assertions.assertEquals(
+        DorisExceptionConverter.CODE_NO_SUCH_TABLE,
+        DorisExceptionConverter.getErrorCodeFromMessage(msg));
   }
 }

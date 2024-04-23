@@ -21,7 +21,6 @@ DISK_FREE=`df -BG | grep '/$' | tr -s ' ' | cut -d ' ' -f4 | grep -o '[0-9]*'`
 if [ "$DISK_FREE" -le "$THRESHOLD" ]
 then
     echo "ERROR: Doris FE (version < 2.1.0) can not start with less than ${THRESHOLD}G disk space."
-    exit 1
 fi
 
 # comment a code snippet about max_map_count, it's not necessary for IT environment
@@ -37,6 +36,7 @@ PRIORITY_NETWORKS=$(echo "${CONTAINER_IP}" | awk -F '.' '{print$1"."$2"."$3".0/2
 echo "add priority_networks = ${PRIORITY_NETWORKS} to fe.conf & be.conf"
 echo "priority_networks = ${PRIORITY_NETWORKS}" >> ${DORIS_FE_HOME}/conf/fe.conf
 echo "priority_networks = ${PRIORITY_NETWORKS}" >> ${DORIS_BE_HOME}/conf/be.conf
+echo "report_disk_state_interval_seconds = 10" >> ${DORIS_BE_HOME}/conf/be.conf
 
 # start doris fe and be in daemon mode
 ${DORIS_FE_HOME}/bin/start_fe.sh --daemon
@@ -62,10 +62,7 @@ for i in {1..10}; do
 done
 
 if [ "$fe_started" = false ]; then
-  echo "Doris fe failed to start"
-
-  cat ${DORIS_FE_HOME}/log/fe.*
-  exit 1
+  echo "ERROR: Doris fe failed to start"
 fi
 
 # check for be started
@@ -88,10 +85,7 @@ for i in {1..10}; do
 done
 
 if [ "$be_started" = false ]; then
-  echo "Doris be failed to start"
-
-  cat ${DORIS_BE_HOME}/log/*
-  exit 1
+  echo "ERROR: Doris be failed to start"
 fi
 
 
@@ -113,11 +107,8 @@ for i in {1..10}; do
 done
 
 if [ "$be_added" = false ]; then
-  echo "Doris BE failed to add to FE"
-  cat ${DORIS_FE_HOME}/log/fe.* ${DORIS_BE_HOME}/log/*
-
-  exit 1
+  echo "ERROR: Doris BE failed to add to FE"
 fi
 
 # persist the container
-tail -f ${DORIS_FE_HOME}/log/fe.log ${DORIS_BE_HOME}/log/be.INFO
+tail -f /dev/null

@@ -12,11 +12,11 @@ import com.datastrato.gravitino.Field;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.connector.CatalogInfo;
-import com.datastrato.gravitino.proto.CatalogEntitySerDe;
 import com.google.common.base.Objects;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import lombok.Getter;
 import lombok.ToString;
@@ -124,16 +124,12 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
     return new CatalogInfo(id, name, type, provider, comment, properties, auditInfo, namespace);
   }
 
-  /**
-   * Sets the namespace of the catalog entity. because the {@link CatalogEntitySerDe} does not
-   * serialize the namespace field
-   *
-   * @param namespace the namespace of the catalog entity.
-   * @return the instance of the source catalog entity.
-   */
-  public CatalogEntity withNamespace(Namespace namespace) {
-    this.namespace = namespace;
-    return this;
+  public CatalogInfo toCatalogInfoWithoutHiddenProps(Set<String> hiddenKeys) {
+    Map<String, String> filteredProperties =
+        properties == null ? new HashMap<>() : new HashMap<>(properties);
+    filteredProperties.keySet().removeAll(hiddenKeys);
+    return new CatalogInfo(
+        id, name, type, provider, comment, filteredProperties, auditInfo, namespace);
   }
 
   /** Builder class for creating instances of {@link CatalogEntity}. */
@@ -263,6 +259,7 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
     CatalogEntity that = (CatalogEntity) o;
     return Objects.equal(id, that.id)
         && Objects.equal(name, that.name)
+        && Objects.equal(namespace, that.namespace)
         && type == that.type
         && Objects.equal(provider, that.provider)
         && Objects.equal(comment, that.comment)

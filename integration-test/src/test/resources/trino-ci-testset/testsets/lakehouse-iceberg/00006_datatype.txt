@@ -4,7 +4,7 @@ USE
 
 CREATE TABLE
 
-"CREATE TABLE ""test.gt_iceberg"".gt_db2.tb01 (
+"CREATE TABLE gt_iceberg.gt_db2.tb01 (
    f1 varchar,
    f3 varbinary,
    f4 decimal(10, 3),
@@ -18,7 +18,10 @@ CREATE TABLE
    f14 time(3),
    f15 timestamp(3)
 )
-COMMENT ''"
+COMMENT ''
+WITH (
+   location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/gt_db2.db/tb01'
+)"
 
 
 INSERT: 1 row
@@ -30,7 +33,7 @@ INSERT: 1 row
 
 CREATE TABLE
 
-"CREATE TABLE ""test.gt_iceberg"".gt_db2.tb02 (
+"CREATE TABLE gt_iceberg.gt_db2.tb02 (
    f1 varchar NOT NULL,
    f3 varbinary NOT NULL,
    f4 decimal(10, 3) NOT NULL,
@@ -44,7 +47,10 @@ CREATE TABLE
    f14 time(3) NOT NULL,
    f15 timestamp(3) NOT NULL
 )
-COMMENT ''"
+COMMENT ''
+WITH (
+   location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/gt_db2.db/tb02'
+)"
 
 INSERT: 1 row
 

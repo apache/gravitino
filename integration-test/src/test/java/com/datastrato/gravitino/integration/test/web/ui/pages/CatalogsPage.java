@@ -201,6 +201,18 @@ public class CatalogsPage extends AbstractWebIT {
     }
   }
 
+  public void clickMetalakeLink(String metalakeName) {
+    try {
+      String xpath = "//a[@href='?metalake=" + metalakeName + "']";
+      WebElement link = tableGrid.findElement(By.xpath(xpath));
+      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
+      clickAndWait(link);
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+    }
+  }
+
   public void clickCatalogLink(String metalakeName, String catalogName, String catalogType) {
     try {
       String xpath =
@@ -415,7 +427,7 @@ public class CatalogsPage extends AbstractWebIT {
     }
   }
 
-  public boolean verifyEmptyCatalog() {
+  public boolean verifyEmptyTableData() {
     try {
       // Check is empty table
       boolean isNoRows = waitShowText("No rows", tableWrapper);
@@ -450,13 +462,49 @@ public class CatalogsPage extends AbstractWebIT {
     }
   }
 
-  public boolean verifyShowDataItemInList(String itemName) {
+  /**
+   * Verifies if a given property item is present in a specified list.
+   *
+   * @param item The key or value item of the property.
+   * @param key The key of the property.
+   * @param value The value of key item of the property.
+   * @param isHighlight Whether to highlight the property item or not.
+   * @return True if the property item is found in the list, false otherwise.
+   */
+  public boolean verifyShowPropertiesItemInList(
+      String item, String key, String value, Boolean isHighlight) {
     try {
       Thread.sleep(ACTION_SLEEP_MILLIS);
-      List<WebElement> list =
-          driver.findElements(
-              By.xpath(
-                  "//div[@data-refer='table-grid']//div[contains(@class, 'MuiDataGrid-main')]/div[contains(@class, 'MuiDataGrid-virtualScroller')]/div/div[@role='rowgroup']//div[@data-field='name']"));
+      String xpath;
+      if (isHighlight) {
+        xpath = "//div[@data-refer='props-" + item + "-" + key + "-highlight']";
+      } else {
+        xpath = "//div[@data-refer='props-" + item + "-" + key + "']";
+      }
+      WebElement propertyElement = driver.findElement(By.xpath(xpath));
+      boolean match = Objects.equals(propertyElement.getText(), value);
+
+      if (!match) {
+        LOG.error("Prop: does not include itemName: {}", value);
+        return false;
+      }
+
+      return true;
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+      return false;
+    }
+  }
+
+  public boolean verifyShowDataItemInList(String itemName, Boolean isColumnLevel) {
+    try {
+      Thread.sleep(ACTION_SLEEP_MILLIS);
+      String xpath =
+          "//div[@data-refer='table-grid']//div[contains(@class, 'MuiDataGrid-main')]/div[contains(@class, 'MuiDataGrid-virtualScroller')]/div/div[@role='rowgroup']//div[@data-field='name']";
+      if (isColumnLevel) {
+        xpath = xpath + "//p";
+      }
+      List<WebElement> list = driver.findElements(By.xpath(xpath));
       List<String> texts = new ArrayList<>();
       for (WebElement element : list) {
         texts.add(element.getText());

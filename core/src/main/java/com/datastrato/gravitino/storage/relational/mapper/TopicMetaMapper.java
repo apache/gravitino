@@ -6,6 +6,7 @@ package com.datastrato.gravitino.storage.relational.mapper;
 
 import com.datastrato.gravitino.storage.relational.po.TopicPO;
 import java.util.List;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -152,4 +153,11 @@ public interface TopicMetaMapper {
           + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
           + " WHERE schema_id = #{schemaId} AND deleted_at = 0")
   Integer softDeleteTopicMetasBySchemaId(@Param("schemaId") Long schemaId);
+
+  @Delete(
+      "DELETE FROM "
+          + TABLE_NAME
+          + " WHERE deleted_at != 0 AND deleted_at < #{legacyTimeLine} LIMIT #{limit}")
+  Integer deleteTopicMetasByLegacyTimeLine(
+      @Param("legacyTimeLine") Long legacyTimeLine, @Param("limit") int limit);
 }

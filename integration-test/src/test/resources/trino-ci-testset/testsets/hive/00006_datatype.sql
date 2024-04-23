@@ -1,6 +1,6 @@
-CREATE SCHEMA "test.gt_hive".gt_db1;
+CREATE SCHEMA gt_hive.gt_db1;
 
-USE "test.gt_hive".gt_db1;
+USE gt_hive.gt_db1;
 
 -- Unsupported Type: TIME
 CREATE TABLE tb01 (
@@ -32,4 +32,4 @@ select * from tb01 order by f1;
 
 drop table tb01;
 
-drop schema "test.gt_hive".gt_db1 cascade;
+drop schema gt_hive.gt_db1 cascade;

@@ -15,12 +15,26 @@ import com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlException
 import com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter;
 import com.datastrato.gravitino.catalog.postgresql.operation.PostgreSqlSchemaOperations;
 import com.datastrato.gravitino.catalog.postgresql.operation.PostgreSqlTableOperations;
+import com.datastrato.gravitino.connector.CatalogOperations;
+import java.util.Map;
 
 public class PostgreSqlCatalog extends JdbcCatalog {
 
   @Override
   public String shortName() {
     return "jdbc-postgresql";
+  }
+
+  @Override
+  protected CatalogOperations newOps(Map<String, String> config) {
+    JdbcTypeConverter<String> jdbcTypeConverter = createJdbcTypeConverter();
+    return new PostgreSQLCatalogOperations(
+        createExceptionConverter(),
+        jdbcTypeConverter,
+        createJdbcDatabaseOperations(),
+        createJdbcTableOperations(),
+        createJdbcTablePropertiesMetadata(),
+        createJdbcColumnDefaultValueConverter());
   }
 
   @Override
