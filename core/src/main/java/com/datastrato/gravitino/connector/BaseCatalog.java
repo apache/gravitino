@@ -35,7 +35,8 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     implements Catalog, CatalogProvider, HasPropertyMetadata {
   private static final Logger LOG = LoggerFactory.getLogger(BaseCatalog.class);
 
-  // This variable is used as a key in properties of catalogs to inject custom operation to Gravitino.
+  // This variable is used as a key in properties of catalogs to inject custom operation to
+  // Gravitino.
   // You can use your own object to replace the default catalog operation.
   // The object you used is not stable, don't use it unless you know what you are doing.
   @VisibleForTesting public static final String CATALOG_OPERATION_IMPL = "ops-impl";
