@@ -165,14 +165,15 @@ public class TopicMetaService {
 
     String topicName = identifier.name();
 
-    Long schemaId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
-
-    Long topicId = getTopicIdBySchemaIdAndName(schemaId, topicName);
-
-    SessionUtils.doWithCommit(
-        TopicMetaMapper.class, mapper -> mapper.softDeleteTopicMetasByTopicId(topicId));
-
+    try {
+      Long schemaId =
+          CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
+      Long topicId = getTopicIdBySchemaIdAndName(schemaId, topicName);
+      SessionUtils.doWithCommit(
+          TopicMetaMapper.class, mapper -> mapper.softDeleteTopicMetasByTopicId(topicId));
+    } catch (NoSuchEntityException e) {
+      return false;
+    }
     return true;
   }
 

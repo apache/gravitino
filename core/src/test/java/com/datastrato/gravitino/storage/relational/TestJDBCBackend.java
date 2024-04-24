@@ -657,6 +657,7 @@ public class TestJDBCBackend {
                 GroupMetaMapper.class, mapper -> mapper.listGroupsByRoleId(role.id()))
             .size());
     assertTrue(backend.exists(anotherGroup.nameIdentifier(), Entity.EntityType.GROUP));
+    assertFalse(backend.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE, true));
 
     // check legacy record after soft delete
     assertTrue(legacyRecordExistsInDB(metalake.id(), Entity.EntityType.METALAKE));

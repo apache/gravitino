@@ -144,92 +144,97 @@ public class MetalakeMetaService {
 
   public boolean deleteMetalake(NameIdentifier ident, boolean cascade) {
     NameIdentifier.checkMetalake(ident);
-    Long metalakeId = getMetalakeIdByName(ident.name());
-    if (metalakeId != null) {
-      if (cascade) {
-        SessionUtils.doMultipleWithCommit(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    MetalakeMetaMapper.class,
-                    mapper -> mapper.softDeleteMetalakeMetaByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    CatalogMetaMapper.class,
-                    mapper -> mapper.softDeleteCatalogMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    SchemaMetaMapper.class,
-                    mapper -> mapper.softDeleteSchemaMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    TableMetaMapper.class,
-                    mapper -> mapper.softDeleteTableMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    FilesetMetaMapper.class,
-                    mapper -> mapper.softDeleteFilesetMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    FilesetVersionMapper.class,
-                    mapper -> mapper.softDeleteFilesetVersionsByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    TopicMetaMapper.class,
-                    mapper -> mapper.softDeleteTopicMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    UserRoleRelMapper.class,
-                    mapper -> mapper.softDeleteUserRoleRelByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    UserMetaMapper.class,
-                    mapper -> mapper.softDeleteUserMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    GroupRoleRelMapper.class,
-                    mapper -> mapper.softDeleteGroupRoleRelByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    GroupMetaMapper.class,
-                    mapper -> mapper.softDeleteGroupMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    RoleMetaMapper.class,
-                    mapper -> mapper.softDeleteRoleMetasByMetalakeId(metalakeId)));
-      } else {
-        List<CatalogEntity> catalogEntities =
-            CatalogMetaService.getInstance()
-                .listCatalogsByNamespace(Namespace.ofCatalog(ident.name()));
-        if (!catalogEntities.isEmpty()) {
-          throw new NonEmptyEntityException(
-              "Entity %s has sub-entities, you should remove sub-entities first", ident);
+    try {
+      Long metalakeId = getMetalakeIdByName(ident.name());
+
+      if (metalakeId != null) {
+        if (cascade) {
+          SessionUtils.doMultipleWithCommit(
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      MetalakeMetaMapper.class,
+                      mapper -> mapper.softDeleteMetalakeMetaByMetalakeId(metalakeId)),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      CatalogMetaMapper.class,
+                      mapper -> mapper.softDeleteCatalogMetasByMetalakeId(metalakeId)),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      SchemaMetaMapper.class,
+                      mapper -> mapper.softDeleteSchemaMetasByMetalakeId(metalakeId)),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      TableMetaMapper.class,
+                      mapper -> mapper.softDeleteTableMetasByMetalakeId(metalakeId)),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      FilesetMetaMapper.class,
+                      mapper -> mapper.softDeleteFilesetMetasByMetalakeId(metalakeId)),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      FilesetVersionMapper.class,
+                      mapper -> mapper.softDeleteFilesetVersionsByMetalakeId(metalakeId)),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      TopicMetaMapper.class,
+                      mapper -> mapper.softDeleteTopicMetasByMetalakeId(metalakeId)),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      UserRoleRelMapper.class,
+                      mapper -> mapper.softDeleteUserRoleRelByMetalakeId(metalakeId)),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      UserMetaMapper.class,
+                      mapper -> mapper.softDeleteUserMetasByMetalakeId(metalakeId)),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      GroupRoleRelMapper.class,
+                      mapper -> mapper.softDeleteGroupRoleRelByMetalakeId(metalakeId)),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      GroupMetaMapper.class,
+                      mapper -> mapper.softDeleteGroupMetasByMetalakeId(metalakeId)),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      RoleMetaMapper.class,
+                      mapper -> mapper.softDeleteRoleMetasByMetalakeId(metalakeId)));
+        } else {
+          List<CatalogEntity> catalogEntities =
+              CatalogMetaService.getInstance()
+                  .listCatalogsByNamespace(Namespace.ofCatalog(ident.name()));
+          if (!catalogEntities.isEmpty()) {
+            throw new NonEmptyEntityException(
+                "Entity %s has sub-entities, you should remove sub-entities first", ident);
+          }
+          SessionUtils.doMultipleWithCommit(
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      MetalakeMetaMapper.class,
+                      mapper -> mapper.softDeleteMetalakeMetaByMetalakeId(metalakeId)),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      UserRoleRelMapper.class,
+                      mapper -> mapper.softDeleteUserRoleRelByMetalakeId(metalakeId)),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      UserMetaMapper.class,
+                      mapper -> mapper.softDeleteUserMetasByMetalakeId(metalakeId)),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      GroupRoleRelMapper.class,
+                      mapper -> mapper.softDeleteGroupRoleRelByMetalakeId(metalakeId)),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      GroupMetaMapper.class,
+                      mapper -> mapper.softDeleteGroupMetasByMetalakeId(metalakeId)),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      RoleMetaMapper.class,
+                      mapper -> mapper.softDeleteRoleMetasByMetalakeId(metalakeId)));
         }
-        SessionUtils.doMultipleWithCommit(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    MetalakeMetaMapper.class,
-                    mapper -> mapper.softDeleteMetalakeMetaByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    UserRoleRelMapper.class,
-                    mapper -> mapper.softDeleteUserRoleRelByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    UserMetaMapper.class,
-                    mapper -> mapper.softDeleteUserMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    GroupRoleRelMapper.class,
-                    mapper -> mapper.softDeleteGroupRoleRelByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    GroupMetaMapper.class,
-                    mapper -> mapper.softDeleteGroupMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    RoleMetaMapper.class,
-                    mapper -> mapper.softDeleteRoleMetasByMetalakeId(metalakeId)));
       }
+    } catch (NoSuchEntityException e) {
+      return false;
     }
     return true;
   }
