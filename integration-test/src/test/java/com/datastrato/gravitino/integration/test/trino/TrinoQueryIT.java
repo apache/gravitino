@@ -84,7 +84,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
       while (tries-- >= 0) {
         String[] catalogs = trinoQueryRunner.runQuery("show catalogs").split("\n");
         LOG.info("Catalogs: {}", Arrays.toString(catalogs));
-        if (Arrays.stream(catalogs).filter(s -> s.startsWith("\"test.gt_")).count() == 0) {
+        if (Arrays.stream(catalogs).noneMatch(s -> s.startsWith("\"gt_"))) {
           break;
         }
         Thread.sleep(1000);
@@ -172,10 +172,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
   }
 
   private static boolean isQueryFailed(String result) {
-    if (Pattern.compile("^Query \\w+ failed:").matcher(result).find()) {
-      return true;
-    }
-    return false;
+    return Pattern.compile("^Query \\w+ failed:").matcher(result).find();
   }
 
   void executeSqlFileWithCheckResult(
@@ -267,13 +264,11 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     // expectResult:
     // <QUERY_FAILED> Schema must be specified when session schema is not set
     if (expectResult.startsWith("<QUERY_FAILED>")) {
-      boolean match =
-          Pattern.compile(
-                  "^Query \\w+ failed.*: "
-                      + Pattern.quote(expectResult.replace("<QUERY_FAILED>", "").trim()))
-              .matcher(result)
-              .find();
-      return match;
+      return Pattern.compile(
+              "^Query \\w+ failed.*: "
+                  + Pattern.quote(expectResult.replace("<QUERY_FAILED>", "").trim()))
+          .matcher(result)
+          .find();
     }
 
     // match text
@@ -325,11 +320,10 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     ExecutorService executor = Executors.newFixedThreadPool(testParallelism);
     CompletionService completionService = new ExecutorCompletionService<>(executor);
 
-    List<Future<Integer>> allFutures = new ArrayList<>();
     totalCount.addAndGet(getTesterCount(testSetDirName, catalogFileName, testerPrefix));
     List<Future<Integer>> futures =
         runOneTestset(completionService, testSetDirName, catalogFileName, testerPrefix);
-    allFutures.addAll(futures);
+    List<Future<Integer>> allFutures = new ArrayList<>(futures);
 
     waitForCompleted(executor, completionService, allFutures);
   }
