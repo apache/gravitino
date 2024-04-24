@@ -894,9 +894,14 @@ public abstract class SparkCommonIT extends SparkEnvIT {
         .check(tableInfo);
   }
 
-  protected void checkParquetFile(SparkTableInfo tableInfo) {
-    String location = tableInfo.getTableLocation();
-    Assertions.assertDoesNotThrow(() -> getSparkSession().read().parquet(location).printSchema());
+  private void writeToEmptyTableAndCheckData(String tableName) {
+    sql(
+        String.format(
+            "INSERT INTO %s VALUES (1, '1', 1),(2, '2', 2),(3, '3', 3),(4, '4', 4),(5, '5', 5)",
+            tableName));
+    List<String> queryResult = getTableData(tableName);
+    Assertions.assertEquals(5, queryResult.size());
+    Assertions.assertEquals("1,1,1;2,2,2;3,3,3;4,4,4;5,5,5", String.join(";", queryResult));
   }
 
   // partition expression may contain "'", like a='s'/b=1
@@ -906,13 +911,8 @@ public abstract class SparkCommonIT extends SparkEnvIT {
         .collect(Collectors.joining(delimiter));
   }
 
-  private void writeToEmptyTableAndCheckData(String tableName) {
-    sql(
-        String.format(
-            "INSERT INTO %s VALUES (1, '1', 1),(2, '2', 2),(3, '3', 3),(4, '4', 4),(5, '5', 5)",
-            tableName));
-    List<String> queryResult = getTableData(tableName);
-    Assertions.assertEquals(5, queryResult.size());
-    Assertions.assertEquals("1,1,1;2,2,2;3,3,3;4,4,4;5,5,5", String.join(";", queryResult));
+  protected void checkParquetFile(SparkTableInfo tableInfo) {
+    String location = tableInfo.getTableLocation();
+    Assertions.assertDoesNotThrow(() -> getSparkSession().read().parquet(location).printSchema());
   }
 }

@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.hadoop.fs.Path;
-import org.apache.iceberg.RowLevelOperationMode;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.Column;
 import org.apache.spark.sql.Dataset;
@@ -520,10 +519,10 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
 
   private List<Tuple3<Boolean, Integer, String>> getIcebergTablePropertyValues() {
     return Arrays.asList(
-        new Tuple3<>(false, 1, RowLevelOperationMode.COPY_ON_WRITE.modeName()),
-        new Tuple3<>(false, 2, RowLevelOperationMode.MERGE_ON_READ.modeName()),
-        new Tuple3<>(true, 1, RowLevelOperationMode.COPY_ON_WRITE.modeName()),
-        new Tuple3<>(true, 2, RowLevelOperationMode.MERGE_ON_READ.modeName()));
+        new Tuple3<>(false, 1, "copy-on-write"),
+        new Tuple3<>(false, 2, "merge-on-read"),
+        new Tuple3<>(true, 1, "copy-on-write"),
+        new Tuple3<>(true, 2, "merge-on-read"));
   }
 
   private void createIcebergTableWithTabProperties(
