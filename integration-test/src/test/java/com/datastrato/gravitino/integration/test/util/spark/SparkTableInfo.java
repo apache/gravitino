@@ -43,7 +43,7 @@ public class SparkTableInfo {
   private Transform bucket;
   private List<Transform> partitions = new ArrayList<>();
   private Set<String> partitionColumnNames = new HashSet<>();
-  private SparkMetadataColumn[] metadataColumns;
+  private SparkMetadataColumnInfo[] metadataColumns;
 
   public SparkTableInfo() {}
 
@@ -140,11 +140,11 @@ public class SparkTableInfo {
           Arrays.stream(supportsMetadataColumns.metadataColumns())
               .map(
                   metadataColumn ->
-                      new SparkMetadataColumn(
+                      new SparkMetadataColumnInfo(
                           metadataColumn.name(),
                           metadataColumn.dataType(),
                           metadataColumn.isNullable()))
-              .toArray(SparkMetadataColumn[]::new);
+              .toArray(SparkMetadataColumnInfo[]::new);
     }
     return sparkTableInfo;
   }

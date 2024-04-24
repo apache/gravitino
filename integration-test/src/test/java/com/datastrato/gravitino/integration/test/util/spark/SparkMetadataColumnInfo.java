@@ -8,12 +8,12 @@ package com.datastrato.gravitino.integration.test.util.spark;
 import org.apache.spark.sql.connector.catalog.MetadataColumn;
 import org.apache.spark.sql.types.DataType;
 
-public class SparkMetadataColumn implements MetadataColumn {
+public class SparkMetadataColumnInfo implements MetadataColumn {
   private final String name;
   private final DataType dataType;
   private final boolean isNullable;
 
-  public SparkMetadataColumn(String name, DataType dataType, boolean isNullable) {
+  public SparkMetadataColumnInfo(String name, DataType dataType, boolean isNullable) {
     this.name = name;
     this.dataType = dataType;
     this.isNullable = isNullable;

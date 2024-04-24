@@ -136,7 +136,7 @@ public class SparkTableInfoChecker {
     return this;
   }
 
-  public SparkTableInfoChecker withMetadataColumns(SparkMetadataColumn[] metadataColumns) {
+  public SparkTableInfoChecker withMetadataColumns(SparkMetadataColumnInfo[] metadataColumns) {
     this.expectedTableInfo.setMetadataColumns(metadataColumns);
     this.checkFields.add(CheckField.METADATA_COLUMN);
     return this;

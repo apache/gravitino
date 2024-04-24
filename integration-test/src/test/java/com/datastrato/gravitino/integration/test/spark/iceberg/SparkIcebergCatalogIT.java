@@ -5,7 +5,7 @@
 package com.datastrato.gravitino.integration.test.spark.iceberg;
 
 import com.datastrato.gravitino.integration.test.spark.SparkCommonIT;
-import com.datastrato.gravitino.integration.test.util.spark.SparkMetadataColumn;
+import com.datastrato.gravitino.integration.test.util.spark.SparkMetadataColumnInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
 import com.google.common.collect.ImmutableList;
@@ -229,7 +229,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
     SparkTableInfo tableInfo = getTableInfo(tableName);
 
-    SparkMetadataColumn[] metadataColumns = getIcebergMetadataColumns();
+    SparkMetadataColumnInfo[] metadataColumns = getIcebergMetadataColumns();
     SparkTableInfoChecker checker =
         SparkTableInfoChecker.create()
             .withName(tableName)
@@ -247,7 +247,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
     SparkTableInfo tableInfo = getTableInfo(tableName);
 
-    SparkMetadataColumn[] metadataColumns = getIcebergMetadataColumns();
+    SparkMetadataColumnInfo[] metadataColumns = getIcebergMetadataColumns();
     SparkTableInfoChecker checker =
         SparkTableInfoChecker.create()
             .withName(tableName)
@@ -275,7 +275,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
     SparkTableInfo tableInfo = getTableInfo(tableName);
 
-    SparkMetadataColumn[] metadataColumns = getIcebergMetadataColumns();
+    SparkMetadataColumnInfo[] metadataColumns = getIcebergMetadataColumns();
     SparkTableInfoChecker checker =
         SparkTableInfoChecker.create()
             .withName(tableName)
@@ -312,9 +312,9 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
     SparkTableInfo tableInfo = getTableInfo(tableName);
 
-    SparkMetadataColumn[] metadataColumns = getIcebergMetadataColumns();
+    SparkMetadataColumnInfo[] metadataColumns = getIcebergMetadataColumns();
     metadataColumns[1] =
-        new SparkMetadataColumn(
+        new SparkMetadataColumnInfo(
             "_partition", DataTypes.createStructType(new StructField[] {}), true);
     SparkTableInfoChecker checker =
         SparkTableInfoChecker.create()
@@ -342,7 +342,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
     SparkTableInfo tableInfo = getTableInfo(tableName);
 
-    SparkMetadataColumn[] metadataColumns = getIcebergMetadataColumns();
+    SparkMetadataColumnInfo[] metadataColumns = getIcebergMetadataColumns();
     SparkTableInfoChecker checker =
         SparkTableInfoChecker.create()
             .withName(tableName)
@@ -368,7 +368,7 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
     SparkTableInfo tableInfo = getTableInfo(tableName);
 
-    SparkMetadataColumn[] metadataColumns = getIcebergMetadataColumns();
+    SparkMetadataColumnInfo[] metadataColumns = getIcebergMetadataColumns();
     SparkTableInfoChecker checker =
         SparkTableInfoChecker.create()
             .withName(tableName)
@@ -407,17 +407,17 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
         tableName);
   }
 
-  private SparkMetadataColumn[] getIcebergMetadataColumns() {
-    return new SparkMetadataColumn[] {
-      new SparkMetadataColumn("_spec_id", DataTypes.IntegerType, false),
-      new SparkMetadataColumn(
+  private SparkMetadataColumnInfo[] getIcebergMetadataColumns() {
+    return new SparkMetadataColumnInfo[] {
+      new SparkMetadataColumnInfo("_spec_id", DataTypes.IntegerType, false),
+      new SparkMetadataColumnInfo(
           "_partition",
           DataTypes.createStructType(
               new StructField[] {DataTypes.createStructField("name", DataTypes.StringType, true)}),
           true),
-      new SparkMetadataColumn("_file", DataTypes.StringType, false),
-      new SparkMetadataColumn("_pos", DataTypes.LongType, false),
-      new SparkMetadataColumn("_deleted", DataTypes.BooleanType, false)
+      new SparkMetadataColumnInfo("_file", DataTypes.StringType, false),
+      new SparkMetadataColumnInfo("_pos", DataTypes.LongType, false),
+      new SparkMetadataColumnInfo("_deleted", DataTypes.BooleanType, false)
     };
   }
 }
