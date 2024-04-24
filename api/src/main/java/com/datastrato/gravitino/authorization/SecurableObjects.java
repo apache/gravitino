@@ -6,6 +6,9 @@ package com.datastrato.gravitino.authorization;
 
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 
@@ -15,40 +18,15 @@ public class SecurableObjects {
   private static final Splitter DOT = Splitter.on('.');
 
   /**
-   * Create the {@link SecurableObject} with the given names.
+   * Create the metalake {@link SecurableObject} with the given metalake name.
    *
-   * @param names The names of the securable object.
-   * @return The created {@link SecurableObject}
+   * @param metalake The metalake name
+   * @return The created metalake {@link SecurableObject}
    */
-  public static SecurableObject of(String... names) {
-    if (names == null) {
-      throw new IllegalArgumentException("Cannot create a securable object with null names");
-    }
+  public static SecurableObject ofMetalake(String metalake) {
+    checkName(metalake);
 
-    if (names.length == 0) {
-      throw new IllegalArgumentException("Cannot create a securable object with no names");
-    }
-
-    SecurableObject parent = null;
-    for (String name : names) {
-      if (name == null) {
-        throw new IllegalArgumentException("Cannot create a securable object with null name");
-      }
-
-      if (name.equals("*")) {
-        throw new IllegalArgumentException(
-            "Cannot create a securable object with `*` name. If you want to use a securable object which represents all catalogs,"
-                + " you use the method `ofAllCatalogs`."
-                + " If you want to create an another securable object which represents all entities,"
-                + " you can use its parent entity, For example,"
-                + " if you want to have read table privileges of all tables of `catalog1.schema1`,"
-                + " you can use add `read table` privilege for `catalog1.schema1` directly");
-      }
-
-      parent = new SecurableObjectImpl(parent, name);
-    }
-
-    return parent;
+    return new SecurableObjectImpl(null, metalake, SecurableObject.Type.METALAKE);
   }
 
   /**
@@ -58,7 +36,9 @@ public class SecurableObjects {
    * @return The created catalog {@link SecurableObject}
    */
   public static SecurableObject ofCatalog(String catalog) {
-    return of(catalog);
+    checkName(catalog);
+
+    return new SecurableObjectImpl(null, catalog, SecurableObject.Type.CATALOG);
   }
 
   /**
@@ -71,8 +51,9 @@ public class SecurableObjects {
    */
   public static SecurableObject ofSchema(SecurableObject catalog, String schema) {
     checkCatalog(catalog);
+    checkName(schema);
 
-    return of(catalog.name(), schema);
+    return new SecurableObjectImpl(catalog, schema, SecurableObject.Type.SCHEMA);
   }
 
   /**
@@ -84,8 +65,9 @@ public class SecurableObjects {
    */
   public static SecurableObject ofTable(SecurableObject schema, String table) {
     checkSchema(schema);
+    checkName(table);
 
-    return of(schema.parent().name(), schema.name(), table);
+    return new SecurableObjectImpl(schema, table, SecurableObject.Type.TABLE);
   }
 
   /**
@@ -97,8 +79,9 @@ public class SecurableObjects {
    */
   public static SecurableObject ofTopic(SecurableObject schema, String topic) {
     checkSchema(schema);
+    checkName(topic);
 
-    return of(schema.parent().name(), schema.name(), topic);
+    return new SecurableObjectImpl(schema, topic, SecurableObject.Type.TOPIC);
   }
 
   /**
@@ -111,25 +94,32 @@ public class SecurableObjects {
    */
   public static SecurableObject ofFileset(SecurableObject schema, String fileset) {
     checkSchema(schema);
+    checkName(fileset);
 
-    return of(schema.parent().name(), schema.name(), fileset);
+    return new SecurableObjectImpl(schema, fileset, SecurableObject.Type.FILESET);
   }
 
   /**
-   * All catalogs is a special securable object .You can give the securable object the privileges
-   * `LOAD CATALOG`, `CREATE CATALOG`, etc. It means that you can load any catalog and create any
-   * which doesn't exist.
+   * All metalakes is a special securable object .You can give the securable object the privileges
+   * `CREATE METALAKE`, etc. It means that you can create any which doesn't exist. This securable
+   * object is only used for metalake admin. You can't grant any privilege to this securable object.
+   * You can't bind this securable object to any role, too.
    *
    * @return The created {@link SecurableObject}
    */
-  public static SecurableObject ofAllCatalogs() {
-    return ALL_CATALOGS;
+  public static SecurableObject ofAllMetalakes() {
+    return ALL_METALAKES;
   }
 
   private static void checkSchema(SecurableObject schema) {
     if (schema == null) {
       throw new IllegalArgumentException("Securable schema object can't be null");
     }
+
+    if (schema.type() != SecurableObject.Type.SCHEMA) {
+      throw new IllegalArgumentException("Securable schema object type must be SCHEMA");
+    }
+
     checkCatalog(schema.parent());
   }
 
@@ -138,22 +128,29 @@ public class SecurableObjects {
       throw new IllegalArgumentException("Securable catalog object can't be null");
     }
 
+    if (catalog.type() != SecurableObject.Type.CATALOG) {
+      throw new IllegalArgumentException("Securable catalog type must be CATALOG");
+    }
+
     if (catalog.parent() != null) {
       throw new IllegalArgumentException(
           String.format("The parent of securable catalog object %s must be null", catalog.name()));
     }
   }
 
-  private static final SecurableObject ALL_CATALOGS = new SecurableObjectImpl(null, "*");
+  private static final SecurableObject ALL_METALAKES =
+      new SecurableObjectImpl(null, "*", SecurableObject.Type.METALAKE);
 
   private static class SecurableObjectImpl implements SecurableObject {
 
     private final SecurableObject parent;
     private final String name;
+    private final Type type;
 
-    SecurableObjectImpl(SecurableObject parent, String name) {
+    SecurableObjectImpl(SecurableObject parent, String name, Type type) {
       this.parent = parent;
       this.name = name;
+      this.type = type;
     }
 
     @Override
@@ -167,8 +164,18 @@ public class SecurableObjects {
     }
 
     @Override
+    public String fullName() {
+      return toString();
+    }
+
+    @Override
+    public Type type() {
+      return type;
+    }
+
+    @Override
     public int hashCode() {
-      return Objects.hash(parent, name);
+      return Objects.hash(parent, name, type);
     }
 
     @Override
@@ -188,26 +195,133 @@ public class SecurableObjects {
 
       SecurableObject otherSecurableObject = (SecurableObject) other;
       return Objects.equals(parent, otherSecurableObject.parent())
-          && Objects.equals(name, otherSecurableObject.name());
+          && Objects.equals(name, otherSecurableObject.name())
+          && Objects.equals(type, otherSecurableObject.type());
     }
   }
 
   /**
-   * Create a {@link SecurableObject} from the given identifier string.
+   * Create a {@link SecurableObject} from the given full name.
    *
-   * @param securableObjectIdentifier The identifier string
+   * @param fullName The full name of securable object.
+   * @param type The securable object type.
    * @return The created {@link SecurableObject}
    */
-  public static SecurableObject parse(String securableObjectIdentifier) {
-    if ("*".equals(securableObjectIdentifier)) {
-      return SecurableObjects.ofAllCatalogs();
+  public static SecurableObject parse(String fullName, SecurableObject.Type type) {
+    if ("*".equals(fullName)) {
+      if (type != SecurableObject.Type.METALAKE) {
+        throw new IllegalArgumentException("If securable object isn't metalake, it can't be `*`");
+      }
+      return SecurableObjects.ofAllMetalakes();
     }
 
-    if (StringUtils.isBlank(securableObjectIdentifier)) {
+    if (StringUtils.isBlank(fullName)) {
       throw new IllegalArgumentException("securable object identifier can't be blank");
     }
 
-    Iterable<String> parts = DOT.split(securableObjectIdentifier);
-    return SecurableObjects.of(Iterables.toArray(parts, String.class));
+    Iterable<String> parts = DOT.split(fullName);
+    return SecurableObjects.of(type, Iterables.toArray(parts, String.class));
+  }
+
+  /**
+   * Create the {@link SecurableObject} with the given names.
+   *
+   * @param type The securable object type.
+   * @param names The names of the securable object.
+   * @return The created {@link SecurableObject}
+   */
+  static SecurableObject of(SecurableObject.Type type, String... names) {
+
+    if (names == null) {
+      throw new IllegalArgumentException("Cannot create a securable object with null names");
+    }
+
+    if (names.length == 0) {
+      throw new IllegalArgumentException("Cannot create a securable object with no names");
+    }
+
+    if (type == null) {
+      throw new IllegalArgumentException("Cannot create a securable object with no type");
+    }
+
+    if (names.length > 3) {
+      throw new IllegalArgumentException(
+          "Cannot create a securable object with the name length which is greater than 3");
+    }
+
+    if (names.length == 1
+        && type != SecurableObject.Type.CATALOG
+        && type != SecurableObject.Type.METALAKE) {
+      throw new IllegalArgumentException(
+          "If the length of names is 1, it must be the CATALOG or METALAKE type");
+    }
+
+    if (names.length == 2 && type != SecurableObject.Type.SCHEMA) {
+      throw new IllegalArgumentException("If the length of names is 2, it must be the SCHEMA type");
+    }
+
+    if (names.length == 3
+        && type != SecurableObject.Type.FILESET
+        && type != SecurableObject.Type.TABLE
+        && type != SecurableObject.Type.TOPIC) {
+      throw new IllegalArgumentException(
+          "If the length of names is 3, it must be FILESET, TABLE or TOPIC");
+    }
+
+    List<SecurableObject.Type> types = Lists.newArrayList(type);
+
+    // Find all the types of the parent securable object.
+    SecurableObject.Type curType = type;
+    List<String> reverseNames = Lists.newArrayList(names);
+    Collections.reverse(reverseNames);
+    for (String ignored : reverseNames) {
+      types.add(curType);
+      curType = getParentSecurableObjectType(curType);
+    }
+    Collections.reverse(types);
+
+    SecurableObject parent = null;
+    int level = 0;
+    for (String name : names) {
+      checkName(name);
+
+      parent = new SecurableObjectImpl(parent, name, types.get(level));
+
+      level++;
+    }
+
+    return parent;
+  }
+
+  private static SecurableObject.Type getParentSecurableObjectType(SecurableObject.Type type) {
+    switch (type) {
+      case FILESET:
+        return SecurableObject.Type.SCHEMA;
+
+      case TOPIC:
+        return SecurableObject.Type.SCHEMA;
+
+      case TABLE:
+        return SecurableObject.Type.SCHEMA;
+
+      case SCHEMA:
+        return SecurableObject.Type.CATALOG;
+
+      case CATALOG:
+        return SecurableObject.Type.METALAKE;
+
+      default:
+        return null;
+    }
+  }
+
+  private static void checkName(String name) {
+    if (name == null) {
+      throw new IllegalArgumentException("Cannot create a securable object with null name");
+    }
+
+    if ("*".equals(name)) {
+      throw new IllegalArgumentException("Cannot create a securable object with `*` name.");
+    }
   }
 }

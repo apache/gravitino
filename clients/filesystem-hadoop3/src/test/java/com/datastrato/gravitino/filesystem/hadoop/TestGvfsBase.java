@@ -558,6 +558,12 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       assertThrows(
           IllegalArgumentException.class,
           () -> fs.extractIdentifier(new URI("/catalog1/schema1/")));
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> fs.extractIdentifier(new URI("gvfs://fileset/catalog1/schema1/fileset1//")));
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> fs.extractIdentifier(new URI("/catalog1/schema1/fileset1/dir//")));
     }
   }
 }

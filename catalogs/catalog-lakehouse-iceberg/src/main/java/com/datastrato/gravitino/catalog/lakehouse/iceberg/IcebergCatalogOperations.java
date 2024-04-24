@@ -128,7 +128,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
           icebergTableOps.listNamespace(IcebergTableOpsHelper.getIcebergNamespace()).namespaces();
 
       return namespaces.stream()
-          .map(icebergNamespace -> NameIdentifier.of(icebergNamespace.levels()))
+          .map(icebergNamespace -> NameIdentifier.of(namespace, icebergNamespace.toString()))
           .toArray(NameIdentifier[]::new);
     } catch (NoSuchNamespaceException e) {
       throw new NoSuchSchemaException(

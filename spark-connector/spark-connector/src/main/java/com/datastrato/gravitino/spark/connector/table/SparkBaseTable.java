@@ -11,6 +11,7 @@ import com.datastrato.gravitino.spark.connector.ConnectorConstants;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
 import com.datastrato.gravitino.spark.connector.SparkTypeConverter;
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -142,6 +143,11 @@ public abstract class SparkBaseTable implements Table, SupportsRead, SupportsWri
       }
     }
     return lazySparkTable;
+  }
+
+  @VisibleForTesting
+  public SparkTransformConverter getSparkTransformConverter() {
+    return sparkTransformConverter;
   }
 
   protected boolean isCaseSensitive() {

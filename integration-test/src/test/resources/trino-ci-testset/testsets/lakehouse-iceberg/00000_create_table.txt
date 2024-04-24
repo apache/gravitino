@@ -2,7 +2,7 @@ CREATE SCHEMA
 
 CREATE TABLE
 
-"CREATE TABLE ""test.gt_iceberg"".gt_db2.tb01 (
+"CREATE TABLE gt_iceberg.gt_db2.tb01 (
    name varchar,
    salary integer
 )
@@ -13,7 +13,7 @@ WITH (
 
 CREATE TABLE
 
-"CREATE TABLE ""test.gt_iceberg"".gt_db2.tb02 (
+"CREATE TABLE gt_iceberg.gt_db2.tb02 (
    name varchar,
    salary integer
 )
@@ -28,7 +28,7 @@ WITH (
 
 CREATE TABLE
 
-"CREATE TABLE ""test.gt_iceberg"".gt_db2.tb03 (
+"CREATE TABLE gt_iceberg.gt_db2.tb03 (
    name varchar,
    salary integer
 )
@@ -41,7 +41,7 @@ WITH (
 
 CREATE TABLE
 
-"CREATE TABLE ""test.gt_iceberg"".gt_db2.tb04 (
+"CREATE TABLE gt_iceberg.gt_db2.tb04 (
    name varchar,
    salary integer
 )
@@ -53,7 +53,7 @@ WITH (
 
 CREATE TABLE
 
-"CREATE TABLE ""test.gt_iceberg"".gt_db2.tb05 (
+"CREATE TABLE gt_iceberg.gt_db2.tb05 (
    name varchar,
    salary integer
 )
@@ -65,7 +65,7 @@ WITH (
 
 CREATE TABLE
 
-"CREATE TABLE ""test.gt_iceberg"".gt_db2.tb06 (
+"CREATE TABLE gt_iceberg.gt_db2.tb06 (
    name varchar,
    salary integer
 )

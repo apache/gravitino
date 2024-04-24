@@ -163,6 +163,14 @@ public class TableMetaService {
     return true;
   }
 
+  public int deleteTableMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
+    return SessionUtils.doWithCommitAndFetchResult(
+        TableMetaMapper.class,
+        mapper -> {
+          return mapper.deleteTableMetasByLegacyTimeLine(legacyTimeLine, limit);
+        });
+  }
+
   private void fillTablePOBuilderParentEntityId(TablePO.Builder builder, Namespace namespace) {
     Namespace.checkTable(namespace);
     Long parentEntityId = null;

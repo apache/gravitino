@@ -584,7 +584,7 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertEquals(TEXT_INPUT_FORMAT_CLASS, actualTable2.getSd().getInputFormat());
     Assertions.assertEquals(IGNORE_KEY_OUTPUT_FORMAT_CLASS, actualTable2.getSd().getOutputFormat());
     Assertions.assertEquals(EXTERNAL_TABLE.name(), actualTable2.getTableType());
-    Assertions.assertEquals(table2, actualTable2.getSd().getSerdeInfo().getName());
+    Assertions.assertEquals(table2.toLowerCase(), actualTable2.getSd().getSerdeInfo().getName());
     Assertions.assertEquals(TABLE_COMMENT, actualTable2.getParameters().get(COMMENT));
     Assertions.assertEquals(
         ((Boolean) tablePropertiesMetadata.getDefaultValue(EXTERNAL)).toString().toUpperCase(),
@@ -1224,7 +1224,7 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertEquals(
         ((TableType) tablePropertiesMetadata.getDefaultValue(TABLE_TYPE)).name(),
         actualTable.getTableType());
-    Assertions.assertEquals(tableName, actualTable.getSd().getSerdeInfo().getName());
+    Assertions.assertEquals(tableName.toLowerCase(), actualTable.getSd().getSerdeInfo().getName());
     Assertions.assertEquals(
         ((Boolean) tablePropertiesMetadata.getDefaultValue(EXTERNAL)).toString().toUpperCase(),
         actualTable.getParameters().get(EXTERNAL));
@@ -1561,6 +1561,72 @@ public class CatalogHiveIT extends AbstractIT {
     Path tableDirectory = new Path(hiveTab.getSd().getLocation());
     Assertions.assertTrue(
         hdfs.listStatus(tableDirectory).length > 0, "The table should not be empty");
+  }
+
+  @Test
+  public void testRemoveNonExistTable() throws TException, InterruptedException {
+    Column[] columns = createColumns();
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            columns,
+            TABLE_COMMENT,
+            ImmutableMap.of(TABLE_TYPE, EXTERNAL_TABLE.name().toLowerCase(Locale.ROOT)),
+            new Transform[] {Transforms.identity(columns[2].name())});
+
+    // Directly drop table from hive metastore.
+    hiveClientPool.run(
+        client -> {
+          client.dropTable(schemaName, tableName, true, false, false);
+          return null;
+        });
+
+    // Drop table from catalog, drop non-exist table should return false;
+    Assertions.assertFalse(
+        catalog
+            .asTableCatalog()
+            .dropTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName)),
+        "The table should not be found in the catalog");
+
+    Assertions.assertFalse(
+        catalog
+            .asTableCatalog()
+            .tableExists(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName)),
+        "The table should not be found in the catalog");
+  }
+
+  @Test
+  public void testPurgeNonExistTable() throws TException, InterruptedException {
+    Column[] columns = createColumns();
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            columns,
+            TABLE_COMMENT,
+            ImmutableMap.of(TABLE_TYPE, EXTERNAL_TABLE.name().toLowerCase(Locale.ROOT)),
+            new Transform[] {Transforms.identity(columns[2].name())});
+
+    // Directly drop table from hive metastore.
+    hiveClientPool.run(
+        client -> {
+          client.dropTable(schemaName, tableName, true, false, true);
+          return null;
+        });
+
+    // Drop table from catalog, drop non-exist table should return false;
+    Assertions.assertFalse(
+        catalog
+            .asTableCatalog()
+            .purgeTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName)),
+        "The table should not be found in the catalog");
+
+    Assertions.assertFalse(
+        catalog
+            .asTableCatalog()
+            .tableExists(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName)),
+        "The table should not be found in the catalog");
   }
 
   @Test

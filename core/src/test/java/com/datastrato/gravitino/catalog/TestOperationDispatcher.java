@@ -5,7 +5,6 @@
 package com.datastrato.gravitino.catalog;
 
 import static com.datastrato.gravitino.TestFilesetPropertiesMetadata.TEST_FILESET_HIDDEN_KEY;
-import static com.datastrato.gravitino.connector.BasePropertiesMetadata.GRAVITINO_MANAGED_ENTITY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.reset;
@@ -119,7 +118,6 @@ public abstract class TestOperationDispatcher {
           Assertions.assertEquals(v, testProps.get(k));
         });
     Assertions.assertFalse(testProps.containsKey(StringIdentifier.ID_KEY));
-    Assertions.assertFalse(testProps.containsKey(GRAVITINO_MANAGED_ENTITY));
     Assertions.assertFalse(testProps.containsKey(TEST_FILESET_HIDDEN_KEY));
   }
 

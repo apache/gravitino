@@ -101,10 +101,17 @@ public class SparkTableInfo {
   void addPartition(Transform partition) {
     if (partition instanceof IdentityTransform) {
       partitionColumnNames.add(((IdentityTransform) partition).reference().fieldNames()[0]);
+      this.partitions.add(partition);
+    } else if (partition instanceof BucketTransform
+        || partition instanceof HoursTransform
+        || partition instanceof DaysTransform
+        || partition instanceof MonthsTransform
+        || partition instanceof YearsTransform
+        || (partition instanceof ApplyTransform && "truncate".equalsIgnoreCase(partition.name()))) {
+      this.partitions.add(partition);
     } else {
       throw new NotSupportedException("Doesn't support " + partition.name());
     }
-    this.partitions.add(partition);
   }
 
   static SparkTableInfo create(SparkBaseTable baseTable) {
@@ -127,13 +134,25 @@ public class SparkTableInfo {
             .collect(Collectors.toList());
     sparkTableInfo.comment = baseTable.properties().remove(ConnectorConstants.COMMENT);
     sparkTableInfo.tableProperties = baseTable.properties();
+    boolean supportsBucketPartition =
+        baseTable.getSparkTransformConverter().isSupportsBucketPartition();
     Arrays.stream(baseTable.partitioning())
         .forEach(
             transform -> {
               if (transform instanceof BucketTransform
                   || transform instanceof SortedBucketTransform) {
-                sparkTableInfo.setBucket(transform);
-              } else if (transform instanceof IdentityTransform) {
+                if (isBucketPartition(supportsBucketPartition, transform)) {
+                  sparkTableInfo.addPartition(transform);
+                } else {
+                  sparkTableInfo.setBucket(transform);
+                }
+              } else if (transform instanceof IdentityTransform
+                  || transform instanceof HoursTransform
+                  || transform instanceof DaysTransform
+                  || transform instanceof MonthsTransform
+                  || transform instanceof YearsTransform
+                  || (transform instanceof ApplyTransform
+                      && "truncate".equalsIgnoreCase(transform.name()))) {
                 sparkTableInfo.addPartition(transform);
               } else if (transform instanceof HoursTransform) {
                 sparkTableInfo.addHourPartition(transform);
@@ -164,6 +183,10 @@ public class SparkTableInfo {
               .toArray(SparkMetadataColumn[]::new);
     }
     return sparkTableInfo;
+  }
+
+  private static boolean isBucketPartition(boolean supportsBucketPartition, Transform transform) {
+    return supportsBucketPartition && !(transform instanceof SortedBucketTransform);
   }
 
   public List<SparkColumnInfo> getUnPartitionedColumns() {

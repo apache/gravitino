@@ -6,6 +6,7 @@ package com.datastrato.gravitino.proto;
 
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.authorization.Privileges;
+import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.meta.RoleEntity;
 import java.util.stream.Collectors;
@@ -29,7 +30,8 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
                 roleEntity.privileges().stream()
                     .map(privilege -> privilege.name().toString())
                     .collect(Collectors.toList()))
-            .setSecurableObject(roleEntity.securableObject().toString());
+            .setSecurableObjectFullName(roleEntity.securableObject().fullName())
+            .setSecurableObjectType(roleEntity.securableObject().type().name());
 
     if (roleEntity.properties() != null && !roleEntity.properties().isEmpty()) {
       builder.putAllProperties(roleEntity.properties());
@@ -55,7 +57,10 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
                 role.getPrivilegesList().stream()
                     .map(Privileges::fromString)
                     .collect(Collectors.toList()))
-            .withSecurableObject(SecurableObjects.parse(role.getSecurableObject()))
+            .withSecurableObject(
+                SecurableObjects.parse(
+                    role.getSecurableObjectFullName(),
+                    SecurableObject.Type.valueOf(role.getSecurableObjectType())))
             .withAuditInfo(new AuditInfoSerDe().deserialize(role.getAuditInfo(), namespace));
 
     if (!role.getPropertiesMap().isEmpty()) {

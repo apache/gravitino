@@ -57,6 +57,7 @@ public interface Configs {
   String DEFAULT_KV_ROCKSDB_BACKEND_PATH =
       String.join(File.separator, System.getenv("GRAVITINO_HOME"), "data", "rocksdb");
 
+  int GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT = 100;
   long MAX_NODE_IN_MEMORY = 100000L;
 
   long MIN_NODE_IN_MEMORY = 1000L;
