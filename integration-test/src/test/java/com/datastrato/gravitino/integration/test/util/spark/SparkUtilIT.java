@@ -119,6 +119,11 @@ public abstract class SparkUtilIT extends AbstractIT {
         .collect(Collectors.toList());
   }
 
+  // columns data are joined by ','
+  protected List<String> getTableMetadata(String getTableMetadataSql) {
+    return getQueryData(getTableMetadataSql);
+  }
+
   // Create SparkTableInfo from SparkBaseTable retrieved from LogicalPlan.
   protected SparkTableInfo getTableInfo(String tableName) {
     Dataset ds = getSparkSession().sql("DESC TABLE EXTENDED " + tableName);
