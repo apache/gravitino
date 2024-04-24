@@ -9,12 +9,9 @@ import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.exceptions.IllegalNameIdentifierException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
-import com.google.errorprone.annotations.FormatMethod;
-import com.google.errorprone.annotations.FormatString;
 import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,45 +71,38 @@ public class AuthorizationUtils {
   }
 
   public static void checkUser(NameIdentifier ident) {
-    check(ident != null, "User identifier must not be null");
+    NameIdentifier.check(ident != null, "User identifier must not be null");
     checkUserNamespace(ident.namespace());
   }
 
   public static void checkGroup(NameIdentifier ident) {
-    check(ident != null, "Group identifier must not be null");
+    NameIdentifier.check(ident != null, "Group identifier must not be null");
     checkGroupNamespace(ident.namespace());
   }
 
   public static void checkRole(NameIdentifier ident) {
-    check(ident != null, "Role identifier must not be null");
+    NameIdentifier.check(ident != null, "Role identifier must not be null");
     checkRoleNamespace(ident.namespace());
   }
 
   public static void checkUserNamespace(Namespace namespace) {
-    check(
+    Namespace.check(
         namespace != null && namespace.length() == 3,
         "User namespace must be non-null and have 3 levels, the input namespace is %s",
         namespace);
   }
 
   public static void checkGroupNamespace(Namespace namespace) {
-    check(
+    Namespace.check(
         namespace != null && namespace.length() == 3,
         "Group namespace must be non-null and have 3 levels, the input namespace is %s",
         namespace);
   }
 
   public static void checkRoleNamespace(Namespace namespace) {
-    check(
+    Namespace.check(
         namespace != null && namespace.length() == 3,
         "Role namespace must be non-null and have 3 levels, the input namespace is %s",
         namespace);
-  }
-
-  @FormatMethod
-  private static void check(boolean condition, @FormatString String message, Object... args) {
-    if (!condition) {
-      throw new IllegalNameIdentifierException(message, args);
-    }
   }
 }

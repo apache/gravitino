@@ -1,8 +1,13 @@
+/*
+ * Copyright 2024 Datastrato Pvt Ltd.
+ * This software is licensed under the Apache License version 2.
+ */
 package com.datastrato.gravitino.authorization;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.IllegalNameIdentifierException;
+import com.datastrato.gravitino.exceptions.IllegalNamespaceException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -22,7 +27,10 @@ class TestAuthorizationUtils {
     Assertions.assertEquals("group", group.name());
     Assertions.assertEquals(AuthorizationUtils.ofRoleNamespace(metalake), role.namespace());
     Assertions.assertEquals("role", role.name());
+  }
 
+  @Test
+  void testCreateNameIdentifierWithInvalidArgs() {
     Assertions.assertThrows(
         IllegalNameIdentifierException.class, () -> AuthorizationUtils.ofUser(metalake, null));
     Assertions.assertThrows(
@@ -56,19 +64,22 @@ class TestAuthorizationUtils {
     Assertions.assertEquals(metalake, namespace.level(0));
     Assertions.assertEquals("system", namespace.level(1));
     Assertions.assertEquals("role", namespace.level(2));
+  }
 
+  @Test
+  void testCreateNamespaceWithInvalidArgs() {
     Assertions.assertThrows(
-        IllegalNameIdentifierException.class, () -> AuthorizationUtils.ofUserNamespace(null));
+        IllegalNamespaceException.class, () -> AuthorizationUtils.ofUserNamespace(null));
     Assertions.assertThrows(
-        IllegalNameIdentifierException.class, () -> AuthorizationUtils.ofUserNamespace(""));
+        IllegalNamespaceException.class, () -> AuthorizationUtils.ofUserNamespace(""));
     Assertions.assertThrows(
-        IllegalNameIdentifierException.class, () -> AuthorizationUtils.ofGroupNamespace(null));
+        IllegalNamespaceException.class, () -> AuthorizationUtils.ofGroupNamespace(null));
     Assertions.assertThrows(
-        IllegalNameIdentifierException.class, () -> AuthorizationUtils.ofGroupNamespace(""));
+        IllegalNamespaceException.class, () -> AuthorizationUtils.ofGroupNamespace(""));
     Assertions.assertThrows(
-        IllegalNameIdentifierException.class, () -> AuthorizationUtils.ofRoleNamespace(null));
+        IllegalNamespaceException.class, () -> AuthorizationUtils.ofRoleNamespace(null));
     Assertions.assertThrows(
-        IllegalNameIdentifierException.class, () -> AuthorizationUtils.ofRoleNamespace(""));
+        IllegalNamespaceException.class, () -> AuthorizationUtils.ofRoleNamespace(""));
   }
 
   @Test
@@ -83,13 +94,13 @@ class TestAuthorizationUtils {
 
     Assertions.assertThrows(
         IllegalNameIdentifierException.class,
-        () -> AuthorizationUtils.checkUser(NameIdentifier.of("a", "b")));
+        () -> AuthorizationUtils.checkUser(NameIdentifier.of("")));
     Assertions.assertThrows(
         IllegalNameIdentifierException.class,
-        () -> AuthorizationUtils.checkGroup(NameIdentifier.of("a")));
+        () -> AuthorizationUtils.checkGroup(NameIdentifier.of("")));
     Assertions.assertThrows(
         IllegalNameIdentifierException.class,
-        () -> AuthorizationUtils.checkRole(NameIdentifier.of("a", "b", "c")));
+        () -> AuthorizationUtils.checkRole(NameIdentifier.of("")));
   }
 
   @Test
@@ -103,13 +114,13 @@ class TestAuthorizationUtils {
     Assertions.assertDoesNotThrow(() -> AuthorizationUtils.checkRoleNamespace(roleNamespace));
 
     Assertions.assertThrows(
-        IllegalNameIdentifierException.class,
+        IllegalNamespaceException.class,
         () -> AuthorizationUtils.checkUserNamespace(Namespace.of("a", "b")));
     Assertions.assertThrows(
-        IllegalNameIdentifierException.class,
+        IllegalNamespaceException.class,
         () -> AuthorizationUtils.checkGroupNamespace(Namespace.of("a")));
     Assertions.assertThrows(
-        IllegalNameIdentifierException.class,
+        IllegalNamespaceException.class,
         () -> AuthorizationUtils.checkRoleNamespace(Namespace.of("a", "b", "c", "d")));
   }
 }
