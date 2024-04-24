@@ -7,6 +7,7 @@ package com.datastrato.gravitino.storage.relational.service;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.authorization.AuthorizationUtils;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.GroupEntity;
 import com.datastrato.gravitino.storage.relational.mapper.GroupMetaMapper;
@@ -67,7 +68,7 @@ public class GroupMetaService {
   }
 
   public GroupEntity getGroupByIdentifier(NameIdentifier identifier) {
-    NameIdentifier.checkGroup(identifier);
+    AuthorizationUtils.checkGroup(identifier);
 
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
@@ -79,7 +80,7 @@ public class GroupMetaService {
 
   public void insertGroup(GroupEntity groupEntity, boolean overwritten) {
     try {
-      NameIdentifier.checkGroup(groupEntity.nameIdentifier());
+      AuthorizationUtils.checkGroup(groupEntity.nameIdentifier());
 
       Long metalakeId =
           MetalakeMetaService.getInstance().getMetalakeIdByName(groupEntity.namespace().level(0));
@@ -123,7 +124,7 @@ public class GroupMetaService {
   }
 
   public boolean deleteGroup(NameIdentifier identifier) {
-    NameIdentifier.checkGroup(identifier);
+    AuthorizationUtils.checkGroup(identifier);
 
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
@@ -142,7 +143,7 @@ public class GroupMetaService {
 
   public <E extends Entity & HasIdentifier> GroupEntity updateGroup(
       NameIdentifier identifier, Function<E, E> updater) {
-    NameIdentifier.checkGroup(identifier);
+    AuthorizationUtils.checkGroup(identifier);
 
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));

@@ -6,6 +6,7 @@ package com.datastrato.gravitino.storage.relational.service;
 
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.authorization.AuthorizationUtils;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.RoleEntity;
 import com.datastrato.gravitino.storage.relational.mapper.GroupRoleRelMapper;
@@ -69,7 +70,7 @@ public class RoleMetaService {
 
   public void insertRole(RoleEntity roleEntity, boolean overwritten) {
     try {
-      NameIdentifier.checkRole(roleEntity.nameIdentifier());
+      AuthorizationUtils.checkRole(roleEntity.nameIdentifier());
 
       Long metalakeId =
           MetalakeMetaService.getInstance().getMetalakeIdByName(roleEntity.namespace().level(0));
@@ -94,7 +95,7 @@ public class RoleMetaService {
   }
 
   public RoleEntity getRoleByIdentifier(NameIdentifier identifier) {
-    NameIdentifier.checkRole(identifier);
+    AuthorizationUtils.checkRole(identifier);
 
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
@@ -104,7 +105,7 @@ public class RoleMetaService {
   }
 
   public boolean deleteRole(NameIdentifier identifier) {
-    NameIdentifier.checkRole(identifier);
+    AuthorizationUtils.checkRole(identifier);
 
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
