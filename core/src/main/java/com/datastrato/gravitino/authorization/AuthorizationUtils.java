@@ -10,8 +10,6 @@ import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
-import com.datastrato.gravitino.meta.CatalogEntity;
-import com.datastrato.gravitino.meta.SchemaEntity;
 import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,8 +60,7 @@ public class AuthorizationUtils {
   }
 
   public static Namespace ofGroupNamespace(String metalake) {
-    return Namespace.of(
-        metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, SchemaEntity.GROUP_SCHEMA_NAME);
+    return Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.GROUP_SCHEMA_NAME);
   }
 
   public static Namespace ofUserNamespace(String metalake) {
