@@ -35,7 +35,7 @@ public class SparkTableInfoChecker {
     COLUMN,
     PARTITION,
     BUCKET,
-      METADATACOLUMN,
+    METADATA_COLUMN,
     COMMENT,
     TABLE_PROPERTY,
   }
@@ -52,11 +52,11 @@ public class SparkTableInfoChecker {
     return this;
   }
 
-    public SparkTableInfoChecker withMetadataColumns(SparkMetadataColumn[] metadataColumns) {
-        this.expectedTableInfo.setMetadataColumns(metadataColumns);
-        this.checkFields.add(CheckField.METADATACOLUMN);
-        return this;
-    }
+  public SparkTableInfoChecker withMetadataColumns(SparkMetadataColumn[] metadataColumns) {
+    this.expectedTableInfo.setMetadataColumns(metadataColumns);
+    this.checkFields.add(CheckField.METADATA_COLUMN);
+    return this;
+  }
 
   public SparkTableInfoChecker withBucket(int bucketNum, List<String> bucketColumns) {
     Transform bucketTransform = Expressions.bucket(bucketNum, bucketColumns.toArray(new String[0]));
@@ -163,20 +163,20 @@ public class SparkTableInfoChecker {
                 case BUCKET:
                   Assertions.assertEquals(expectedTableInfo.getBucket(), realTableInfo.getBucket());
                   break;
-              case METADATACOLUMN:
+                case METADATA_COLUMN:
                   Assertions.assertEquals(
-                          expectedTableInfo.getMetadataColumns().length,
-                          realTableInfo.getMetadataColumns().length);
+                      expectedTableInfo.getMetadataColumns().length,
+                      realTableInfo.getMetadataColumns().length);
                   for (int i = 0; i < expectedTableInfo.getMetadataColumns().length; i++) {
-                      Assertions.assertEquals(
-                              expectedTableInfo.getMetadataColumns()[i].name(),
-                              realTableInfo.getMetadataColumns()[i].name());
-                      Assertions.assertEquals(
-                              expectedTableInfo.getMetadataColumns()[i].dataType(),
-                              realTableInfo.getMetadataColumns()[i].dataType());
-                      Assertions.assertEquals(
-                              expectedTableInfo.getMetadataColumns()[i].isNullable(),
-                              realTableInfo.getMetadataColumns()[i].isNullable());
+                    Assertions.assertEquals(
+                        expectedTableInfo.getMetadataColumns()[i].name(),
+                        realTableInfo.getMetadataColumns()[i].name());
+                    Assertions.assertEquals(
+                        expectedTableInfo.getMetadataColumns()[i].dataType(),
+                        realTableInfo.getMetadataColumns()[i].dataType());
+                    Assertions.assertEquals(
+                        expectedTableInfo.getMetadataColumns()[i].isNullable(),
+                        realTableInfo.getMetadataColumns()[i].isNullable());
                   }
                   break;
                 case COMMENT:
