@@ -28,6 +28,7 @@ import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
+import com.datastrato.gravitino.rest.RESTUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
@@ -100,7 +101,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
 
     TableResponse resp =
         restClient.get(
-            formatTableRequestPath(ident.namespace()) + "/" + ident.name(),
+            formatTableRequestPath(ident.namespace()) + "/" + RESTUtils.encodeString(ident.name()),
             TableResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.tableErrorHandler());
@@ -137,7 +138,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
 
     TableCreateRequest req =
         new TableCreateRequest(
-            ident.name(),
+            RESTUtils.encodeString(ident.name()),
             comment,
             toDTOs(columns),
             properties,
@@ -182,7 +183,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
 
     TableResponse resp =
         restClient.put(
-            formatTableRequestPath(ident.namespace()) + "/" + ident.name(),
+            formatTableRequestPath(ident.namespace()) + "/" + RESTUtils.encodeString(ident.name()),
             updatesRequest,
             TableResponse.class,
             Collections.emptyMap(),
@@ -205,7 +206,9 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
     try {
       DropResponse resp =
           restClient.delete(
-              formatTableRequestPath(ident.namespace()) + "/" + ident.name(),
+              formatTableRequestPath(ident.namespace())
+                  + "/"
+                  + RESTUtils.encodeString(ident.name()),
               DropResponse.class,
               Collections.emptyMap(),
               ErrorHandlers.tableErrorHandler());
@@ -233,7 +236,9 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
     try {
       DropResponse resp =
           restClient.delete(
-              formatTableRequestPath(ident.namespace()) + "/" + ident.name(),
+              formatTableRequestPath(ident.namespace())
+                  + "/"
+                  + RESTUtils.encodeString(ident.name()),
               params,
               DropResponse.class,
               Collections.emptyMap(),
@@ -255,7 +260,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
     return new StringBuilder()
         .append(formatSchemaRequestPath(schemaNs))
         .append("/")
-        .append(ns.level(2))
+        .append(RESTUtils.encodeString(ns.level(2)))
         .append("/tables")
         .toString();
   }

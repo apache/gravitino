@@ -18,7 +18,7 @@ class GravitinoClientBase:
     Base class for Gravitino Java client;
     It uses an underlying {@link RESTClient} to send HTTP requests and receive responses from the API.
     """
-    rest_client: HTTPClient
+    _rest_client: HTTPClient
     """The REST client to communicate with the REST server"""
 
     API_METALAKES_LIST_PATH = "api/metalakes"
@@ -29,7 +29,7 @@ class GravitinoClientBase:
     """The REST API path prefix for load a specific metalake"""
 
     def __init__(self, uri: str):
-        self.rest_client = HTTPClient(uri)
+        self._rest_client = HTTPClient(uri)
 
     def load_metalake(self, ident: NameIdentifier) -> GravitinoMetalake:
         """Loads a specific Metalake from the Gravitino API.
@@ -46,11 +46,11 @@ class GravitinoClientBase:
 
         NameIdentifier.check_metalake(ident)
 
-        response = self.rest_client.get(GravitinoClientBase.API_METALAKES_IDENTIFIER_PATH + ident.name())
+        response = self._rest_client.get(GravitinoClientBase.API_METALAKES_IDENTIFIER_PATH + ident.name())
         metalake_response = MetalakeResponse.from_json(response.body, infer_missing=True)
         metalake_response.validate()
 
-        return GravitinoMetalake.build(metalake_response.metalake, self.rest_client)
+        return GravitinoMetalake(metalake_response.metalake(), self._rest_client)
 
     def get_version(self) -> GravitinoVersion:
         """Retrieves the version of the Gravitino API.
@@ -58,15 +58,15 @@ class GravitinoClientBase:
         Returns:
             A GravitinoVersion instance representing the version of the Gravitino API.
         """
-        resp = self.rest_client.get("api/version")
+        resp = self._rest_client.get("api/version")
         resp.validate()
 
         return GravitinoVersion(resp.get_version())
 
     def close(self):
         """Closes the GravitinoClient and releases any underlying resources."""
-        if self.rest_client is not None:
+        if self._rest_client is not None:
             try:
-                self.rest_client.close()
+                self._rest_client.close()
             except Exception as e:
                 logger.warning("Failed to close the HTTP REST client", e)

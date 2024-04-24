@@ -1249,6 +1249,47 @@ public class CatalogMysqlIT extends AbstractIT {
   }
 
   @Test
+  void testNameSpec() {
+    // test operate illegal schema name from MySQL
+    String testSchemaName = "//";
+    String sql = String.format("CREATE DATABASE `%s`", testSchemaName);
+    mysqlService.executeQuery(sql);
+
+    NameIdentifier schemaIdent = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
+    Schema schema = catalog.asSchemas().loadSchema(schemaIdent);
+    Assertions.assertEquals(testSchemaName, schema.name());
+
+    NameIdentifier[] schemaIdents =
+        catalog.asSchemas().listSchemas(Namespace.of(metalakeName, catalogName));
+    Assertions.assertTrue(
+        Arrays.stream(schemaIdents).anyMatch(s -> s.name().equals(testSchemaName)));
+
+    Assertions.assertTrue(catalog.asSchemas().dropSchema(schemaIdent, false));
+    Assertions.assertFalse(catalog.asSchemas().schemaExists(schemaIdent));
+
+    // test operate illegal table name from MySQL
+    mysqlService.executeQuery(sql);
+    String testTableName = "//";
+    sql = String.format("CREATE TABLE `%s`.`%s` (id int)", testSchemaName, testTableName);
+    mysqlService.executeQuery(sql);
+    NameIdentifier tableIdent =
+        NameIdentifier.of(metalakeName, catalogName, testSchemaName, testTableName);
+
+    Table table = catalog.asTableCatalog().loadTable(tableIdent);
+    Assertions.assertEquals(testTableName, table.name());
+
+    NameIdentifier[] tableIdents =
+        catalog
+            .asTableCatalog()
+            .listTables(Namespace.of(metalakeName, catalogName, testSchemaName));
+    Assertions.assertTrue(Arrays.stream(tableIdents).anyMatch(t -> t.name().equals(testTableName)));
+
+    Assertions.assertTrue(catalog.asTableCatalog().dropTable(tableIdent));
+    Assertions.assertFalse(catalog.asTableCatalog().tableExists(tableIdent));
+    Assertions.assertFalse(catalog.asTableCatalog().purgeTable(tableIdent));
+  }
+
+  @Test
   void testMySQLSchemaNameCaseSensitive() {
     Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, false, null);
     Column col2 = Column.of("col_2", Types.VarCharType.of(255), "code", false, false, null);

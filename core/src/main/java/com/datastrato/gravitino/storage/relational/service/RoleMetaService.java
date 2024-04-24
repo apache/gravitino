@@ -5,14 +5,17 @@
 package com.datastrato.gravitino.storage.relational.service;
 
 import com.datastrato.gravitino.Entity;
+import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.authorization.AuthorizationUtils;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.RoleEntity;
+import com.datastrato.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import com.datastrato.gravitino.storage.relational.mapper.RoleMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.UserRoleRelMapper;
 import com.datastrato.gravitino.storage.relational.po.RolePO;
 import com.datastrato.gravitino.storage.relational.utils.ExceptionUtils;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
-import com.google.common.base.Preconditions;
 import java.util.List;
 
 /** The service class for role metadata. It provides the basic database operations for role. */
@@ -24,6 +27,21 @@ public class RoleMetaService {
   }
 
   private RoleMetaService() {}
+
+  private RolePO getRolePOByMetalakeIdAndName(Long metalakeId, String roleName) {
+    RolePO rolePO =
+        SessionUtils.getWithoutCommit(
+            RoleMetaMapper.class,
+            mapper -> mapper.selectRoleMetaByMetalakeIdAndName(metalakeId, roleName));
+
+    if (rolePO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.ROLE.name().toLowerCase(),
+          roleName);
+    }
+    return rolePO;
+  }
 
   public Long getRoleIdByMetalakeIdAndName(Long metalakeId, String roleName) {
     Long roleId =
@@ -52,11 +70,7 @@ public class RoleMetaService {
 
   public void insertRole(RoleEntity roleEntity, boolean overwritten) {
     try {
-      Preconditions.checkArgument(
-          roleEntity.namespace() != null
-              && !roleEntity.namespace().isEmpty()
-              && roleEntity.namespace().levels().length == 3,
-          "The identifier should not be null and should have three level.");
+      AuthorizationUtils.checkRole(roleEntity.nameIdentifier());
 
       Long metalakeId =
           MetalakeMetaService.getInstance().getMetalakeIdByName(roleEntity.namespace().level(0));
@@ -78,5 +92,35 @@ public class RoleMetaService {
           re, Entity.EntityType.ROLE, roleEntity.nameIdentifier().toString());
       throw re;
     }
+  }
+
+  public RoleEntity getRoleByIdentifier(NameIdentifier identifier) {
+    AuthorizationUtils.checkRole(identifier);
+
+    Long metalakeId =
+        MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
+    RolePO rolePO = getRolePOByMetalakeIdAndName(metalakeId, identifier.name());
+
+    return POConverters.fromRolePO(rolePO, identifier.namespace());
+  }
+
+  public boolean deleteRole(NameIdentifier identifier) {
+    AuthorizationUtils.checkRole(identifier);
+
+    Long metalakeId =
+        MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
+    Long roleId = getRoleIdByMetalakeIdAndName(metalakeId, identifier.name());
+
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            SessionUtils.doWithoutCommit(
+                RoleMetaMapper.class, mapper -> mapper.softDeleteRoleMetaByRoleId(roleId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                UserRoleRelMapper.class, mapper -> mapper.softDeleteUserRoleRelByRoleId(roleId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                GroupRoleRelMapper.class, mapper -> mapper.softDeleteGroupRoleRelByRoleId(roleId)));
+    return true;
   }
 }

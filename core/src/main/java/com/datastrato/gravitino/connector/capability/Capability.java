@@ -94,7 +94,7 @@ public interface Capability {
      *
      * <p>$ - End of the string
      */
-    private static final String DEFAULT_NAME_PATTERN = "^[a-zA-Z0-9_][a-zA-Z0-9_/=-]{0,63}$";
+    private static final String DEFAULT_NAME_PATTERN = "^\\w[\\w/=-]{0,63}$";
 
     @Override
     public CapabilityResult columnNotNull() {

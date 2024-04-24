@@ -237,10 +237,18 @@ const MetalakeTree = props => {
   }
 
   const renderNode = nodeData => {
+    const len = extractPlaceholder(nodeData.key).length
+    const maxWidth = 260 - (26 * 2 - 26 * (5 - len))
     if (nodeData.path) {
       return (
         <Typography
-          sx={{ color: theme => theme.palette.text.secondary }}
+          sx={{
+            color: theme => theme.palette.text.secondary,
+            whiteSpace: 'nowrap',
+            maxWidth,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}
           data-refer='tree-node'
           data-refer-node={nodeData.key}
         >

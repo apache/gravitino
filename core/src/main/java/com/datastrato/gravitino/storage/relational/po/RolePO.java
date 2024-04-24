@@ -12,7 +12,8 @@ public class RolePO {
   private String roleName;
   private Long metalakeId;
   private String properties;
-  private String securableObject;
+  private String securableObjectFullName;
+  private String securableObjectType;
   private String privileges;
   private String auditInfo;
   private Long currentVersion;
@@ -35,8 +36,12 @@ public class RolePO {
     return properties;
   }
 
-  public String getSecurableObject() {
-    return securableObject;
+  public String getSecurableObjectFullName() {
+    return securableObjectFullName;
+  }
+
+  public String getSecurableObjectType() {
+    return securableObjectType;
   }
 
   public String getPrivileges() {
@@ -72,7 +77,8 @@ public class RolePO {
         && Objects.equal(getRoleName(), tablePO.getRoleName())
         && Objects.equal(getMetalakeId(), tablePO.getMetalakeId())
         && Objects.equal(getProperties(), tablePO.getProperties())
-        && Objects.equal(getSecurableObject(), tablePO.getSecurableObject())
+        && Objects.equal(getSecurableObjectFullName(), tablePO.getSecurableObjectFullName())
+        && Objects.equal(getSecurableObjectType(), tablePO.getSecurableObjectType())
         && Objects.equal(getPrivileges(), tablePO.getPrivileges())
         && Objects.equal(getAuditInfo(), tablePO.getAuditInfo())
         && Objects.equal(getCurrentVersion(), tablePO.getCurrentVersion())
@@ -87,7 +93,8 @@ public class RolePO {
         getRoleName(),
         getMetalakeId(),
         getProperties(),
-        getSecurableObject(),
+        getSecurableObjectFullName(),
+        getSecurableObjectType(),
         getPrivileges(),
         getAuditInfo(),
         getCurrentVersion(),
@@ -122,8 +129,13 @@ public class RolePO {
       return this;
     }
 
-    public Builder withSecurableObject(String securableObject) {
-      rolePO.securableObject = securableObject;
+    public Builder withSecurableObjectFullName(String securableObjectFullName) {
+      rolePO.securableObjectFullName = securableObjectFullName;
+      return this;
+    }
+
+    public Builder withSecurableObjectType(String securableObjectType) {
+      rolePO.securableObjectType = securableObjectType;
       return this;
     }
 
@@ -156,8 +168,10 @@ public class RolePO {
       Preconditions.checkArgument(rolePO.roleId != null, "Role id is required");
       Preconditions.checkArgument(rolePO.roleName != null, "Role name is required");
       Preconditions.checkArgument(rolePO.metalakeId != null, "Metalake id is required");
-      Preconditions.checkArgument(rolePO.properties != null, "Properties is required");
-      Preconditions.checkArgument(rolePO.securableObject != null, "Securable object is required");
+      Preconditions.checkArgument(
+          rolePO.securableObjectFullName != null, "Securable object full name is required");
+      Preconditions.checkArgument(
+          rolePO.securableObjectType != null, "Securable object type is required");
       Preconditions.checkArgument(rolePO.privileges != null, "Privileges is required");
       Preconditions.checkArgument(rolePO.auditInfo != null, "Audit info is required");
       Preconditions.checkArgument(rolePO.currentVersion != null, "Current version is required");

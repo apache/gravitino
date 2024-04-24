@@ -7,6 +7,9 @@ package com.datastrato.gravitino.storage.relational.utils;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.authorization.Privileges;
+import com.datastrato.gravitino.authorization.SecurableObject;
+import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.meta.AuditInfo;
@@ -33,6 +36,7 @@ import com.datastrato.gravitino.storage.relational.po.TopicPO;
 import com.datastrato.gravitino.storage.relational.po.UserPO;
 import com.datastrato.gravitino.storage.relational.po.UserRoleRelPO;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.Map;
@@ -778,11 +782,14 @@ public class POConverters {
           .withRoleId(roleEntity.id())
           .withRoleName(roleEntity.name())
           .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(roleEntity.properties()))
-          .withSecurableObject(roleEntity.securableObject().toString())
+          .withSecurableObjectFullName(roleEntity.securableObject().fullName())
+          .withSecurableObjectType(roleEntity.securableObject().type().name())
           .withPrivileges(
-              roleEntity.privileges().stream()
-                  .map(privilege -> privilege.name().toString())
-                  .collect(Collectors.joining(",")))
+              JsonUtils.anyFieldMapper()
+                  .writeValueAsString(
+                      roleEntity.privileges().stream()
+                          .map(privilege -> privilege.name().toString())
+                          .collect(Collectors.toList())))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(roleEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
@@ -869,6 +876,30 @@ public class POConverters {
       return groupRoleRelPOS;
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  public static RoleEntity fromRolePO(RolePO rolePO, Namespace namespace) {
+    try {
+      return RoleEntity.builder()
+          .withId(rolePO.getRoleId())
+          .withName(rolePO.getRoleName())
+          .withNamespace(namespace)
+          .withProperties(JsonUtils.anyFieldMapper().readValue(rolePO.getProperties(), Map.class))
+          .withPrivileges(
+              JsonUtils.anyFieldMapper()
+                  .readValue(rolePO.getPrivileges(), new TypeReference<List<String>>() {}).stream()
+                  .map(Privileges::fromString)
+                  .collect(Collectors.toList()))
+          .withSecurableObject(
+              SecurableObjects.parse(
+                  rolePO.getSecurableObjectFullName(),
+                  SecurableObject.Type.valueOf(rolePO.getSecurableObjectType())))
+          .withAuditInfo(
+              JsonUtils.anyFieldMapper().readValue(rolePO.getAuditInfo(), AuditInfo.class))
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize json object:", e);
     }
   }
 }

@@ -12,11 +12,16 @@ import { Link as MUILink, Breadcrumbs, Typography, Tooltip, styled } from '@mui/
 
 import Icon from '@/components/Icon'
 
-const Text = styled(Typography)(({ theme }) => ({
-  maxWidth: '120px',
+const TextWrapper = styled(Typography)(({ theme }) => ({
+  mixWidth: '120px',
   overflow: 'hidden',
-  textOverflow: 'ellipsis'
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap'
 }))
+
+const Text = props => {
+  return <TextWrapper component='span' {...props} />
+}
 
 const MetalakePath = props => {
   const searchParams = useSearchParams()
@@ -47,10 +52,26 @@ const MetalakePath = props => {
   return (
     <Breadcrumbs
       sx={{
+        width: 'calc(100% - 48px)',
+        overflow: 'hidden',
         mt: 0,
         '& a': { display: 'flex', alignItems: 'center' },
+        '& ol': {
+          flexWrap: 'nowrap'
+        },
+        '& ol > li.MuiBreadcrumbs-li': {
+          overflow: 'hidden',
+          display: 'inline-flex',
+          '& > a': {
+            width: '100%',
+            '& > svg': {
+              minWidth: 20
+            }
+          }
+        },
         '& ol > li:last-of-type': {
-          color: theme => `${theme.palette.text.primary} !important`
+          color: theme => `${theme.palette.text.primary} !important`,
+          overflow: 'hidden'
         }
       }}
     >

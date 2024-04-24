@@ -3,13 +3,16 @@ Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
 from abc import ABC
+from dataclasses import field
+
+from dataclasses_json import config
 
 
 class SchemaChange(ABC):
     """NamespaceChange class to set the property and value pairs for the namespace."""
 
     @staticmethod
-    def set_property(property, value):
+    def set_property(property: str, value: str):
         """SchemaChange class to set the property and value pairs for the schema.
 
         Args:
@@ -22,7 +25,7 @@ class SchemaChange(ABC):
         return SchemaChange.SetProperty(property, value)
 
     @staticmethod
-    def remove_property(property):
+    def remove_property(property: str):
         """SchemaChange class to remove a property from the schema.
 
         Args:
@@ -35,25 +38,29 @@ class SchemaChange(ABC):
 
     class SetProperty:
         """SchemaChange class to set the property and value pairs for the schema."""
-        def __init__(self, property, value):
-            self.property = property
-            self.value = value
 
-        def get_property(self):
+        _property: str = field(metadata=config(field_name='property'))
+        _value: str = field(metadata=config(field_name='value'))
+
+        def __init__(self, property: str, value: str):
+            self._property = property
+            self._value = value
+
+        def property(self):
             """Retrieves the name of the property to be set.
 
             Returns:
                  The name of the property.
             """
-            return self.property
+            return self._property
 
-        def get_value(self):
+        def value(self):
             """Retrieves the value of the property to be set.
 
             Returns:
                  The value of the property.
             """
-            return self.value
+            return self._value
 
         def __eq__(self, other):
             """Compares this SetProperty instance with another object for equality.
@@ -67,7 +74,7 @@ class SchemaChange(ABC):
             """
             if not isinstance(other, SchemaChange.SetProperty):
                 return False
-            return self.property == other.property and self.value == other.value
+            return self._property == other.property() and self._value == other.value()
 
         def __hash__(self):
             """Generates a hash code for this SetProperty instance.
@@ -76,7 +83,7 @@ class SchemaChange(ABC):
              Returns:
                   A hash code value for this property setting.
             """
-            return hash((self.property, self.value))
+            return hash((self._property, self._value))
 
         def __str__(self):
             """Provides a string representation of the SetProperty instance.
@@ -85,20 +92,23 @@ class SchemaChange(ABC):
             Returns:
                  A string summary of the property setting.
             """
-            return f"SETPROPERTY {self.property} {self.value}"
+            return f"SETPROPERTY {self._property} {self._value}"
 
     class RemoveProperty:
         """SchemaChange class to remove a property from the schema."""
-        def __init__(self, property):
-            self.property = property
 
-        def get_property(self):
+        _property: str = field(metadata=config(field_name='property'))
+
+        def __init__(self, property: str):
+            self._property = property
+
+        def property(self):
             """Retrieves the name of the property to be removed.
 
             Returns:
                  The name of the property for removal.
             """
-            return self.property
+            return self._property
 
         def __eq__(self, other):
             """Compares this RemoveProperty instance with another object for equality.
@@ -112,7 +122,7 @@ class SchemaChange(ABC):
             """
             if not isinstance(other, SchemaChange.RemoveProperty):
                 return False
-            return self.property == other.property
+            return self._property == other.property()
 
         def __hash__(self):
             """Generates a hash code for this RemoveProperty instance.
@@ -121,7 +131,7 @@ class SchemaChange(ABC):
             Returns:
                  A hash code value for this property removal operation.
             """
-            return hash(self.property)
+            return hash(self._property)
 
         def __str__(self):
             """Provides a string representation of the RemoveProperty instance.
@@ -130,4 +140,4 @@ class SchemaChange(ABC):
             Returns:
                  A string summary of the property removal operation.
             """
-            return f"REMOVEPROPERTY {self.property}"
+            return f"REMOVEPROPERTY {self._property}"

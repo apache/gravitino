@@ -15,6 +15,7 @@ import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import com.datastrato.gravitino.exceptions.NoSuchColumnException;
+import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
@@ -32,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import javax.sql.DataSource;
 import org.apache.commons.collections4.MapUtils;
@@ -68,6 +70,27 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(database),
         "The `jdbc-database` configuration item is mandatory in PostgreSQL.");
+  }
+
+  protected JdbcTable.Builder getTableBuilder(
+      ResultSet tablesResult, String databaseName, String tableName) throws SQLException {
+    boolean found = false;
+    JdbcTable.Builder builder = null;
+    while (tablesResult.next() && !found) {
+      String tableNameInResult = tablesResult.getString("TABLE_NAME");
+      String tableSchemaInResultLowerCase = tablesResult.getString("TABLE_SCHEM");
+      if (Objects.equals(tableNameInResult, tableName)
+          && Objects.equals(tableSchemaInResultLowerCase, databaseName)) {
+        builder = getBasicJdbcTableInfo(tablesResult);
+        found = true;
+      }
+    }
+
+    if (!found) {
+      throw new NoSuchTableException("Table %s does not exist in %s.", tableName, databaseName);
+    }
+
+    return builder;
   }
 
   @Override
