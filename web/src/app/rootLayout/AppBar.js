@@ -7,6 +7,9 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
+import { Alata } from 'next/font/google'
+
+import { useState, useEffect } from 'react'
 
 import {
   Box,
@@ -20,6 +23,8 @@ import {
   MenuItem
 } from '@mui/material'
 
+import clsx from 'clsx'
+
 import VersionView from './VersionView'
 import LogoutButton from './Logout'
 import { useSearchParams } from 'next/navigation'
@@ -27,7 +32,7 @@ import { useRouter } from 'next/navigation'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
 import { fetchMetalakes } from '@/lib/store/metalakes'
 
-import { useState, useEffect } from 'react'
+const fonts = Alata({ subsets: ['latin'], weight: ['400'], display: 'swap' })
 
 const AppBar = () => {
   const searchParams = useSearchParams()
@@ -72,9 +77,10 @@ const AppBar = () => {
               />
               <Typography
                 variant='h5'
-                className={
-                  'logoText twc-ml-2 twc-leading-none twc-font-bold twc-tracking-[-0.45px] twc-normal-case twc-text-[1.75rem]'
-                }
+                className={clsx(
+                  'twc-ml-2 twc-leading-none twc-tracking-[-0.45px] twc-normal-case twc-text-[1.75rem]',
+                  fonts.className
+                )}
               >
                 Gravitino
               </Typography>
