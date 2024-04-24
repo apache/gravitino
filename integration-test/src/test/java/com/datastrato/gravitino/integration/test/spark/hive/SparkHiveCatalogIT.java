@@ -249,6 +249,30 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
   }
 
   @Test
+  void testHiveFormatWithUsingHive() {
+    String tableName = "test_hive_format_using_hive_table";
+    dropTableIfExists(tableName);
+    String createTableSql = getCreateSimpleTableString(tableName);
+    createTableSql += "USING HIVE";
+    sql(createTableSql);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withTableProperties(
+                ImmutableMap.of(
+                    HivePropertiesConstants.SPARK_HIVE_INPUT_FORMAT,
+                    HivePropertiesConstants.TEXT_INPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_OUTPUT_FORMAT,
+                    HivePropertiesConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_SERDE_LIB,
+                    HivePropertiesConstants.LAZY_SIMPLE_SERDE_CLASS));
+    checker.check(tableInfo);
+    checkTableReadWrite(tableInfo);
+  }
+
+  @Test
   void testHiveFormatWithUsing() {
     String tableName = "test_hive_format_using_table";
     dropTableIfExists(tableName);
