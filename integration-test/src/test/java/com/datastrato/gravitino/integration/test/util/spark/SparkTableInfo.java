@@ -17,6 +17,7 @@ import java.util.stream.Collectors;
 import javax.ws.rs.NotSupportedException;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.spark.sql.connector.catalog.SupportsMetadataColumns;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.connector.expressions.ApplyTransform;
 import org.apache.spark.sql.connector.expressions.BucketTransform;
@@ -42,6 +43,7 @@ public class SparkTableInfo {
   private Transform bucket;
   private List<Transform> partitions = new ArrayList<>();
   private Set<String> partitionColumnNames = new HashSet<>();
+  private SparkMetadataColumnInfo[] metadataColumns;
 
   public SparkTableInfo() {}
 
@@ -132,6 +134,18 @@ public class SparkTableInfo {
                     "Doesn't support Spark transform: " + transform.name());
               }
             });
+    if (baseTable instanceof SupportsMetadataColumns) {
+      SupportsMetadataColumns supportsMetadataColumns = (SupportsMetadataColumns) baseTable;
+      sparkTableInfo.metadataColumns =
+          Arrays.stream(supportsMetadataColumns.metadataColumns())
+              .map(
+                  metadataColumn ->
+                      new SparkMetadataColumnInfo(
+                          metadataColumn.name(),
+                          metadataColumn.dataType(),
+                          metadataColumn.isNullable()))
+              .toArray(SparkMetadataColumnInfo[]::new);
+    }
     return sparkTableInfo;
   }
 
