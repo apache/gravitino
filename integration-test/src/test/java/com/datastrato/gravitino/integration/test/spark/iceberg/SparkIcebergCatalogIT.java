@@ -328,9 +328,9 @@ public class SparkIcebergCatalogIT extends SparkCommonIT {
 
     String getMetadataSQL = String.format("SELECT _partition FROM %s", tableName);
     Assertions.assertEquals(1, getSparkSession().sql(getMetadataSQL).count());
-    // _partition value is null for unPartitioned table, so it will throw NPE when try to build
-    // query data.
-    Assertions.assertThrows(NullPointerException.class, () -> getTableMetadata(getMetadataSQL));
+    Row row = getSparkSession().sql(getMetadataSQL).collectAsList().get(0);
+    Assertions.assertNotNull(row);
+    Assertions.assertNull(row.get(0));
   }
 
   private void testFileMetadataColumn() {
