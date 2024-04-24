@@ -33,13 +33,9 @@ import org.apache.spark.sql.connector.catalog.functions.UnboundFunction;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructField;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
 
-@Tag("gravitino-docker-it")
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class SparkIcebergCatalogIT extends SparkCommonIT {
+public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Override
   protected String getCatalogName() {

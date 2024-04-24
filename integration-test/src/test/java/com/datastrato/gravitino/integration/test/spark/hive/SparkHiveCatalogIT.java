@@ -8,11 +8,14 @@ import com.datastrato.gravitino.integration.test.spark.SparkCommonIT;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo.SparkColumnInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
+import com.datastrato.gravitino.spark.connector.GravitinoSparkConfig;
 import com.datastrato.gravitino.spark.connector.hive.HivePropertiesConstants;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.types.DataTypes;
@@ -33,6 +36,13 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
   @Override
   protected String getProvider() {
     return "hive";
+  }
+
+  @Override
+  protected Map<String, String> getCatalogConfigs() {
+    Map<String, String> catalogProperties = Maps.newHashMap();
+    catalogProperties.put(GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI, hiveMetastoreUri);
+    return catalogProperties;
   }
 
   @Override
