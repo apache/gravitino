@@ -88,21 +88,21 @@ public class AuthorizationUtils {
   public static void checkUserNamespace(Namespace namespace) {
     Namespace.check(
         namespace != null && namespace.length() == 3,
-        "User namespace must be non-null and have 3 levels, the input namespace is %s",
+        "User namespace must have 3 levels, the input namespace is %s",
         namespace);
   }
 
   public static void checkGroupNamespace(Namespace namespace) {
     Namespace.check(
         namespace != null && namespace.length() == 3,
-        "Group namespace must be non-null and have 3 levels, the input namespace is %s",
+        "Group namespace must have 3 levels, the input namespace is %s",
         namespace);
   }
 
   public static void checkRoleNamespace(Namespace namespace) {
     Namespace.check(
         namespace != null && namespace.length() == 3,
-        "Role namespace must be non-null and have 3 levels, the input namespace is %s",
+        "Role namespace must have 3 levels, the input namespace is %s",
         namespace);
   }
 }
