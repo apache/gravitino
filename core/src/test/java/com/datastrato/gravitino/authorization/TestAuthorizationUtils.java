@@ -93,6 +93,12 @@ class TestAuthorizationUtils {
     Assertions.assertDoesNotThrow(() -> AuthorizationUtils.checkRole(role));
 
     Assertions.assertThrows(
+        IllegalNameIdentifierException.class, () -> AuthorizationUtils.checkUser(null));
+    Assertions.assertThrows(
+        IllegalNameIdentifierException.class, () -> AuthorizationUtils.checkGroup(null));
+    Assertions.assertThrows(
+        IllegalNameIdentifierException.class, () -> AuthorizationUtils.checkRole(null));
+    Assertions.assertThrows(
         IllegalNameIdentifierException.class,
         () -> AuthorizationUtils.checkUser(NameIdentifier.of("")));
     Assertions.assertThrows(
@@ -113,6 +119,12 @@ class TestAuthorizationUtils {
     Assertions.assertDoesNotThrow(() -> AuthorizationUtils.checkGroupNamespace(groupNamespace));
     Assertions.assertDoesNotThrow(() -> AuthorizationUtils.checkRoleNamespace(roleNamespace));
 
+    Assertions.assertThrows(
+        IllegalNamespaceException.class, () -> AuthorizationUtils.checkUserNamespace(null));
+    Assertions.assertThrows(
+        IllegalNamespaceException.class, () -> AuthorizationUtils.checkGroupNamespace(null));
+    Assertions.assertThrows(
+        IllegalNamespaceException.class, () -> AuthorizationUtils.checkRoleNamespace(null));
     Assertions.assertThrows(
         IllegalNamespaceException.class,
         () -> AuthorizationUtils.checkUserNamespace(Namespace.of("a", "b")));
