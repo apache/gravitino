@@ -7,6 +7,7 @@ package com.datastrato.gravitino.storage.relational.service;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.authorization.AuthorizationUtils;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.relational.mapper.UserMetaMapper;
@@ -67,11 +68,8 @@ public class UserMetaService {
   }
 
   public UserEntity getUserByIdentifier(NameIdentifier identifier) {
-    Preconditions.checkArgument(
-        identifier != null
-            && !identifier.namespace().isEmpty()
-            && identifier.namespace().levels().length == 3,
-        "The identifier should not be null and should have three level.");
+    AuthorizationUtils.checkUser(identifier);
+
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
     UserPO userPO = getUserPOByMetalakeIdAndName(metalakeId, identifier.name());
@@ -82,11 +80,7 @@ public class UserMetaService {
 
   public void insertUser(UserEntity userEntity, boolean overwritten) {
     try {
-      Preconditions.checkArgument(
-          userEntity.namespace() != null
-              && !userEntity.namespace().isEmpty()
-              && userEntity.namespace().levels().length == 3,
-          "The identifier should not be null and should have three level.");
+      AuthorizationUtils.checkUser(userEntity.nameIdentifier());
 
       Long metalakeId =
           MetalakeMetaService.getInstance().getMetalakeIdByName(userEntity.namespace().level(0));
@@ -130,11 +124,8 @@ public class UserMetaService {
   }
 
   public boolean deleteUser(NameIdentifier identifier) {
-    Preconditions.checkArgument(
-        identifier != null
-            && !identifier.namespace().isEmpty()
-            && identifier.namespace().levels().length == 3,
-        "The identifier should not be null and should have three level.");
+    AuthorizationUtils.checkUser(identifier);
+
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
     Long userId = getUserIdByMetalakeIdAndName(metalakeId, identifier.name());
@@ -151,11 +142,7 @@ public class UserMetaService {
 
   public <E extends Entity & HasIdentifier> UserEntity updateUser(
       NameIdentifier identifier, Function<E, E> updater) {
-    Preconditions.checkArgument(
-        identifier != null
-            && !identifier.namespace().isEmpty()
-            && identifier.namespace().levels().length == 3,
-        "The identifier should not be null and should have three level.");
+    AuthorizationUtils.checkUser(identifier);
 
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
