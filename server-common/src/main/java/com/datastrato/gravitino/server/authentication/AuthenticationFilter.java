@@ -14,7 +14,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.Enumeration;
 import java.util.Map;
-import java.util.Optional;
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
 import javax.servlet.FilterConfig;
@@ -50,20 +49,19 @@ public class AuthenticationFilter implements Filter {
       throws IOException, ServletException {
     try {
       HttpServletRequest req = (HttpServletRequest) request;
-      String authenticatorType =
-          Optional.ofNullable(req.getHeader(AuthConstants.HTTP_HEADER_AUTHORIZATION_TYPE))
-              .orElse(AuthenticatorType.SIMPLE.name().toLowerCase());
-      Authenticator authenticator = filterAuthenticators.get(authenticatorType);
-      if (authenticator == null) {
-        throw new UnauthorizedException(
-            "Gravitino Server only support %s authentication, [%s] is not allowed",
-            "Simple, OAuth, Kerberos", authenticatorType);
-      }
 
       Enumeration<String> headerData = req.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION);
+      Authenticator authenticator = null;
       byte[] authData = null;
       if (headerData.hasMoreElements()) {
         authData = headerData.nextElement().getBytes(StandardCharsets.UTF_8);
+        AuthenticatorType authenticatorType = parseAuthenticatorType(authData);
+        authenticator = filterAuthenticators.get(authenticatorType.name().toLowerCase());
+      }
+      if (authenticator == null) {
+        throw new UnauthorizedException(
+            "Gravitino Server only support %s authentication, current authentication is not allowed",
+            "Simple, OAuth, Kerberos");
       }
       if (authenticator.isDataFromToken()) {
         Principal principal = authenticator.authenticateToken(authData);
@@ -86,4 +84,18 @@ public class AuthenticationFilter implements Filter {
 
   @Override
   public void destroy() {}
+
+  private AuthenticatorType parseAuthenticatorType(byte[] authData) {
+    String auth = new String(authData, StandardCharsets.UTF_8);
+
+    if (auth.startsWith(AuthConstants.AUTHORIZATION_BASIC_HEADER)) {
+      return AuthenticatorType.SIMPLE;
+    } else if (auth.startsWith(AuthConstants.AUTHORIZATION_BEARER_HEADER)) {
+      return AuthenticatorType.OAUTH;
+    } else if (auth.startsWith(AuthConstants.NEGOTIATE)) {
+      return AuthenticatorType.KERBEROS;
+    } else {
+      throw new UnauthorizedException("Unknown authenticator type:{}", auth);
+    }
+  }
 }

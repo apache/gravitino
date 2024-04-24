@@ -31,7 +31,6 @@ public class TestAuthenticationFilter {
   public void testDoFilterNormal() throws ServletException, IOException {
 
     Authenticator authenticator = mock(Authenticator.class);
-    when(authenticator.name()).thenReturn("simple");
     AuthenticationFilter filter = new AuthenticationFilter(authenticator);
     FilterChain mockChain = mock(FilterChain.class);
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
@@ -47,7 +46,6 @@ public class TestAuthenticationFilter {
   @Test
   public void testDoFilterWithException() throws ServletException, IOException {
     Authenticator authenticator = mock(Authenticator.class);
-    when(authenticator.name()).thenReturn("simple");
     AuthenticationFilter filter = new AuthenticationFilter(authenticator);
     FilterChain mockChain = mock(FilterChain.class);
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);

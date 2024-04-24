@@ -17,5 +17,8 @@ public enum AuthenticatorType {
   OAUTH,
 
   /** Authentication that uses Kerberos. */
-  KERBEROS
+  KERBEROS,
+
+  /** Unknown authentication. */
+  UNKNOWN
 }
