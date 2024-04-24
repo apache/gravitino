@@ -7,13 +7,14 @@ package com.datastrato.gravitino.catalog;
 import static com.datastrato.gravitino.Entity.EntityType.SCHEMA;
 import static com.datastrato.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 
-import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;
+import com.datastrato.gravitino.connector.capability.Capability;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
+import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
@@ -74,9 +75,6 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    if (Entity.SECURABLE_ENTITY_RESERVED_NAME.equals(ident.name())) {
-      throw new IllegalArgumentException("Can't create a schema with with reserved name `*`");
-    }
 
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
     doWithCatalog(
@@ -104,7 +102,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             SchemaAlreadyExistsException.class);
 
     // If the Schema is maintained by the Gravitino's store, we don't have to store again.
-    boolean isManagedSchema = isManagedEntity(createdSchema.properties());
+    boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);
     if (isManagedSchema) {
       return EntityCombinedSchema.of(createdSchema)
           .withHiddenPropertiesSet(
@@ -169,7 +167,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             NoSuchSchemaException.class);
 
     // If the Schema is maintained by the Gravitino's store, we don't have to load again.
-    boolean isManagedSchema = isManagedEntity(schema.properties());
+    boolean isManagedSchema = isManagedEntity(catalogIdentifier, Capability.Scope.SCHEMA);
     if (isManagedSchema) {
       return EntityCombinedSchema.of(schema)
           .withHiddenPropertiesSet(
@@ -237,7 +235,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             NoSuchSchemaException.class);
 
     // If the Schema is maintained by the Gravitino's store, we don't have to alter again.
-    boolean isManagedSchema = isManagedEntity(alteredSchema.properties());
+    boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);
     if (isManagedSchema) {
       return EntityCombinedSchema.of(alteredSchema)
           .withHiddenPropertiesSet(
@@ -295,25 +293,41 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
    *
    * @param ident The identifier of the schema to be dropped.
    * @param cascade If true, drops all tables within the schema as well.
-   * @return True if the schema was successfully dropped, false otherwise.
+   * @return True if the schema was successfully dropped, false if the schema doesn't exist.
    * @throws NonEmptySchemaException If the schema contains tables and cascade is set to false.
+   * @throws RuntimeException If an error occurs while dropping the schema.
    */
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
-    boolean dropped =
+    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+    boolean droppedFromCatalog =
         doWithCatalog(
-            getCatalogIdentifier(ident),
+            catalogIdent,
             c -> c.doWithSchemaOps(s -> s.dropSchema(ident, cascade)),
-            NonEmptySchemaException.class);
+            NonEmptySchemaException.class,
+            RuntimeException.class);
 
-    if (!dropped) {
-      return false;
-    }
-
+    // For unmanaged schema, it could happen that the schema:
+    // 1. Is not found in the catalog (dropped directly from underlying sources)
+    // 2. Is found in the catalog but not in the store (not managed by Gravitino)
+    // 3. Is found in the catalog and the store (managed by Gravitino)
+    // 4. Neither found in the catalog nor in the store.
+    // In all situations, we try to delete the schema from the store, but we don't take the
+    // return value of the store operation into account. We only take the return value of the
+    // catalog into account.
+    //
+    // For managed schema, we should take the return value of the store operation into account.
+    boolean droppedFromStore = false;
     try {
-      return store.delete(ident, SCHEMA, cascade);
+      droppedFromStore = store.delete(ident, SCHEMA, cascade);
+    } catch (NoSuchEntityException e) {
+      LOG.warn("The schema to be dropped does not exist in the store: {}", ident, e);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+
+    return isManagedEntity(catalogIdent, Capability.Scope.SCHEMA)
+        ? droppedFromStore
+        : droppedFromCatalog;
   }
 }

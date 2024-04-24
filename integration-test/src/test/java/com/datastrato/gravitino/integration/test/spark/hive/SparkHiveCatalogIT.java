@@ -8,11 +8,14 @@ import com.datastrato.gravitino.integration.test.spark.SparkCommonIT;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo.SparkColumnInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
+import com.datastrato.gravitino.spark.connector.GravitinoSparkConfig;
 import com.datastrato.gravitino.spark.connector.hive.HivePropertiesConstants;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.types.DataTypes;
@@ -33,6 +36,13 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
   @Override
   protected String getProvider() {
     return "hive";
+  }
+
+  @Override
+  protected Map<String, String> getCatalogConfigs() {
+    Map<String, String> catalogProperties = Maps.newHashMap();
+    catalogProperties.put(GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI, hiveMetastoreUri);
+    return catalogProperties;
   }
 
   @Override
@@ -251,6 +261,30 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
               checkTableReadWrite(tableInfo);
               Assertions.assertTrue(tableInfo.getTableLocation().equals(hdfs.getUri() + location));
             });
+  }
+
+  @Test
+  void testHiveFormatWithUsingHive() {
+    String tableName = "test_hive_format_using_hive_table";
+    dropTableIfExists(tableName);
+    String createTableSql = getCreateSimpleTableString(tableName);
+    createTableSql += "USING HIVE";
+    sql(createTableSql);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withTableProperties(
+                ImmutableMap.of(
+                    HivePropertiesConstants.SPARK_HIVE_INPUT_FORMAT,
+                    HivePropertiesConstants.TEXT_INPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_OUTPUT_FORMAT,
+                    HivePropertiesConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_SERDE_LIB,
+                    HivePropertiesConstants.LAZY_SIMPLE_SERDE_CLASS));
+    checker.check(tableInfo);
+    checkTableReadWrite(tableInfo);
   }
 
   @Test

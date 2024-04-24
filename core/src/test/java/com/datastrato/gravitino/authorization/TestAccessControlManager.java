@@ -222,7 +222,11 @@ public class TestAccessControlManager {
 
     Role role =
         accessControlManager.createRole(
-            "metalake", "create", props, SecurableObjects.ofAllCatalogs(), Lists.newArrayList());
+            "metalake",
+            "create",
+            props,
+            SecurableObjects.ofCatalog("catalog"),
+            Lists.newArrayList());
     Assertions.assertEquals("create", role.name());
     testProperties(props, role.properties());
 
@@ -234,7 +238,7 @@ public class TestAccessControlManager {
                 "metalake",
                 "create",
                 props,
-                SecurableObjects.ofAllCatalogs(),
+                SecurableObjects.ofCatalog("catalog"),
                 Lists.newArrayList()));
   }
 
@@ -243,11 +247,11 @@ public class TestAccessControlManager {
     Map<String, String> props = ImmutableMap.of("k1", "v1");
 
     accessControlManager.createRole(
-        "metalake", "loadRole", props, SecurableObjects.ofAllCatalogs(), Lists.newArrayList());
+        "metalake", "loadRole", props, SecurableObjects.ofCatalog("catalog"), Lists.newArrayList());
 
-    Role cachedRole = accessControlManager.loadRole("metalake", "loadRole");
+    Role cachedRole = accessControlManager.getRole("metalake", "loadRole");
     accessControlManager.getRoleManager().getCache().invalidateAll();
-    Role role = accessControlManager.loadRole("metalake", "loadRole");
+    Role role = accessControlManager.getRole("metalake", "loadRole");
 
     // Verify the cached roleEntity is correct
     Assertions.assertEquals(role, cachedRole);
@@ -258,8 +262,7 @@ public class TestAccessControlManager {
     // Test load non-existed group
     Throwable exception =
         Assertions.assertThrows(
-            NoSuchRoleException.class,
-            () -> accessControlManager.loadRole("metalake", "not-exist"));
+            NoSuchRoleException.class, () -> accessControlManager.getRole("metalake", "not-exist"));
     Assertions.assertTrue(exception.getMessage().contains("Role not-exist does not exist"));
   }
 
@@ -268,14 +271,14 @@ public class TestAccessControlManager {
     Map<String, String> props = ImmutableMap.of("k1", "v1");
 
     accessControlManager.createRole(
-        "metalake", "testDrop", props, SecurableObjects.ofAllCatalogs(), Lists.newArrayList());
+        "metalake", "testDrop", props, SecurableObjects.ofCatalog("catalog"), Lists.newArrayList());
 
     // Test drop role
-    boolean dropped = accessControlManager.dropRole("metalake", "testDrop");
+    boolean dropped = accessControlManager.deleteRole("metalake", "testDrop");
     Assertions.assertTrue(dropped);
 
     // Test drop non-existed role
-    boolean dropped1 = accessControlManager.dropRole("metalake", "no-exist");
+    boolean dropped1 = accessControlManager.deleteRole("metalake", "no-exist");
     Assertions.assertFalse(dropped1);
   }
 

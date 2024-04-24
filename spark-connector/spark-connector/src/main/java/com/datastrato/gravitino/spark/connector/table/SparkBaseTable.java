@@ -11,6 +11,7 @@ import com.datastrato.gravitino.spark.connector.ConnectorConstants;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
 import com.datastrato.gravitino.spark.connector.SparkTypeConverter;
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -47,16 +48,19 @@ public abstract class SparkBaseTable implements Table, SupportsRead, SupportsWri
   private TableCatalog sparkCatalog;
   private Table lazySparkTable;
   private PropertiesConverter propertiesConverter;
+  private SparkTransformConverter sparkTransformConverter;
 
   public SparkBaseTable(
       Identifier identifier,
       com.datastrato.gravitino.rel.Table gravitinoTable,
       TableCatalog sparkCatalog,
-      PropertiesConverter propertiesConverter) {
+      PropertiesConverter propertiesConverter,
+      SparkTransformConverter sparkTransformConverter) {
     this.identifier = identifier;
     this.gravitinoTable = gravitinoTable;
     this.sparkCatalog = sparkCatalog;
     this.propertiesConverter = propertiesConverter;
+    this.sparkTransformConverter = sparkTransformConverter;
   }
 
   @Override
@@ -127,7 +131,7 @@ public abstract class SparkBaseTable implements Table, SupportsRead, SupportsWri
         gravitinoTable.partitioning();
     Distribution distribution = gravitinoTable.distribution();
     SortOrder[] sortOrders = gravitinoTable.sortOrder();
-    return SparkTransformConverter.toSparkTransform(partitions, distribution, sortOrders);
+    return sparkTransformConverter.toSparkTransform(partitions, distribution, sortOrders);
   }
 
   protected Table getSparkTable() {
@@ -139,6 +143,11 @@ public abstract class SparkBaseTable implements Table, SupportsRead, SupportsWri
       }
     }
     return lazySparkTable;
+  }
+
+  @VisibleForTesting
+  public SparkTransformConverter getSparkTransformConverter() {
+    return sparkTransformConverter;
   }
 
   protected boolean isCaseSensitive() {

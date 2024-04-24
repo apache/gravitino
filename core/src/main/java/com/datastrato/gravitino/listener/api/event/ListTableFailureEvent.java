@@ -25,7 +25,7 @@ public final class ListTableFailureEvent extends TableFailureEvent {
    * @param exception The exception encountered during the attempt to list tables.
    */
   public ListTableFailureEvent(String user, Namespace namespace, Exception exception) {
-    super(user, NameIdentifier.of(namespace.toString()), exception);
+    super(user, NameIdentifier.of(namespace.levels()), exception);
     this.namespace = namespace;
   }
 

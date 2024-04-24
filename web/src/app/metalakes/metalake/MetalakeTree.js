@@ -45,13 +45,15 @@ const MetalakeTree = props => {
       case 'relational':
         switch (provider) {
           case 'hive':
-            return 'simple-icons:apachehive'
+            return 'custom-icons-hive'
           case 'lakehouse-iceberg':
             return 'openmoji:iceberg'
           case 'jdbc-mysql':
             return 'devicon:mysql-wordmark'
           case 'jdbc-postgresql':
             return 'devicon:postgresql-wordmark'
+          case 'jdbc-doris':
+            return 'custom-icons-doris'
           default:
             return 'bx:book'
         }
@@ -79,7 +81,7 @@ const MetalakeTree = props => {
       case 'fileset': {
         if (store.selectedNodes.includes(nodeProps.data.key)) {
           const pathArr = extractPlaceholder(nodeProps.data.key)
-          const [metalake, catalog, schema, fileset] = pathArr
+          const [metalake, catalog, type, schema, fileset] = pathArr
           dispatch(getFilesetDetails({ init: true, metalake, catalog, schema, fileset }))
         }
         break
@@ -87,7 +89,7 @@ const MetalakeTree = props => {
       case 'topic': {
         if (store.selectedNodes.includes(nodeProps.data.key)) {
           const pathArr = extractPlaceholder(nodeProps.data.key)
-          const [metalake, catalog, schema, topic] = pathArr
+          const [metalake, catalog, type, schema, topic] = pathArr
           dispatch(getTopicDetails({ init: true, metalake, catalog, schema, topic }))
         }
         break
@@ -235,10 +237,18 @@ const MetalakeTree = props => {
   }
 
   const renderNode = nodeData => {
+    const len = extractPlaceholder(nodeData.key).length
+    const maxWidth = 260 - (26 * 2 - 26 * (5 - len))
     if (nodeData.path) {
       return (
         <Typography
-          sx={{ color: theme => theme.palette.text.secondary }}
+          sx={{
+            color: theme => theme.palette.text.secondary,
+            whiteSpace: 'nowrap',
+            maxWidth,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}
           data-refer='tree-node'
           data-refer-node={nodeData.key}
         >

@@ -7,6 +7,7 @@ package com.datastrato.gravitino.spark.connector.iceberg;
 
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
+import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
 import com.datastrato.gravitino.spark.connector.table.SparkBaseTable;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.MetadataColumn;
@@ -19,14 +20,20 @@ import org.apache.spark.sql.connector.write.RowLevelOperationInfo;
 import org.apache.spark.sql.sources.Filter;
 
 public class SparkIcebergTable extends SparkBaseTable
-    implements SupportsDelete, SupportsRowLevelOperations, SupportsMetadataColumns {
+    implements SupportsDelete, SupportsMetadataColumns, SupportsRowLevelOperations {
 
   public SparkIcebergTable(
       Identifier identifier,
       Table gravitinoTable,
       TableCatalog sparkIcebergCatalog,
-      PropertiesConverter propertiesConverter) {
-    super(identifier, gravitinoTable, sparkIcebergCatalog, propertiesConverter);
+      PropertiesConverter propertiesConverter,
+      SparkTransformConverter sparkTransformConverter) {
+    super(
+        identifier,
+        gravitinoTable,
+        sparkIcebergCatalog,
+        propertiesConverter,
+        sparkTransformConverter);
   }
 
   @Override
@@ -40,12 +47,13 @@ public class SparkIcebergTable extends SparkBaseTable
   }
 
   @Override
+  public MetadataColumn[] metadataColumns() {
+    return ((SupportsMetadataColumns) getSparkTable()).metadataColumns();
+  }
+
+  @Override
   public RowLevelOperationBuilder newRowLevelOperationBuilder(RowLevelOperationInfo info) {
     return ((SupportsRowLevelOperations) getSparkTable()).newRowLevelOperationBuilder(info);
   }
 
-  @Override
-  public MetadataColumn[] metadataColumns() {
-    return ((SupportsMetadataColumns) getSparkTable()).metadataColumns();
-  }
 }

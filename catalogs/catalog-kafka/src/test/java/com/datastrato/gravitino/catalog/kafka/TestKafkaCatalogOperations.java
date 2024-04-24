@@ -25,7 +25,6 @@ import com.datastrato.gravitino.EntityStoreFactory;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.kafka.embedded.KafkaClusterEmbedded;
-import com.datastrato.gravitino.connector.BasePropertiesMetadata;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTopicException;
 import com.datastrato.gravitino.exceptions.TopicAlreadyExistsException;
@@ -189,10 +188,7 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
     Assertions.assertEquals(DEFAULT_SCHEMA_NAME, schema.name());
     Assertions.assertEquals(
         "The default schema of Kafka catalog including all topics", schema.comment());
-    Assertions.assertEquals(2, schema.properties().size());
-    Assertions.assertTrue(
-        schema.properties().containsKey(BasePropertiesMetadata.GRAVITINO_MANAGED_ENTITY));
-    Assertions.assertEquals("true", schema.properties().get("gravitino.managed.entity"));
+    Assertions.assertEquals(1, schema.properties().size());
   }
 
   @Test

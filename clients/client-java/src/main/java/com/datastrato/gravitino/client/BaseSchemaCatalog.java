@@ -21,6 +21,7 @@ import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.SupportsSchemas;
+import com.datastrato.gravitino.rest.RESTUtils;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Arrays;
 import java.util.Collections;
@@ -95,7 +96,8 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements SupportsSchemas {
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     NameIdentifier.checkSchema(ident);
 
-    SchemaCreateRequest req = new SchemaCreateRequest(ident.name(), comment, properties);
+    SchemaCreateRequest req =
+        new SchemaCreateRequest(RESTUtils.encodeString(ident.name()), comment, properties);
     req.validate();
 
     SchemaResponse resp =
@@ -123,7 +125,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements SupportsSchemas {
 
     SchemaResponse resp =
         restClient.get(
-            formatSchemaRequestPath(ident.namespace()) + "/" + ident.name(),
+            formatSchemaRequestPath(ident.namespace()) + "/" + RESTUtils.encodeString(ident.name()),
             SchemaResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.schemaErrorHandler());
@@ -154,7 +156,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements SupportsSchemas {
 
     SchemaResponse resp =
         restClient.put(
-            formatSchemaRequestPath(ident.namespace()) + "/" + ident.name(),
+            formatSchemaRequestPath(ident.namespace()) + "/" + RESTUtils.encodeString(ident.name()),
             updatesRequest,
             SchemaResponse.class,
             Collections.emptyMap(),
@@ -179,7 +181,9 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements SupportsSchemas {
     try {
       DropResponse resp =
           restClient.delete(
-              formatSchemaRequestPath(ident.namespace()) + "/" + ident.name(),
+              formatSchemaRequestPath(ident.namespace())
+                  + "/"
+                  + RESTUtils.encodeString(ident.name()),
               Collections.singletonMap("cascade", String.valueOf(cascade)),
               DropResponse.class,
               Collections.emptyMap(),

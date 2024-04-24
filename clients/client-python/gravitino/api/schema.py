@@ -2,13 +2,13 @@
 Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import Optional, Dict
 
 from gravitino.api.auditable import Auditable
 
 
-class Schema(Auditable, ABC):
+class Schema(Auditable):
     """
     An interface representing a schema in the Catalog. A Schema is a
     basic container of relational objects, like tables, views, etc. A Schema can be self-nested,

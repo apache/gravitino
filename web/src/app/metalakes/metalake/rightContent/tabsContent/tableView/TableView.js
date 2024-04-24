@@ -7,7 +7,7 @@
 
 import { Inconsolata } from 'next/font/google'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 
 import Link from 'next/link'
 
@@ -111,11 +111,28 @@ const TableView = () => {
                 </Box>
 
                 <Box sx={{ p: 1.5, px: 4 }}>
-                  {items.map(i => {
+                  {items.map((it, idx) => {
                     return (
-                      <Typography key={i} variant='caption' color='white' className={fonts.className}>
-                        {i.text || i.fields}
-                      </Typography>
+                      <Fragment key={idx}>
+                        <Typography
+                          variant='caption'
+                          color='white'
+                          className={fonts.className}
+                          sx={{ display: 'flex', flexDirection: 'column' }}
+                        >
+                          {it.text || it.fields}
+                        </Typography>
+                        {idx < items.length - 1 && (
+                          <Box
+                            component={'span'}
+                            sx={{
+                              display: 'block',
+                              my: 1,
+                              borderTop: theme => `1px solid ${theme.palette.grey[800]}`
+                            }}
+                          ></Box>
+                        )}
+                      </Fragment>
                     )
                   })}
                 </Box>

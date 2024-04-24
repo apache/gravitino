@@ -117,3 +117,69 @@ CREATE TABLE IF NOT EXISTS `topic_meta` (
     KEY `idx_mid` (`metalake_id`),
     KEY `idx_cid` (`catalog_id`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'topic metadata';
+
+CREATE TABLE IF NOT EXISTS `user_meta` (
+    `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'user id',
+    `user_name` VARCHAR(128) NOT NULL COMMENT 'username',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'user audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'user current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'user last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'user deleted at',
+    PRIMARY KEY (`user_id`),
+    UNIQUE KEY `uk_mid_us_del` (`metalake_id`, `user_name`, `deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'user metadata';
+
+CREATE TABLE IF NOT EXISTS `role_meta` (
+    `role_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'role id',
+    `role_name` VARCHAR(128) NOT NULL COMMENT 'role name',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `properties` MEDIUMTEXT DEFAULT NULL COMMENT 'schema properties',
+    `securable_object_full_name` VARCHAR(256) NOT NULL COMMENT 'securable object full name',
+    `securable_object_type` VARCHAR(32) NOT NULL COMMENT 'securable object type',
+    `privileges` VARCHAR(64) NOT NULL COMMENT 'securable privileges',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'role audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'role current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'role last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'role deleted at',
+    PRIMARY KEY (`role_id`),
+    UNIQUE KEY `uk_mid_rn_del` (`metalake_id`, `role_name`, `deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'role metadata';
+
+CREATE TABLE IF NOT EXISTS `user_role_rel` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'user id',
+    `role_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'role id',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'relation audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'relation current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'relation last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'relation deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_ui_ri_del` (`user_id`, `role_id`, `deleted_at`),
+    KEY `idx_rid` (`role_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'user role relation';
+
+CREATE TABLE IF NOT EXISTS `group_meta` (
+    `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'group id',
+    `group_name` VARCHAR(128) NOT NULL COMMENT 'group name',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'group audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'group current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'group last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'group deleted at',
+    PRIMARY KEY (`group_id`),
+    UNIQUE KEY `uk_mid_gr_del` (`metalake_id`, `group_name`, `deleted_at`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'group metadata';
+
+CREATE TABLE IF NOT EXISTS `group_role_rel` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'group id',
+    `role_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'role id',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'relation audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'relation current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'relation last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'relation deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_gi_ri_del` (`group_id`, `role_id`, `deleted_at`),
+    KEY `idx_rid` (`group_id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'group role relation';

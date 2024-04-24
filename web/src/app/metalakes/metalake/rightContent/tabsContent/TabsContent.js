@@ -7,11 +7,13 @@
 
 import { Inconsolata } from 'next/font/google'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 
 import { styled, Box, Divider, List, ListItem, ListItemText, Stack, Tab, Typography } from '@mui/material'
 import Tooltip, { tooltipClasses } from '@mui/material/Tooltip'
 import { TabContext, TabList, TabPanel } from '@mui/lab'
+
+import clsx from 'clsx'
 
 import { useAppSelector } from '@/lib/hooks/useStore'
 
@@ -163,11 +165,48 @@ const TabsContent = () => {
                             </Box>
 
                             <Box sx={{ p: 1.5, px: 4 }}>
-                              {item.items.map(i => {
+                              {item.items.map((it, idx) => {
                                 return (
-                                  <Typography key={i} variant='caption' color='white' className={fonts.className}>
-                                    {item.type === 'sortOrders' ? i.text : i.fields}
-                                  </Typography>
+                                  <Fragment key={idx}>
+                                    <Typography
+                                      variant='caption'
+                                      color='white'
+                                      className={fonts.className}
+                                      sx={{ display: 'flex', flexDirection: 'column' }}
+                                    >
+                                      {item.type === 'sortOrders'
+                                        ? it.text
+                                        : it.fields.map((v, vi) => {
+                                            return (
+                                              <Fragment key={vi}>
+                                                <Box component={'span'} sx={{}}>
+                                                  {Array.isArray(v) ? v.join('.') : v}
+                                                </Box>
+                                                {vi < it.fields.length - 1 && (
+                                                  <Box
+                                                    component={'span'}
+                                                    sx={{
+                                                      display: 'block',
+                                                      my: 1,
+                                                      borderTop: theme => `1px solid ${theme.palette.grey[800]}`
+                                                    }}
+                                                  ></Box>
+                                                )}
+                                              </Fragment>
+                                            )
+                                          })}
+                                    </Typography>
+                                    {idx < item.items.length - 1 && (
+                                      <Box
+                                        component={'span'}
+                                        sx={{
+                                          display: 'block',
+                                          my: 1,
+                                          borderTop: theme => `1px solid ${theme.palette.grey[800]}`
+                                        }}
+                                      ></Box>
+                                    )}
+                                  </Fragment>
                                 )
                               })}
                             </Box>
@@ -210,11 +249,18 @@ const TabsContent = () => {
                                   textOverflow: 'ellipsis'
                                 }}
                               >
-                                <Typography variant='caption' className={fonts.className}>
-                                  {item.type === 'sortOrders'
-                                    ? item.items.map(i => i.text)
-                                    : item.items.map(i => i.fields)}
-                                </Typography>
+                                {item.items.map((it, idx) => {
+                                  return (
+                                    <Fragment key={idx}>
+                                      <Typography variant='caption' className={fonts.className}>
+                                        {it.fields.map(v => (Array.isArray(v) ? v.join('.') : v)).join(',')}
+                                      </Typography>
+                                      {idx < item.items.length - 1 && (
+                                        <span className={clsx(fonts.className, 'twc-text-[12px]')}>,</span>
+                                      )}
+                                    </Fragment>
+                                  )
+                                })}
                               </Box>
                             }
                           />

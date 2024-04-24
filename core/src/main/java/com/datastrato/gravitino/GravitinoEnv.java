@@ -7,25 +7,29 @@ package com.datastrato.gravitino;
 import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
 import com.datastrato.gravitino.catalog.CatalogDispatcher;
-import com.datastrato.gravitino.catalog.CatalogEventDispatcher;
 import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.catalog.FilesetDispatcher;
-import com.datastrato.gravitino.catalog.FilesetEventDispatcher;
+import com.datastrato.gravitino.catalog.FilesetNormalizeDispatcher;
 import com.datastrato.gravitino.catalog.FilesetOperationDispatcher;
 import com.datastrato.gravitino.catalog.SchemaDispatcher;
-import com.datastrato.gravitino.catalog.SchemaEventDispatcher;
+import com.datastrato.gravitino.catalog.SchemaNormalizeDispatcher;
 import com.datastrato.gravitino.catalog.SchemaOperationDispatcher;
 import com.datastrato.gravitino.catalog.TableDispatcher;
-import com.datastrato.gravitino.catalog.TableEventDispatcher;
+import com.datastrato.gravitino.catalog.TableNormalizeDispatcher;
 import com.datastrato.gravitino.catalog.TableOperationDispatcher;
 import com.datastrato.gravitino.catalog.TopicDispatcher;
-import com.datastrato.gravitino.catalog.TopicEventDispatcher;
+import com.datastrato.gravitino.catalog.TopicNormalizeDispatcher;
 import com.datastrato.gravitino.catalog.TopicOperationDispatcher;
+import com.datastrato.gravitino.listener.CatalogEventDispatcher;
 import com.datastrato.gravitino.listener.EventBus;
 import com.datastrato.gravitino.listener.EventListenerManager;
+import com.datastrato.gravitino.listener.FilesetEventDispatcher;
+import com.datastrato.gravitino.listener.MetalakeEventDispatcher;
+import com.datastrato.gravitino.listener.SchemaEventDispatcher;
+import com.datastrato.gravitino.listener.TableEventDispatcher;
+import com.datastrato.gravitino.listener.TopicEventDispatcher;
 import com.datastrato.gravitino.lock.LockManager;
 import com.datastrato.gravitino.metalake.MetalakeDispatcher;
-import com.datastrato.gravitino.metalake.MetalakeEventDispatcher;
 import com.datastrato.gravitino.metalake.MetalakeManager;
 import com.datastrato.gravitino.metrics.MetricsSystem;
 import com.datastrato.gravitino.metrics.source.JVMMetricsSource;
@@ -155,16 +159,27 @@ public class GravitinoEnv {
 
     SchemaOperationDispatcher schemaOperationDispatcher =
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
-    this.schemaDispatcher = new SchemaEventDispatcher(eventBus, schemaOperationDispatcher);
+    SchemaNormalizeDispatcher schemaNormalizeDispatcher =
+        new SchemaNormalizeDispatcher(schemaOperationDispatcher);
+    this.schemaDispatcher = new SchemaEventDispatcher(eventBus, schemaNormalizeDispatcher);
+
     TableOperationDispatcher tableOperationDispatcher =
         new TableOperationDispatcher(catalogManager, entityStore, idGenerator);
-    this.tableDispatcher = new TableEventDispatcher(eventBus, tableOperationDispatcher);
+    TableNormalizeDispatcher tableNormalizeDispatcher =
+        new TableNormalizeDispatcher(tableOperationDispatcher);
+    this.tableDispatcher = new TableEventDispatcher(eventBus, tableNormalizeDispatcher);
+
     FilesetOperationDispatcher filesetOperationDispatcher =
         new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator);
-    this.filesetDispatcher = new FilesetEventDispatcher(eventBus, filesetOperationDispatcher);
+    FilesetNormalizeDispatcher filesetNormalizeDispatcher =
+        new FilesetNormalizeDispatcher(filesetOperationDispatcher);
+    this.filesetDispatcher = new FilesetEventDispatcher(eventBus, filesetNormalizeDispatcher);
+
     TopicOperationDispatcher topicOperationDispatcher =
         new TopicOperationDispatcher(catalogManager, entityStore, idGenerator);
-    this.topicDispatcher = new TopicEventDispatcher(eventBus, topicOperationDispatcher);
+    TopicNormalizeDispatcher topicNormalizeDispatcher =
+        new TopicNormalizeDispatcher(topicOperationDispatcher);
+    this.topicDispatcher = new TopicEventDispatcher(eventBus, topicNormalizeDispatcher);
 
     // Create and initialize access control related modules
     boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);

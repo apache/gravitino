@@ -35,6 +35,11 @@ public final class TableInfo {
   private final Index[] indexes;
   @Nullable private final Audit auditInfo;
 
+  /**
+   * Constructs a TableInfo object from a Table instance.
+   *
+   * @param table The source Table instance.
+   */
   public TableInfo(Table table) {
     this(
         table.name(),
@@ -48,6 +53,19 @@ public final class TableInfo {
         table.auditInfo());
   }
 
+  /**
+   * Constructs a TableInfo object with specified details.
+   *
+   * @param name Name of the table.
+   * @param columns Array of columns in the table.
+   * @param comment Optional comment about the table.
+   * @param properties Map of table properties.
+   * @param partitions Array of partition transforms.
+   * @param distribution Table distribution configuration.
+   * @param sortOrders Array of sort order configurations.
+   * @param indexes Array of indexes on the table.
+   * @param auditInfo Optional audit information.
+   */
   public TableInfo(
       String name,
       Column[] columns,
@@ -61,69 +79,93 @@ public final class TableInfo {
     this.name = name;
     this.columns = columns.clone();
     this.comment = comment;
-    if (properties == null) {
-      this.properties = ImmutableMap.of();
-    } else {
-      this.properties = ImmutableMap.<String, String>builder().putAll(properties).build();
-    }
-    if (partitions == null) {
-      this.partitions = new Transform[0];
-    } else {
-      this.partitions = partitions.clone();
-    }
-    if (distribution == null) {
-      this.distribution = Distributions.NONE;
-    } else {
-      this.distribution = distribution;
-    }
-    if (sortOrders == null) {
-      this.sortOrders = new SortOrder[0];
-    } else {
-      this.sortOrders = sortOrders.clone();
-    }
-    if (indexes == null) {
-      this.indexes = Indexes.EMPTY_INDEXES;
-    } else {
-      this.indexes = indexes.clone();
-    }
+    this.properties = properties == null ? ImmutableMap.of() : ImmutableMap.copyOf(properties);
+    this.partitions = partitions == null ? new Transform[0] : partitions.clone();
+    this.distribution = distribution == null ? Distributions.NONE : distribution;
+    this.sortOrders = sortOrders == null ? new SortOrder[0] : sortOrders.clone();
+    this.indexes = indexes == null ? Indexes.EMPTY_INDEXES : indexes.clone();
     this.auditInfo = auditInfo;
   }
 
-  /** Audit information is null when tableInfo is generated from create table request. */
+  /**
+   * Returns the audit information for the table.
+   *
+   * @return Audit information, or {@code null} if not available.
+   */
   @Nullable
   public Audit auditInfo() {
     return this.auditInfo;
   }
 
+  /**
+   * Returns the name of the table.
+   *
+   * @return Table name.
+   */
   public String name() {
     return name;
   }
 
+  /**
+   * Returns the columns of the table.
+   *
+   * @return Array of table columns.
+   */
   public Column[] columns() {
     return columns;
   }
 
+  /**
+   * Returns the partitioning transforms applied to the table.
+   *
+   * @return Array of partition transforms.
+   */
   public Transform[] partitioning() {
     return partitions;
   }
 
+  /**
+   * Returns the sort order configurations for the table.
+   *
+   * @return Array of sort orders.
+   */
   public SortOrder[] sortOrder() {
     return sortOrders;
   }
 
+  /**
+   * Returns the distribution configuration for the table.
+   *
+   * @return Distribution configuration.
+   */
   public Distribution distribution() {
     return distribution;
   }
 
+  /**
+   * Returns the indexes applied to the table.
+   *
+   * @return Array of indexes.
+   */
   public Index[] index() {
     return indexes;
   }
 
+  /**
+   * Returns the optional comment about the table.
+   *
+   * @return Table comment, or {@code null} if not provided.
+   */
   @Nullable
   public String comment() {
     return comment;
   }
 
+  /**
+   * Returns the properties associated with the table.
+   *
+   * @return Map of table properties.
+   */
   public Map<String, String> properties() {
     return properties;
   }

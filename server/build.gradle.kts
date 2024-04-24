@@ -3,9 +3,6 @@
  * This software is licensed under the Apache License version 2.
  */
 
-import java.text.SimpleDateFormat
-import java.util.Date
-
 plugins {
   `maven-publish`
   id("java")
@@ -20,6 +17,7 @@ dependencies {
   implementation(libs.bundles.jetty)
   implementation(libs.bundles.jersey)
   implementation(libs.bundles.log4j)
+  implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.jackson.annotations)
   implementation(libs.jackson.datatype.jdk8)
@@ -71,49 +69,9 @@ fun getGitCommitId(): String {
   return gitCommitId
 }
 
-val propertiesFile = "src/main/resources/project.properties"
-fun writeProjectPropertiesFile() {
-  val propertiesFile = file(propertiesFile)
-  if (propertiesFile.exists()) {
-    propertiesFile.delete()
-  }
-
-  val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
-
-  val compileDate = dateFormat.format(Date())
-  val projectVersion = project.version.toString()
-  val commitId = getGitCommitId()
-
-  propertiesFile.parentFile.mkdirs()
-  propertiesFile.createNewFile()
-  propertiesFile.writer().use { writer ->
-    writer.write(
-      "#\n" +
-        "# Copyright 2023 Datastrato Pvt Ltd.\n" +
-        "# This software is licensed under the Apache License version 2.\n" +
-        "#\n"
-    )
-    writer.write("project.version=$projectVersion\n")
-    writer.write("compile.date=$compileDate\n")
-    writer.write("git.commit.id=$commitId\n")
-  }
-}
-
 tasks {
-  jar {
-    doFirst() {
-      writeProjectPropertiesFile()
-      val file = file(propertiesFile)
-      if (!file.exists()) {
-        throw GradleException("$propertiesFile file not generated!")
-      }
-    }
-  }
   test {
     environment("GRAVITINO_HOME", rootDir.path)
     environment("GRAVITINO_TEST", "true")
-  }
-  clean {
-    delete(file(propertiesFile).getParentFile())
   }
 }

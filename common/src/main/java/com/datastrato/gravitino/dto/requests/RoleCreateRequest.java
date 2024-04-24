@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.dto.requests;
 
+import com.datastrato.gravitino.dto.authorization.SecurableObjectDTO;
 import com.datastrato.gravitino.rest.RESTRequest;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
@@ -37,7 +38,7 @@ public class RoleCreateRequest implements RESTRequest {
   private List<String> privileges;
 
   @JsonProperty("securableObject")
-  private String securableObject;
+  private SecurableObjectDTO securableObject;
 
   /** Default constructor for RoleCreateRequest. (Used for Jackson deserialization.) */
   public RoleCreateRequest() {
@@ -56,7 +57,7 @@ public class RoleCreateRequest implements RESTRequest {
       String name,
       Map<String, String> properties,
       List<String> privileges,
-      String securableObject) {
+      SecurableObjectDTO securableObject) {
     super();
     this.name = name;
     this.properties = properties;

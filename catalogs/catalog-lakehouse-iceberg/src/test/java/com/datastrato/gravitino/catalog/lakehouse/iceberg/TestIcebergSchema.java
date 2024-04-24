@@ -66,6 +66,18 @@ public class TestIcebergSchema {
   }
 
   @Test
+  public void testListSchema() {
+    IcebergCatalog icebergCatalog = initIcebergCatalog("testListIcebergSchema");
+    NameIdentifier ident = NameIdentifier.of("metalake", icebergCatalog.name(), "test");
+    icebergCatalog.asSchemas().createSchema(ident, COMMENT_VALUE, Maps.newHashMap());
+
+    NameIdentifier[] schemas = icebergCatalog.asSchemas().listSchemas(ident.namespace());
+    Assertions.assertEquals(1, schemas.length);
+    Assertions.assertEquals(ident.name(), schemas[0].name());
+    Assertions.assertEquals(ident.namespace(), schemas[0].namespace());
+  }
+
+  @Test
   public void testAlterSchema() {
     IcebergCatalog icebergCatalog = initIcebergCatalog("testAlterSchema");
 

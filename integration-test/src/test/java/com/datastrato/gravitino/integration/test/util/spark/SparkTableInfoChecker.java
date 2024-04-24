@@ -7,9 +7,10 @@ package com.datastrato.gravitino.integration.test.util.spark;
 
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo.SparkColumnInfo;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
-import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.spark.sql.connector.expressions.Expressions;
 import org.apache.spark.sql.connector.expressions.IdentityTransform;
 import org.apache.spark.sql.connector.expressions.Transform;
@@ -21,7 +22,7 @@ import org.junit.jupiter.api.Assertions;
  */
 public class SparkTableInfoChecker {
   private SparkTableInfo expectedTableInfo = new SparkTableInfo();
-  private List<CheckField> checkFields = new ArrayList<>();
+  private Set<CheckField> checkFields = new LinkedHashSet<>();
 
   private SparkTableInfoChecker() {}
 
@@ -34,14 +35,9 @@ public class SparkTableInfoChecker {
     COLUMN,
     PARTITION,
     BUCKET,
-    HOUR,
-    DAY,
-    MONTH,
-    YEAR,
-    TRUNCATE,
-    METADATACOLUMN,
     COMMENT,
     TABLE_PROPERTY,
+    METADATA_COLUMN
   }
 
   public SparkTableInfoChecker withName(String name) {
@@ -53,23 +49,6 @@ public class SparkTableInfoChecker {
   public SparkTableInfoChecker withColumns(List<SparkColumnInfo> columns) {
     this.expectedTableInfo.setColumns(columns);
     this.checkFields.add(CheckField.COLUMN);
-    return this;
-  }
-
-  public SparkTableInfoChecker withMetadataColumns(SparkMetadataColumn[] metadataColumns) {
-    this.expectedTableInfo.setMetadataColumns(metadataColumns);
-    this.checkFields.add(CheckField.METADATACOLUMN);
-    return this;
-  }
-
-  public SparkTableInfoChecker withIdentifyPartition(List<String> partitionColumns) {
-    partitionColumns.forEach(
-        columnName -> {
-          IdentityTransform identityTransform =
-              SparkTransformConverter.createSparkIdentityTransform(columnName);
-          this.expectedTableInfo.addPartition(identityTransform);
-        });
-    this.checkFields.add(CheckField.PARTITION);
     return this;
   }
 
@@ -90,40 +69,58 @@ public class SparkTableInfoChecker {
     return this;
   }
 
-  public SparkTableInfoChecker withHourPartition(List<String> partitionColumns) {
-    Transform hourTransform = Expressions.hours(partitionColumns.get(0));
-    this.expectedTableInfo.setHourPartition(hourTransform);
-    this.checkFields.add(CheckField.HOUR);
+  public SparkTableInfoChecker withIdentifyPartition(List<String> partitionColumns) {
+    partitionColumns.forEach(
+        columnName -> {
+          IdentityTransform identityTransform =
+              SparkTransformConverter.createSparkIdentityTransform(columnName);
+          this.expectedTableInfo.addPartition(identityTransform);
+        });
+    this.checkFields.add(CheckField.PARTITION);
     return this;
   }
 
-  public SparkTableInfoChecker withDayPartition(List<String> partitionColumns) {
-    Transform dayTransform = Expressions.days(partitionColumns.get(0));
-    this.expectedTableInfo.setDayPartition(dayTransform);
-    this.checkFields.add(CheckField.DAY);
+  public SparkTableInfoChecker withBucketPartition(int bucketNum, List<String> bucketColumns) {
+    Transform bucketTransform = Expressions.bucket(bucketNum, bucketColumns.toArray(new String[0]));
+    this.expectedTableInfo.addPartition(bucketTransform);
+    this.checkFields.add(CheckField.PARTITION);
     return this;
   }
 
-  public SparkTableInfoChecker withMonthPartition(List<String> partitionColumns) {
-    Transform monthTransform = Expressions.months(partitionColumns.get(0));
-    this.expectedTableInfo.setMonthPartition(monthTransform);
-    this.checkFields.add(CheckField.MONTH);
+  public SparkTableInfoChecker withHourPartition(String partitionColumn) {
+    Transform hourTransform = Expressions.hours(partitionColumn);
+    this.expectedTableInfo.addPartition(hourTransform);
+    this.checkFields.add(CheckField.PARTITION);
     return this;
   }
 
-  public SparkTableInfoChecker withYearPartition(List<String> partitionColumns) {
-    Transform yearTransform = Expressions.years(partitionColumns.get(0));
-    this.expectedTableInfo.setYearPartition(yearTransform);
-    this.checkFields.add(CheckField.YEAR);
+  public SparkTableInfoChecker withDayPartition(String partitionColumn) {
+    Transform dayTransform = Expressions.days(partitionColumn);
+    this.expectedTableInfo.addPartition(dayTransform);
+    this.checkFields.add(CheckField.PARTITION);
     return this;
   }
 
-  public SparkTableInfoChecker withTruncatePartition(int width, List<String> partitionColumns) {
+  public SparkTableInfoChecker withMonthPartition(String partitionColumn) {
+    Transform monthTransform = Expressions.months(partitionColumn);
+    this.expectedTableInfo.addPartition(monthTransform);
+    this.checkFields.add(CheckField.PARTITION);
+    return this;
+  }
+
+  public SparkTableInfoChecker withYearPartition(String partitionColumn) {
+    Transform yearTransform = Expressions.years(partitionColumn);
+    this.expectedTableInfo.addPartition(yearTransform);
+    this.checkFields.add(CheckField.PARTITION);
+    return this;
+  }
+
+  public SparkTableInfoChecker withTruncatePartition(int width, String partitionColumn) {
     Transform truncateTransform =
         Expressions.apply(
-            "truncate", Expressions.literal(width), Expressions.column(partitionColumns.get(0)));
-    this.expectedTableInfo.setTruncatePartition(truncateTransform);
-    this.checkFields.add(CheckField.TRUNCATE);
+            "truncate", Expressions.literal(width), Expressions.column(partitionColumn));
+    this.expectedTableInfo.addPartition(truncateTransform);
+    this.checkFields.add(CheckField.PARTITION);
     return this;
   }
 
@@ -136,6 +133,12 @@ public class SparkTableInfoChecker {
   public SparkTableInfoChecker withTableProperties(Map<String, String> properties) {
     this.expectedTableInfo.setTableProperties(properties);
     this.checkFields.add(CheckField.TABLE_PROPERTY);
+    return this;
+  }
+
+  public SparkTableInfoChecker withMetadataColumns(SparkMetadataColumnInfo[] metadataColumns) {
+    this.expectedTableInfo.setMetadataColumns(metadataColumns);
+    this.checkFields.add(CheckField.METADATA_COLUMN);
     return this;
   }
 
@@ -153,34 +156,14 @@ public class SparkTableInfoChecker {
                       expectedTableInfo.getColumns(), realTableInfo.getColumns());
                   break;
                 case PARTITION:
-                  Assertions.assertEquals(
-                      expectedTableInfo.getPartitions(), realTableInfo.getPartitions());
+                  Assertions.assertArrayEquals(
+                      expectedTableInfo.getPartitions().toArray(),
+                      realTableInfo.getPartitions().toArray());
                   break;
                 case BUCKET:
                   Assertions.assertEquals(expectedTableInfo.getBucket(), realTableInfo.getBucket());
                   break;
-                case HOUR:
-                  Assertions.assertEquals(
-                      expectedTableInfo.getHourPartition(), realTableInfo.getHourPartition());
-                  break;
-                case DAY:
-                  Assertions.assertEquals(
-                      expectedTableInfo.getDayPartition(), realTableInfo.getDayPartition());
-                  break;
-                case MONTH:
-                  Assertions.assertEquals(
-                      expectedTableInfo.getMonthPartition(), realTableInfo.getMonthPartition());
-                  break;
-                case YEAR:
-                  Assertions.assertEquals(
-                      expectedTableInfo.getYearPartition(), realTableInfo.getYearPartition());
-                  break;
-                case TRUNCATE:
-                  Assertions.assertEquals(
-                      expectedTableInfo.getTruncatePartition(),
-                      realTableInfo.getTruncatePartition());
-                  break;
-                case METADATACOLUMN:
+                case METADATA_COLUMN:
                   Assertions.assertEquals(
                       expectedTableInfo.getMetadataColumns().length,
                       realTableInfo.getMetadataColumns().length);

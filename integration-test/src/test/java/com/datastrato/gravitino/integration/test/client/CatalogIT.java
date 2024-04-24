@@ -16,6 +16,7 @@ import com.google.common.collect.Maps;
 import java.io.File;
 import java.util.Collections;
 import java.util.Map;
+import org.apache.commons.lang.ArrayUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -92,6 +93,26 @@ public class CatalogIT extends AbstractIT {
   }
 
   @Test
+  public void testCreateCatalogWithoutProperties() {
+    String catalogName = GravitinoITUtils.genRandomName("catalog");
+    NameIdentifier catalogIdent = NameIdentifier.of(metalakeName, catalogName);
+    Assertions.assertFalse(metalake.catalogExists(catalogIdent));
+
+    Catalog catalog =
+        metalake.createCatalog(
+            catalogIdent, Catalog.Type.FILESET, "hadoop", "catalog comment", null);
+    Assertions.assertTrue(metalake.catalogExists(catalogIdent));
+
+    Assertions.assertEquals(catalogName, catalog.name());
+    Assertions.assertEquals(Catalog.Type.FILESET, catalog.type());
+    Assertions.assertEquals("hadoop", catalog.provider());
+    Assertions.assertEquals("catalog comment", catalog.comment());
+    Assertions.assertTrue(catalog.properties().isEmpty());
+
+    metalake.dropCatalog(catalogIdent);
+  }
+
+  @Test
   public void testListCatalogsInfo() {
     String relCatalogName = GravitinoITUtils.genRandomName("rel_catalog_");
     NameIdentifier relCatalogIdent = NameIdentifier.of(metalakeName, relCatalogName);
@@ -123,9 +144,8 @@ public class CatalogIT extends AbstractIT {
         assertCatalogEquals(fileCatalog, catalog);
       }
     }
-    // TODO: uncomment this after fixing hidden properties
-    // Assertions.assertTrue(ArrayUtils.contains(catalogs, relCatalog));
-    // Assertions.assertTrue(ArrayUtils.contains(catalogs, fileCatalog));
+    Assertions.assertTrue(ArrayUtils.contains(catalogs, relCatalog));
+    Assertions.assertTrue(ArrayUtils.contains(catalogs, fileCatalog));
   }
 
   private void assertCatalogEquals(Catalog catalog1, Catalog catalog2) {

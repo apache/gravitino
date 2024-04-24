@@ -20,11 +20,11 @@ def get_gravitino_server_version():
         response.close()
         return True
     except requests.exceptions.RequestException as e:
-        logger.warning("Failed to access the server: {}", e)
+        logger.warning("Failed to access the Gravitino server")
         return False
 
 
-def check_gravitino_server_status():
+def check_gravitino_server_status() -> bool:
     gravitino_server_running = False
     for i in range(5):
         logger.info("Monitoring Gravitino server status. Attempt %s", i + 1)
@@ -38,30 +38,27 @@ def check_gravitino_server_status():
     return gravitino_server_running
 
 
-def _init_logging():
-    logging.basicConfig(level=logging.DEBUG)
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.DEBUG)
-    logger.addHandler(console_handler)
-
-
 class IntegrationTestEnv(unittest.TestCase):
     """Provide real test environment for the Gravitino Server"""
     gravitino_startup_script = None
 
     @classmethod
     def setUpClass(cls):
-        _init_logging()
-
-        if os.environ.get('GRADLE_START_GRAVITINO') is not None:
-            logger.info('Manual start gravitino server [%s].', check_gravitino_server_status())
+        if os.environ.get('START_EXTERNAL_GRAVITINO') is not None:
+            """Maybe Gravitino server already startup by Gradle test command or developer manual startup."""
+            if not check_gravitino_server_status():
+                logger.error("ERROR: Can't find online Gravitino server!")
             return
 
-        current_path = os.getcwd()
-        cls.gravitino_startup_script = os.path.join(current_path, '../../../distribution/package/bin/gravitino.sh')
+        GravitinoHome = os.environ.get('GRAVITINO_HOME')
+        if GravitinoHome is None:
+            logger.error('Gravitino Python client integration test must configure `GRAVITINO_HOME`')
+            quit(0)
+
+        cls.gravitino_startup_script = os.path.join(GravitinoHome, 'bin/gravitino.sh')
         if not os.path.exists(cls.gravitino_startup_script):
             logger.error("Can't find Gravitino startup script: %s, "
-                         "Please execute `./gradlew compileDistribution -x test` in the gravitino project root "
+                         "Please execute `./gradlew compileDistribution -x test` in the Gravitino project root "
                          "directory.", cls.gravitino_startup_script)
             quit(0)
 
@@ -78,11 +75,9 @@ class IntegrationTestEnv(unittest.TestCase):
             logger.error("ERROR: Can't start Gravitino server!")
             quit(0)
 
-        cls.clean_test_date()
-
     @classmethod
     def tearDownClass(cls):
-        if os.environ.get('GRADLE_START_GRAVITINO') is not None:
+        if os.environ.get('START_EXTERNAL_GRAVITINO') is not None:
             return
 
         logger.info("Stop integration test environment...")

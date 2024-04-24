@@ -54,7 +54,7 @@ const schema = yup.object().shape({
     .required()
     .matches(
       nameRegex,
-      'This field must start with a letter or underscore, and can only contain letters, numbers, and underscores'
+      'This field must start with a letter or underscore, and can only contain letters, numbers, dashes, and underscores'
     ),
   type: yup.mixed().oneOf(['relational', 'fileset', 'messaging']).required(),
   provider: yup.string().when('type', (type, schema) => {
@@ -396,7 +396,7 @@ const CreateCatalogDialog = props => {
       setInnerProps(propsItems)
       setValue('propItems', propsItems)
     }
-  }, [open, data, setValue])
+  }, [open, data, setValue, type])
 
   return (
     <Dialog fullWidth maxWidth='sm' scroll='body' TransitionComponent={Transition} open={open} onClose={handleClose}>

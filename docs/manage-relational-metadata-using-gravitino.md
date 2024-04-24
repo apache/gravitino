@@ -21,6 +21,7 @@ For more details, please refer to the related doc.
 - [**Apache Hive**](./apache-hive-catalog.md)
 - [**MySQL**](./jdbc-mysql-catalog.md)
 - [**PostgreSQL**](./jdbc-postgresql-catalog.md)
+- [**Doris**](./jdbc-doris-catalog.md)
 - [**Apache Iceberg**](./lakehouse-iceberg-catalog.md)
 
 Assuming:
@@ -93,6 +94,7 @@ Currently, Gravitino supports the following catalog providers:
 | `lakehouse-iceberg` | [Iceberg catalog property](./lakehouse-iceberg-catalog.md#catalog-properties)  |
 | `jdbc-mysql`        | [MySQL catalog property](./jdbc-mysql-catalog.md#catalog-properties)           |
 | `jdbc-postgresql`   | [PostgreSQL catalog property](./jdbc-postgresql-catalog.md#catalog-properties) |
+| `jdbc-doris`        | [Doris catalog property](./jdbc-doris-catalog.md#catalog-properties)           |
 
 ### Load a catalog
 
@@ -305,6 +307,7 @@ Currently, Gravitino supports the following schema property:
 | `lakehouse-iceberg` | [Iceberg scheme property](./lakehouse-iceberg-catalog.md#schema-properties)  |
 | `jdbc-mysql`        | [MySQL schema property](./jdbc-mysql-catalog.md#schema-properties)           |
 | `jdbc-postgresql`   | [PostgreSQL schema property](./jdbc-postgresql-catalog.md#schema-properties) |
+| `jdbc-doris`        | [Doris schema property](./jdbc-doris-catalog.md#schema-properties)           |
 
 ### Load a schema
 
@@ -664,7 +667,7 @@ The following types that Gravitino supports:
 | Struct                    | `Types.StructType.of([Types.StructType.Field.of(name, type, nullable)])` | `{"type": "struct", "fields": [JSON StructField, {"name": string, "type": type JSON, "nullable": JSON Boolean, "comment": string}]}` | Struct type, indicate a struct of fields                                                         |
 | Union                     | `Types.UnionType.of([type1, type2, ...])`                                | `{"type": "union", "types": [type JSON, ...]}`                                                                                       | Union type, indicates a union of types                                                           |
 
-The related java doc is [here](pathname:///docs/0.4.0/api/java/com/datastrato/gravitino/rel/types/Type.html).
+The related java doc is [here](pathname:///docs/0.5.0/api/java/com/datastrato/gravitino/rel/types/Type.html).
 
 ##### Unparsed type
 
@@ -727,6 +730,7 @@ The following is the table property that Gravitino supports:
 | `lakehouse-iceberg` | [Iceberg table property](./lakehouse-iceberg-catalog.md#table-properties)  | [Iceberg type mapping](./lakehouse-iceberg-catalog.md#table-column-types)  |
 | `jdbc-mysql`        | [MySQL table property](./jdbc-mysql-catalog.md#table-properties)           | [MySQL type mapping](./jdbc-mysql-catalog.md#table-column-types)           |
 | `jdbc-postgresql`   | [PostgreSQL table property](./jdbc-postgresql-catalog.md#table-properties) | [PostgreSQL type mapping](./jdbc-postgresql-catalog.md#table-column-types) |
+| `doris`             | [Doris table property](./jdbc-doris-catalog.md#table-properties)           | [Doris type mapping](./jdbc-doris-catalog.md#table-column-types)           |
 
 #### Table partitioning, bucketing, sort ordering and indexes
 
@@ -734,10 +738,10 @@ In addition to the basic settings, Gravitino supports the following features:
 
 | Feature             | Description                                                                                                                                                                                                                                                                                    | Java doc                                                                                                                 |
 |---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------|
-| Table partitioning  | Equal to `PARTITION BY` in Apache Hive, It is a partitioning strategy that is used to split a table into parts based on partition keys. Some table engine may not support this feature                                                                                                         | [Partition](pathname:///docs/0.4.0/api/java/com/datastrato/gravitino/dto/rel/partitioning/Partitioning.html)             |
-| Table bucketing     | Equal to `CLUSTERED BY` in Apache Hive, Bucketing a.k.a (Clustering) is a technique to split the data into more manageable files/parts, (By specifying the number of buckets to create). The value of the bucketing column will be hashed by a user-defined number into buckets.               | [Distribution](pathname:///docs/0.4.0/api/java/com/datastrato/gravitino/rel/expressions/distributions/Distribution.html) |
-| Table sort ordering | Equal to `SORTED BY` in Apache Hive, sort ordering is a method to sort the data in specific ways such as by a column or a function, and then store table data. it will highly improve the query performance under certain scenarios.                                                           | [SortOrder](pathname:///docs/0.4.0/api/java/com/datastrato/gravitino/rel/expressions/sorts/SortOrder.html)               |
-| Table indexes       | Equal to `KEY/INDEX` in MySQL , unique key enforces uniqueness of values in one or more columns within a table. It ensures that no two rows have identical values in specified columns, thereby facilitating data integrity and enabling efficient data retrieval and manipulation operations. | [Index](pathname:///docs/0.4.0/api/java/com/datastrato/gravitino/rel/indexes/Index.html)                                 |
+| Table partitioning  | Equal to `PARTITION BY` in Apache Hive, It is a partitioning strategy that is used to split a table into parts based on partition keys. Some table engine may not support this feature                                                                                                         | [Partition](pathname:///docs/0.5.0/api/java/com/datastrato/gravitino/dto/rel/partitioning/Partitioning.html)             |
+| Table bucketing     | Equal to `CLUSTERED BY` in Apache Hive, Bucketing a.k.a (Clustering) is a technique to split the data into more manageable files/parts, (By specifying the number of buckets to create). The value of the bucketing column will be hashed by a user-defined number into buckets.               | [Distribution](pathname:///docs/0.5.0/api/java/com/datastrato/gravitino/rel/expressions/distributions/Distribution.html) |
+| Table sort ordering | Equal to `SORTED BY` in Apache Hive, sort ordering is a method to sort the data in specific ways such as by a column or a function, and then store table data. it will highly improve the query performance under certain scenarios.                                                           | [SortOrder](pathname:///docs/0.5.0/api/java/com/datastrato/gravitino/rel/expressions/sorts/SortOrder.html)               |
+| Table indexes       | Equal to `KEY/INDEX` in MySQL , unique key enforces uniqueness of values in one or more columns within a table. It ensures that no two rows have identical values in specified columns, thereby facilitating data integrity and enabling efficient data retrieval and manipulation operations. | [Index](pathname:///docs/0.5.0/api/java/com/datastrato/gravitino/rel/indexes/Index.html)                                 |
 
 For more information, please see the related document on [partitioning, bucketing, sorting, and indexes](table-partitioning-bucketing-sort-order-indexes.md).
 

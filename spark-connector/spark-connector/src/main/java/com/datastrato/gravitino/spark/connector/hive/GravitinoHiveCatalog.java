@@ -8,6 +8,7 @@ package com.datastrato.gravitino.spark.connector.hive;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.spark.connector.GravitinoSparkConfig;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
+import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
 import com.datastrato.gravitino.spark.connector.catalog.BaseCatalog;
 import com.datastrato.gravitino.spark.connector.table.SparkBaseTable;
 import com.google.common.base.Preconditions;
@@ -50,12 +51,19 @@ public class GravitinoHiveCatalog extends BaseCatalog {
       Identifier identifier,
       Table gravitinoTable,
       TableCatalog sparkCatalog,
-      PropertiesConverter propertiesConverter) {
-    return new SparkHiveTable(identifier, gravitinoTable, sparkCatalog, propertiesConverter);
+      PropertiesConverter propertiesConverter,
+      SparkTransformConverter sparkTransformConverter) {
+    return new SparkHiveTable(
+        identifier, gravitinoTable, sparkCatalog, propertiesConverter, sparkTransformConverter);
   }
 
   @Override
   protected PropertiesConverter getPropertiesConverter() {
     return new HivePropertiesConverter();
+  }
+
+  @Override
+  protected SparkTransformConverter getSparkTransformConverter() {
+    return new SparkTransformConverter(false);
   }
 }

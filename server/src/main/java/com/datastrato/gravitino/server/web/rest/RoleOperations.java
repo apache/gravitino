@@ -11,7 +11,7 @@ import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.dto.requests.RoleCreateRequest;
-import com.datastrato.gravitino.dto.responses.DropResponse;
+import com.datastrato.gravitino.dto.responses.DeleteResponse;
 import com.datastrato.gravitino.dto.responses.RoleResponse;
 import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.metrics.MetricNames;
@@ -44,18 +44,18 @@ public class RoleOperations {
   @GET
   @Path("{role}")
   @Produces("application/vnd.gravitino.v1+json")
-  @Timed(name = "load-role." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "load-role", absolute = true)
-  public Response loadRole(@PathParam("metalake") String metalake, @PathParam("role") String role) {
+  @Timed(name = "get-role." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "get-role", absolute = true)
+  public Response getRole(@PathParam("metalake") String metalake, @PathParam("role") String role) {
     try {
       return Utils.doAs(
           httpRequest,
           () ->
               Utils.ok(
                   new RoleResponse(
-                      DTOConverters.toDTO(accessControlManager.loadRole(metalake, role)))));
+                      DTOConverters.toDTO(accessControlManager.getRole(metalake, role)))));
     } catch (Exception e) {
-      return ExceptionHandlers.handleRoleException(OperationType.LOAD, role, metalake, e);
+      return ExceptionHandlers.handleRoleException(OperationType.GET, role, metalake, e);
     }
   }
 
@@ -63,8 +63,9 @@ public class RoleOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "create-role." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-role", absolute = true)
-  public Response creatRole(@PathParam("metalake") String metalake, RoleCreateRequest request) {
+  public Response createRole(@PathParam("metalake") String metalake, RoleCreateRequest request) {
     try {
+
       return Utils.doAs(
           httpRequest,
           () ->
@@ -75,7 +76,9 @@ public class RoleOperations {
                               metalake,
                               request.getName(),
                               request.getProperties(),
-                              SecurableObjects.parse(request.getSecurableObject()),
+                              SecurableObjects.parse(
+                                  request.getSecurableObject().fullName(),
+                                  request.getSecurableObject().type()),
                               request.getPrivileges().stream()
                                   .map(Privileges::fromString)
                                   .collect(Collectors.toList()))))));
@@ -88,21 +91,22 @@ public class RoleOperations {
   @DELETE
   @Path("{role}")
   @Produces("application/vnd.gravitino.v1+json")
-  @Timed(name = "drop-role." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "drop-role", absolute = true)
-  public Response dropRole(@PathParam("metalake") String metalake, @PathParam("role") String role) {
+  @Timed(name = "delete-role." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "delete-role", absolute = true)
+  public Response deleteRole(
+      @PathParam("metalake") String metalake, @PathParam("role") String role) {
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            boolean dropped = accessControlManager.dropRole(metalake, role);
-            if (!dropped) {
-              LOG.warn("Failed to drop role {} under metalake {}", role, metalake);
+            boolean deleted = accessControlManager.deleteRole(metalake, role);
+            if (!deleted) {
+              LOG.warn("Failed to delete role {} under metalake {}", role, metalake);
             }
-            return Utils.ok(new DropResponse(dropped));
+            return Utils.ok(new DeleteResponse(deleted));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleRoleException(OperationType.DROP, role, metalake, e);
+      return ExceptionHandlers.handleRoleException(OperationType.DELETE, role, metalake, e);
     }
   }
 }

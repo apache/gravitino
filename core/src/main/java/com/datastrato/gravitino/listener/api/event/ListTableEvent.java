@@ -28,7 +28,7 @@ public final class ListTableEvent extends TableEvent {
    * @param namespace The namespace from which tables were listed.
    */
   public ListTableEvent(String user, Namespace namespace) {
-    super(user, NameIdentifier.parse(namespace.toString()));
+    super(user, NameIdentifier.of(namespace.levels()));
     this.namespace = namespace;
   }
 
