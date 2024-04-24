@@ -7,7 +7,6 @@ package com.datastrato.gravitino.integration.test.spark;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo.SparkColumnInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
@@ -55,23 +54,6 @@ public abstract class SparkCommonIT extends SparkEnvIT {
                   DataTypes.createStructField("col2", DataTypes.StringType, true))),
           "struct(1, 'a')");
 
-  // To generate test data for update table.
-  private static final Map<DataType, String> typeNewConstant =
-      ImmutableMap.of(
-          DataTypes.IntegerType,
-          "2",
-          DataTypes.StringType,
-          "'gravitino_it_test_new'",
-          DataTypes.createArrayType(DataTypes.IntegerType),
-          "array(4, 5, 6)",
-          DataTypes.createMapType(DataTypes.StringType, DataTypes.IntegerType),
-          "map('b', 2)",
-          DataTypes.createStructType(
-              Arrays.asList(
-                  DataTypes.createStructField("col1", DataTypes.IntegerType, true),
-                  DataTypes.createStructField("col2", DataTypes.StringType, true))),
-          "struct(2, 'b')");
-
   private static String getInsertWithoutPartitionSql(String tableName, String values) {
     return String.format("INSERT INTO %s VALUES (%s)", tableName, values);
   }
@@ -94,7 +76,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
       String targetTableName, String selectClause, String sourceTableName, String onClause) {
     return String.format(
         "MERGE INTO %s "
-            + "USING (SELECT %s) %s "
+            + "USING (%s) %s "
             + "ON %s "
             + "WHEN MATCHED THEN UPDATE SET * "
             + "WHEN NOT MATCHED THEN INSERT *",
@@ -105,7 +87,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
       String targetTableName, String selectClause, String sourceTableName, String onClause) {
     return String.format(
         "MERGE INTO %s "
-            + "USING (SELECT %s) %s "
+            + "USING (%s) %s "
             + "ON %s "
             + "WHEN MATCHED THEN DELETE "
             + "WHEN NOT MATCHED THEN INSERT *",
@@ -828,277 +810,47 @@ public abstract class SparkCommonIT extends SparkEnvIT {
         .collect(Collectors.joining(","));
   }
 
-  protected void checkTableReadAndUpdate(SparkTableInfo table) {
-    String name = table.getTableIdentifier();
-    checkTableReadWrite(table);
-
-    String updatedValues =
-        table.getColumns().stream()
-            .map(
-                columnInfo ->
-                    String.format(
-                        "%s = %s", columnInfo.getName(), typeNewConstant.get(columnInfo.getType())))
-            .map(Object::toString)
-            .collect(Collectors.joining(","));
-
-    sql(getUpdateTableSql(name, updatedValues, "1 = 1"));
-
-    // do something to match the query result:
-    // 1. remove "'" from values, such as 'a' is trans to a
-    // 2. remove "array" from values, such as array(1, 2, 3) is trans to [1, 2, 3]
-    // 3. remove "map" from values, such as map('a', 1, 'b', 2) is trans to {a=1, b=2}
-    // 4. remove "struct" from values, such as struct(1, 'a') is trans to 1,a
-    String checkValues =
-        table.getColumns().stream()
-            .map(columnInfo -> typeNewConstant.get(columnInfo.getType()))
-            .map(Object::toString)
-            .map(
-                s -> {
-                  String tmp = org.apache.commons.lang3.StringUtils.remove(s, "'");
-                  if (org.apache.commons.lang3.StringUtils.isEmpty(tmp)) {
-                    return tmp;
-                  } else if (tmp.startsWith("array")) {
-                    return tmp.replace("array", "").replace("(", "[").replace(")", "]");
-                  } else if (tmp.startsWith("map")) {
-                    return tmp.replace("map", "")
-                        .replace("(", "{")
-                        .replace(")", "}")
-                        .replace(", ", "=");
-                  } else if (tmp.startsWith("struct")) {
-                    return tmp.replace("struct", "")
-                        .replace("(", "")
-                        .replace(")", "")
-                        .replace(", ", ",");
-                  }
-                  return tmp;
-                })
-            .collect(Collectors.joining(","));
-
-    List<String> queryResult =
-        sql(getSelectAllSql(name)).stream()
-            .map(
-                line ->
-                    Arrays.stream(line)
-                        .map(
-                            item -> {
-                              if (item instanceof Object[]) {
-                                return Arrays.stream((Object[]) item)
-                                    .map(Object::toString)
-                                    .collect(Collectors.joining(","));
-                              } else {
-                                return item.toString();
-                              }
-                            })
-                        .collect(Collectors.joining(",")))
-            .collect(Collectors.toList());
-    Assertions.assertEquals(
-        1, queryResult.size(), "Should just one row, table content: " + queryResult);
-    Assertions.assertEquals(checkValues, queryResult.get(0));
+  protected void checkTableRowLevelUpdate(String tableName) {
+    writeToEmptyTableAndCheckData(tableName);
+    String updatedValues = "id = 6, name = '6', value = 6";
+    sql(getUpdateTableSql(tableName, updatedValues, "id = 5"));
+    List<String> queryResult = getTableData(tableName);
+    Assertions.assertEquals(5, queryResult.size());
+    Assertions.assertEquals("1,1,1;2,2,2;3,3,3;4,4,4;6,6,6", String.join(";", queryResult));
   }
 
   protected void checkTableRowLevelDelete(String tableName) {
-    sql(
-        String.format(
-            "INSERT INTO %s VALUES (1, '1', 1),(2, '2', 2),(3, '3', 3),(4, '4', 4),(5, '5', 5)",
-            tableName));
-    List<String> queryResult1 = getTableData(tableName);
-    Assertions.assertEquals(5, queryResult1.size());
-    Assertions.assertEquals("1,1,1;2,2,2;3,3,3;4,4,4;5,5,5", String.join(";", queryResult1));
+    writeToEmptyTableAndCheckData(tableName);
     sql(getDeleteSql(tableName, "id <= 2"));
-    List<String> queryResult2 = getTableData(tableName);
-    Assertions.assertEquals(3, queryResult2.size());
-    Assertions.assertEquals("3,3,3;4,4,4;5,5,5", String.join(";", queryResult2));
+    List<String> queryResult = getTableData(tableName);
+    Assertions.assertEquals(3, queryResult.size());
+    Assertions.assertEquals("3,3,3;4,4,4;5,5,5", String.join(";", queryResult));
   }
 
-  protected void checkTableUpdateInMerge(SparkTableInfo table) {
-    String name = table.getTableIdentifier();
-    checkTableReadWrite(table);
+  protected void checkTableDeleteByMergeInto(String tableName) {
+    writeToEmptyTableAndCheckData(tableName);
 
     String sourceTableName = "source_table";
-
     String selectClause =
-        table.getColumns().stream()
-            .map(
-                columnInfo ->
-                    String.format(
-                        "%s as %s",
-                        typeNewConstant.get(columnInfo.getType()), columnInfo.getName()))
-            .map(Object::toString)
-            .collect(Collectors.joining(","));
-
-    List<SparkColumnInfo> columns = table.getColumns();
-    Preconditions.checkArgument(columns.size() > 0, "columns should not be empty");
-    SparkColumnInfo onColumn = columns.get(0);
-
-    String onClause =
-        String.format(
-            "%s.%s = %s.%s", name, onColumn.getName(), sourceTableName, onColumn.getName());
-
-    sql(getRowLevelUpdateTableSql(name, selectClause, sourceTableName, onClause));
-
-    // do something to match the query result:
-    // 1. remove "'" from values, such as 'a' is trans to a
-    // 2. remove "array" from values, such as array(1, 2, 3) is trans to [1, 2, 3]
-    // 3. remove "map" from values, such as map('a', 1, 'b', 2) is trans to {a=1, b=2}
-    // 4. remove "struct" from values, such as struct(1, 'a') is trans to 1,a
-    String checkValues =
-        table.getColumns().stream()
-            .map(columnInfo -> typeNewConstant.get(columnInfo.getType()))
-            .map(Object::toString)
-            .map(
-                s -> {
-                  String tmp = org.apache.commons.lang3.StringUtils.remove(s, "'");
-                  if (org.apache.commons.lang3.StringUtils.isEmpty(tmp)) {
-                    return tmp;
-                  } else if (tmp.startsWith("array")) {
-                    return tmp.replace("array", "").replace("(", "[").replace(")", "]");
-                  } else if (tmp.startsWith("map")) {
-                    return tmp.replace("map", "")
-                        .replace("(", "{")
-                        .replace(")", "}")
-                        .replace(", ", "=");
-                  } else if (tmp.startsWith("struct")) {
-                    return tmp.replace("struct", "")
-                        .replace("(", "")
-                        .replace(")", "")
-                        .replace(", ", ",");
-                  }
-                  return tmp;
-                })
-            .collect(Collectors.joining(","));
-
-    List<String> queryResult =
-        sql(getSelectAllSql(name)).stream()
-            .map(
-                line ->
-                    Arrays.stream(line)
-                        .map(
-                            item -> {
-                              if (item instanceof Object[]) {
-                                return Arrays.stream((Object[]) item)
-                                    .map(Object::toString)
-                                    .collect(Collectors.joining(","));
-                              } else {
-                                return item.toString();
-                              }
-                            })
-                        .collect(Collectors.joining(",")))
-            .collect(Collectors.toList());
-    Assertions.assertEquals(
-        1, queryResult.size(), "Should just one row, table content: " + queryResult);
-    Assertions.assertEquals(checkValues, queryResult.get(0));
+        "SELECT 1 AS id, '1' AS name, 1 AS age UNION ALL SELECT 6 AS id, '6' AS name, 6 AS age";
+    String onClause = String.format("%s.id = %s.id", tableName, sourceTableName);
+    sql(getRowLevelDeleteTableSql(tableName, selectClause, sourceTableName, onClause));
+    List<String> queryResult = getTableData(tableName);
+    Assertions.assertEquals(5, queryResult.size());
+    Assertions.assertEquals("2,2,2;3,3,3;4,4,4;5,5,5;6,6,6", String.join(";", queryResult));
   }
 
-  protected void checkTableDeleteInMerge(SparkTableInfo table) {
-    String name = table.getTableIdentifier();
-    checkTableReadWrite(table);
+  protected void checkTableUpdateByMergeInto(String tableName) {
+    writeToEmptyTableAndCheckData(tableName);
 
     String sourceTableName = "source_table";
-
     String selectClause =
-        table.getColumns().stream()
-            .map(
-                columnInfo ->
-                    String.format(
-                        "%s as %s",
-                        typeNewConstant.get(columnInfo.getType()), columnInfo.getName()))
-            .map(Object::toString)
-            .collect(Collectors.joining(","));
-
-    List<SparkColumnInfo> columns = table.getColumns();
-    Preconditions.checkArgument(columns.size() > 0, "columns should not be empty");
-    SparkColumnInfo onColumn = columns.get(0);
-
-    String onClause =
-        String.format(
-            "%s.%s = %s.%s", name, onColumn.getName(), sourceTableName, onColumn.getName());
-
-    sql(getRowLevelDeleteTableSql(name, selectClause, sourceTableName, onClause));
-
-    List<Object[]> queryResult = sql(getSelectAllSql(name));
-    Assertions.assertEquals(0, queryResult.size(), "Should no rows, table content: " + queryResult);
-  }
-
-  protected void checkTableInsertInMerge(SparkTableInfo table) {
-    String name = table.getTableIdentifier();
-    List<Object[]> queryResult = sql(getSelectAllSql(name));
-    Assertions.assertEquals(0, queryResult.size(), "Should no rows, table content: " + queryResult);
-
-    String sourceTableName = "source_table";
-
-    String selectClause =
-        table.getColumns().stream()
-            .map(
-                columnInfo ->
-                    String.format(
-                        "%s as %s",
-                        typeNewConstant.get(columnInfo.getType()), columnInfo.getName()))
-            .map(Object::toString)
-            .collect(Collectors.joining(","));
-
-    List<SparkColumnInfo> columns = table.getColumns();
-    Preconditions.checkArgument(columns.size() > 0, "columns should not be empty");
-    SparkColumnInfo onColumn = columns.get(0);
-
-    String onClause =
-        String.format(
-            "%s.%s = %s.%s", name, onColumn.getName(), sourceTableName, onColumn.getName());
-
-    sql(getRowLevelDeleteTableSql(name, selectClause, sourceTableName, onClause));
-
-    // do something to match the query result:
-    // 1. remove "'" from values, such as 'a' is trans to a
-    // 2. remove "array" from values, such as array(1, 2, 3) is trans to [1, 2, 3]
-    // 3. remove "map" from values, such as map('a', 1, 'b', 2) is trans to {a=1, b=2}
-    // 4. remove "struct" from values, such as struct(1, 'a') is trans to 1,a
-    String checkValues =
-        table.getColumns().stream()
-            .map(columnInfo -> typeNewConstant.get(columnInfo.getType()))
-            .map(Object::toString)
-            .map(
-                s -> {
-                  String tmp = org.apache.commons.lang3.StringUtils.remove(s, "'");
-                  if (org.apache.commons.lang3.StringUtils.isEmpty(tmp)) {
-                    return tmp;
-                  } else if (tmp.startsWith("array")) {
-                    return tmp.replace("array", "").replace("(", "[").replace(")", "]");
-                  } else if (tmp.startsWith("map")) {
-                    return tmp.replace("map", "")
-                        .replace("(", "{")
-                        .replace(")", "}")
-                        .replace(", ", "=");
-                  } else if (tmp.startsWith("struct")) {
-                    return tmp.replace("struct", "")
-                        .replace("(", "")
-                        .replace(")", "")
-                        .replace(", ", ",");
-                  }
-                  return tmp;
-                })
-            .collect(Collectors.joining(","));
-
-    List<String> queryResultWithInsert =
-        sql(getSelectAllSql(name)).stream()
-            .map(
-                line ->
-                    Arrays.stream(line)
-                        .map(
-                            item -> {
-                              if (item instanceof Object[]) {
-                                return Arrays.stream((Object[]) item)
-                                    .map(Object::toString)
-                                    .collect(Collectors.joining(","));
-                              } else {
-                                return item.toString();
-                              }
-                            })
-                        .collect(Collectors.joining(",")))
-            .collect(Collectors.toList());
-    Assertions.assertEquals(
-        1,
-        queryResultWithInsert.size(),
-        "Should just one row, table content: " + queryResultWithInsert);
-    Assertions.assertEquals(checkValues, queryResultWithInsert.get(0));
+        "SELECT 1 AS id, '2' AS name, 2 AS age UNION ALL SELECT 6 AS id, '6' AS name, 6 AS age";
+    String onClause = String.format("%s.id = %s.id", tableName, sourceTableName);
+    sql(getRowLevelUpdateTableSql(tableName, selectClause, sourceTableName, onClause));
+    List<String> queryResult = getTableData(tableName);
+    Assertions.assertEquals(6, queryResult.size());
+    Assertions.assertEquals("1,2,2;2,2,2;3,3,3;4,4,4;5,5,5;6,6,6", String.join(";", queryResult));
   }
 
   protected String getCreateSimpleTableString(String tableName) {
@@ -1142,6 +894,11 @@ public abstract class SparkCommonIT extends SparkEnvIT {
         .check(tableInfo);
   }
 
+  protected void checkParquetFile(SparkTableInfo tableInfo) {
+    String location = tableInfo.getTableLocation();
+    Assertions.assertDoesNotThrow(() -> getSparkSession().read().parquet(location).printSchema());
+  }
+
   // partition expression may contain "'", like a='s'/b=1
   private String getPartitionExpression(SparkTableInfo table, String delimiter) {
     return table.getPartitionedColumns().stream()
@@ -1149,8 +906,13 @@ public abstract class SparkCommonIT extends SparkEnvIT {
         .collect(Collectors.joining(delimiter));
   }
 
-  protected void checkParquetFile(SparkTableInfo tableInfo) {
-    String location = tableInfo.getTableLocation();
-    Assertions.assertDoesNotThrow(() -> getSparkSession().read().parquet(location).printSchema());
+  private void writeToEmptyTableAndCheckData(String tableName) {
+    sql(
+        String.format(
+            "INSERT INTO %s VALUES (1, '1', 1),(2, '2', 2),(3, '3', 3),(4, '4', 4),(5, '5', 5)",
+            tableName));
+    List<String> queryResult = getTableData(tableName);
+    Assertions.assertEquals(5, queryResult.size());
+    Assertions.assertEquals("1,1,1;2,2,2;3,3,3;4,4,4;5,5,5", String.join(";", queryResult));
   }
 }

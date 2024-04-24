@@ -34,11 +34,6 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 public class GravitinoIcebergCatalog extends BaseCatalog implements FunctionCatalog {
 
   @Override
-  protected boolean supportsBucketTransfrom() {
-    return true;
-  }
-
-  @Override
   protected TableCatalog createAndInitSparkCatalog(
       String name, CaseInsensitiveStringMap options, Map<String, String> properties) {
     Preconditions.checkArgument(
