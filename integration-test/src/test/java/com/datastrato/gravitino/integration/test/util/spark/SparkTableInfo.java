@@ -41,11 +41,6 @@ public class SparkTableInfo {
   private Map<String, String> tableProperties;
   private List<String> unknownItems = new ArrayList<>();
   private Transform bucket;
-  private List<Transform> hourPartitions = new ArrayList<>();
-  private List<Transform> dayPartitions = new ArrayList<>();
-  private List<Transform> monthPartitions = new ArrayList<>();
-  private List<Transform> yearPartitions = new ArrayList<>();
-  private List<Transform> truncatePartitions = new ArrayList<>();
   private List<Transform> partitions = new ArrayList<>();
   private Set<String> partitionColumnNames = new HashSet<>();
   private SparkMetadataColumn[] metadataColumns;
@@ -76,26 +71,6 @@ public class SparkTableInfo {
   void setBucket(Transform bucket) {
     Assertions.assertNull(this.bucket, "Should only one distribution");
     this.bucket = bucket;
-  }
-
-  void addHourPartition(Transform hourPartition) {
-    this.hourPartitions.add(hourPartition);
-  }
-
-  void addDayPartition(Transform dayPartition) {
-    this.dayPartitions.add(dayPartition);
-  }
-
-  void addMonthPartition(Transform monthPartition) {
-    this.monthPartitions.add(monthPartition);
-  }
-
-  void addYearPartition(Transform yearPartition) {
-    this.yearPartitions.add(yearPartition);
-  }
-
-  void addTruncatePartition(Transform truncate) {
-    this.truncatePartitions.add(truncate);
   }
 
   void addPartition(Transform partition) {
@@ -154,17 +129,6 @@ public class SparkTableInfo {
                   || (transform instanceof ApplyTransform
                       && "truncate".equalsIgnoreCase(transform.name()))) {
                 sparkTableInfo.addPartition(transform);
-              } else if (transform instanceof HoursTransform) {
-                sparkTableInfo.addHourPartition(transform);
-              } else if (transform instanceof DaysTransform) {
-                sparkTableInfo.addDayPartition(transform);
-              } else if (transform instanceof MonthsTransform) {
-                sparkTableInfo.addMonthPartition(transform);
-              } else if (transform instanceof YearsTransform) {
-                sparkTableInfo.addYearPartition(transform);
-              } else if (transform instanceof ApplyTransform
-                  && "truncate".equals(transform.name())) {
-                sparkTableInfo.addTruncatePartition(transform);
               } else {
                 throw new NotSupportedException(
                     "Doesn't support Spark transform: " + transform.name());

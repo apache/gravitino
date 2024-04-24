@@ -121,22 +121,7 @@ public abstract class SparkUtilIT extends AbstractIT {
 
   // columns data are joined by ','
   protected List<String> getTableMetadata(String getTableMetadataSql) {
-    return sql(getTableMetadataSql).stream()
-        .map(
-            line ->
-                Arrays.stream(line)
-                    .map(
-                        item -> {
-                          if (item instanceof Object[]) {
-                            return Arrays.stream((Object[]) item)
-                                .map(Object::toString)
-                                .collect(Collectors.joining(","));
-                          } else {
-                            return item.toString();
-                          }
-                        })
-                    .collect(Collectors.joining(",")))
-        .collect(Collectors.toList());
+    return getQueryData(getTableMetadataSql);
   }
 
   // Create SparkTableInfo from SparkBaseTable retrieved from LogicalPlan.

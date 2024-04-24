@@ -35,9 +35,9 @@ public class SparkTableInfoChecker {
     COLUMN,
     PARTITION,
     BUCKET,
-    METADATA_COLUMN,
     COMMENT,
     TABLE_PROPERTY,
+    METADATA_COLUMN
   }
 
   public SparkTableInfoChecker withName(String name) {
@@ -49,12 +49,6 @@ public class SparkTableInfoChecker {
   public SparkTableInfoChecker withColumns(List<SparkColumnInfo> columns) {
     this.expectedTableInfo.setColumns(columns);
     this.checkFields.add(CheckField.COLUMN);
-    return this;
-  }
-
-  public SparkTableInfoChecker withMetadataColumns(SparkMetadataColumn[] metadataColumns) {
-    this.expectedTableInfo.setMetadataColumns(metadataColumns);
-    this.checkFields.add(CheckField.METADATA_COLUMN);
     return this;
   }
 
@@ -139,6 +133,12 @@ public class SparkTableInfoChecker {
   public SparkTableInfoChecker withTableProperties(Map<String, String> properties) {
     this.expectedTableInfo.setTableProperties(properties);
     this.checkFields.add(CheckField.TABLE_PROPERTY);
+    return this;
+  }
+
+  public SparkTableInfoChecker withMetadataColumns(SparkMetadataColumn[] metadataColumns) {
+    this.expectedTableInfo.setMetadataColumns(metadataColumns);
+    this.checkFields.add(CheckField.METADATA_COLUMN);
     return this;
   }
 
