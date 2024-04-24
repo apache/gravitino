@@ -55,5 +55,4 @@ public class SparkIcebergTable extends SparkBaseTable
   public RowLevelOperationBuilder newRowLevelOperationBuilder(RowLevelOperationInfo info) {
     return ((SupportsRowLevelOperations) getSparkTable()).newRowLevelOperationBuilder(info);
   }
-
 }
