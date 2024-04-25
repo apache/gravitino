@@ -348,7 +348,6 @@ public class TestDTOJsonSerDe {
             new String[][] {field1, field2}, new ListPartitionDTO[] {pCalifornia, pTexas});
 
     // construct range partition
-    // TODO: support assign partition value
     RangePartitionDTO p20230101 =
         RangePartitionDTO.builder()
             .withName("p20230101")

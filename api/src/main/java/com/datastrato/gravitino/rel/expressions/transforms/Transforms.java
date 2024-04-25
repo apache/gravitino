@@ -4,14 +4,11 @@
  */
 package com.datastrato.gravitino.rel.expressions.transforms;
 
-import static com.datastrato.gravitino.rel.partitions.Partitions.EMPTY_PARTITIONS;
-
 import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
 import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.partitions.ListPartition;
-import com.datastrato.gravitino.rel.partitions.Partition;
 import com.datastrato.gravitino.rel.partitions.RangePartition;
 import com.google.common.collect.ObjectArrays;
 import java.util.Arrays;
@@ -171,8 +168,7 @@ public class Transforms {
    * @return The created transform
    */
   public static ListTransform list(String[]... fieldNames) {
-    return new ListTransform(
-        Arrays.stream(fieldNames).map(NamedReference::field).toArray(NamedReference[]::new));
+    return list(fieldNames, new ListPartition[0]);
   }
 
   /**
