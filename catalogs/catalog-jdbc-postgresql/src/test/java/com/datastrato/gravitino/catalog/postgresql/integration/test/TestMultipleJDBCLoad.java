@@ -38,8 +38,7 @@ import org.testcontainers.containers.MySQLContainer;
 @Tag("gravitino-docker-it")
 public class TestMultipleJDBCLoad extends AbstractIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
-//  private static String TEST_DB_NAME = RandomNameUtils.genRandomName("ct_db");
-    private static TestDatabaseName TEST_DB_NAME = TestDatabaseName.PG_TEST_MULTIPLE_JDBC_lOAD;
+  private static TestDatabaseName TEST_DB_NAME = TestDatabaseName.PG_TEST_PG_CATALOG_MULTIPLE_JDBC_lOAD;
 
   private static MySQLContainer mySQLContainer;
   private static PostgreSQLContainer postgreSQLContainer;

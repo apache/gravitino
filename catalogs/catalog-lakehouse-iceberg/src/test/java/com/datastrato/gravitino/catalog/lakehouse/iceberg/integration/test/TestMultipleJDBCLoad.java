@@ -13,9 +13,11 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import com.datastrato.gravitino.client.GravitinoMetalake;
+import com.datastrato.gravitino.integration.test.container.PostgreSQLContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.integration.test.util.JdbcDriverDownloader;
+import com.datastrato.gravitino.integration.test.util.TestDatabaseName;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.types.Types;
 import com.datastrato.gravitino.utils.RandomNameUtils;
@@ -24,6 +26,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.SQLException;
 import java.util.Collections;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
@@ -31,11 +34,10 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.MySQLContainer;
-import org.testcontainers.containers.PostgreSQLContainer;
 
 @Tag("gravitino-docker-it")
 public class TestMultipleJDBCLoad extends AbstractIT {
-  private static String TEST_DB_NAME = RandomNameUtils.genRandomName("ct_db");
+  private static TestDatabaseName TEST_DB_NAME = TestDatabaseName.PG_TEST_ICEBERG_CATALOG_MULTIPLE_JDBC_lOAD;
 
   private static MySQLContainer mySQLContainer;
   private static PostgreSQLContainer postgreSQLContainer;
@@ -71,31 +73,27 @@ public class TestMultipleJDBCLoad extends AbstractIT {
 
     mySQLContainer =
         new MySQLContainer<>(MYSQL_DEFAULT_IMAGE_NAME)
-            .withDatabaseName(TEST_DB_NAME)
+            .withDatabaseName(TEST_DB_NAME.toString())
             .withUsername("root")
             .withPassword("root");
     mySQLContainer.start();
-    postgreSQLContainer =
-        new PostgreSQLContainer<>(DEFAULT_POSTGRES_IMAGE)
-            .withDatabaseName(TEST_DB_NAME)
-            .withUsername("root")
-            .withPassword("root");
-    postgreSQLContainer.start();
+    containerSuite.startPostgreSQLContainer(TEST_DB_NAME);
+    postgreSQLContainer = containerSuite.getPostgreSQLContainer();
   }
 
   @Test
-  public void testCreateMultipleJdbcInIceberg() throws URISyntaxException {
+  public void testCreateMultipleJdbcInIceberg() throws URISyntaxException, SQLException {
     String metalakeName = RandomNameUtils.genRandomName("it_metalake");
     String postgreSqlCatalogName = RandomNameUtils.genRandomName("it_iceberg_postgresql");
     GravitinoMetalake metalake =
         client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
 
     Map<String, String> icebergPgConf = Maps.newHashMap();
-    String jdbcUrl = postgreSQLContainer.getJdbcUrl();
+    String jdbcUrl = postgreSQLContainer.getJdbcUrl(TEST_DB_NAME);
     icebergPgConf.put(IcebergConfig.CATALOG_URI.getKey(), jdbcUrl);
     icebergPgConf.put(IcebergConfig.CATALOG_BACKEND.getKey(), "jdbc");
     icebergPgConf.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), "file:///tmp/iceberg-jdbc");
-    icebergPgConf.put(IcebergConfig.JDBC_DRIVER.getKey(), postgreSQLContainer.getDriverClassName());
+    icebergPgConf.put(IcebergConfig.JDBC_DRIVER.getKey(), postgreSQLContainer.getDriverClassName(TEST_DB_NAME));
     icebergPgConf.put(GRAVITINO_JDBC_USER, postgreSQLContainer.getUsername());
     icebergPgConf.put(GRAVITINO_JDBC_PASSWORD, postgreSQLContainer.getPassword());
 
