@@ -18,7 +18,7 @@ import lombok.EqualsAndHashCode;
 public final class ListPartitioningDTO implements Partitioning {
 
   /**
-   * Creates a new ListPartitioningDTO.
+   * Creates a new ListPartitioningDTO with no pre-assigned partitions.
    *
    * @param fieldNames The names of the fields to partition.
    * @return The new ListPartitioningDTO.
@@ -27,6 +27,13 @@ public final class ListPartitioningDTO implements Partitioning {
     return of(fieldNames, new ListPartitionDTO[0]);
   }
 
+  /**
+   * Creates a new ListPartitioningDTO.
+   *
+   * @param fieldNames The names of the fields to partition.
+   * @param assignments The pre-assigned list partitions.
+   * @return The new ListPartitioningDTO.
+   */
   public static ListPartitioningDTO of(String[][] fieldNames, ListPartitionDTO[] assignments) {
     return new ListPartitioningDTO(fieldNames, assignments);
   }

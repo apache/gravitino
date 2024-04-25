@@ -17,7 +17,7 @@ import lombok.EqualsAndHashCode;
 public final class RangePartitioningDTO implements Partitioning {
 
   /**
-   * Creates a new RangePartitioningDTO.
+   * Creates a new RangePartitioningDTO with no pre-assigned partitions.
    *
    * @param fieldName The name of the field to partition.
    * @return The new RangePartitioningDTO.
@@ -26,6 +26,13 @@ public final class RangePartitioningDTO implements Partitioning {
     return of(fieldName, new RangePartitionDTO[0]);
   }
 
+  /**
+   * Creates a new RangePartitioningDTO.
+   *
+   * @param fieldName The name of the field to partition.
+   * @param assignments The pre-assigned range partitions.
+   * @return The new RangePartitioningDTO.
+   */
   public static RangePartitioningDTO of(String[] fieldName, RangePartitionDTO[] assignments) {
     return new RangePartitioningDTO(fieldName, assignments);
   }
