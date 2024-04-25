@@ -11,6 +11,7 @@ import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
+import com.datastrato.gravitino.integration.test.container.MySQLContainer;
 import com.datastrato.gravitino.integration.test.container.PostgreSQLContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
@@ -33,7 +34,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.MySQLContainer;
 
 @Tag("gravitino-docker-it")
 public class TestMultipleJDBCLoad extends AbstractIT {
@@ -45,7 +45,6 @@ public class TestMultipleJDBCLoad extends AbstractIT {
 
   private static final String DOWNLOAD_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar";
-  private static final String MYSQL_DEFAULT_IMAGE_NAME = "mysql:8.0";
 
   @BeforeAll
   public static void startup() throws IOException {
@@ -76,13 +75,8 @@ public class TestMultipleJDBCLoad extends AbstractIT {
           DOWNLOAD_JDBC_DRIVER_URL, pgDirPath.toString(), icebergLibsPath.toString());
     }
 
-    mySQLContainer =
-        new MySQLContainer<>(MYSQL_DEFAULT_IMAGE_NAME)
-            // FIXME: should use ccontainerSuite
-            .withDatabaseName(TEST_DB_NAME.toString())
-            .withUsername("root")
-            .withPassword("root");
-    mySQLContainer.start();
+    containerSuite.startMySQLContainer(TEST_DB_NAME);
+    mySQLContainer = containerSuite.getMySQLContainer();
     containerSuite.startPostgreSQLContainer(TEST_DB_NAME);
     postgreSQLContainer = containerSuite.getPostgreSQLContainer();
   }
@@ -116,8 +110,8 @@ public class TestMultipleJDBCLoad extends AbstractIT {
     mysqlConf.put(
         JdbcConfig.JDBC_URL.getKey(),
         StringUtils.substring(
-            mySQLContainer.getJdbcUrl(), 0, mySQLContainer.getJdbcUrl().lastIndexOf("/")));
-    mysqlConf.put(JdbcConfig.JDBC_DRIVER.getKey(), mySQLContainer.getDriverClassName());
+            mySQLContainer.getJdbcUrl(TEST_DB_NAME), 0, mySQLContainer.getJdbcUrl(TEST_DB_NAME).lastIndexOf("/")));
+    mysqlConf.put(JdbcConfig.JDBC_DRIVER.getKey(), mySQLContainer.getDriverClassName(TEST_DB_NAME));
     mysqlConf.put(JdbcConfig.USERNAME.getKey(), mySQLContainer.getUsername());
     mysqlConf.put(JdbcConfig.PASSWORD.getKey(), mySQLContainer.getPassword());
     String mysqlCatalogName = RandomNameUtils.genRandomName("it_mysql");
