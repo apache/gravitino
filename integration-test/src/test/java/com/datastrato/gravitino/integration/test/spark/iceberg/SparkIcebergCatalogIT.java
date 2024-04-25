@@ -423,10 +423,11 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
   }
 
   private void testIcebergDeleteOperation() {
-    String tableName = "test_iceberg_delete_operation";
     getIcebergTablePropertyValues()
         .forEach(
             tuple -> {
+              String tableName =
+                  String.format("test_iceberg_%s_%s_delete_operation", tuple._1(), tuple._2());
               dropTableIfExists(tableName);
               createIcebergTableWithTabProperties(
                   tableName,
@@ -442,10 +443,11 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
   }
 
   private void testIcebergUpdateOperation() {
-    String tableName = "test_iceberg_update_operation";
     getIcebergTablePropertyValues()
         .forEach(
             tuple -> {
+              String tableName =
+                  String.format("test_iceberg_%s_%s_update_operation", tuple._1(), tuple._2());
               dropTableIfExists(tableName);
               createIcebergTableWithTabProperties(
                   tableName,
@@ -461,10 +463,12 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
   }
 
   private void testIcebergMergeIntoDeleteOperation() {
-    String tableName = "test_iceberg_mergeinto_delete_operation";
     getIcebergTablePropertyValues()
         .forEach(
             tuple -> {
+              String tableName =
+                  String.format(
+                      "test_iceberg_%s_%s_mergeinto_delete_operation", tuple._1(), tuple._2());
               dropTableIfExists(tableName);
               createIcebergTableWithTabProperties(
                   tableName,
@@ -480,10 +484,12 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
   }
 
   private void testIcebergMergeIntoUpdateOperation() {
-    String tableName = "test_iceberg_mergeinto_update_operation";
     getIcebergTablePropertyValues()
         .forEach(
             tuple -> {
+              String tableName =
+                  String.format(
+                      "test_iceberg_%s_%s_mergeinto_update_operation", tuple._1(), tuple._2());
               dropTableIfExists(tableName);
               createIcebergTableWithTabProperties(
                   tableName,

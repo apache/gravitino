@@ -159,6 +159,10 @@ public abstract class SparkUtilIT extends AbstractIT {
     sql(String.format("INSERT INTO TABLE %s SELECT * FROM %s", newName, tableName));
   }
 
+  protected static String getSelectAllSqlWithOrder(String tableName) {
+    return String.format("SELECT * FROM %s ORDER BY id", tableName);
+  }
+
   private static String getSelectAllSql(String tableName) {
     return String.format("SELECT * FROM %s", tableName);
   }
