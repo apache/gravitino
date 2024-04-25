@@ -4,11 +4,6 @@
  */
 package com.datastrato.gravitino.integration.test.spark.iceberg;
 
-import static org.apache.iceberg.TableProperties.DELETE_MODE;
-import static org.apache.iceberg.TableProperties.FORMAT_VERSION;
-import static org.apache.iceberg.TableProperties.MERGE_MODE;
-import static org.apache.iceberg.TableProperties.UPDATE_MODE;
-
 import com.datastrato.gravitino.integration.test.spark.SparkCommonIT;
 import com.datastrato.gravitino.integration.test.util.spark.SparkMetadataColumnInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
@@ -47,6 +42,11 @@ import org.junit.platform.commons.util.StringUtils;
 import scala.Tuple3;
 
 public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
+
+  private static final String ICEBERG_FORMAT_VERSION = "format-version";
+  private static final String ICEBERG_DELETE_MODE = "write.delete.mode";
+  private static final String ICEBERG_UPDATE_MODE = "write.update.mode";
+  private static final String ICEBERG_MERGE_MODE = "write.merge.mode";
 
   @Override
   protected String getCatalogName() {
@@ -432,7 +432,10 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
                   tableName,
                   tuple._1(),
                   ImmutableMap.of(
-                      FORMAT_VERSION, String.valueOf(tuple._2()), DELETE_MODE, tuple._3()));
+                      ICEBERG_FORMAT_VERSION,
+                      String.valueOf(tuple._2()),
+                      ICEBERG_DELETE_MODE,
+                      tuple._3()));
               checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
               checkTableRowLevelDelete(tableName);
             });
@@ -448,7 +451,10 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
                   tableName,
                   tuple._1(),
                   ImmutableMap.of(
-                      FORMAT_VERSION, String.valueOf(tuple._2()), UPDATE_MODE, tuple._3()));
+                      ICEBERG_FORMAT_VERSION,
+                      String.valueOf(tuple._2()),
+                      ICEBERG_UPDATE_MODE,
+                      tuple._3()));
               checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
               checkTableRowLevelUpdate(tableName);
             });
@@ -464,7 +470,10 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
                   tableName,
                   tuple._1(),
                   ImmutableMap.of(
-                      FORMAT_VERSION, String.valueOf(tuple._2()), MERGE_MODE, tuple._3()));
+                      ICEBERG_FORMAT_VERSION,
+                      String.valueOf(tuple._2()),
+                      ICEBERG_MERGE_MODE,
+                      tuple._3()));
               checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
               checkTableDeleteByMergeInto(tableName);
             });
@@ -480,7 +489,10 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
                   tableName,
                   tuple._1(),
                   ImmutableMap.of(
-                      FORMAT_VERSION, String.valueOf(tuple._2()), MERGE_MODE, tuple._3()));
+                      ICEBERG_FORMAT_VERSION,
+                      String.valueOf(tuple._2()),
+                      ICEBERG_MERGE_MODE,
+                      tuple._3()));
               checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
               checkTableUpdateByMergeInto(tableName);
             });
