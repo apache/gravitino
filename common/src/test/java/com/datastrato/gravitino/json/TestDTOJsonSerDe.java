@@ -405,6 +405,8 @@ public class TestDTOJsonSerDe {
             .configure(EnumFeature.WRITE_ENUMS_TO_LOWERCASE, true)
             .build()
             .writeValueAsString(partitioning);
+    System.out.println("lmh");
+    System.out.printf("partitioning: %s\n", serJson);
     Partitioning[] desPartitioning =
         JsonUtils.objectMapper().readValue(serJson, Partitioning[].class);
 
