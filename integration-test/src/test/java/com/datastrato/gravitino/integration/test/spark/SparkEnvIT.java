@@ -33,14 +33,14 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   private static final Logger LOG = LoggerFactory.getLogger(SparkEnvIT.class);
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
-  private final String metalakeName = "test";
-  private SparkSession sparkSession;
-  private String gravitinoUri = "http://127.0.0.1:8090";
-
   protected String hiveMetastoreUri = "thrift://127.0.0.1:9083";
   protected String icebergRestServiceUri = "http://127.0.0.1:%d/iceberg/";
   protected String warehouse;
   protected FileSystem hdfs;
+
+  private final String metalakeName = "test";
+  private SparkSession sparkSession;
+  private String gravitinoUri = "http://127.0.0.1:8090";
 
   protected abstract String getCatalogName();
 
@@ -110,13 +110,6 @@ public abstract class SparkEnvIT extends SparkUtilIT {
         properties);
   }
 
-  private int getIcebergRestServicePort() {
-    JettyServerConfig jettyServerConfig =
-        JettyServerConfig.fromConfig(
-            serverConfig, AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX + "iceberg-rest.");
-    return jettyServerConfig.getHttpPort();
-  }
-
   private void initGravitinoEnv() {
     // Gravitino server is already started by AbstractIT, just construct gravitinoUrl
     int gravitinoPort = getGravitinoServerPort();
@@ -174,4 +167,11 @@ public abstract class SparkEnvIT extends SparkUtilIT {
     Map<String, String> icebergConfigs = getCatalogConfigs();
     AbstractIT.registerCustomConfigs(icebergConfigs);
   }
+
+    private int getIcebergRestServicePort() {
+        JettyServerConfig jettyServerConfig =
+                JettyServerConfig.fromConfig(
+                        serverConfig, AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX + "iceberg-rest.");
+        return jettyServerConfig.getHttpPort();
+    }
 }

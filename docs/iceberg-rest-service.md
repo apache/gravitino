@@ -127,11 +127,13 @@ To start the service:
 ./bin/gravitino.sh start
 ```
 
-To find out whether the service has started:
+To verify whether the service has started:
 
 ```shell
-curl  http://127.0.0.1:9001/iceberg/application.wadl
+curl  http://127.0.0.1:9001/iceberg/v1/config
 ```
+
+Normally you will see the output like `{"defaults":{},"overrides":{}}%`.
 
 ## Exploring the Gravitino and Apache Iceberg REST catalog service with Apache Spark
 

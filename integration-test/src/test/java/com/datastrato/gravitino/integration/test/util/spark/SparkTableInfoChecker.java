@@ -37,6 +37,7 @@ public class SparkTableInfoChecker {
     BUCKET,
     COMMENT,
     TABLE_PROPERTY,
+    METADATA_COLUMN
   }
 
   public SparkTableInfoChecker withName(String name) {
@@ -135,6 +136,12 @@ public class SparkTableInfoChecker {
     return this;
   }
 
+  public SparkTableInfoChecker withMetadataColumns(SparkMetadataColumnInfo[] metadataColumns) {
+    this.expectedTableInfo.setMetadataColumns(metadataColumns);
+    this.checkFields.add(CheckField.METADATA_COLUMN);
+    return this;
+  }
+
   public void check(SparkTableInfo realTableInfo) {
     checkFields.stream()
         .forEach(
@@ -155,6 +162,22 @@ public class SparkTableInfoChecker {
                   break;
                 case BUCKET:
                   Assertions.assertEquals(expectedTableInfo.getBucket(), realTableInfo.getBucket());
+                  break;
+                case METADATA_COLUMN:
+                  Assertions.assertEquals(
+                      expectedTableInfo.getMetadataColumns().length,
+                      realTableInfo.getMetadataColumns().length);
+                  for (int i = 0; i < expectedTableInfo.getMetadataColumns().length; i++) {
+                    Assertions.assertEquals(
+                        expectedTableInfo.getMetadataColumns()[i].name(),
+                        realTableInfo.getMetadataColumns()[i].name());
+                    Assertions.assertEquals(
+                        expectedTableInfo.getMetadataColumns()[i].dataType(),
+                        realTableInfo.getMetadataColumns()[i].dataType());
+                    Assertions.assertEquals(
+                        expectedTableInfo.getMetadataColumns()[i].isNullable(),
+                        realTableInfo.getMetadataColumns()[i].isNullable());
+                  }
                   break;
                 case COMMENT:
                   Assertions.assertEquals(
