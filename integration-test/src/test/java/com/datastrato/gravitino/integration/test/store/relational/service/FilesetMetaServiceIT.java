@@ -12,8 +12,10 @@ import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.config.ConfigConstants;
 import com.datastrato.gravitino.file.Fileset;
-import com.datastrato.gravitino.integration.test.util.AbstractIT;
+import com.datastrato.gravitino.integration.test.container.ContainerSuite;
+import com.datastrato.gravitino.integration.test.container.MySQLContainer;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.integration.test.util.TestDatabaseName;
 import com.datastrato.gravitino.meta.AuditInfo;
@@ -29,39 +31,78 @@ import com.datastrato.gravitino.storage.relational.service.FilesetMetaService;
 import com.datastrato.gravitino.storage.relational.service.MetalakeMetaService;
 import com.datastrato.gravitino.storage.relational.service.SchemaMetaService;
 import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import java.io.File;
 import java.io.IOException;
 import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.ibatis.session.SqlSession;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-it")
-public class FilesetMetaServiceIT extends AbstractIT {
+public class FilesetMetaServiceIT {
+  private static final Logger LOG = LoggerFactory.getLogger(FilesetMetaServiceIT.class);
+  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+
   @BeforeAll
   public static void setup() {
-    META_DATA = TestDatabaseName.MYSQL_JDBC_BACKEND;
+    TestDatabaseName META_DATA = TestDatabaseName.MYSQL_JDBC_BACKEND;
     containerSuite.startMySQLContainer(META_DATA);
-    MYSQL_CONTAINER = containerSuite.getMySQLContainer();
-    setMySQLBackend();
+    MySQLContainer MYSQL_CONTAINER = containerSuite.getMySQLContainer();
+
+    String mysqlUrl = MYSQL_CONTAINER.getJdbcUrl(META_DATA);
+    LOG.info("MySQL URL: {}", mysqlUrl);
+    // Connect to the mysql docker and create a databases
+    try (Connection connection =
+            DriverManager.getConnection(
+                StringUtils.substring(mysqlUrl, 0, mysqlUrl.lastIndexOf("/")), "root", "root");
+        final Statement statement = connection.createStatement()) {
+      statement.execute("drop database if exists " + META_DATA);
+      statement.execute("create database " + META_DATA);
+      String gravitinoHome = System.getenv("GRAVITINO_ROOT_DIR");
+      String mysqlContent =
+          FileUtils.readFileToString(
+              new File(
+                  gravitinoHome
+                      + String.format(
+                          "/scripts/mysql/schema-%s-mysql.sql", ConfigConstants.VERSION_0_5_0)),
+              "UTF-8");
+      String[] initMySQLBackendSqls = mysqlContent.split(";");
+      initMySQLBackendSqls = ArrayUtils.addFirst(initMySQLBackendSqls, "use " + META_DATA + ";");
+      for (String sql : initMySQLBackendSqls) {
+        statement.execute(sql);
+      }
+    } catch (Exception e) {
+      LOG.error("Failed to create database in mysql", e);
+      throw new RuntimeException(e);
+    }
+
     Config config = Mockito.mock(Config.class);
-    Mockito.when(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL))
-        .thenReturn(customConfigs.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY));
+    Mockito.when(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL)).thenReturn(mysqlUrl);
     Mockito.when(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER))
-        .thenReturn(customConfigs.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER_KEY));
-    Mockito.when(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER))
-        .thenReturn(customConfigs.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER_KEY));
-    Mockito.when(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD))
-        .thenReturn(customConfigs.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD_KEY));
+        .thenReturn("com.mysql.cj.jdbc.Driver");
+    Mockito.when(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("root");
+    Mockito.when(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("root");
+
     SqlSessionFactoryHelper.getInstance().init(config);
   }
+
+  @AfterAll
+  public static void tearDown() {}
 
   @Test
   public void testDeleteFilesetVersionsByRetentionCount() throws IOException {
