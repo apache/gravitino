@@ -10,6 +10,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
 
+/** This class use Iceberg HiveCatalog for backend catalog. */
 @Tag("gravitino-docker-it")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class SparkIcebergCatalogHiveBackendIT extends SparkIcebergCatalogIT {
@@ -17,7 +18,9 @@ public class SparkIcebergCatalogHiveBackendIT extends SparkIcebergCatalogIT {
   @Override
   protected Map<String, String> getCatalogConfigs() {
     Map<String, String> catalogProperties = Maps.newHashMap();
-    catalogProperties.put(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND, "hive");
+    catalogProperties.put(
+        IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
+        IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND_HIVE);
     catalogProperties.put(
         IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE, warehouse);
     catalogProperties.put(

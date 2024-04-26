@@ -113,6 +113,8 @@ dependencies {
     exclude("io.dropwizard.metrics")
     exclude("org.rocksdb")
   }
+  testImplementation("org.apache.iceberg:iceberg-core:$icebergVersion")
+  testImplementation("org.apache.iceberg:iceberg-hive-metastore:$icebergVersion")
 
   testImplementation(libs.okhttp3.loginterceptor)
   testImplementation(libs.postgresql.driver)
