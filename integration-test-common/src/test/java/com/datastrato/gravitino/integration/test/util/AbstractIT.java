@@ -64,8 +64,8 @@ public class AbstractIT {
   private static final String DOWNLOAD_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.26/mysql-connector-java-8.0.26.jar";
 
-  private static TestDatabaseName META_DATA;
-  private static MySQLContainer MYSQL_CONTAINER;
+  protected static TestDatabaseName META_DATA;
+  protected static MySQLContainer MYSQL_CONTAINER;
 
   protected static String serverUri;
 
@@ -113,7 +113,7 @@ public class AbstractIT {
     }
   }
 
-  private static void setMySQLBackend() {
+  protected static void setMySQLBackend() {
     String mysqlUrl = MYSQL_CONTAINER.getJdbcUrl(META_DATA);
     customConfigs.put(Configs.ENTITY_STORE_KEY, "relational");
     customConfigs.put(Configs.ENTITY_RELATIONAL_STORE_KEY, "JDBCBackend");

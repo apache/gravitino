@@ -99,6 +99,7 @@ dependencies {
     exclude("org.apache.directory.api", "api-ldap-schema-data")
   }
   testImplementation(libs.mockito.core)
+  testImplementation(libs.mybatis)
   testImplementation(libs.mysql.driver)
 
   testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion") {

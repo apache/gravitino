@@ -203,11 +203,6 @@ public class JDBCBackend implements RelationalBackend {
 
   @Override
   public int hardDeleteLegacyData(Entity.EntityType entityType, long legacyTimeLine) {
-    LOG.info(
-        "Try to physically delete {} legacy data that has been marked deleted before {}",
-        entityType,
-        legacyTimeLine);
-
     switch (entityType) {
       case METALAKE:
         return MetalakeMetaService.getInstance()
