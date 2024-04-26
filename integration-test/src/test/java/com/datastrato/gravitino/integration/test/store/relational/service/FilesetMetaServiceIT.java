@@ -46,6 +46,7 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -60,6 +61,7 @@ public class FilesetMetaServiceIT {
 
   @BeforeAll
   public static void setup() {
+    Assumptions.assumeTrue("true".equals(System.getenv("jdbcBackend")));
     TestDatabaseName META_DATA = TestDatabaseName.MYSQL_JDBC_BACKEND;
     containerSuite.startMySQLContainer(META_DATA);
     MySQLContainer MYSQL_CONTAINER = containerSuite.getMySQLContainer();
@@ -106,6 +108,7 @@ public class FilesetMetaServiceIT {
 
   @Test
   public void testDeleteFilesetVersionsByRetentionCount() throws IOException {
+    Assumptions.assumeTrue("true".equals(System.getenv("jdbcBackend")));
     IdGenerator idGenerator = new RandomIdGenerator();
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
