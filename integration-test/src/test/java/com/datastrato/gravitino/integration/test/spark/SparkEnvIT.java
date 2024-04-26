@@ -168,10 +168,10 @@ public abstract class SparkEnvIT extends SparkUtilIT {
     AbstractIT.registerCustomConfigs(icebergConfigs);
   }
 
-    private int getIcebergRestServicePort() {
-        JettyServerConfig jettyServerConfig =
-                JettyServerConfig.fromConfig(
-                        serverConfig, AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX + "iceberg-rest.");
-        return jettyServerConfig.getHttpPort();
-    }
+  private int getIcebergRestServicePort() {
+    JettyServerConfig jettyServerConfig =
+        JettyServerConfig.fromConfig(
+            serverConfig, AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX + "iceberg-rest.");
+    return jettyServerConfig.getHttpPort();
+  }
 }
