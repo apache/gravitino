@@ -22,8 +22,7 @@ import org.testcontainers.containers.Network;
 
 public class PostgreSQLContainer extends BaseContainer {
   public static final Logger LOG = LoggerFactory.getLogger(PostgreSQLContainer.class);
-
-  public static final String DEFAULT_IMAGE = "postgres:14.0";
+  public static final PGImageName DEFAULT_IMAGE = PGImageName.VERSION_13;
   public static final String HOST_NAME = "gravitino-ci-pg";
   public static final int PG_PORT = 5432;
   public static final String USER_NAME = "root";
@@ -65,11 +64,7 @@ public class PostgreSQLContainer extends BaseContainer {
       try {
         String[] commandAndArgs =
             new String[] {
-              "pg_isready",
-              "-h",
-              "localhost",
-              "-U",
-              getUsername(),
+              "pg_isready", "-h", "localhost", "-U", getUsername(),
             };
         Container.ExecResult execResult = executeInContainer(commandAndArgs);
         if (execResult.getExitCode() != 0) {
@@ -100,14 +95,10 @@ public class PostgreSQLContainer extends BaseContainer {
   }
 
   public void createDatabase(TestDatabaseName testDatabaseName) {
-//    String pgJdbcUrl =
-//        StringUtils.substring(
-//            getJdbcUrl(testDatabaseName), 0, getJdbcUrl(testDatabaseName).lastIndexOf("/"));
-        String pgJdbcUrl =
+    String pgJdbcUrl =
         StringUtils.substring(
-            getJdbcUrl(testDatabaseName), 0, getJdbcUrl(testDatabaseName).lastIndexOf("/")) + "/";
-        //
-
+                getJdbcUrl(testDatabaseName), 0, getJdbcUrl(testDatabaseName).lastIndexOf("/"))
+            + "/";
 
     // change password for root user, Gravitino API must set password in catalog properties
     try (Connection connection =
@@ -116,7 +107,6 @@ public class PostgreSQLContainer extends BaseContainer {
 
       // FIXME: PG doesn't have IF NOT EXISTS clause, we need to handle possible error.
       String query = format("CREATE DATABASE %s;", testDatabaseName);
-      // FIXME: String, which is used in SQL, can be unsafe
       statement.execute(query);
       LOG.info(format("PostgreSQL container database %s has been created", testDatabaseName));
     } catch (Exception e) {
@@ -144,7 +134,7 @@ public class PostgreSQLContainer extends BaseContainer {
       extends BaseContainer.Builder<PostgreSQLContainer.Builder, PostgreSQLContainer> {
 
     private Builder() {
-      this.image = DEFAULT_IMAGE;
+      this.image = DEFAULT_IMAGE.toString();
       this.hostName = HOST_NAME;
       this.exposePorts = ImmutableSet.of(PG_PORT);
     }

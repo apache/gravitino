@@ -17,6 +17,7 @@ import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
+import com.datastrato.gravitino.integration.test.container.PGImageName;
 import com.datastrato.gravitino.integration.test.container.PostgreSQLContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
@@ -49,6 +50,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.SQLException;
 import java.sql.DriverManager;
 import java.util.Arrays;
 import java.util.Collections;
@@ -70,6 +72,7 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 @Tag("gravitino-docker-it")
 @TestInstance(Lifecycle.PER_CLASS)
 public class CatalogPostgreSqlIT extends AbstractIT {
+  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   public static final String DEFAULT_POSTGRES_IMAGE = "postgres:13";
   public static final String DOWNLOAD_JDBC_DRIVER_URL =
       "https://jdbc.postgresql.org/download/postgresql-42.7.0.jar";
@@ -92,11 +95,11 @@ public class CatalogPostgreSqlIT extends AbstractIT {
 
   private PostgreSqlService postgreSqlService;
 
-  private PostgreSQLContainer<?> POSTGRESQL_CONTAINER;
+  private PostgreSQLContainer POSTGRESQL_CONTAINER;
 
-  protected final String TEST_DB_NAME = GravitinoITUtils.genRandomName("test_db");
+  protected final TestDatabaseName TEST_DB_NAME = TestDatabaseName.PG_AUDIT_CATALOG_PostgreSql_IT;
 
-  protected String postgreImageName = DEFAULT_POSTGRES_IMAGE;
+  protected PGImageName postgreImageName = DEFAULT_POSTGRES_IMAGE;
 
   @BeforeAll
   public void startup() throws IOException {
@@ -106,15 +109,8 @@ public class CatalogPostgreSqlIT extends AbstractIT {
       Path tmpPath = Paths.get(gravitinoHome, "/catalogs/jdbc-postgresql/libs");
       JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_JDBC_DRIVER_URL, tmpPath.toString());
     }
-//
-//    POSTGRESQL_CONTAINER =
-//        new PostgreSQLContainer<>(postgreImageName)
-//            .withDatabaseName(TEST_DB_NAME)
-//            .withUsername("root")
-//            .withPassword("root");
-//    POSTGRESQL_CONTAINER.start();
-   containerSuite.startPostgreSQLContainer(TEST_DB_NAME);
-     POSTGRESQL_CONTAINER = containerSuite.getPostgreSQLContainer();
+   containerSuite.startPostgreSQLContainer(TEST_DB_NAME, postgreImageName);
+   POSTGRESQL_CONTAINER = containerSuite.getPostgreSQLContainer(postgreImageName);
 
     postgreSqlService = new PostgreSqlService(POSTGRESQL_CONTAINER, TEST_DB_NAME);
     createMetalake();
@@ -859,7 +855,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   void testColumnDefaultValueConverter() {
     // test convert from MySQL to Gravitino
     String tableName = GravitinoITUtils.genRandomName("test_default_value");
-    String fullTableName = TEST_DB_NAME + "." + schemaName + "." + tableName;
+    String fullTableName = TEST_DB_NAME.toString() + "." + schemaName + "." + tableName;
     String sql =
         "CREATE TABLE "
             + fullTableName

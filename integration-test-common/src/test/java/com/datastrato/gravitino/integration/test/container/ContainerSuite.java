@@ -16,7 +16,10 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.DockerClientFactory;
@@ -42,7 +45,8 @@ public class ContainerSuite implements Closeable {
 
   private static volatile MySQLContainer mySQLContainer;
   private static volatile MySQLContainer mySQLVersion5Container;
-  private static volatile PostgreSQLContainer postgreSQLContainer;
+  private static volatile Map<PGImageName, PostgreSQLContainer> pgContainerMap =
+      new EnumMap<>(PGImageName.class);
 
   protected static final CloseableGroup closer = CloseableGroup.create();
 
@@ -209,14 +213,14 @@ public class ContainerSuite implements Closeable {
     }
   }
 
-  public void startPostgreSQLContainer(TestDatabaseName testDatabaseName) {
-    if (postgreSQLContainer == null) {
+  public void startPostgreSQLContainer(TestDatabaseName testDatabaseName, PGImageName pgImageName) {
+    if (!pgContainerMap.containsKey(pgImageName)) {
       synchronized (ContainerSuite.class) {
-        if (postgreSQLContainer == null) {
+        if (!pgContainerMap.containsKey(pgImageName)) {
           // Start PostgreSQL container
           PostgreSQLContainer.Builder pgBuilder =
               PostgreSQLContainer.builder()
-                  .withImage(PostgreSQLContainer.DEFAULT_IMAGE)
+                  .withImage(pgImageName.toString())
                   .withHostName(PostgreSQLContainer.HOST_NAME)
                   .withEnvVars(
                       ImmutableMap.<String, String>builder()
@@ -228,13 +232,18 @@ public class ContainerSuite implements Closeable {
 
           PostgreSQLContainer container = closer.register(pgBuilder.build());
           container.start();
-          postgreSQLContainer = container;
+          pgContainerMap.put(pgImageName, container);
         }
       }
     }
     synchronized (PostgreSQLContainer.class) {
-      postgreSQLContainer.createDatabase(testDatabaseName);
+      pgContainerMap.get(pgImageName).createDatabase(testDatabaseName);
     }
+  }
+
+  public void startPostgreSQLContainer(TestDatabaseName testDatabaseName) {
+    // Apply default image
+    startPostgreSQLContainer(testDatabaseName, PGImageName.VERSION_13);
   }
 
   public void startKafkaContainer() {
@@ -287,8 +296,19 @@ public class ContainerSuite implements Closeable {
     return mySQLVersion5Container;
   }
 
-  public PostgreSQLContainer getPostgreSQLContainer() {
-    return postgreSQLContainer;
+  public PostgreSQLContainer getPostgreSQLContainer() throws NoSuchElementException {
+    return getPostgreSQLContainer(PGImageName.VERSION_13);
+  }
+
+  public PostgreSQLContainer getPostgreSQLContainer(PGImageName pgImageName)
+      throws NoSuchElementException {
+    if (!pgContainerMap.containsKey(pgImageName)) {
+      throw new NoSuchElementException(
+          String.format(
+              "PostgreSQL container %s not found, please create it by calling startPostgreSQLContainer() first",
+              pgImageName));
+    }
+    return pgContainerMap.get(pgImageName);
   }
 
   // Let containers assign addresses in a fixed subnet to avoid
