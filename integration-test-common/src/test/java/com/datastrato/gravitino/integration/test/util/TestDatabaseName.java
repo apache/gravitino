@@ -56,7 +56,9 @@ public enum TestDatabaseName {
     }
   },
 
-    /** Represents the PostgreSQL database for lakehouse.iceberg.integration.test.TestMultipleJDBCLoad. */
+  /**
+   * Represents the PostgreSQL database for lakehouse.iceberg.integration.test.TestMultipleJDBCLoad.
+   */
   PG_TEST_ICEBERG_CATALOG_MULTIPLE_JDBC_lOAD {
     /** PostgreSQL only accept lowercase database name */
     @Override
