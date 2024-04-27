@@ -38,7 +38,7 @@ public class PostgreSQLCatalogOperations extends JdbcCatalogOperations {
     try {
       // Unload the PostgreSQL driver, only Unload the driver if it is loaded by
       // IsolatedClassLoader.
-      Driver pgDriver = DriverManager.getDriver("jdbc:postgresql://dummy_address:dummy_port/");
+      Driver pgDriver = DriverManager.getDriver("jdbc:postgresql://dummy_address:12345/");
       deregisterDriver(pgDriver);
     } catch (Exception e) {
       LOG.warn("Failed to deregister PostgreSQL driver", e);

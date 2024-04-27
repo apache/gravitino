@@ -218,8 +218,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             () -> {
               try {
                 kerberosLoginUgi.checkTGTAndReloginFromKeytab();
-              } catch (Throwable throwable) {
-                LOG.error("Fail to refresh ugi token: ", throwable);
+              } catch (Exception e) {
+                LOG.error("Fail to refresh ugi token: ", e);
               }
             },
             checkInterval,

@@ -27,6 +27,7 @@ public class HivePropertiesConverter implements PropertiesConverter {
           "orc", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_ORC,
           "parquet", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_PARQUET,
           "textfile", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_TEXTFILE,
+          "hive", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_TEXTFILE,
           "json", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_JSON,
           "csv", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_CSV,
           "avro", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_AVRO);
