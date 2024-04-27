@@ -51,7 +51,6 @@ import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.SQLException;
-import java.sql.DriverManager;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
@@ -73,7 +72,7 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 @TestInstance(Lifecycle.PER_CLASS)
 public class CatalogPostgreSqlIT extends AbstractIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
-  public static final String DEFAULT_POSTGRES_IMAGE = "postgres:13";
+  public static final PGImageName DEFAULT_POSTGRES_IMAGE = PGImageName.VERSION_13;
   public static final String DOWNLOAD_JDBC_DRIVER_URL =
       "https://jdbc.postgresql.org/download/postgresql-42.7.0.jar";
 
@@ -109,8 +108,8 @@ public class CatalogPostgreSqlIT extends AbstractIT {
       Path tmpPath = Paths.get(gravitinoHome, "/catalogs/jdbc-postgresql/libs");
       JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_JDBC_DRIVER_URL, tmpPath.toString());
     }
-   containerSuite.startPostgreSQLContainer(TEST_DB_NAME, postgreImageName);
-   POSTGRESQL_CONTAINER = containerSuite.getPostgreSQLContainer(postgreImageName);
+    containerSuite.startPostgreSQLContainer(TEST_DB_NAME, postgreImageName);
+    POSTGRESQL_CONTAINER = containerSuite.getPostgreSQLContainer(postgreImageName);
 
     postgreSqlService = new PostgreSqlService(POSTGRESQL_CONTAINER, TEST_DB_NAME);
     createMetalake();
