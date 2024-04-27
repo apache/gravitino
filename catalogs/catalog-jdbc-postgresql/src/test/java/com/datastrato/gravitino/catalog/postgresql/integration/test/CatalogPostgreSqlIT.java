@@ -50,6 +50,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -1499,5 +1500,14 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         properties,
         Indexes.EMPTY_INDEXES,
         table);
+  }
+
+  @Test
+  void testGetPGDriver() {
+    Assertions.assertDoesNotThrow(
+        () -> DriverManager.getDriver("jdbc:postgresql://dummy_address:12345/"));
+    Assertions.assertThrows(
+        Exception.class,
+        () -> DriverManager.getDriver("jdbc:postgresql://dummy_address:dummy_port/"));
   }
 }
