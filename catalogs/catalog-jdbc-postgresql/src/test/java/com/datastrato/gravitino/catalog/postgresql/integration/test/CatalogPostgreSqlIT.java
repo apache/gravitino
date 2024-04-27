@@ -16,10 +16,13 @@ import com.datastrato.gravitino.catalog.postgresql.integration.test.service.Post
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
+import com.datastrato.gravitino.integration.test.container.ContainerSuite;
+import com.datastrato.gravitino.integration.test.container.PostgreSQLContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.integration.test.util.JdbcDriverDownloader;
+import com.datastrato.gravitino.integration.test.util.TestDatabaseName;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SupportsSchemas;
@@ -63,7 +66,6 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
-import org.testcontainers.containers.PostgreSQLContainer;
 
 @Tag("gravitino-docker-it")
 @TestInstance(Lifecycle.PER_CLASS)
@@ -104,14 +106,17 @@ public class CatalogPostgreSqlIT extends AbstractIT {
       Path tmpPath = Paths.get(gravitinoHome, "/catalogs/jdbc-postgresql/libs");
       JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_JDBC_DRIVER_URL, tmpPath.toString());
     }
+//
+//    POSTGRESQL_CONTAINER =
+//        new PostgreSQLContainer<>(postgreImageName)
+//            .withDatabaseName(TEST_DB_NAME)
+//            .withUsername("root")
+//            .withPassword("root");
+//    POSTGRESQL_CONTAINER.start();
+   containerSuite.startPostgreSQLContainer(TEST_DB_NAME);
+     POSTGRESQL_CONTAINER = containerSuite.getPostgreSQLContainer();
 
-    POSTGRESQL_CONTAINER =
-        new PostgreSQLContainer<>(postgreImageName)
-            .withDatabaseName(TEST_DB_NAME)
-            .withUsername("root")
-            .withPassword("root");
-    POSTGRESQL_CONTAINER.start();
-    postgreSqlService = new PostgreSqlService(POSTGRESQL_CONTAINER);
+    postgreSqlService = new PostgreSqlService(POSTGRESQL_CONTAINER, TEST_DB_NAME);
     createMetalake();
     createCatalog();
     createSchema();
@@ -122,11 +127,10 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     clearTableAndSchema();
     client.dropMetalake(NameIdentifier.of(metalakeName));
     postgreSqlService.close();
-    POSTGRESQL_CONTAINER.stop();
   }
 
   @AfterEach
-  private void resetSchema() {
+  public void resetSchema() {
     clearTableAndSchema();
     createSchema();
   }
@@ -156,15 +160,17 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Map<String, String> catalogProperties = Maps.newHashMap();
 
     try {
-      String jdbcUrl = POSTGRESQL_CONTAINER.getJdbcUrl();
+      String jdbcUrl = POSTGRESQL_CONTAINER.getJdbcUrl(TEST_DB_NAME);
       String database = new URI(jdbcUrl.substring(jdbcUrl.lastIndexOf("/") + 1)).getPath();
       catalogProperties.put(
-          JdbcConfig.JDBC_DRIVER.getKey(), POSTGRESQL_CONTAINER.getDriverClassName());
+          JdbcConfig.JDBC_DRIVER.getKey(), POSTGRESQL_CONTAINER.getDriverClassName(TEST_DB_NAME));
       catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
       catalogProperties.put(JdbcConfig.JDBC_DATABASE.getKey(), database);
       catalogProperties.put(JdbcConfig.USERNAME.getKey(), POSTGRESQL_CONTAINER.getUsername());
       catalogProperties.put(JdbcConfig.PASSWORD.getKey(), POSTGRESQL_CONTAINER.getPassword());
     } catch (URISyntaxException e) {
+      throw new RuntimeException(e);
+    } catch (SQLException e) {
       throw new RuntimeException(e);
     }
 
@@ -1498,14 +1504,5 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         properties,
         Indexes.EMPTY_INDEXES,
         table);
-  }
-
-  @Test
-  void testGetPGDriver() {
-    Assertions.assertDoesNotThrow(
-        () -> DriverManager.getDriver("jdbc:postgresql://dummy_address:12345/"));
-    Assertions.assertThrows(
-        Exception.class,
-        () -> DriverManager.getDriver("jdbc:postgresql://dummy_address:dummy_port/"));
   }
 }

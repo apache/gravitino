@@ -216,11 +216,12 @@ public class ContainerSuite implements Closeable {
           // Start PostgreSQL container
           PostgreSQLContainer.Builder pgBuilder =
               PostgreSQLContainer.builder()
-                  .withImage("postgresql:14.0")
-                  .withHostName("gravitino-ci-pg")
+                  .withImage(PostgreSQLContainer.DEFAULT_IMAGE)
+                  .withHostName(PostgreSQLContainer.HOST_NAME)
                   .withEnvVars(
                       ImmutableMap.<String, String>builder()
-                          .put("MYSQL_ROOT_PASSWORD", "root")
+                          .put("POSTGRES_USER", PostgreSQLContainer.USER_NAME)
+                          .put("POSTGRES_PASSWORD", PostgreSQLContainer.PASSWORD)
                           .build())
                   .withExposePorts(ImmutableSet.of(PostgreSQLContainer.PG_PORT))
                   .withNetwork(network);
@@ -284,6 +285,10 @@ public class ContainerSuite implements Closeable {
 
   public MySQLContainer getMySQLVersion5Container() {
     return mySQLVersion5Container;
+  }
+
+  public PostgreSQLContainer getPostgreSQLContainer() {
+    return postgreSQLContainer;
   }
 
   // Let containers assign addresses in a fixed subnet to avoid

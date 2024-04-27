@@ -36,5 +36,23 @@ public enum TestDatabaseName {
   MYSQL_AUDIT_CATALOG_MYSQL_IT,
 
   /** Represents the MySQL database used for testing the catalog integration with MySQL. */
-  MYSQL_CATALOG_MYSQL_IT
+  MYSQL_CATALOG_MYSQL_IT,
+
+  /** Represents the PostgreSQL database for AudtCatalogPostgreSqlIT. */
+  PG_AUDIT_CATALOG_PostgreSql_IT {
+    /** PostgreSQL only accept lowercase database name */
+    @Override
+    public String toString() {
+      return this.name().toLowerCase();
+    }
+  },
+
+  /** Represents the PostgreSQL database for postgresql.integration.test.TestMultipleJDBCLoad. */
+  PG_TEST_MULTIPLE_JDBC_lOAD  {
+    /** PostgreSQL only accept lowercase database name */
+    @Override
+    public String toString() {
+      return this.name().toLowerCase();
+    }
+  },
 }

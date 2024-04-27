@@ -23,7 +23,7 @@ import org.testcontainers.containers.Network;
 public class PostgreSQLContainer extends BaseContainer {
   public static final Logger LOG = LoggerFactory.getLogger(PostgreSQLContainer.class);
 
-  public static final String DEFAULT_IMAGE = "postgresql:14.0";
+  public static final String DEFAULT_IMAGE = "postgres:14.0";
   public static final String HOST_NAME = "gravitino-ci-pg";
   public static final int PG_PORT = 5432;
   public static final String USER_NAME = "root";
@@ -53,7 +53,7 @@ public class PostgreSQLContainer extends BaseContainer {
   @Override
   public void start() {
     super.start();
-    Preconditions.check("MySQL container startup failed!", checkContainerStatus(5));
+    Preconditions.check("PostgreSQL container startup failed!", checkContainerStatus(5));
   }
 
   @Override
@@ -65,13 +65,11 @@ public class PostgreSQLContainer extends BaseContainer {
       try {
         String[] commandAndArgs =
             new String[] {
-              "mysqladmin",
-              "ping",
+              "pg_isready",
               "-h",
               "localhost",
-              "-u",
+              "-U",
               getUsername(),
-              format("-p%s", getPassword())
             };
         Container.ExecResult execResult = executeInContainer(commandAndArgs);
         if (execResult.getExitCode() != 0) {
@@ -102,19 +100,25 @@ public class PostgreSQLContainer extends BaseContainer {
   }
 
   public void createDatabase(TestDatabaseName testDatabaseName) {
-    String mySQLJdbcUrl =
+//    String pgJdbcUrl =
+//        StringUtils.substring(
+//            getJdbcUrl(testDatabaseName), 0, getJdbcUrl(testDatabaseName).lastIndexOf("/"));
+        String pgJdbcUrl =
         StringUtils.substring(
-            getJdbcUrl(testDatabaseName), 0, getJdbcUrl(testDatabaseName).lastIndexOf("/"));
+            getJdbcUrl(testDatabaseName), 0, getJdbcUrl(testDatabaseName).lastIndexOf("/")) + "/";
+        //
+
 
     // change password for root user, Gravitino API must set password in catalog properties
     try (Connection connection =
-            DriverManager.getConnection(mySQLJdbcUrl, USER_NAME, getPassword());
+            DriverManager.getConnection(pgJdbcUrl, getUsername(), getPassword());
         Statement statement = connection.createStatement()) {
 
-      String query = format("CREATE DATABASE IF NOT EXISTS %s;", testDatabaseName);
+      // FIXME: PG doesn't have IF NOT EXISTS clause, we need to handle possible error.
+      String query = format("CREATE DATABASE %s;", testDatabaseName);
       // FIXME: String, which is used in SQL, can be unsafe
       statement.execute(query);
-      LOG.info(format("MySQL container database %s has been created", testDatabaseName));
+      LOG.info(format("PostgreSQL container database %s has been created", testDatabaseName));
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
@@ -129,7 +133,7 @@ public class PostgreSQLContainer extends BaseContainer {
   }
 
   public String getJdbcUrl(TestDatabaseName testDatabaseName) {
-    return format("jdbc:mysql://%s:%d/%s", getContainerIpAddress(), PG_PORT, testDatabaseName);
+    return format("jdbc:postgresql://%s:%d/%s", getContainerIpAddress(), PG_PORT, testDatabaseName);
   }
 
   public String getDriverClassName(TestDatabaseName testDatabaseName) throws SQLException {
