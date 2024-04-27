@@ -37,7 +37,8 @@ import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-it")
 public class TestMultipleJDBCLoad extends AbstractIT {
-  private static TestDatabaseName TEST_DB_NAME = TestDatabaseName.PG_TEST_ICEBERG_CATALOG_MULTIPLE_JDBC_lOAD;
+  private static TestDatabaseName TEST_DB_NAME =
+      TestDatabaseName.PG_TEST_ICEBERG_CATALOG_MULTIPLE_JDBC_lOAD;
 
   private static MySQLContainer mySQLContainer;
   private static PostgreSQLContainer postgreSQLContainer;
@@ -88,7 +89,8 @@ public class TestMultipleJDBCLoad extends AbstractIT {
     icebergPgConf.put(IcebergConfig.CATALOG_URI.getKey(), jdbcUrl);
     icebergPgConf.put(IcebergConfig.CATALOG_BACKEND.getKey(), "jdbc");
     icebergPgConf.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), "file:///tmp/iceberg-jdbc");
-    icebergPgConf.put(IcebergConfig.JDBC_DRIVER.getKey(), postgreSQLContainer.getDriverClassName(TEST_DB_NAME));
+    icebergPgConf.put(
+        IcebergConfig.JDBC_DRIVER.getKey(), postgreSQLContainer.getDriverClassName(TEST_DB_NAME));
     icebergPgConf.put(GRAVITINO_JDBC_USER, postgreSQLContainer.getUsername());
     icebergPgConf.put(GRAVITINO_JDBC_PASSWORD, postgreSQLContainer.getPassword());
 
@@ -102,10 +104,12 @@ public class TestMultipleJDBCLoad extends AbstractIT {
 
     Map<String, String> icebergMysqlConf = Maps.newHashMap();
 
-    icebergMysqlConf.put(IcebergConfig.CATALOG_URI.getKey(), mySQLContainer.getJdbcUrl(TEST_DB_NAME));
+    icebergMysqlConf.put(
+        IcebergConfig.CATALOG_URI.getKey(), mySQLContainer.getJdbcUrl(TEST_DB_NAME));
     icebergMysqlConf.put(IcebergConfig.CATALOG_BACKEND.getKey(), "jdbc");
     icebergMysqlConf.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), "file:///tmp/iceberg-jdbc");
-    icebergMysqlConf.put(IcebergConfig.JDBC_DRIVER.getKey(), mySQLContainer.getDriverClassName(TEST_DB_NAME));
+    icebergMysqlConf.put(
+        IcebergConfig.JDBC_DRIVER.getKey(), mySQLContainer.getDriverClassName(TEST_DB_NAME));
     icebergMysqlConf.put(GRAVITINO_JDBC_USER, mySQLContainer.getUsername());
     icebergMysqlConf.put(GRAVITINO_JDBC_PASSWORD, mySQLContainer.getPassword());
     String mysqlCatalogName = RandomNameUtils.genRandomName("it_iceberg_mysql");

@@ -38,7 +38,8 @@ import org.junit.jupiter.api.Test;
 @Tag("gravitino-docker-it")
 public class TestMultipleJDBCLoad extends AbstractIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
-  private static TestDatabaseName TEST_DB_NAME = TestDatabaseName.PG_TEST_PG_CATALOG_MULTIPLE_JDBC_lOAD;
+  private static TestDatabaseName TEST_DB_NAME =
+      TestDatabaseName.PG_TEST_PG_CATALOG_MULTIPLE_JDBC_lOAD;
 
   private static MySQLContainer mySQLContainer;
   private static PostgreSQLContainer postgreSQLContainer;
@@ -93,7 +94,8 @@ public class TestMultipleJDBCLoad extends AbstractIT {
     String database = new URI(jdbcUrl.substring(jdbcUrl.lastIndexOf("/") + 1)).getPath();
     pgConf.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
     pgConf.put(JdbcConfig.JDBC_DATABASE.getKey(), database);
-    pgConf.put(JdbcConfig.JDBC_DRIVER.getKey(), postgreSQLContainer.getDriverClassName(TEST_DB_NAME));
+    pgConf.put(
+        JdbcConfig.JDBC_DRIVER.getKey(), postgreSQLContainer.getDriverClassName(TEST_DB_NAME));
     pgConf.put(JdbcConfig.USERNAME.getKey(), postgreSQLContainer.getUsername());
     pgConf.put(JdbcConfig.PASSWORD.getKey(), postgreSQLContainer.getPassword());
 
@@ -110,7 +112,9 @@ public class TestMultipleJDBCLoad extends AbstractIT {
     mysqlConf.put(
         JdbcConfig.JDBC_URL.getKey(),
         StringUtils.substring(
-            mySQLContainer.getJdbcUrl(TEST_DB_NAME), 0, mySQLContainer.getJdbcUrl(TEST_DB_NAME).lastIndexOf("/")));
+            mySQLContainer.getJdbcUrl(TEST_DB_NAME),
+            0,
+            mySQLContainer.getJdbcUrl(TEST_DB_NAME).lastIndexOf("/")));
     mysqlConf.put(JdbcConfig.JDBC_DRIVER.getKey(), mySQLContainer.getDriverClassName(TEST_DB_NAME));
     mysqlConf.put(JdbcConfig.USERNAME.getKey(), mySQLContainer.getUsername());
     mysqlConf.put(JdbcConfig.PASSWORD.getKey(), mySQLContainer.getPassword());

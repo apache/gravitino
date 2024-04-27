@@ -8,6 +8,8 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.jdbc.JdbcSchema;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
+import com.datastrato.gravitino.integration.test.container.PostgreSQLContainer;
+import com.datastrato.gravitino.integration.test.util.TestDatabaseName;
 import java.net.URI;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -17,9 +19,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
-
-import com.datastrato.gravitino.integration.test.container.PostgreSQLContainer;
-import com.datastrato.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.commons.lang3.ArrayUtils;
 
 public class PostgreSqlService {
