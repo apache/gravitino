@@ -7,6 +7,5 @@ package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 public enum IcebergCatalogBackend {
   HIVE,
   JDBC,
-  REST,
   MEMORY
 }

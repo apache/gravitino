@@ -112,7 +112,7 @@ public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
         Assertions.assertTrue(properties.contains("(ID,001), (Name,John)"));
         break;
       default:
-        Assertions.assertTrue(properties.contains("(ID,001), (Name,John)"));
+        Assertions.assertEquals("((ID,001), (Name,John))", properties);
         break;
     }
 
@@ -275,7 +275,7 @@ public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
             + "(id bigint COMMENT 'unique id',data string) using iceberg");
 
     Class exception =
-        catalogType == IcebergCatalogBackend.HIVE || (catalogType == IcebergCatalogBackend.REST && backendCatalogType == IcebergCatalogBackend.HIVE)
+        catalogType == IcebergCatalogBackend.HIVE
             ? ServiceFailureException.class
             : TableAlreadyExistsException.class;
 

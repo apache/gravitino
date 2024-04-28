@@ -234,28 +234,7 @@ public class MiniGravitino {
     configMap.putAll(getIcebergRestServiceConfigs());
     configMap.putAll(context.customConfig);
 
-    updateIcebergRestServiceUri(configMap);
-
     ITUtils.rewriteConfigFile(configTempFileName, configFileName, configMap);
-  }
-
-  private void updateIcebergRestServiceUri(Map<String, String> configs) {
-    String catalog_backend = AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
-            + "iceberg-rest"
-            + "."
-            + "catalog-backend";
-    String uri = AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
-            + "iceberg-rest"
-            + "."
-            + "uri";
-    if ("rest".equalsIgnoreCase(configs.get(catalog_backend))) {
-      String httpPort = configs.get(AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
-              + "iceberg-rest"
-              + "."
-              + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey());
-      String IcebergRESTUri = String.format("http://127.0.0.1:%s/iceberg/", httpPort);
-      configs.put(uri, IcebergRESTUri);
-    }
   }
 
   private boolean checkIfServerIsRunning() {
