@@ -54,12 +54,14 @@ public class HiveContainer extends BaseContainer {
 
   @Override
   public void start() {
-    try {
-      super.start();
-      Preconditions.check("Hive container startup failed!", checkContainerStatus(10));
-    } finally {
-      copyHiveLog();
-    }
+    super.start();
+    Preconditions.check("Hive container startup failed!", checkContainerStatus(10));
+  }
+
+  @Override
+  public void close() {
+    copyHiveLog();
+    super.close();
   }
 
   private void copyHiveLog() {

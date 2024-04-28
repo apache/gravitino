@@ -14,6 +14,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.io.Closeable;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -55,6 +56,8 @@ public class ContainerSuite implements Closeable {
       if ("true".equalsIgnoreCase(System.getenv("NEED_CREATE_DOCKER_NETWORK"))) {
         network = createDockerNetwork();
       }
+      String name = ManagementFactory.getRuntimeMXBean().getName();
+      LOG.info("tgg is " + name);
     } catch (Exception e) {
       throw new RuntimeException("Failed to initialize ContainerSuite", e);
     }
@@ -150,6 +153,7 @@ public class ContainerSuite implements Closeable {
           DorisContainer container = closer.register(dorisBuilder.build());
           container.start();
           dorisContainer = container;
+          LOG.info("doris container was created!!!");
         }
       }
     }
@@ -380,6 +384,7 @@ public class ContainerSuite implements Closeable {
   @Override
   public void close() throws IOException {
     try {
+      LOG.info("Containers were closed successfully!");
       closer.close();
     } catch (Exception e) {
       LOG.error("Failed to close ContainerEnvironment", e);
