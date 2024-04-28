@@ -34,8 +34,8 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   protected static final String icebergRestServiceName = "iceberg-rest";
-  protected String hiveMetastoreUri = "thrift://127.0.0.1:9083";
   protected String icebergRestServiceUri = "http://%s:%d/iceberg/";
+  protected String hiveMetastoreUri = "thrift://127.0.0.1:9083";
   protected String warehouse;
   protected FileSystem hdfs;
 
@@ -57,11 +57,12 @@ public abstract class SparkEnvIT extends SparkUtilIT {
 
   @BeforeAll
   void startUp() throws Exception {
+    initHiveEnv();
     // initialize the hiveMetastoreUri and warehouse at first to inject properties to
     // IcebergRestService
-    initHiveEnv();
     if ("lakehouse-iceberg".equalsIgnoreCase(getProvider())) {
       ignoreIcebergRestService = false;
+      AbstractIT.registerCustomConfigs(getCatalogConfigs());
     }
     // Start Gravitino server
     AbstractIT.startIntegrationTest();
@@ -116,11 +117,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
     // Gravitino server is already started by AbstractIT, just construct gravitinoUrl
     int gravitinoPort = getGravitinoServerPort();
     gravitinoUri = String.format("http://127.0.0.1:%d", gravitinoPort);
-    JettyServerConfig icebergRestServiceConfig = getIcebergRestServiceConfig();
-    String icebergRestServiceHost = icebergRestServiceConfig.getHost();
-    int icebergRestServicePort = icebergRestServiceConfig.getHttpPort();
-    icebergRestServiceUri =
-        String.format(icebergRestServiceUri, icebergRestServiceHost, icebergRestServicePort);
+    icebergRestServiceUri = getIcebergRestServiceUri();
   }
 
   private void initHiveEnv() {
@@ -168,11 +165,13 @@ public abstract class SparkEnvIT extends SparkUtilIT {
             .getOrCreate();
   }
 
-  private JettyServerConfig getIcebergRestServiceConfig() {
+  private String getIcebergRestServiceUri() {
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(
             serverConfig,
             AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX + icebergRestServiceName + ".");
-    return jettyServerConfig;
+    String icebergRestServiceHost = jettyServerConfig.getHost();
+    int icebergRestServicePort = jettyServerConfig.getHttpPort();
+    return String.format(icebergRestServiceUri, icebergRestServiceHost, icebergRestServicePort);
   }
 }

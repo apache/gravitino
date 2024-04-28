@@ -5,7 +5,6 @@
 package com.datastrato.gravitino.integration.test.spark.iceberg;
 
 import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
-import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.spark.connector.iceberg.IcebergPropertiesConstants;
 import com.google.common.collect.Maps;
 import java.util.Map;
@@ -16,6 +15,8 @@ import org.junit.jupiter.api.TestInstance;
 @Tag("gravitino-docker-it")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class SparkIcebergCatalogRestHiveBackendIT extends SparkIcebergCatalogIT {
+
+  private static final String icebergRestServiceName = "iceberg-rest";
 
   @Override
   protected Map<String, String> getCatalogConfigs() {
@@ -28,26 +29,24 @@ public class SparkIcebergCatalogRestHiveBackendIT extends SparkIcebergCatalogIT 
     catalogProperties.put(
         IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE, warehouse);
 
-    Map<String, String> icebergRestServiceProperties = Maps.newHashMap();
-    icebergRestServiceProperties.put(
+    catalogProperties.put(
         AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
             + icebergRestServiceName
             + "."
             + IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
         IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND_HIVE);
-    icebergRestServiceProperties.put(
+    catalogProperties.put(
         AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
             + icebergRestServiceName
             + "."
             + IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI,
         hiveMetastoreUri);
-    icebergRestServiceProperties.put(
+    catalogProperties.put(
         AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
             + icebergRestServiceName
             + "."
             + IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE,
         warehouse);
-    AbstractIT.registerCustomConfigs(icebergRestServiceProperties);
 
     return catalogProperties;
   }
