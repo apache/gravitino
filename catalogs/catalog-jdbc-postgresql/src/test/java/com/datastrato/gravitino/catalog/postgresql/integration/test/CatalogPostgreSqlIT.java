@@ -97,7 +97,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
 
   private PostgreSQLContainer POSTGRESQL_CONTAINER;
 
-  protected final TestDatabaseName TEST_DB_NAME = TestDatabaseName.PG_AUDIT_CATALOG_PostgreSql_IT;
+  protected final TestDatabaseName TEST_DB_NAME = TestDatabaseName.PG_CATALOG_POSTGRESQL_IT;
 
   protected PGImageName postgreImageName = DEFAULT_POSTGRES_IMAGE;
 

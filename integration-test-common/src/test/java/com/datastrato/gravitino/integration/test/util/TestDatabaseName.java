@@ -38,8 +38,8 @@ public enum TestDatabaseName {
   /** Represents the MySQL database used for testing the catalog integration with MySQL. */
   MYSQL_CATALOG_MYSQL_IT,
 
-  /** Represents the PostgreSQL database for AudtCatalogPostgreSqlIT. */
-  PG_AUDIT_CATALOG_PostgreSql_IT {
+  /** Represents the PostgreSQL database for CatalogPostgreSqlIT. */
+  PG_CATALOG_POSTGRESQL_IT {
     /** PostgreSQL only accept lowercase database name */
     @Override
     public String toString() {
