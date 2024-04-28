@@ -13,11 +13,12 @@ import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
-import java.util.HashMap;
-import java.util.Map;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @Tag("gravitino-docker-it")
 @TestInstance(Lifecycle.PER_CLASS)
@@ -45,20 +46,21 @@ public class IcebergRESTRESTCatalogJdbcBackendIT extends IcebergRESTServiceIT {
         IcebergCatalogBackend.REST.toString().toLowerCase());
 
     configMap.put(
-        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
-            + IcebergRESTService.SERVICE_NAME
-            + "."
-            + IcebergConfig.CATALOG_URI.getKey(),
-        String.format(
-            "http://%s:%d/iceberg/",
-            "127.0.0.1", JettyServerConfig.DEFAULT_ICEBERG_REST_SERVICE_HTTP_PORT));
+            AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+                    + IcebergRESTService.SERVICE_NAME
+                    + "."
+                    + IcebergConfig.CATALOG_URI.getKey(),
+            String.format(
+                    "http://%s:%d/iceberg/",
+                    "127.0.0.1",
+                    JettyServerConfig.DEFAULT_ICEBERG_REST_SERVICE_HTTP_PORT));
 
     configMap.put(
-        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
-            + IcebergRESTService.SERVICE_NAME
-            + "."
-            + IcebergConfig.REAL_CATALOG_BACKEND.getKey(),
-        IcebergCatalogBackend.JDBC.toString().toLowerCase());
+            AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+                    + IcebergRESTService.SERVICE_NAME
+                    + "."
+                    + IcebergConfig.REAL_CATALOG_BACKEND.getKey(),
+            IcebergCatalogBackend.JDBC.toString().toLowerCase());
 
     configMap.put(
         AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX

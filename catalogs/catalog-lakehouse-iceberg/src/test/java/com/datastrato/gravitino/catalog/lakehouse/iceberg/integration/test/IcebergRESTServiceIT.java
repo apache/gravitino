@@ -275,9 +275,7 @@ public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
             + "(id bigint COMMENT 'unique id',data string) using iceberg");
 
     Class exception =
-        catalogType == IcebergCatalogBackend.HIVE
-                || (catalogType == IcebergCatalogBackend.REST
-                    && backendCatalogType == IcebergCatalogBackend.HIVE)
+        catalogType == IcebergCatalogBackend.HIVE || (catalogType == IcebergCatalogBackend.REST && backendCatalogType == IcebergCatalogBackend.HIVE)
             ? ServiceFailureException.class
             : TableAlreadyExistsException.class;
 
