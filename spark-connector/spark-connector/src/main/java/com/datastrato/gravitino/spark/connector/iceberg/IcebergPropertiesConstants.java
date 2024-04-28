@@ -15,19 +15,11 @@ public class IcebergPropertiesConstants {
       IcebergCatalogPropertiesMetadata.CATALOG_BACKEND_NAME;
 
   @VisibleForTesting
-  public static final String GRAVITINO_ICEBERG_REAL_CATALOG_BACKEND =
-      IcebergCatalogPropertiesMetadata.REAL_CATALOG_BACKEND_NAME;
-
-  @VisibleForTesting
   public static final String GRAVITINO_ICEBERG_CATALOG_WAREHOUSE =
       IcebergCatalogPropertiesMetadata.WAREHOUSE;
 
   @VisibleForTesting
   public static final String GRAVITINO_ICEBERG_CATALOG_URI = IcebergCatalogPropertiesMetadata.URI;
-
-  @VisibleForTesting
-  public static final String GRAVITINO_ICEBERG_CATALOG_BACKEND_URI =
-      IcebergCatalogPropertiesMetadata.BACKEND_CATALOG_URI;
 
   public static final String GRAVITINO_JDBC_USER =
       IcebergCatalogPropertiesMetadata.GRAVITINO_JDBC_USER;

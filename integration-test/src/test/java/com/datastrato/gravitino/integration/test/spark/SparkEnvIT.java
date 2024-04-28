@@ -33,8 +33,9 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   private static final Logger LOG = LoggerFactory.getLogger(SparkEnvIT.class);
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
+  protected static final String icebergRestServiceName = "iceberg-rest";
   protected String hiveMetastoreUri = "thrift://127.0.0.1:9083";
-  protected String icebergRestServiceUri = "http://127.0.0.1:%d/iceberg/";
+  protected String icebergRestServiceUri = "http://%s:%d/iceberg/";
   protected String warehouse;
   protected FileSystem hdfs;
 
@@ -56,13 +57,14 @@ public abstract class SparkEnvIT extends SparkUtilIT {
 
   @BeforeAll
   void startUp() throws Exception {
+    // initialize the hiveMetastoreUri and warehouse at first to inject properties to
+    // IcebergRestService
+    initHiveEnv();
     if ("lakehouse-iceberg".equalsIgnoreCase(getProvider())) {
       ignoreIcebergRestService = false;
-      registerCatalogConfigs();
     }
     // Start Gravitino server
     AbstractIT.startIntegrationTest();
-    initHiveEnv();
     initHdfsFileSystem();
     initGravitinoEnv();
     initMetalakeAndCatalogs();
@@ -114,8 +116,11 @@ public abstract class SparkEnvIT extends SparkUtilIT {
     // Gravitino server is already started by AbstractIT, just construct gravitinoUrl
     int gravitinoPort = getGravitinoServerPort();
     gravitinoUri = String.format("http://127.0.0.1:%d", gravitinoPort);
-    int icebergRestServicePort = getIcebergRestServicePort();
-    icebergRestServiceUri = String.format(icebergRestServiceUri, icebergRestServicePort);
+    JettyServerConfig icebergRestServiceConfig = getIcebergRestServiceConfig();
+    String icebergRestServiceHost = icebergRestServiceConfig.getHost();
+    int icebergRestServicePort = icebergRestServiceConfig.getHttpPort();
+    icebergRestServiceUri =
+        String.format(icebergRestServiceUri, icebergRestServiceHost, icebergRestServicePort);
   }
 
   private void initHiveEnv() {
@@ -163,15 +168,11 @@ public abstract class SparkEnvIT extends SparkUtilIT {
             .getOrCreate();
   }
 
-  private void registerCatalogConfigs() {
-    Map<String, String> icebergConfigs = getCatalogConfigs();
-    AbstractIT.registerCustomConfigs(icebergConfigs);
-  }
-
-  private int getIcebergRestServicePort() {
+  private JettyServerConfig getIcebergRestServiceConfig() {
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(
-            serverConfig, AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX + "iceberg-rest.");
-    return jettyServerConfig.getHttpPort();
+            serverConfig,
+            AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX + icebergRestServiceName + ".");
+    return jettyServerConfig;
   }
 }
