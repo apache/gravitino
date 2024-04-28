@@ -22,7 +22,7 @@ public class CatalogIcebergHiveIT extends CatalogIcebergBaseIT {
     TYPE = "hive";
     WAREHOUSE =
         String.format(
-            "hdfs://%s:%d/user/hive/warehouse-catalog-iceberg/",
+            "hdfs://%s:%d/user/hive/iceberg-hive-warehouse/",
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HDFS_DEFAULTFS_PORT);
   }
