@@ -29,6 +29,7 @@ public class CloseContainerExtension implements BeforeAllCallback {
     public void close() {
       try {
         CONTAINER_SUITE.close();
+        LOGGER.info("Containers were closed successfully");
       } catch (Exception e) {
         LOGGER.warn("Containers are not closed as expected", e);
       }
