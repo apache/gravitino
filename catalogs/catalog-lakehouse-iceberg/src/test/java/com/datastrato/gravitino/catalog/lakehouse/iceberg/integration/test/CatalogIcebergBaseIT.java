@@ -114,7 +114,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     ignoreIcebergRestService = false;
     AbstractIT.startIntegrationTest();
     containerSuite.startHiveContainer();
-    initCatalogProperties();
+    initIcebergCatalogProperties();
     createMetalake();
     createCatalog();
     createSchema();
@@ -126,7 +126,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     clearTableAndSchema();
     client.dropMetalake(NameIdentifier.of(metalakeName));
     spark.close();
-    AbstractIT.startIntegrationTest();
+    AbstractIT.stopIntegrationTest();
   }
 
   @AfterEach
@@ -144,7 +144,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
   @AfterAll
   public static void stopIntegrationTest() {}
 
-  protected abstract void initCatalogProperties();
+  protected abstract void initIcebergCatalogProperties();
 
   private void initSparkEnv() {
     spark =

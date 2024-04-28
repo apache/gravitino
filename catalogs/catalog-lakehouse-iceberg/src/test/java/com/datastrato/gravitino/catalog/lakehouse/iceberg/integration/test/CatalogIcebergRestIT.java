@@ -19,7 +19,7 @@ import org.junit.jupiter.api.TestInstance;
 public class CatalogIcebergRestIT extends CatalogIcebergBaseIT {
 
   @Override
-  protected void initCatalogProperties() {
+  protected void initIcebergCatalogProperties() {
     Map<String, String> map =
         serverConfig.getConfigsWithPrefix(AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX);
     map = MapUtils.getPrefixMap(map, IcebergRESTService.SERVICE_NAME + ".");

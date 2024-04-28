@@ -13,7 +13,7 @@ import org.junit.jupiter.api.TestInstance;
 public class CatalogIcebergHiveIT extends CatalogIcebergBaseIT {
 
   @Override
-  protected void initCatalogProperties() {
+  protected void initIcebergCatalogProperties() {
     URIS =
         String.format(
             "thrift://%s:%d",
