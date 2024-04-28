@@ -18,7 +18,6 @@ import java.util.Map;
 
 public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
   public static final String CATALOG_BACKEND_NAME = "catalog-backend";
-  public static final String REAL_CATALOG_BACKEND_NAME = "real.catalog-backend";
 
   public static final String GRAVITINO_JDBC_USER = "jdbc-user";
   public static final String ICEBERG_JDBC_USER = "jdbc.user";
@@ -30,7 +29,6 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
   public static final String GRAVITINO_JDBC_DRIVER = "jdbc-driver";
   public static final String WAREHOUSE = "warehouse";
   public static final String URI = "uri";
-  public static final String BACKEND_CATALOG_URI = "backend-catalog.uri";
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
@@ -42,8 +40,6 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
       ImmutableMap.of(
           CATALOG_BACKEND_NAME,
           CATALOG_BACKEND_NAME,
-          REAL_CATALOG_BACKEND_NAME,
-          REAL_CATALOG_BACKEND_NAME,
           GRAVITINO_JDBC_DRIVER,
           GRAVITINO_JDBC_DRIVER,
           GRAVITINO_JDBC_USER,
@@ -52,8 +48,6 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
           ICEBERG_JDBC_PASSWORD,
           URI,
           URI,
-          BACKEND_CATALOG_URI,
-          BACKEND_CATALOG_URI,
           WAREHOUSE,
           WAREHOUSE);
 

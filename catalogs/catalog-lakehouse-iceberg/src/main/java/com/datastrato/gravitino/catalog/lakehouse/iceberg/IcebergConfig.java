@@ -5,13 +5,11 @@
 
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
-import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.BACKEND_CATALOG_URI;
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.CATALOG_BACKEND_NAME;
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.GRAVITINO_JDBC_DRIVER;
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.ICEBERG_JDBC_INITIALIZE;
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.ICEBERG_JDBC_PASSWORD;
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.ICEBERG_JDBC_USER;
-import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.REAL_CATALOG_BACKEND_NAME;
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.URI;
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.WAREHOUSE;
 
@@ -35,13 +33,6 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .stringConf()
           .createWithDefault("memory");
 
-  public static final ConfigEntry<String> REAL_CATALOG_BACKEND =
-      new ConfigBuilder(REAL_CATALOG_BACKEND_NAME)
-          .doc("The real catalog backend of Gravitino Iceberg RESTCatalog")
-          .version(ConfigConstants.VERSION_0_6_0)
-          .stringConf()
-          .createWithDefault("memory");
-
   public static final ConfigEntry<String> CATALOG_WAREHOUSE =
       new ConfigBuilder(WAREHOUSE)
           .doc("Warehouse directory of catalog")
@@ -53,14 +44,6 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
   public static final ConfigEntry<String> CATALOG_URI =
       new ConfigBuilder(URI)
           .doc("The uri config of the Iceberg catalog")
-          .version(ConfigConstants.VERSION_0_2_0)
-          .stringConf()
-          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
-          .create();
-
-  public static final ConfigEntry<String> CATALOG_BACKEND_URI =
-      new ConfigBuilder(BACKEND_CATALOG_URI)
-          .doc("The uri config of the Iceberg backend catalog")
           .version(ConfigConstants.VERSION_0_2_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)

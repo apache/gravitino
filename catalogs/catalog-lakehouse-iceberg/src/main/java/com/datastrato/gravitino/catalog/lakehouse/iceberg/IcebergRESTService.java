@@ -52,7 +52,7 @@ public class IcebergRESTService implements GravitinoAuxiliaryService {
         new HttpServerMetricsSource(MetricsSource.ICEBERG_REST_SERVER_METRIC_NAME, config, server);
     metricsSystem.register(httpServerMetricsSource);
 
-    icebergTableOps = new IcebergTableOps(icebergConfig, true);
+    icebergTableOps = new IcebergTableOps(icebergConfig);
     icebergMetricsManager = new IcebergMetricsManager(icebergConfig);
     config.register(
         new AbstractBinder() {
