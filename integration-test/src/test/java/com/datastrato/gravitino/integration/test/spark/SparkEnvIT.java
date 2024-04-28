@@ -11,12 +11,15 @@ import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
+import com.datastrato.gravitino.integration.test.container.MySQLContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
+import com.datastrato.gravitino.integration.test.util.TestDatabaseName;
 import com.datastrato.gravitino.integration.test.util.spark.SparkUtilIT;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.datastrato.gravitino.spark.connector.GravitinoSparkConfig;
 import com.datastrato.gravitino.spark.connector.plugin.GravitinoSparkPlugin;
 import java.io.IOException;
+import java.sql.SQLException;
 import java.util.Collections;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
@@ -36,6 +39,10 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   protected static final String icebergRestServiceName = "iceberg-rest";
   protected String icebergRestServiceUri = "http://%s:%d/iceberg/";
   protected String hiveMetastoreUri = "thrift://127.0.0.1:9083";
+  protected String jdbcUrl = "jdbc://%s:%d/%s";
+  protected String jdbcUsername;
+  protected String jdbcPassword;
+  protected String jdbcDriverClassName;
   protected String warehouse;
   protected FileSystem hdfs;
 
@@ -58,6 +65,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   @BeforeAll
   void startUp() throws Exception {
     initHiveEnv();
+    initMysqlEnv();
     // initialize the hiveMetastoreUri and warehouse at first to inject properties to
     // IcebergRestService
     if ("lakehouse-iceberg".equalsIgnoreCase(getProvider())) {
@@ -100,6 +108,17 @@ public abstract class SparkEnvIT extends SparkUtilIT {
 
   @AfterAll
   public static void stopIntegrationTest() {}
+
+  private void initMysqlEnv() throws SQLException {
+    containerSuite.startMySQLContainer(TestDatabaseName.MYSQL_CATALOG_MYSQL_IT);
+    MySQLContainer mySQLContainer = containerSuite.getMySQLContainer();
+    mySQLContainer.createDatabase(TestDatabaseName.MYSQL_CATALOG_MYSQL_IT);
+    jdbcUrl = mySQLContainer.getJdbcUrl(TestDatabaseName.MYSQL_CATALOG_MYSQL_IT);
+    jdbcUsername = mySQLContainer.getUsername();
+    jdbcPassword = mySQLContainer.getPassword();
+    jdbcDriverClassName =
+        mySQLContainer.getDriverClassName(TestDatabaseName.MYSQL_CATALOG_MYSQL_IT);
+  }
 
   private void initMetalakeAndCatalogs() {
     client.createMetalake(NameIdentifier.of(metalakeName), "", Collections.emptyMap());

@@ -31,6 +31,8 @@ public class IcebergPropertiesConstants {
       IcebergCatalogPropertiesMetadata.ICEBERG_JDBC_PASSWORD;
   public static final String GRAVITINO_ICEBERG_JDBC_DRIVER =
       IcebergCatalogPropertiesMetadata.GRAVITINO_JDBC_DRIVER;
+  public static final String GRAVITINO_ICEBERG_JDBC_INITIALIZE =
+      IcebergCatalogPropertiesMetadata.ICEBERG_JDBC_INITIALIZE;
 
   public static final String GRAVITINO_ICEBERG_CATALOG_TYPE = "type";
   public static final String GRAVITINO_ICEBERG_CATALOG_BACKEND_HIVE = "hive";
