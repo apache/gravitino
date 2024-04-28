@@ -58,8 +58,7 @@ public class IcebergTableOps implements AutoCloseable {
       }
     }
     catalog =
-        IcebergCatalogUtil.loadCatalogBackend(
-            catalogType, icebergConfig.getAllConfig(), buildForIcebergRestService);
+        IcebergCatalogUtil.loadCatalogBackend(catalogType, icebergConfig.getAllConfig());
     if (catalog instanceof SupportsNamespaces) {
       asNamespaceCatalog = (SupportsNamespaces) catalog;
     }
