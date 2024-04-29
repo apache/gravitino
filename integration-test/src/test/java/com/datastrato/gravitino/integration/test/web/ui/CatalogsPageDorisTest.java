@@ -119,7 +119,7 @@ public class CatalogsPageDorisTest extends AbstractWebIT {
 
   @Test
   @Order(0)
-  public void testCreateKafkaCatalog() throws InterruptedException {
+  public void testCreateDorisCatalog() throws InterruptedException {
     // create metalake
     clickAndWait(metalakePage.createMetalakeBtn);
     metalakePage.setMetalakeNameField(METALAKE_NAME);
