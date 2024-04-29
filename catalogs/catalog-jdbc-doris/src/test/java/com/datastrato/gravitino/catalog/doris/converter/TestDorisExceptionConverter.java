@@ -17,7 +17,7 @@ public class TestDorisExceptionConverter {
         DorisExceptionConverter.getErrorCodeFromMessage(msg));
 
     msg =
-        "errCode = 2, detailMessage = Can't drop database 'default_cluster:test_schema'; database doesn't exists";
+        "errCode = 2, detailMessage = Can't drop database 'default_cluster:test_schema'; database doesn't exist";
     Assertions.assertEquals(
         DorisExceptionConverter.CODE_DATABASE_NOT_EXISTS,
         DorisExceptionConverter.getErrorCodeFromMessage(msg));
