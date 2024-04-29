@@ -104,7 +104,7 @@ You must download the corresponding JDBC driver to the `catalogs/lakehouse-icebe
 
 ### Other Apache Iceberg catalog properties
 
-You can add other properties defined in [Iceberg catalog properties](https://iceberg.apache.org/docs/1.3.1/configuration/#catalog-properties).
+You can add other properties defined in [Iceberg catalog properties](https://iceberg.apache.org/docs/latest/configuration/#catalog-properties).
 The `clients` property for example:
 
 | Configuration item                          | Description                          | Default value | Required |
