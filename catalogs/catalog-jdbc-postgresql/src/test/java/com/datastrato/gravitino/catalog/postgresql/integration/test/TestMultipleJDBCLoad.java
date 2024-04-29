@@ -39,7 +39,7 @@ import org.junit.jupiter.api.Test;
 public class TestMultipleJDBCLoad extends AbstractIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static TestDatabaseName TEST_DB_NAME =
-      TestDatabaseName.PG_TEST_PG_CATALOG_MULTIPLE_JDBC_lOAD;
+      TestDatabaseName.PG_TEST_PG_CATALOG_MULTIPLE_JDBC_LOAD;
 
   private static MySQLContainer mySQLContainer;
   private static PostgreSQLContainer postgreSQLContainer;

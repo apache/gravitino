@@ -48,7 +48,7 @@ public enum TestDatabaseName {
   },
 
   /** Represents the PostgreSQL database for postgresql.integration.test.TestMultipleJDBCLoad. */
-  PG_TEST_PG_CATALOG_MULTIPLE_JDBC_lOAD {
+  PG_TEST_PG_CATALOG_MULTIPLE_JDBC_LOAD {
     /** PostgreSQL only accept lowercase database name */
     @Override
     public String toString() {
