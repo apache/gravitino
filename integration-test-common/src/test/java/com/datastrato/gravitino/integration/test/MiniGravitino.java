@@ -41,6 +41,10 @@ import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * MiniGravitino is a mini Gravitino server for integration tests. It starts a Gravitino server in
+ * the same JVM process.
+ */
 public class MiniGravitino {
   private static final Logger LOG = LoggerFactory.getLogger(MiniGravitino.class);
   private MiniGravitinoContext context;
