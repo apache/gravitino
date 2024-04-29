@@ -23,6 +23,12 @@ package com.datastrato.gravitino.integration.test.util;
  *       AuditCatalogMysqlIT.
  *   <li>{@link #MYSQL_CATALOG_MYSQL_IT}: Represents the MySQL database used for testing the catalog
  *       integration with MySQL.
+ *   <li>{@link #PG_CATALOG_POSTGRESQL_IT}: Represents the PostgreSQL database for
+ *       CatalogPostgreSqlIT.
+ *   <li>{@link #PG_TEST_PG_CATALOG_MULTIPLE_JDBC_LOAD}: Represents the PostgreSQL database for
+ *       postgresql.integration.test.TestMultipleJDBCLoad.
+ *   <li>{@link #PG_TEST_ICEBERG_CATALOG_MULTIPLE_JDBC_LOAD}: Represents the PostgreSQL database for
+ *       lakehouse.iceberg.integration.test.TestMultipleJDBCLoad.
  * </ul>
  */
 public enum TestDatabaseName {
