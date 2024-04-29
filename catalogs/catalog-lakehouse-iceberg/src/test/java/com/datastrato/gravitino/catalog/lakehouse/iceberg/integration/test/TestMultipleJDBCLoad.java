@@ -38,7 +38,7 @@ import org.junit.jupiter.api.Test;
 @Tag("gravitino-docker-it")
 public class TestMultipleJDBCLoad extends AbstractIT {
   private static TestDatabaseName TEST_DB_NAME =
-      TestDatabaseName.PG_TEST_ICEBERG_CATALOG_MULTIPLE_JDBC_lOAD;
+      TestDatabaseName.PG_TEST_ICEBERG_CATALOG_MULTIPLE_JDBC_LOAD;
 
   private static MySQLContainer mySQLContainer;
   private static PostgreSQLContainer postgreSQLContainer;
