@@ -222,7 +222,7 @@ Meanwhile, the data types other than listed above are mapped to Gravitino **[Unp
 
 ### Table properties
 
-You can pass [Iceberg table properties](https://iceberg.apache.org/docs/1.3.1/configuration/) to Gravitino when creating an Iceberg table.
+You can pass [Iceberg table properties](https://iceberg.apache.org/docs/latest/configuration/) to Gravitino when creating an Iceberg table.
 
 The Gravitino server doesn't allow passing the following reserved fields.
 
