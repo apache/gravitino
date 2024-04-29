@@ -61,6 +61,7 @@ public class DorisContainer extends BaseContainer {
     super.start();
     Preconditions.check("Doris container startup failed!", checkContainerStatus(5));
     Preconditions.check("Doris container password change failed!", changePassword());
+    throw new IllegalArgumentException("just for test");
   }
 
   @Override
