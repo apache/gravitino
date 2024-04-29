@@ -11,12 +11,14 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Metalake;
 import com.datastrato.gravitino.authorization.Group;
 import com.datastrato.gravitino.authorization.Role;
+import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.User;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
 import com.datastrato.gravitino.dto.authorization.GroupDTO;
 import com.datastrato.gravitino.dto.authorization.RoleDTO;
+import com.datastrato.gravitino.dto.authorization.SecurableObjectDTO;
 import com.datastrato.gravitino.dto.authorization.UserDTO;
 import com.datastrato.gravitino.dto.file.FilesetDTO;
 import com.datastrato.gravitino.dto.messaging.TopicDTO;
@@ -384,10 +386,27 @@ public class DTOConverters {
 
     return RoleDTO.builder()
         .withName(role.name())
-        .withSecurableObject(role.securableObject())
+        .withSecurableObject(toDTO(role.securableObject()))
         .withPrivileges(role.privileges())
         .withProperties(role.properties())
         .withAudit(toDTO(role.auditInfo()))
+        .build();
+  }
+
+  /**
+   * Converts a securable object implementation to a SecurableObjectDTO.
+   *
+   * @param securableObject The securable object implementation.
+   * @return The securable object DTO.
+   */
+  public static SecurableObjectDTO toDTO(SecurableObject securableObject) {
+    if (securableObject instanceof SecurableObjectDTO) {
+      return (SecurableObjectDTO) securableObject;
+    }
+
+    return SecurableObjectDTO.builder()
+        .withFullName(securableObject.fullName())
+        .withType(securableObject.type())
         .build();
   }
 

@@ -26,6 +26,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -309,7 +310,7 @@ public class CatalogKafkaIT extends AbstractIT {
   }
 
   @Test
-  public void testDropTopic() {
+  public void testDropTopic() throws ExecutionException, InterruptedException {
     String topicName = GravitinoITUtils.genRandomName("test-topic");
     Topic createdTopic =
         catalog
@@ -332,6 +333,61 @@ public class CatalogKafkaIT extends AbstractIT {
         Assertions.assertThrows(ExecutionException.class, () -> getTopicDesc(createdTopic.name()));
     Assertions.assertTrue(
         ex.getMessage().contains("This server does not host this topic-partition"));
+
+    // verify dropping non-exist topic
+    String topicName1 = GravitinoITUtils.genRandomName("test-topic");
+    catalog
+        .asTopicCatalog()
+        .createTopic(
+            NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, topicName1),
+            "comment",
+            null,
+            Collections.emptyMap());
+
+    adminClient.deleteTopics(Collections.singleton(topicName1)).all().get();
+    boolean dropped1 =
+        catalog
+            .asTopicCatalog()
+            .dropTopic(
+                NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, topicName1));
+    Assertions.assertFalse(dropped1, "Should return false when dropping non-exist topic");
+    Assertions.assertFalse(
+        catalog
+            .asTopicCatalog()
+            .topicExists(
+                NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, topicName1)),
+        "Topic should not exist after dropping");
+  }
+
+  @Test
+  public void testNameSpec() throws ExecutionException, InterruptedException {
+    // create topic in Kafka with special characters
+    String illegalName = "test.topic";
+    adminClient.createTopics(ImmutableList.of(new NewTopic(illegalName, 1, (short) 1))).all().get();
+
+    NameIdentifier ident =
+        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, illegalName);
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTopicCatalog()
+                    .createTopic(ident, "comment", null, Collections.emptyMap()));
+    Assertions.assertTrue(exception.getMessage().contains("Illegal name: test.topic"));
+
+    Topic loadedTopic = catalog.asTopicCatalog().loadTopic(ident);
+    Assertions.assertEquals(illegalName, loadedTopic.name());
+
+    NameIdentifier[] topics =
+        catalog
+            .asTopicCatalog()
+            .listTopics(Namespace.ofTopic(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME));
+    Assertions.assertTrue(
+        Arrays.stream(topics).anyMatch(topic -> topic.name().equals(illegalName)));
+
+    Assertions.assertTrue(catalog.asTopicCatalog().dropTopic(ident));
+    Assertions.assertFalse(catalog.asTopicCatalog().topicExists(ident));
   }
 
   private void assertTopicWithKafka(Topic createdTopic)

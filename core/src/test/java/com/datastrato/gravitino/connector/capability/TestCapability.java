@@ -18,6 +18,12 @@ public class TestCapability {
       CapabilityResult result = Capability.DEFAULT.specificationOnName(scope, "_name_123_/_=-");
       Assertions.assertTrue(result.supported());
 
+      result = Capability.DEFAULT.specificationOnName(scope, "name_123_/_=-");
+      Assertions.assertTrue(result.supported());
+
+      result = Capability.DEFAULT.specificationOnName(scope, "Name_123_/_=-");
+      Assertions.assertTrue(result.supported());
+
       // test for reserved name
       result = Capability.DEFAULT.specificationOnName(scope, SECURABLE_ENTITY_RESERVED_NAME);
       Assertions.assertFalse(result.supported());
@@ -41,6 +47,18 @@ public class TestCapability {
       Assertions.assertTrue(result.unsupportedMessage().contains("is illegal"));
 
       result = Capability.DEFAULT.specificationOnName(scope, "name_with_%");
+      Assertions.assertFalse(result.supported());
+      Assertions.assertTrue(result.unsupportedMessage().contains("is illegal"));
+
+      result = Capability.DEFAULT.specificationOnName(scope, "-name_start_with-");
+      Assertions.assertFalse(result.supported());
+      Assertions.assertTrue(result.unsupportedMessage().contains("is illegal"));
+
+      result = Capability.DEFAULT.specificationOnName(scope, "/name_start_with/");
+      Assertions.assertFalse(result.supported());
+      Assertions.assertTrue(result.unsupportedMessage().contains("is illegal"));
+
+      result = Capability.DEFAULT.specificationOnName(scope, "=name_start_with=");
       Assertions.assertFalse(result.supported());
       Assertions.assertTrue(result.unsupportedMessage().contains("is illegal"));
 

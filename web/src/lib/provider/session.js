@@ -48,7 +48,7 @@ const AuthProvider = ({ children }) => {
   useEffect(() => {
     const initAuth = async () => {
       const [authConfigsErr, resAuthConfigs] = await to(dispatch(getAuthConfigs()))
-      const { authType } = resAuthConfigs.payload
+      const authType = resAuthConfigs?.payload?.authType
 
       if (authType === 'simple') {
         dispatch(initialVersion())

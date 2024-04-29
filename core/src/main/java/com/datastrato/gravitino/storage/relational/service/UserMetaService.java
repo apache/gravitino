@@ -7,6 +7,7 @@ package com.datastrato.gravitino.storage.relational.service;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.authorization.AuthorizationUtils;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.relational.mapper.UserMetaMapper;
@@ -25,7 +26,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /** The service class for user metadata. It provides the basic database operations for user. */
 public class UserMetaService {
@@ -68,11 +68,8 @@ public class UserMetaService {
   }
 
   public UserEntity getUserByIdentifier(NameIdentifier identifier) {
-    Preconditions.checkArgument(
-        identifier != null
-            && !identifier.namespace().isEmpty()
-            && identifier.namespace().levels().length == 3,
-        "The identifier should not be null and should have three level.");
+    AuthorizationUtils.checkUser(identifier);
+
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
     UserPO userPO = getUserPOByMetalakeIdAndName(metalakeId, identifier.name());
@@ -83,27 +80,14 @@ public class UserMetaService {
 
   public void insertUser(UserEntity userEntity, boolean overwritten) {
     try {
-      Preconditions.checkArgument(
-          userEntity.namespace() != null
-              && !userEntity.namespace().isEmpty()
-              && userEntity.namespace().levels().length == 3,
-          "The identifier should not be null and should have three level.");
+      AuthorizationUtils.checkUser(userEntity.nameIdentifier());
 
       Long metalakeId =
           MetalakeMetaService.getInstance().getMetalakeIdByName(userEntity.namespace().level(0));
       UserPO.Builder builder = UserPO.builder().withMetalakeId(metalakeId);
       UserPO userPO = POConverters.initializeUserPOWithVersion(userEntity, builder);
 
-      List<Long> roleIds = userEntity.roleIds();
-      if (roleIds == null) {
-        roleIds =
-            Optional.ofNullable(userEntity.roleNames()).orElse(Lists.newArrayList()).stream()
-                .map(
-                    roleName ->
-                        RoleMetaService.getInstance()
-                            .getRoleIdByMetalakeIdAndName(metalakeId, roleName))
-                .collect(Collectors.toList());
-      }
+      List<Long> roleIds = Optional.ofNullable(userEntity.roleIds()).orElse(Lists.newArrayList());
       List<UserRoleRelPO> userRoleRelPOs =
           POConverters.initializeUserRoleRelsPOWithVersion(userEntity, roleIds);
 
@@ -140,11 +124,8 @@ public class UserMetaService {
   }
 
   public boolean deleteUser(NameIdentifier identifier) {
-    Preconditions.checkArgument(
-        identifier != null
-            && !identifier.namespace().isEmpty()
-            && identifier.namespace().levels().length == 3,
-        "The identifier should not be null and should have three level.");
+    AuthorizationUtils.checkUser(identifier);
+
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
     Long userId = getUserIdByMetalakeIdAndName(metalakeId, identifier.name());
@@ -161,11 +142,7 @@ public class UserMetaService {
 
   public <E extends Entity & HasIdentifier> UserEntity updateUser(
       NameIdentifier identifier, Function<E, E> updater) {
-    Preconditions.checkArgument(
-        identifier != null
-            && !identifier.namespace().isEmpty()
-            && identifier.namespace().levels().length == 3,
-        "The identifier should not be null and should have three level.");
+    AuthorizationUtils.checkUser(identifier);
 
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
@@ -193,34 +170,41 @@ public class UserMetaService {
     if (insertRoleIds.isEmpty() && deleteRoleIds.isEmpty()) {
       return newEntity;
     }
-    SessionUtils.doMultipleWithCommit(
-        () ->
+
+    try {
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              SessionUtils.doWithoutCommit(
+                  UserMetaMapper.class,
+                  mapper ->
+                      mapper.updateUserMeta(
+                          POConverters.updateUserPOWithVersion(oldUserPO, newEntity), oldUserPO)),
+          () -> {
+            if (insertRoleIds.isEmpty()) {
+              return;
+            }
             SessionUtils.doWithoutCommit(
-                UserMetaMapper.class,
+                UserRoleRelMapper.class,
                 mapper ->
-                    mapper.updateUserMeta(
-                        POConverters.updateUserPOWithVersion(oldUserPO, newEntity), oldUserPO)),
-        () -> {
-          if (insertRoleIds.isEmpty()) {
-            return;
-          }
-          SessionUtils.doWithoutCommit(
-              UserRoleRelMapper.class,
-              mapper ->
-                  mapper.batchInsertUserRoleRel(
-                      POConverters.initializeUserRoleRelsPOWithVersion(
-                          newEntity, Lists.newArrayList(insertRoleIds))));
-        },
-        () -> {
-          if (deleteRoleIds.isEmpty()) {
-            return;
-          }
-          SessionUtils.doWithoutCommit(
-              UserRoleRelMapper.class,
-              mapper ->
-                  mapper.softDeleteUserRoleRelByUserAndRoles(
-                      newEntity.id(), Lists.newArrayList(deleteRoleIds)));
-        });
+                    mapper.batchInsertUserRoleRel(
+                        POConverters.initializeUserRoleRelsPOWithVersion(
+                            newEntity, Lists.newArrayList(insertRoleIds))));
+          },
+          () -> {
+            if (deleteRoleIds.isEmpty()) {
+              return;
+            }
+            SessionUtils.doWithoutCommit(
+                UserRoleRelMapper.class,
+                mapper ->
+                    mapper.softDeleteUserRoleRelByUserAndRoles(
+                        newEntity.id(), Lists.newArrayList(deleteRoleIds)));
+          });
+    } catch (RuntimeException re) {
+      ExceptionUtils.checkSQLException(
+          re, Entity.EntityType.USER, newEntity.nameIdentifier().toString());
+      throw re;
+    }
     return newEntity;
   }
 }

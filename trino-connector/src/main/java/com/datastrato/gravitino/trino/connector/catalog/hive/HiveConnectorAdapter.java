@@ -9,7 +9,6 @@ import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.HasPropertyMeta;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
-import com.google.common.collect.Maps;
 import io.trino.spi.session.PropertyMetadata;
 import java.util.Collections;
 import java.util.HashMap;
@@ -44,18 +43,7 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
     properties.put("hive.security", "allow-all");
     Map<String, String> trinoProperty =
         catalogConverter.gravitinoToEngineProperties(catalog.getProperties());
-
-    // Trino only supports properties that define in catalogPropertyMeta, the name of entries in
-    // catalogPropertyMeta is in the format of "catalogName_propertyName", so we need to replace
-    // '_' with '.' to align with the name in trino.
-    Map<String, PropertyMetadata<?>> catalogPropertyMeta =
-        Maps.uniqueIndex(
-            propertyMetadata.getCatalogPropertyMeta(),
-            propertyMetadata -> propertyMetadata.getName().replace("_", "."));
-
-    trinoProperty.entrySet().stream()
-        .filter(entry -> catalogPropertyMeta.containsKey(entry.getKey()))
-        .forEach(entry -> properties.put(entry.getKey(), entry.getValue()));
+    properties.putAll(trinoProperty);
 
     config.put("properties", properties);
     return config;

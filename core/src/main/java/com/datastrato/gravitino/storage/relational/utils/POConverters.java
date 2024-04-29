@@ -7,12 +7,16 @@ package com.datastrato.gravitino.storage.relational.utils;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.authorization.Privileges;
+import com.datastrato.gravitino.authorization.SecurableObject;
+import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.FilesetEntity;
+import com.datastrato.gravitino.meta.GroupEntity;
 import com.datastrato.gravitino.meta.RoleEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
@@ -22,6 +26,8 @@ import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.relational.po.CatalogPO;
 import com.datastrato.gravitino.storage.relational.po.FilesetPO;
 import com.datastrato.gravitino.storage.relational.po.FilesetVersionPO;
+import com.datastrato.gravitino.storage.relational.po.GroupPO;
+import com.datastrato.gravitino.storage.relational.po.GroupRoleRelPO;
 import com.datastrato.gravitino.storage.relational.po.MetalakePO;
 import com.datastrato.gravitino.storage.relational.po.RolePO;
 import com.datastrato.gravitino.storage.relational.po.SchemaPO;
@@ -30,6 +36,7 @@ import com.datastrato.gravitino.storage.relational.po.TopicPO;
 import com.datastrato.gravitino.storage.relational.po.UserPO;
 import com.datastrato.gravitino.storage.relational.po.UserRoleRelPO;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.Map;
@@ -642,13 +649,14 @@ public class POConverters {
   /**
    * Update UserPO version
    *
-   * @param oldUserPO the old UserEntity object
+   * @param oldUserPO the old UserPO object
    * @param newUser the new TableEntity object
    * @return UserPO object with updated version
    */
   public static UserPO updateUserPOWithVersion(UserPO oldUserPO, UserEntity newUser) {
     Long lastVersion = oldUserPO.getLastVersion();
-    // Will set the version to the last version + 1 when having some fields need be multiple version
+    // TODO: set the version to the last version + 1 when having some fields need be multiple
+    // version
     Long nextVersion = lastVersion;
     try {
       return UserPO.builder()
@@ -678,15 +686,55 @@ public class POConverters {
       List<String> roleNames =
           rolePOs.stream().map(RolePO::getRoleName).collect(Collectors.toList());
       List<Long> roleIds = rolePOs.stream().map(RolePO::getRoleId).collect(Collectors.toList());
-      return UserEntity.builder()
-          .withId(userPO.getUserId())
-          .withName(userPO.getUserName())
-          .withRoleNames(roleNames.isEmpty() ? null : roleNames)
-          .withRoleIds(roleIds.isEmpty() ? null : roleIds)
-          .withNamespace(namespace)
-          .withAuditInfo(
-              JsonUtils.anyFieldMapper().readValue(userPO.getAuditInfo(), AuditInfo.class))
-          .build();
+
+      UserEntity.Builder builder =
+          UserEntity.builder()
+              .withId(userPO.getUserId())
+              .withName(userPO.getUserName())
+              .withNamespace(namespace)
+              .withAuditInfo(
+                  JsonUtils.anyFieldMapper().readValue(userPO.getAuditInfo(), AuditInfo.class));
+      if (!roleNames.isEmpty()) {
+        builder.withRoleNames(roleNames);
+      }
+      if (!roleIds.isEmpty()) {
+        builder.withRoleIds(roleIds);
+      }
+      return builder.build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
+
+  /**
+   * Convert {@link GroupPO} to {@link GroupEntity}
+   *
+   * @param groupPO GroupPO object to be converted
+   * @param rolePOs list of rolePO
+   * @param namespace Namespace object to be associated with the group
+   * @return GroupEntity object from GroupPO object
+   */
+  public static GroupEntity fromGroupPO(
+      GroupPO groupPO, List<RolePO> rolePOs, Namespace namespace) {
+    try {
+      List<String> roleNames =
+          rolePOs.stream().map(RolePO::getRoleName).collect(Collectors.toList());
+      List<Long> roleIds = rolePOs.stream().map(RolePO::getRoleId).collect(Collectors.toList());
+
+      GroupEntity.Builder builder =
+          GroupEntity.builder()
+              .withId(groupPO.getGroupId())
+              .withName(groupPO.getGroupName())
+              .withNamespace(namespace)
+              .withAuditInfo(
+                  JsonUtils.anyFieldMapper().readValue(groupPO.getAuditInfo(), AuditInfo.class));
+      if (!roleNames.isEmpty()) {
+        builder.withRoleNames(roleNames);
+      }
+      if (!roleIds.isEmpty()) {
+        builder.withRoleIds(roleIds);
+      }
+      return builder.build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize json object:", e);
     }
@@ -734,11 +782,14 @@ public class POConverters {
           .withRoleId(roleEntity.id())
           .withRoleName(roleEntity.name())
           .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(roleEntity.properties()))
-          .withSecurableObject(roleEntity.securableObject().toString())
+          .withSecurableObjectFullName(roleEntity.securableObject().fullName())
+          .withSecurableObjectType(roleEntity.securableObject().type().name())
           .withPrivileges(
-              roleEntity.privileges().stream()
-                  .map(privilege -> privilege.name().toString())
-                  .collect(Collectors.joining(",")))
+              JsonUtils.anyFieldMapper()
+                  .writeValueAsString(
+                      roleEntity.privileges().stream()
+                          .map(privilege -> privilege.name().toString())
+                          .collect(Collectors.toList())))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(roleEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
@@ -746,6 +797,109 @@ public class POConverters {
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  /**
+   * Initialize GroupPO
+   *
+   * @param groupEntity GroupEntity object
+   * @return GroupPO object with version initialized
+   */
+  public static GroupPO initializeGroupPOWithVersion(
+      GroupEntity groupEntity, GroupPO.Builder builder) {
+    try {
+      return builder
+          .withGroupId(groupEntity.id())
+          .withGroupName(groupEntity.name())
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(groupEntity.auditInfo()))
+          .withCurrentVersion(INIT_VERSION)
+          .withLastVersion(INIT_VERSION)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  /**
+   * Update GroupPO version
+   *
+   * @param oldGroupPO the old GroupPO object
+   * @param newGroup the new GroupEntity object
+   * @return GroupPO object with updated version
+   */
+  public static GroupPO updateGroupPOWithVersion(GroupPO oldGroupPO, GroupEntity newGroup) {
+    Long lastVersion = oldGroupPO.getLastVersion();
+    // TODO: set the version to the last version + 1 when having some fields need be multiple
+    // version
+    Long nextVersion = lastVersion;
+    try {
+      return GroupPO.builder()
+          .withGroupId(oldGroupPO.getGroupId())
+          .withGroupName(newGroup.name())
+          .withMetalakeId(oldGroupPO.getMetalakeId())
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newGroup.auditInfo()))
+          .withCurrentVersion(nextVersion)
+          .withLastVersion(nextVersion)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  /**
+   * Initialize GroupRoleRelPO
+   *
+   * @param groupEntity GroupEntity object
+   * @param roleIds list of role ids
+   * @return GroupRoleRelPO object with version initialized
+   */
+  public static List<GroupRoleRelPO> initializeGroupRoleRelsPOWithVersion(
+      GroupEntity groupEntity, List<Long> roleIds) {
+    try {
+      List<GroupRoleRelPO> groupRoleRelPOS = Lists.newArrayList();
+      for (Long roleId : roleIds) {
+        GroupRoleRelPO roleRelPO =
+            GroupRoleRelPO.builder()
+                .withGroupId(groupEntity.id())
+                .withRoleId(roleId)
+                .withAuditInfo(
+                    JsonUtils.anyFieldMapper().writeValueAsString(groupEntity.auditInfo()))
+                .withCurrentVersion(INIT_VERSION)
+                .withLastVersion(INIT_VERSION)
+                .withDeletedAt(DEFAULT_DELETED_AT)
+                .build();
+        groupRoleRelPOS.add(roleRelPO);
+      }
+      return groupRoleRelPOS;
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  public static RoleEntity fromRolePO(RolePO rolePO, Namespace namespace) {
+    try {
+      return RoleEntity.builder()
+          .withId(rolePO.getRoleId())
+          .withName(rolePO.getRoleName())
+          .withNamespace(namespace)
+          .withProperties(JsonUtils.anyFieldMapper().readValue(rolePO.getProperties(), Map.class))
+          .withPrivileges(
+              JsonUtils.anyFieldMapper()
+                  .readValue(rolePO.getPrivileges(), new TypeReference<List<String>>() {}).stream()
+                  .map(Privileges::fromString)
+                  .collect(Collectors.toList()))
+          .withSecurableObject(
+              SecurableObjects.parse(
+                  rolePO.getSecurableObjectFullName(),
+                  SecurableObject.Type.valueOf(rolePO.getSecurableObjectType())))
+          .withAuditInfo(
+              JsonUtils.anyFieldMapper().readValue(rolePO.getAuditInfo(), AuditInfo.class))
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize json object:", e);
     }
   }
 }

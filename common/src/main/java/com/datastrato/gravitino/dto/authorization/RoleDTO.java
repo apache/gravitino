@@ -9,7 +9,6 @@ import com.datastrato.gravitino.authorization.Privilege;
 import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.Role;
 import com.datastrato.gravitino.authorization.SecurableObject;
-import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
@@ -39,7 +38,7 @@ public class RoleDTO implements Role {
   private List<String> privileges;
 
   @JsonProperty("securableObject")
-  private String securableObject;
+  private SecurableObjectDTO securableObject;
 
   /** Default constructor for Jackson deserialization. */
   protected RoleDTO() {}
@@ -57,7 +56,7 @@ public class RoleDTO implements Role {
       String name,
       Map<String, String> properties,
       List<String> privileges,
-      String securableObject,
+      SecurableObjectDTO securableObject,
       AuditDTO audit) {
     this.name = name;
     this.audit = audit;
@@ -103,7 +102,7 @@ public class RoleDTO implements Role {
    */
   @Override
   public SecurableObject securableObject() {
-    return SecurableObjects.parse(securableObject);
+    return securableObject;
   }
 
   /** @return The audit information of the Role DTO. */
@@ -141,7 +140,7 @@ public class RoleDTO implements Role {
     protected Map<String, String> properties;
 
     /** The securable object of the role. */
-    protected SecurableObject securableObject;
+    protected SecurableObjectDTO securableObject;
 
     /**
      * Sets the name of the role.
@@ -188,7 +187,7 @@ public class RoleDTO implements Role {
      * @param securableObject The securableObject of the role.
      * @return The builder instance.
      */
-    public S withSecurableObject(SecurableObject securableObject) {
+    public S withSecurableObject(SecurableObjectDTO securableObject) {
       this.securableObject = securableObject;
       return (S) this;
     }
@@ -224,7 +223,7 @@ public class RoleDTO implements Role {
               .map(Privilege::name)
               .map(Objects::toString)
               .collect(Collectors.toList()),
-          securableObject.toString(),
+          securableObject,
           audit);
     }
   }

@@ -74,6 +74,12 @@ paths:
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets/{fileset}:
     $ref: "./filesets.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1filesets~1%7Bfileset%7D"
 
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/topics:
+    $ref: "./topics.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1topics"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/topics/{topic}:
+    $ref: "./topics.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1topics~1%7Btopic%7D"
+
 components:
 
   schemas:
@@ -256,6 +262,14 @@ components:
       name: fileset
       in: path
       description: The name of the fileset
+      required: true
+      schema:
+        type: string
+
+    topic:
+      name: topic
+      in: path
+      description: The name of the topic
       required: true
       schema:
         type: string

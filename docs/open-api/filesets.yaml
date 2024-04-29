@@ -208,7 +208,7 @@ components:
     FilesetUpdatesRequest:
       type: object
       required:
-        - name
+        - updates
       properties:
         updates:
           type: array
@@ -218,16 +218,16 @@ components:
     FilesetUpdateRequest:
       oneOf:
         - $ref: "#/components/schemas/RenameFilesetRequest"
-        - $ref: "#/components/schemas/SetFilesetPropertiesRequest"
+        - $ref: "#/components/schemas/SetFilesetPropertyRequest"
         - $ref: "#/components/schemas/UpdateFilesetCommentRequest"
-        - $ref: "#/components/schemas/RemoveFilesetPropertiesRequest"
+        - $ref: "#/components/schemas/RemoveFilesetPropertyRequest"
       discriminator:
         propertyName: "@type"
         mapping:
           rename: "#/components/schemas/RenameFilesetRequest"
-          setProperties: "#/components/schemas/SetFilesetPropertiesRequest"
+          setProperty: "#/components/schemas/SetFilesetPropertyRequest"
           updateComment: "#/components/schemas/UpdateFilesetCommentRequest"
-          removeProperties: "#/components/schemas/RemoveFilesetPropertiesRequest"
+          removeProperty: "#/components/schemas/RemoveFilesetPropertyRequest"
 
     RenameFilesetRequest:
       type: object
@@ -248,7 +248,7 @@ components:
         "newName": "newName"
       }
 
-    SetFilesetPropertiesRequest:
+    SetFilesetPropertyRequest:
       type: object
       required:
         - "@type"
@@ -291,7 +291,7 @@ components:
         "newComment": "new comment"
       }
 
-    RemoveFilesetPropertiesRequest:
+    RemoveFilesetPropertyRequest:
       type: object
       required:
         - "@type"
@@ -361,7 +361,7 @@ components:
 
     FilesetAlreadyExistsException:
       value: {
-        "code": 1001,
+        "code": 1004,
         "type": "FilesetAlreadyExistsException",
         "message": "Fileset already exists",
         "stack": [
@@ -371,7 +371,7 @@ components:
 
     NoSuchFilesetException:
       value: {
-        "code": 1004,
+        "code": 1003,
         "type": "NoSuchFilesetException",
         "message": "Fileset does not exist",
         "stack": [

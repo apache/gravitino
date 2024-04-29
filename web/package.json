@@ -13,7 +13,8 @@
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --write .",
-    "prettier:check": "prettier --check ."
+    "prettier:check": "prettier --check .",
+    "gen:icons": "tsx src/lib/icons/iconify-icons.js && prettier --write src/lib/icons/iconify-icons.css"
   },
   "dependencies": {
     "@emotion/cache": "^11.11.0",
@@ -45,6 +46,8 @@
   },
   "devDependencies": {
     "@iconify/react": "^4.1.1",
+    "@iconify/tools": "^4.0.4",
+    "@iconify/utils": "^2.1.23",
     "@next/bundle-analyzer": "^14.0.4",
     "@types/lodash-es": "^4.17.12",
     "@types/node": "^20.10.5",
@@ -58,6 +61,7 @@
     "postcss": "^8",
     "prettier": "^3.1.0",
     "tailwindcss": "^3.3.5",
+    "tsx": "^4.7.2",
     "typescript": "^5.3.3"
   }
 }

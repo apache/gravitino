@@ -141,6 +141,8 @@ paths:
         - table
       summary: Drop table
       operationId: dropTable
+      parameters:
+        - $ref: "#/components/parameters/purge"
       responses:
         "200":
           $ref: "./openapi.yaml#/components/responses/DropResponse"
@@ -151,6 +153,15 @@ paths:
 
 
 components:
+  parameters:
+    purge:
+      name: purge
+      in: query
+      description: Removes both the metadata and the directory associated with the table completely and skipping trash.
+      required: false
+      schema:
+        type: boolean
+        default: false
 
   schemas:
     TableCreateRequest:

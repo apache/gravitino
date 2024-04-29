@@ -14,6 +14,8 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;
+import com.datastrato.gravitino.connector.capability.Capability;
+import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
@@ -296,27 +298,37 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    * @param ident The identifier of the table to drop.
    * @return {@code true} if the table was successfully dropped, {@code false} if the table does not
    *     exist.
-   * @throws NoSuchTableException If the table to drop does not exist.
+   * @throws RuntimeException If an error occurs while dropping the table.
    */
   @Override
   public boolean dropTable(NameIdentifier ident) {
-    boolean dropped =
+    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+    boolean droppedFromCatalog =
         doWithCatalog(
-            getCatalogIdentifier(ident),
-            c -> c.doWithTableOps(t -> t.dropTable(ident)),
-            NoSuchTableException.class);
+            catalogIdent, c -> c.doWithTableOps(t -> t.dropTable(ident)), RuntimeException.class);
 
-    if (!dropped) {
-      return false;
-    }
-
+    // For unmanaged table, it could happen that the table:
+    // 1. Is not found in the catalog (dropped directly from underlying sources)
+    // 2. Is found in the catalog but not in the store (not managed by Gravitino)
+    // 3. Is found in the catalog and the store (managed by Gravitino)
+    // 4. Neither found in the catalog nor in the store.
+    // In all situations, we try to delete the schema from the store, but we don't take the
+    // return value of the store operation into account. We only take the return value of the
+    // catalog into account.
+    //
+    // For managed table, we should take the return value of the store operation into account.
+    boolean droppedFromStore = false;
     try {
-      store.delete(ident, TABLE);
+      droppedFromStore = store.delete(ident, TABLE);
+    } catch (NoSuchEntityException e) {
+      LOG.warn("The table to be dropped does not exist in the store: {}", ident, e);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
 
-    return true;
+    return isManagedEntity(catalogIdent, Capability.Scope.TABLE)
+        ? droppedFromStore
+        : droppedFromCatalog;
   }
 
   /**
@@ -331,26 +343,40 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    * @param ident A table identifier.
    * @return True if the table was purged, false if the table did not exist.
    * @throws UnsupportedOperationException If the catalog does not support to purge a table.
+   * @throws RuntimeException If an error occurs while purging the table.
    */
   @Override
   public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
-    boolean purged =
+    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+    boolean droppedFromCatalog =
         doWithCatalog(
-            getCatalogIdentifier(ident),
+            catalogIdent,
             c -> c.doWithTableOps(t -> t.purgeTable(ident)),
-            NoSuchTableException.class,
+            RuntimeException.class,
             UnsupportedOperationException.class);
 
-    if (!purged) {
-      return false;
-    }
-
+    // For unmanaged table, it could happen that the table:
+    // 1. Is not found in the catalog (dropped directly from underlying sources)
+    // 2. Is found in the catalog but not in the store (not managed by Gravitino)
+    // 3. Is found in the catalog and the store (managed by Gravitino)
+    // 4. Neither found in the catalog nor in the store.
+    // In all situations, we try to delete the schema from the store, but we don't take the
+    // return value of the store operation into account. We only take the return value of the
+    // catalog into account.
+    //
+    // For managed table, we should take the return value of the store operation into account.
+    boolean droppedFromStore = false;
     try {
-      store.delete(ident, TABLE);
+      droppedFromStore = store.delete(ident, TABLE);
+    } catch (NoSuchEntityException e) {
+      LOG.warn("The table to be purged does not exist in the store: {}", ident, e);
+      return false;
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
 
-    return true;
+    return isManagedEntity(catalogIdent, Capability.Scope.TABLE)
+        ? droppedFromStore
+        : droppedFromCatalog;
   }
 }

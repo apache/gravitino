@@ -10,6 +10,8 @@ import Provider from '@/lib/provider'
 import Layout from './rootLayout/Layout'
 import StyledToast from '../components/StyledToast'
 
+import '../lib/icons/iconify-icons.css'
+
 export const metadata = {
   title: 'Gravitino',
   description: 'A high-performance, geo-distributed and federated metadata lake.',

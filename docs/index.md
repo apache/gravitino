@@ -55,10 +55,12 @@ REST API and the Java SDK. You can use either to manage metadata. See
   to learn how to manage relational metadata.
 * [Manage fileset metadata using Gravitino](./manage-fileset-metadata-using-gravitino.md) to learn
   how to manage fileset metadata.
+* [Manage messaging metadata using Gravitino](./manage-messaging-metadata-using-gravitino.md) to learn how to manage
+  messaging metadata.
 
 Also, you can find the complete REST API definition in
 [Gravitino Open API](./api/rest/gravitino-rest-api), and the
-Java SDK definition in [Gravitino Javadoc](pathname:///docs/0.4.0/api/java/index.html).
+Java SDK definition in [Gravitino Javadoc](pathname:///docs/0.5.0/api/java/index.html).
 
 Gravitino provides a web UI to manage the metadata. Visit the web UI in the browser via `http://<ip-address>:8090`. See [Gravitino web UI](./webui.md) for details.
 
@@ -75,6 +77,10 @@ Gravitino currently supports the following catalogs:
 **Fileset catalogs:**
 
 * [**Hadoop catalog**](./hadoop-catalog.md)
+
+**Messaging catalogs:**
+
+* [**Kafka catalog**](./kafka-catalog.md)
 
 Gravitino also provides an Iceberg REST catalog service for the Iceberg table format. See the
 [Iceberg REST catalog service](./iceberg-rest-service.md) for details.
@@ -109,6 +115,7 @@ Gravitino supports different catalogs to manage the metadata in different source
 * [Doris catalog](./jdbc-doris-catalog.md): a complete guide to using Gravitino to manage Doris data.
 * [Hadoop catalog](./hadoop-catalog.md): a complete guide to using Gravitino to manage fileset
   using Hadoop Compatible File System (HCFS).
+* [Kafka catalog](./kafka-catalog.md): a complete guide to using Gravitino to manage Kafka topics metadata.
 
 ### Trino connector
 
@@ -131,7 +138,7 @@ Gravitino provides several ways to configure and manage the Gravitino server. Se
 
 * [Gravitino Open API](./api/rest/gravitino-rest-api): provides the complete Open API definition of
   Gravitino.
-* [Gravitino Javadoc](pathname:///docs/0.4.0/api/java/index.html): provides the Javadoc for the Gravitino API.
+* [Gravitino Javadoc](pathname:///docs/0.5.0/api/java/index.html): provides the Javadoc for the Gravitino API.
 
 ### Development guides
 

@@ -14,7 +14,10 @@ from gravitino.name_identifier import NameIdentifier
 @dataclass
 class EntityListResponse(BaseResponse):
     """Represents a response containing a list of catalogs."""
-    idents: Optional[List[NameIdentifier]] = field(metadata=config(field_name='identifiers'))
+    _idents: List[NameIdentifier] = field(metadata=config(field_name='identifiers'))
+
+    def identifiers(self) -> List[NameIdentifier]:
+        return self._idents
 
     def validate(self):
         """Validates the response data.
@@ -24,4 +27,4 @@ class EntityListResponse(BaseResponse):
         """
         super().validate()
 
-        assert self.idents is not None, "identifiers must not be null"
+        assert self._idents is not None, "identifiers must not be null"

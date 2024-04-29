@@ -23,6 +23,7 @@ import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.SchemaDTO;
 import com.datastrato.gravitino.dto.rel.TableDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
+import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.Lists;
 import java.time.Instant;
@@ -267,8 +268,8 @@ public class TestResponses {
     RoleDTO role =
         RoleDTO.builder()
             .withName("role1")
-            .withPrivileges(Lists.newArrayList(Privileges.LoadCatalog.get()))
-            .withSecurableObject(SecurableObjects.ofCatalog("catalog"))
+            .withPrivileges(Lists.newArrayList(Privileges.UseCatalog.get()))
+            .withSecurableObject(DTOConverters.toDTO(SecurableObjects.ofCatalog("catalog")))
             .withAudit(audit)
             .build();
     RoleResponse response = new RoleResponse(role);

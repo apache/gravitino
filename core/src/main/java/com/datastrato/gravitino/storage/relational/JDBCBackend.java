@@ -20,6 +20,7 @@ import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.FilesetEntity;
+import com.datastrato.gravitino.meta.GroupEntity;
 import com.datastrato.gravitino.meta.RoleEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.TableEntity;
@@ -28,6 +29,7 @@ import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 import com.datastrato.gravitino.storage.relational.service.CatalogMetaService;
 import com.datastrato.gravitino.storage.relational.service.FilesetMetaService;
+import com.datastrato.gravitino.storage.relational.service.GroupMetaService;
 import com.datastrato.gravitino.storage.relational.service.MetalakeMetaService;
 import com.datastrato.gravitino.storage.relational.service.RoleMetaService;
 import com.datastrato.gravitino.storage.relational.service.SchemaMetaService;
@@ -109,6 +111,8 @@ public class JDBCBackend implements RelationalBackend {
       UserMetaService.getInstance().insertUser((UserEntity) e, overwritten);
     } else if (e instanceof RoleEntity) {
       RoleMetaService.getInstance().insertRole((RoleEntity) e, overwritten);
+    } else if (e instanceof GroupEntity) {
+      GroupMetaService.getInstance().insertGroup((GroupEntity) e, overwritten);
     } else {
       throw new UnsupportedEntityTypeException(
           "Unsupported entity type: %s for insert operation", e.getClass());
@@ -134,6 +138,8 @@ public class JDBCBackend implements RelationalBackend {
         return (E) TopicMetaService.getInstance().updateTopic(ident, updater);
       case USER:
         return (E) UserMetaService.getInstance().updateUser(ident, updater);
+      case GROUP:
+        return (E) GroupMetaService.getInstance().updateGroup(ident, updater);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for update operation", entityType);
@@ -158,6 +164,10 @@ public class JDBCBackend implements RelationalBackend {
         return (E) TopicMetaService.getInstance().getTopicByIdentifier(ident);
       case USER:
         return (E) UserMetaService.getInstance().getUserByIdentifier(ident);
+      case GROUP:
+        return (E) GroupMetaService.getInstance().getGroupByIdentifier(ident);
+      case ROLE:
+        return (E) RoleMetaService.getInstance().getRoleByIdentifier(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for get operation", entityType);
@@ -181,6 +191,10 @@ public class JDBCBackend implements RelationalBackend {
         return TopicMetaService.getInstance().deleteTopic(ident);
       case USER:
         return UserMetaService.getInstance().deleteUser(ident);
+      case GROUP:
+        return GroupMetaService.getInstance().deleteGroup(ident);
+      case ROLE:
+        return RoleMetaService.getInstance().deleteRole(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for delete operation", entityType);

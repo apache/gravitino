@@ -66,7 +66,7 @@ class CatalogChange(ABC):
         def __init__(self, new_name):
             self.new_name = new_name
 
-        def get_new_name(self):
+        def new_name(self):
             """Retrieves the new name set for the catalog.
 
             Returns:
@@ -74,7 +74,7 @@ class CatalogChange(ABC):
             """
             return self.new_name
 
-        def __eq__(self, other):
+        def __eq__(self, other) -> bool:
             """Compares this RenameCatalog instance with another object for equality. Two instances are
             considered equal if they designate the same new name for the catalog.
 
@@ -112,7 +112,7 @@ class CatalogChange(ABC):
         def __init__(self, new_comment):
             self.new_comment = new_comment
 
-        def get_new_comment(self):
+        def new_comment(self):
             """Retrieves the new comment intended for the catalog.
 
             Returns:
@@ -120,7 +120,7 @@ class CatalogChange(ABC):
             """
             return self.new_comment
 
-        def __eq__(self, other):
+        def __eq__(self, other) -> bool:
             """Compares this UpdateCatalogComment instance with another object for equality.
             Two instances are considered equal if they designate the same new comment for the catalog.
 
@@ -159,7 +159,7 @@ class CatalogChange(ABC):
             self.property = property
             self.value = value
 
-        def get_property(self):
+        def property(self):
             """Retrieves the name of the property being set in the catalog.
 
             Returns:
@@ -167,7 +167,7 @@ class CatalogChange(ABC):
             """
             return self.property
 
-        def get_value(self):
+        def value(self):
             """Retrieves the value assigned to the property in the catalog.
 
             Returns:
@@ -175,7 +175,7 @@ class CatalogChange(ABC):
             """
             return self.value
 
-        def __eq__(self, other):
+        def __eq__(self, other) -> bool:
             """Compares this SetProperty instance with another object for equality.
             Two instances are considered equal if they have the same property and value for the catalog.
 
@@ -211,7 +211,7 @@ class CatalogChange(ABC):
         """A catalog change to remove a property from the catalog."""
 
         def __init__(self, property):
-            self.property = property
+            self._property = property
 
         def get_property(self):
             """Retrieves the name of the property to be removed from the catalog.
@@ -219,9 +219,9 @@ class CatalogChange(ABC):
             Returns:
                  The name of the property for removal.
             """
-            return self.property
+            return self._property
 
-        def __eq__(self, other):
+        def __eq__(self, other) -> bool:
             """Compares this RemoveProperty instance with another object for equality.
             Two instances are considered equal if they target the same property for removal from the catalog.
 
@@ -233,7 +233,7 @@ class CatalogChange(ABC):
             """
             if not isinstance(other, CatalogChange.RemoveProperty):
                 return False
-            return self.property == other.property
+            return self._property == other._property
 
         def __hash__(self):
             """Generates a hash code for this RemoveProperty instance.
@@ -242,7 +242,7 @@ class CatalogChange(ABC):
             Returns:
                  A hash code value for this property removal operation.
             """
-            return hash(self.property)
+            return hash(self._property)
 
         def __str__(self):
             """Provides a string representation of the RemoveProperty instance.
@@ -251,4 +251,4 @@ class CatalogChange(ABC):
             Returns:
                  A string summary of the property removal operation.
             """
-            return f"REMOVEPROPERTY {self.property}"
+            return f"REMOVEPROPERTY {self._property}"

@@ -143,7 +143,8 @@ CREATE TABLE IF NOT EXISTS `role_meta` (
     `role_name` VARCHAR(128) NOT NULL COMMENT 'role name',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `properties` MEDIUMTEXT DEFAULT NULL COMMENT 'schema properties',
-    `securable_object` VARCHAR(256) NOT NULL COMMENT 'securable object',
+    `securable_object_full_name` VARCHAR(256) NOT NULL COMMENT 'securable object full name',
+    `securable_object_type` VARCHAR(32) NOT NULL COMMENT 'securable object type',
     `privileges` VARCHAR(64) NOT NULL COMMENT 'securable privileges',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'role audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'role current version',
@@ -165,3 +166,28 @@ CREATE TABLE IF NOT EXISTS `user_role_rel` (
     CONSTRAINT `uk_ui_ri_del` UNIQUE (`user_id`, `role_id`, `deleted_at`),
     KEY `idx_rid` (`role_id`)
 ) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `group_meta` (
+    `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'group id',
+    `group_name` VARCHAR(128) NOT NULL COMMENT 'group name',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'group audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'group current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'group last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'group deleted at',
+    PRIMARY KEY (`group_id`),
+    CONSTRAINT `uk_mid_gr_del` UNIQUE (`metalake_id`, `group_name`, `deleted_at`)
+    ) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `group_role_rel` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'group id',
+    `role_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'role id',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'relation audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'relation current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'relation last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'relation deleted at',
+    PRIMARY KEY (`id`),
+    CONSTRAINT `uk_gi_ri_del` UNIQUE (`group_id`, `role_id`, `deleted_at`),
+    KEY `idx_gid` (`group_id`)
+    ) ENGINE=InnoDB;
