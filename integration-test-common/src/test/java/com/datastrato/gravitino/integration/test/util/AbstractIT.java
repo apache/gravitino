@@ -40,7 +40,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@ExtendWith(PrintFuncNameExtension.class)
+@ExtendWith({PrintFuncNameExtension.class, CloseContainerExtension.class})
 public class AbstractIT {
   protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
