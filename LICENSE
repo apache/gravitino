@@ -219,6 +219,7 @@
    ./api/src/main/java/com/datastrato/gravitino/rel/expressions/Expression.java
    ./api/src/main/java/com/datastrato/gravitino/rel/expressions/NamedReference.java
    ./integration-test/src/test/java/com/datastrato/gravitino/integration/test/util/spark/SparkUtilIT.java
+   ./spark-connector/spark-connector/src/main/scala/org/apache/spark/sql/iceberg/catalyst/parser/GravitinoIcebergSparkSqlExtensionsParser.scala
 
    Apache Iceberg
    ./api/src/main/java/com/datastrato/gravitino/exceptions/RESTException.java

@@ -1,6 +1,20 @@
 /*
- *  Copyright 2024 Datastrato Pvt Ltd.
- *  This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
 package org.apache.spark.sql.iceberg.catalyst.parser
@@ -31,6 +45,19 @@ import scala.collection.JavaConverters._
 import java.util.Locale
 import scala.util.Try
 
+/**
+ * when parsing RowLevelCommands, IcebergSparkSqlExtensionsParser only supports the Iceberg SparkTable
+ * instead of the SparkIcebergTable defined by the Gravitino spark-connector,
+ * which will cause unexpected exceptions if run RowLevelCommands using the Gravitino spark-connector.
+ * Therefore it is necessary to rewrite IcebergSparkSqlExtensionsParser,
+ * so that RowLevelCommands can run normally using the Gravitino spark-connector.
+ *
+ * GravitinoIcebergSparkSqlExtensionsParser will be injected automatically in GravitinoIcebergSparkSessionExtensions,
+ * and GravitinoIcebergSparkSessionExtensions will be automatically registered in GravitinoDriverPlugin.
+ * Injecting GravitinoIcebergSparkSessionExtensions manually is not recommended,
+ * because we need to ensure GravitinoIcebergSparkSessionExtensions is injected before IcebergSparkSessionExtensions
+ * to avoid some unexpected exceptions.
+ */
 // Referred from v3.4/spark-extensions/src/main/scala/org/apache/spark/sql/catalyst/parser/extensions/IcebergSparkSqlExtensionsParser.scala
 class GravitinoIcebergSparkSqlExtensionsParser(delegate: ParserInterface) extends ParserInterface with ExtendedParser {
 
