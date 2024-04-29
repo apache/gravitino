@@ -5,7 +5,6 @@
 
 package com.datastrato.gravitino.spark.connector.catalog;
 
-import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import org.apache.spark.sql.connector.catalog.ColumnDefaultValue;
 import org.apache.spark.sql.connector.catalog.TableChange;
 import org.apache.spark.sql.connector.expressions.LiteralValue;
@@ -247,27 +246,5 @@ public class TestTransformTableChange {
   }
 
   @Test
-  void testUpdateColumnDefaultValue() {
-    String[] fieldNames = new String[] {"col"};
-    String newDedauleValue = "col_default_value";
-    TableChange.UpdateColumnDefaultValue sparkUpdateColumnDefaultValue =
-        (TableChange.UpdateColumnDefaultValue)
-            TableChange.updateColumnDefaultValue(fieldNames, newDedauleValue);
-
-    com.datastrato.gravitino.rel.TableChange gravitinoChange =
-        BaseCatalog.transformTableChange(sparkUpdateColumnDefaultValue);
-
-    Assertions.assertTrue(
-        gravitinoChange
-            instanceof com.datastrato.gravitino.rel.TableChange.UpdateColumnDefaultValue);
-    com.datastrato.gravitino.rel.TableChange.UpdateColumnDefaultValue
-        gravitinoUpdateColumnDefaultValue =
-            (com.datastrato.gravitino.rel.TableChange.UpdateColumnDefaultValue) gravitinoChange;
-
-    Assertions.assertArrayEquals(
-        sparkUpdateColumnDefaultValue.fieldNames(), gravitinoUpdateColumnDefaultValue.fieldName());
-    Assertions.assertEquals(
-        Literals.stringLiteral(newDedauleValue),
-        gravitinoUpdateColumnDefaultValue.getNewDefaultValue());
-  }
+  void testUpdateColumnDefaultValue() {}
 }

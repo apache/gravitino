@@ -30,7 +30,6 @@ import org.apache.spark.sql.types.ShortType;
 import org.apache.spark.sql.types.StringType;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
-import org.apache.spark.sql.types.TimestampNTZType;
 import org.apache.spark.sql.types.TimestampType;
 import org.apache.spark.sql.types.VarcharType;
 
@@ -68,8 +67,6 @@ public class SparkTypeConverter {
       return Types.DateType.get();
     } else if (sparkType instanceof TimestampType) {
       return Types.TimestampType.withTimeZone();
-    } else if (sparkType instanceof TimestampNTZType) {
-      return Types.TimestampType.withoutTimeZone();
     } else if (sparkType instanceof ArrayType) {
       ArrayType arrayType = (ArrayType) sparkType;
       return Types.ListType.of(toGravitinoType(arrayType.elementType()), arrayType.containsNull());
@@ -131,9 +128,6 @@ public class SparkTypeConverter {
     } else if (gravitinoType instanceof Types.TimestampType
         && ((Types.TimestampType) gravitinoType).hasTimeZone()) {
       return DataTypes.TimestampType;
-    } else if (gravitinoType instanceof Types.TimestampType
-        && !((Types.TimestampType) gravitinoType).hasTimeZone()) {
-      return DataTypes.TimestampNTZType;
     } else if (gravitinoType instanceof Types.ListType) {
       Types.ListType listType = (Types.ListType) gravitinoType;
       return DataTypes.createArrayType(

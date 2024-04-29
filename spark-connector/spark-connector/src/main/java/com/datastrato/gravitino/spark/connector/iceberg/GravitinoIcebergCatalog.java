@@ -16,12 +16,8 @@ import java.util.Locale;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.iceberg.spark.SparkCatalog;
-import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
-import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
-import org.apache.spark.sql.connector.catalog.FunctionCatalog;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
-import org.apache.spark.sql.connector.catalog.functions.UnboundFunction;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
 /**
@@ -31,7 +27,7 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap;
  * StagingTableCatalog and FunctionCatalog, allowing for advanced operations like table staging and
  * function management tailored to the needs of Iceberg tables.
  */
-public class GravitinoIcebergCatalog extends BaseCatalog implements FunctionCatalog {
+public class GravitinoIcebergCatalog extends BaseCatalog {
 
   @Override
   protected TableCatalog createAndInitSparkCatalog(
@@ -84,16 +80,6 @@ public class GravitinoIcebergCatalog extends BaseCatalog implements FunctionCata
   @Override
   protected SparkTransformConverter getSparkTransformConverter() {
     return new SparkTransformConverter(true);
-  }
-
-  @Override
-  public Identifier[] listFunctions(String[] namespace) throws NoSuchNamespaceException {
-    return ((SparkCatalog) sparkCatalog).listFunctions(namespace);
-  }
-
-  @Override
-  public UnboundFunction loadFunction(Identifier ident) throws NoSuchFunctionException {
-    return ((SparkCatalog) sparkCatalog).loadFunction(ident);
   }
 
   private void initHiveProperties(

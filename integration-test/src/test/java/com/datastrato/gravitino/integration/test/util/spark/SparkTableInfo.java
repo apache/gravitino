@@ -25,7 +25,6 @@ import org.apache.spark.sql.connector.expressions.DaysTransform;
 import org.apache.spark.sql.connector.expressions.HoursTransform;
 import org.apache.spark.sql.connector.expressions.IdentityTransform;
 import org.apache.spark.sql.connector.expressions.MonthsTransform;
-import org.apache.spark.sql.connector.expressions.SortedBucketTransform;
 import org.apache.spark.sql.connector.expressions.Transform;
 import org.apache.spark.sql.connector.expressions.YearsTransform;
 import org.apache.spark.sql.types.DataType;
@@ -114,9 +113,8 @@ public class SparkTableInfo {
     Arrays.stream(baseTable.partitioning())
         .forEach(
             transform -> {
-              if (transform instanceof BucketTransform
-                  || transform instanceof SortedBucketTransform) {
-                if (isBucketPartition(supportsBucketPartition, transform)) {
+              if (transform instanceof BucketTransform) {
+                if (isBucketPartition(supportsBucketPartition)) {
                   sparkTableInfo.addPartition(transform);
                 } else {
                   sparkTableInfo.setBucket(transform);
@@ -149,8 +147,8 @@ public class SparkTableInfo {
     return sparkTableInfo;
   }
 
-  private static boolean isBucketPartition(boolean supportsBucketPartition, Transform transform) {
-    return supportsBucketPartition && !(transform instanceof SortedBucketTransform);
+  private static boolean isBucketPartition(boolean supportsBucketPartition) {
+    return supportsBucketPartition;
   }
 
   public List<SparkColumnInfo> getUnPartitionedColumns() {

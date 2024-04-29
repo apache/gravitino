@@ -10,7 +10,6 @@ import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
-import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.google.common.annotations.VisibleForTesting;
@@ -21,7 +20,6 @@ import java.util.List;
 import javax.ws.rs.NotSupportedException;
 import lombok.Getter;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.spark.sql.connector.expressions.ApplyTransform;
 import org.apache.spark.sql.connector.expressions.BucketTransform;
 import org.apache.spark.sql.connector.expressions.DaysTransform;
@@ -31,7 +29,6 @@ import org.apache.spark.sql.connector.expressions.IdentityTransform;
 import org.apache.spark.sql.connector.expressions.Literal;
 import org.apache.spark.sql.connector.expressions.LogicalExpressions;
 import org.apache.spark.sql.connector.expressions.MonthsTransform;
-import org.apache.spark.sql.connector.expressions.SortedBucketTransform;
 import org.apache.spark.sql.connector.expressions.YearsTransform;
 import org.apache.spark.sql.types.IntegerType;
 import org.apache.spark.sql.types.LongType;
@@ -49,9 +46,8 @@ import scala.collection.JavaConverters;
 public class SparkTransformConverter {
 
   /**
-   * If supportsBucketPartition is ture, BucketTransform is transfromed to partition, and
-   * SortedBucketTransform is not supported. If false, BucketTransform and SortedBucketTransform is
-   * transformed to Distribution and SortOrder.
+   * If supportsBucketPartition is ture, BucketTransform is transfromed to partition, and is not
+   * supported. If false, BucketTransform is transformed to Distribution and SortOrder.
    */
   private final boolean supportsBucketPartition;
 
@@ -142,19 +138,13 @@ public class SparkTransformConverter {
         .filter(transform -> !isPartitionTransform(transform))
         .forEach(
             transform -> {
-              if (transform instanceof SortedBucketTransform) {
-                Pair<Distribution, SortOrder[]> pair =
-                    toGravitinoDistributionAndSortOrders((SortedBucketTransform) transform);
-                distributionAndSortOrdersInfo.setDistribution(pair.getLeft());
-                distributionAndSortOrdersInfo.setSortOrders(pair.getRight());
-              } else if (transform instanceof BucketTransform) {
+              if (transform instanceof BucketTransform) {
                 BucketTransform bucketTransform = (BucketTransform) transform;
                 Distribution distribution = toGravitinoDistribution(bucketTransform);
                 distributionAndSortOrdersInfo.setDistribution(distribution);
               } else {
                 throw new NotSupportedException(
-                    "Only support BucketTransform and SortedBucketTransform, but get: "
-                        + transform.name());
+                    "Only support BucketTransform , but get: " + transform.name());
               }
             });
 
@@ -255,26 +245,6 @@ public class SparkTransformConverter {
     return Distributions.hash(bucketNum, expressions);
   }
 
-  // Spark datasourceV2 doesn't support specify sort order direction, use ASCENDING as default.
-  private static Pair<Distribution, SortOrder[]> toGravitinoDistributionAndSortOrders(
-      SortedBucketTransform sortedBucketTransform) {
-    int bucketNum = (Integer) sortedBucketTransform.numBuckets().value();
-    Expression[] bucketColumns =
-        toGravitinoNamedReference(JavaConverters.seqAsJavaList(sortedBucketTransform.columns()));
-
-    Expression[] sortColumns =
-        toGravitinoNamedReference(
-            JavaConverters.seqAsJavaList(sortedBucketTransform.sortedColumns()));
-    SortOrder[] sortOrders =
-        Arrays.stream(sortColumns)
-            .map(
-                sortColumn ->
-                    SortOrders.of(sortColumn, ConnectorConstants.SPARK_DEFAULT_SORT_DIRECTION))
-            .toArray(SortOrder[]::new);
-
-    return Pair.of(Distributions.hash(bucketNum, bucketColumns), sortOrders);
-  }
-
   private static org.apache.spark.sql.connector.expressions.Transform toSparkBucketTransform(
       Distribution distribution, SortOrder[] sortOrders) {
     if (distribution == null) {
@@ -325,8 +295,7 @@ public class SparkTransformConverter {
 
   public static org.apache.spark.sql.connector.expressions.Transform createSortBucketTransform(
       int bucketNum, String[] bucketFields, String[] sortFields) {
-    return LogicalExpressions.bucket(
-        bucketNum, createSparkNamedReference(bucketFields), createSparkNamedReference(sortFields));
+    return null;
   }
 
   // columnName could be "a" or "a.b" for nested column
@@ -382,12 +351,9 @@ public class SparkTransformConverter {
   private boolean isPartitionTransform(
       org.apache.spark.sql.connector.expressions.Transform transform) {
     if (supportsBucketPartition) {
-      Preconditions.checkArgument(
-          !(transform instanceof SortedBucketTransform),
-          "Spark doesn't support SortedBucketTransform as partition transform");
       return true;
     }
-    return !(transform instanceof BucketTransform || transform instanceof SortedBucketTransform);
+    return !(transform instanceof BucketTransform);
   }
 
   // Referred from org.apache.iceberg.spark.Spark3Util
