@@ -79,35 +79,29 @@ import org.junit.jupiter.api.Test;
 public abstract class CatalogIcebergBaseIT extends AbstractIT {
 
   protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
-  protected static String WAREHOUSE;
-  protected static String URIS;
-  protected static String TYPE;
+  protected String metalakeName = GravitinoITUtils.genRandomName("iceberg_it_metalake");
+  protected String catalogName = GravitinoITUtils.genRandomName("iceberg_it_catalog");
+  protected String schemaName = GravitinoITUtils.genRandomName("iceberg_it_schema");
+  protected String tableName = GravitinoITUtils.genRandomName("iceberg_it_table");
+  protected String alertTableName = "alert_table_name";
+  protected String table_comment = "table_comment";
+  protected String schema_comment = "schema_comment";
+  protected String ICEBERG_COL_NAME1 = "iceberg_col_name1";
+  protected String ICEBERG_COL_NAME2 = "iceberg_col_name2";
+  protected String ICEBERG_COL_NAME3 = "iceberg_col_name3";
+  protected String ICEBERG_COL_NAME4 = "iceberg_col_name4";
+  protected String WAREHOUSE;
+  protected String URIS;
+  protected String TYPE;
 
-  public static String metalakeName = GravitinoITUtils.genRandomName("iceberg_it_metalake");
-  public static String catalogName = GravitinoITUtils.genRandomName("iceberg_it_catalog");
-  public static String schemaName = GravitinoITUtils.genRandomName("iceberg_it_schema");
-  public static String tableName = GravitinoITUtils.genRandomName("iceberg_it_table");
-  public static String alertTableName = "alert_table_name";
-  public static String table_comment = "table_comment";
-
-  public static String schema_comment = "schema_comment";
-  public static String ICEBERG_COL_NAME1 = "iceberg_col_name1";
-  public static String ICEBERG_COL_NAME2 = "iceberg_col_name2";
-  public static String ICEBERG_COL_NAME3 = "iceberg_col_name3";
-  public static String ICEBERG_COL_NAME4 = "iceberg_col_name4";
-  private static final String provider = "lakehouse-iceberg";
-
-  private static String SELECT_ALL_TEMPLATE = "SELECT * FROM iceberg.%s";
-  private static String INSERT_BATCH_WITHOUT_PARTITION_TEMPLATE =
-      "INSERT INTO iceberg.%s VALUES %s";
-  private static GravitinoMetalake metalake;
-
-  private static Catalog catalog;
-
-  private static org.apache.iceberg.catalog.Catalog icebergCatalog;
-  private static org.apache.iceberg.catalog.SupportsNamespaces icebergSupportsNamespaces;
-
-  private static SparkSession spark;
+  private final String provider = "lakehouse-iceberg";
+  private String SELECT_ALL_TEMPLATE = "SELECT * FROM iceberg.%s";
+  private String INSERT_BATCH_WITHOUT_PARTITION_TEMPLATE = "INSERT INTO iceberg.%s VALUES %s";
+  private GravitinoMetalake metalake;
+  private Catalog catalog;
+  private org.apache.iceberg.catalog.Catalog icebergCatalog;
+  private org.apache.iceberg.catalog.SupportsNamespaces icebergSupportsNamespaces;
+  private SparkSession spark;
 
   @BeforeAll
   public void startup() throws Exception {
@@ -162,7 +156,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
             .getOrCreate();
   }
 
-  private static void clearTableAndSchema() {
+  private void clearTableAndSchema() {
     NameIdentifier[] nameIdentifiers =
         catalog.asTableCatalog().listTables(Namespace.of(metalakeName, catalogName, schemaName));
     for (NameIdentifier nameIdentifier : nameIdentifiers) {
@@ -171,7 +165,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), false);
   }
 
-  private static void createMetalake() {
+  private void createMetalake() {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
@@ -183,7 +177,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     metalake = loadMetalake;
   }
 
-  private static void createCatalog() {
+  private void createCatalog() {
     Map<String, String> catalogProperties = Maps.newHashMap();
     catalogProperties.put("key1", "val1");
     catalogProperties.put("key2", "val2");
@@ -214,7 +208,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     catalog = loadCatalog;
   }
 
-  private static void createSchema() {
+  private void createSchema() {
     NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
     Map<String, String> prop = Maps.newHashMap();
     prop.put("key1", "val1");
