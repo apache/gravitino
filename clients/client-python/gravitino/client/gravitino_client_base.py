@@ -69,4 +69,4 @@ class GravitinoClientBase:
             try:
                 self._rest_client.close()
             except Exception as e:
-                logger.warning("Failed to close the HTTP REST client", e)
+                logger.warning("Failed to close the HTTP REST client: %s", e)

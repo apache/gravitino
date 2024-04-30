@@ -107,5 +107,5 @@ class GravitinoAdminClient(GravitinoClientBase):
 
             return dropResponse.dropped()
         except Exception as e:
-            logger.warning(f"Failed to drop metalake {ident}")
+            logger.warning("Failed to drop metalake %s", ident)
             return False

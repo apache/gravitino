@@ -191,5 +191,5 @@ class GravitinoMetalake(MetalakeDTO):
 
             return drop_response.dropped()
         except Exception as e:
-            logger.warning(f"Failed to drop catalog {ident}")
+            logger.warning("Failed to drop catalog %s", ident)
             return False
