@@ -59,9 +59,7 @@ public class AuthenticationFilter implements Filter {
         authenticator = filterAuthenticators.get(authenticatorType.name().toLowerCase());
       }
       if (authenticator == null) {
-        throw new UnauthorizedException(
-            "Gravitino Server only support %s authentication, current authentication is not allowed",
-            "Simple, OAuth, Kerberos");
+        throw new UnauthorizedException("Invalid authentication type");
       }
       if (authenticator.isDataFromToken()) {
         Principal principal = authenticator.authenticateToken(authData);
@@ -92,7 +90,7 @@ public class AuthenticationFilter implements Filter {
       return AuthenticatorType.SIMPLE;
     } else if (auth.startsWith(AuthConstants.AUTHORIZATION_BEARER_HEADER)) {
       return AuthenticatorType.OAUTH;
-    } else if (auth.startsWith(AuthConstants.NEGOTIATE)) {
+    } else if (auth.startsWith(AuthConstants.AUTHORIZATION_NEGOTIATE_HEADER)) {
       return AuthenticatorType.KERBEROS;
     } else {
       throw new UnauthorizedException("Unknown authenticator type:{}", auth);

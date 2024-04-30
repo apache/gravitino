@@ -8,13 +8,16 @@ package com.datastrato.gravitino.server.authentication;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.datastrato.gravitino.UserPrincipal;
 import com.datastrato.gravitino.auth.AuthConstants;
+import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import java.io.IOException;
 import java.util.Collections;
@@ -31,12 +34,13 @@ public class TestAuthenticationFilter {
   public void testDoFilterNormal() throws ServletException, IOException {
 
     Authenticator authenticator = mock(Authenticator.class);
+    when(authenticator.name()).thenReturn(AuthenticatorType.SIMPLE.name().toLowerCase());
     AuthenticationFilter filter = new AuthenticationFilter(authenticator);
     FilterChain mockChain = mock(FilterChain.class);
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
     HttpServletResponse mockResponse = mock(HttpServletResponse.class);
     when(mockRequest.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION))
-        .thenReturn(new Vector<>(Collections.singletonList("user")).elements());
+        .thenReturn(new Vector<>(Collections.singletonList("Basic user")).elements());
     when(authenticator.isDataFromToken()).thenReturn(true);
     when(authenticator.authenticateToken(any())).thenReturn(new UserPrincipal("user"));
     filter.doFilter(mockRequest, mockResponse, mockChain);
@@ -46,12 +50,13 @@ public class TestAuthenticationFilter {
   @Test
   public void testDoFilterWithException() throws ServletException, IOException {
     Authenticator authenticator = mock(Authenticator.class);
+    when(authenticator.name()).thenReturn(AuthenticatorType.SIMPLE.name().toLowerCase());
     AuthenticationFilter filter = new AuthenticationFilter(authenticator);
     FilterChain mockChain = mock(FilterChain.class);
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
     HttpServletResponse mockResponse = mock(HttpServletResponse.class);
     when(mockRequest.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION))
-        .thenReturn(new Vector<>(Collections.singletonList("user")).elements());
+        .thenReturn(new Vector<>(Collections.singletonList("Basic user")).elements());
     when(authenticator.isDataFromToken()).thenReturn(true);
     when(authenticator.authenticateToken(any()))
         .thenThrow(new UnauthorizedException("UNAUTHORIZED"));
@@ -68,7 +73,7 @@ public class TestAuthenticationFilter {
     when(authenticator1.name()).thenReturn("simple");
     when(authenticator2.name()).thenReturn("oauth");
     when(authenticator1.isDataFromToken()).thenReturn(true);
-    when(authenticator1.authenticateToken(any())).thenReturn(new UserPrincipal("user"));
+    when(authenticator1.authenticateToken(any())).thenReturn(new UserPrincipal("Basic user"));
 
     AuthenticationFilter filter = new AuthenticationFilter(authenticator1, authenticator2);
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
@@ -76,32 +81,30 @@ public class TestAuthenticationFilter {
 
     // verify simple authenticator by default.
     when(mockRequest.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION))
-        .thenReturn(new Vector<>(Collections.singletonList("user")).elements());
+        .thenReturn(new Vector<>(Collections.singletonList("Basic user")).elements());
     filter.doFilter(mockRequest, mockResponse, mockChain);
     verify(mockResponse, never()).sendError(anyInt(), anyString());
 
     // verify simple authenticator
     when(mockRequest.getHeader(AuthConstants.HTTP_HEADER_AUTHORIZATION_TYPE)).thenReturn("simple");
     when(mockRequest.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION))
-        .thenReturn(new Vector<>(Collections.singletonList("user")).elements());
+        .thenReturn(new Vector<>(Collections.singletonList("Basic user")).elements());
     filter.doFilter(mockRequest, mockResponse, mockChain);
     verify(mockResponse, never()).sendError(anyInt(), anyString());
 
     // verify oauth authenticator
     when(mockRequest.getHeader(AuthConstants.HTTP_HEADER_AUTHORIZATION_TYPE)).thenReturn("oauth");
     when(mockRequest.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION))
-        .thenReturn(new Vector<>(Collections.singletonList("user")).elements());
+        .thenReturn(new Vector<>(Collections.singletonList("Bearer user")).elements());
     filter.doFilter(mockRequest, mockResponse, mockChain);
     verify(mockResponse, never()).sendError(anyInt(), anyString());
 
     // verify unknown authenticator
     when(mockRequest.getHeader(AuthConstants.HTTP_HEADER_AUTHORIZATION_TYPE)).thenReturn("unknown");
     when(mockRequest.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION))
-        .thenReturn(new Vector<>(Collections.singletonList("user")).elements());
+        .thenReturn(new Vector<>(Collections.singletonList("Negotiate user")).elements());
     filter.doFilter(mockRequest, mockResponse, mockChain);
-    verify(mockResponse)
-        .sendError(
-            HttpServletResponse.SC_UNAUTHORIZED,
-            "Gravitino Server only support Simple, OAuth, Kerberos authentication, [unknown] is not allowed");
+    verify(mockResponse, times(1))
+        .sendError(eq(HttpServletResponse.SC_UNAUTHORIZED), eq("Invalid authentication type"));
   }
 }
