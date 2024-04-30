@@ -63,16 +63,32 @@ public final class RelationalGarbageCollector implements Closeable {
       long legacyTimeLine = System.currentTimeMillis() - storeDeleteAfterTimeMillis;
       for (Entity.EntityType entityType : Entity.EntityType.values()) {
         long deletedCount = Long.MAX_VALUE;
-        while (deletedCount > 0) {
-          deletedCount = backend.hardDeleteLegacyData(entityType, legacyTimeLine);
+        LOG.info(
+            "Try to physically delete {} legacy data that has been marked deleted before {}",
+            entityType,
+            legacyTimeLine);
+        try {
+          while (deletedCount > 0) {
+            deletedCount = backend.hardDeleteLegacyData(entityType, legacyTimeLine);
+          }
+        } catch (RuntimeException e) {
+          LOG.error("Failed to physically delete type of " + entityType + "'s legacy data: ", e);
         }
       }
 
       LOG.info("Start to collect and delete old version data by thread {}", threadId);
       for (Entity.EntityType entityType : Entity.EntityType.values()) {
         long deletedCount = Long.MAX_VALUE;
-        while (deletedCount > 0) {
-          deletedCount = backend.deleteOldVersionData(entityType, versionRetentionCount);
+        LOG.info(
+            "Try to softly delete {} old version data that has been over retention count {}",
+            entityType,
+            versionRetentionCount);
+        try {
+          while (deletedCount > 0) {
+            deletedCount = backend.deleteOldVersionData(entityType, versionRetentionCount);
+          }
+        } catch (RuntimeException e) {
+          LOG.error("Failed to softly delete type of " + entityType + "'s old version data: ", e);
         }
       }
     } catch (Exception e) {
