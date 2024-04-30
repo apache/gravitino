@@ -27,12 +27,7 @@ public class AuthenticationFilter implements Filter {
 
   private final Map<String, Authenticator> filterAuthenticators = Maps.newHashMap();
 
-  public AuthenticationFilter() {
-    Authenticator[] authenticators = ServerAuthenticator.getInstance().authenticators();
-    for (Authenticator authenticator : authenticators) {
-      filterAuthenticators.put(authenticator.name(), authenticator);
-    }
-  }
+  public AuthenticationFilter() {}
 
   @VisibleForTesting
   AuthenticationFilter(Authenticator... authenticators) {
@@ -48,6 +43,13 @@ public class AuthenticationFilter implements Filter {
   public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
       throws IOException, ServletException {
     try {
+      if (filterAuthenticators.isEmpty()) {
+        Authenticator[] authenticators = ServerAuthenticator.getInstance().authenticators();
+        for (Authenticator authenticator : authenticators) {
+          filterAuthenticators.put(authenticator.name(), authenticator);
+        }
+      }
+
       HttpServletRequest req = (HttpServletRequest) request;
 
       Enumeration<String> headerData = req.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION);
