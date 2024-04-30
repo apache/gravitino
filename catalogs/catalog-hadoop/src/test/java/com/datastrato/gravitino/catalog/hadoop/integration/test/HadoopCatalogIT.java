@@ -210,7 +210,7 @@ public class HadoopCatalogIT extends AbstractIT {
             "这是中文comment",
             Fileset.Type.MANAGED,
             storageLocation,
-            ImmutableMap.of("k1", "v1", "test", "中文测试test"));
+            ImmutableMap.of("k1", "v1", "test", "中文测试test","中文key","test1"));
 
     // verify fileset is created
     assertFilesetExists(filesetName);
@@ -221,6 +221,7 @@ public class HadoopCatalogIT extends AbstractIT {
     Assertions.assertEquals(1, fileset.properties().size());
     Assertions.assertEquals("v1", fileset.properties().get("k1"));
     Assertions.assertEquals("中文测试test", fileset.properties().get("test"));
+    Assertions.assertEquals("test1", fileset.properties().get("中文key"));
   }
 
   @Test
