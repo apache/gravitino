@@ -38,6 +38,11 @@ tasks {
     args = listOf("install", "-e", ".[dev]")
   }
 
+  val pylint by registering(VenvTask::class) {
+    venvExec = "pylint"
++   args = listOf("./gravitino", "./tests")
+  }
+
   val test by registering(VenvTask::class) {
     val skipPyClientITs = project.hasProperty("skipPyClientITs")
     if (!skipPyClientITs) {
@@ -45,7 +50,7 @@ tasks {
         gravitinoServer("start")
       }
 
-      dependsOn(pipInstall)
+      dependsOn(pipInstall, pylint)
       venvExec = "python"
       args = listOf("-m", "unittest")
       workingDir = projectDir.resolve(".")
@@ -62,6 +67,7 @@ tasks {
   }
 
   val build by registering(VenvTask::class) {
+    dependsOn(pipInstall, pylint)
   }
 
   val clean by registering(Delete::class) {
