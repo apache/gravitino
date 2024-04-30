@@ -10,6 +10,7 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
+import com.datastrato.gravitino.integration.test.container.DorisContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.JdbcDriverDownloader;
 import com.datastrato.gravitino.integration.test.web.ui.pages.CatalogsPage;
@@ -76,8 +77,12 @@ public class CatalogsPageDorisTest extends AbstractWebIT {
 
     containerSuite.startDorisContainer();
 
-    String address = containerSuite.getDorisContainer().getContainerIpAddress();
-    dorisUri = String.format("%s:%d", address, FE_MYSQL_PORT);
+    dorisUri =
+        String.format(
+            "jdbc:mysql://%s:%d/",
+            containerSuite.getDorisContainer().getContainerIpAddress(),
+            DorisContainer.FE_MYSQL_PORT);
+    LOG.info("Doris jdbc url: {}", dorisUri);
   }
 
   /**
