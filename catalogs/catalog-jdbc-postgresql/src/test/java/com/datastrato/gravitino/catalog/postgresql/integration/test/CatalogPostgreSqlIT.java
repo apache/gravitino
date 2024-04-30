@@ -855,7 +855,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   void testColumnDefaultValueConverter() {
     // test convert from MySQL to Gravitino
     String tableName = GravitinoITUtils.genRandomName("test_default_value");
-    String fullTableName = TEST_DB_NAME.toString() + "." + schemaName + "." + tableName;
+    String fullTableName = String.format("%s.%s.%s", TEST_DB_NAME, schemaName, tableName);
     String sql =
         "CREATE TABLE "
             + fullTableName
