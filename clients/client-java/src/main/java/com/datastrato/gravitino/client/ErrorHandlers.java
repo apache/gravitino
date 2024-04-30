@@ -193,7 +193,7 @@ public class ErrorHandlers {
     if (stack.isEmpty()) {
       return message;
     } else {
-      return String.format("%s\n%s", message, stack);
+      return String.format("%s%n%s", message, stack);
     }
   }
 
