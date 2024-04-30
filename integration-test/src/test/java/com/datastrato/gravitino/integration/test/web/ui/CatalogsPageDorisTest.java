@@ -12,11 +12,15 @@ import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.DorisContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
+import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.integration.test.util.JdbcDriverDownloader;
 import com.datastrato.gravitino.integration.test.web.ui.pages.CatalogsPage;
 import com.datastrato.gravitino.integration.test.web.ui.pages.MetalakePage;
 import com.datastrato.gravitino.integration.test.web.ui.utils.AbstractWebIT;
 import com.datastrato.gravitino.rel.Column;
+import com.datastrato.gravitino.rel.expressions.NamedReference;
+import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.Maps;
 import java.nio.file.Path;
@@ -67,12 +71,16 @@ public class CatalogsPageDorisTest extends AbstractWebIT {
 
   @BeforeAll
   public static void before() throws Exception {
+
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    Path tmpPath = Paths.get(gravitinoHome, "/catalogs/catalog-jdbc-doris/build/libs");
-    JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_JDBC_DRIVER_URL, tmpPath.toString());
-
+    if (!ITUtils.EMBEDDED_TEST_MODE.equals(AbstractIT.testMode)) {
+      Path tmpPath = Paths.get(gravitinoHome, "/catalogs/jdbc-doris/libs");
+      JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_JDBC_DRIVER_URL, tmpPath.toString());
+    } else {
+      Path tmpPath = Paths.get(gravitinoHome, "/catalogs/catalog-jdbc-doris/build/libs");
+      JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_JDBC_DRIVER_URL, tmpPath.toString());
+    }
     gravitinoClient = AbstractIT.getGravitinoClient();
-
     gravitinoUri = String.format("http://127.0.0.1:%d", AbstractIT.getGravitinoServerPort());
 
     containerSuite.startDorisContainer();
@@ -119,6 +127,7 @@ public class CatalogsPageDorisTest extends AbstractWebIT {
       String tableName,
       String colName) {
     Map<String, String> properties = Maps.newHashMap();
+    properties.put("replication_allocation", "tag.location.default: 1");
     Column column = Column.of(colName, Types.IntegerType.get(), "column comment");
     Catalog catalog_doris =
         metalake.loadCatalog(NameIdentifier.ofCatalog(metalakeName, catalogName));
@@ -128,7 +137,9 @@ public class CatalogsPageDorisTest extends AbstractWebIT {
             NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
             new Column[] {column},
             "comment",
-            properties);
+            properties,
+            Distributions.hash(2, NamedReference.field(colName)),
+            new SortOrder[0]);
   }
 
   @Test
