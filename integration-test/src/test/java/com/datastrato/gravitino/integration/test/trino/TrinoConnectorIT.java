@@ -4,8 +4,6 @@
  */
 package com.datastrato.gravitino.integration.test.trino;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.client.GravitinoMetalake;
@@ -96,7 +94,7 @@ public class TrinoConnectorIT extends AbstractIT {
         System.getenv("GRAVITINO_ROOT_DIR") + "/trino-connector/build/libs",
         getGravitinoServerPort(),
         metalakeName);
-    assertTrue(
+    Assertions.assertTrue(
         containerSuite.getTrinoContainer().checkSyncCatalogFromGravitino(5, catalogName),
         "Can not synchronize calatogs from gravitino");
 
@@ -211,7 +209,7 @@ public class TrinoConnectorIT extends AbstractIT {
             .getTrinoContainer()
             .executeQuerySQL(
                 String.format("show create table %s.%s.%s", catalogName, dbName, tableName));
-    assertTrue(r.get(0).get(0).contains(tableName));
+    Assertions.assertTrue(r.get(0).get(0).contains(tableName));
   }
 
   public void testScenarioTable1() throws TException, InterruptedException {
@@ -473,7 +471,7 @@ public class TrinoConnectorIT extends AbstractIT {
 
     String data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
 
-    assertTrue(
+    Assertions.assertTrue(
         data.contains(
             "location = 'hdfs://localhost:9000/user/hive/warehouse/hive_schema_1223445.db'"));
   }
@@ -615,7 +613,7 @@ public class TrinoConnectorIT extends AbstractIT {
             .build());
 
     String sql = String.format("show catalogs like '%s'", catalogName);
-    assertTrue(checkTrinoHasLoaded(sql, 30));
+    Assertions.assertTrue(checkTrinoHasLoaded(sql, 30));
 
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
     String tableName = GravitinoITUtils.genRandomName("table").toLowerCase();
@@ -623,7 +621,7 @@ public class TrinoConnectorIT extends AbstractIT {
     containerSuite.getTrinoContainer().executeUpdateSQL(createSchemaSql);
 
     sql = String.format("show create schema %s.%s", catalogName, schemaName);
-    assertTrue(checkTrinoHasLoaded(sql, 30));
+    Assertions.assertTrue(checkTrinoHasLoaded(sql, 30));
 
     String createTableSql =
         String.format(
@@ -635,7 +633,7 @@ public class TrinoConnectorIT extends AbstractIT {
         String.format("show create table %s.%s.%s", catalogName, schemaName, tableName);
     ArrayList<ArrayList<String>> rs =
         containerSuite.getTrinoContainer().executeQuerySQL(showCreateTableSql);
-    assertTrue(rs.get(0).get(0).toLowerCase(Locale.ENGLISH).contains("not null"));
+    Assertions.assertTrue(rs.get(0).get(0).toLowerCase(Locale.ENGLISH).contains("not null"));
 
     containerSuite
         .getTrinoContainer()
@@ -745,18 +743,19 @@ public class TrinoConnectorIT extends AbstractIT {
 
     String data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
 
-    assertTrue(data.contains("serde_name = 'mock11'"));
-    assertTrue(data.contains("table_type = 'EXTERNAL_TABLE'"));
-    assertTrue(data.contains("serde_lib = 'org.apache.hadoop.hive.ql.io.orc.OrcSerde'"));
-    assertTrue(
+    Assertions.assertTrue(data.contains("serde_name = 'mock11'"));
+    Assertions.assertTrue(data.contains("table_type = 'EXTERNAL_TABLE'"));
+    Assertions.assertTrue(data.contains("serde_lib = 'org.apache.hadoop.hive.ql.io.orc.OrcSerde'"));
+    Assertions.assertTrue(
         data.contains(
             "location = 'hdfs://localhost:9000/user/hive/warehouse/hive_schema.db/hive_table'"));
-    assertTrue(data.contains("input_format = 'org.apache.hadoop.hive.ql.io.orc.OrcInputFormat'"));
-    assertTrue(data.contains("serde_lib = 'org.apache.hadoop.hive.ql.io.orc.OrcSerde'"));
-    assertTrue(data.contains("bucket_count = 4"));
-    assertTrue(data.contains("bucketed_by = ARRAY['booleantype']"));
-    assertTrue(data.contains("partitioned_by = ARRAY['binarytype']"));
-    assertTrue(data.contains("sorted_by = ARRAY['longtype']"));
+    Assertions.assertTrue(
+        data.contains("input_format = 'org.apache.hadoop.hive.ql.io.orc.OrcInputFormat'"));
+    Assertions.assertTrue(data.contains("serde_lib = 'org.apache.hadoop.hive.ql.io.orc.OrcSerde'"));
+    Assertions.assertTrue(data.contains("bucket_count = 4"));
+    Assertions.assertTrue(data.contains("bucketed_by = ARRAY['booleantype']"));
+    Assertions.assertTrue(data.contains("partitioned_by = ARRAY['binarytype']"));
+    Assertions.assertTrue(data.contains("sorted_by = ARRAY['longtype']"));
 
     // Test table format issues.
     tableName = GravitinoITUtils.genRandomName("table_format1").toLowerCase();
@@ -767,12 +766,14 @@ public class TrinoConnectorIT extends AbstractIT {
     containerSuite.getTrinoContainer().executeUpdateSQL(sql);
 
     sql = String.format("show create table %s.%s.%s", catalogName, schemaName, tableName);
-    assertTrue(checkTrinoHasLoaded(sql, 30), "Trino fail to create table:" + tableName);
+    Assertions.assertTrue(checkTrinoHasLoaded(sql, 30), "Trino fail to create table:" + tableName);
     data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
 
-    assertTrue(data.contains("input_format = 'org.apache.hadoop.hive.ql.io.orc.OrcInputFormat'"));
-    assertTrue(data.contains("output_format = 'org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat'"));
-    assertTrue(data.contains("serde_lib = 'org.apache.hadoop.hive.ql.io.orc.OrcSerde'"));
+    Assertions.assertTrue(
+        data.contains("input_format = 'org.apache.hadoop.hive.ql.io.orc.OrcInputFormat'"));
+    Assertions.assertTrue(
+        data.contains("output_format = 'org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat'"));
+    Assertions.assertTrue(data.contains("serde_lib = 'org.apache.hadoop.hive.ql.io.orc.OrcSerde'"));
 
     // Test input_format can overwrite format setting
     tableName = GravitinoITUtils.genRandomName("table_format2").toLowerCase();
@@ -782,12 +783,14 @@ public class TrinoConnectorIT extends AbstractIT {
             catalogName, schemaName, tableName);
     containerSuite.getTrinoContainer().executeUpdateSQL(sql);
     sql = String.format("show create table %s.%s.%s", catalogName, schemaName, tableName);
-    assertTrue(checkTrinoHasLoaded(sql, 30), "Trino fail to create table:" + tableName);
+    Assertions.assertTrue(checkTrinoHasLoaded(sql, 30), "Trino fail to create table:" + tableName);
     data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
 
-    assertTrue(data.contains("input_format = 'org.apache.hadoop.mapred.TextInputFormat'"));
-    assertTrue(data.contains("output_format = 'org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat'"));
-    assertTrue(data.contains("serde_lib = 'org.apache.hadoop.hive.ql.io.orc.OrcSerde'"));
+    Assertions.assertTrue(
+        data.contains("input_format = 'org.apache.hadoop.mapred.TextInputFormat'"));
+    Assertions.assertTrue(
+        data.contains("output_format = 'org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat'"));
+    Assertions.assertTrue(data.contains("serde_lib = 'org.apache.hadoop.hive.ql.io.orc.OrcSerde'"));
 
     // Test output_format can overwrite format setting
     tableName = GravitinoITUtils.genRandomName("table_format3").toLowerCase();
@@ -797,14 +800,15 @@ public class TrinoConnectorIT extends AbstractIT {
             catalogName, schemaName, tableName);
     containerSuite.getTrinoContainer().executeUpdateSQL(sql);
     sql = String.format("show create table %s.%s.%s", catalogName, schemaName, tableName);
-    assertTrue(checkTrinoHasLoaded(sql, 30), "Trino fail to create table:" + tableName);
+    Assertions.assertTrue(checkTrinoHasLoaded(sql, 30), "Trino fail to create table:" + tableName);
     data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
 
-    assertTrue(data.contains("input_format = 'org.apache.hadoop.hive.ql.io.orc.OrcInputFormat'"));
-    assertTrue(
+    Assertions.assertTrue(
+        data.contains("input_format = 'org.apache.hadoop.hive.ql.io.orc.OrcInputFormat'"));
+    Assertions.assertTrue(
         data.contains(
             "output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'"));
-    assertTrue(data.contains("serde_lib = 'org.apache.hadoop.hive.ql.io.orc.OrcSerde'"));
+    Assertions.assertTrue(data.contains("serde_lib = 'org.apache.hadoop.hive.ql.io.orc.OrcSerde'"));
   }
 
   @Test
@@ -884,7 +888,7 @@ public class TrinoConnectorIT extends AbstractIT {
     String sql = String.format("show catalogs like '%s'", catalogName);
     checkTrinoHasLoaded(sql, 6);
     // Because we assign 'hive.target-max-file-size' a wrong value, trino can't load the catalog
-    assertTrue(containerSuite.getTrinoContainer().executeQuerySQL(sql).isEmpty());
+    Assertions.assertTrue(containerSuite.getTrinoContainer().executeQuerySQL(sql).isEmpty());
   }
 
   @Test
@@ -959,8 +963,8 @@ public class TrinoConnectorIT extends AbstractIT {
     LOG.info("create iceberg hive table sql is: {}", data);
     // Iceberg does not contain any properties;
     Assertions.assertFalse(data.contains("key1"));
-    assertTrue(data.contains("partitioning = ARRAY['BinaryType']"));
-    assertTrue(data.contains("sorted_by = ARRAY['LongType']"));
+    Assertions.assertTrue(data.contains("partitioning = ARRAY['BinaryType']"));
+    Assertions.assertTrue(data.contains("sorted_by = ARRAY['LongType']"));
 
     String tableCreatedByTrino = GravitinoITUtils.genRandomName("table").toLowerCase();
     String createTableSql =
@@ -1056,7 +1060,7 @@ public class TrinoConnectorIT extends AbstractIT {
             ImmutableMap.<String, String>builder().build());
 
     sql = String.format("show schemas in %s like '%s'", catalogName, schemaName);
-    assertTrue(checkTrinoHasLoaded(sql, 30));
+    Assertions.assertTrue(checkTrinoHasLoaded(sql, 30));
 
     final String sql1 = String.format("drop schema %s.%s cascade", catalogName, schemaName);
     // Will fail because the iceberg catalog does not support cascade drop
@@ -1236,8 +1240,9 @@ public class TrinoConnectorIT extends AbstractIT {
     }
     data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
 
-    assertTrue(data.contains("engine = 'InnoDB'"));
-    assertTrue(data.contains("integertype integer NOT NULL WITH ( auto_increment = true )"));
+    Assertions.assertTrue(data.contains("engine = 'InnoDB'"));
+    Assertions.assertTrue(
+        data.contains("integertype integer NOT NULL WITH ( auto_increment = true )"));
   }
 
   @Test
@@ -1312,8 +1317,8 @@ public class TrinoConnectorIT extends AbstractIT {
     sql = String.format("show create table %s.%s.%s", catalogName, schemaName, tableName);
 
     data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
-    assertTrue(data.contains("age integer NOT NULL"));
-    assertTrue(data.contains("address varchar(20) NOT NULL"));
+    Assertions.assertTrue(data.contains("age integer NOT NULL"));
+    Assertions.assertTrue(data.contains("address varchar(20) NOT NULL"));
 
     // Test special characters in table name
     String tableName1 = "t112";
@@ -1396,12 +1401,12 @@ public class TrinoConnectorIT extends AbstractIT {
 
       String sql = String.format("show catalogs like '%s'", catalogName);
       boolean success = checkTrinoHasLoaded(sql, 30);
-      assertTrue(success, "Trino should load the catalog: " + sql);
+      Assertions.assertTrue(success, "Trino should load the catalog: " + sql);
 
       createdMetalake.dropCatalog(NameIdentifier.of(metalakeName, catalogName));
       // We need to test we can't load this catalog any more by Trino.
       success = checkTrinoHasRemoved(sql, 30);
-      assertTrue(success, "Trino should not load the catalog any more: " + sql);
+      Assertions.assertTrue(success, "Trino should not load the catalog any more: " + sql);
     }
   }
 
