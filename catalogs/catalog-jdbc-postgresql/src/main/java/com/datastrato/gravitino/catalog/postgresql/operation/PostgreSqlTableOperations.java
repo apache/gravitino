@@ -675,7 +675,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
   }
 
   @Override
-  protected Connection getConnection(String schema) throws SQLException {
+  public Connection getConnection(String schema) throws SQLException {
     Connection connection = dataSource.getConnection();
     connection.setCatalog(database);
     connection.setSchema(schema);

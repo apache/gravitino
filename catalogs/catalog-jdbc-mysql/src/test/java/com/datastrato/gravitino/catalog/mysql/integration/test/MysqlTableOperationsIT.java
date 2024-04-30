@@ -21,6 +21,8 @@ import com.datastrato.gravitino.rel.types.Decimal;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
 import com.datastrato.gravitino.utils.RandomNameUtils;
+import java.sql.Connection;
+import java.sql.ResultSet;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -769,6 +771,49 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
 
     tables = TABLE_OPERATIONS.listTables(TEST_DB_NAME.toString());
     Assertions.assertFalse(tables.contains(test_table_2));
+  }
+
+  @Test
+  void testListTable() {
+    String[] dbNames = new String[] {"db1", "db2"};
+    String[] tableNames = new String[] {"table1", "table2", "table3"};
+    for (String dbName : dbNames) {
+      DATABASE_OPERATIONS.create(dbName, null, null);
+    }
+
+    for (String dbName : dbNames) {
+      for (String tableName : tableNames) {
+        TABLE_OPERATIONS.create(
+            dbName,
+            tableName,
+            new JdbcColumn[] {
+              JdbcColumn.builder()
+                  .withName("col_1")
+                  .withType(Types.DecimalType.of(10, 2))
+                  .withComment("test_decimal")
+                  .withNullable(false)
+                  .build()
+            },
+            "test_comment",
+            null,
+            null,
+            Distributions.NONE,
+            Indexes.EMPTY_INDEXES);
+      }
+    }
+
+    for (String dbName : dbNames) {
+      try (Connection connection = TABLE_OPERATIONS.getConnection(dbName);
+          ResultSet resultSet = TABLE_OPERATIONS.getTables(connection, dbName)) {
+        List<String> tables = new ArrayList<>();
+        while (resultSet.next()) {
+          tables.add(resultSet.getString("TABLE_NAME"));
+        }
+        Assertions.assertEquals(Arrays.asList(tableNames), tables);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }
   }
 
   @Test

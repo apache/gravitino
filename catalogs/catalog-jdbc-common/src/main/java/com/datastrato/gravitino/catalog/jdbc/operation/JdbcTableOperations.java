@@ -23,6 +23,7 @@ import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -110,7 +111,7 @@ public abstract class JdbcTableOperations implements TableOperation {
   public List<String> listTables(String databaseName) throws NoSuchSchemaException {
     try (Connection connection = getConnection(databaseName)) {
       final List<String> names = Lists.newArrayList();
-      try (ResultSet tables = getTables(connection)) {
+      try (ResultSet tables = getTables(connection, databaseName)) {
         while (tables.next()) {
           if (Objects.equals(tables.getString("TABLE_SCHEM"), databaseName)) {
             names.add(tables.getString("TABLE_NAME"));
@@ -259,9 +260,9 @@ public abstract class JdbcTableOperations implements TableOperation {
     }
   }
 
-  protected ResultSet getTables(Connection connection) throws SQLException {
+  @VisibleForTesting
+  public ResultSet getTables(Connection connection, String databaseName) throws SQLException {
     final DatabaseMetaData metaData = connection.getMetaData();
-    String databaseName = connection.getSchema();
     return metaData.getTables(databaseName, databaseName, null, JdbcConnectorUtils.getTableTypes());
   }
 
@@ -415,7 +416,8 @@ public abstract class JdbcTableOperations implements TableOperation {
                         "Column %s does not exist in table %s", colName, jdbcTable.name()));
   }
 
-  protected Connection getConnection(String catalog) throws SQLException {
+  @VisibleForTesting
+  public Connection getConnection(String catalog) throws SQLException {
     Connection connection = dataSource.getConnection();
     connection.setCatalog(catalog);
     return connection;

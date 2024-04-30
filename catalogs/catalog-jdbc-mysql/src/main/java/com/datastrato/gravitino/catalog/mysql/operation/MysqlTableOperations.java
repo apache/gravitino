@@ -58,13 +58,20 @@ public class MysqlTableOperations extends JdbcTableOperations {
     final List<String> names = Lists.newArrayList();
 
     try (Connection connection = getConnection(databaseName);
-        ResultSet tables = getTables(connection)) {
+        ResultSet tables = getTables(connection, databaseName)) {
+      long total = 0;
       while (tables.next()) {
-        if (Objects.equals(tables.getString("TABLE_CAT"), databaseName)) {
+        String dbNameFromResult = tables.getString("TABLE_CAT");
+        if (Objects.equals(dbNameFromResult, databaseName)) {
           names.add(tables.getString("TABLE_NAME"));
         }
+        total++;
       }
-      LOG.info("Finished listing tables size {} for database name {} ", names.size(), databaseName);
+      LOG.info(
+          "Finished listing tables size {} for database name {}, total scan = {}",
+          names.size(),
+          databaseName,
+          total);
       return names;
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);

@@ -109,7 +109,7 @@ public class SqliteTableOperations extends JdbcTableOperations {
   public List<String> listTables(String databaseName) throws NoSuchSchemaException {
     try (Connection connection = getConnection(databaseName)) {
       final List<String> names = Lists.newArrayList();
-      try (ResultSet tables = getTables(connection)) {
+      try (ResultSet tables = getTables(connection, databaseName)) {
         // tables.getString("TABLE_SCHEM") is always null.
         while (tables.next()) {
           names.add(tables.getString("TABLE_NAME"));

@@ -52,7 +52,7 @@ public class DorisTableOperations extends JdbcTableOperations {
     final List<String> names = Lists.newArrayList();
 
     try (Connection connection = getConnection(databaseName);
-        ResultSet tables = getTables(connection)) {
+        ResultSet tables = getTables(connection, databaseName)) {
       while (tables.next()) {
         if (Objects.equals(tables.getString("TABLE_CAT"), databaseName)) {
           names.add(tables.getString("TABLE_NAME"));
