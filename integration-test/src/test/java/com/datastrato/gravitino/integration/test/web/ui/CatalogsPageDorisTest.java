@@ -48,7 +48,7 @@ public class CatalogsPageDorisTest extends AbstractWebIT {
   private static final String CATALOG_TYPE_RELATIONAL = "relational";
 
   private static final String DORIS_CATALOG_NAME = "catalog_doris";
-  private static final String DORIS_JDBC_DRIVER = "com.mysql.jdbc.Driver";
+  private static final String DORIS_JDBC_DRIVER = "com.mysql.cj.jdbc.Driver";
   public static final String USER_NAME = "root";
   public static final String PASSWORD = "root";
   public static final int FE_MYSQL_PORT = 9030;
