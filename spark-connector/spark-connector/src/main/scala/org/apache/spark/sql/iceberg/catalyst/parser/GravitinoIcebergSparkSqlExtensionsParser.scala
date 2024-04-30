@@ -19,37 +19,28 @@
 
 package org.apache.spark.sql.iceberg.catalyst.parser
 
-import com.datastrato.gravitino.spark.connector.iceberg.SparkIcebergTable
-import org.antlr.v4.runtime._
-import org.antlr.v4.runtime.atn.PredictionMode
-import org.antlr.v4.runtime.misc.{Interval, ParseCancellationException}
-import org.antlr.v4.runtime.tree.TerminalNodeImpl
-import org.apache.iceberg.common.DynConstructors
-import org.apache.iceberg.spark.ExtendedParser.RawOrderField
-import org.apache.iceberg.spark.{ExtendedParser, Spark3Util}
-import org.apache.spark.sql.{AnalysisException, SparkSession}
-import org.apache.spark.sql.catalyst.{FunctionIdentifier, TableIdentifier}
-import org.apache.spark.sql.catalyst.analysis.{EliminateSubqueryAliases, UnresolvedRelation}
-import org.apache.spark.sql.catalyst.expressions.Expression
-import org.apache.spark.sql.catalyst.parser.ParserInterface
-import org.apache.spark.sql.catalyst.parser.extensions.{IcebergParserUtils, IcebergSqlExtensionsAstBuilder, IcebergSqlExtensionsBaseListener, IcebergSqlExtensionsLexer, IcebergSqlExtensionsParser}
-import org.apache.spark.sql.catalyst.parser.extensions.IcebergSqlExtensionsParser.{NonReservedContext, QuotedIdentifierContext}
-import org.apache.spark.sql.catalyst.plans.logical._
-import org.apache.spark.sql.catalyst.trees.Origin
-import org.apache.spark.sql.connector.catalog.{Table, TableCatalog}
-import org.apache.spark.sql.execution.command.ExplainCommand
-import org.apache.spark.sql.internal.{SQLConf, VariableSubstitution}
-import org.apache.spark.sql.types.{DataType, StructType}
-
 import scala.collection.JavaConverters._
 import java.util.Locale
 import scala.util.Try
 
+import com.datastrato.gravitino.spark.connector.iceberg.SparkIcebergTable
+import org.apache.iceberg.common.DynConstructors
+import org.apache.iceberg.spark.Spark3Util
+
+import org.apache.spark.sql.{AnalysisException, SparkSession}
+import org.apache.spark.sql.catalyst.analysis.{EliminateSubqueryAliases, UnresolvedRelation}
+import org.apache.spark.sql.catalyst.parser.ParserInterface
+import org.apache.spark.sql.catalyst.parser.extensions.{IcebergSparkSqlExtensionsParser, IcebergSqlExtensionsAstBuilder}
+import org.apache.spark.sql.catalyst.plans.logical._
+import org.apache.spark.sql.connector.catalog.{Table, TableCatalog}
+import org.apache.spark.sql.execution.command.ExplainCommand
+import org.apache.spark.sql.internal.{SQLConf, VariableSubstitution}
+
 /**
- * when parsing RowLevelCommands, IcebergSparkSqlExtensionsParser only supports the Iceberg SparkTable
+ * When parsing RowLevelCommands, IcebergSparkSqlExtensionsParser only supports the Iceberg SparkTable
  * instead of the SparkIcebergTable defined by the Gravitino spark-connector,
  * which will cause unexpected exceptions if run RowLevelCommands using the Gravitino spark-connector.
- * Therefore it is necessary to rewrite IcebergSparkSqlExtensionsParser,
+ * Therefore it is necessary to override IcebergSparkSqlExtensionsParser,
  * so that RowLevelCommands can run normally using the Gravitino spark-connector.
  *
  * GravitinoIcebergSparkSqlExtensionsParser will be injected automatically in GravitinoIcebergSparkSessionExtensions,
@@ -58,106 +49,49 @@ import scala.util.Try
  * because we need to ensure GravitinoIcebergSparkSessionExtensions is injected before IcebergSparkSessionExtensions
  * to avoid some unexpected exceptions.
  */
-// Referred from v3.4/spark-extensions/src/main/scala/org/apache/spark/sql/catalyst/parser/extensions/IcebergSparkSqlExtensionsParser.scala
-class GravitinoIcebergSparkSqlExtensionsParser(delegate: ParserInterface) extends ParserInterface with ExtendedParser {
+class GravitinoIcebergSparkSqlExtensionsParser(delegate: ParserInterface) extends IcebergSparkSqlExtensionsParser(delegate: ParserInterface) {
 
   import GravitinoIcebergSparkSqlExtensionsParser._
 
-  private lazy val substitutor = substitutorCtor.newInstance(SQLConf.get)
-  private lazy val astBuilder = new IcebergSqlExtensionsAstBuilder(delegate)
-
-  /**
-   * Parse a string to a DataType.
-   */
-  override def parseDataType(sqlText: String): DataType = {
-    delegate.parseDataType(sqlText)
-  }
-
-  /**
-   * Parse a string to a raw DataType without CHAR/VARCHAR replacement.
-   */
-  def parseRawDataType(sqlText: String): DataType =
-    throw new UnsupportedOperationException()
-
-  /**
-   * Parse a string to an Expression.
-   */
-  override def parseExpression(sqlText: String): Expression = {
-    delegate.parseExpression(sqlText)
-  }
-
-  /**
-   * Parse a string to a TableIdentifier.
-   */
-  override def parseTableIdentifier(sqlText: String): TableIdentifier = {
-    delegate.parseTableIdentifier(sqlText)
-  }
-
-  /**
-   * Parse a string to a FunctionIdentifier.
-   */
-  override def parseFunctionIdentifier(sqlText: String): FunctionIdentifier = {
-    delegate.parseFunctionIdentifier(sqlText)
-  }
-
-  /**
-   * Parse a string to a multi-part identifier.
-   */
-  override def parseMultipartIdentifier(sqlText: String): Seq[String] = {
-    delegate.parseMultipartIdentifier(sqlText)
-  }
-
-  /**
-   * Creates StructType for a given SQL string, which is a comma separated list of field
-   * definitions which will preserve the correct Hive metadata.
-   */
-  override def parseTableSchema(sqlText: String): StructType = {
-    delegate.parseTableSchema(sqlText)
-  }
-
-  override def parseSortOrder(sqlText: String): java.util.List[RawOrderField] = {
-    val fields = parse(sqlText) { parser => astBuilder.visitSingleOrder(parser.singleOrder()) }
-    fields.map { field =>
-      val (term, direction, order) = field
-      new RawOrderField(term, direction, order)
-    }.asJava
-  }
+  private lazy val icebergSubstitutor = substitutorCtor.newInstance(SQLConf.get)
+  private lazy val icebergAstBuilder = new IcebergSqlExtensionsAstBuilder(delegate)
 
   /**
    * Parse a string to a LogicalPlan.
    */
   override def parsePlan(sqlText: String): LogicalPlan = {
-    val sqlTextAfterSubstitution = substitutor.substitute(sqlText)
-    if (isIcebergCommand(sqlTextAfterSubstitution)) {
-      parse(sqlTextAfterSubstitution) { parser => astBuilder.visit(parser.singleStatement()) }.asInstanceOf[LogicalPlan]
+    val sqlTextAfterSubstitution = icebergSubstitutor.substitute(sqlText)
+    if (isGravitinoIcebergCommand(sqlTextAfterSubstitution)) {
+      parse(sqlTextAfterSubstitution) { parser => icebergAstBuilder.visit(parser.singleStatement()) }.asInstanceOf[LogicalPlan]
     } else {
       val parsedPlan = delegate.parsePlan(sqlText)
       parsedPlan match {
         case e: ExplainCommand =>
-          e.copy(logicalPlan = replaceRowLevelCommands(e.logicalPlan))
+          e.copy(logicalPlan = replaceIcebergRowLevelCommands(e.logicalPlan))
         case p =>
-          replaceRowLevelCommands(p)
+          replaceIcebergRowLevelCommands(p)
       }
     }
   }
 
-  private def replaceRowLevelCommands(plan: LogicalPlan): LogicalPlan = plan resolveOperatorsDown {
-    case UpdateTable(UnresolvedIcebergTable(aliasedTable), assignments, condition) =>
+  // replaceIcebergRowLevelCommands is private in IcebergSparkSqlExtensionsParser, so it must be redefine here
+  private def replaceIcebergRowLevelCommands(plan: LogicalPlan): LogicalPlan = plan resolveOperatorsDown {
+    case UpdateTable(UnresolvedGravitinoIcebergTable(aliasedTable), assignments, condition) =>
       UpdateIcebergTable(aliasedTable, assignments, condition)
 
-    case MergeIntoTable(UnresolvedIcebergTable(aliasedTable), source, cond, matchedActions, notMatchedActions, Nil) =>
+    case MergeIntoTable(UnresolvedGravitinoIcebergTable(aliasedTable), source, cond, matchedActions, notMatchedActions, Nil) =>
       // cannot construct MergeIntoIcebergTable right away as MERGE operations require special resolution
       // that's why the condition and actions must be hidden from the regular resolution rules in Spark
       // see ResolveMergeIntoTableReferences for details
       val context = MergeIntoContext(cond, matchedActions, notMatchedActions)
       UnresolvedMergeIntoIcebergTable(aliasedTable, source, context)
 
-    case MergeIntoTable(UnresolvedIcebergTable(_), _, _, _, _, notMatchedBySourceActions)
+    case MergeIntoTable(UnresolvedGravitinoIcebergTable(_), _, _, _, _, notMatchedBySourceActions)
       if notMatchedBySourceActions.nonEmpty =>
       throw new AnalysisException("Iceberg does not support WHEN NOT MATCHED BY SOURCE clause")
   }
 
-  object UnresolvedIcebergTable {
+  object UnresolvedGravitinoIcebergTable {
 
     def unapply(plan: LogicalPlan): Option[LogicalPlan] = {
       EliminateSubqueryAliases(plan) match {
@@ -181,13 +115,16 @@ class GravitinoIcebergSparkSqlExtensionsParser(delegate: ParserInterface) extend
       }
     }
 
+    // isSparkIcebergTable is private and defined in object UnresolvedIcebergTable of IcebergSparkSqlExtensionsParser,
+    // so it must be redefine here
     private def isSparkIcebergTable(table: Table): Boolean = table match {
       case _: SparkIcebergTable => true
       case _ => false
     }
   }
 
-  private def isIcebergCommand(sqlText: String): Boolean = {
+  // isIcebergCommand is private in IcebergSparkSqlExtensionsParser, so it must be redefine here
+  private def isGravitinoIcebergCommand(sqlText: String): Boolean = {
     val normalized = sqlText.toLowerCase(Locale.ROOT).trim()
       // Strip simple SQL comments that terminate a line, e.g. comments starting with `--` .
       .replaceAll("--.*?\\n", " ")
@@ -208,59 +145,17 @@ class GravitinoIcebergSparkSqlExtensionsParser(delegate: ParserInterface) extend
           normalized.contains("write unordered") ||
           normalized.contains("set identifier fields") ||
           normalized.contains("drop identifier fields") ||
-          isSnapshotRefDdl(normalized)))
+          isGravitinoIcebergSnapshotRefDdl(normalized)))
   }
 
-  private def isSnapshotRefDdl(normalized: String): Boolean = {
+  // isSnapshotRefDdl is private in IcebergSparkSqlExtensionsParser, so it must be redefine here
+  private def isGravitinoIcebergSnapshotRefDdl(normalized: String): Boolean = {
     normalized.contains("create branch") ||
       normalized.contains("replace branch") ||
       normalized.contains("create tag") ||
       normalized.contains("replace tag") ||
       normalized.contains("drop branch") ||
       normalized.contains("drop tag")
-  }
-
-  protected def parse[T](command: String)(toResult: IcebergSqlExtensionsParser => T): T = {
-    val lexer = new IcebergSqlExtensionsLexer(new UpperCaseCharStream(CharStreams.fromString(command)))
-    lexer.removeErrorListeners()
-    lexer.addErrorListener(IcebergParseErrorListener)
-
-    val tokenStream = new CommonTokenStream(lexer)
-    val parser = new IcebergSqlExtensionsParser(tokenStream)
-    parser.addParseListener(IcebergSqlExtensionsPostProcessor)
-    parser.removeErrorListeners()
-    parser.addErrorListener(IcebergParseErrorListener)
-
-    try {
-      try {
-        // first, try parsing with potentially faster SLL mode
-        parser.getInterpreter.setPredictionMode(PredictionMode.SLL)
-        toResult(parser)
-      }
-      catch {
-        case _: ParseCancellationException =>
-          // if we fail, parse with LL mode
-          tokenStream.seek(0) // rewind input stream
-          parser.reset()
-
-          // Try Again.
-          parser.getInterpreter.setPredictionMode(PredictionMode.LL)
-          toResult(parser)
-      }
-    }
-    catch {
-      case e: IcebergParseException if e.command.isDefined =>
-        throw e
-      case e: IcebergParseException =>
-        throw e.withCommand(command)
-      case e: AnalysisException =>
-        val position = Origin(e.line, e.startPosition)
-        throw new IcebergParseException(Option(command), e.message, position, position)
-    }
-  }
-
-  override def parseQuery(sqlText: String): LogicalPlan = {
-    parsePlan(sqlText)
   }
 }
 
@@ -270,129 +165,4 @@ object GravitinoIcebergSparkSqlExtensionsParser {
       .impl(classOf[VariableSubstitution])
       .impl(classOf[VariableSubstitution], classOf[SQLConf])
       .build()
-}
-
-/* Copied from Apache Spark's to avoid dependency on Spark Internals */
-class UpperCaseCharStream(wrapped: CodePointCharStream) extends CharStream {
-  override def consume(): Unit = wrapped.consume
-  override def getSourceName(): String = wrapped.getSourceName
-  override def index(): Int = wrapped.index
-  override def mark(): Int = wrapped.mark
-  override def release(marker: Int): Unit = wrapped.release(marker)
-  override def seek(where: Int): Unit = wrapped.seek(where)
-  override def size(): Int = wrapped.size
-
-  override def getText(interval: Interval): String = wrapped.getText(interval)
-
-  // scalastyle:off
-  override def LA(i: Int): Int = {
-    val la = wrapped.LA(i)
-    if (la == 0 || la == IntStream.EOF) la
-    else Character.toUpperCase(la)
-  }
-  // scalastyle:on
-}
-
-/**
- * The post-processor validates & cleans-up the parse tree during the parse process.
- */
-case object IcebergSqlExtensionsPostProcessor extends IcebergSqlExtensionsBaseListener {
-
-  /** Remove the back ticks from an Identifier. */
-  override def exitQuotedIdentifier(ctx: QuotedIdentifierContext): Unit = {
-    replaceTokenByIdentifier(ctx, 1) { token =>
-      // Remove the double back ticks in the string.
-      token.setText(token.getText.replace("``", "`"))
-      token
-    }
-  }
-
-  /** Treat non-reserved keywords as Identifiers. */
-  override def exitNonReserved(ctx: NonReservedContext): Unit = {
-    replaceTokenByIdentifier(ctx, 0)(identity)
-  }
-
-  private def replaceTokenByIdentifier(
-                                        ctx: ParserRuleContext,
-                                        stripMargins: Int)(
-                                        f: CommonToken => CommonToken = identity): Unit = {
-    val parent = ctx.getParent
-    parent.removeLastChild()
-    val token = ctx.getChild(0).getPayload.asInstanceOf[Token]
-    val newToken = new CommonToken(
-      new org.antlr.v4.runtime.misc.Pair(token.getTokenSource, token.getInputStream),
-      IcebergSqlExtensionsParser.IDENTIFIER,
-      token.getChannel,
-      token.getStartIndex + stripMargins,
-      token.getStopIndex - stripMargins)
-    parent.addChild(new TerminalNodeImpl(f(newToken)))
-  }
-}
-
-/* Partially copied from Apache Spark's Parser to avoid dependency on Spark Internals */
-case object IcebergParseErrorListener extends BaseErrorListener {
-  override def syntaxError(
-                            recognizer: Recognizer[_, _],
-                            offendingSymbol: scala.Any,
-                            line: Int,
-                            charPositionInLine: Int,
-                            msg: String,
-                            e: RecognitionException): Unit = {
-    val (start, stop) = offendingSymbol match {
-      case token: CommonToken =>
-        val start = Origin(Some(line), Some(token.getCharPositionInLine))
-        val length = token.getStopIndex - token.getStartIndex + 1
-        val stop = Origin(Some(line), Some(token.getCharPositionInLine + length))
-        (start, stop)
-      case _ =>
-        val start = Origin(Some(line), Some(charPositionInLine))
-        (start, start)
-    }
-    throw new IcebergParseException(None, msg, start, stop)
-  }
-}
-
-/**
- * Copied from Apache Spark
- * A [[ParseException]] is an [[AnalysisException]] that is thrown during the parse process. It
- * contains fields and an extended error message that make reporting and diagnosing errors easier.
- */
-class IcebergParseException(
-                             val command: Option[String],
-                             message: String,
-                             val start: Origin,
-                             val stop: Origin) extends AnalysisException(message, start.line, start.startPosition) {
-
-  def this(message: String, ctx: ParserRuleContext) = {
-    this(Option(IcebergParserUtils.command(ctx)),
-      message,
-      IcebergParserUtils.position(ctx.getStart),
-      IcebergParserUtils.position(ctx.getStop))
-  }
-
-  override def getMessage: String = {
-    val builder = new StringBuilder
-    builder ++= "\n" ++= message
-    start match {
-      case Origin(
-      Some(l), Some(p), Some(startIndex), Some(stopIndex), Some(sqlText), Some(objectType), Some(objectName)) =>
-        builder ++= s"(line $l, pos $p)\n"
-        command.foreach { cmd =>
-          val (above, below) = cmd.split("\n").splitAt(l)
-          builder ++= "\n== SQL ==\n"
-          above.foreach(builder ++= _ += '\n')
-          builder ++= (0 until p).map(_ => "-").mkString("") ++= "^^^\n"
-          below.foreach(builder ++= _ += '\n')
-        }
-      case _ =>
-        command.foreach { cmd =>
-          builder ++= "\n== SQL ==\n" ++= cmd
-        }
-    }
-    builder.toString
-  }
-
-  def withCommand(cmd: String): IcebergParseException = {
-    new IcebergParseException(Option(cmd), message, start, stop)
-  }
 }

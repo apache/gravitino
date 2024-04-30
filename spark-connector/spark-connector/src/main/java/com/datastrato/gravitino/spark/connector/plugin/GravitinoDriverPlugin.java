@@ -35,6 +35,11 @@ public class GravitinoDriverPlugin implements DriverPlugin {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoDriverPlugin.class);
 
   private GravitinoCatalogManager catalogManager;
+  // GravitinoIcebergSparkSessionExtensions must be injected before IcebergSparkSessionExtensions.
+  // Some commands of Iceberg, such as SetWriteDistributionAndOrderingExec must be rewritten
+  // as the table is Gravitino SparkIcebergTable rather than Iceberg SparkTable.
+  // If IcebergSparkSessionExtensions is injected before GravitinoIcebergSparkSessionExtensions,
+  // spark will throw an exception.
   private static final String[] GRAVITINO_DRIVER_EXTENSIONS =
       new String[] {
         GravitinoIcebergSparkSessionExtensions.class.getName(),
