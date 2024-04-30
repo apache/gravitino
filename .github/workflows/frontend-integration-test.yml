@@ -86,15 +86,15 @@ jobs:
         run: |
           dev/ci/util_free_space.sh
 
+      - name: Setup debug Github Action
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'debug action') }}
+        uses: csexton/debugger-action@master
+
       - name: Frontend Integration Test
         id: integrationTest
         run: |
           ./gradlew --rerun-tasks -PskipTests -PtestMode=embedded -PjdkVersion=${{ matrix.java-version }} :integration-test:test --tests "com.datastrato.gravitino.integration.test.web.ui.**"
           ./gradlew --rerun-tasks -PskipTests -PtestMode=deploy -PjdkVersion=${{ matrix.java-version }} :integration-test:test --tests "com.datastrato.gravitino.integration.test.web.ui.**"
-
-      - name: Setup debug Github Action
-        if: ${{ contains(github.event.pull_request.labels.*.name, 'debug action') }}
-        uses: csexton/debugger-action@master
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
