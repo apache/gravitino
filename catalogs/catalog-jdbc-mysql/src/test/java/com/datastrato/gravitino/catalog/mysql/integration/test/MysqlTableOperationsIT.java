@@ -774,7 +774,7 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
   }
 
   @Test
-  void testListTable() {
+  void testListMySQLTable() {
     String[] dbNames = new String[] {"db1", "db2"};
     String[] tableNames = new String[] {"table1", "table2", "table3"};
     for (String dbName : dbNames) {
