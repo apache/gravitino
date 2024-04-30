@@ -117,16 +117,15 @@ public class TrinoContainer extends BaseContainer {
   }
 
   // Check tha Trino has synchronized the catalog from Gravitino
-  public boolean checkSyncCatalogFromGravitino(
-      int retryLimit, String metalakeName, String catalogName) {
+  public boolean checkSyncCatalogFromGravitino(int retryLimit, String catalogName) {
     int nRetry = 0;
     int sleepTime = 5000;
     while (nRetry++ < retryLimit) {
       ArrayList<ArrayList<String>> queryData =
-          executeQuerySQL(format("SHOW CATALOGS LIKE '%s.%s'", metalakeName, catalogName));
+          executeQuerySQL(format("SHOW CATALOGS LIKE '%s'", catalogName));
       for (ArrayList<String> record : queryData) {
         String columnValue = record.get(0);
-        if (columnValue.equals(String.format("%s.%s", metalakeName, catalogName))) {
+        if (columnValue.equals(catalogName)) {
           return true;
         }
       }
