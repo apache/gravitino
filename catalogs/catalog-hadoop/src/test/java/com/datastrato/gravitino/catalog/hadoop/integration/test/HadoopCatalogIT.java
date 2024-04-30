@@ -198,10 +198,10 @@ public class HadoopCatalogIT extends AbstractIT {
   }
 
   @Test
-  public void testCreateFilesetWithChineseComment() throws IOException {
+  public void testCreateFilesetWithChinese() throws IOException {
     // create fileset
     String filesetName = "test_create_fileset";
-    String storageLocation = storageLocation(filesetName);
+    String storageLocation = storageLocation(filesetName) + "/中文目录test";
     Assertions.assertFalse(
         hdfs.exists(new Path(storageLocation)), "storage location should not exists");
     Fileset fileset =
@@ -210,7 +210,7 @@ public class HadoopCatalogIT extends AbstractIT {
             "这是中文comment",
             Fileset.Type.MANAGED,
             storageLocation,
-            ImmutableMap.of("k1", "v1"));
+            ImmutableMap.of("k1", "v1", "test", "中文测试test"));
 
     // verify fileset is created
     assertFilesetExists(filesetName);
@@ -220,6 +220,7 @@ public class HadoopCatalogIT extends AbstractIT {
     Assertions.assertEquals(storageLocation, fileset.storageLocation());
     Assertions.assertEquals(1, fileset.properties().size());
     Assertions.assertEquals("v1", fileset.properties().get("k1"));
+    Assertions.assertEquals("中文测试test", fileset.properties().get("test"));
   }
 
   @Test
