@@ -104,17 +104,18 @@ public class PostgreSQLContainer extends BaseContainer {
                 getJdbcUrl(testDatabaseName), 0, getJdbcUrl(testDatabaseName).lastIndexOf("/"))
             + "/";
 
-    // change password for root user, Gravitino API must set password in catalog properties
     try (Connection connection =
             DriverManager.getConnection(pgJdbcUrl, getUsername(), getPassword());
         Statement statement = connection.createStatement()) {
 
-      // FIXME: PG doesn't have IF NOT EXISTS clause, we need to handle possible error.
       String query = format("CREATE DATABASE %s;", testDatabaseName);
       statement.execute(query);
       LOG.info(format("PostgreSQL container database %s has been created", testDatabaseName));
-    } catch (Exception e) {
-      LOG.error(e.getMessage(), e);
+    } catch (SQLException e) {
+      if (e.getMessage()
+          .equals(String.format("ERROR: database \"%s\" already exists", testDatabaseName))) {
+        LOG.info("PostgreSQL Database {} already exists, skipping", testDatabaseName);
+      } else throw new RuntimeException(e);
     }
   }
 
