@@ -5,10 +5,34 @@
 confidence=
 
 # Enable the message, report, category or checker with the given id(s).
-enable=logging
+# enable=logging
 
 # Disable the message, report, category or checker with the given id(s). 
-disable=all
+disable=missing-class-docstring,
+        missing-function-docstring,
+        missing-module-docstring,
+        global-variable-not-assigned,
+        too-many-public-methods,
+        too-few-public-methods,       
+        unused-argument,
+        no-else-break,
+        no-member,
+        fixme,          
+        unnecessary-pass,               
+        missing-timeout,                #TODO-fix
+        redefined-builtin,              #TODO-fix
+        broad-exception-caught,         #TODO-fix    
+        duplicate-code,                 #TODO-fix
+        method-hidden,                  #TODO-fix
+        no-name-in-module,              #TODO-fix
+        invalid-field-call,             #TODO-fix
+        protected-access,               #TODO-fix
+        too-many-arguments,             #TODO-fix
+        inconsistent-return-statements, #TODO-fix
+        line-too-long,                  #TODO-config
+        invalid-name,                   #TODO-config
+        trailing-whitespace,            #TODO-config
+        missing-final-newline           #TODO-config
 
 [LOGGING]
 
@@ -19,3 +43,10 @@ logging-format-style=old
 # Logging modules to check that the string format arguments are in logging
 # function parameter format.
 logging-modules=logging
+
+[TYPECHECK]
+
+# List of members which are set dynamically and missed by pylint inference
+# system, and so shouldn't trigger E1101 when accessed. Python regular
+# expressions are accepted.
+generated-members=gravitino.utils.http_client.Response

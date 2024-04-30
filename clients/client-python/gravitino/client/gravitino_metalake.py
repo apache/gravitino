@@ -3,10 +3,10 @@ Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
 import logging
+from typing import List, Dict
 
 from gravitino.api.catalog import Catalog
 from gravitino.api.catalog_change import CatalogChange
-from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.dto_converters import DTOConverters
 from gravitino.dto.metalake_dto import MetalakeDTO
 from gravitino.dto.requests.catalog_create_request import CatalogCreateRequest
@@ -19,7 +19,6 @@ from gravitino.name_identifier import NameIdentifier
 from gravitino.namespace import Namespace
 from gravitino.utils import HTTPClient
 
-from typing import List, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -190,6 +189,6 @@ class GravitinoMetalake(MetalakeDTO):
             drop_response.validate()
 
             return drop_response.dropped()
-        except Exception as e:
+        except Exception:
             logger.warning("Failed to drop catalog %s", ident)
             return False

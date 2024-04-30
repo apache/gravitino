@@ -20,14 +20,14 @@ class DTOConverters:
         # Assuming MetalakeUpdateRequest has similar nested class structure for requests
         if isinstance(change, MetalakeChange.RenameMetalake):
             return MetalakeUpdateRequest.RenameMetalakeRequest(change.new_name())
-        elif isinstance(change, MetalakeChange.UpdateMetalakeComment):
+        if isinstance(change, MetalakeChange.UpdateMetalakeComment):
             return MetalakeUpdateRequest.UpdateMetalakeCommentRequest(change.new_comment())
-        elif isinstance(change, MetalakeChange.SetProperty):
+        if isinstance(change, MetalakeChange.SetProperty):
             return MetalakeUpdateRequest.SetMetalakePropertyRequest(change.property(), change.value())
-        elif isinstance(change, MetalakeChange.RemoveProperty):
+        if isinstance(change, MetalakeChange.RemoveProperty):
             return MetalakeUpdateRequest.RemoveMetalakePropertyRequest(change.property())
-        else:
-            raise ValueError(f"Unknown change type: {type(change).__name__}")
+        
+        raise ValueError(f"Unknown change type: {type(change).__name__}")
 
     @staticmethod
     def to_catalog(catalog: CatalogDTO, client: HTTPClient):
@@ -39,18 +39,20 @@ class DTOConverters:
                                   properties=catalog.properties(),
                                   audit=catalog.audit_info(),
                                   rest_client=client)
-        else:
-            raise NotImplementedError("Unsupported catalog type: " + str(catalog.type()))
+        
+        raise NotImplementedError("Unsupported catalog type: " + str(catalog.type()))
 
     @staticmethod
     def to_catalog_update_request(change: CatalogChange):
         if isinstance(change, CatalogChange.RenameCatalog):
             return CatalogUpdateRequest.RenameCatalogRequest(change.new_name)
-        elif isinstance(change, CatalogChange.UpdateCatalogComment):
+        if isinstance(change, CatalogChange.UpdateCatalogComment):
             return CatalogUpdateRequest.UpdateCatalogCommentRequest(change.new_comment)
-        elif isinstance(change, CatalogChange.SetProperty):
+        if isinstance(change, CatalogChange.SetProperty):
+            # TODO
+            # pylint: disable=too-many-function-args 
             return CatalogUpdateRequest.SetCatalogPropertyRequest(change.property(), change.value())
-        elif isinstance(change, CatalogChange.RemoveProperty):
+        if isinstance(change, CatalogChange.RemoveProperty):
             return CatalogUpdateRequest.RemoveCatalogPropertyRequest(change._property)
-        else:
-            raise ValueError(f"Unknown change type: {type(change).__name__}")
+        
+        raise ValueError(f"Unknown change type: {type(change).__name__}")

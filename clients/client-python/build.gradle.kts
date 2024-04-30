@@ -40,7 +40,7 @@ tasks {
 
   val pylint by registering(VenvTask::class) {
     venvExec = "pylint"
-+   args = listOf("./gravitino", "./tests")
+    args = listOf("./gravitino", "./tests")
   }
 
   val test by registering(VenvTask::class) {
