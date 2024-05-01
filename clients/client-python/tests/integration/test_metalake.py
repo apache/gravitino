@@ -85,8 +85,8 @@ class TestMetalake(IntegrationTestEnv):
         )
         reqs = [DTOConverters.to_metalake_update_request(change) for change in changes]
         updates_request = MetalakeUpdatesRequest(reqs)
-        valid_json = (f'{{"updates": [{{"@type": "rename", "newName": "my_metalake_new"}}, '
-                      f'{{"@type": "updateComment", "newComment": "new metalake comment"}}]}}')
+        valid_json = ('{"updates": [{"@type": "rename", "newName": "my_metalake_new"}, '
+                      '{"@type": "updateComment", "newComment": "new metalake comment"}]}')
         self.assertEqual(updates_request.to_json(), valid_json)
 
     def test_from_json_metalake_response(self):

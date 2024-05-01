@@ -5,5 +5,7 @@
 **/__pycache__/**
 gravitino.egg-info
 vevn
+venv
 .vevn
+.venv
 .idea
