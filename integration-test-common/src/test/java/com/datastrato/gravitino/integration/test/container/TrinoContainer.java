@@ -123,10 +123,10 @@ public class TrinoContainer extends BaseContainer {
         .until(
             () -> {
               ArrayList<ArrayList<String>> queryData =
-                      executeQuerySQL(format("SHOW CATALOGS LIKE '%s'", catalogName));
+                  executeQuerySQL(format("SHOW CATALOGS LIKE '%s'", catalogName));
               for (ArrayList<String> record : queryData) {
                 String columnValue = record.get(0);
-                  if (columnValue.equals(catalogName)) {
+                if (columnValue.equals(catalogName)) {
                   return true;
                 }
               }
