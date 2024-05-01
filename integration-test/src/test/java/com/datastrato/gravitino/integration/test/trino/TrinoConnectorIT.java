@@ -890,7 +890,8 @@ public class TrinoConnectorIT extends AbstractIT {
         "true", catalog.properties().get("trino.bypass.hive.validate-bucketing"));
 
     String sql = String.format("show catalogs like '%s'", catalogName);
-    checkTrinoHasLoaded(sql, 6);
+    await().atLeast(6, TimeUnit.SECONDS);
+
     // Because we assign 'hive.target-max-file-size' a wrong value, trino can't load the catalog
     Assertions.assertTrue(containerSuite.getTrinoContainer().executeQuerySQL(sql).isEmpty());
   }
