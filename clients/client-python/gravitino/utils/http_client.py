@@ -118,7 +118,7 @@ class HTTPClient:
             raise exc from None
 
     def _request(
-        self, method, endpoint=None, params=None, json=None, headers=None, timeout=None
+        self, method, endpoint, params=None, json=None, headers=None, timeout=None
     ):
         method = method.upper()
         request_data = None
@@ -156,7 +156,7 @@ class HTTPClient:
         return self._request("put", endpoint, json=json, **kwargs)
 
     def close(self):
-        self._request("close")
+        self._request("close", "/")
 
 
 def unpack(path: str):
