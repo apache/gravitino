@@ -94,7 +94,9 @@ public class TrinoConnectorIT extends AbstractIT {
         System.getenv("GRAVITINO_ROOT_DIR") + "/trino-connector/build/libs",
         getGravitinoServerPort(),
         metalakeName);
-    containerSuite.getTrinoContainer().checkSyncCatalogFromGravitino(5, metalakeName, catalogName);
+    Assertions.assertTrue(
+        containerSuite.getTrinoContainer().checkSyncCatalogFromGravitino(5, catalogName),
+        "Can not synchronize calatogs from gravitino");
 
     createSchema();
 
