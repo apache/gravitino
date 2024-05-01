@@ -3,7 +3,7 @@ Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
 from abc import ABC, abstractmethod
-from typing import List, Dict, Optional
+from typing import List, Dict
 
 from gravitino.api.schema import Schema
 from gravitino.api.schema_change import SchemaChange

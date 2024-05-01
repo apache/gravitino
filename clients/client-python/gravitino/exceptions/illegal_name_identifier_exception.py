@@ -7,8 +7,8 @@ This software is licensed under the Apache License version 2.
 class IllegalNameIdentifierException(Exception):
     """An exception thrown when a name identifier is invalid."""
 
-    def __init__(self, message=None, *args):
+    def __init__(self, message=None):
         if message:
-            super().__init__(message.format(*args))
+            super().__init__(message)
         else:
             super().__init__()
