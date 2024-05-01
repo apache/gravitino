@@ -92,7 +92,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
   private static final String ICEBERG_COL_NAME4 = "iceberg_col_name4";
   private static final String provider = "lakehouse-iceberg";
   private static final String SELECT_ALL_TEMPLATE = "SELECT * FROM iceberg.%s";
-  private static final String INSERT_BATCH_WITHOUT_PARTITION_TEMPLATE =
+  private static String INSERT_BATCH_WITHOUT_PARTITION_TEMPLATE =
       "INSERT INTO iceberg.%s VALUES %s";
   private String metalakeName = GravitinoITUtils.genRandomName("iceberg_it_metalake");
   private String catalogName = GravitinoITUtils.genRandomName("iceberg_it_catalog");
