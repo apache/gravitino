@@ -9,7 +9,6 @@ import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
 import com.datastrato.gravitino.spark.connector.catalog.BaseCatalog;
-import com.datastrato.gravitino.spark.connector.table.SparkBaseTable;
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Locale;
@@ -66,14 +65,20 @@ public class GravitinoIcebergCatalog extends BaseCatalog implements FunctionCata
   }
 
   @Override
-  protected SparkBaseTable createSparkTable(
+  protected org.apache.spark.sql.connector.catalog.Table createSparkTable(
       Identifier identifier,
       Table gravitinoTable,
-      TableCatalog sparkCatalog,
+      org.apache.spark.sql.connector.catalog.Table sparkTable,
+      TableCatalog sparkIcebergCatalog,
       PropertiesConverter propertiesConverter,
       SparkTransformConverter sparkTransformConverter) {
     return new SparkIcebergTable(
-        identifier, gravitinoTable, sparkCatalog, propertiesConverter, sparkTransformConverter);
+        identifier,
+        gravitinoTable,
+        sparkTable,
+        sparkIcebergCatalog,
+        propertiesConverter,
+        sparkTransformConverter);
   }
 
   @Override
