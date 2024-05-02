@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 class GravitinoAdminClient(GravitinoClientBase):
     """
-    Gravitino Client for the administrator to interact with the Gravitino API. 
+    Gravitino Client for the administrator to interact with the Gravitino API.
     It allows the client to list, load, create, and alter Metalakes.
     Normal users should use {@link GravitinoClient} to connect with the Gravitino server.
     """

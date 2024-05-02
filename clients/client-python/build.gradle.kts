@@ -38,7 +38,13 @@ tasks {
     args = listOf("install", "-e", ".[dev]")
   }
 
+  val black by registering(VenvTask::class) {
+    venvExec = "black"
+    args = listOf("./gravitino", "./tests")
+  }
+
   val pylint by registering(VenvTask::class) {
+    mustRunAfter(black)
     venvExec = "pylint"
     args = listOf("./gravitino", "./tests")
   }
@@ -50,7 +56,7 @@ tasks {
         gravitinoServer("start")
       }
 
-      dependsOn(pipInstall, pylint)
+      dependsOn(pipInstall, black, pylint)
       venvExec = "python"
       args = listOf("-m", "unittest")
       workingDir = projectDir.resolve(".")
@@ -67,7 +73,7 @@ tasks {
   }
 
   val build by registering(VenvTask::class) {
-    dependsOn(pipInstall, pylint)
+    dependsOn(pipInstall, black, pylint)
   }
 
   val clean by registering(Delete::class) {
