@@ -32,10 +32,7 @@ disable=missing-class-docstring,
         protected-access,               #TODO-fix
         too-many-arguments,             #TODO-fix
         inconsistent-return-statements, #TODO-fix
-        line-too-long,                  #TODO-config
         invalid-name,                   #TODO-config
-        trailing-whitespace,            #TODO-config
-        missing-final-newline           #TODO-config
 
 [LOGGING]
 
@@ -53,3 +50,8 @@ logging-modules=logging
 # system, and so shouldn't trigger E1101 when accessed. Python regular
 # expressions are accepted.
 generated-members=gravitino.utils.http_client.Response
+
+[FORMAT]
+
+# Maximum number of characters on a single line.
+max-line-length=120

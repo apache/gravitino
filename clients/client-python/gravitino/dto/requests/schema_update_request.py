@@ -2,6 +2,7 @@
 Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
+
 from abc import abstractmethod
 from dataclasses import dataclass, field
 
@@ -13,7 +14,7 @@ from gravitino.rest.rest_message import RESTRequest
 
 @dataclass
 class SchemaUpdateRequestBase(RESTRequest):
-    _type: str = field(metadata=config(field_name='@type'))
+    _type: str = field(metadata=config(field_name="@type"))
 
     def __init__(self, type: str):
         self._type = type
@@ -31,10 +32,10 @@ class SchemaUpdateRequest:
     class SetSchemaPropertyRequest(SchemaUpdateRequestBase):
         """Represents a request to set a property on a Schema."""
 
-        _property: str = field(metadata=config(field_name='property'))
+        _property: str = field(metadata=config(field_name="property"))
         """The property to set."""
 
-        _value: str = field(metadata=config(field_name='value'))
+        _value: str = field(metadata=config(field_name="value"))
         """The value of the property."""
 
         def __init__(self, property: str, value: str):
@@ -60,7 +61,7 @@ class SchemaUpdateRequest:
     class RemoveSchemaPropertyRequest(SchemaUpdateRequestBase):
         """Represents a request to remove a property from a Schema."""
 
-        _property: str = field(metadata=config(field_name='property'))
+        _property: str = field(metadata=config(field_name="property"))
         """The property to remove."""
 
         def __init__(self, property: str):

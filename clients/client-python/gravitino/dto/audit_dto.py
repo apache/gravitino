@@ -2,6 +2,7 @@
 Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
+
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -14,18 +15,22 @@ from gravitino.api.audit import Audit
 class AuditDTO(Audit, DataClassJsonMixin):
     """Data transfer object representing audit information."""
 
-    _creator: Optional[str] = field(default=None, metadata=config(field_name='creator'))
+    _creator: Optional[str] = field(default=None, metadata=config(field_name="creator"))
     """The creator of the audit."""
 
-    _create_time: Optional[str] = field(default=None, metadata=config(
-        field_name='createTime'))  # TODO: Can't deserialized datetime from JSON
+    _create_time: Optional[str] = field(
+        default=None, metadata=config(field_name="createTime")
+    )  # TODO: Can't deserialized datetime from JSON
     """The create time of the audit."""
 
-    _last_modifier: Optional[str] = field(default=None, metadata=config(field_name='lastModifier'))
+    _last_modifier: Optional[str] = field(
+        default=None, metadata=config(field_name="lastModifier")
+    )
     """The last modifier of the audit."""
 
-    _last_modified_time: Optional[str] = field(default=None, metadata=config(
-        field_name='lastModifiedTime'))  # TODO: Can't deserialized datetime from JSON
+    _last_modified_time: Optional[str] = field(
+        default=None, metadata=config(field_name="lastModifiedTime")
+    )  # TODO: Can't deserialized datetime from JSON
     """The last modified time of the audit."""
 
     def creator(self) -> str:

@@ -34,6 +34,7 @@ from gravitino.constants import TIMEOUT
 
 logger = logging.getLogger(__name__)
 
+
 class Response:
     def __init__(self, response):
         self._status_code = response.getcode()
@@ -126,7 +127,10 @@ class HTTPClient:
         if headers:
             self._update_headers(headers)
         else:
-            headers = {'Content-Type': 'application/json', 'Accept': 'application/vnd.gravitino.v1+json'}
+            headers = {
+                "Content-Type": "application/json",
+                "Accept": "application/vnd.gravitino.v1+json",
+            }
             self._update_headers(headers)
 
         if json:

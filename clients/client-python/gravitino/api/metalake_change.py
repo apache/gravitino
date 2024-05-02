@@ -2,6 +2,7 @@
 Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
+
 from dataclasses import dataclass, field
 
 from dataclasses_json import config
@@ -14,7 +15,7 @@ class MetalakeChange:
     """
 
     @staticmethod
-    def rename(new_name: str) -> 'MetalakeChange.RenameMetalake':
+    def rename(new_name: str) -> "MetalakeChange.RenameMetalake":
         """Creates a new metalake change to rename the metalake.
 
         Args:
@@ -26,7 +27,7 @@ class MetalakeChange:
         return MetalakeChange.RenameMetalake(new_name)
 
     @staticmethod
-    def update_comment(new_comment: str) -> 'MetalakeChange.UpdateMetalakeComment':
+    def update_comment(new_comment: str) -> "MetalakeChange.UpdateMetalakeComment":
         """Creates a new metalake change to update the metalake comment.
 
         Args:
@@ -38,7 +39,7 @@ class MetalakeChange:
         return MetalakeChange.UpdateMetalakeComment(new_comment)
 
     @staticmethod
-    def set_property(property: str, value: str) -> 'SetProperty':
+    def set_property(property: str, value: str) -> "SetProperty":
         """Creates a new metalake change to set a property and value pair for the metalake.
 
         Args:
@@ -51,7 +52,7 @@ class MetalakeChange:
         return MetalakeChange.SetProperty(property, value)
 
     @staticmethod
-    def remove_property(property: str) -> 'RemoveProperty':
+    def remove_property(property: str) -> "RemoveProperty":
         """Creates a new metalake change to remove a property from the metalake.
 
         Args:
@@ -65,7 +66,8 @@ class MetalakeChange:
     @dataclass(frozen=True)
     class RenameMetalake:
         """A metalake change to rename the metalake."""
-        _new_name: str = field(metadata=config(field_name='new_name'))
+
+        _new_name: str = field(metadata=config(field_name="new_name"))
 
         def new_name(self) -> str:
             return self._new_name
@@ -76,7 +78,8 @@ class MetalakeChange:
     @dataclass(frozen=True)
     class UpdateMetalakeComment:
         """A metalake change to update the metalake comment"""
-        _new_comment: str = field(metadata=config(field_name='new_comment'))
+
+        _new_comment: str = field(metadata=config(field_name="new_comment"))
 
         def new_comment(self) -> str:
             return self._new_comment
@@ -87,8 +90,9 @@ class MetalakeChange:
     @dataclass(frozen=True)
     class SetProperty:
         """A metalake change to set a property and value pair for the metalake"""
-        _property: str = field(metadata=config(field_name='property'))
-        _value: str = field(metadata=config(field_name='value'))
+
+        _property: str = field(metadata=config(field_name="property"))
+        _value: str = field(metadata=config(field_name="value"))
 
         def property(self) -> str:
             return self._property
@@ -102,6 +106,7 @@ class MetalakeChange:
     @dataclass(frozen=True)
     class RemoveProperty:
         """A metalake change to remove a property from the metalake"""
+
         _property: str
 
         def property(self) -> str:

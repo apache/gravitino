@@ -2,6 +2,7 @@
 Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
+
 import logging
 from typing import List, Dict
 
@@ -21,7 +22,8 @@ logger = logging.getLogger(__name__)
 
 class GravitinoAdminClient(GravitinoClientBase):
     """
-    Gravitino Client for the administrator to interact with the Gravitino API, allowing the client to list, load, create, and alter Metalakes.
+    Gravitino Client for the administrator to interact with the Gravitino API. 
+    It allows the client to list, load, create, and alter Metalakes.
     Normal users should use {@link GravitinoClient} to connect with the Gravitino server.
     """
 
@@ -34,12 +36,19 @@ class GravitinoAdminClient(GravitinoClientBase):
             An array of GravitinoMetalake objects representing the Metalakes.
         """
         resp = self._rest_client.get(self.API_METALAKES_LIST_PATH)
-        metalake_list_resp = MetalakeListResponse.from_json(resp.body, infer_missing=True)
+        metalake_list_resp = MetalakeListResponse.from_json(
+            resp.body, infer_missing=True
+        )
         metalake_list_resp.validate()
 
-        return [GravitinoMetalake(o, self._rest_client) for o in metalake_list_resp.metalakes()]
+        return [
+            GravitinoMetalake(o, self._rest_client)
+            for o in metalake_list_resp.metalakes()
+        ]
 
-    def create_metalake(self, ident: NameIdentifier, comment: str, properties: Dict[str, str]) -> GravitinoMetalake:
+    def create_metalake(
+        self, ident: NameIdentifier, comment: str, properties: Dict[str, str]
+    ) -> GravitinoMetalake:
         """Creates a new Metalake using the Gravitino API.
 
         Args:
@@ -63,7 +72,9 @@ class GravitinoAdminClient(GravitinoClientBase):
 
         return GravitinoMetalake(metalake, self._rest_client)
 
-    def alter_metalake(self, ident: NameIdentifier, *changes: MetalakeChange) -> GravitinoMetalake:
+    def alter_metalake(
+        self, ident: NameIdentifier, *changes: MetalakeChange
+    ) -> GravitinoMetalake:
         """Alters a specific Metalake using the Gravitino API.
 
         Args:
@@ -81,7 +92,9 @@ class GravitinoAdminClient(GravitinoClientBase):
         updates_request = MetalakeUpdatesRequest(reqs)
         updates_request.validate()
 
-        resp = self._rest_client.put(self.API_METALAKES_IDENTIFIER_PATH + ident.name(), updates_request)
+        resp = self._rest_client.put(
+            self.API_METALAKES_IDENTIFIER_PATH + ident.name(), updates_request
+        )
         metalake_response = MetalakeResponse.from_json(resp.body, infer_missing=True)
         metalake_response.validate()
         metalake = metalake_response.metalake()
@@ -100,7 +113,9 @@ class GravitinoAdminClient(GravitinoClientBase):
         NameIdentifier.check_metalake(ident)
 
         try:
-            resp = self._rest_client.delete(self.API_METALAKES_IDENTIFIER_PATH + ident.name())
+            resp = self._rest_client.delete(
+                self.API_METALAKES_IDENTIFIER_PATH + ident.name()
+            )
             dropResponse = DropResponse.from_json(resp.body, infer_missing=True)
 
             return dropResponse.dropped()
