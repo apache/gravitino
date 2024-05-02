@@ -39,6 +39,7 @@ tasks {
   }
 
   val black by registering(VenvTask::class) {
+    mustRunAfter(pipInstall)
     venvExec = "black"
     args = listOf("./gravitino", "./tests")
   }
