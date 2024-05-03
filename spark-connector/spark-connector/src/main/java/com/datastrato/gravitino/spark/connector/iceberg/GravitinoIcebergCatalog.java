@@ -14,13 +14,18 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.spark.SparkCatalog;
+import org.apache.iceberg.spark.source.HasIcebergCatalog;
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
+import org.apache.spark.sql.catalyst.analysis.NoSuchProcedureException;
 import org.apache.spark.sql.connector.catalog.FunctionCatalog;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.connector.catalog.functions.UnboundFunction;
+import org.apache.spark.sql.connector.iceberg.catalog.Procedure;
+import org.apache.spark.sql.connector.iceberg.catalog.ProcedureCatalog;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
 /**
@@ -30,7 +35,8 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap;
  * StagingTableCatalog and FunctionCatalog, allowing for advanced operations like table staging and
  * function management tailored to the needs of Iceberg tables.
  */
-public class GravitinoIcebergCatalog extends BaseCatalog implements FunctionCatalog {
+public class GravitinoIcebergCatalog extends BaseCatalog
+    implements FunctionCatalog, ProcedureCatalog, HasIcebergCatalog {
 
   @Override
   protected TableCatalog createAndInitSparkCatalog(
@@ -99,6 +105,16 @@ public class GravitinoIcebergCatalog extends BaseCatalog implements FunctionCata
   @Override
   public UnboundFunction loadFunction(Identifier ident) throws NoSuchFunctionException {
     return ((SparkCatalog) sparkCatalog).loadFunction(ident);
+  }
+
+  @Override
+  public Procedure loadProcedure(Identifier identifier) throws NoSuchProcedureException {
+    return ((SparkCatalog) sparkCatalog).loadProcedure(identifier);
+  }
+
+  @Override
+  public Catalog icebergCatalog() {
+    return ((SparkCatalog) sparkCatalog).icebergCatalog();
   }
 
   private void initHiveProperties(
