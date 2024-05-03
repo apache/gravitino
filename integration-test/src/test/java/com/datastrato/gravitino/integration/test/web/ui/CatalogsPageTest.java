@@ -372,7 +372,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   @Order(11)
   public void testRefreshCatalogPage() {
     driver.navigate().refresh();
-    Assertions.assertEquals(driver.getTitle(), WEB_TITLE);
+    Assertions.assertEquals(WEB_TITLE, driver.getTitle());
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(CATALOG_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(SCHEMA_NAME, false));
     List<String> treeNodes =
@@ -405,7 +405,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   @Order(13)
   public void testRefreshSchemaPage() {
     driver.navigate().refresh();
-    Assertions.assertEquals(driver.getTitle(), WEB_TITLE);
+    Assertions.assertEquals(WEB_TITLE, driver.getTitle());
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(SCHEMA_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TABLE_NAME, false));
     List<String> treeNodes =
@@ -441,7 +441,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   @Order(15)
   public void testRefreshTablePage() {
     driver.navigate().refresh();
-    Assertions.assertEquals(driver.getTitle(), WEB_TITLE);
+    Assertions.assertEquals(WEB_TITLE, driver.getTitle());
     Assertions.assertTrue(catalogsPage.verifyRefreshPage());
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(TABLE_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyTableColumns());

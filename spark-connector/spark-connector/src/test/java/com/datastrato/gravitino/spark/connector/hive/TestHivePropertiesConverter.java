@@ -37,13 +37,13 @@ public class TestHivePropertiesConverter {
         hivePropertiesConverter.toGravitinoTableProperties(
             ImmutableMap.of(TableCatalog.PROP_PROVIDER, "PARQUET"));
     Assertions.assertEquals(
-        hiveProperties.get(HivePropertiesConstants.GRAVITINO_HIVE_FORMAT), "PARQUET");
+            "PARQUET", hiveProperties.get(HivePropertiesConstants.GRAVITINO_HIVE_FORMAT));
     hiveProperties =
         hivePropertiesConverter.toGravitinoTableProperties(
             ImmutableMap.of(TableCatalog.PROP_PROVIDER, "HIVE"));
     Assertions.assertEquals(
-        hiveProperties.get(HivePropertiesConstants.GRAVITINO_HIVE_FORMAT),
-        HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_TEXTFILE);
+        HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_TEXTFILE,
+        hiveProperties.get(HivePropertiesConstants.GRAVITINO_HIVE_FORMAT));
     Assertions.assertThrowsExactly(
         NotSupportedException.class,
         () ->
