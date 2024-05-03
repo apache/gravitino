@@ -1,0 +1,28 @@
+CREATE SCHEMA
+
+USE
+
+CREATE TABLE
+
+"tb01"
+
+"tb01"
+
+USE
+
+"customer"
+"lineitem"
+"nation"
+"orders"
+"part"
+"partsupp"
+"region"
+"supplier"
+
+USE
+
+"tb01"
+
+DROP TABLE
+
+DROP SCHEMA
