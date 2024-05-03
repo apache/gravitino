@@ -14,7 +14,7 @@ from gravitino.rest.rest_message import RESTRequest
 
 @dataclass
 class MetalakeCreateRequest(RESTRequest):
-    """ "Represents a request to create a Metalake."""
+    """Represents a request to create a Metalake."""
 
     _name: str = field(metadata=config(field_name="name"))
     _comment: Optional[str] = field(metadata=config(field_name="comment"))
