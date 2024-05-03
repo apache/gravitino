@@ -18,10 +18,16 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.iceberg.spark.SparkCatalog;
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
+import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
+import org.apache.spark.sql.catalyst.analysis.TableAlreadyExistsException;
 import org.apache.spark.sql.connector.catalog.FunctionCatalog;
 import org.apache.spark.sql.connector.catalog.Identifier;
+import org.apache.spark.sql.connector.catalog.StagedTable;
+import org.apache.spark.sql.connector.catalog.StagingTableCatalog;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.connector.catalog.functions.UnboundFunction;
+import org.apache.spark.sql.connector.expressions.Transform;
+import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
 /**
@@ -31,7 +37,8 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap;
  * StagingTableCatalog and FunctionCatalog, allowing for advanced operations like table staging and
  * function management tailored to the needs of Iceberg tables.
  */
-public class GravitinoIcebergCatalog extends BaseCatalog implements FunctionCatalog {
+public class GravitinoIcebergCatalog extends BaseCatalog
+    implements FunctionCatalog, StagingTableCatalog {
 
   @Override
   protected TableCatalog createAndInitSparkCatalog(
@@ -94,6 +101,28 @@ public class GravitinoIcebergCatalog extends BaseCatalog implements FunctionCata
   @Override
   public UnboundFunction loadFunction(Identifier ident) throws NoSuchFunctionException {
     return ((SparkCatalog) sparkCatalog).loadFunction(ident);
+  }
+
+  @SuppressWarnings("deprecation")
+  @Override
+  public StagedTable stageCreate(
+      Identifier ident, StructType schema, Transform[] partitions, Map<String, String> properties)
+      throws TableAlreadyExistsException {
+    return ((SparkCatalog) sparkCatalog).stageCreate(ident, schema, partitions, properties);
+  }
+
+  @Override
+  public StagedTable stageReplace(
+      Identifier ident, StructType schema, Transform[] partitions, Map<String, String> properties)
+      throws NoSuchTableException {
+    return ((SparkCatalog) sparkCatalog).stageReplace(ident, schema, partitions, properties);
+  }
+
+  @Override
+  public StagedTable stageCreateOrReplace(
+      Identifier ident, StructType schema, Transform[] partitions, Map<String, String> properties) {
+    return ((SparkCatalog) sparkCatalog)
+        .stageCreateOrReplace(ident, schema, partitions, properties);
   }
 
   private void initHiveProperties(
