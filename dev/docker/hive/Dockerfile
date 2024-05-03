@@ -3,13 +3,30 @@
 # This software is licensed under the Apache License version 2.
 #
 
-FROM ubuntu:16.04
-LABEL maintainer="support@datastrato.com"
+FROM ubuntu:16.04 AS packages
 
 ARG HADOOP_PACKAGE_NAME
 ARG HIVE_PACKAGE_NAME
 ARG JDBC_DIVER_PACKAGE_NAME
 ARG DEBIAN_FRONTEND=noninteractive
+
+COPY packages /tmp/packages
+
+ENV JAVA_HOME=/usr/local/jdk
+ENV HIVE_HOME=/usr/local/hive
+ENV HADOOP_HOME=/usr/local/hadoop
+
+# hadoop
+RUN mkdir ${HADOOP_HOME}
+RUN tar -xz -C ${HADOOP_HOME} --strip-components 1 -f /tmp/packages/${HADOOP_PACKAGE_NAME} && rm -rf /tmp/packages/${HADOOP_PACKAGE_NAME}
+# hive
+RUN mkdir ${HIVE_HOME}
+RUN tar -xz -C ${HIVE_HOME} --strip-components 1 -f /tmp/packages/${HIVE_PACKAGE_NAME} && rm -rf /tmp/packages/${HIVE_PACKAGE_NAME}
+# add mysql jdbc driver
+RUN tar -xz -C ${HIVE_HOME}/lib --strip-components 1 -f /tmp/packages/${JDBC_DIVER_PACKAGE_NAME} && rm -rf /tmp/packages/${JDBC_DIVER_PACKAGE_NAME}
+
+FROM ubuntu:16.04
+LABEL maintainer="support@datastrato.com"
 
 WORKDIR /
 
@@ -45,7 +62,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install --fix-missing -yq \
 RUN mkdir /root/.ssh
 RUN cat /dev/zero | ssh-keygen -q -N "" > /dev/null && cat /root/.ssh/id_rsa.pub > /root/.ssh/authorized_keys
 
-COPY packages /tmp/packages
+#COPY packages /tmp/packages
 
 ################################################################################
 # set environment variables
@@ -90,8 +107,12 @@ RUN echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}" >> /etc/environment
 
 ################################################################################
 # install hadoop
-RUN mkdir ${HADOOP_HOME}
-RUN tar -xz -C ${HADOOP_HOME} --strip-components 1 -f /tmp/packages/${HADOOP_PACKAGE_NAME}
+#RUN mkdir ${HADOOP_HOME}
+COPY --from=packages /tmp/packages/${HADOOP_PACKAGE_NAME}/* ${HADOOP_HOME}/
+#RUN tar -xz -C ${HADOOP_HOME} --strip-components 1 -f /tmp/packages/${HADOOP_PACKAGE_NAME} && rm -rf /tmp/packages/${HADOOP_PACKAGE_NAME}
+#ADD packages/${HADOOP_PACKAGE_NAME} ${HADOOP_HOME}/
+
+RUN ls -la ${HADOOP_HOME}
 
 # replace configuration templates
 RUN rm -f ${HADOOP_CONF_DIR}/core-site.xml
@@ -110,8 +131,10 @@ RUN ${HADOOP_HOME}/bin/hdfs namenode -format -nonInteractive
 
 ################################################################################
 # install hive
-RUN mkdir ${HIVE_HOME}
-RUN tar -xz -C ${HIVE_HOME} --strip-components 1 -f /tmp/packages/${HIVE_PACKAGE_NAME}
+#RUN mkdir ${HIVE_HOME}
+COPY --from=packages /tmp/packages/${HIVE_PACKAGE_NAME}/* ${HIVE_HOME}/
+#RUN tar -xz -C ${HIVE_HOME} --strip-components 1 -f /tmp/packages/${HIVE_PACKAGE_NAME} && rm -rf /tmp/packages/${HIVE_PACKAGE_NAME}
+#ADD packages/${HIVE_PACKAGE_NAME} ${HIVE_HOME}/
 ADD hive-site.xml ${HIVE_HOME}/conf/hive-site.xml
 
 ################################################################################
@@ -119,7 +142,7 @@ ADD hive-site.xml ${HIVE_HOME}/conf/hive-site.xml
 ENV MYSQL_PWD=ds123
 RUN echo "mysql-server mysql-server/root_password password ${MYSQL_PWD}" | debconf-set-selections
 RUN echo "mysql-server mysql-server/root_password_again password ${MYSQL_PWD}" | debconf-set-selections
-RUN apt-get install -y mysql-server
+RUN apt-get install -y mysql-server && rm -rf /var/lib/apt/lists/*
 
 RUN chown -R mysql:mysql /var/lib/mysql
 RUN usermod -d /var/lib/mysql/ mysql
@@ -127,7 +150,9 @@ RUN sed -i "s/.*bind-address.*/bind-address = 0.0.0.0/" /etc/mysql/mysql.conf.d/
 
 ################################################################################
 # add mysql jdbc driver
-RUN tar -xz -C ${HIVE_HOME}/lib --strip-components 1 -f /tmp/packages/${JDBC_DIVER_PACKAGE_NAME}
+COPY --from=packages /tmp/packages/${JDBC_DIVER_PACKAGE_NAME}/* ${HIVE_HOME}/lib/
+#RUN tar -xz -C ${HIVE_HOME}/lib --strip-components 1 -f /tmp/packages/${JDBC_DIVER_PACKAGE_NAME} && rm -rf /tmp/packages/${JDBC_DIVER_PACKAGE_NAME}
+# ADD packages/${JDBC_DIVER_PACKAGE_NAME} ${HIVE_HOME}/lib/
 
 ################################################################################
 # add users and groups
@@ -146,8 +171,8 @@ RUN chown -R datastrato:hadoop /home/datastrato
 
 ################################################################################
 # removed install packages and cache
-RUN rm -rf /tmp/packages
-RUN rm -rf /var/lib/apt/lists/*
+#RUN rm -rf /tmp/packages
+#RUN rm -rf /var/lib/apt/lists/*
 
 ################################################################################
 # expose port
