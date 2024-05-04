@@ -12,6 +12,7 @@ import com.datastrato.gravitino.spark.connector.GravitinoSparkConfig;
 import com.datastrato.gravitino.spark.connector.catalog.GravitinoCatalogManager;
 import com.datastrato.gravitino.spark.connector.hive.GravitinoHiveCatalog;
 import com.datastrato.gravitino.spark.connector.iceberg.GravitinoIcebergCatalog;
+import com.datastrato.gravitino.spark.connector.iceberg.extensions.GravitinoIcebergSparkSessionExtensions;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.Locale;
@@ -35,7 +36,10 @@ public class GravitinoDriverPlugin implements DriverPlugin {
 
   private GravitinoCatalogManager catalogManager;
   private static final String[] GRAVITINO_DRIVER_EXTENSIONS =
-      new String[] {IcebergSparkSessionExtensions.class.getName()};
+      new String[] {
+        GravitinoIcebergSparkSessionExtensions.class.getName(),
+        IcebergSparkSessionExtensions.class.getName()
+      };
 
   @Override
   public Map<String, String> init(SparkContext sc, PluginContext pluginContext) {
