@@ -37,7 +37,7 @@ public class TestHivePropertiesConverter {
         hivePropertiesConverter.toGravitinoTableProperties(
             ImmutableMap.of(TableCatalog.PROP_PROVIDER, "PARQUET"));
     Assertions.assertEquals(
-            "PARQUET", hiveProperties.get(HivePropertiesConstants.GRAVITINO_HIVE_FORMAT));
+        "PARQUET", hiveProperties.get(HivePropertiesConstants.GRAVITINO_HIVE_FORMAT));
     hiveProperties =
         hivePropertiesConverter.toGravitinoTableProperties(
             ImmutableMap.of(TableCatalog.PROP_PROVIDER, "HIVE"));
