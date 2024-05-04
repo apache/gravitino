@@ -217,12 +217,46 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
   @Override
   public Table loadTable(Identifier ident) throws NoSuchTableException {
     try {
-      String database = getDatabase(ident);
-      com.datastrato.gravitino.rel.Table gravitinoTable =
-          gravitinoCatalogClient
-              .asTableCatalog()
-              .loadTable(NameIdentifier.of(metalakeName, catalogName, database, ident.name()));
+      com.datastrato.gravitino.rel.Table gravitinoTable = loadGravitinoTable(ident);
       Table sparkTable = sparkCatalog.loadTable(ident);
+      // Will create a catalog specific table
+      return createSparkTable(
+          ident,
+          gravitinoTable,
+          sparkTable,
+          sparkCatalog,
+          propertiesConverter,
+          sparkTransformConverter);
+    } catch (com.datastrato.gravitino.exceptions.NoSuchTableException e) {
+      throw new NoSuchTableException(ident);
+    }
+  }
+
+  @Override
+  public Table loadTable(Identifier ident, String version) throws NoSuchTableException {
+    try {
+      com.datastrato.gravitino.rel.Table gravitinoTable = loadGravitinoTable(ident);
+      // load SparkTable with version
+      Table sparkTable = sparkCatalog.loadTable(ident, version);
+      // Will create a catalog specific table
+      return createSparkTable(
+          ident,
+          gravitinoTable,
+          sparkTable,
+          sparkCatalog,
+          propertiesConverter,
+          sparkTransformConverter);
+    } catch (com.datastrato.gravitino.exceptions.NoSuchTableException e) {
+      throw new NoSuchTableException(ident);
+    }
+  }
+
+  @Override
+  public Table loadTable(Identifier ident, long timestamp) throws NoSuchTableException {
+    try {
+      com.datastrato.gravitino.rel.Table gravitinoTable = loadGravitinoTable(ident);
+      // load SparkTable with timestamp
+      Table sparkTable = sparkCatalog.loadTable(ident, timestamp);
       // Will create a catalog specific table
       return createSparkTable(
           ident,
@@ -518,6 +552,18 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
       throw new UnsupportedOperationException(
           String.format(
               "Unsupported table column position %s", columnPosition.getClass().getName()));
+    }
+  }
+
+  private com.datastrato.gravitino.rel.Table loadGravitinoTable(Identifier ident)
+      throws NoSuchTableException {
+    try {
+      String database = getDatabase(ident);
+      return gravitinoCatalogClient
+          .asTableCatalog()
+          .loadTable(NameIdentifier.of(metalakeName, catalogName, database, ident.name()));
+    } catch (com.datastrato.gravitino.exceptions.NoSuchTableException e) {
+      throw new NoSuchTableException(ident);
     }
   }
 }
