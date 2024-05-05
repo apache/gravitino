@@ -109,12 +109,7 @@ RUN echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}" >> /etc/environment
 
 ################################################################################
 # install hadoop
-#RUN mkdir ${HADOOP_HOME}
 COPY --from=packages ${HADOOP_HOME} ${HADOOP_HOME}
-#RUN tar -xz -C ${HADOOP_HOME} --strip-components 1 -f /tmp/packages/${HADOOP_PACKAGE_NAME} && rm -rf /tmp/packages/${HADOOP_PACKAGE_NAME}
-#ADD packages/${HADOOP_PACKAGE_NAME} ${HADOOP_HOME}/
-
-RUN ls -la ${HADOOP_HOME}
 
 # replace configuration templates
 RUN rm -f ${HADOOP_CONF_DIR}/core-site.xml
@@ -133,11 +128,7 @@ RUN ${HADOOP_HOME}/bin/hdfs namenode -format -nonInteractive
 
 ################################################################################
 # install hive
-#RUN mkdir ${HIVE_HOME}
 COPY --from=packages ${HIVE_HOME} ${HIVE_HOME}
-RUN ls -la ${HIVE_HOME}/bin
-#RUN tar -xz -C ${HIVE_HOME} --strip-components 1 -f /tmp/packages/${HIVE_PACKAGE_NAME} && rm -rf /tmp/packages/${HIVE_PACKAGE_NAME}
-#ADD packages/${HIVE_PACKAGE_NAME} ${HIVE_HOME}/
 ADD hive-site.xml ${HIVE_HOME}/conf/hive-site.xml
 
 ################################################################################
@@ -150,13 +141,6 @@ RUN apt-get install -y mysql-server && rm -rf /var/lib/apt/lists/*
 RUN chown -R mysql:mysql /var/lib/mysql
 RUN usermod -d /var/lib/mysql/ mysql
 RUN sed -i "s/.*bind-address.*/bind-address = 0.0.0.0/" /etc/mysql/mysql.conf.d/mysqld.cnf
-
-################################################################################
-# add mysql jdbc driver
-# FIXME: already copied at installation of HIVE_HOME ?
-#COPY --from=packages ${HIVE_HOME}/lib/* ${HIVE_HOME}/lib/
-#RUN tar -xz -C ${HIVE_HOME}/lib --strip-components 1 -f /tmp/packages/${JDBC_DIVER_PACKAGE_NAME} && rm -rf /tmp/packages/${JDBC_DIVER_PACKAGE_NAME}
-# ADD packages/${JDBC_DIVER_PACKAGE_NAME} ${HIVE_HOME}/lib/
 
 ################################################################################
 # add users and groups
@@ -172,11 +156,6 @@ RUN usermod -a -G mapred datastrato
 
 RUN mkdir /home/datastrato
 RUN chown -R datastrato:hadoop /home/datastrato
-
-################################################################################
-# removed install packages and cache
-#RUN rm -rf /tmp/packages
-#RUN rm -rf /var/lib/apt/lists/*
 
 ################################################################################
 # expose port
