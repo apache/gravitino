@@ -88,7 +88,7 @@ public class ContainerSuite implements Closeable {
           HiveContainer.Builder hiveBuilder =
               HiveContainer.builder()
                   .withHostName("gravitino-ci-hive")
-                  .withImage("unknowntpo/gravitino-ci-hive:shrink")
+                  .withImage("unknowntpo/gravitino-ci-hive:latest")
                   .withEnvVars(
                       ImmutableMap.<String, String>builder()
                           .put("HADOOP_USER_NAME", "datastrato")
