@@ -8,7 +8,6 @@ from typing import List, Dict
 from gravitino.client.gravitino_client_base import GravitinoClientBase
 from gravitino.client.gravitino_metalake import GravitinoMetalake
 from gravitino.dto.dto_converters import DTOConverters
-from gravitino.dto.metalake_dto import MetalakeDTO
 from gravitino.dto.requests.metalake_create_request import MetalakeCreateRequest
 from gravitino.dto.requests.metalake_updates_request import MetalakeUpdatesRequest
 from gravitino.dto.responses.drop_response import DropResponse
@@ -26,8 +25,7 @@ class GravitinoAdminClient(GravitinoClientBase):
     Normal users should use {@link GravitinoClient} to connect with the Gravitino server.
     """
 
-    def __init__(self, uri):  # TODO: AuthDataProvider authDataProvider
-        super().__init__(uri)
+    # TODO: AuthDataProvider authDataProvider
 
     def list_metalakes(self) -> List[GravitinoMetalake]:
         """Retrieves a list of Metalakes from the Gravitino API.
@@ -106,6 +104,6 @@ class GravitinoAdminClient(GravitinoClientBase):
             dropResponse = DropResponse.from_json(resp.body, infer_missing=True)
 
             return dropResponse.dropped()
-        except Exception as e:
-            logger.warning(f"Failed to drop metalake {ident}")
+        except Exception:
+            logger.warning("Failed to drop metalake %s", ident)
             return False
