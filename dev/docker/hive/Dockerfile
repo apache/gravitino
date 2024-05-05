@@ -20,12 +20,10 @@ ENV HADOOP_HOME=/usr/local/hadoop
 RUN mkdir ${HADOOP_HOME}
 RUN tar -xz -C ${HADOOP_HOME} --strip-components 1 -f /tmp/packages/${HADOOP_PACKAGE_NAME} && rm -rf /tmp/packages/${HADOOP_PACKAGE_NAME}
 
-RUN ls -la ${HADOOP_HOME}
 # hive
 RUN mkdir ${HIVE_HOME}
 RUN tar -xz -C ${HIVE_HOME} --strip-components 1 -f /tmp/packages/${HIVE_PACKAGE_NAME} && rm -rf /tmp/packages/${HIVE_PACKAGE_NAME}
 
-RUN ls -la ${HIVE_HOME}/bin
 # add mysql jdbc driver
 RUN tar -xz -C ${HIVE_HOME}/lib --strip-components 1 -f /tmp/packages/${JDBC_DIVER_PACKAGE_NAME} && rm -rf /tmp/packages/${JDBC_DIVER_PACKAGE_NAME}
 
