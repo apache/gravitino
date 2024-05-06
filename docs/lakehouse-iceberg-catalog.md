@@ -43,6 +43,9 @@ Any properties not defined by Gravitino with `gravitino.bypass.` prefix will pas
 
 When you use the Gravitino with Trino. You can pass the Trino Iceberg connector configuration using prefix `trino.bypass.`. For example, using `trino.bypass.iceberg.table-statistics-enabled` to pass the `iceberg.table-statistics-enabled` to the Gravitino Iceberg catalog in Trino runtime.
 
+When you use the Gravitino with Spark. You can pass the Spark Iceberg connector configuration using prefix `spark.bypass.`. For example, using `spark.bypass.iceberg.config.resources` to pass the `iceberg.config.resources` to the Spark Iceberg connector in Spark runtime.
+
+
 #### JDBC catalog
 
 If you are using JDBC catalog, you must provide `jdbc-user`, `jdbc-password` and `jdbc-driver` to catalog properties.

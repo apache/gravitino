@@ -58,3 +58,15 @@ VALUES
 
 SELECT * FROM employee WHERE date(hire_date) = '2021-01-01'
 ```
+
+## Catalog properties
+
+| Gravitino catalog property name | Spark catalog property name | Description               | Since Version |
+|---------------------------------|-----------------------------|---------------------------|---------------|
+| `catalog-backend`               | `type`                      | Catalog backend type      | 0.5.0         |
+| `uri`                           | `uri`                       | Catalog backend uri       | 0.5.0         |
+| `warehouse`                     | `warehouse`                 | Catalog backend warehouse | 0.5.0         |
+| `jdbc-user`                     | `jdbc.user`                 | JDBC user name            | 0.5.0         |
+| `jdbc-password`                 | `jdbc.password`             | JDBC password             | 0.5.0         |
+
+Catalog properties with prefix `spark.bypass.` are passed to Spark Iceberg connector. For example, using `spark.bypass.config.resources` to pass the `config.resources` to the Spark Iceberg connector.

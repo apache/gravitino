@@ -51,3 +51,17 @@ INSERT OVERWRITE TABLE employees PARTITION(department='Marketing') VALUES (3, 'M
 
 SELECT * FROM employees WHERE department = 'Engineering';
 ```
+
+
+## Catalog properties
+
+| Gravitino catalog property name | Spark catalog property name | Description                | Since Version |
+|---------------------------------|-----------------------------|----------------------------|---------------|
+| `metastore.uris`                | `hive.metastore.uris`       | Hive metastore uri address | 0.5.0         |
+
+Catalog properties with prefix `spark.bypass.` are passed to Spark Hive connector. For example, using `spark.bypass.config.resources` to pass the `config.resources` to the Spark Hive connector.
+
+
+:::caution
+When using the `spark-sql` shell client, you must explicitly set the `spark.bypass.spark.sql.hive.metastore.jars` in the Gravitino Hive catalog properties. Replace the default `builtin` value with the appropriate setting for your setup.
+:::
