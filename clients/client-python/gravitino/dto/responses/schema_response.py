@@ -14,7 +14,9 @@ from gravitino.dto.schema_dto import SchemaDTO
 class SchemaResponse(BaseResponse, DataClassJsonMixin):
     """Represents a response for a schema."""
     _schema: SchemaDTO = field(metadata=config(field_name='schema'))
-
+    
+    # TODO
+    # pylint: disable=arguments-differ 
     def schema(self) -> SchemaDTO:
         return self._schema
 

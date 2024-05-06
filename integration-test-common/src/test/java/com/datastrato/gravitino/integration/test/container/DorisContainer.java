@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.integration.test.container;
 
 import static java.lang.String.format;
+import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
 import com.google.common.collect.ImmutableSet;
 import java.io.File;
@@ -16,6 +17,7 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.rnorth.ducttape.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,13 +60,15 @@ public class DorisContainer extends BaseContainer {
 
   @Override
   public void start() {
-    try {
-      super.start();
-      Preconditions.check("Doris container startup failed!", checkContainerStatus(5));
-      Preconditions.check("Doris container password change failed!", changePassword());
-    } finally {
-      copyDorisLog();
-    }
+    super.start();
+    Preconditions.check("Doris container startup failed!", checkContainerStatus(5));
+    Preconditions.check("Doris container password change failed!", changePassword());
+  }
+
+  @Override
+  public void close() {
+    copyDorisLog();
+    super.close();
   }
 
   private void copyDorisLog() {
@@ -89,39 +93,41 @@ public class DorisContainer extends BaseContainer {
 
   @Override
   protected boolean checkContainerStatus(int retryLimit) {
-    int nRetry = 0;
-
     String dorisJdbcUrl = format("jdbc:mysql://%s:%d/", getContainerIpAddress(), FE_MYSQL_PORT);
     LOG.info("Doris url is " + dorisJdbcUrl);
 
-    while (nRetry++ < retryLimit) {
-      try (Connection connection = DriverManager.getConnection(dorisJdbcUrl, USER_NAME, "");
-          Statement statement = connection.createStatement()) {
+    await()
+        .atMost(30, TimeUnit.SECONDS)
+        .pollInterval(30 / retryLimit, TimeUnit.SECONDS)
+        .until(
+            () -> {
+              try (Connection connection =
+                      DriverManager.getConnection(dorisJdbcUrl, USER_NAME, "");
+                  Statement statement = connection.createStatement()) {
 
-        // execute `SHOW PROC '/backends';` to check if backends is ready
-        String query = "SHOW PROC '/backends';";
-        try (ResultSet resultSet = statement.executeQuery(query)) {
-          while (resultSet.next()) {
-            String alive = resultSet.getString("Alive");
-            String totalCapacity = resultSet.getString("TotalCapacity");
-            float totalCapacityFloat = Float.parseFloat(totalCapacity.split(" ")[0]);
+                // execute `SHOW PROC '/backends';` to check if backends is ready
+                String query = "SHOW PROC '/backends';";
+                try (ResultSet resultSet = statement.executeQuery(query)) {
+                  while (resultSet.next()) {
+                    String alive = resultSet.getString("Alive");
+                    String totalCapacity = resultSet.getString("TotalCapacity");
+                    float totalCapacityFloat = Float.parseFloat(totalCapacity.split(" ")[0]);
 
-            // alive should be true and totalCapacity should not be 0.000
-            if (alive.equalsIgnoreCase("true") && totalCapacityFloat > 0.0f) {
-              LOG.info("Doris container startup success!");
-              return true;
-            }
-          }
-        }
+                    // alive should be true and totalCapacity should not be 0.000
+                    if (alive.equalsIgnoreCase("true") && totalCapacityFloat > 0.0f) {
+                      LOG.info("Doris container startup success!");
+                      return true;
+                    }
+                  }
+                }
+                LOG.info("Doris container is not ready yet!");
+              } catch (Exception e) {
+                LOG.error(e.getMessage(), e);
+              }
+              return false;
+            });
 
-        LOG.info("Doris container is not ready yet!");
-        Thread.sleep(5000);
-      } catch (Exception e) {
-        LOG.error(e.getMessage(), e);
-      }
-    }
-
-    return false;
+    return true;
   }
 
   private boolean changePassword() {

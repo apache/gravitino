@@ -549,6 +549,18 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       assertEquals(
           NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier10);
 
+      StringBuilder longUri = new StringBuilder("gvfs://fileset/catalog1/schema1/fileset1");
+      for (int i = 0; i < 1500; i++) {
+        longUri.append("/dir");
+      }
+      NameIdentifier identifier11 = fs.extractIdentifier(new URI(longUri.toString()));
+      assertEquals(
+          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier11);
+
+      NameIdentifier identifier12 = fs.extractIdentifier(new URI(longUri.delete(0, 14).toString()));
+      assertEquals(
+          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier12);
+
       assertThrows(
           IllegalArgumentException.class,
           () -> fs.extractIdentifier(new URI("gvfs://fileset/catalog1/")));

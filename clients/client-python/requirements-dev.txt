@@ -2,3 +2,4 @@
 # This software is licensed under the Apache License version 2.
 requests
 dataclasses-json
+pylint

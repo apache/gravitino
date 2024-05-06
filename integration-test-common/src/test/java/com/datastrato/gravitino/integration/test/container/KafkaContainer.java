@@ -47,12 +47,14 @@ public class KafkaContainer extends BaseContainer {
 
   @Override
   public void start() {
-    try {
-      super.start();
-      Preconditions.checkArgument(checkContainerStatus(5), "Kafka container startup failed!");
-    } finally {
-      copyKafkaLogs();
-    }
+    super.start();
+    Preconditions.checkArgument(checkContainerStatus(5), "Kafka container startup failed!");
+  }
+
+  @Override
+  public void close() {
+    copyKafkaLogs();
+    super.close();
   }
 
   private void copyKafkaLogs() {
