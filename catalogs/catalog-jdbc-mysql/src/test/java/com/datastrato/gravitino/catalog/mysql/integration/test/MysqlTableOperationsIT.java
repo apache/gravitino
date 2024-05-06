@@ -23,6 +23,7 @@ import com.datastrato.gravitino.rel.types.Types;
 import com.datastrato.gravitino.utils.RandomNameUtils;
 import java.sql.Connection;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -774,7 +775,7 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
   }
 
   @Test
-  void testListMySQLTable() {
+  void testListMySQLTable() throws SQLException {
     String[] dbNames = new String[] {"db1", "db2"};
     String[] tableNames = new String[] {"table1", "table2", "table3"};
     for (String dbName : dbNames) {
@@ -810,8 +811,6 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
           tables.add(resultSet.getString("TABLE_NAME"));
         }
         Assertions.assertEquals(Arrays.asList(tableNames), tables);
-      } catch (Exception e) {
-        throw new RuntimeException(e);
       }
     }
   }

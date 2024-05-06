@@ -626,7 +626,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
   }
 
   @Test
-  void testListPostgreSQLTable() {
+  void testListPostgreSQLTable() throws SQLException {
     String[] dbNames = new String[] {"db1", "db2"};
     String[] tableNames = new String[] {"table1", "table2", "table3"};
     for (String dbName : dbNames) {
@@ -662,8 +662,6 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
           tables.add(resultSet.getString("TABLE_NAME"));
         }
         Assertions.assertEquals(Arrays.asList(tableNames), tables);
-      } catch (Exception e) {
-        throw new RuntimeException(e);
       }
     }
   }
