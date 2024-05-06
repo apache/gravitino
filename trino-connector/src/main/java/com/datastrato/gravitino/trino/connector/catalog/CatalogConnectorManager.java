@@ -57,7 +57,7 @@ import org.slf4j.LoggerFactory;
 public class CatalogConnectorManager {
   private static final Logger LOG = LoggerFactory.getLogger(CatalogConnectorManager.class);
 
-  private static final int CATALOG_LOAD_FREQUENCY_SECOND = 3;
+  private static final int CATALOG_LOAD_FREQUENCY_SECOND = 10;
   private static final int NUMBER_EXECUTOR_THREAD = 1;
   private static final int LOAD_METALAKE_TIMEOUT = 30;
 
@@ -111,30 +111,31 @@ public class CatalogConnectorManager {
       future.get();
     } catch (Exception e) {
       LOG.error("Load metalake sync failed.", e);
+    } finally {
+      // Load metalake for handling catalog in the metalake updates.
+      executorService.scheduleWithFixedDelay(
+          this::loadMetalakeImpl,
+          CATALOG_LOAD_FREQUENCY_SECOND,
+          CATALOG_LOAD_FREQUENCY_SECOND,
+          TimeUnit.SECONDS);
     }
   }
 
   private void loadMetalakeImpl() {
-    try {
-      for (String usedMetalake : usedMetalakes) {
-        GravitinoMetalake metalake;
-        try {
-          metalake = gravitinoClient.loadMetalake(NameIdentifier.ofMetalake(usedMetalake));
-        } catch (NoSuchMetalakeException noSuchMetalakeException) {
-          LOG.warn("Metalake {} does not exist.", usedMetalake);
-          continue;
-        } catch (Exception e) {
-          LOG.error("Load Metalake {} failed.", usedMetalake, e);
-          continue;
-        }
-
-        LOG.info("Load metalake: {}", usedMetalake);
-        loadCatalogs(metalake);
+    for (String usedMetalake : usedMetalakes) {
+      GravitinoMetalake metalake;
+      try {
+        metalake = gravitinoClient.loadMetalake(NameIdentifier.ofMetalake(usedMetalake));
+      } catch (NoSuchMetalakeException noSuchMetalakeException) {
+        LOG.warn("Metalake {} does not exist.", usedMetalake);
+        continue;
+      } catch (Exception e) {
+        LOG.error("Load Metalake {} failed.", usedMetalake, e);
+        continue;
       }
-    } finally {
-      // Load metalake for handling catalog in the metalake updates.
-      executorService.schedule(
-          this::loadMetalakeImpl, CATALOG_LOAD_FREQUENCY_SECOND, TimeUnit.SECONDS);
+
+      LOG.info("Load metalake: {}", usedMetalake);
+      loadCatalogs(metalake);
     }
   }
 
