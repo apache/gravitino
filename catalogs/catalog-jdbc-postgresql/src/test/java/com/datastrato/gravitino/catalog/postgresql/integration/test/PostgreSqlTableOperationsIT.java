@@ -82,6 +82,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
         properties,
         null,
         Distributions.NONE,
+        SortOrders.EMPTY_SORT_ORDERS,
         Indexes.EMPTY_INDEXES);
 
     // list table
