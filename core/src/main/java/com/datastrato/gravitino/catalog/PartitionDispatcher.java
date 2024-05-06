@@ -55,7 +55,7 @@ public interface PartitionDispatcher {
     try {
       getPartition(tableIdent, partitionName);
       return true;
-    } catch (Exception e) {
+    } catch (NoSuchPartitionException e) {
       return false;
     }
   }
