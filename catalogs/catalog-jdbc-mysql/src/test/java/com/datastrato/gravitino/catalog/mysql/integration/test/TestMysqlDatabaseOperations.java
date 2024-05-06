@@ -8,6 +8,7 @@ import static com.datastrato.gravitino.catalog.mysql.operation.MysqlDatabaseOper
 
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.types.Types;
@@ -66,6 +67,7 @@ public class TestMysqlDatabaseOperations extends TestMysqlAbstractIT {
         properties,
         new Transform[0],
         Distributions.NONE,
+        SortOrders.EMPTY_SORT_ORDERS,
         new Index[0]);
     DATABASE_OPERATIONS.delete(databaseName, true);
   }

@@ -15,6 +15,7 @@ import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.literals.Literals;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Decimal;
@@ -86,6 +87,7 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
         properties,
         null,
         Distributions.NONE,
+        SortOrders.EMPTY_SORT_ORDERS,
         indexes);
 
     // list table
@@ -225,6 +227,7 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
         properties,
         null,
         Distributions.NONE,
+        SortOrders.EMPTY_SORT_ORDERS,
         indexes);
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
     assertionsTableInfo(tableName, tableComment, columns, properties, indexes, load);
@@ -484,6 +487,7 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
         properties,
         null,
         Distributions.NONE,
+        SortOrders.EMPTY_SORT_ORDERS,
         indexes);
 
     JdbcTable loaded = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
@@ -568,6 +572,7 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
         properties,
         null,
         Distributions.NONE,
+        SortOrders.EMPTY_SORT_ORDERS,
         indexes);
 
     JdbcTable loaded = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
@@ -666,6 +671,7 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
         Collections.emptyMap(),
         null,
         Distributions.NONE,
+        SortOrders.EMPTY_SORT_ORDERS,
         Indexes.EMPTY_INDEXES);
 
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
@@ -710,6 +716,7 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
                     emptyMap,
                     null,
                     Distributions.NONE,
+                    SortOrders.EMPTY_SORT_ORDERS,
                     Indexes.EMPTY_INDEXES);
               });
       Assertions.assertTrue(
@@ -740,6 +747,7 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
         null,
         null,
         Distributions.NONE,
+        SortOrders.EMPTY_SORT_ORDERS,
         Indexes.EMPTY_INDEXES);
 
     String testDb = "test_db_2";
@@ -765,6 +773,7 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
         null,
         null,
         Distributions.NONE,
+        SortOrders.EMPTY_SORT_ORDERS,
         Indexes.EMPTY_INDEXES);
 
     tables = TABLE_OPERATIONS.listTables(TEST_DB_NAME.toString());
@@ -789,6 +798,7 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
         null,
         null,
         Distributions.NONE,
+        SortOrders.EMPTY_SORT_ORDERS,
         Indexes.EMPTY_INDEXES);
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), test_table_1);
     Assertions.assertEquals("InnoDB", load.properties().get(MYSQL_ENGINE_KEY));
@@ -839,6 +849,7 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
         properties,
         null,
         Distributions.NONE,
+        SortOrders.EMPTY_SORT_ORDERS,
         indexes);
 
     JdbcTable table = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
@@ -865,6 +876,7 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
         properties,
         null,
         Distributions.NONE,
+        SortOrders.EMPTY_SORT_ORDERS,
         indexes);
 
     table = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
@@ -887,6 +899,7 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
         properties,
         null,
         Distributions.NONE,
+        SortOrders.EMPTY_SORT_ORDERS,
         indexes);
 
     table = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
@@ -912,6 +925,7 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
                     properties,
                     null,
                     Distributions.NONE,
+                    SortOrders.EMPTY_SORT_ORDERS,
                     Indexes.EMPTY_INDEXES));
     Assertions.assertTrue(
         StringUtils.contains(
@@ -946,6 +960,7 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
                     properties,
                     null,
                     Distributions.NONE,
+                    SortOrders.EMPTY_SORT_ORDERS,
                     primaryIndex));
     Assertions.assertTrue(
         StringUtils.contains(

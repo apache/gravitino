@@ -18,6 +18,7 @@ import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.literals.Literals;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Type;
@@ -352,6 +353,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
         Collections.emptyMap(),
         null,
         Distributions.NONE,
+        SortOrders.EMPTY_SORT_ORDERS,
         Indexes.EMPTY_INDEXES);
 
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
@@ -407,6 +409,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
         null,
         null,
         Distributions.NONE,
+        SortOrders.EMPTY_SORT_ORDERS,
         Indexes.EMPTY_INDEXES);
 
     List<String> tableNames = TABLE_OPERATIONS.listTables(TEST_DB_NAME);
@@ -436,6 +439,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
         null,
         null,
         Distributions.NONE,
+        SortOrders.EMPTY_SORT_ORDERS,
         Indexes.EMPTY_INDEXES);
     tableNames = postgreSqlTableOperations.listTables(TEST_DB_NAME);
     Assertions.assertFalse(tableNames.contains(table_2));
@@ -488,6 +492,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
         properties,
         null,
         Distributions.NONE,
+        SortOrders.EMPTY_SORT_ORDERS,
         Indexes.EMPTY_INDEXES);
 
     // list table
@@ -530,6 +535,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
                   properties,
                   null,
                   Distributions.NONE,
+                  SortOrders.EMPTY_SORT_ORDERS,
                   Indexes.EMPTY_INDEXES);
             });
 
@@ -589,6 +595,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
         properties,
         null,
         Distributions.NONE,
+        SortOrders.EMPTY_SORT_ORDERS,
         indexes);
 
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
@@ -615,6 +622,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
                   properties,
                   null,
                   Distributions.NONE,
+                  SortOrders.EMPTY_SORT_ORDERS,
                   primaryIndex);
             });
     Assertions.assertTrue(
