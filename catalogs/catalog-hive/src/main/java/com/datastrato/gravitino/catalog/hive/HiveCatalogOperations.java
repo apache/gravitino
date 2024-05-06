@@ -987,10 +987,16 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public boolean dropTable(NameIdentifier tableIdent) {
-    if (isExternalTable(tableIdent)) {
-      return dropHiveTable(tableIdent, false, false);
-    } else {
-      return dropHiveTable(tableIdent, true, false);
+    try {
+      if (isExternalTable(tableIdent)) {
+        return dropHiveTable(tableIdent, false, false);
+      } else {
+        return dropHiveTable(tableIdent, true, false);
+      }
+    } catch (NoSuchTableException e) {
+      return false;
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     }
   }
 
@@ -1079,13 +1085,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   private boolean isExternalTable(NameIdentifier tableIdent) {
-    try {
-      return EXTERNAL_TABLE.name().equalsIgnoreCase(loadHiveTable(tableIdent).getTableType());
-    } catch (NoSuchTableException e) {
-      return false;
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+    org.apache.hadoop.hive.metastore.api.Table hiveTable = loadHiveTable(tableIdent);
+    return EXTERNAL_TABLE.name().equalsIgnoreCase(hiveTable.getTableType());
   }
 
   private static ThreadFactory getThreadFactory(String factoryName) {

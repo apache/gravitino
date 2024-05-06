@@ -61,6 +61,7 @@ public interface TableOperation {
   /**
    * @param databaseName The name of the database.
    * @param tableName The name of the table.
+   * @return true if the table is successfully dropped; false if the table does not exist.
    */
   boolean drop(String databaseName, String tableName);
 
