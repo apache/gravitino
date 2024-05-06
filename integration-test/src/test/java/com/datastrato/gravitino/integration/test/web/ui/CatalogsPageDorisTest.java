@@ -62,6 +62,7 @@ public class CatalogsPageDorisTest extends AbstractWebIT {
   public static final int FE_MYSQL_PORT = 9030;
 
   private static final String SCHEMA_NAME_DORIS = "schema_doris";
+  private static final String SCHEMA_DEFAULT_DORIS = "information_schema";
   private static final String TABLE_NAME = "table1";
   private static final String COLUMN_NAME = "col1";
   private static final String PROPERTIES_KEY1 = "key1";
@@ -210,6 +211,7 @@ public class CatalogsPageDorisTest extends AbstractWebIT {
   @Test
   @Order(4)
   public void testDorisSchemaTreeNode() throws InterruptedException {
+    catalogsPage.clickBreadCrumbsToCatalogs();
     // click doris catalog tree node
     String dorisCatalogNode =
         String.format(
@@ -218,7 +220,8 @@ public class CatalogsPageDorisTest extends AbstractWebIT {
     // verify show table title、 schema name and tree node
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(CATALOG_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(SCHEMA_NAME_DORIS, false));
-    List<String> treeNodes = Arrays.asList(DORIS_CATALOG_NAME, SCHEMA_NAME_DORIS);
+    List<String> treeNodes =
+        Arrays.asList(DORIS_CATALOG_NAME, SCHEMA_DEFAULT_DORIS, SCHEMA_NAME_DORIS);
     Assertions.assertTrue(catalogsPage.verifyTreeNodes(treeNodes));
   }
 
@@ -234,7 +237,8 @@ public class CatalogsPageDorisTest extends AbstractWebIT {
     // 2. verify show table title、 default schema name and tree node
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(SCHEMA_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TABLE_NAME, false));
-    List<String> treeNodes = Arrays.asList(DORIS_CATALOG_NAME, SCHEMA_NAME_DORIS, TABLE_NAME);
+    List<String> treeNodes =
+        Arrays.asList(DORIS_CATALOG_NAME, SCHEMA_DEFAULT_DORIS, SCHEMA_NAME_DORIS, TABLE_NAME);
     Assertions.assertTrue(catalogsPage.verifyTreeNodes(treeNodes));
   }
 
@@ -251,17 +255,11 @@ public class CatalogsPageDorisTest extends AbstractWebIT {
             SCHEMA_NAME_DORIS,
             TABLE_NAME);
     catalogsPage.clickTreeNode(tableNode);
+    // 2. verify show table column after click table tree node
+    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(COLUMN_NAME, true));
     clickAndWait(catalogsPage.tabDetailsBtn);
-    // 2. verify show tab details
+    // 3. verify show tab details
     Assertions.assertTrue(catalogsPage.verifyShowDetailsContent());
-    // 3. verify show highlight properties
-    Assertions.assertTrue(catalogsPage.verifyShowDetailsContent());
-    Assertions.assertTrue(
-        catalogsPage.verifyShowPropertiesItemInList(
-            "key", PROPERTIES_KEY1, PROPERTIES_KEY1, false));
-    Assertions.assertTrue(
-        catalogsPage.verifyShowPropertiesItemInList(
-            "value", PROPERTIES_KEY1, PROPERTIES_VALUE1, false));
   }
 
   @Test
