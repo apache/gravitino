@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.integration.test.trino;
 
+import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
+
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import java.io.FileOutputStream;
@@ -22,6 +24,7 @@ import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -80,16 +83,15 @@ public class TrinoQueryIT extends TrinoQueryITBase {
           .filter(catalog -> catalog.name().startsWith("gt_"))
           .forEach(catalog -> TrinoQueryITBase.dropCatalog(catalog.name()));
 
-      int tries = 30;
-      while (tries-- >= 0) {
-        String[] catalogs = trinoQueryRunner.runQuery("show catalogs").split("\n");
-        LOG.info("Catalogs: {}", Arrays.toString(catalogs));
-        if (Arrays.stream(catalogs).filter(s -> s.startsWith("\"test.gt_")).count() == 0) {
-          break;
-        }
-        Thread.sleep(1000);
-        LOG.info("Waiting for test catalogs to be dropped");
-      }
+      await()
+          .atMost(30, TimeUnit.SECONDS)
+          .pollInterval(1, TimeUnit.SECONDS)
+          .until(
+              () -> {
+                String[] catalogs = trinoQueryRunner.runQuery("show catalogs").split("\n");
+                LOG.info("Catalogs: {}", Arrays.toString(catalogs));
+                return Arrays.stream(catalogs).filter(s -> s.startsWith("\"test.gt_")).count() == 0;
+              });
     } catch (Exception e) {
       throw new Exception("Failed to clean up test env: " + e.getMessage(), e);
     }
