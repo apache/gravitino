@@ -65,8 +65,6 @@ class Response:
     def json(self):
         if self.body:
             return _json.loads(self.body.decode("utf-8"))
-        else:
-            return None
 
 
 class HTTPClient:
@@ -87,12 +85,12 @@ class HTTPClient:
         url = self.host
 
         if endpoint:
-            url = "{}/{}".format(url.rstrip("/"), endpoint.lstrip("/"))
+            url = f"{url.rstrip('/')}/{endpoint.lstrip('/')}"
 
         if params:
             params = {k: v for k, v in params.items() if v is not None}
             url_values = urlencode(sorted(params.items()), True)
-            url = "{}?{}".format(url, url_values)
+            url = f"{url}?{url_values}"
 
         return url
 
@@ -117,8 +115,7 @@ class HTTPClient:
             return opener.open(request, timeout=timeout)
         except HTTPError as err:
             exc = handle_error(err)
-            exc.__cause__ = None
-            raise exc
+            raise exc from None
 
     def _request(
         self, method, endpoint, params=None, json=None, headers=None, timeout=None
@@ -159,7 +156,7 @@ class HTTPClient:
         return self._request("put", endpoint, json=json, **kwargs)
 
     def close(self):
-        self._request("close")
+        self._request("close", "/")
 
 
 def unpack(path: str):

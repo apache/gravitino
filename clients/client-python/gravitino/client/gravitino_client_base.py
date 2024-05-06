@@ -8,7 +8,7 @@ from gravitino.client.gravitino_metalake import GravitinoMetalake
 from gravitino.client.gravitino_version import GravitinoVersion
 from gravitino.dto.responses.metalake_response import MetalakeResponse
 from gravitino.name_identifier import NameIdentifier
-from gravitino.utils import HTTPClient, Response
+from gravitino.utils import HTTPClient
 
 logger = logging.getLogger(__name__)
 
@@ -69,4 +69,4 @@ class GravitinoClientBase:
             try:
                 self._rest_client.close()
             except Exception as e:
-                logger.warning("Failed to close the HTTP REST client", e)
+                logger.warning("Failed to close the HTTP REST client: %s", e)
