@@ -12,6 +12,9 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Type;
@@ -91,6 +94,7 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
         createProperties(),
         null,
         distribution,
+        null,
         indexes);
     List<String> listTables = TABLE_OPERATIONS.listTables(databaseName);
     Assertions.assertTrue(listTables.contains(tableName));
@@ -140,6 +144,7 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
         createProperties(),
         null,
         distribution,
+        null,
         indexes);
     JdbcTable load = TABLE_OPERATIONS.load(databaseName, tableName);
     assertionsTableInfo(tableName, tableComment, columns, properties, indexes, load);
@@ -354,6 +359,7 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
         createProperties(),
         null,
         distribution,
+        null,
         indexes);
 
     JdbcTable load = TABLE_OPERATIONS.load(databaseName, tableName);
@@ -396,6 +402,7 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
                     createProperties(),
                     null,
                     Distributions.hash(32, NamedReference.field("col_1")),
+                    null,
                     Indexes.EMPTY_INDEXES);
               });
       Assertions.assertTrue(
@@ -405,5 +412,46 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
                   String.format(
                       "Couldn't convert Gravitino type %s to Doris type", type.simpleString())));
     }
+  }
+
+  @Test
+  void testSortOrderTable() {
+    String tableName = GravitinoITUtils.genRandomName("doris_sort_order_table");
+
+    String tableComment = "test_comment";
+    List<JdbcColumn> columns = new ArrayList<>();
+    JdbcColumn col_1 =
+        JdbcColumn.builder().withName("col_1").withType(INT).withComment("id").build();
+    columns.add(col_1);
+    JdbcColumn col_2 =
+        JdbcColumn.builder().withName("col_2").withType(VARCHAR_255).withComment("col_2").build();
+    columns.add(col_2);
+    JdbcColumn col_3 =
+        JdbcColumn.builder().withName("col_3").withType(VARCHAR_255).withComment("col_3").build();
+    columns.add(col_3);
+
+    Distribution distribution = Distributions.hash(32, NamedReference.field("col_1"));
+    Index[] indexes = new Index[] {};
+
+    SortOrder[] sortOrders =
+        new SortOrder[] {
+          SortOrders.of(NamedReference.field("col_1"), SortDirection.ASCENDING),
+          SortOrders.of(NamedReference.field("col_2"), SortDirection.ASCENDING)
+        };
+
+    // create table
+    TABLE_OPERATIONS.create(
+        databaseName,
+        tableName,
+        columns.toArray(new JdbcColumn[0]),
+        tableComment,
+        createProperties(),
+        null,
+        distribution,
+        sortOrders,
+        indexes);
+
+    JdbcTable jdbcTable = TABLE_OPERATIONS.load(databaseName, tableName);
+    Assertions.assertArrayEquals(sortOrders, jdbcTable.sortOrder());
   }
 }

@@ -10,6 +10,8 @@ import java.util.Objects;
 /** Helper methods to create SortOrders to pass into Gravitino. */
 public class SortOrders {
 
+  /** A empty sort order instance to avoid using null value as the value of SortOrder[]. */
+  public static final SortOrder[] EMPTY_SORT_ORDERS = new SortOrder[] {};
   /**
    * Create a sort order by the given expression with the ascending sort direction and nulls first
    * ordering.

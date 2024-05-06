@@ -16,12 +16,18 @@ import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.Expression;
+import com.datastrato.gravitino.rel.expressions.NamedReference;
+import com.datastrato.gravitino.rel.expressions.NamedReference.FieldReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.sql.Connection;
@@ -35,8 +41,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 
@@ -46,6 +55,9 @@ public class DorisTableOperations extends JdbcTableOperations {
   private static final String DORIS_AUTO_INCREMENT = "AUTO_INCREMENT";
 
   private static final String NEW_LINE = "\n";
+
+  private static final Pattern DORIS_TABLE_SORT_ORDER_PATTERN =
+      Pattern.compile("DUPLICATE KEY\\(([^)]+)\\)");
 
   @Override
   public List<String> listTables(String databaseName) throws NoSuchSchemaException {
@@ -73,7 +85,8 @@ public class DorisTableOperations extends JdbcTableOperations {
       Map<String, String> properties,
       Transform[] partitioning,
       Distribution distribution,
-      com.datastrato.gravitino.rel.indexes.Index[] indexes) {
+      SortOrder[] sortOrders,
+      Index[] indexes) {
 
     validateIncrementCol(columns);
     validateDistribution(distribution, columns);
@@ -101,6 +114,23 @@ public class DorisTableOperations extends JdbcTableOperations {
     appendIndexesSql(indexes, sqlBuilder);
 
     sqlBuilder.append(NEW_LINE).append(")");
+
+    // Add sort order operation.
+    if (ArrayUtils.isNotEmpty(sortOrders)) {
+      List<String> sortColumns = Lists.newArrayListWithCapacity(sortOrders.length);
+      for (SortOrder sortOrder : sortOrders) {
+        Expression expression = sortOrder.expression();
+        if (!(expression instanceof FieldReference)) {
+          throw new UnsupportedOperationException(
+              "Sort column only support raw column, current is: " + expression);
+        }
+
+        FieldReference fieldReference = (FieldReference) expression;
+        sortColumns.add(BACK_QUOTE + fieldReference.fieldName()[0] + BACK_QUOTE);
+      }
+
+      sqlBuilder.append(" DUPLICATE KEY(").append(Joiner.on(",").join(sortColumns)).append(")");
+    }
 
     // Add table comment if specified
     if (StringUtils.isNotEmpty(comment)) {
@@ -592,5 +622,29 @@ public class DorisTableOperations extends JdbcTableOperations {
           "Index does not exist");
     }
     return "DROP INDEX " + deleteIndex.getName();
+  }
+
+  @Override
+  protected SortOrder[] getSortOrder(Connection connection, String databaseName, String tableName) {
+    try (PreparedStatement preparedStatement =
+            connection.prepareStatement(
+                String.format("show create table `%s`.`%s`", databaseName, tableName));
+        ResultSet resultSet = preparedStatement.executeQuery()) {
+      List<SortOrder> sortOrders = new ArrayList<>();
+      while (resultSet.next()) {
+        String createTableSQL = resultSet.getString(2);
+        Matcher matcher = DORIS_TABLE_SORT_ORDER_PATTERN.matcher(createTableSQL);
+        if (matcher.find()) {
+          String[] sortColumns = matcher.group(1).split("\\s*,\\s*");
+          for (String sortColumn : sortColumns) {
+            // Should trim possible back quotes around the column name
+            sortOrders.add(SortOrders.ascending(NamedReference.field(sortColumn.replace("`", ""))));
+          }
+        }
+      }
+      return sortOrders.toArray(new SortOrder[0]);
+    } catch (SQLException e) {
+      throw exceptionMapper.toGravitinoException(e);
+    }
   }
 }

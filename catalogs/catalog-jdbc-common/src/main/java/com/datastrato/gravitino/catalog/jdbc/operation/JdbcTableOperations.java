@@ -20,6 +20,8 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.literals.Literals;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
@@ -81,6 +83,7 @@ public abstract class JdbcTableOperations implements TableOperation {
       Map<String, String> properties,
       Transform[] partitioning,
       Distribution distribution,
+      SortOrder[] sortOrders,
       Index[] indexes)
       throws TableAlreadyExistsException {
     LOG.info("Attempting to create table {} in database {}", tableName, databaseName);
@@ -88,7 +91,14 @@ public abstract class JdbcTableOperations implements TableOperation {
       JdbcConnectorUtils.executeUpdate(
           connection,
           generateCreateTableSql(
-              tableName, columns, comment, properties, partitioning, distribution, indexes));
+              tableName,
+              columns,
+              comment,
+              properties,
+              partitioning,
+              distribution,
+              sortOrders,
+              indexes));
       LOG.info("Created table {} in database {}", tableName, databaseName);
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
@@ -188,10 +198,27 @@ public abstract class JdbcTableOperations implements TableOperation {
 
       // 5.Leave the information to the bottom layer to append the table
       correctJdbcTableFields(connection, databaseName, tableName, jdbcTableBuilder);
+
+      // 6.Get sort order information
+      SortOrder[] sortOrders = getSortOrder(connection, databaseName, tableName);
+      jdbcTableBuilder.withSortOrders(sortOrders);
+
       return jdbcTableBuilder.build();
     } catch (SQLException e) {
       throw exceptionMapper.toGravitinoException(e);
     }
+  }
+
+  /**
+   * Get the sort order of the table.
+   *
+   * @param connection jdbc connection
+   * @param databaseName the database name
+   * @param tableName the table name
+   * @return Returns the sort order of the table.
+   */
+  protected SortOrder[] getSortOrder(Connection connection, String databaseName, String tableName) {
+    return SortOrders.EMPTY_SORT_ORDERS;
   }
 
   /**
@@ -377,6 +404,7 @@ public abstract class JdbcTableOperations implements TableOperation {
       Map<String, String> properties,
       Transform[] partitioning,
       Distribution distribution,
+      SortOrder[] sortOrders,
       Index[] indexes);
 
   protected abstract String generateRenameTableSql(String oldTableName, String newTableName);

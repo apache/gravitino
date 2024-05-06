@@ -370,9 +370,6 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    Preconditions.checkArgument(
-        null == sortOrders || sortOrders.length == 0, "jdbc-catalog does not support sort orders");
-
     StringIdentifier identifier =
         Preconditions.checkNotNull(
             StringIdentifier.fromProperties(properties), GRAVITINO_ATTRIBUTE_DOES_NOT_EXIST_MSG);
@@ -404,6 +401,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         resultProperties,
         partitioning,
         distribution,
+        sortOrders,
         indexes);
 
     return JdbcTable.builder()

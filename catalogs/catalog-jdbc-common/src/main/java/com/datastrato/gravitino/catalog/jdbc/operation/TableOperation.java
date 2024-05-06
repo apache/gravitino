@@ -15,6 +15,7 @@ import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import java.util.List;
@@ -45,6 +46,7 @@ public interface TableOperation {
    * @param comment The comment of the table.
    * @param properties The properties of the table.
    * @param partitioning The partitioning of the table.
+   * @param sortOrders The sort ordering of the table.
    * @param indexes The indexes of the table.
    */
   void create(
@@ -55,6 +57,7 @@ public interface TableOperation {
       Map<String, String> properties,
       Transform[] partitioning,
       Distribution distribution,
+      SortOrder[] sortOrders,
       Index[] indexes)
       throws TableAlreadyExistsException;
 

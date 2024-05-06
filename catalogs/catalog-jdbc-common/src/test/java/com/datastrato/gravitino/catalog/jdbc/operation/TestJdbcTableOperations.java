@@ -142,6 +142,7 @@ public class TestJdbcTableOperations {
                 properties,
                 null,
                 Distributions.NONE,
+                null,
                 Indexes.EMPTY_INDEXES));
 
     // list table.

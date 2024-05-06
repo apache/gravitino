@@ -20,6 +20,7 @@ import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.types.Types;
@@ -101,6 +102,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       Map<String, String> properties,
       Transform[] partitioning,
       Distribution distribution,
+      SortOrder[] sortOrders,
       Index[] indexes) {
     if (ArrayUtils.isNotEmpty(partitioning)) {
       throw new UnsupportedOperationException(
@@ -108,6 +110,10 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     }
     Preconditions.checkArgument(
         Distributions.NONE.equals(distribution), "PostgreSQL does not support distribution");
+
+    Preconditions.checkArgument(
+        null == sortOrders || sortOrders.length == 0,
+        "PostgreSQL catalog does not support sort orders");
 
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder

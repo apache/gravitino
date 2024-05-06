@@ -11,6 +11,7 @@ import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.google.common.base.Preconditions;
@@ -31,6 +32,7 @@ public class SqliteTableOperations extends JdbcTableOperations {
       Map<String, String> properties,
       Transform[] partitioning,
       Distribution distribution,
+      SortOrder[] sortOrders,
       Index[] indexes) {
     Preconditions.checkArgument(
         distribution == Distributions.NONE, "SQLite does not support distribution");
