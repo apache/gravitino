@@ -11,6 +11,7 @@ import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.partitions.Partition;
 import com.datastrato.gravitino.rel.partitions.Partitions;
 import com.datastrato.gravitino.rel.types.Types;
+import com.datastrato.gravitino.utils.IsolatedClassLoader;
 import com.google.common.collect.Maps;
 import java.util.Arrays;
 import org.junit.jupiter.api.Assertions;
@@ -37,6 +38,17 @@ public class TestPartitionOperationDispatcher extends TestOperationDispatcher {
   public static void initialize() {
     prepareTable();
     partitionOperationDispatcher.addPartition(TABLE_IDENT, PARTITION);
+
+    // Assert that the custom class loader is used
+    ClassLoader classLoader =
+        partitionOperationDispatcher.doWithTable(
+            TABLE_IDENT,
+            s -> Thread.currentThread().getContextClassLoader(),
+            RuntimeException.class);
+    Assertions.assertInstanceOf(
+        IsolatedClassLoader.CUSTOM_CLASS_LOADER_CLASS,
+        classLoader,
+        "Custom class loader is not used");
   }
 
   protected static void prepareTable() {
