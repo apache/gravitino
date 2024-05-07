@@ -26,7 +26,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import javax.ws.rs.NotSupportedException;
-import lombok.SneakyThrows;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.spark.sql.catalyst.analysis.NamespaceAlreadyExistsException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
@@ -164,10 +163,10 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
     }
   }
 
-  @SneakyThrows
   @Override
   public Table createTable(
-      Identifier ident, Column[] columns, Transform[] transforms, Map<String, String> properties) {
+      Identifier ident, Column[] columns, Transform[] transforms, Map<String, String> properties)
+      throws TableAlreadyExistsException, NoSuchNamespaceException {
     NameIdentifier gravitinoIdentifier =
         NameIdentifier.of(metalakeName, catalogName, getDatabase(ident), ident.name());
     com.datastrato.gravitino.rel.Column[] gravitinoColumns =
@@ -197,7 +196,16 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
                   partitionings,
                   distributionAndSortOrdersInfo.getDistribution(),
                   distributionAndSortOrdersInfo.getSortOrders());
-      Table sparkTable = sparkCatalog.loadTable(ident);
+      Table sparkTable;
+      try {
+        sparkTable = sparkCatalog.loadTable(ident);
+      } catch (NoSuchTableException e) {
+        throw new RuntimeException(
+            String.format(
+                "Failed to load the real sparkTable: %s",
+                String.join(".", getDatabase(ident), ident.name())),
+            e);
+      }
       return createSparkTable(
           ident,
           gravitinoTable,
@@ -209,8 +217,6 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
       throw new NoSuchNamespaceException(ident.namespace());
     } catch (com.datastrato.gravitino.exceptions.TableAlreadyExistsException e) {
       throw new TableAlreadyExistsException(ident);
-    } catch (NoSuchTableException e) {
-      throw new NoSuchTableException(ident);
     }
   }
 

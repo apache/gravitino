@@ -18,14 +18,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import lombok.Data;
 import org.apache.hadoop.fs.Path;
-import org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions;
-import org.apache.spark.SparkConf;
 import org.apache.spark.sql.Column;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
-import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
@@ -34,13 +32,12 @@ import org.apache.spark.sql.connector.catalog.CatalogPlugin;
 import org.apache.spark.sql.connector.catalog.FunctionCatalog;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.functions.UnboundFunction;
-import org.apache.spark.sql.internal.StaticSQLConf;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructField;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.junit.platform.commons.util.StringUtils;
-import scala.Tuple3;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
 
@@ -233,22 +230,13 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     testDeleteMetadataColumn();
   }
 
-  @Test
-  void testInjectSparkExtensions() {
-    SparkSession sparkSession = getSparkSession();
-    SparkConf conf = sparkSession.sparkContext().getConf();
-    Assertions.assertTrue(conf.contains(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key()));
-    String extensions = conf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key());
-    Assertions.assertTrue(StringUtils.isNotBlank(extensions));
-    Assertions.assertEquals(IcebergSparkSessionExtensions.class.getName(), extensions);
-  }
-
-  @Test
-  void testIcebergTableRowLevelOperations() {
-    testIcebergDeleteOperation();
-    testIcebergUpdateOperation();
-    testIcebergMergeIntoDeleteOperation();
-    testIcebergMergeIntoUpdateOperation();
+  @ParameterizedTest
+  @MethodSource("getIcebergTablePropertyValues")
+  void testIcebergTableRowLevelOperations(IcebergTableWriteProperties icebergTableWriteProperties) {
+    testIcebergDeleteOperation(icebergTableWriteProperties);
+    testIcebergUpdateOperation(icebergTableWriteProperties);
+    testIcebergMergeIntoDeleteOperation(icebergTableWriteProperties);
+    testIcebergMergeIntoUpdateOperation(icebergTableWriteProperties);
   }
 
   private void testMetadataColumns() {
@@ -421,86 +409,82 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     Assertions.assertEquals(0, queryResult1.size());
   }
 
-  private void testIcebergDeleteOperation() {
-    getIcebergTablePropertyValues()
-        .forEach(
-            tuple -> {
-              String tableName =
-                  String.format("test_iceberg_%s_%s_delete_operation", tuple._1(), tuple._2());
-              dropTableIfExists(tableName);
-              createIcebergTableWithTabProperties(
-                  tableName,
-                  tuple._1(),
-                  ImmutableMap.of(
-                      ICEBERG_FORMAT_VERSION,
-                      String.valueOf(tuple._2()),
-                      ICEBERG_DELETE_MODE,
-                      tuple._3()));
-              checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
-              checkTableRowLevelDelete(tableName);
-            });
+  private void testIcebergDeleteOperation(IcebergTableWriteProperties icebergTableWriteProperties) {
+    String tableName =
+        String.format(
+            "test_iceberg_%s_%s_delete_operation",
+            icebergTableWriteProperties.isPartitionedTable,
+            icebergTableWriteProperties.formatVersion);
+    dropTableIfExists(tableName);
+    createIcebergTableWithTabProperties(
+        tableName,
+        icebergTableWriteProperties.isPartitionedTable,
+        ImmutableMap.of(
+            ICEBERG_FORMAT_VERSION,
+            String.valueOf(icebergTableWriteProperties.formatVersion),
+            ICEBERG_DELETE_MODE,
+            icebergTableWriteProperties.writeMode));
+    checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
+    checkRowLevelDelete(tableName);
   }
 
-  private void testIcebergUpdateOperation() {
-    getIcebergTablePropertyValues()
-        .forEach(
-            tuple -> {
-              String tableName =
-                  String.format("test_iceberg_%s_%s_update_operation", tuple._1(), tuple._2());
-              dropTableIfExists(tableName);
-              createIcebergTableWithTabProperties(
-                  tableName,
-                  tuple._1(),
-                  ImmutableMap.of(
-                      ICEBERG_FORMAT_VERSION,
-                      String.valueOf(tuple._2()),
-                      ICEBERG_UPDATE_MODE,
-                      tuple._3()));
-              checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
-              checkTableRowLevelUpdate(tableName);
-            });
+  private void testIcebergUpdateOperation(IcebergTableWriteProperties icebergTableWriteProperties) {
+    String tableName =
+        String.format(
+            "test_iceberg_%s_%s_update_operation",
+            icebergTableWriteProperties.isPartitionedTable,
+            icebergTableWriteProperties.formatVersion);
+    dropTableIfExists(tableName);
+    createIcebergTableWithTabProperties(
+        tableName,
+        icebergTableWriteProperties.isPartitionedTable,
+        ImmutableMap.of(
+            ICEBERG_FORMAT_VERSION,
+            String.valueOf(icebergTableWriteProperties.formatVersion),
+            ICEBERG_UPDATE_MODE,
+            icebergTableWriteProperties.writeMode));
+    checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
+    checkRowLevelUpdate(tableName);
   }
 
-  private void testIcebergMergeIntoDeleteOperation() {
-    getIcebergTablePropertyValues()
-        .forEach(
-            tuple -> {
-              String tableName =
-                  String.format(
-                      "test_iceberg_%s_%s_mergeinto_delete_operation", tuple._1(), tuple._2());
-              dropTableIfExists(tableName);
-              createIcebergTableWithTabProperties(
-                  tableName,
-                  tuple._1(),
-                  ImmutableMap.of(
-                      ICEBERG_FORMAT_VERSION,
-                      String.valueOf(tuple._2()),
-                      ICEBERG_MERGE_MODE,
-                      tuple._3()));
-              checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
-              checkTableDeleteByMergeInto(tableName);
-            });
+  private void testIcebergMergeIntoDeleteOperation(
+      IcebergTableWriteProperties icebergTableWriteProperties) {
+    String tableName =
+        String.format(
+            "test_iceberg_%s_%s_mergeinto_delete_operation",
+            icebergTableWriteProperties.isPartitionedTable,
+            icebergTableWriteProperties.formatVersion);
+    dropTableIfExists(tableName);
+    createIcebergTableWithTabProperties(
+        tableName,
+        icebergTableWriteProperties.isPartitionedTable,
+        ImmutableMap.of(
+            ICEBERG_FORMAT_VERSION,
+            String.valueOf(icebergTableWriteProperties.formatVersion),
+            ICEBERG_MERGE_MODE,
+            icebergTableWriteProperties.writeMode));
+    checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
+    checkDeleteByMergeInto(tableName);
   }
 
-  private void testIcebergMergeIntoUpdateOperation() {
-    getIcebergTablePropertyValues()
-        .forEach(
-            tuple -> {
-              String tableName =
-                  String.format(
-                      "test_iceberg_%s_%s_mergeinto_update_operation", tuple._1(), tuple._2());
-              dropTableIfExists(tableName);
-              createIcebergTableWithTabProperties(
-                  tableName,
-                  tuple._1(),
-                  ImmutableMap.of(
-                      ICEBERG_FORMAT_VERSION,
-                      String.valueOf(tuple._2()),
-                      ICEBERG_MERGE_MODE,
-                      tuple._3()));
-              checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
-              checkTableUpdateByMergeInto(tableName);
-            });
+  private void testIcebergMergeIntoUpdateOperation(
+      IcebergTableWriteProperties icebergTableWriteProperties) {
+    String tableName =
+        String.format(
+            "test_iceberg_%s_%s_mergeinto_update_operation",
+            icebergTableWriteProperties.isPartitionedTable,
+            icebergTableWriteProperties.formatVersion);
+    dropTableIfExists(tableName);
+    createIcebergTableWithTabProperties(
+        tableName,
+        icebergTableWriteProperties.isPartitionedTable,
+        ImmutableMap.of(
+            ICEBERG_FORMAT_VERSION,
+            String.valueOf(icebergTableWriteProperties.formatVersion),
+            ICEBERG_MERGE_MODE,
+            icebergTableWriteProperties.writeMode));
+    checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
+    checkTableUpdateByMergeInto(tableName);
   }
 
   private List<SparkTableInfo.SparkColumnInfo> getIcebergSimpleTableColumn() {
@@ -534,12 +518,12 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     };
   }
 
-  private List<Tuple3<Boolean, Integer, String>> getIcebergTablePropertyValues() {
+  private List<IcebergTableWriteProperties> getIcebergTablePropertyValues() {
     return Arrays.asList(
-        new Tuple3<>(false, 1, "copy-on-write"),
-        new Tuple3<>(false, 2, "merge-on-read"),
-        new Tuple3<>(true, 1, "copy-on-write"),
-        new Tuple3<>(true, 2, "merge-on-read"));
+        IcebergTableWriteProperties.of(false, 1, "copy-on-write"),
+        IcebergTableWriteProperties.of(false, 2, "merge-on-read"),
+        IcebergTableWriteProperties.of(true, 1, "copy-on-write"),
+        IcebergTableWriteProperties.of(true, 2, "merge-on-read"));
   }
 
   private void createIcebergTableWithTabProperties(
@@ -554,5 +538,25 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
             "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', age INT) %s TBLPROPERTIES(%s)",
             tableName, partitionedClause, tblPropertiesStr);
     sql(createSql);
+  }
+
+  @Data
+  private static class IcebergTableWriteProperties {
+
+    private boolean isPartitionedTable;
+    private int formatVersion;
+    private String writeMode;
+
+    private IcebergTableWriteProperties(
+        boolean isPartitionedTable, int formatVersion, String writeMode) {
+      this.isPartitionedTable = isPartitionedTable;
+      this.formatVersion = formatVersion;
+      this.writeMode = writeMode;
+    }
+
+    static IcebergTableWriteProperties of(
+        boolean isPartitionedTable, int formatVersion, String writeMode) {
+      return new IcebergTableWriteProperties(isPartitionedTable, formatVersion, writeMode);
+    }
   }
 }

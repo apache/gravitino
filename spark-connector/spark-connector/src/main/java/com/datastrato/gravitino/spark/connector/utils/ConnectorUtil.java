@@ -10,14 +10,14 @@ import static com.datastrato.gravitino.spark.connector.ConnectorConstants.COMMA;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Set;
-import org.apache.commons.lang3.StringUtils;
 
 public class ConnectorUtil {
 
-  public static String removeDuplicates(String[] elements, String otherElements) {
-    Set<String> uniqueElements = new LinkedHashSet<>(Arrays.asList(elements));
-    if (StringUtils.isNotBlank(otherElements)) {
-      uniqueElements.addAll(Arrays.asList(otherElements.split(COMMA)));
+  public static String removeDuplicateSparkExtensions(
+      String[] extensions, String[] addedExtensions) {
+    Set<String> uniqueElements = new LinkedHashSet<>(Arrays.asList(extensions));
+    if (addedExtensions != null && addedExtensions.length > 0) {
+      uniqueElements.addAll(Arrays.asList(addedExtensions));
     }
     return uniqueElements.stream()
         .reduce((element1, element2) -> element1 + COMMA + element2)

@@ -8,7 +8,7 @@ package com.datastrato.gravitino.spark.connector.iceberg;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
-import com.datastrato.gravitino.spark.connector.utils.SparkBaseTableHelper;
+import com.datastrato.gravitino.spark.connector.utils.GravitinoTableInfoHelper;
 import com.google.common.annotations.VisibleForTesting;
 import java.lang.reflect.Field;
 import java.util.Map;
@@ -19,7 +19,9 @@ import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.MetadataColumn;
 import org.apache.spark.sql.connector.catalog.SupportsDelete;
 import org.apache.spark.sql.connector.catalog.SupportsMetadataColumns;
+import org.apache.spark.sql.connector.catalog.SupportsRead;
 import org.apache.spark.sql.connector.catalog.SupportsRowLevelOperations;
+import org.apache.spark.sql.connector.catalog.SupportsWrite;
 import org.apache.spark.sql.connector.catalog.TableCapability;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.connector.expressions.Transform;
@@ -38,85 +40,82 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap;
  */
 public class SparkIcebergTable extends SparkTable {
 
-  private SparkBaseTableHelper sparkBaseTableHelper;
+  private GravitinoTableInfoHelper gravitinoTableInfoHelper;
+  private org.apache.spark.sql.connector.catalog.Table sparkTable;
 
   public SparkIcebergTable(
       Identifier identifier,
       Table gravitinoTable,
-      org.apache.spark.sql.connector.catalog.Table sparkIcebergTable,
+      org.apache.spark.sql.connector.catalog.Table sparkTable,
       TableCatalog sparkIcebergCatalog,
       PropertiesConverter propertiesConverter,
       SparkTransformConverter sparkTransformConverter) {
-    super(((SparkTable) sparkIcebergTable).table(), !isCacheEnabled(sparkIcebergCatalog));
-    this.sparkBaseTableHelper =
-        new SparkBaseTableHelper(
-            identifier,
-            gravitinoTable,
-            sparkIcebergTable,
-            propertiesConverter,
-            sparkTransformConverter);
+    super(((SparkTable) sparkTable).table(), !isCacheEnabled(sparkIcebergCatalog));
+    this.gravitinoTableInfoHelper =
+        new GravitinoTableInfoHelper(
+            identifier, gravitinoTable, propertiesConverter, sparkTransformConverter);
+    this.sparkTable = sparkTable;
   }
 
   @Override
   public String name() {
-    return sparkBaseTableHelper.name(true);
+    return gravitinoTableInfoHelper.name(true);
   }
 
   @Override
   @SuppressWarnings("deprecation")
   public StructType schema() {
-    return sparkBaseTableHelper.schema();
+    return gravitinoTableInfoHelper.schema();
   }
 
   @Override
   public Map<String, String> properties() {
-    return sparkBaseTableHelper.properties();
+    return gravitinoTableInfoHelper.properties();
   }
 
   @Override
   public Transform[] partitioning() {
-    return sparkBaseTableHelper.partitioning();
+    return gravitinoTableInfoHelper.partitioning();
   }
 
   @Override
   public Set<TableCapability> capabilities() {
-    return sparkBaseTableHelper.capabilities();
+    return sparkTable.capabilities();
   }
 
   @Override
   public ScanBuilder newScanBuilder(CaseInsensitiveStringMap options) {
-    return sparkBaseTableHelper.newScanBuilder(options);
+    return ((SupportsRead) sparkTable).newScanBuilder(options);
   }
 
   @Override
   public WriteBuilder newWriteBuilder(LogicalWriteInfo info) {
-    return sparkBaseTableHelper.newWriteBuilder(info);
+    return ((SupportsWrite) sparkTable).newWriteBuilder(info);
   }
 
   @Override
   public boolean canDeleteWhere(Filter[] filters) {
-    return ((SupportsDelete) sparkBaseTableHelper.getSparkTable()).canDeleteWhere(filters);
+    return ((SupportsDelete) sparkTable).canDeleteWhere(filters);
   }
 
   @Override
   public void deleteWhere(Filter[] filters) {
-    ((SupportsDelete) sparkBaseTableHelper.getSparkTable()).deleteWhere(filters);
+    ((SupportsDelete) sparkTable).deleteWhere(filters);
   }
 
   @Override
   public MetadataColumn[] metadataColumns() {
-    return ((SupportsMetadataColumns) sparkBaseTableHelper.getSparkTable()).metadataColumns();
+    return ((SupportsMetadataColumns) sparkTable).metadataColumns();
   }
 
   @Override
   public RowLevelOperationBuilder newRowLevelOperationBuilder(RowLevelOperationInfo info) {
-    return ((SupportsRowLevelOperations) sparkBaseTableHelper.getSparkTable())
-        .newRowLevelOperationBuilder(info);
+    return ((SupportsRowLevelOperations) sparkTable).newRowLevelOperationBuilder(info);
   }
 
   @VisibleForTesting
   public SparkTransformConverter getSparkTransformConverter() {
-    return sparkBaseTableHelper.getSparkTransformConverter();
+    return gravitinoTableInfoHelper.getSparkTransformConverter();
   }
 
   private static boolean isCacheEnabled(TableCatalog sparkIcebergCatalog) {

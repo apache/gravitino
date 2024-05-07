@@ -102,6 +102,8 @@ public class SparkTableInfo {
     sparkTableInfo.tableName = items[1];
     sparkTableInfo.database = items[0];
     sparkTableInfo.columns =
+        // using `baseTable.schema()` directly will failed because the method named `schema` is
+        // Deprecated in Spark Table interface
         Arrays.stream(getSchema(baseTable).fields())
             .map(
                 sparkField ->
