@@ -5,9 +5,7 @@
 
 package com.datastrato.gravitino.spark.connector.catalog;
 
-import org.apache.spark.sql.connector.catalog.ColumnDefaultValue;
 import org.apache.spark.sql.connector.catalog.TableChange;
-import org.apache.spark.sql.connector.expressions.LiteralValue;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -82,14 +80,10 @@ public class TestTransformTableChange {
 
     TableChange.ColumnPosition first = TableChange.ColumnPosition.first();
     TableChange.ColumnPosition after = TableChange.ColumnPosition.after("col0");
-    ColumnDefaultValue defaultValue =
-        new ColumnDefaultValue(
-            "CURRENT_DEFAULT", new LiteralValue("default_value", DataTypes.StringType));
 
     TableChange.AddColumn sparkAddColumnFirst =
         (TableChange.AddColumn)
-            TableChange.addColumn(
-                new String[] {"col1"}, DataTypes.StringType, true, "", first, defaultValue);
+            TableChange.addColumn(new String[] {"col1"}, DataTypes.StringType, true, "", first);
     com.datastrato.gravitino.rel.TableChange gravitinoChangeFirst =
         BaseCatalog.transformTableChange(sparkAddColumnFirst);
 
@@ -108,8 +102,7 @@ public class TestTransformTableChange {
 
     TableChange.AddColumn sparkAddColumnAfter =
         (TableChange.AddColumn)
-            TableChange.addColumn(
-                new String[] {"col1"}, DataTypes.StringType, true, "", after, defaultValue);
+            TableChange.addColumn(new String[] {"col1"}, DataTypes.StringType, true, "", after);
     com.datastrato.gravitino.rel.TableChange gravitinoChangeAfter =
         BaseCatalog.transformTableChange(sparkAddColumnAfter);
 
@@ -128,8 +121,7 @@ public class TestTransformTableChange {
 
     TableChange.AddColumn sparkAddColumnDefault =
         (TableChange.AddColumn)
-            TableChange.addColumn(
-                new String[] {"col1"}, DataTypes.StringType, true, "", null, defaultValue);
+            TableChange.addColumn(new String[] {"col1"}, DataTypes.StringType, true, "", null);
     com.datastrato.gravitino.rel.TableChange gravitinoChangeDefault =
         BaseCatalog.transformTableChange(sparkAddColumnDefault);
 
@@ -150,7 +142,7 @@ public class TestTransformTableChange {
   @Test
   void testTransformDeleteColumn() {
     TableChange.DeleteColumn sparkDeleteColumn =
-        (TableChange.DeleteColumn) TableChange.deleteColumn(new String[] {"col1"}, true);
+        (TableChange.DeleteColumn) TableChange.deleteColumn(new String[] {"col1"});
     com.datastrato.gravitino.rel.TableChange gravitinoChange =
         BaseCatalog.transformTableChange(sparkDeleteColumn);
 
@@ -160,7 +152,6 @@ public class TestTransformTableChange {
         (com.datastrato.gravitino.rel.TableChange.DeleteColumn) gravitinoChange;
 
     Assertions.assertArrayEquals(sparkDeleteColumn.fieldNames(), gravitinoDeleteColumn.fieldName());
-    Assertions.assertEquals(sparkDeleteColumn.ifExists(), gravitinoDeleteColumn.getIfExists());
   }
 
   @Test

@@ -16,6 +16,7 @@ import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter.DistributionAndSortOrdersInfo;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Map;
 import javax.ws.rs.NotSupportedException;
 import org.apache.spark.sql.connector.expressions.BucketTransform;
 import org.apache.spark.sql.connector.expressions.Expressions;

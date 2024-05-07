@@ -62,7 +62,6 @@ public class TestSparkTypeConverter {
     gravitinoToSparkTypeMapper.put(BooleanType.get(), DataTypes.BooleanType);
     gravitinoToSparkTypeMapper.put(DateType.get(), DataTypes.DateType);
     gravitinoToSparkTypeMapper.put(TimestampType.withTimeZone(), DataTypes.TimestampType);
-    gravitinoToSparkTypeMapper.put(TimestampType.withoutTimeZone(), DataTypes.TimestampNTZType);
     gravitinoToSparkTypeMapper.put(
         ListType.of(IntegerType.get(), true), DataTypes.createArrayType(DataTypes.IntegerType));
     gravitinoToSparkTypeMapper.put(
