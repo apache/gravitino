@@ -15,7 +15,7 @@ import org.junit.jupiter.api.TestInstance;
 public class TestConnectorUtil {
 
   @Test
-  void testRemoveDuplicates() {
+  void testRemoveDuplicateSparkExtensions() {
     String[] extensions = {"a", "b", "c"};
     String addedExtensions = "a,d,e";
     String result =
