@@ -785,7 +785,7 @@ public class HTTPClient implements RESTClient {
 
   private StringEntity toJson(Object requestBody) {
     try {
-      return new StringEntity(mapper.writeValueAsString(requestBody));
+      return new StringEntity(mapper.writeValueAsString(requestBody), StandardCharsets.UTF_8);
     } catch (JsonProcessingException e) {
       throw new RESTException(e, "Failed to write request body: %s", requestBody);
     }

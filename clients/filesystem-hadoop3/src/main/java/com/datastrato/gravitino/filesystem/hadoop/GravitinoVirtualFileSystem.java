@@ -57,7 +57,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   //     gvfs://fileset/fileset_catalog/fileset_schema/fileset1/file.txt
   //     /fileset_catalog/fileset_schema/fileset1/sub_dir/
   private static final Pattern IDENTIFIER_PATTERN =
-      Pattern.compile("^(?:gvfs://fileset)?/([^/]+)/([^/]+)/([^/]+)(?:/[^/]+)*/?$");
+      Pattern.compile("^(?:gvfs://fileset)?/([^/]+)/([^/]+)/([^/]+)(?>/[^/]+)*/?$");
 
   @Override
   public void initialize(URI name, Configuration configuration) throws IOException {

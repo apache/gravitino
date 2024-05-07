@@ -40,20 +40,20 @@ Please refer to the following sections for details.
 
 ### REST catalog server configuration
 
-| Configuration item                                          | Description                                                                                                                                                                                                                                                | Default value                                                                | Required | Since Version |
-|-------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|----------|---------------|
-| `gravitino.auxService.names`                                | The auxiliary service name of the Gravitino Iceberg REST catalog service. Use **`iceberg-rest`**.                                                                                                           | (none)                                                                       | Yes      | 0.2.0         |
+| Configuration item                                          | Description                                                                                                                                                                                                                                          | Default value                                                                | Required | Since Version |
+|-------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|----------|---------------|
+| `gravitino.auxService.names`                                | The auxiliary service name of the Gravitino Iceberg REST catalog service. Use **`iceberg-rest`**.                                                                                                                                                    | (none)                                                                       | Yes      | 0.2.0         |
 | `gravitino.auxService.iceberg-rest.classpath`               | The classpath of the Gravitino Iceberg REST catalog service; includes the directory containing jars and configuration. It supports both absolute and relative paths, for example, `catalogs/lakehouse-iceberg/libs, catalogs/lakehouse-iceberg/conf` | (none)                                                                       | Yes      | 0.2.0         |
-| `gravitino.auxService.iceberg-rest.host`                    | The host of the Gravitino Iceberg REST catalog service.                                                                                                                                                                                                    | `0.0.0.0`                                                                    | No       | 0.2.0         |
-| `gravitino.auxService.iceberg-rest.httpPort`                | The port of the Gravitino Iceberg REST catalog service.                                                                                                                                                                                                    | `9001`                                                                       | No       | 0.2.0         |
-| `gravitino.auxService.iceberg-rest.minThreads`              | The minimum number of threads in the thread pool used by the Jetty web server. `minThreads` is 8 if the value is less than 8.                                                                                                                              | `Math.max(Math.min(Runtime.getRuntime().availableProcessors() * 2, 100), 8)` | No       | 0.2.0         |
-| `gravitino.auxService.iceberg-rest.maxThreads`              | The maximum number of threads in the thread pool used by the Jetty web server. `maxThreads` is 8 if the value is less than 8, and `maxThreads` must be greater than or equal to `minThreads`.                                                              | `Math.max(Runtime.getRuntime().availableProcessors() * 4, 400)`              | No       | 0.2.0         |
-| `gravitino.auxService.iceberg-rest.threadPoolWorkQueueSize` | The size of the queue in the thread pool used by Gravitino Iceberg REST catalog service.                                                                                                                                                                   | `100`                                                                        | No       | 0.2.0         |
-| `gravitino.auxService.iceberg-rest.stopTimeout`             | The amount of time in ms for the Gravitino Iceberg REST catalog service to stop gracefully. For more information, see `org.eclipse.jetty.server.Server#setStopTimeout`.                                                                                     | `30000`                                                                      | No       | 0.2.0         |
-| `gravitino.auxService.iceberg-rest.idleTimeout`             | The timeout in ms of idle connections.                                                                                                                                                                                                                     | `30000`                                                                      | No       | 0.2.0         |
-| `gravitino.auxService.iceberg-rest.requestHeaderSize`       | The maximum size of an HTTP request.                                                                                                                                                                                                                       | `131072`                                                                     | No       | 0.2.0         |
-| `gravitino.auxService.iceberg-rest.responseHeaderSize`      | The maximum size of an HTTP response.                                                                                                                                                                                                                      | `131072`                                                                     | No       | 0.2.0         |
-| `gravitino.auxService.iceberg-rest.customFilters`           | Comma-separated list of filter class names to apply to the APIs.                                                                                                                                                                                           | (none)                                                                       | No       | 0.4.0         |
+| `gravitino.auxService.iceberg-rest.host`                    | The host of the Gravitino Iceberg REST catalog service.                                                                                                                                                                                              | `0.0.0.0`                                                                    | No       | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.httpPort`                | The port of the Gravitino Iceberg REST catalog service.                                                                                                                                                                                              | `9001`                                                                       | No       | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.minThreads`              | The minimum number of threads in the thread pool used by the Jetty web server. `minThreads` is 8 if the value is less than 8.                                                                                                                        | `Math.max(Math.min(Runtime.getRuntime().availableProcessors() * 2, 100), 8)` | No       | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.maxThreads`              | The maximum number of threads in the thread pool used by the Jetty web server. `maxThreads` is 8 if the value is less than 8, and `maxThreads` must be greater than or equal to `minThreads`.                                                        | `Math.max(Runtime.getRuntime().availableProcessors() * 4, 400)`              | No       | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.threadPoolWorkQueueSize` | The size of the queue in the thread pool used by Gravitino Iceberg REST catalog service.                                                                                                                                                             | `100`                                                                        | No       | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.stopTimeout`             | The amount of time in ms for the Gravitino Iceberg REST catalog service to stop gracefully. For more information, see `org.eclipse.jetty.server.Server#setStopTimeout`.                                                                              | `30000`                                                                      | No       | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.idleTimeout`             | The timeout in ms of idle connections.                                                                                                                                                                                                               | `30000`                                                                      | No       | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.requestHeaderSize`       | The maximum size of an HTTP request.                                                                                                                                                                                                                 | `131072`                                                                     | No       | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.responseHeaderSize`      | The maximum size of an HTTP response.                                                                                                                                                                                                                | `131072`                                                                     | No       | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.customFilters`           | Comma-separated list of filter class names to apply to the APIs.                                                                                                                                                                                     | (none)                                                                       | No       | 0.4.0         |
 
 
 The filter in `customFilters` should be a standard javax servlet filter.
@@ -127,17 +127,19 @@ To start the service:
 ./bin/gravitino.sh start
 ```
 
-To find out whether the service has started:
+To verify whether the service has started:
 
 ```shell
-curl  http://127.0.0.1:9001/iceberg/application.wadl
+curl  http://127.0.0.1:9001/iceberg/v1/config
 ```
+
+Normally you will see the output like `{"defaults":{},"overrides":{}}%`.
 
 ## Exploring the Gravitino and Apache Iceberg REST catalog service with Apache Spark
 
 ### Deploying Apache Spark with Apache Iceberg support
 
-Follow the [Spark Iceberg start guide](https://iceberg.apache.org/docs/latest/getting-started/) to set up Apache Spark's and Apache Iceberg's environment. Keep the Apache Spark version consistent with the `spark-iceberg-runtime` version.
+Follow the [Spark Iceberg start guide](https://iceberg.apache.org/docs/latest/getting-started/) to set up Apache Spark's and Apache Iceberg's environment. 
 
 ### Starting the Apache Spark client with the Apache Iceberg REST catalog
 
@@ -146,15 +148,18 @@ Follow the [Spark Iceberg start guide](https://iceberg.apache.org/docs/latest/ge
 | `spark.sql.catalog.${catalog-name}.type` | The Spark catalog type; should set to `rest`.                             |
 | `spark.sql.catalog.${catalog-name}.uri`  | Spark Iceberg REST catalog URI, such as `http://127.0.0.1:9001/iceberg/`. |
 
-For example:
+For example, we can configure Spark catalog options to use Gravitino Iceberg REST catalog with the catalog name `rest`.
 
 ```shell
-./bin/spark-shell -v \
+./bin/spark-sql -v \
+--packages org.apache.iceberg:iceberg-spark-runtime-3.4_2.12:1.3.1 \
 --conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
 --conf spark.sql.catalog.rest=org.apache.iceberg.spark.SparkCatalog  \
 --conf spark.sql.catalog.rest.type=rest  \
 --conf spark.sql.catalog.rest.uri=http://127.0.0.1:9001/iceberg/
 ```
+
+You may need to adjust the Iceberg Spark runtime jar file name according to the real version number in your environment.
 
 ### Exploring Apache Iceberg with Apache Spark SQL
 
@@ -162,10 +167,10 @@ For example:
 // First change to use the `rest` catalog
 USE rest;
 CREATE DATABASE IF NOT EXISTS dml;
-CREATE TABLE dml.test (id bigint COMMENT 'unique id') using iceberg
+CREATE TABLE dml.test (id bigint COMMENT 'unique id') using iceberg;
 DESCRIBE TABLE EXTENDED dml.test;
 INSERT INTO dml.test VALUES (1), (2);
-SELECT * FROM dml.test
+SELECT * FROM dml.test;
 ```
 
 You could try Spark with Gravitino REST catalog service in our [playground](./how-to-use-the-playground.md#using-iceberg-rest-service).

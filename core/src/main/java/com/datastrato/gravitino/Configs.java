@@ -254,8 +254,11 @@ public interface Configs {
           .doc("The admins of Gravitino service")
           .version(ConfigConstants.VERSION_0_5_0)
           .stringConf()
-          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .toSequence()
+          .checkValue(
+              valueList ->
+                  valueList != null && valueList.stream().allMatch(StringUtils::isNotBlank),
+              ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   ConfigEntry<Long> ROLE_CACHE_EVICTION_INTERVAL_MS =

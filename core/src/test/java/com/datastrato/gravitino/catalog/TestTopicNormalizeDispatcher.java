@@ -17,15 +17,17 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-public class TestTopicNormalizeDispatcher extends TestTopicOperationDispatcher {
+public class TestTopicNormalizeDispatcher extends TestOperationDispatcher {
   private static TopicNormalizeDispatcher topicNormalizeDispatcher;
   private static SchemaNormalizeDispatcher schemaNormalizeDispatcher;
 
   @BeforeAll
   public static void initialize() throws IOException {
     TestTopicOperationDispatcher.initialize();
-    schemaNormalizeDispatcher = new SchemaNormalizeDispatcher(schemaOperationDispatcher);
-    topicNormalizeDispatcher = new TopicNormalizeDispatcher(topicOperationDispatcher);
+    schemaNormalizeDispatcher =
+        new SchemaNormalizeDispatcher(TestTopicOperationDispatcher.schemaOperationDispatcher);
+    topicNormalizeDispatcher =
+        new TopicNormalizeDispatcher(TestTopicOperationDispatcher.topicOperationDispatcher);
   }
 
   @Test
