@@ -13,7 +13,6 @@ import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
-import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.spark.connector.ConnectorConstants;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
@@ -25,14 +24,12 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import javax.ws.rs.NotSupportedException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.spark.sql.catalyst.analysis.NamespaceAlreadyExistsException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.catalyst.analysis.NonEmptyNamespaceException;
 import org.apache.spark.sql.catalyst.analysis.TableAlreadyExistsException;
-import org.apache.spark.sql.connector.catalog.Column;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.NamespaceChange;
 import org.apache.spark.sql.connector.catalog.NamespaceChange.SetProperty;
@@ -41,6 +38,7 @@ import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.connector.catalog.TableChange;
 import org.apache.spark.sql.connector.expressions.Transform;
+import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
@@ -163,13 +161,13 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
 
   @Override
   public Table createTable(
-      Identifier ident, Column[] columns, Transform[] transforms, Map<String, String> properties)
+      Identifier ident, StructType schema, Transform[] transforms, Map<String, String> properties)
       throws TableAlreadyExistsException, NoSuchNamespaceException {
     NameIdentifier gravitinoIdentifier =
         NameIdentifier.of(metalakeName, catalogName, getDatabase(ident), ident.name());
     com.datastrato.gravitino.rel.Column[] gravitinoColumns =
-        Arrays.stream(columns)
-            .map(column -> createGravitinoColumn(column))
+        Arrays.stream(schema.fields())
+            .map(structField -> createGravitinoColumn(structField))
             .toArray(com.datastrato.gravitino.rel.Column[]::new);
 
     Map<String, String> gravitinoProperties =
@@ -217,14 +215,6 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
     } catch (com.datastrato.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(ident);
     }
-  }
-
-  @SuppressWarnings("deprecation")
-  @Override
-  public Table createTable(
-      Identifier ident, StructType schema, Transform[] partitions, Map<String, String> properties)
-      throws TableAlreadyExistsException, NoSuchNamespaceException {
-    throw new NotSupportedException("Deprecated create table method");
   }
 
   @Override
@@ -391,12 +381,12 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
     return catalogDefaultNamespace[0];
   }
 
-  private com.datastrato.gravitino.rel.Column createGravitinoColumn(Column sparkColumn) {
+  private com.datastrato.gravitino.rel.Column createGravitinoColumn(StructField structField) {
     return com.datastrato.gravitino.rel.Column.of(
-        sparkColumn.name(),
-        SparkTypeConverter.toGravitinoType(sparkColumn.dataType()),
-        sparkColumn.comment(),
-        sparkColumn.nullable(),
+        structField.name(),
+        SparkTypeConverter.toGravitinoType(structField.dataType()),
+        structField.getComment().isEmpty() ? null : structField.getComment().get(),
+        structField.nullable(),
         // Spark doesn't support autoIncrement
         false,
         // todo: support default value
@@ -470,12 +460,6 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
           (TableChange.UpdateColumnNullability) change;
       return com.datastrato.gravitino.rel.TableChange.updateColumnNullability(
           updateColumnNullability.fieldNames(), updateColumnNullability.nullable());
-    } else if (change instanceof TableChange.UpdateColumnDefaultValue) {
-      TableChange.UpdateColumnDefaultValue updateColumnDefaultValue =
-          (TableChange.UpdateColumnDefaultValue) change;
-      return com.datastrato.gravitino.rel.TableChange.updateColumnDefaultValue(
-          updateColumnDefaultValue.fieldNames(),
-          Literals.stringLiteral(updateColumnDefaultValue.newDefaultValue()));
     } else {
       throw new UnsupportedOperationException(
           String.format("Unsupported table change %s", change.getClass().getName()));

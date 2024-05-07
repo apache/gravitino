@@ -131,9 +131,6 @@ public class SparkTypeConverter {
     } else if (gravitinoType instanceof Types.TimestampType
         && ((Types.TimestampType) gravitinoType).hasTimeZone()) {
       return DataTypes.TimestampType;
-    } else if (gravitinoType instanceof Types.TimestampType
-        && !((Types.TimestampType) gravitinoType).hasTimeZone()) {
-      return DataTypes.TimestampNTZType;
     } else if (gravitinoType instanceof Types.ListType) {
       Types.ListType listType = (Types.ListType) gravitinoType;
       return DataTypes.createArrayType(

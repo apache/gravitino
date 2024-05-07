@@ -14,10 +14,10 @@ repositories {
 }
 
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
-val sparkVersion: String = libs.versions.spark.get()
+val sparkVersion: String = "3.3.4"
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
 val icebergVersion: String = libs.versions.iceberg.get()
-val kyuubiVersion: String = libs.versions.kyuubi.get()
+val kyuubiVersion: String = "1.7.4"
 val scalaJava8CompatVersion: String = libs.versions.scala.java.compat.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
@@ -38,7 +38,10 @@ dependencies {
   testCompileOnly(libs.lombok)
 
   testImplementation(project(":integration-test-common", "testArtifacts"))
-  testImplementation(project(":server"))
+  testImplementation(project(":server")) {
+    exclude("org.slf4j")
+    exclude("org.apache.logging.log4j")
+  }
 
   testImplementation(libs.hive2.common) {
     exclude("org.apache.curator")
