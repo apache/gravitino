@@ -46,8 +46,6 @@ import com.datastrato.gravitino.rel.types.Types.IntegerType;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.DriverManager;
@@ -102,7 +100,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   protected PGImageName postgreImageName = DEFAULT_POSTGRES_IMAGE;
 
   @BeforeAll
-  public void startup() throws IOException {
+  public void startup() throws IOException, SQLException {
 
     if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
       String gravitinoHome = System.getenv("GRAVITINO_HOME");
@@ -152,23 +150,16 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     metalake = loadMetalake;
   }
 
-  private void createCatalog() {
+  private void createCatalog() throws SQLException {
     Map<String, String> catalogProperties = Maps.newHashMap();
 
-    try {
-      String jdbcUrl = POSTGRESQL_CONTAINER.getJdbcUrl(TEST_DB_NAME);
-      String database = new URI(jdbcUrl.substring(jdbcUrl.lastIndexOf("/") + 1)).getPath();
-      catalogProperties.put(
-          JdbcConfig.JDBC_DRIVER.getKey(), POSTGRESQL_CONTAINER.getDriverClassName(TEST_DB_NAME));
-      catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
-      catalogProperties.put(JdbcConfig.JDBC_DATABASE.getKey(), database);
-      catalogProperties.put(JdbcConfig.USERNAME.getKey(), POSTGRESQL_CONTAINER.getUsername());
-      catalogProperties.put(JdbcConfig.PASSWORD.getKey(), POSTGRESQL_CONTAINER.getPassword());
-    } catch (URISyntaxException e) {
-      throw new RuntimeException(e);
-    } catch (SQLException e) {
-      throw new RuntimeException(e);
-    }
+    String jdbcUrl = POSTGRESQL_CONTAINER.getJdbcUrl(TEST_DB_NAME);
+    catalogProperties.put(
+        JdbcConfig.JDBC_DRIVER.getKey(), POSTGRESQL_CONTAINER.getDriverClassName(TEST_DB_NAME));
+    catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
+    catalogProperties.put(JdbcConfig.JDBC_DATABASE.getKey(), TEST_DB_NAME.toString());
+    catalogProperties.put(JdbcConfig.USERNAME.getKey(), POSTGRESQL_CONTAINER.getUsername());
+    catalogProperties.put(JdbcConfig.PASSWORD.getKey(), POSTGRESQL_CONTAINER.getPassword());
 
     Catalog createdCatalog =
         metalake.createCatalog(
