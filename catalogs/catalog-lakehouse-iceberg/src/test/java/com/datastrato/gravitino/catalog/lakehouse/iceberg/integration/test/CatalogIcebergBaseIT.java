@@ -79,24 +79,25 @@ import org.junit.jupiter.api.Test;
 public abstract class CatalogIcebergBaseIT extends AbstractIT {
 
   protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
-  protected String metalakeName = GravitinoITUtils.genRandomName("iceberg_it_metalake");
-  protected String catalogName = GravitinoITUtils.genRandomName("iceberg_it_catalog");
-  protected String schemaName = GravitinoITUtils.genRandomName("iceberg_it_schema");
-  protected String tableName = GravitinoITUtils.genRandomName("iceberg_it_table");
-  protected String alertTableName = "alert_table_name";
-  protected String table_comment = "table_comment";
-  protected String schema_comment = "schema_comment";
-  protected String ICEBERG_COL_NAME1 = "iceberg_col_name1";
-  protected String ICEBERG_COL_NAME2 = "iceberg_col_name2";
-  protected String ICEBERG_COL_NAME3 = "iceberg_col_name3";
-  protected String ICEBERG_COL_NAME4 = "iceberg_col_name4";
   protected String WAREHOUSE;
   protected String URIS;
   protected String TYPE;
 
-  private final String provider = "lakehouse-iceberg";
-  private String SELECT_ALL_TEMPLATE = "SELECT * FROM iceberg.%s";
-  private String INSERT_BATCH_WITHOUT_PARTITION_TEMPLATE = "INSERT INTO iceberg.%s VALUES %s";
+  private static final String alertTableName = "alert_table_name";
+  private static final String table_comment = "table_comment";
+  private static final String schema_comment = "schema_comment";
+  private static final String ICEBERG_COL_NAME1 = "iceberg_col_name1";
+  private static final String ICEBERG_COL_NAME2 = "iceberg_col_name2";
+  private static final String ICEBERG_COL_NAME3 = "iceberg_col_name3";
+  private static final String ICEBERG_COL_NAME4 = "iceberg_col_name4";
+  private static final String provider = "lakehouse-iceberg";
+  private static final String SELECT_ALL_TEMPLATE = "SELECT * FROM iceberg.%s";
+  private static String INSERT_BATCH_WITHOUT_PARTITION_TEMPLATE =
+      "INSERT INTO iceberg.%s VALUES %s";
+  private String metalakeName = GravitinoITUtils.genRandomName("iceberg_it_metalake");
+  private String catalogName = GravitinoITUtils.genRandomName("iceberg_it_catalog");
+  private String schemaName = GravitinoITUtils.genRandomName("iceberg_it_schema");
+  private String tableName = GravitinoITUtils.genRandomName("iceberg_it_table");
   private GravitinoMetalake metalake;
   private Catalog catalog;
   private org.apache.iceberg.catalog.Catalog icebergCatalog;
