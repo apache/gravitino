@@ -4,12 +4,13 @@
  */
 package com.datastrato.gravitino.catalog.doris.integration.test;
 
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.Tag;
 
 @Tag("gravitino-docker-it")
 public class CatalogDorisDriverIT extends CatalogDorisIT {
   public CatalogDorisDriverIT() {
     super();
-    mysqlDriverDownloadUrl = "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.11/mysql-connector-java-8.0.11.jar";
+    mysqlDriverDownloadUrl =
+        "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.11/mysql-connector-java-8.0.11.jar";
   }
 }
