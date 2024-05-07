@@ -5,6 +5,8 @@
 
 package com.datastrato.gravitino.integration.test.web.ui;
 
+import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.identity;
+
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.client.GravitinoAdminClient;
@@ -17,6 +19,14 @@ import com.datastrato.gravitino.integration.test.web.ui.pages.CatalogsPage;
 import com.datastrato.gravitino.integration.test.web.ui.pages.MetalakePage;
 import com.datastrato.gravitino.integration.test.web.ui.utils.AbstractWebIT;
 import com.datastrato.gravitino.rel.Column;
+import com.datastrato.gravitino.rel.expressions.NamedReference;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
+import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.Maps;
 import java.util.Arrays;
@@ -124,23 +134,38 @@ public class CatalogsPageTest extends AbstractWebIT {
    * @param catalogName The name of the Catalog where the table will be created.
    * @param schemaName The name of the Schema where the table will be created.
    * @param tableName The name of the Table to be created.
-   * @param colName The name of the Column to be created in the Table.
    */
-  void createTableAndColumn(
-      String metalakeName,
-      String catalogName,
-      String schemaName,
-      String tableName,
-      String colName) {
+  void createHiveTableAndColumn(
+      String metalakeName, String catalogName, String schemaName, String tableName) {
     Map<String, String> properties = Maps.newHashMap();
-    Column column = Column.of(colName, Types.IntegerType.get(), "column comment");
+    Column col1 = Column.of(COLUMN_NAME, Types.ByteType.get(), "col1 comment");
+    Column col2 = Column.of(COLUMN_NAME_2, Types.ByteType.get(), "col2 comment");
+    Column[] columns = new Column[] {col1, col2};
+    Distribution distribution = createDistribution();
+    SortOrder[] sortOrders = createSortOrder();
+    Transform[] partitions = new Transform[] {identity(col2.name())};
+
     catalog
         .asTableCatalog()
         .createTable(
             NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
-            new Column[] {column},
+            columns,
             "comment",
-            properties);
+            properties,
+            partitions,
+            distribution,
+            sortOrders);
+  }
+
+  private Distribution createDistribution() {
+    return Distributions.hash(10, NamedReference.field(COLUMN_NAME));
+  }
+
+  private SortOrder[] createSortOrder() {
+    return new SortOrders.SortImpl[] {
+      SortOrders.of(
+          NamedReference.field(COLUMN_NAME_2), SortDirection.DESCENDING, NullOrdering.NULLS_FIRST)
+    };
   }
 
   /**
@@ -392,8 +417,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   @Order(12)
   public void testClickSchemaLink() {
     // create table
-    createTableAndColumn(
-        METALAKE_NAME, MODIFIED_HIVE_CATALOG_NAME, SCHEMA_NAME, TABLE_NAME, COLUMN_NAME);
+    createHiveTableAndColumn(METALAKE_NAME, MODIFIED_HIVE_CATALOG_NAME, SCHEMA_NAME, TABLE_NAME);
     catalogsPage.clickSchemaLink(
         METALAKE_NAME, MODIFIED_HIVE_CATALOG_NAME, CATALOG_TYPE_RELATIONAL, SCHEMA_NAME);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(SCHEMA_TABLE_TITLE));
@@ -492,8 +516,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   @Test
   @Order(17)
   public void testTreeNodeRefresh() throws InterruptedException {
-    createTableAndColumn(
-        METALAKE_NAME, MODIFIED_HIVE_CATALOG_NAME, SCHEMA_NAME, TABLE_NAME_2, COLUMN_NAME_2);
+    createHiveTableAndColumn(METALAKE_NAME, MODIFIED_HIVE_CATALOG_NAME, SCHEMA_NAME, TABLE_NAME_2);
     String hiveNode =
         String.format(
             "{{%s}}{{%s}}{{%s}}",
