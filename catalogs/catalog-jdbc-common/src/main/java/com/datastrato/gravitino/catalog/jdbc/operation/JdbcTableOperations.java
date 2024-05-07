@@ -261,8 +261,9 @@ public abstract class JdbcTableOperations implements TableOperation {
 
   protected ResultSet getTables(Connection connection) throws SQLException {
     final DatabaseMetaData metaData = connection.getMetaData();
-    String databaseName = connection.getSchema();
-    return metaData.getTables(databaseName, databaseName, null, JdbcConnectorUtils.getTableTypes());
+    String catalogName = connection.getCatalog();
+    String schemaName = connection.getSchema();
+    return metaData.getTables(catalogName, schemaName, null, JdbcConnectorUtils.getTableTypes());
   }
 
   protected ResultSet getTable(Connection connection, String databaseName, String tableName)
