@@ -10,7 +10,6 @@ import com.datastrato.gravitino.catalog.jdbc.JdbcSchema;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.integration.test.container.PostgreSQLContainer;
 import com.datastrato.gravitino.integration.test.util.TestDatabaseName;
-import java.net.URI;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -33,7 +32,7 @@ public class PostgreSqlService {
 
     try {
       String jdbcUrl = postgreSQLContainer.getJdbcUrl(testDBName);
-      String database = new URI(jdbcUrl.substring(jdbcUrl.lastIndexOf("/") + 1)).getPath();
+      String database = testDBName.toString();
       this.connection = DriverManager.getConnection(jdbcUrl, username, password);
       connection.setCatalog(database);
       this.database = database;
