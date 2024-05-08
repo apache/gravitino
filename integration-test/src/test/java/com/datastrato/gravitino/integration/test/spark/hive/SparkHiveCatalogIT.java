@@ -82,7 +82,6 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
     checkPartitionDirExists(tableInfo);
   }
 
-  @Test
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   void testWriteHiveDynamicPartition(boolean isInsertOverWrite) {
