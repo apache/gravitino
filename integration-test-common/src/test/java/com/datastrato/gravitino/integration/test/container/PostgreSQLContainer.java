@@ -17,7 +17,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.StringUtils;
 import org.rnorth.ducttape.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -122,16 +121,12 @@ public class PostgreSQLContainer extends BaseContainer {
     return PASSWORD;
   }
 
-  /**
-   * getJdbcUrl without database name.
-   */
+  /** getJdbcUrl without database name. */
   public String getJdbcUrl() {
     return format("jdbc:postgresql://%s:%d/", getContainerIpAddress(), PG_PORT);
   }
 
-  /**
-   * getJdbcUrl with database name.
-   */
+  /** getJdbcUrl with database name. */
   public String getJdbcUrl(TestDatabaseName testDatabaseName) {
     return format("jdbc:postgresql://%s:%d/%s", getContainerIpAddress(), PG_PORT, testDatabaseName);
   }

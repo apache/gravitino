@@ -28,7 +28,6 @@ import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.util.Collections;
 import java.util.Map;
-import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -106,8 +105,7 @@ public class TestMultipleJDBCLoad extends AbstractIT {
 
     Map<String, String> mysqlConf = Maps.newHashMap();
 
-    mysqlConf.put(
-        JdbcConfig.JDBC_URL.getKey(), mySQLContainer.getJdbcUrl());
+    mysqlConf.put(JdbcConfig.JDBC_URL.getKey(), mySQLContainer.getJdbcUrl());
     mysqlConf.put(JdbcConfig.JDBC_DRIVER.getKey(), mySQLContainer.getDriverClassName(TEST_DB_NAME));
     mysqlConf.put(JdbcConfig.USERNAME.getKey(), mySQLContainer.getUsername());
     mysqlConf.put(JdbcConfig.PASSWORD.getKey(), mySQLContainer.getPassword());
