@@ -150,20 +150,17 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     metalake = loadMetalake;
   }
 
-  private void createCatalog() {
+  private void createCatalog() throws SQLException {
     Map<String, String> catalogProperties = Maps.newHashMap();
 
-    try {
-      String jdbcUrl = POSTGRESQL_CONTAINER.getJdbcUrl(TEST_DB_NAME);
-      catalogProperties.put(
-          JdbcConfig.JDBC_DRIVER.getKey(), POSTGRESQL_CONTAINER.getDriverClassName(TEST_DB_NAME));
-      catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
-      catalogProperties.put(JdbcConfig.JDBC_DATABASE.getKey(), TEST_DB_NAME.toString());
-      catalogProperties.put(JdbcConfig.USERNAME.getKey(), POSTGRESQL_CONTAINER.getUsername());
-      catalogProperties.put(JdbcConfig.PASSWORD.getKey(), POSTGRESQL_CONTAINER.getPassword());
-    } catch (SQLException e) {
-      throw new RuntimeException(e);
-    }
+    // FiXME: should get jdbcUrl without database name
+    String jdbcUrl = POSTGRESQL_CONTAINER.getJdbcUrl(TEST_DB_NAME);
+    catalogProperties.put(
+        JdbcConfig.JDBC_DRIVER.getKey(), POSTGRESQL_CONTAINER.getDriverClassName(TEST_DB_NAME));
+    catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
+    catalogProperties.put(JdbcConfig.JDBC_DATABASE.getKey(), TEST_DB_NAME.toString());
+    catalogProperties.put(JdbcConfig.USERNAME.getKey(), POSTGRESQL_CONTAINER.getUsername());
+    catalogProperties.put(JdbcConfig.PASSWORD.getKey(), POSTGRESQL_CONTAINER.getPassword());
 
     Catalog createdCatalog =
         metalake.createCatalog(
