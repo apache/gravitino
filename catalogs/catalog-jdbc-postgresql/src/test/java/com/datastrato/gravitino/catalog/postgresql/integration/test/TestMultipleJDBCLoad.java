@@ -88,7 +88,7 @@ public class TestMultipleJDBCLoad extends AbstractIT {
         client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
 
     Map<String, String> pgConf = Maps.newHashMap();
-    pgConf.put(JdbcConfig.JDBC_URL.getKey(), postgreSQLContainer.getJdbcUrl());
+    pgConf.put(JdbcConfig.JDBC_URL.getKey(), postgreSQLContainer.getJdbcUrl(TEST_DB_NAME));
     pgConf.put(JdbcConfig.JDBC_DATABASE.getKey(), TEST_DB_NAME.toString());
     pgConf.put(
         JdbcConfig.JDBC_DRIVER.getKey(), postgreSQLContainer.getDriverClassName(TEST_DB_NAME));
