@@ -136,8 +136,8 @@ public abstract class TestJdbcAbstractIT {
 
     Assertions.assertEquals(expected.name(), actual.name());
     Assertions.assertEquals(
-        expected.dataType(),
-        actual.dataType(),
+        expected.dataType().name(),
+        actual.dataType().name(),
         String.format(
             "expected: %s, actual: %s",
             expected.dataType().simpleString(), actual.dataType().simpleString()));

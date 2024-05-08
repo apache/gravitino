@@ -23,6 +23,7 @@ public class ObjectMapperProvider implements ContextResolver<ObjectMapper> {
             .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
             .configure(EnumFeature.WRITE_ENUMS_TO_LOWERCASE, true)
             .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
+            .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
             .build()
             .setSerializationInclusion(JsonInclude.Include.NON_NULL)
             .registerModule(new JavaTimeModule());

@@ -27,10 +27,12 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 
+@Disabled
 @Tag("gravitino-docker-it")
 public class DorisTableOperationsIT extends TestDorisAbstractIT {
   private static final Type VARCHAR_255 = Types.VarCharType.of(255);

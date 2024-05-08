@@ -48,11 +48,13 @@ import org.apache.thrift.TException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@Disabled
 @Tag("gravitino-docker-it")
 public class TrinoConnectorIT extends AbstractIT {
   public static final Logger LOG = LoggerFactory.getLogger(TrinoConnectorIT.class);

@@ -1,15 +1,15 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ *  Copyright 2024 Datastrato Pvt Ltd.
+ *  This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.integration.test.spark.hive;
+package com.datastrato.gravitino.spark.connector.integration.test.hive;
 
-import com.datastrato.gravitino.integration.test.spark.SparkCommonIT;
-import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
-import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo.SparkColumnInfo;
-import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
 import com.datastrato.gravitino.spark.connector.GravitinoSparkConfig;
 import com.datastrato.gravitino.spark.connector.hive.HivePropertiesConstants;
+import com.datastrato.gravitino.spark.connector.integration.test.SparkCommonIT;
+import com.datastrato.gravitino.spark.connector.integration.test.util.SparkTableInfo;
+import com.datastrato.gravitino.spark.connector.integration.test.util.SparkTableInfo.SparkColumnInfo;
+import com.datastrato.gravitino.spark.connector.integration.test.util.SparkTableInfoChecker;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.ArrayList;
