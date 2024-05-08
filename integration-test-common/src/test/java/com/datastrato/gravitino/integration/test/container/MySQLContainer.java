@@ -127,6 +127,10 @@ public class MySQLContainer extends BaseContainer {
     return PASSWORD;
   }
 
+  public String getJdbcUrl() {
+    return format("jdbc:mysql://%s:%d", getContainerIpAddress(), MYSQL_PORT);
+  }
+
   public String getJdbcUrl(TestDatabaseName testDatabaseName) {
     return format("jdbc:mysql://%s:%d/%s", getContainerIpAddress(), MYSQL_PORT, testDatabaseName);
   }
