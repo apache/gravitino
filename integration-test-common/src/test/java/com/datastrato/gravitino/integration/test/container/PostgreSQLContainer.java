@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
+ * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.integration.test.container;
@@ -17,19 +17,17 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.StringUtils;
 import org.rnorth.ducttape.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Container;
 import org.testcontainers.containers.Network;
 
-public class MySQLContainer extends BaseContainer {
-  public static final Logger LOG = LoggerFactory.getLogger(MySQLContainer.class);
-
-  public static final String DEFAULT_IMAGE = "mysql:8.0";
-  public static final String HOST_NAME = "gravitino-ci-mysql";
-  public static final int MYSQL_PORT = 3306;
+public class PostgreSQLContainer extends BaseContainer {
+  public static final Logger LOG = LoggerFactory.getLogger(PostgreSQLContainer.class);
+  public static final PGImageName DEFAULT_IMAGE = PGImageName.VERSION_13;
+  public static final String HOST_NAME = "gravitino-ci-pg";
+  public static final int PG_PORT = 5432;
   public static final String USER_NAME = "root";
   public static final String PASSWORD = "root";
 
@@ -37,7 +35,7 @@ public class MySQLContainer extends BaseContainer {
     return new Builder();
   }
 
-  protected MySQLContainer(
+  protected PostgreSQLContainer(
       String image,
       String hostName,
       Set<Integer> ports,
@@ -51,31 +49,25 @@ public class MySQLContainer extends BaseContainer {
   @Override
   protected void setupContainer() {
     super.setupContainer();
-    withLogConsumer(new PrintingContainerLog(format("%-14s| ", "MySQLContainer")));
+    withLogConsumer(new PrintingContainerLog(format("%-14s| ", "PostgreSQLContainer")));
   }
 
   @Override
   public void start() {
     super.start();
-    Preconditions.check("MySQL container startup failed!", checkContainerStatus(5));
+    Preconditions.check("PostgreSQL container startup failed!", checkContainerStatus(5));
   }
 
   @Override
   protected boolean checkContainerStatus(int retryLimit) {
     int nRetry = 0;
-    boolean isMySQLContainerReady = false;
+    boolean isPostgreSQLContainerReady = false;
     int sleepTimeMillis = 20_00;
     while (nRetry++ < retryLimit) {
       try {
         String[] commandAndArgs =
             new String[] {
-              "mysqladmin",
-              "ping",
-              "-h",
-              "localhost",
-              "-u",
-              getUsername(),
-              String.format("-p%s", getPassword())
+              "pg_isready", "-h", "localhost", "-U", getUsername(),
             };
         Container.ExecResult execResult = executeInContainer(commandAndArgs);
         if (execResult.getExitCode() != 0) {
@@ -87,12 +79,12 @@ public class MySQLContainer extends BaseContainer {
           LOG.error("stderr: {}", execResult.getStderr());
           LOG.error("stdout: {}", execResult.getStdout());
         } else {
-          LOG.info("MySQL container startup success!");
-          isMySQLContainerReady = true;
+          LOG.info("PostgreSQL container startup success!");
+          isPostgreSQLContainerReady = true;
           break;
         }
         LOG.info(
-            "MySQL container is not ready, recheck({}/{}) after {}ms",
+            "PostgreSQL container is not ready, recheck({}/{}) after {}ms",
             nRetry,
             retryLimit,
             sleepTimeMillis);
@@ -102,25 +94,22 @@ public class MySQLContainer extends BaseContainer {
       }
     }
 
-    return isMySQLContainerReady;
+    return isPostgreSQLContainerReady;
   }
 
   public void createDatabase(TestDatabaseName testDatabaseName) {
-    String mySQLJdbcUrl =
-        StringUtils.substring(
-            getJdbcUrl(testDatabaseName), 0, getJdbcUrl(testDatabaseName).lastIndexOf("/"));
-
-    // change password for root user, Gravitino API must set password in catalog properties
     try (Connection connection =
-            DriverManager.getConnection(mySQLJdbcUrl, USER_NAME, getPassword());
+            DriverManager.getConnection(getJdbcUrl(), getUsername(), getPassword());
         Statement statement = connection.createStatement()) {
 
-      String query = String.format("CREATE DATABASE IF NOT EXISTS %s;", testDatabaseName);
-      // FIXME: String, which is used in SQL, can be unsafe
+      String query = format("CREATE DATABASE %s;", testDatabaseName);
       statement.execute(query);
-      LOG.info(String.format("MySQL container database %s has been created", testDatabaseName));
-    } catch (Exception e) {
-      LOG.error(e.getMessage(), e);
+      LOG.info(format("PostgreSQL container database %s has been created", testDatabaseName));
+    } catch (SQLException e) {
+      if (e.getMessage()
+          .equals(String.format("ERROR: database \"%s\" already exists", testDatabaseName))) {
+        LOG.info("PostgreSQL Database {} already exists, skipping", testDatabaseName);
+      } else throw new RuntimeException(e);
     }
   }
 
@@ -132,12 +121,14 @@ public class MySQLContainer extends BaseContainer {
     return PASSWORD;
   }
 
+  /** getJdbcUrl without database name. */
   public String getJdbcUrl() {
-    return format("jdbc:mysql://%s:%d", getContainerIpAddress(), MYSQL_PORT);
+    return format("jdbc:postgresql://%s:%d/", getContainerIpAddress(), PG_PORT);
   }
 
+  /** getJdbcUrl with database name. */
   public String getJdbcUrl(TestDatabaseName testDatabaseName) {
-    return format("jdbc:mysql://%s:%d/%s", getContainerIpAddress(), MYSQL_PORT, testDatabaseName);
+    return format("jdbc:postgresql://%s:%d/%s", getContainerIpAddress(), PG_PORT, testDatabaseName);
   }
 
   public String getDriverClassName(TestDatabaseName testDatabaseName) throws SQLException {
@@ -145,17 +136,17 @@ public class MySQLContainer extends BaseContainer {
   }
 
   public static class Builder
-      extends BaseContainer.Builder<MySQLContainer.Builder, MySQLContainer> {
+      extends BaseContainer.Builder<PostgreSQLContainer.Builder, PostgreSQLContainer> {
 
     private Builder() {
-      this.image = DEFAULT_IMAGE;
+      this.image = DEFAULT_IMAGE.toString();
       this.hostName = HOST_NAME;
-      this.exposePorts = ImmutableSet.of(MYSQL_PORT);
+      this.exposePorts = ImmutableSet.of(PG_PORT);
     }
 
     @Override
-    public MySQLContainer build() {
-      return new MySQLContainer(
+    public PostgreSQLContainer build() {
+      return new PostgreSQLContainer(
           image, hostName, exposePorts, extraHosts, filesToMount, envVars, network);
     }
   }
