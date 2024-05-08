@@ -214,9 +214,18 @@ public class IsolatedClassLoader implements Closeable {
         || name.startsWith("org.apache.log4j")
         || name.startsWith("org.apache.logging.log4j")
         || name.startsWith("java.")
-        || (name.startsWith("com.datastrato.gravitino.")
-            && !name.startsWith("com.datastrato.gravitino.catalog.hive."))
+        || !isCatalogClass(name)
         || sharedClasses.stream().anyMatch(name::startsWith);
+  }
+
+  /**
+   * Checks if a given class name belongs to a catalog class.
+   *
+   * @param name The fully qualified class name.
+   * @return true if the class is a catalog class, false otherwise.
+   */
+  private boolean isCatalogClass(String name) {
+    return name.startsWith("com.datastrato.gravitino.catalog");
   }
 
   /**
