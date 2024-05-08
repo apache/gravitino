@@ -153,8 +153,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   private void createCatalog() throws SQLException {
     Map<String, String> catalogProperties = Maps.newHashMap();
 
-    // FiXME: should get jdbcUrl without database name
-    String jdbcUrl = POSTGRESQL_CONTAINER.getJdbcUrl(TEST_DB_NAME);
+    String jdbcUrl = POSTGRESQL_CONTAINER.getJdbcUrl();
     catalogProperties.put(
         JdbcConfig.JDBC_DRIVER.getKey(), POSTGRESQL_CONTAINER.getDriverClassName(TEST_DB_NAME));
     catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
