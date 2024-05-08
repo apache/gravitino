@@ -127,6 +127,16 @@ public class PostgreSQLContainer extends BaseContainer {
     return PASSWORD;
   }
 
+  /**
+   * getJdbcUrl without database name.
+   */
+  public String getJdbcUrl() {
+    return format("jdbc:postgresql://%s:%d/", getContainerIpAddress(), PG_PORT);
+  }
+
+  /**
+   * getJdbcUrl with database name.
+   */
   public String getJdbcUrl(TestDatabaseName testDatabaseName) {
     return format("jdbc:postgresql://%s:%d/%s", getContainerIpAddress(), PG_PORT, testDatabaseName);
   }
