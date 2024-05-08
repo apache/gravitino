@@ -23,6 +23,12 @@ package com.datastrato.gravitino.integration.test.util;
  *       AuditCatalogMysqlIT.
  *   <li>{@link #MYSQL_CATALOG_MYSQL_IT}: Represents the MySQL database used for testing the catalog
  *       integration with MySQL.
+ *   <li>{@link #PG_CATALOG_POSTGRESQL_IT}: Represents the PostgreSQL database for
+ *       CatalogPostgreSqlIT.
+ *   <li>{@link #PG_TEST_PG_CATALOG_MULTIPLE_JDBC_LOAD}: Represents the PostgreSQL database for
+ *       postgresql.integration.test.TestMultipleJDBCLoad.
+ *   <li>{@link #PG_TEST_ICEBERG_CATALOG_MULTIPLE_JDBC_LOAD}: Represents the PostgreSQL database for
+ *       lakehouse.iceberg.integration.test.TestMultipleJDBCLoad.
  * </ul>
  */
 public enum TestDatabaseName {
@@ -36,5 +42,34 @@ public enum TestDatabaseName {
   MYSQL_AUDIT_CATALOG_MYSQL_IT,
 
   /** Represents the MySQL database used for testing the catalog integration with MySQL. */
-  MYSQL_CATALOG_MYSQL_IT
+  MYSQL_CATALOG_MYSQL_IT,
+
+  /** Represents the PostgreSQL database for CatalogPostgreSqlIT. */
+  PG_CATALOG_POSTGRESQL_IT {
+    /** PostgreSQL only accept lowercase database name */
+    @Override
+    public String toString() {
+      return this.name().toLowerCase();
+    }
+  },
+
+  /** Represents the PostgreSQL database for postgresql.integration.test.TestMultipleJDBCLoad. */
+  PG_TEST_PG_CATALOG_MULTIPLE_JDBC_LOAD {
+    /** PostgreSQL only accept lowercase database name */
+    @Override
+    public String toString() {
+      return this.name().toLowerCase();
+    }
+  },
+
+  /**
+   * Represents the PostgreSQL database for lakehouse.iceberg.integration.test.TestMultipleJDBCLoad.
+   */
+  PG_TEST_ICEBERG_CATALOG_MULTIPLE_JDBC_LOAD {
+    /** PostgreSQL only accept lowercase database name */
+    @Override
+    public String toString() {
+      return this.name().toLowerCase();
+    }
+  },
 }
