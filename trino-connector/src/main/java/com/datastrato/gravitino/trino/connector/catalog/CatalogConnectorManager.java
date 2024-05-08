@@ -126,16 +126,14 @@ public class CatalogConnectorManager {
       GravitinoMetalake metalake;
       try {
         metalake = gravitinoClient.loadMetalake(NameIdentifier.ofMetalake(usedMetalake));
+
+        LOG.info("Load metalake: {}", usedMetalake);
+        loadCatalogs(metalake);
       } catch (NoSuchMetalakeException noSuchMetalakeException) {
         LOG.warn("Metalake {} does not exist.", usedMetalake);
-        continue;
       } catch (Exception e) {
         LOG.error("Load Metalake {} failed.", usedMetalake, e);
-        continue;
       }
-
-      LOG.info("Load metalake: {}", usedMetalake);
-      loadCatalogs(metalake);
     }
   }
 
@@ -167,7 +165,11 @@ public class CatalogConnectorManager {
           &&
           // Skip the catalog doesn't belong to this metalake.
           entry.getValue().getMetalake().name().equals(metalake.name())) {
-        unloadCatalog(metalake, entry.getKey());
+        try {
+          unloadCatalog(metalake, entry.getKey());
+        } catch (Exception e) {
+          LOG.error("Failed to remove catalog {}.", entry.getKey(), e);
+        }
       }
     }
 
