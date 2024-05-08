@@ -219,8 +219,7 @@ public class CatalogsPageDorisTest extends AbstractWebIT {
     // verify show table title、 schema name and tree node
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(CATALOG_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(SCHEMA_NAME_DORIS, false));
-    List<String> treeNodes =
-        Arrays.asList(DORIS_CATALOG_NAME, SCHEMA_NAME_DORIS);
+    List<String> treeNodes = Arrays.asList(DORIS_CATALOG_NAME, SCHEMA_NAME_DORIS);
     Assertions.assertTrue(catalogsPage.verifyTreeNodes(treeNodes));
   }
 
@@ -236,8 +235,7 @@ public class CatalogsPageDorisTest extends AbstractWebIT {
     // 2. verify show table title、 default schema name and tree node
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(SCHEMA_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TABLE_NAME, false));
-    List<String> treeNodes =
-        Arrays.asList(DORIS_CATALOG_NAME, SCHEMA_NAME_DORIS, TABLE_NAME);
+    List<String> treeNodes = Arrays.asList(DORIS_CATALOG_NAME, SCHEMA_NAME_DORIS, TABLE_NAME);
     Assertions.assertTrue(catalogsPage.verifyTreeNodes(treeNodes));
   }
 
