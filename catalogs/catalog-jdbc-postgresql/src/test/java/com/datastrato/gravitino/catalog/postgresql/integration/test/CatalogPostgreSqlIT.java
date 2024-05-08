@@ -843,7 +843,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   }
 
   @Test
-  void testColumnDefaultValueConverter() throws SQLException {
+  void testColumnDefaultValueConverter() {
     // test convert from MySQL to Gravitino
     String tableName = GravitinoITUtils.genRandomName("test_default_value");
     String fullTableName = String.format("%s.%s.%s", TEST_DB_NAME, schemaName, tableName);
@@ -1283,7 +1283,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   }
 
   @Test
-  void testUnparsedTypeConverter() throws SQLException {
+  void testUnparsedTypeConverter() {
     String tableName = GravitinoITUtils.genRandomName("test_unparsed_type");
     postgreSqlService.executeQuery(
         String.format("CREATE TABLE %s.%s (bit_col bit);", schemaName, tableName));

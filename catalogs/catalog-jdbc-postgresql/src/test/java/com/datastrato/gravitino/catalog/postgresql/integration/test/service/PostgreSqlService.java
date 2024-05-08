@@ -88,8 +88,11 @@ public class PostgreSqlService {
     }
   }
 
-  public void executeQuery(String sql) throws SQLException {
-    Statement statement = connection.createStatement();
-    statement.execute(sql);
+  public void executeQuery(String sql) {
+    try (Statement statement = connection.createStatement()) {
+      statement.execute(sql);
+    } catch (SQLException e) {
+      throw new RuntimeException(e);
+    }
   }
 }
