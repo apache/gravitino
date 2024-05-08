@@ -62,7 +62,6 @@ public class CatalogsPageDorisTest extends AbstractWebIT {
   public static final int FE_MYSQL_PORT = 9030;
 
   private static final String SCHEMA_NAME_DORIS = "schema_doris";
-  private static final String SCHEMA_DEFAULT_DORIS = "information_schema";
   private static final String TABLE_NAME = "table1";
   private static final String COLUMN_NAME = "col1";
   private static final String PROPERTIES_KEY1 = "key1";
@@ -221,7 +220,7 @@ public class CatalogsPageDorisTest extends AbstractWebIT {
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(CATALOG_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(SCHEMA_NAME_DORIS, false));
     List<String> treeNodes =
-        Arrays.asList(DORIS_CATALOG_NAME, SCHEMA_DEFAULT_DORIS, SCHEMA_NAME_DORIS);
+        Arrays.asList(DORIS_CATALOG_NAME, SCHEMA_NAME_DORIS);
     Assertions.assertTrue(catalogsPage.verifyTreeNodes(treeNodes));
   }
 
@@ -238,7 +237,7 @@ public class CatalogsPageDorisTest extends AbstractWebIT {
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(SCHEMA_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TABLE_NAME, false));
     List<String> treeNodes =
-        Arrays.asList(DORIS_CATALOG_NAME, SCHEMA_DEFAULT_DORIS, SCHEMA_NAME_DORIS, TABLE_NAME);
+        Arrays.asList(DORIS_CATALOG_NAME, SCHEMA_NAME_DORIS, TABLE_NAME);
     Assertions.assertTrue(catalogsPage.verifyTreeNodes(treeNodes));
   }
 
