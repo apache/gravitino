@@ -89,8 +89,7 @@ public class TestMultipleJDBCLoad extends AbstractIT {
         client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
 
     Map<String, String> pgConf = Maps.newHashMap();
-    String jdbcUrl = postgreSQLContainer.getJdbcUrl(TEST_DB_NAME);
-    pgConf.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
+    pgConf.put(JdbcConfig.JDBC_URL.getKey(), postgreSQLContainer.getJdbcUrl());
     pgConf.put(JdbcConfig.JDBC_DATABASE.getKey(), TEST_DB_NAME.toString());
     pgConf.put(
         JdbcConfig.JDBC_DRIVER.getKey(), postgreSQLContainer.getDriverClassName(TEST_DB_NAME));
@@ -108,11 +107,7 @@ public class TestMultipleJDBCLoad extends AbstractIT {
     Map<String, String> mysqlConf = Maps.newHashMap();
 
     mysqlConf.put(
-        JdbcConfig.JDBC_URL.getKey(),
-        StringUtils.substring(
-            mySQLContainer.getJdbcUrl(TEST_DB_NAME),
-            0,
-            mySQLContainer.getJdbcUrl(TEST_DB_NAME).lastIndexOf("/")));
+        JdbcConfig.JDBC_URL.getKey(), mySQLContainer.getJdbcUrl());
     mysqlConf.put(JdbcConfig.JDBC_DRIVER.getKey(), mySQLContainer.getDriverClassName(TEST_DB_NAME));
     mysqlConf.put(JdbcConfig.USERNAME.getKey(), mySQLContainer.getUsername());
     mysqlConf.put(JdbcConfig.PASSWORD.getKey(), mySQLContainer.getPassword());
