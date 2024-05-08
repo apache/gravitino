@@ -99,13 +99,8 @@ public class PostgreSQLContainer extends BaseContainer {
   }
 
   public void createDatabase(TestDatabaseName testDatabaseName) {
-    String pgJdbcUrl =
-        StringUtils.substring(
-                getJdbcUrl(testDatabaseName), 0, getJdbcUrl(testDatabaseName).lastIndexOf("/"))
-            + "/";
-
     try (Connection connection =
-            DriverManager.getConnection(pgJdbcUrl, getUsername(), getPassword());
+            DriverManager.getConnection(getJdbcUrl(), getUsername(), getPassword());
         Statement statement = connection.createStatement()) {
 
       String query = format("CREATE DATABASE %s;", testDatabaseName);
