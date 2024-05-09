@@ -38,7 +38,7 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
 
   private static final Type INT = Types.IntegerType.get();
 
-  private static final Integer DEFAULT_BUCKET_SIZE = 2;
+  private static final Integer DEFAULT_BUCKET_SIZE = 1;
 
   private static final String databaseName = GravitinoITUtils.genRandomName("doris_test_db");
 
