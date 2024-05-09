@@ -30,7 +30,6 @@ import org.mockserver.model.HttpRequest;
 
 public class TestKerberosClient extends TestGvfsBase {
 
-  @SuppressWarnings("JavaUtilDate")
   @BeforeAll
   public static void setup() {
     try {
