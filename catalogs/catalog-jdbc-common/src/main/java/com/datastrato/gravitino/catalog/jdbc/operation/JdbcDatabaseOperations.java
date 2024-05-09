@@ -7,7 +7,6 @@ package com.datastrato.gravitino.catalog.jdbc.operation;
 
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
-import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import java.sql.Connection;
@@ -57,8 +56,6 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
       LOG.info("Finished dropping database {}", databaseName);
     } catch (NoSuchSchemaException e) {
       return false;
-    } catch (GravitinoRuntimeException e) {
-      throw new RuntimeException("Failed to drop database " + databaseName, e);
     }
     return true;
   }

@@ -11,7 +11,6 @@ import com.datastrato.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueCon
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
-import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
 import com.datastrato.gravitino.exceptions.NoSuchColumnException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
@@ -104,8 +103,6 @@ public abstract class JdbcTableOperations implements TableOperation {
       LOG.info("Deleted table {} from database {}", tableName, databaseName);
     } catch (NoSuchTableException e) {
       return false;
-    } catch (GravitinoRuntimeException e) {
-      throw new RuntimeException("Failed to drop table " + tableName + " from " + databaseName, e);
     }
     return true;
   }
