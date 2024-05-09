@@ -225,7 +225,15 @@ public class IsolatedClassLoader implements Closeable {
    * @return true if the class is a catalog class, false otherwise.
    */
   private boolean isCatalogClass(String name) {
-    return name.startsWith("com.datastrato.gravitino.catalog");
+    return name.startsWith("com.datastrato.gravitino.catalog")
+        && (name.startsWith("com.datastrato.gravitino.catalog.hive.")
+            || name.startsWith("com.datastrato.gravitino.catalog.lakehouse.")
+            || name.startsWith("com.datastrato.gravitino.catalog.jdbc.")
+            || name.startsWith("com.datastrato.gravitino.catalog.mysql.")
+            || name.startsWith("com.datastrato.gravitino.catalog.postgresql.")
+            || name.startsWith("com.datastrato.gravitino.catalog.doris.")
+            || name.startsWith("com.datastrato.gravitino.catalog.hadoop.")
+            || name.startsWith("com.datastrato.gravitino.catalog.kafka."));
   }
 
   /**
