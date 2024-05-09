@@ -1610,6 +1610,8 @@ public class TestEntityStorage {
   private void validateDeleteGroup(EntityStore store, GroupEntity group1) throws IOException {
     Assertions.assertTrue(store.delete(group1.nameIdentifier(), EntityType.GROUP));
     Assertions.assertFalse(store.exists(group1.nameIdentifier(), Entity.EntityType.GROUP));
+    // delete again should return false
+    Assertions.assertFalse(store.delete(group1.nameIdentifier(), Entity.EntityType.GROUP));
 
     GroupEntity group =
         createGroup(RandomIdGenerator.INSTANCE.nextId(), "metalake", "group1", group1.auditInfo());
@@ -1620,6 +1622,8 @@ public class TestEntityStorage {
   private void validateDeleteRole(EntityStore store, RoleEntity role1) throws IOException {
     Assertions.assertTrue(store.delete(role1.nameIdentifier(), EntityType.ROLE));
     Assertions.assertFalse(store.exists(role1.nameIdentifier(), Entity.EntityType.ROLE));
+    // delete again should return false
+    Assertions.assertFalse(store.delete(role1.nameIdentifier(), Entity.EntityType.ROLE));
 
     RoleEntity role =
         createRole(RandomIdGenerator.INSTANCE.nextId(), "metalake", "role1", role1.auditInfo());
