@@ -19,6 +19,7 @@ import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.file.FilesetChange;
 import com.datastrato.gravitino.messaging.TopicChange;
 import com.datastrato.gravitino.rel.SchemaChange;
+import com.datastrato.gravitino.rel.SupportsPartitions;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.ThrowableFunction;
@@ -58,6 +59,24 @@ public abstract class OperationDispatcher {
     this.catalogManager = catalogManager;
     this.store = store;
     this.idGenerator = idGenerator;
+  }
+
+  <R, E extends Throwable> R doWithTable(
+      NameIdentifier tableIdent, ThrowableFunction<SupportsPartitions, R> fn, Class<E> ex)
+      throws E {
+    try {
+      NameIdentifier catalogIdent = getCatalogIdentifier(tableIdent);
+      CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(catalogIdent);
+      return c.doWithPartitionOps(tableIdent, fn);
+    } catch (Throwable throwable) {
+      if (ex.isInstance(throwable)) {
+        throw ex.cast(throwable);
+      }
+      if (RuntimeException.class.isAssignableFrom(throwable.getClass())) {
+        throw (RuntimeException) throwable;
+      }
+      throw new RuntimeException(throwable);
+    }
   }
 
   <R, E extends Throwable> R doWithCatalog(
