@@ -103,6 +103,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
       GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory =
           new GravitinoStoredProcedureFactory(catalogConnectorManager, metalake);
 
+      catalogConnectorManager.loadMetalakeSync();
       return new GravitinoSystemConnector(gravitinoStoredProcedureFactory);
     }
   }

@@ -17,6 +17,7 @@ import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.hive.HiveCatalog;
 import org.apache.iceberg.inmemory.InMemoryCatalog;
 import org.apache.iceberg.jdbc.JdbcCatalog;
+import org.apache.iceberg.rest.RESTCatalog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,6 +67,15 @@ public class IcebergCatalogUtil {
     return jdbcCatalog;
   }
 
+  private static Catalog loadRestCatalog(Map<String, String> properties) {
+    RESTCatalog restCatalog = new RESTCatalog();
+    HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
+    properties.forEach(hdfsConfiguration::set);
+    restCatalog.setConf(hdfsConfiguration);
+    restCatalog.initialize("rest", properties);
+    return restCatalog;
+  }
+
   public static Catalog loadCatalogBackend(String catalogType) {
     return loadCatalogBackend(catalogType, Collections.emptyMap());
   }
@@ -79,6 +89,8 @@ public class IcebergCatalogUtil {
         return loadHiveCatalog(properties);
       case JDBC:
         return loadJdbcCatalog(properties);
+      case REST:
+        return loadRestCatalog(properties);
       default:
         throw new RuntimeException(
             catalogType

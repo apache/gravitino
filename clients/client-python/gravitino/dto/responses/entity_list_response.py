@@ -3,7 +3,7 @@ Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
 from dataclasses import dataclass, field
-from typing import Optional, List
+from typing import List
 
 from dataclasses_json import config
 

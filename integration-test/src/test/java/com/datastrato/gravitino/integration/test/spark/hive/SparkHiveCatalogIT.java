@@ -23,6 +23,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @Tag("gravitino-docker-it")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -56,7 +58,7 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
   }
 
   @Test
-  public void testCreateHiveFormatPartitionTable() {
+  void testCreateHiveFormatPartitionTable() {
     String tableName = "hive_partition_table";
 
     dropTableIfExists(tableName);
@@ -80,8 +82,9 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
     checkPartitionDirExists(tableInfo);
   }
 
-  @Test
-  public void testWriteHiveDynamicPartition() {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testWriteHiveDynamicPartition(boolean isInsertOverWrite) {
     String tableName = "hive_dynamic_partition_table";
 
     dropTableIfExists(tableName);
@@ -94,7 +97,8 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
     // write data to dynamic partition
     String insertData =
         String.format(
-            "INSERT OVERWRITE %s PARTITION(age_p1=1, age_p2) values(1,'a',3,'b');", tableName);
+            "INSERT %s %s PARTITION(age_p1=1, age_p2) values(1,'a',3,'b');",
+            isInsertOverWrite ? "OVERWRITE" : "INTO", tableName);
     sql(insertData);
     List<String> queryResult = getTableData(tableName);
     Assertions.assertTrue(queryResult.size() == 1);
@@ -106,7 +110,7 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
   }
 
   @Test
-  public void testInsertHiveFormatPartitionTableAsSelect() {
+  void testInsertHiveFormatPartitionTableAsSelect() {
     String tableName = "insert_hive_partition_table";
     String newTableName = "new_" + tableName;
 
@@ -256,6 +260,30 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
               checkTableReadWrite(tableInfo);
               Assertions.assertTrue(tableInfo.getTableLocation().equals(hdfs.getUri() + location));
             });
+  }
+
+  @Test
+  void testHiveFormatWithUsingHive() {
+    String tableName = "test_hive_format_using_hive_table";
+    dropTableIfExists(tableName);
+    String createTableSql = getCreateSimpleTableString(tableName);
+    createTableSql += "USING HIVE";
+    sql(createTableSql);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withTableProperties(
+                ImmutableMap.of(
+                    HivePropertiesConstants.SPARK_HIVE_INPUT_FORMAT,
+                    HivePropertiesConstants.TEXT_INPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_OUTPUT_FORMAT,
+                    HivePropertiesConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS,
+                    HivePropertiesConstants.SPARK_HIVE_SERDE_LIB,
+                    HivePropertiesConstants.LAZY_SIMPLE_SERDE_CLASS));
+    checker.check(tableInfo);
+    checkTableReadWrite(tableInfo);
   }
 
   @Test

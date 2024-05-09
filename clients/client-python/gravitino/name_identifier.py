@@ -263,8 +263,7 @@ class NameIdentifier(DataClassJsonMixin):
     def __str__(self):
         if self.has_namespace():
             return str(self._namespace) + "." + self._name
-        else:
-            return self._name
+        return self._name
 
     @staticmethod
     def check(condition, message, *args):
