@@ -47,7 +47,7 @@ public class TestTopicNormalizeDispatcher extends TestOperationDispatcher {
 
     // test case-insensitive in listing
     NameIdentifier[] idents = topicNormalizeDispatcher.listTopics(topicNs);
-    Assertions.assertEquals(1, idents.length);
+    Assertions.assertEquals(topicIdent.name().toLowerCase(), idents[0].name());
 
     // test case-insensitive in altering
     Topic alteredTopic =
