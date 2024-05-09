@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
-import org.apache.spark.sql.AnalysisException;
+import org.apache.spark.sql.catalyst.ExtendedAnalysisException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
@@ -337,7 +337,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
     // rename a not existing tables
     Assertions.assertThrowsExactly(
-        AnalysisException.class, () -> sql("ALTER TABLE not_exists1 RENAME TO not_exist2"));
+        ExtendedAnalysisException.class, () -> sql("ALTER TABLE not_exists1 RENAME TO not_exist2"));
   }
 
   @Test

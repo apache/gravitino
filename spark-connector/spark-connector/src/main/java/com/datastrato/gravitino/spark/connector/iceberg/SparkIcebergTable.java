@@ -22,9 +22,7 @@ import org.apache.spark.sql.types.StructType;
  * Iceberg table, so the SparkIcebergTable must extend SparkTable.
  */
 public class SparkIcebergTable extends SparkTable {
-
   private GravitinoTableInfoHelper gravitinoTableInfoHelper;
-
   public SparkIcebergTable(
       Identifier identifier,
       Table gravitinoTable,

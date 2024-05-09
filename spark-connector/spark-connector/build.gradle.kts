@@ -14,10 +14,10 @@ repositories {
 }
 
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
-val sparkVersion: String = libs.versions.spark.get()
+val sparkVersion: String = "3.5.1"
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
-val icebergVersion: String = libs.versions.iceberg.get()
-val kyuubiVersion: String = libs.versions.kyuubi.get()
+val icebergVersion: String = "1.5.1"
+val kyuubiVersion: String = "1.9.0"
 val scalaJava8CompatVersion: String = libs.versions.scala.java.compat.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
