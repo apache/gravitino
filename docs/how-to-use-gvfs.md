@@ -40,20 +40,22 @@ the path mapping and convert automatically.
 
 ## Configuration
 
-| Configuration item                                    | Description                                                                                                                                                                                       | Default value | Required                          | Since version |
-|-------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|-----------------------------------|---------------|
-| `fs.AbstractFileSystem.gvfs.impl`                     | The Gravitino Virtual File System abstract class, set it to `com.datastrato.gravitino.filesystem.hadoop.Gvfs`.                                                                       | (none)        | Yes                               | 0.5.0         |
-| `fs.gvfs.impl`                                        | The Gravitino Virtual File System implementation class, set it to `com.datastrato.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem`.                                           | (none)        | Yes                               | 0.5.0         |
-| `fs.gvfs.impl.disable.cache`                          | Disable the Gravitino Virtual File System cache in the Hadoop environment. If you need to proxy multi-user operations, please set this value to `true` and create a separate File System for each user. | `false`       | No                                | 0.5.0         |
-| `fs.gravitino.server.uri`                             | The Gravitino server URI which GVFS needs to load the fileset metadata.                                                                                                                               | (none)        | Yes                               | 0.5.0         |
-| `fs.gravitino.client.metalake`                        | The metalake to which the fileset belongs.                                                                                                                                                               | (none)        | Yes                               | 0.5.0         |
-| `fs.gravitino.client.authType`                        | The auth type to initialize the Gravitino client to use with the Gravitino Virtual File System. Currently only supports `simple` and `oauth2` auth types.                                                             | `simple`      | No                                | 0.5.0         |
-| `fs.gravitino.client.oauth2.serverUri`                | The auth server URI for the Gravitino client when using `oauth2` auth type with the Gravitino Virtual File System.                                                                                     | (none)        | Yes if you use `oauth2` auth type | 0.5.0         |
-| `fs.gravitino.client.oauth2.credential`               | The auth credential for the Gravitino client when using `oauth2` auth type in the Gravitino Virtual File System.                                                                                     | (none)        | Yes if you use `oauth2` auth type | 0.5.0         |
-| `fs.gravitino.client.oauth2.path`                     | The auth server path for the Gravitino client when using `oauth2` auth type with the Gravitino Virtual File System. Please remove the first slash `/` from the path, for example `oauth/token`.            | (none)        | Yes if you use `oauth2` auth type | 0.5.0         |
-| `fs.gravitino.client.oauth2.scope`                    | The auth scope for the Gravitino client when using `oauth2` auth type with the Gravitino Virtual File System.                                                                                          | (none)        | Yes if you use `oauth2` auth type | 0.5.0         |
-| `fs.gravitino.fileset.cache.maxCapacity`              | The cache capacity of the Gravitino Virtual File System.                                                                                                                                          | `20`          | No                                | 0.5.0         |
-| `fs.gravitino.fileset.cache.evictionMillsAfterAccess` | The value of time that the cache expires after accessing in the Gravitino Virtual File System. The value is in `milliseconds`.                                                            | `300000`      | No                                | 0.5.0         |
+| Configuration item                                    | Description                                                                                                                                                                                             | Default value | Required                                              | Since version |
+|-------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|-------------------------------------------------------|---------------|
+| `fs.AbstractFileSystem.gvfs.impl`                     | The Gravitino Virtual File System abstract class, set it to `com.datastrato.gravitino.filesystem.hadoop.Gvfs`.                                                                                          | (none)        | Yes                                                   | 0.5.0         |
+| `fs.gvfs.impl`                                        | The Gravitino Virtual File System implementation class, set it to `com.datastrato.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem`.                                                              | (none)        | Yes                                                   | 0.5.0         |
+| `fs.gvfs.impl.disable.cache`                          | Disable the Gravitino Virtual File System cache in the Hadoop environment. If you need to proxy multi-user operations, please set this value to `true` and create a separate File System for each user. | `false`       | No                                                    | 0.5.0         |
+| `fs.gravitino.server.uri`                             | The Gravitino server URI which GVFS needs to load the fileset metadata.                                                                                                                                 | (none)        | Yes                                                   | 0.5.0         |
+| `fs.gravitino.client.metalake`                        | The metalake to which the fileset belongs.                                                                                                                                                              | (none)        | Yes                                                   | 0.5.0         |
+| `fs.gravitino.client.authType`                        | The auth type to initialize the Gravitino client to use with the Gravitino Virtual File System. Currently only supports `simple`, `oauth2` and `kerberos` auth types.                                   | `simple`      | No                                                    | 0.5.0         |
+| `fs.gravitino.client.oauth2.serverUri`                | The auth server URI for the Gravitino client when using `oauth2` auth type with the Gravitino Virtual File System.                                                                                      | (none)        | Yes if you use `oauth2` auth type                     | 0.5.0         |
+| `fs.gravitino.client.oauth2.credential`               | The auth credential for the Gravitino client when using `oauth2` auth type in the Gravitino Virtual File System.                                                                                        | (none)        | Yes if you use `oauth2` auth type                     | 0.5.0         |
+| `fs.gravitino.client.oauth2.path`                     | The auth server path for the Gravitino client when using `oauth2` auth type with the Gravitino Virtual File System. Please remove the first slash `/` from the path, for example `oauth/token`.         | (none)        | Yes if you use `oauth2` auth type                     | 0.5.0         |
+| `fs.gravitino.client.oauth2.scope`                    | The auth scope for the Gravitino client when using `oauth2` auth type with the Gravitino Virtual File System.                                                                                           | (none)        | Yes if you use `oauth2` auth type                     | 0.5.0         |
+| `fs.gravitino.client.kerberos.principal`              | The auth principal for the Gravitino client when using `kerberos` auth type with the Gravitino Virtual File System.                                                                                     | (none)        | Yes if you use `kerberos` auth type                   | 0.5.1         |
+| `fs.gravitino.client.kerberos.keytabFilePath`         | The auth keytab file path for the Gravitino client when using `kerberos` auth type in the Gravitino Virtual File System.                                                                                | (none)        | Yes if you use `kerberos` auth type and not use `TGT` | 0.5.1         |
+| `fs.gravitino.fileset.cache.maxCapacity`              | The cache capacity of the Gravitino Virtual File System.                                                                                                                                                | `20`          | No                                                    | 0.5.0         |
+| `fs.gravitino.fileset.cache.evictionMillsAfterAccess` | The value of time that the cache expires after accessing in the Gravitino Virtual File System. The value is in `milliseconds`.                                                                          | `300000`      | No                                                    | 0.5.0         |
 
 You can configure these properties in two ways:
 
@@ -280,6 +282,28 @@ conf.set("fs.gravitino.client.oauth2.serverUri", "${your_oauth_server_uri}");
 conf.set("fs.gravitino.client.oauth2.credential", "${your_client_credential}");
 conf.set("fs.gravitino.client.oauth2.path", "${your_oauth_server_path}");
 conf.set("fs.gravitino.client.oauth2.scope", "${your_client_scope}");
+Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_fileset_1");
+FileSystem fs = filesetPath.getFileSystem(conf);
+```
+
+#### Using `Kerberos` authentication
+
+If you want to use `kerberos` authentication for the Gravitino client in the Gravitino Virtual File System,
+please refer to this document to complete the configuration of the Gravitino server: [Security](./security.md).
+
+Then, you can configure the Hadoop configuration like this:
+
+```java
+Configuration conf = new Configuration();
+conf.set("fs.AbstractFileSystem.gvfs.impl","com.datastrato.gravitino.filesystem.hadoop.Gvfs");
+conf.set("fs.gvfs.impl","com.datastrato.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
+conf.set("fs.gravitino.server.uri","http://localhost:8090");
+conf.set("fs.gravitino.client.metalake","test_metalake");
+// Configure the auth type to kerberos.
+conf.set("fs.gravitino.client.authType", "kerberos");
+// Configure the Kerberos configuration.
+conf.set("fs.gravitino.client.kerberos.principal", "${your_kerberos_principal}");
+conf.set("fs.gravitino.client.kerberos.keytabFilePath", "${your_kerberos_keytab}");
 Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_fileset_1");
 FileSystem fs = filesetPath.getFileSystem(conf);
 ```
