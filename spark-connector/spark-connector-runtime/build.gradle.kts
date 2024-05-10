@@ -29,7 +29,6 @@ tasks.withType<ShadowJar>(ShadowJar::class.java) {
   relocate("com.google", "com.datastrato.gravitino.shaded.com.google")
   relocate("google", "com.datastrato.gravitino.shaded.google")
   relocate("org.apache.hc", "com.datastrato.gravitino.shaded.org.apache.hc")
-  relocate("org.apache.logging.slf4j", "com.datastrato.gravitino.shaded.org.apache.logging.slf4j")
 }
 
 tasks.jar {
