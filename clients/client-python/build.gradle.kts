@@ -38,7 +38,15 @@ tasks {
     args = listOf("install", "-e", ".[dev]")
   }
 
+  val black by registering(VenvTask::class) {
+    dependsOn(pipInstall)
+    venvExec = "black"
+    args = listOf("./gravitino", "./tests")
+  }
+
   val pylint by registering(VenvTask::class) {
+    dependsOn(pipInstall)
+    mustRunAfter(black)
     venvExec = "pylint"
     args = listOf("./gravitino", "./tests")
   }
@@ -50,7 +58,6 @@ tasks {
         gravitinoServer("start")
       }
 
-      dependsOn(pipInstall, pylint)
       venvExec = "python"
       args = listOf("-m", "unittest")
       workingDir = projectDir.resolve(".")
@@ -67,7 +74,6 @@ tasks {
   }
 
   val build by registering(VenvTask::class) {
-    dependsOn(pipInstall, pylint)
   }
 
   val clean by registering(Delete::class) {
@@ -78,5 +84,12 @@ tasks {
       deleteCacheDir(".pytest_cache")
       deleteCacheDir("__pycache__")
     }
+  }
+
+  matching {
+    it.name.endsWith("envSetup")
+  }.all {
+    // add install package and code formatting before any tasks
+    finalizedBy(pipInstall, black, pylint)
   }
 }
