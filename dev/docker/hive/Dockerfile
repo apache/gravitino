@@ -3,32 +3,13 @@
 # This software is licensed under the Apache License version 2.
 #
 
-FROM ubuntu:16.04 AS packages
+FROM ubuntu:16.04
+LABEL maintainer="support@datastrato.com"
 
 ARG HADOOP_PACKAGE_NAME
 ARG HIVE_PACKAGE_NAME
 ARG JDBC_DIVER_PACKAGE_NAME
 ARG DEBIAN_FRONTEND=noninteractive
-
-COPY packages /tmp/packages
-
-ENV JAVA_HOME=/usr/local/jdk
-ENV HIVE_HOME=/usr/local/hive
-ENV HADOOP_HOME=/usr/local/hadoop
-
-# hadoop
-RUN mkdir ${HADOOP_HOME}
-RUN tar -xz -C ${HADOOP_HOME} --strip-components 1 -f /tmp/packages/${HADOOP_PACKAGE_NAME} && rm -rf /tmp/packages/${HADOOP_PACKAGE_NAME}
-
-# hive
-RUN mkdir ${HIVE_HOME}
-RUN tar -xz -C ${HIVE_HOME} --strip-components 1 -f /tmp/packages/${HIVE_PACKAGE_NAME} && rm -rf /tmp/packages/${HIVE_PACKAGE_NAME}
-
-# add mysql jdbc driver
-RUN tar -xz -C ${HIVE_HOME}/lib --strip-components 1 -f /tmp/packages/${JDBC_DIVER_PACKAGE_NAME} && rm -rf /tmp/packages/${JDBC_DIVER_PACKAGE_NAME}
-
-FROM ubuntu:16.04
-LABEL maintainer="support@datastrato.com"
 
 WORKDIR /
 
@@ -63,6 +44,8 @@ RUN apt-get update && apt-get upgrade -y && apt-get install --fix-missing -yq \
 ## setup ssh
 RUN mkdir /root/.ssh
 RUN cat /dev/zero | ssh-keygen -q -N "" > /dev/null && cat /root/.ssh/id_rsa.pub > /root/.ssh/authorized_keys
+
+COPY packages /tmp/packages
 
 ################################################################################
 # set environment variables
@@ -107,7 +90,8 @@ RUN echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}" >> /etc/environment
 
 ################################################################################
 # install hadoop
-COPY --from=packages ${HADOOP_HOME} ${HADOOP_HOME}
+RUN mkdir ${HADOOP_HOME}
+RUN tar -xz -C ${HADOOP_HOME} --strip-components 1 -f /tmp/packages/${HADOOP_PACKAGE_NAME}
 
 # replace configuration templates
 RUN rm -f ${HADOOP_CONF_DIR}/core-site.xml
@@ -126,7 +110,8 @@ RUN ${HADOOP_HOME}/bin/hdfs namenode -format -nonInteractive
 
 ################################################################################
 # install hive
-COPY --from=packages ${HIVE_HOME} ${HIVE_HOME}
+RUN mkdir ${HIVE_HOME}
+RUN tar -xz -C ${HIVE_HOME} --strip-components 1 -f /tmp/packages/${HIVE_PACKAGE_NAME}
 ADD hive-site.xml ${HIVE_HOME}/conf/hive-site.xml
 
 ################################################################################
@@ -134,11 +119,15 @@ ADD hive-site.xml ${HIVE_HOME}/conf/hive-site.xml
 ENV MYSQL_PWD=ds123
 RUN echo "mysql-server mysql-server/root_password password ${MYSQL_PWD}" | debconf-set-selections
 RUN echo "mysql-server mysql-server/root_password_again password ${MYSQL_PWD}" | debconf-set-selections
-RUN apt-get install -y mysql-server && rm -rf /var/lib/apt/lists/*
+RUN apt-get install -y mysql-server
 
 RUN chown -R mysql:mysql /var/lib/mysql
 RUN usermod -d /var/lib/mysql/ mysql
 RUN sed -i "s/.*bind-address.*/bind-address = 0.0.0.0/" /etc/mysql/mysql.conf.d/mysqld.cnf
+
+################################################################################
+# add mysql jdbc driver
+RUN tar -xz -C ${HIVE_HOME}/lib --strip-components 1 -f /tmp/packages/${JDBC_DIVER_PACKAGE_NAME}
 
 ################################################################################
 # add users and groups
@@ -154,6 +143,11 @@ RUN usermod -a -G mapred datastrato
 
 RUN mkdir /home/datastrato
 RUN chown -R datastrato:hadoop /home/datastrato
+
+################################################################################
+# removed install packages and cache
+RUN rm -rf /tmp/packages
+RUN rm -rf /var/lib/apt/lists/*
 
 ################################################################################
 # expose port
