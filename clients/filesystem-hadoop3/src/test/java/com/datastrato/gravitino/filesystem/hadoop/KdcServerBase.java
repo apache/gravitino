@@ -12,7 +12,7 @@ import org.apache.hadoop.minikdc.KerberosSecurityTestcase;
 public class KdcServerBase extends KerberosSecurityTestcase {
   private static final KerberosSecurityTestcase INSTANCE = new KerberosSecurityTestcase();
   private static final String CLIENT_PRINCIPAL = "client@EXAMPLE.COM";
-  private static final String SERVER_PRINCIPAL = "HTTP/127.0.0.1@EXAMPLE.COM";
+  private static final String SERVER_PRINCIPAL = "HTTP/localhost@EXAMPLE.COM";
   private static final String KEYTAB_FILE =
       new File(System.getProperty("test.dir", "target"), UUID.randomUUID().toString())
           .getAbsolutePath();
