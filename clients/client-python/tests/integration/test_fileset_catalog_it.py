@@ -18,7 +18,7 @@ from tests.integration.integration_test_env import IntegrationTestEnv
 logger = logging.getLogger(__name__)
 
 
-class TestFilesetCatalog(IntegrationTestEnv):
+class TestFilesetCatalogIT(IntegrationTestEnv):
     metalake_name: str = "TestFilesetCatalog-metalake" + str(randint(1, 10000))
     catalog_name: str = "catalog"
     catalog_location_pcatarop: str = "location"  # Fileset Catalog must set `location`

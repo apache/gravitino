@@ -10,7 +10,6 @@ from gravitino.client.gravitino_admin_client import GravitinoAdminClient
 from gravitino.client.gravitino_metalake import GravitinoMetalake
 from gravitino.dto.dto_converters import DTOConverters
 from gravitino.dto.requests.metalake_updates_request import MetalakeUpdatesRequest
-from gravitino.dto.responses.metalake_response import MetalakeResponse
 from gravitino.api.metalake_change import MetalakeChange
 from gravitino.name_identifier import NameIdentifier
 from tests.integration.integration_test_env import IntegrationTestEnv
@@ -18,7 +17,7 @@ from tests.integration.integration_test_env import IntegrationTestEnv
 logger = logging.getLogger(__name__)
 
 
-class TestMetalake(IntegrationTestEnv):
+class TestMetalakeIT(IntegrationTestEnv):
     metalake_name: str = "TestMetalake-metalake"
     metalake_new_name = metalake_name + "_new"
 
@@ -112,35 +111,6 @@ class TestMetalake(IntegrationTestEnv):
             '{"@type": "updateComment", "newComment": "new metalake comment"}]}'
         )
         self.assertEqual(updates_request.to_json(), valid_json)
-
-    def test_from_json_metalake_response(self):
-        str_json = (
-            b'{"code":0,"metalake":{"name":"example_name18","comment":"This is a sample comment",'
-            b'"properties":{"key1":"value1","key2":"value2"},'
-            b'"audit":{"creator":"anonymous","createTime":"2024-04-05T10:10:35.218Z"}}}'
-        )
-        metalake_response = MetalakeResponse.from_json(str_json, infer_missing=True)
-        self.assertEqual(metalake_response.code(), 0)
-        self.assertIsNotNone(metalake_response._metalake)
-        self.assertEqual(metalake_response._metalake.name(), "example_name18")
-        self.assertEqual(
-            metalake_response._metalake.audit_info().creator(), "anonymous"
-        )
-
-    def test_from_error_json_metalake_response(self):
-        str_json = (
-            b'{"code":0, "undefine-key1":"undefine-value1", '
-            b'"metalake":{"undefine-key2":1, "name":"example_name18","comment":"This is a sample comment",'
-            b'"properties":{"key1":"value1","key2":"value2"},'
-            b'"audit":{"creator":"anonymous","createTime":"2024-04-05T10:10:35.218Z"}}}'
-        )
-        metalake_response = MetalakeResponse.from_json(str_json, infer_missing=True)
-        self.assertEqual(metalake_response.code(), 0)
-        self.assertIsNotNone(metalake_response._metalake)
-        self.assertEqual(metalake_response._metalake.name(), "example_name18")
-        self.assertEqual(
-            metalake_response._metalake.audit_info().creator(), "anonymous"
-        )
 
     def test_list_metalakes(self):
         self.create_metalake(self.metalake_name)

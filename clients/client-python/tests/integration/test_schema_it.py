@@ -18,7 +18,7 @@ from tests.integration.integration_test_env import IntegrationTestEnv
 logger = logging.getLogger(__name__)
 
 
-class TestSchema(IntegrationTestEnv):
+class TestSchemaIT(IntegrationTestEnv):
     metalake_name: str = "TestSchema-metalake" + str(randint(1, 10000))
 
     catalog_name: str = "testCatalog"
