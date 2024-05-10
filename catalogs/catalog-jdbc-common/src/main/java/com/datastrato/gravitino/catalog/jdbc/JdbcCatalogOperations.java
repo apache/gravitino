@@ -298,6 +298,8 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         .withComment(comment)
         .withProperties(properties)
         .withIndexes(load.index())
+        .withTablePartitionOperations(
+            tableOperation.createJdbcTablePartitionOperations(databaseName, tableName))
         .build();
   }
 

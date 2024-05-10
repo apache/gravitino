@@ -11,6 +11,7 @@ import com.datastrato.gravitino.catalog.doris.utils.DorisUtils;
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
+import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTablePartitionOperations;
 import com.datastrato.gravitino.exceptions.NoSuchColumnException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
@@ -66,6 +67,12 @@ public class DorisTableOperations extends JdbcTableOperations {
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
     }
+  }
+
+  @Override
+  public JdbcTablePartitionOperations createJdbcTablePartitionOperations(
+      String databaseName, String tableName) {
+    return new DorisTablePartitionOperations(exceptionMapper, dataSource, databaseName, tableName);
   }
 
   @Override

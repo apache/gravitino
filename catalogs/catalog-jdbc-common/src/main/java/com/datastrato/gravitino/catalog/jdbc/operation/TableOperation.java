@@ -100,4 +100,9 @@ public interface TableOperation {
    * @param tableName The name of the table.
    */
   void purge(String databaseName, String tableName) throws NoSuchTableException;
+
+  default JdbcTablePartitionOperations createJdbcTablePartitionOperations(
+      String databaseName, String tableName) {
+    throw new UnsupportedOperationException("Table partition operation is not supported yet");
+  }
 }

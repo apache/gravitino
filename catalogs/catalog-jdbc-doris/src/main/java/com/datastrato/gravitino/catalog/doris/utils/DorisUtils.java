@@ -11,6 +11,8 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public final class DorisUtils {
+  private static final String PARTITION_BY = "PARTITION BY";
+
   private DorisUtils() {}
 
   // convert Map<String, String> properties to SQL String
@@ -50,5 +52,25 @@ public final class DorisUtils {
       }
     }
     return properties;
+  }
+
+  public static PartitionType extractPartitionTypeFromSql(String createTableSql) {
+    String[] lines = createTableSql.split("\n");
+    for (String line: lines) {
+      if (line.contains(PARTITION_BY)) {
+        try {
+          return PartitionType.valueOf(line.substring(PARTITION_BY.length() + 1, line.indexOf("(")).toUpperCase());
+        } catch (Exception e) {
+          return PartitionType.NONE;
+        }
+      }
+    }
+    return PartitionType.NONE;
+  }
+
+  enum PartitionType {
+    RANGE,
+    LIST,
+    NONE
   }
 }
