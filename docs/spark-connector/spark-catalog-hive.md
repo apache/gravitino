@@ -55,9 +55,11 @@ SELECT * FROM employees WHERE department = 'Engineering';
 
 ## Catalog properties
 
-| Gravitino catalog property name | Spark catalog property name | Description                | Since Version |
-|---------------------------------|-----------------------------|----------------------------|---------------|
-| `metastore.uris`                | `hive.metastore.uris`       | Hive metastore uri address | 0.5.0         |
+Gravitino spark connector will transform below property names which are defined in catalog properties to Spark Hive connector configuration.
+
+| Property name in Gravitino catalog properties | Spark Hive connector configuration | Description                | Since Version |
+|-----------------------------------------------|------------------------------------|----------------------------|---------------|
+| `metastore.uris`                              | `hive.metastore.uris`              | Hive metastore uri address | 0.5.0         |
 
 Gravitino catalog property names with the prefix `spark.bypass.` are passed to Spark Hive connector. For example, using `spark.bypass.hive.exec.dynamic.partition.mode` to pass the `hive.exec.dynamic.partition.mode` to the Spark Hive connector.
 
