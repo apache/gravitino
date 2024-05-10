@@ -62,7 +62,7 @@ public class HivePropertiesConverter implements PropertiesConverter {
           HivePropertiesConstants.SPARK_HIVE_LOCATION);
 
   @Override
-  public Map<String, String> transformSparkCatalogProperties(Map<String, String> properties) {
+  public Map<String, String> toSparkCatalogProperties(Map<String, String> properties) {
     Preconditions.checkArgument(properties != null, "Hive Catalog properties should not be null");
     String metastoreUri = properties.get(GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI);
     Preconditions.checkArgument(

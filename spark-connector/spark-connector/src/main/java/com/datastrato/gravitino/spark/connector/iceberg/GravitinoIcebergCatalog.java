@@ -33,7 +33,7 @@ public class GravitinoIcebergCatalog extends BaseCatalog implements FunctionCata
   protected TableCatalog createAndInitSparkCatalog(
       String name, CaseInsensitiveStringMap options, Map<String, String> properties) {
     Map<String, String> all =
-        IcebergPropertiesConverter.getInstance().toSparkCatalogProperties(options, properties);
+        getPropertiesConverter().toSparkCatalogProperties(options, properties);
     TableCatalog icebergCatalog = new SparkCatalog();
     icebergCatalog.initialize(name, new CaseInsensitiveStringMap(all));
     return icebergCatalog;

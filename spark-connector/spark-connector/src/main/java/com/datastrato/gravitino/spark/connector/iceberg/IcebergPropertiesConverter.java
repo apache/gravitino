@@ -26,7 +26,7 @@ public class IcebergPropertiesConverter implements PropertiesConverter {
   }
 
   @Override
-  public Map<String, String> transformSparkCatalogProperties(Map<String, String> properties) {
+  public Map<String, String> toSparkCatalogProperties(Map<String, String> properties) {
     Preconditions.checkArgument(
         properties != null, "Iceberg Catalog properties should not be null");
 
@@ -101,25 +101,26 @@ public class IcebergPropertiesConverter implements PropertiesConverter {
         "Couldn't get "
             + IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE
             + " from Iceberg Catalog properties");
-    String jdbcUser = gravitinoProperties.get(IcebergPropertiesConstants.GRAVITINO_JDBC_USER);
+    String jdbcUser =
+        gravitinoProperties.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_JDBC_USER);
     Preconditions.checkArgument(
         StringUtils.isNotBlank(jdbcUser),
         "Couldn't get "
-            + IcebergPropertiesConstants.GRAVITINO_JDBC_USER
+            + IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_JDBC_USER
             + " from Iceberg Catalog properties");
     String jdbcPassword =
-        gravitinoProperties.get(IcebergPropertiesConstants.GRAVITINO_JDBC_PASSWORD);
+        gravitinoProperties.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_JDBC_PASSWORD);
     Preconditions.checkArgument(
         StringUtils.isNotBlank(jdbcPassword),
         "Couldn't get "
-            + IcebergPropertiesConstants.GRAVITINO_JDBC_PASSWORD
+            + IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_JDBC_PASSWORD
             + " from Iceberg Catalog properties");
     icebergProperties.put(
         IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE,
         IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_JDBC);
     icebergProperties.put(IcebergPropertiesConstants.ICEBERG_CATALOG_URI, jdbcUri);
     icebergProperties.put(IcebergPropertiesConstants.ICEBERG_CATALOG_WAREHOUSE, jdbcWarehouse);
-    icebergProperties.put(IcebergPropertiesConstants.ICEBERG_JDBC_USER, jdbcUser);
-    icebergProperties.put(IcebergPropertiesConstants.ICEBERG_JDBC_PASSWORD, jdbcPassword);
+    icebergProperties.put(IcebergPropertiesConstants.ICEBERG_CATALOG_JDBC_USER, jdbcUser);
+    icebergProperties.put(IcebergPropertiesConstants.ICEBERG_CATALOG_JDBC_PASSWORD, jdbcPassword);
   }
 }

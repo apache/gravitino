@@ -5,14 +5,14 @@
 
 package com.datastrato.gravitino.spark.connector;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
 /** Interface for transforming properties between Gravitino and Spark. */
 public interface PropertiesConverter {
-
-  public static final String SPARK_PROPERTY_PREFIX = "spark.bypass.";
+  @VisibleForTesting String SPARK_PROPERTY_PREFIX = "spark.bypass.";
 
   /**
    * Converts properties from application provided properties and Gravitino catalog properties to
@@ -38,7 +38,7 @@ public interface PropertiesConverter {
           });
     }
 
-    Map<String, String> transformedProperties = transformSparkCatalogProperties(properties);
+    Map<String, String> transformedProperties = toSparkCatalogProperties(properties);
     if (transformedProperties != null) {
       all.putAll(transformedProperties);
     }
@@ -58,7 +58,7 @@ public interface PropertiesConverter {
    * @param properties Gravitino catalog properties.
    * @return properties for the Spark connector.
    */
-  Map<String, String> transformSparkCatalogProperties(Map<String, String> properties);
+  Map<String, String> toSparkCatalogProperties(Map<String, String> properties);
 
   /**
    * Converts Spark table properties to Gravitino table properties.

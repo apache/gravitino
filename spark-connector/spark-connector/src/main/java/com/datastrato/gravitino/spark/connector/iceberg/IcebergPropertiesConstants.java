@@ -28,12 +28,14 @@ public class IcebergPropertiesConstants {
 
   static final String ICEBERG_CATALOG_URI = CatalogProperties.URI;
 
-  static final String GRAVITINO_JDBC_USER = IcebergCatalogPropertiesMetadata.GRAVITINO_JDBC_USER;
-  static final String ICEBERG_JDBC_USER = IcebergCatalogPropertiesMetadata.ICEBERG_JDBC_USER;
+  static final String GRAVITINO_ICEBERG_CATALOG_JDBC_USER =
+      IcebergCatalogPropertiesMetadata.GRAVITINO_JDBC_USER;
+  static final String ICEBERG_CATALOG_JDBC_USER =
+      IcebergCatalogPropertiesMetadata.ICEBERG_JDBC_USER;
 
-  static final String GRAVITINO_JDBC_PASSWORD =
+  static final String GRAVITINO_ICEBERG_CATALOG_JDBC_PASSWORD =
       IcebergCatalogPropertiesMetadata.GRAVITINO_JDBC_PASSWORD;
-  static final String ICEBERG_JDBC_PASSWORD =
+  static final String ICEBERG_CATALOG_JDBC_PASSWORD =
       IcebergCatalogPropertiesMetadata.ICEBERG_JDBC_PASSWORD;
 
   static final String GRAVITINO_ICEBERG_CATALOG_BACKEND_HIVE = "hive";

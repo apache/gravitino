@@ -59,7 +59,7 @@ SELECT * FROM employees WHERE department = 'Engineering';
 |---------------------------------|-----------------------------|----------------------------|---------------|
 | `metastore.uris`                | `hive.metastore.uris`       | Hive metastore uri address | 0.5.0         |
 
-Catalog properties with prefix `spark.bypass.` are passed to Spark Hive connector. For example, using `spark.bypass.config.resources` to pass the `config.resources` to the Spark Hive connector.
+Gravitino catalog property names with the prefix `spark.bypass.` are passed to Spark Hive connector. For example, using `spark.bypass.hive.exec.dynamic.partition.mode` to pass the `hive.exec.dynamic.partition.mode` to the Spark Hive connector.
 
 
 :::caution

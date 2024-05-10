@@ -17,7 +17,7 @@ public class TestIcebergPropertiesConverter {
   @Test
   void testCatalogPropertiesWithHiveBackend() {
     Map<String, String> properties =
-        icebergPropertiesConverter.transformSparkCatalogProperties(
+        icebergPropertiesConverter.toSparkCatalogProperties(
             ImmutableMap.of(
                 IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
                 IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND_HIVE,
@@ -41,7 +41,7 @@ public class TestIcebergPropertiesConverter {
   @Test
   void testCatalogPropertiesWithJdbcBackend() {
     Map<String, String> properties =
-        icebergPropertiesConverter.transformSparkCatalogProperties(
+        icebergPropertiesConverter.toSparkCatalogProperties(
             ImmutableMap.of(
                 IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
                 IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_JDBC,
@@ -49,9 +49,9 @@ public class TestIcebergPropertiesConverter {
                 "jdbc-uri",
                 IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE,
                 "jdbc-warehouse",
-                IcebergPropertiesConstants.GRAVITINO_JDBC_USER,
+                IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_JDBC_USER,
                 "user",
-                IcebergPropertiesConstants.GRAVITINO_JDBC_PASSWORD,
+                IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_JDBC_PASSWORD,
                 "passwd",
                 "key1",
                 "value1"));
@@ -63,9 +63,9 @@ public class TestIcebergPropertiesConverter {
             "jdbc-uri",
             IcebergPropertiesConstants.ICEBERG_CATALOG_WAREHOUSE,
             "jdbc-warehouse",
-            IcebergPropertiesConstants.ICEBERG_JDBC_USER,
+            IcebergPropertiesConstants.ICEBERG_CATALOG_JDBC_USER,
             "user",
-            IcebergPropertiesConstants.ICEBERG_JDBC_PASSWORD,
+            IcebergPropertiesConstants.ICEBERG_CATALOG_JDBC_PASSWORD,
             "passwd"),
         properties);
   }

@@ -69,4 +69,4 @@ SELECT * FROM employee WHERE date(hire_date) = '2021-01-01'
 | `jdbc-user`                     | `jdbc.user`                 | JDBC user name            | 0.5.0         |
 | `jdbc-password`                 | `jdbc.password`             | JDBC password             | 0.5.0         |
 
-Catalog properties with prefix `spark.bypass.` are passed to Spark Iceberg connector. For example, using `spark.bypass.config.resources` to pass the `config.resources` to the Spark Iceberg connector.
+Gravitino catalog property names with the prefix `spark.bypass.` are passed to Spark Iceberg connector. For example, using `spark.bypass.io-impl` to pass the `io-impl` to the Spark Iceberg connector.

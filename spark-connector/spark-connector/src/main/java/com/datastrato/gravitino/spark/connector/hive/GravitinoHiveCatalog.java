@@ -23,7 +23,7 @@ public class GravitinoHiveCatalog extends BaseCatalog {
       String name, CaseInsensitiveStringMap options, Map<String, String> properties) {
     TableCatalog hiveCatalog = new HiveTableCatalog();
     Map<String, String> all =
-        HivePropertiesConverter.getInstance().toSparkCatalogProperties(options, properties);
+        getPropertiesConverter().toSparkCatalogProperties(options, properties);
     hiveCatalog.initialize(name, new CaseInsensitiveStringMap(all));
 
     return hiveCatalog;
