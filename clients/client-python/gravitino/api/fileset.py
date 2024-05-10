@@ -2,6 +2,7 @@
 Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
+
 from abc import abstractmethod
 from enum import Enum
 from typing import Optional, Dict
@@ -20,6 +21,7 @@ class Fileset(Auditable):
     Fileset defines the basic properties of a fileset object. A catalog implementation
     with FilesetCatalog should implement this interface.
     """
+
     class Type(Enum):
         """An enum representing the type of the fileset object."""
 
