@@ -31,19 +31,22 @@ import org.slf4j.LoggerFactory;
  * report metrics from MetricsSources registered to MetricsSystem.
  */
 public class MetricsSystem implements Closeable {
+
   private static final Logger LOG = LoggerFactory.getLogger(MetricsSystem.class);
   private final String name;
   private final MetricRegistry metricRegistry;
   private HashMap<String, MetricsSource> metricSources = new HashMap<>();
   private List<Reporter> metricsReporters = new ArrayList<>();
   private CollectorRegistry prometheusRegistry;
+  private int timeSlidingWindowSeconds;
 
-  public MetricsSystem() {
-    this("");
+  public MetricsSystem(int timeSlidingWindowSeconds) {
+    this("", timeSlidingWindowSeconds);
   }
 
-  public MetricsSystem(String name) {
+  public MetricsSystem(String name, int timeSlidingWindowSeconds) {
     this.name = name;
+    this.timeSlidingWindowSeconds = timeSlidingWindowSeconds;
     this.metricRegistry = new MetricRegistry();
     this.prometheusRegistry = new CollectorRegistry();
   }
@@ -175,5 +178,9 @@ public class MetricsSystem implements Closeable {
 
   public MetricsServlet getPrometheusServlet() {
     return new MetricsServlet(prometheusRegistry);
+  }
+
+  public int getTimeSlidingWindowSeconds() {
+    return timeSlidingWindowSeconds;
   }
 }

@@ -276,4 +276,11 @@ public class Configs {
           .version(ConfigConstants.VERSION_0_5_0)
           .longConf()
           .createWithDefault(60 * 60 * 1000L);
+
+  ConfigEntry<Long> METRICS_TIME_SLIDING_WINDOW_SECONDS =
+      new ConfigBuilder("gravitino.metrics.timeSlidingWindowSecs")
+          .doc("The seconds of Gravitino metrics time sliding window")
+          .version(ConfigConstants.VERSION_0_6_0)
+          .longConf()
+          .createWithDefault(60L);
 }

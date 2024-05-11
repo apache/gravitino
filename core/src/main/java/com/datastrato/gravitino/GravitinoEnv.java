@@ -141,7 +141,8 @@ public class GravitinoEnv {
     LOG.info("Initializing Gravitino Environment...");
 
     this.config = config;
-    this.metricsSystem = new MetricsSystem();
+    int slidingWindowSeconds = config.get(Configs.METRICS_TIME_SLIDING_WINDOW_SECONDS).intValue();
+    this.metricsSystem = new MetricsSystem(slidingWindowSeconds);
     metricsSystem.register(new JVMMetricsSource());
 
     // Initialize EntityStore
