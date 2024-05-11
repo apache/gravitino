@@ -3,3 +3,4 @@
 requests
 dataclasses-json
 pylint
+black
