@@ -416,7 +416,7 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
             icebergTableWriteProperties.isPartitionedTable,
             icebergTableWriteProperties.formatVersion);
     dropTableIfExists(tableName);
-    createIcebergTableWithTabProperties(
+    createIcebergTableWithTableProperties(
         tableName,
         icebergTableWriteProperties.isPartitionedTable,
         ImmutableMap.of(
@@ -435,7 +435,7 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
             icebergTableWriteProperties.isPartitionedTable,
             icebergTableWriteProperties.formatVersion);
     dropTableIfExists(tableName);
-    createIcebergTableWithTabProperties(
+    createIcebergTableWithTableProperties(
         tableName,
         icebergTableWriteProperties.isPartitionedTable,
         ImmutableMap.of(
@@ -455,7 +455,7 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
             icebergTableWriteProperties.isPartitionedTable,
             icebergTableWriteProperties.formatVersion);
     dropTableIfExists(tableName);
-    createIcebergTableWithTabProperties(
+    createIcebergTableWithTableProperties(
         tableName,
         icebergTableWriteProperties.isPartitionedTable,
         ImmutableMap.of(
@@ -475,7 +475,7 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
             icebergTableWriteProperties.isPartitionedTable,
             icebergTableWriteProperties.formatVersion);
     dropTableIfExists(tableName);
-    createIcebergTableWithTabProperties(
+    createIcebergTableWithTableProperties(
         tableName,
         icebergTableWriteProperties.isPartitionedTable,
         ImmutableMap.of(
@@ -526,7 +526,7 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
         IcebergTableWriteProperties.of(true, 2, "merge-on-read"));
   }
 
-  private void createIcebergTableWithTabProperties(
+  private void createIcebergTableWithTableProperties(
       String tableName, boolean isPartitioned, ImmutableMap<String, String> tblProperties) {
     String partitionedClause = isPartitioned ? " PARTITIONED BY (name) " : "";
     String tblPropertiesStr =
