@@ -52,7 +52,7 @@ public interface PropertiesConverter {
   /**
    * Transform properties from Gravitino catalog properties to Spark connector properties.
    *
-   * <p>This interface focus on the catalog specific transform logic, the common logic are
+   * <p>This interface focuses on the catalog specific transform logic, the common logic are
    * implemented in {@code toSparkCatalogProperties}.
    *
    * @param properties Gravitino catalog properties.
