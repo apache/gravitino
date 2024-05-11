@@ -17,7 +17,7 @@ from tests.integration.integration_test_env import IntegrationTestEnv
 logger = logging.getLogger(__name__)
 
 
-class TestMetalakeIT(IntegrationTestEnv):
+class TestMetalake(IntegrationTestEnv):
     metalake_name: str = "TestMetalake-metalake"
     metalake_new_name = metalake_name + "_new"
 

@@ -8,7 +8,7 @@ import unittest
 from gravitino.dto.responses.metalake_response import MetalakeResponse
 
 
-class TestMetalakeUT(unittest.TestCase):
+class TestMetalake(unittest.TestCase):
     def test_from_json_metalake_response(self):
         str_json = (
             b'{"code":0,"metalake":{"name":"example_name18","comment":"This is a sample comment",'
