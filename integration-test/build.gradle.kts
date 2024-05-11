@@ -114,6 +114,7 @@ dependencies {
     exclude("io.dropwizard.metrics")
     exclude("org.rocksdb")
   }
+  testImplementation("org.apache.spark:spark-catalyst_$scalaVersion:$sparkVersion")
 
   testImplementation(libs.okhttp3.loginterceptor)
   testImplementation(libs.postgresql.driver)

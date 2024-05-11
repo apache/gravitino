@@ -29,6 +29,7 @@ import org.apache.spark.sql.catalyst.expressions.Literal;
 import org.apache.spark.sql.connector.catalog.CatalogPlugin;
 import org.apache.spark.sql.connector.catalog.FunctionCatalog;
 import org.apache.spark.sql.connector.catalog.Identifier;
+import org.apache.spark.sql.connector.catalog.StagingTableCatalog;
 import org.apache.spark.sql.connector.catalog.functions.UnboundFunction;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructField;
@@ -214,6 +215,78 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     testPartitionMetadataColumnWithUnPartitionedTable();
     testFileMetadataColumn();
     testDeleteMetadataColumn();
+  }
+
+  @Test
+  void testIcebergAtomicCreateTableAsSelect() {
+    String tableName = "test_atomic_create_table_as_select";
+    dropTableIfExists(tableName);
+
+    CatalogPlugin sparkIcebergCatalog =
+        getSparkSession().sessionState().catalogManager().currentCatalog();
+    Assertions.assertInstanceOf(StagingTableCatalog.class, sparkIcebergCatalog);
+
+    sql(
+        String.format(
+            "CREATE TABLE %s USING iceberg AS SELECT 1 AS id, '1' AS name, 1 AS age", tableName));
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+    checkTableColumns(tableName, getSimpleTableColumnWithoutComments(), tableInfo);
+    List<String> tableData = getTableData(tableName);
+    Assertions.assertEquals(1, tableData.size());
+    Assertions.assertEquals("1,1,1", tableData.get(0));
+  }
+
+  @Test
+  void testIcebergAtomicReplaceTableAsSelect() {
+    String tableName = "test_atomic_replace_table_as_select";
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+    checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
+
+    sql(String.format("INSERT INTO %s VALUES (0, '0', 0)", tableName));
+    List<String> tableData = getTableData(tableName);
+    Assertions.assertEquals(1, tableData.size());
+    Assertions.assertEquals("0,0,0", tableData.get(0));
+
+    CatalogPlugin sparkIcebergCatalog =
+        getSparkSession().sessionState().catalogManager().currentCatalog();
+    Assertions.assertInstanceOf(StagingTableCatalog.class, sparkIcebergCatalog);
+
+    sql(
+        String.format(
+            "REPLACE TABLE %s USING iceberg AS SELECT 1 AS id, '1' AS name, 1 AS age", tableName));
+    checkTableColumns(tableName, getSimpleTableColumnWithoutComments(), getTableInfo(tableName));
+    tableData = getTableData(tableName);
+    Assertions.assertEquals(1, tableData.size());
+    Assertions.assertEquals("1,1,1", tableData.get(0));
+  }
+
+  @Test
+  void testIcebergAtomicCreateOrReplaceTableAsSelect() {
+    String tableName = "test_atomic_create_or_replace_table_as_select";
+    dropTableIfExists(tableName);
+    sql(
+        String.format(
+            "CREATE OR REPLACE TABLE %s USING iceberg AS SELECT 0 AS id, '0' AS name, 0 AS age",
+            tableName));
+    checkTableColumns(tableName, getSimpleTableColumnWithoutComments(), getTableInfo(tableName));
+
+    List<String> tableData = getTableData(tableName);
+    Assertions.assertEquals(1, tableData.size());
+    Assertions.assertEquals("0,0,0", tableData.get(0));
+
+    CatalogPlugin sparkIcebergCatalog =
+        getSparkSession().sessionState().catalogManager().currentCatalog();
+    Assertions.assertInstanceOf(StagingTableCatalog.class, sparkIcebergCatalog);
+
+    sql(
+        String.format(
+            "CREATE OR REPLACE TABLE %s USING iceberg AS SELECT 1 AS id, '1' AS name, 1 AS age",
+            tableName));
+    checkTableColumns(tableName, getSimpleTableColumnWithoutComments(), getTableInfo(tableName));
+    tableData = getTableData(tableName);
+    Assertions.assertEquals(1, tableData.size());
+    Assertions.assertEquals("1,1,1", tableData.get(0));
   }
 
   private void testMetadataColumns() {
@@ -415,5 +488,12 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
       new SparkMetadataColumnInfo("_pos", DataTypes.LongType, false),
       new SparkMetadataColumnInfo("_deleted", DataTypes.BooleanType, false)
     };
+  }
+
+  private List<SparkTableInfo.SparkColumnInfo> getSimpleTableColumnWithoutComments() {
+    return Arrays.asList(
+        SparkTableInfo.SparkColumnInfo.of("id", DataTypes.IntegerType, null),
+        SparkTableInfo.SparkColumnInfo.of("name", DataTypes.StringType, null),
+        SparkTableInfo.SparkColumnInfo.of("age", DataTypes.IntegerType, null));
   }
 }
