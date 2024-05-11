@@ -1103,7 +1103,15 @@ public class JsonUtils {
               node);
           List<ListPartitionDTO> assignments = Lists.newArrayList();
           node.get(ASSIGNMENTS_NAME)
-              .forEach(assignment -> assignments.add((ListPartitionDTO) readPartition(assignment)));
+              .forEach(
+                  assignment -> {
+                    PartitionDTO partitionDTO = readPartition(assignment);
+                    Preconditions.checkArgument(
+                        partitionDTO instanceof ListPartitionDTO,
+                        "Cannot parse list partitioning from non-list assignment: %s",
+                        assignment);
+                    assignments.add((ListPartitionDTO) partitionDTO);
+                  });
           return ListPartitioningDTO.of(
               listFields.toArray(new String[0][0]), assignments.toArray(new ListPartitionDTO[0]));
 
@@ -1120,8 +1128,14 @@ public class JsonUtils {
           List<RangePartitionDTO> rangeAssignments = Lists.newArrayList();
           node.get(ASSIGNMENTS_NAME)
               .forEach(
-                  assignment ->
-                      rangeAssignments.add((RangePartitionDTO) readPartition(assignment)));
+                  assignment -> {
+                    PartitionDTO partitionDTO = readPartition(assignment);
+                    Preconditions.checkArgument(
+                        partitionDTO instanceof RangePartitionDTO,
+                        "Cannot parse range partitioning from non-range assignment: %s",
+                        assignment);
+                    rangeAssignments.add((RangePartitionDTO) partitionDTO);
+                  });
           return RangePartitioningDTO.of(
               fields, rangeAssignments.toArray(new RangePartitionDTO[0]));
 

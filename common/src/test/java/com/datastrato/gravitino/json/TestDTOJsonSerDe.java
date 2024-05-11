@@ -405,8 +405,6 @@ public class TestDTOJsonSerDe {
             .configure(EnumFeature.WRITE_ENUMS_TO_LOWERCASE, true)
             .build()
             .writeValueAsString(partitioning);
-    System.out.println("lmh");
-    System.out.printf("partitioning: %s\n", serJson);
     Partitioning[] desPartitioning =
         JsonUtils.objectMapper().readValue(serJson, Partitioning[].class);
 
@@ -414,7 +412,7 @@ public class TestDTOJsonSerDe {
   }
 
   @Test
-  public void testPartitioningDTOSerDeFail() throws Exception {
+  public void testPartitioningDTOSerDeFail() {
     // test `strategy` value null
     String wrongJson1 = "{\"strategy\": null,\"fieldName\":[\"dt\"]}";
     ObjectMapper map = JsonUtils.objectMapper();
@@ -439,5 +437,64 @@ public class TestDTOJsonSerDe {
         Assertions.assertThrows(
             IllegalArgumentException.class, () -> map.readValue(wrongJson6, Partitioning.class));
     Assertions.assertTrue(exception.getMessage().contains("Invalid partitioning strategy"));
+
+    // test invalid arguments for partitioning
+    String wrongJson3 =
+        "{\n"
+            + "    \"strategy\": \"list\",\n"
+            + "    \"fieldNames\": [\n"
+            + "        [\n"
+            + "            \"dt\"\n"
+            + "        ],\n"
+            + "        [\n"
+            + "            \"city\"\n"
+            + "        ]\n"
+            + "    ],\n"
+            + "    \"assignments\": \"partitions\"\n"
+            + "}";
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> map.readValue(wrongJson3, Partitioning.class));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("Cannot parse list partitioning from non-array assignments"),
+        exception.getMessage());
+
+    String wrong4 =
+        "{\n"
+            + "    \"strategy\": \"list\",\n"
+            + "    \"fieldNames\": [\n"
+            + "        [\n"
+            + "            \"dt\"\n"
+            + "        ],\n"
+            + "        [\n"
+            + "            \"city\"\n"
+            + "        ]\n"
+            + "    ],\n"
+            + "    \"assignments\": [\n"
+            + "        {\n"
+            + "            \"type\": \"range\",\n"
+            + "            \"name\": \"p20230101\",\n"
+            + "            \"upper\": {\n"
+            + "                \"type\": \"literal\",\n"
+            + "                \"dataType\": \"date\",\n"
+            + "                \"value\": \"2023-01-01\"\n"
+            + "            },\n"
+            + "            \"lower\": {\n"
+            + "                \"type\": \"literal\",\n"
+            + "                \"dataType\": \"date\",\n"
+            + "                \"value\": \"2023-01-01\"\n"
+            + "            },\n"
+            + "            \"properties\": null\n"
+            + "        }\n"
+            + "    ]\n"
+            + "}";
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> map.readValue(wrong4, Partitioning.class));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Cannot parse list partitioning from non-list assignment"),
+        exception.getMessage());
   }
 }
