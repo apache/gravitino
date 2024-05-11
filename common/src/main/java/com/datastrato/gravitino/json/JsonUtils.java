@@ -56,6 +56,7 @@ import com.fasterxml.jackson.databind.cfg.EnumFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -237,8 +238,13 @@ public class JsonUtils {
   /**
    * Get the shared ObjectMapper instance for JSON serialization/deserialization.
    *
-   * @return The ObjectMapper instance.
+   * <p>This instance should only be used for testing. For production or other environments, obtain
+   * an {@link ObjectMapper} from the appropriate {@code ObjectMapperProvider} on the server or
+   * client side.
+   *
+   * @return the shared {@link ObjectMapper} instance for tests.
    */
+  @VisibleForTesting
   public static ObjectMapper objectMapper() {
     return ObjectMapperHolder.INSTANCE;
   }
