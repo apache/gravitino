@@ -30,7 +30,7 @@ public class CatalogIcebergRestIT extends CatalogIcebergBaseIT {
     TYPE = "rest";
     WAREHOUSE =
         String.format(
-            "hdfs://%s:%d/user/hive/iceberg-rest-warehouse/",
+            "hdfs://%s:%d/user/hive/warehouse-catalog-iceberg/",
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HDFS_DEFAULTFS_PORT);
   }

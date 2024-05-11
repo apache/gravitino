@@ -57,8 +57,9 @@ import org.slf4j.LoggerFactory;
 public class CatalogConnectorManager {
   private static final Logger LOG = LoggerFactory.getLogger(CatalogConnectorManager.class);
 
-  private static final int CATALOG_LOAD_FREQUENCY_SECOND = 3;
+  private static final int CATALOG_LOAD_FREQUENCY_SECOND = 10;
   private static final int NUMBER_EXECUTOR_THREAD = 1;
+  private static final int LOAD_METALAKE_TIMEOUT = 30;
 
   private final ScheduledExecutorService executorService;
   private final CatalogInjector catalogInjector;
@@ -101,31 +102,38 @@ public class CatalogConnectorManager {
       this.gravitinoClient = client;
     }
 
-    // Schedule a task to load catalog from gravitino server.
-    executorService.execute(this::loadMetalake);
     LOG.info("Gravitino CatalogConnectorManager started.");
   }
 
-  void loadMetalake() {
+  public void loadMetalakeSync() {
     try {
-      for (String usedMetalake : usedMetalakes) {
-        GravitinoMetalake metalake;
-        try {
-          metalake = gravitinoClient.loadMetalake(NameIdentifier.ofMetalake(usedMetalake));
-        } catch (NoSuchMetalakeException noSuchMetalakeException) {
-          LOG.warn("Metalake {} does not exist.", usedMetalake);
-          continue;
-        } catch (Exception e) {
-          LOG.error("Load Metalake {} failed.", usedMetalake, e);
-          continue;
-        }
+      Future<?> future = executorService.submit(this::loadMetalakeImpl);
+      future.get();
+    } catch (Exception e) {
+      LOG.error("Load metalake sync failed.", e);
+    } finally {
+      // Load metalake for handling catalog in the metalake updates.
+      executorService.scheduleWithFixedDelay(
+          this::loadMetalakeImpl,
+          CATALOG_LOAD_FREQUENCY_SECOND,
+          CATALOG_LOAD_FREQUENCY_SECOND,
+          TimeUnit.SECONDS);
+    }
+  }
+
+  private void loadMetalakeImpl() {
+    for (String usedMetalake : usedMetalakes) {
+      GravitinoMetalake metalake;
+      try {
+        metalake = gravitinoClient.loadMetalake(NameIdentifier.ofMetalake(usedMetalake));
 
         LOG.info("Load metalake: {}", usedMetalake);
         loadCatalogs(metalake);
+      } catch (NoSuchMetalakeException noSuchMetalakeException) {
+        LOG.warn("Metalake {} does not exist.", usedMetalake);
+      } catch (Exception e) {
+        LOG.error("Load Metalake {} failed.", usedMetalake, e);
       }
-    } finally {
-      // Load metalake for handling catalog in the metalake updates.
-      executorService.schedule(this::loadMetalake, CATALOG_LOAD_FREQUENCY_SECOND, TimeUnit.SECONDS);
     }
   }
 
@@ -157,7 +165,11 @@ public class CatalogConnectorManager {
           &&
           // Skip the catalog doesn't belong to this metalake.
           entry.getValue().getMetalake().name().equals(metalake.name())) {
-        unloadCatalog(metalake, entry.getKey());
+        try {
+          unloadCatalog(metalake, entry.getKey());
+        } catch (Exception e) {
+          LOG.error("Failed to remove catalog {}.", entry.getKey(), e);
+        }
       }
     }
 
@@ -272,8 +284,8 @@ public class CatalogConnectorManager {
 
       LOG.info("Create catalog {} in metalake {} successfully.", catalogName, metalake);
 
-      Future<?> future = executorService.submit(this::loadMetalake);
-      future.get(30, TimeUnit.SECONDS);
+      Future<?> future = executorService.submit(this::loadMetalakeImpl);
+      future.get(LOAD_METALAKE_TIMEOUT, TimeUnit.SECONDS);
 
       if (!catalogConnectors.containsKey(getTrinoCatalogName(metalakeName, catalogName))) {
         throw new TrinoException(
@@ -313,8 +325,8 @@ public class CatalogConnectorManager {
       }
       LOG.info("Drop catalog {} in metalake {} successfully.", catalogName, metalake);
 
-      Future<?> future = executorService.submit(this::loadMetalake);
-      future.get(30, TimeUnit.SECONDS);
+      Future<?> future = executorService.submit(this::loadMetalakeImpl);
+      future.get(LOAD_METALAKE_TIMEOUT, TimeUnit.SECONDS);
 
       if (catalogConnectors.containsKey(getTrinoCatalogName(metalakeName, catalogName))) {
         throw new TrinoException(
@@ -372,8 +384,8 @@ public class CatalogConnectorManager {
           gravitinoClient.loadMetalake(NameIdentifier.ofMetalake(metalakeName));
       metalake.alterCatalog(catalog, changes.toArray(changes.toArray(new CatalogChange[0])));
 
-      Future<?> future = executorService.submit(this::loadMetalake);
-      future.get(30, TimeUnit.SECONDS);
+      Future<?> future = executorService.submit(this::loadMetalakeImpl);
+      future.get(LOAD_METALAKE_TIMEOUT, TimeUnit.SECONDS);
 
       catalogConnectorContext =
           catalogConnectors.get(getTrinoCatalogName(metalakeName, catalogName));

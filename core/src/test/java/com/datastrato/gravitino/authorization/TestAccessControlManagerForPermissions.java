@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.authorization;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.GravitinoEnv;
@@ -92,6 +93,7 @@ public class TestAccessControlManagerForPermissions {
   @BeforeAll
   public static void setUp() throws Exception {
     config = new Config(false) {};
+    config.set(Configs.SERVICE_ADMINS, Lists.newArrayList("admin"));
 
     entityStore = new TestMemoryEntityStore.InMemoryEntityStore();
     entityStore.initialize(config);

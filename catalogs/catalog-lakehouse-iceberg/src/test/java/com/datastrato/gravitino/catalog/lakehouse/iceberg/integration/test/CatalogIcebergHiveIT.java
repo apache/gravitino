@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
+ * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.integration.test;
@@ -22,7 +22,7 @@ public class CatalogIcebergHiveIT extends CatalogIcebergBaseIT {
     TYPE = "hive";
     WAREHOUSE =
         String.format(
-            "hdfs://%s:%d/user/hive/iceberg-hive-warehouse/",
+            "hdfs://%s:%d/user/hive/warehouse-catalog-iceberg/",
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HDFS_DEFAULTFS_PORT);
   }

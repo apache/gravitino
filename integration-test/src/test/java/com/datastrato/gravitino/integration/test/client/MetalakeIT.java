@@ -158,6 +158,25 @@ public class MetalakeIT extends AbstractIT {
   }
 
   @Test
+  public void testCreateMetalakeWithChinese() {
+    client.createMetalake(
+        NameIdentifier.parse(metalakeNameA), "这是中文comment", Collections.emptyMap());
+    GravitinoMetalake metalake = client.loadMetalake(NameIdentifier.of(metalakeNameA));
+    assertEquals(metalakeNameA, metalake.name());
+    assertEquals("这是中文comment", metalake.comment());
+    assertEquals(AuthConstants.ANONYMOUS_USER, metalake.auditInfo().creator());
+
+    // Test metalake name already exists
+    Map<String, String> emptyMap = Collections.emptyMap();
+    NameIdentifier exists = NameIdentifier.parse(metalakeNameA);
+    assertThrows(
+        MetalakeAlreadyExistsException.class,
+        () -> {
+          client.createMetalake(exists, "metalake A comment", emptyMap);
+        });
+  }
+
+  @Test
   public void testDropMetalakes() {
     GravitinoMetalake metalakeA =
         client.createMetalake(
