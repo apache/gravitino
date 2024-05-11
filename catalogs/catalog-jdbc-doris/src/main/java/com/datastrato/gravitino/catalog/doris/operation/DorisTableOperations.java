@@ -19,10 +19,11 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -35,6 +36,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.BooleanUtils;
@@ -73,7 +75,7 @@ public class DorisTableOperations extends JdbcTableOperations {
       Map<String, String> properties,
       Transform[] partitioning,
       Distribution distribution,
-      com.datastrato.gravitino.rel.indexes.Index[] indexes) {
+      Index[] indexes) {
 
     validateIncrementCol(columns);
     validateDistribution(distribution, columns);
@@ -107,6 +109,9 @@ public class DorisTableOperations extends JdbcTableOperations {
       sqlBuilder.append(" COMMENT \"").append(comment).append("\"");
     }
 
+    // Add Partition Info
+    appendPartitionSql(partitioning, columns, sqlBuilder);
+
     // Add distribution info
     if (distribution.strategy() == Strategy.HASH) {
       sqlBuilder.append(NEW_LINE).append(" DISTRIBUTED BY HASH(");
@@ -125,12 +130,6 @@ public class DorisTableOperations extends JdbcTableOperations {
 
     // Add table properties
     sqlBuilder.append(NEW_LINE).append(DorisUtils.generatePropertiesSql(properties));
-
-    // Add Partition Info
-    if (partitioning != null && partitioning.length > 0) {
-      // TODO: Add partitioning support
-      throw new UnsupportedOperationException("Currently we do not support Partitioning in Doris");
-    }
 
     // Return the generated SQL statement
     String result = sqlBuilder.toString();
@@ -169,9 +168,7 @@ public class DorisTableOperations extends JdbcTableOperations {
     }
   }
 
-  @VisibleForTesting
-  static void appendIndexesSql(
-      com.datastrato.gravitino.rel.indexes.Index[] indexes, StringBuilder sqlBuilder) {
+  private static void appendIndexesSql(Index[] indexes, StringBuilder sqlBuilder) {
 
     if (indexes.length == 0) {
       return;
@@ -192,6 +189,65 @@ public class DorisTableOperations extends JdbcTableOperations {
             .collect(Collectors.joining(",\n"));
 
     sqlBuilder.append(",").append(NEW_LINE).append(indexSql);
+  }
+
+  private static void appendPartitionSql(
+      Transform[] partitioning, JdbcColumn[] columns, StringBuilder sqlBuilder) {
+    if (partitioning == null || partitioning.length == 0) {
+      return;
+    }
+
+    StringBuilder partitionSqlBuilder = new StringBuilder();
+    Set<String> columnNames =
+        Arrays.stream(columns).map(JdbcColumn::name).collect(Collectors.toSet());
+
+    if (partitioning[0] instanceof Transforms.RangeTransform) {
+      partitionSqlBuilder.append(NEW_LINE).append(" PARTITION BY RANGE(");
+
+      ImmutableList.Builder<String> partitionColumnsBuilder = ImmutableList.builder();
+      // use an array of partitioning to implement multi-column range partitioning of doris
+      for (Transform part : partitioning) {
+        Preconditions.checkArgument(
+            part instanceof Transforms.RangeTransform,
+            "Doris does not support multiple partition types");
+        Transforms.RangeTransform rangePartition = (Transforms.RangeTransform) part;
+
+        Preconditions.checkArgument(
+            rangePartition.fieldName().length == 1,
+            "Doris partition does not support nested field");
+        Preconditions.checkArgument(
+            columnNames.contains(rangePartition.fieldName()[0]),
+            "The partition field must be one of the columns");
+
+        partitionColumnsBuilder.add(BACK_QUOTE + rangePartition.fieldName()[0] + BACK_QUOTE);
+      }
+      String partitionColumns =
+          partitionColumnsBuilder.build().stream().collect(Collectors.joining(","));
+      // TODO we currently do not support pre-assign partition when creating range partitioning
+      partitionSqlBuilder.append(partitionColumns).append(") () ");
+    } else if (partitioning[0] instanceof Transforms.ListTransform) {
+      Transforms.ListTransform listPartition = (Transforms.ListTransform) partitioning[0];
+      partitionSqlBuilder.append(" PARTITION BY LIST(");
+
+      ImmutableList.Builder<String> partitionColumnsBuilder = ImmutableList.builder();
+      String[][] filedNames = listPartition.fieldNames();
+      for (String[] filedName : filedNames) {
+        Preconditions.checkArgument(
+            filedName.length == 1, "Doris partition does not support nested field");
+        Preconditions.checkArgument(
+            columnNames.contains(filedName[0]), "The partition field must be one of the columns");
+
+        partitionColumnsBuilder.add(BACK_QUOTE + filedName[0] + BACK_QUOTE);
+      }
+      String partitionColumns =
+          partitionColumnsBuilder.build().stream().collect(Collectors.joining(","));
+      // TODO we currently do not support pre-assign partition when creating list partitioning table
+      partitionSqlBuilder.append(partitionColumns).append(") () ");
+    } else {
+      throw new IllegalArgumentException("Unsupported partition type of Doris");
+    }
+
+    sqlBuilder.append(partitionSqlBuilder);
   }
 
   @Override
