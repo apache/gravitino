@@ -8,6 +8,7 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.client.DefaultOAuth2TokenProvider;
 import com.datastrato.gravitino.client.GravitinoClient;
+import com.datastrato.gravitino.client.KerberosTokenProvider;
 import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.shaded.com.google.common.annotations.VisibleForTesting;
 import com.datastrato.gravitino.shaded.com.google.common.base.Preconditions;
@@ -17,6 +18,7 @@ import com.datastrato.gravitino.shaded.org.apache.commons.lang3.tuple.Pair;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
@@ -204,6 +206,36 @@ public class GravitinoVirtualFileSystem extends FileSystem {
           GravitinoClient.builder(serverUri)
               .withMetalake(metalakeName)
               .withOAuth(authDataProvider)
+              .build();
+    } else if (authType.equalsIgnoreCase(
+        GravitinoVirtualFileSystemConfiguration.KERBEROS_AUTH_TYPE)) {
+      String principal =
+          configuration.get(
+              GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_KERBEROS_PRINCIPAL_KEY);
+      checkAuthConfig(
+          GravitinoVirtualFileSystemConfiguration.KERBEROS_AUTH_TYPE,
+          GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_KERBEROS_PRINCIPAL_KEY,
+          principal);
+      String keytabFilePath =
+          configuration.get(
+              GravitinoVirtualFileSystemConfiguration
+                  .FS_GRAVITINO_CLIENT_KERBEROS_KEYTAB_FILE_PATH_KEY);
+      KerberosTokenProvider authDataProvider;
+      if (StringUtils.isNotBlank(keytabFilePath)) {
+        // Using principal and keytab to create auth provider
+        authDataProvider =
+            KerberosTokenProvider.builder()
+                .withClientPrincipal(principal)
+                .withKeyTabFile(new File(keytabFilePath))
+                .build();
+      } else {
+        // Using ticket cache to create auth provider
+        authDataProvider = KerberosTokenProvider.builder().withClientPrincipal(principal).build();
+      }
+      this.client =
+          GravitinoClient.builder(serverUri)
+              .withMetalake(metalakeName)
+              .withKerberosAuth(authDataProvider)
               .build();
     } else {
       throw new IllegalArgumentException(
