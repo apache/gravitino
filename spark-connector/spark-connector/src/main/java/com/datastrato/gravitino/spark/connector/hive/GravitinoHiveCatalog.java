@@ -14,6 +14,7 @@ import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.kyuubi.spark.connector.hive.HiveTable;
 import org.apache.kyuubi.spark.connector.hive.HiveTableCatalog;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.Identifier;
@@ -61,8 +62,8 @@ public class GravitinoHiveCatalog extends BaseCatalog {
     return new SparkHiveTable(
         identifier,
         gravitinoTable,
-        sparkTable,
-        sparkHiveCatalog,
+        (HiveTable) sparkTable,
+        (HiveTableCatalog) sparkHiveCatalog,
         propertiesConverter,
         sparkTransformConverter);
   }

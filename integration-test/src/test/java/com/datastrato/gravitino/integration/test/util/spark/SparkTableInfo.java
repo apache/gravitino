@@ -6,7 +6,6 @@
 package com.datastrato.gravitino.integration.test.util.spark;
 
 import com.datastrato.gravitino.spark.connector.ConnectorConstants;
-import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
 import com.datastrato.gravitino.spark.connector.hive.SparkHiveTable;
 import com.datastrato.gravitino.spark.connector.iceberg.SparkIcebergTable;
 import java.util.ArrayList;
@@ -115,14 +114,12 @@ public class SparkTableInfo {
             .collect(Collectors.toList());
     sparkTableInfo.comment = baseTable.properties().remove(ConnectorConstants.COMMENT);
     sparkTableInfo.tableProperties = baseTable.properties();
-    boolean supportsBucketPartition =
-        getSparkTransformConverter(baseTable).isSupportsBucketPartition();
     Arrays.stream(baseTable.partitioning())
         .forEach(
             transform -> {
               if (transform instanceof BucketTransform
                   || transform instanceof SortedBucketTransform) {
-                if (isBucketPartition(supportsBucketPartition, transform)) {
+                if (isBucketPartition(baseTable, transform)) {
                   sparkTableInfo.addPartition(transform);
                 } else {
                   sparkTableInfo.setBucket(transform);
@@ -167,19 +164,8 @@ public class SparkTableInfo {
         .collect(Collectors.toList());
   }
 
-  private static boolean isBucketPartition(boolean supportsBucketPartition, Transform transform) {
-    return supportsBucketPartition && !(transform instanceof SortedBucketTransform);
-  }
-
-  private static SparkTransformConverter getSparkTransformConverter(Table baseTable) {
-    if (baseTable instanceof SparkHiveTable) {
-      return ((SparkHiveTable) baseTable).getSparkTransformConverter();
-    } else if (baseTable instanceof SparkIcebergTable) {
-      return ((SparkIcebergTable) baseTable).getSparkTransformConverter();
-    } else {
-      throw new IllegalArgumentException(
-          "Doesn't support Spark table: " + baseTable.getClass().getName());
-    }
+  private static boolean isBucketPartition(Table baseTable, Transform transform) {
+    return baseTable instanceof SparkIcebergTable && !(transform instanceof SortedBucketTransform);
   }
 
   private static StructType getSchema(Table baseTable) {

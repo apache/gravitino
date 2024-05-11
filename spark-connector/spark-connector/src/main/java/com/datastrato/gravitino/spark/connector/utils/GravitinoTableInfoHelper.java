@@ -31,24 +31,27 @@ import org.apache.spark.sql.types.StructType;
  */
 public class GravitinoTableInfoHelper {
 
+  private boolean isCaseSensitive;
   private Identifier identifier;
   private com.datastrato.gravitino.rel.Table gravitinoTable;
   private PropertiesConverter propertiesConverter;
   private SparkTransformConverter sparkTransformConverter;
 
   public GravitinoTableInfoHelper(
+      boolean isCaseSensitive,
       Identifier identifier,
       com.datastrato.gravitino.rel.Table gravitinoTable,
       PropertiesConverter propertiesConverter,
       SparkTransformConverter sparkTransformConverter) {
+    this.isCaseSensitive = isCaseSensitive;
     this.identifier = identifier;
     this.gravitinoTable = gravitinoTable;
     this.propertiesConverter = propertiesConverter;
     this.sparkTransformConverter = sparkTransformConverter;
   }
 
-  public String name(boolean isCaseSensitive) {
-    return getNormalizedIdentifier(identifier, gravitinoTable.name(), isCaseSensitive);
+  public String name() {
+    return getNormalizedIdentifier(identifier, gravitinoTable.name());
   }
 
   public StructType schema() {
@@ -104,8 +107,7 @@ public class GravitinoTableInfoHelper {
 
   // The underlying catalogs may not case-sensitive, to keep consistent with the action of SparkSQL,
   // we should return normalized identifiers.
-  private String getNormalizedIdentifier(
-      Identifier tableIdentifier, String gravitinoTableName, boolean isCaseSensitive) {
+  private String getNormalizedIdentifier(Identifier tableIdentifier, String gravitinoTableName) {
     if (tableIdentifier.namespace().length == 0) {
       return gravitinoTableName;
     }

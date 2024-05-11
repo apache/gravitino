@@ -15,6 +15,7 @@ import java.util.Locale;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.iceberg.spark.SparkCatalog;
+import org.apache.iceberg.spark.source.SparkTable;
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
@@ -85,8 +86,8 @@ public class GravitinoIcebergCatalog extends BaseCatalog implements FunctionCata
     return new SparkIcebergTable(
         identifier,
         gravitinoTable,
-        sparkTable,
-        sparkIcebergCatalog,
+        (SparkTable) sparkTable,
+        (SparkCatalog) sparkIcebergCatalog,
         propertiesConverter,
         sparkTransformConverter);
   }

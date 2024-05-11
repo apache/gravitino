@@ -9,13 +9,11 @@ import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
 import com.datastrato.gravitino.spark.connector.utils.GravitinoTableInfoHelper;
-import com.google.common.annotations.VisibleForTesting;
 import java.lang.reflect.Field;
 import java.util.Map;
 import org.apache.iceberg.spark.SparkCatalog;
 import org.apache.iceberg.spark.source.SparkTable;
 import org.apache.spark.sql.connector.catalog.Identifier;
-import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.connector.expressions.Transform;
 import org.apache.spark.sql.types.StructType;
 
@@ -30,19 +28,19 @@ public class SparkIcebergTable extends SparkTable {
   public SparkIcebergTable(
       Identifier identifier,
       Table gravitinoTable,
-      org.apache.spark.sql.connector.catalog.Table sparkTable,
-      TableCatalog sparkIcebergCatalog,
+      SparkTable sparkTable,
+      SparkCatalog sparkCatalog,
       PropertiesConverter propertiesConverter,
       SparkTransformConverter sparkTransformConverter) {
-    super(((SparkTable) sparkTable).table(), !isCacheEnabled(sparkIcebergCatalog));
+    super(sparkTable.table(), !isCacheEnabled(sparkCatalog));
     this.gravitinoTableInfoHelper =
         new GravitinoTableInfoHelper(
-            identifier, gravitinoTable, propertiesConverter, sparkTransformConverter);
+            true, identifier, gravitinoTable, propertiesConverter, sparkTransformConverter);
   }
 
   @Override
   public String name() {
-    return gravitinoTableInfoHelper.name(true);
+    return gravitinoTableInfoHelper.name();
   }
 
   @Override
@@ -61,17 +59,11 @@ public class SparkIcebergTable extends SparkTable {
     return gravitinoTableInfoHelper.partitioning();
   }
 
-  @VisibleForTesting
-  public SparkTransformConverter getSparkTransformConverter() {
-    return gravitinoTableInfoHelper.getSparkTransformConverter();
-  }
-
-  private static boolean isCacheEnabled(TableCatalog sparkIcebergCatalog) {
+  private static boolean isCacheEnabled(SparkCatalog sparkCatalog) {
     try {
-      SparkCatalog catalog = ((SparkCatalog) sparkIcebergCatalog);
-      Field cacheEnabled = catalog.getClass().getDeclaredField("cacheEnabled");
+      Field cacheEnabled = sparkCatalog.getClass().getDeclaredField("cacheEnabled");
       cacheEnabled.setAccessible(true);
-      return cacheEnabled.getBoolean(catalog);
+      return cacheEnabled.getBoolean(sparkCatalog);
     } catch (NoSuchFieldException | IllegalAccessException e) {
       throw new RuntimeException("Failed to get cacheEnabled field from SparkCatalog", e);
     }
