@@ -23,7 +23,6 @@ import com.datastrato.gravitino.rel.SupportsPartitions;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.ThrowableFunction;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import java.util.Arrays;
 import java.util.List;
@@ -246,7 +245,6 @@ public abstract class OperationDispatcher {
     return ret;
   }
 
-  @VisibleForTesting
   // TODO(xun): Remove this method when we implement a better way to get the catalog identifier
   //  [#257] Add an explicit get catalog functions in NameIdentifier
   NameIdentifier getCatalogIdentifier(NameIdentifier ident) {
