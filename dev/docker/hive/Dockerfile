@@ -108,7 +108,7 @@ ADD check-status.sh /tmp/check-status.sh
 # format HFS
 RUN ${HADOOP_HOME}/bin/hdfs namenode -format -nonInteractive
 
-#################################################################################
+################################################################################
 # install hive
 RUN mkdir ${HIVE_HOME}
 ADD packages/apache-hive-${HIVE_VERSION}-bin.tar.gz /opt/
