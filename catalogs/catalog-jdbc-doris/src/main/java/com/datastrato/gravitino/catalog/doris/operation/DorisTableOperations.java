@@ -204,28 +204,18 @@ public class DorisTableOperations extends JdbcTableOperations {
 
     if (partitioning[0] instanceof Transforms.RangeTransform) {
       partitionSqlBuilder.append(NEW_LINE).append(" PARTITION BY RANGE(");
+      // TODO support multi-column range partitioning in doris
+      Transforms.RangeTransform rangePartition = (Transforms.RangeTransform) partitioning[0];
 
-      ImmutableList.Builder<String> partitionColumnsBuilder = ImmutableList.builder();
-      // use an array of partitioning to implement multi-column range partitioning of doris
-      for (Transform part : partitioning) {
-        Preconditions.checkArgument(
-            part instanceof Transforms.RangeTransform,
-            "Doris does not support multiple partition types");
-        Transforms.RangeTransform rangePartition = (Transforms.RangeTransform) part;
+      Preconditions.checkArgument(
+          rangePartition.fieldName().length == 1, "Doris partition does not support nested field");
+      Preconditions.checkArgument(
+          columnNames.contains(rangePartition.fieldName()[0]),
+          "The partition field must be one of the columns");
 
-        Preconditions.checkArgument(
-            rangePartition.fieldName().length == 1,
-            "Doris partition does not support nested field");
-        Preconditions.checkArgument(
-            columnNames.contains(rangePartition.fieldName()[0]),
-            "The partition field must be one of the columns");
-
-        partitionColumnsBuilder.add(BACK_QUOTE + rangePartition.fieldName()[0] + BACK_QUOTE);
-      }
-      String partitionColumns =
-          partitionColumnsBuilder.build().stream().collect(Collectors.joining(","));
+      String partitionColumn = BACK_QUOTE + rangePartition.fieldName()[0] + BACK_QUOTE;
       // TODO we currently do not support pre-assign partition when creating range partitioning
-      partitionSqlBuilder.append(partitionColumns).append(") () ");
+      partitionSqlBuilder.append(partitionColumn).append(") () ");
     } else if (partitioning[0] instanceof Transforms.ListTransform) {
       Transforms.ListTransform listPartition = (Transforms.ListTransform) partitioning[0];
       partitionSqlBuilder.append(" PARTITION BY LIST(");
