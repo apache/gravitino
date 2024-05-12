@@ -39,6 +39,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 
@@ -193,7 +194,7 @@ public class DorisTableOperations extends JdbcTableOperations {
 
   private static void appendPartitionSql(
       Transform[] partitioning, JdbcColumn[] columns, StringBuilder sqlBuilder) {
-    if (partitioning == null || partitioning.length == 0) {
+    if (ArrayUtils.isEmpty(partitioning)) {
       return;
     }
 
