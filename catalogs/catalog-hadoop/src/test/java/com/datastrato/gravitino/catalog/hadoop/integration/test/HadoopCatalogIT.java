@@ -37,6 +37,7 @@ import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-it")
 public class HadoopCatalogIT extends AbstractIT {
+  // for test
   private static final Logger LOG = LoggerFactory.getLogger(HadoopCatalogIT.class);
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
