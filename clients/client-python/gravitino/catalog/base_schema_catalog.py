@@ -200,7 +200,9 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
     @staticmethod
     def to_schema_update_request(change: SchemaChange):
         if isinstance(change, SchemaChange.SetProperty):
-            return SchemaUpdateRequest.SetSchemaPropertyRequest(change.property(), change.value())
+            return SchemaUpdateRequest.SetSchemaPropertyRequest(
+                change.property(), change.value()
+            )
         if isinstance(change, SchemaChange.RemoveProperty):
             return SchemaUpdateRequest.RemoveSchemaPropertyRequest(change.property())
         raise ValueError(f"Unknown change type: {type(change).__name__}")

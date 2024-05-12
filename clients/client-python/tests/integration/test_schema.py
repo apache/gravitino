@@ -7,7 +7,14 @@ import logging
 from random import randint
 from typing import Dict, List
 
-from gravitino import NameIdentifier, GravitinoAdminClient, GravitinoClient, Catalog, SchemaChange, Schema
+from gravitino import (
+    NameIdentifier,
+    GravitinoAdminClient,
+    GravitinoClient,
+    Catalog,
+    SchemaChange,
+    Schema,
+)
 
 from tests.integration.integration_test_env import IntegrationTestEnv
 

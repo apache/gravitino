@@ -6,7 +6,12 @@ This software is licensed under the Apache License version 2.
 import logging
 from typing import Dict, List
 
-from gravitino import GravitinoAdminClient, GravitinoMetalake, MetalakeChange, NameIdentifier
+from gravitino import (
+    GravitinoAdminClient,
+    GravitinoMetalake,
+    MetalakeChange,
+    NameIdentifier,
+)
 from gravitino.dto.dto_converters import DTOConverters
 from gravitino.dto.requests.metalake_updates_request import MetalakeUpdatesRequest
 from tests.integration.integration_test_env import IntegrationTestEnv

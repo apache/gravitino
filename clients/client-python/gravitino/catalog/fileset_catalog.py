@@ -201,9 +201,13 @@ class FilesetCatalog(BaseSchemaCatalog):
         if isinstance(change, FilesetChange.RenameFileset):
             return FilesetUpdateRequest.RenameFilesetRequest(change.new_name())
         if isinstance(change, FilesetChange.UpdateFilesetComment):
-            return FilesetUpdateRequest.UpdateFilesetCommentRequest(change.new_comment())
+            return FilesetUpdateRequest.UpdateFilesetCommentRequest(
+                change.new_comment()
+            )
         if isinstance(change, FilesetChange.SetProperty):
-            return FilesetUpdateRequest.SetFilesetPropertyRequest(change.property(), change.value())
+            return FilesetUpdateRequest.SetFilesetPropertyRequest(
+                change.property(), change.value()
+            )
         if isinstance(change, FilesetChange.RemoveProperty):
             return FilesetUpdateRequest.RemoveFilesetPropertyRequest(change.property())
         raise ValueError(f"Unknown change type: {type(change).__name__}")

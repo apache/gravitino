@@ -6,11 +6,17 @@ This software is licensed under the Apache License version 2.
 from setuptools import find_packages, setup
 
 
+try:
+    with open("README.md") as f:
+        long_description = f.read()
+except FileNotFoundError:
+    long_description = "No README.md file found"
+
 setup(
     name="gravitino",
     description="Python lib/client for Gravitino",
     version="0.5.0.dev12",
-    long_description=open("README.md").read(),
+    long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/datastrato/gravitino",
     author="datastrato",
