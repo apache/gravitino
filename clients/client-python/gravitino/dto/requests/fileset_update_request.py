@@ -2,6 +2,7 @@
 Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
+
 from abc import abstractmethod
 from dataclasses import dataclass, field
 
@@ -13,7 +14,7 @@ from gravitino.rest.rest_message import RESTRequest
 
 @dataclass
 class FilesetUpdateRequestBase(RESTRequest):
-    _type: str = field(metadata=config(field_name='@type'))
+    _type: str = field(metadata=config(field_name="@type"))
 
     def __init__(self, type: str):
         self._type = type
@@ -30,9 +31,8 @@ class FilesetUpdateRequest:
     class RenameFilesetRequest(FilesetUpdateRequestBase):
         """The fileset update request for renaming a fileset."""
 
-        _new_name: str = field(metadata=config(field_name='newName'))
+        _new_name: str = field(metadata=config(field_name="newName"))
         """The new name for the Fileset."""
-
 
         def __init__(self, new_name: str):
             super().__init__("rename")
@@ -59,7 +59,7 @@ class FilesetUpdateRequest:
     class UpdateFilesetCommentRequest(FilesetUpdateRequestBase):
         """Represents a request to update the comment on a Fileset."""
 
-        _new_comment: str = field(metadata=config(field_name='newComment'))
+        _new_comment: str = field(metadata=config(field_name="newComment"))
         """The new comment for the Fileset."""
 
         def __init__(self, new_comment: str):
@@ -83,10 +83,10 @@ class FilesetUpdateRequest:
     class SetFilesetPropertyRequest(FilesetUpdateRequestBase):
         """Represents a request to set a property on a Fileset."""
 
-        _property: str = field(metadata=config(field_name='property'))
+        _property: str = field(metadata=config(field_name="property"))
         """The property to set."""
 
-        _value: str = field(metadata=config(field_name='value'))
+        _value: str = field(metadata=config(field_name="value"))
         """The value of the property."""
 
         def __init__(self, property: str, value: str):
@@ -112,7 +112,7 @@ class FilesetUpdateRequest:
     class RemoveFilesetPropertyRequest(FilesetUpdateRequestBase):
         """Represents a request to remove a property from a Fileset."""
 
-        _property: str = field(metadata=config(field_name='property'))
+        _property: str = field(metadata=config(field_name="property"))
         """The property to remove."""
 
         def __init__(self, property: str):

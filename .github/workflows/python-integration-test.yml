@@ -65,7 +65,7 @@ jobs:
           for pythonVersion in "3.8" "3.9" "3.10" "3.11"
           do
             echo "Use Python version ${pythonVersion} to test the Python client."
-            ./gradlew -PjdkVersion=${{ matrix.java-version }} -PpythonVersion=${pythonVersion} :client:client-python:test
+            ./gradlew -PjdkVersion=${{ matrix.java-version }} -PpythonVersion=${pythonVersion} :clients:client-python:test
             # Clean Gravitino database to clean test data
             rm -rf ./distribution/package/data
           done
