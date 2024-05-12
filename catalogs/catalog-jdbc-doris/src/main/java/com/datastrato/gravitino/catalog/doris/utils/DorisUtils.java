@@ -56,10 +56,11 @@ public final class DorisUtils {
 
   public static PartitionType extractPartitionTypeFromSql(String createTableSql) {
     String[] lines = createTableSql.split("\n");
-    for (String line: lines) {
+    for (String line : lines) {
       if (line.contains(PARTITION_BY)) {
         try {
-          return PartitionType.valueOf(line.substring(PARTITION_BY.length() + 1, line.indexOf("(")).toUpperCase());
+          return PartitionType.valueOf(
+              line.substring(PARTITION_BY.length() + 1, line.indexOf("(")).toUpperCase());
         } catch (Exception e) {
           return PartitionType.NONE;
         }

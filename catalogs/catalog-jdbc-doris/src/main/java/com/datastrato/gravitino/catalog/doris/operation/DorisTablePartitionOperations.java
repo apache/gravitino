@@ -9,10 +9,9 @@ import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTablePartitionOperati
 import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
 import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
 import com.datastrato.gravitino.rel.partitions.Partition;
+import com.google.common.collect.ImmutableList;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.List;
 import javax.sql.DataSource;
 
 public final class DorisTablePartitionOperations extends JdbcTablePartitionOperations {
@@ -29,11 +28,11 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
   public String[] listPartitionNames() {
     String sql = String.format("SHOW PARTITIONS FROM %s", tableName);
     try (ResultSet result = getConnection(databaseName).createStatement().executeQuery(sql)) {
-      List<String> partitionNames = new ArrayList<>();
+      ImmutableList.Builder<String> partitionNames = ImmutableList.builder();
       while (result.next()) {
         partitionNames.add(result.getString("PartitionName"));
       }
-      return partitionNames.toArray(new String[0]);
+      return partitionNames.build().toArray(new String[0]);
     } catch (SQLException e) {
       throw exceptionConverter.toGravitinoException(e);
     }
