@@ -6,9 +6,7 @@
 FROM ubuntu:16.04
 LABEL maintainer="support@datastrato.com"
 
-ARG HADOOP_PACKAGE_NAME
 ARG HADOOP_VERSION
-ARG HIVE_PACKAGE_NAME
 ARG HIVE_VERSION
 ARG JDBC_DIVER_PACKAGE_NAME
 ARG MYSQL_JDBC_DRIVER_VERSION
@@ -131,7 +129,6 @@ RUN sed -i "s/.*bind-address.*/bind-address = 0.0.0.0/" /etc/mysql/mysql.conf.d/
 
 ################################################################################
 # add mysql jdbc driver
-#RUN tar -xz -C ${HIVE_HOME}/lib --strip-components 1 -f /tmp/packages/${JDBC_DIVER_PACKAGE_NAME}
 ADD packages/mysql-connector-java-${MYSQL_JDBC_DRIVER_VERSION}.tar.gz /opt/
 RUN ln -s /opt/mysql-connector-java-${MYSQL_JDBC_DRIVER_VERSION}/* ${HIVE_HOME}/lib
 
