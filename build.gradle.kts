@@ -154,7 +154,6 @@ allprojects {
       param.environment("HADOOP_USER_NAME", "datastrato")
       param.environment("HADOOP_HOME", "/tmp")
       param.environment("PROJECT_VERSION", project.version)
-      // param.environment("DISPLAY_WEBPAGE_IN_TESTING", true)
 
       val dockerRunning = project.rootProject.extra["dockerRunning"] as? Boolean ?: false
       val macDockerConnector = project.rootProject.extra["macDockerConnector"] as? Boolean ?: false
