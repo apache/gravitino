@@ -68,10 +68,38 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     return String.format("DELETE FROM %s where %s", tableName, condition);
   }
 
+  private static String getUpdateTableSql(String tableName, String setClause, String whereClause) {
+    return String.format("UPDATE %s SET %s WHERE %s", tableName, setClause, whereClause);
+  }
+
+  private static String getRowLevelUpdateTableSql(
+      String targetTableName, String selectClause, String sourceTableName, String onClause) {
+    return String.format(
+        "MERGE INTO %s "
+            + "USING (%s) %s "
+            + "ON %s "
+            + "WHEN MATCHED THEN UPDATE SET * "
+            + "WHEN NOT MATCHED THEN INSERT *",
+        targetTableName, selectClause, sourceTableName, onClause);
+  }
+
+  private static String getRowLevelDeleteTableSql(
+      String targetTableName, String selectClause, String sourceTableName, String onClause) {
+    return String.format(
+        "MERGE INTO %s "
+            + "USING (%s) %s "
+            + "ON %s "
+            + "WHEN MATCHED THEN DELETE "
+            + "WHEN NOT MATCHED THEN INSERT *",
+        targetTableName, selectClause, sourceTableName, onClause);
+  }
+
   // Whether supports [CLUSTERED BY col_name3 SORTED BY col_name INTO num_buckets BUCKETS]
   protected abstract boolean supportsSparkSQLClusteredBy();
 
   protected abstract boolean supportsPartition();
+
+  protected abstract boolean supportsDelete();
 
   // Use a custom database not the original default database because SparkCommonIT couldn't
   // read&write data to tables in default database. The main reason is default database location is
@@ -702,6 +730,28 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     checkTableReadWrite(tableInfo);
   }
 
+  @Test
+  @EnabledIf("supportsDelete")
+  void testDeleteOperation() {
+    String tableName = "test_row_level_delete_table";
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+
+    SparkTableInfo table = getTableInfo(tableName);
+    checkTableColumns(tableName, getSimpleTableColumn(), table);
+    sql(
+        String.format(
+            "INSERT INTO %s VALUES (1, '1', 1),(2, '2', 2),(3, '3', 3),(4, '4', 4),(5, '5', 5)",
+            tableName));
+    List<String> queryResult1 = getTableData(tableName);
+    Assertions.assertEquals(5, queryResult1.size());
+    Assertions.assertEquals("1,1,1;2,2,2;3,3,3;4,4,4;5,5,5", String.join(";", queryResult1));
+    sql(getDeleteSql(tableName, "id <= 4"));
+    List<String> queryResult2 = getTableData(tableName);
+    Assertions.assertEquals(1, queryResult2.size());
+    Assertions.assertEquals("5,5,5", queryResult2.get(0));
+  }
+
   protected void checkTableReadWrite(SparkTableInfo table) {
     String name = table.getTableIdentifier();
     boolean isPartitionTable = table.isPartitionTable();
@@ -760,6 +810,49 @@ public abstract class SparkCommonIT extends SparkEnvIT {
         .collect(Collectors.joining(","));
   }
 
+  protected void checkRowLevelUpdate(String tableName) {
+    writeToEmptyTableAndCheckData(tableName);
+    String updatedValues = "id = 6, name = '6', age = 6";
+    sql(getUpdateTableSql(tableName, updatedValues, "id = 5"));
+    List<String> queryResult = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
+    Assertions.assertEquals(5, queryResult.size());
+    Assertions.assertEquals("1,1,1;2,2,2;3,3,3;4,4,4;6,6,6", String.join(";", queryResult));
+  }
+
+  protected void checkRowLevelDelete(String tableName) {
+    writeToEmptyTableAndCheckData(tableName);
+    sql(getDeleteSql(tableName, "id <= 2"));
+    List<String> queryResult = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
+    Assertions.assertEquals(3, queryResult.size());
+    Assertions.assertEquals("3,3,3;4,4,4;5,5,5", String.join(";", queryResult));
+  }
+
+  protected void checkDeleteByMergeInto(String tableName) {
+    writeToEmptyTableAndCheckData(tableName);
+
+    String sourceTableName = "source_table";
+    String selectClause =
+        "SELECT 1 AS id, '1' AS name, 1 AS age UNION ALL SELECT 6 AS id, '6' AS name, 6 AS age";
+    String onClause = String.format("%s.id = %s.id", tableName, sourceTableName);
+    sql(getRowLevelDeleteTableSql(tableName, selectClause, sourceTableName, onClause));
+    List<String> queryResult = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
+    Assertions.assertEquals(5, queryResult.size());
+    Assertions.assertEquals("2,2,2;3,3,3;4,4,4;5,5,5;6,6,6", String.join(";", queryResult));
+  }
+
+  protected void checkTableUpdateByMergeInto(String tableName) {
+    writeToEmptyTableAndCheckData(tableName);
+
+    String sourceTableName = "source_table";
+    String selectClause =
+        "SELECT 1 AS id, '2' AS name, 2 AS age UNION ALL SELECT 6 AS id, '6' AS name, 6 AS age";
+    String onClause = String.format("%s.id = %s.id", tableName, sourceTableName);
+    sql(getRowLevelUpdateTableSql(tableName, selectClause, sourceTableName, onClause));
+    List<String> queryResult = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
+    Assertions.assertEquals(6, queryResult.size());
+    Assertions.assertEquals("1,2,2;2,2,2;3,3,3;4,4,4;5,5,5;6,6,6", String.join(";", queryResult));
+  }
+
   protected String getCreateSimpleTableString(String tableName) {
     return getCreateSimpleTableString(tableName, false);
   }
@@ -799,6 +892,16 @@ public abstract class SparkCommonIT extends SparkEnvIT {
         .withColumns(columns)
         .withComment(null)
         .check(tableInfo);
+  }
+
+  private void writeToEmptyTableAndCheckData(String tableName) {
+    sql(
+        String.format(
+            "INSERT INTO %s VALUES (1, '1', 1),(2, '2', 2),(3, '3', 3),(4, '4', 4),(5, '5', 5)",
+            tableName));
+    List<String> queryResult = getTableData(tableName);
+    Assertions.assertEquals(5, queryResult.size());
+    Assertions.assertEquals("1,1,1;2,2,2;3,3,3;4,4,4;5,5,5", String.join(";", queryResult));
   }
 
   // partition expression may contain "'", like a='s'/b=1

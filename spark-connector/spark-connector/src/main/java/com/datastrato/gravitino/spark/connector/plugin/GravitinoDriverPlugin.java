@@ -5,6 +5,9 @@
 
 package com.datastrato.gravitino.spark.connector.plugin;
 
+import static com.datastrato.gravitino.spark.connector.ConnectorConstants.COMMA;
+import static com.datastrato.gravitino.spark.connector.utils.ConnectorUtil.removeDuplicateSparkExtensions;
+
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.spark.connector.GravitinoSparkConfig;
 import com.datastrato.gravitino.spark.connector.catalog.GravitinoCatalogManager;
@@ -15,10 +18,12 @@ import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions;
 import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
 import org.apache.spark.api.plugin.DriverPlugin;
 import org.apache.spark.api.plugin.PluginContext;
+import org.apache.spark.sql.internal.StaticSQLConf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,6 +35,8 @@ public class GravitinoDriverPlugin implements DriverPlugin {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoDriverPlugin.class);
 
   private GravitinoCatalogManager catalogManager;
+  private static final String[] GRAVITINO_DRIVER_EXTENSIONS =
+      new String[] {IcebergSparkSessionExtensions.class.getName()};
 
   @Override
   public Map<String, String> init(SparkContext sc, PluginContext pluginContext) {
@@ -48,7 +55,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
     catalogManager = GravitinoCatalogManager.create(gravitinoUri, metalake);
     catalogManager.loadRelationalCatalogs();
     registerGravitinoCatalogs(conf, catalogManager.getCatalogs());
-    registerSqlExtensions();
+    registerSqlExtensions(conf);
     return Collections.emptyMap();
   }
 
@@ -103,6 +110,20 @@ public class GravitinoDriverPlugin implements DriverPlugin {
     LOG.info("Register {} catalog to Spark catalog manager.", catalogName);
   }
 
-  // Todo inject Iceberg extensions
-  private void registerSqlExtensions() {}
+  private void registerSqlExtensions(SparkConf conf) {
+    String gravitinoDriverExtensions = String.join(COMMA, GRAVITINO_DRIVER_EXTENSIONS);
+    if (conf.contains(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key())) {
+      String sparkSessionExtensions = conf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key());
+      if (StringUtils.isNotBlank(sparkSessionExtensions)) {
+        conf.set(
+            StaticSQLConf.SPARK_SESSION_EXTENSIONS().key(),
+            removeDuplicateSparkExtensions(
+                GRAVITINO_DRIVER_EXTENSIONS, sparkSessionExtensions.split(COMMA)));
+      } else {
+        conf.set(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key(), gravitinoDriverExtensions);
+      }
+    } else {
+      conf.set(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key(), gravitinoDriverExtensions);
+    }
+  }
 }

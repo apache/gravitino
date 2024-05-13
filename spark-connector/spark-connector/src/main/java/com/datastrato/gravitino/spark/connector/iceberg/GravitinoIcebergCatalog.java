@@ -9,11 +9,12 @@ import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
 import com.datastrato.gravitino.spark.connector.catalog.BaseCatalog;
-import com.datastrato.gravitino.spark.connector.table.SparkBaseTable;
 import java.util.Map;
 import org.apache.iceberg.spark.SparkCatalog;
+import org.apache.iceberg.spark.source.SparkTable;
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
+import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.FunctionCatalog;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
@@ -40,14 +41,29 @@ public class GravitinoIcebergCatalog extends BaseCatalog implements FunctionCata
   }
 
   @Override
-  protected SparkBaseTable createSparkTable(
+  protected org.apache.spark.sql.connector.catalog.Table createSparkTable(
       Identifier identifier,
       Table gravitinoTable,
-      TableCatalog sparkCatalog,
+      TableCatalog sparkIcebergCatalog,
       PropertiesConverter propertiesConverter,
       SparkTransformConverter sparkTransformConverter) {
+    org.apache.spark.sql.connector.catalog.Table sparkTable;
+    try {
+      sparkTable = sparkIcebergCatalog.loadTable(identifier);
+    } catch (NoSuchTableException e) {
+      throw new RuntimeException(
+          String.format(
+              "Failed to load the real sparkTable: %s",
+              String.join(".", getDatabase(identifier), identifier.name())),
+          e);
+    }
     return new SparkIcebergTable(
-        identifier, gravitinoTable, sparkCatalog, propertiesConverter, sparkTransformConverter);
+        identifier,
+        gravitinoTable,
+        (SparkTable) sparkTable,
+        (SparkCatalog) sparkIcebergCatalog,
+        propertiesConverter,
+        sparkTransformConverter);
   }
 
   @Override
