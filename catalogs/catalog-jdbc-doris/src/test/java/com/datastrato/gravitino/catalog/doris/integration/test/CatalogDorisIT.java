@@ -79,7 +79,7 @@ public class CatalogDorisIT extends AbstractIT {
   // Because the creation of Schema Change is an asynchronous process, we need to wait for a while
   // For more information, you can refer to the comment in
   // DorisTableOperations.generateAlterTableSql().
-  private static final long MAX_WAIT_IN_SECONDS = 30;
+  private static final long MAX_WAIT_IN_SECONDS = 120;
 
   private static final long WAIT_INTERVAL_IN_SECONDS = 1;
 
