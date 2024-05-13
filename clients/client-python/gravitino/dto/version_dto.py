@@ -13,8 +13,8 @@ class VersionDTO:
     version: str = ""
     """The version of the software."""
 
-    compileDate: str = ""
+    compile_date: str = ""
     """The date the software was compiled."""
 
-    gitCommit: str = ""
+    git_commit: str = ""
     """The git commit of the software."""

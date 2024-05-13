@@ -116,9 +116,9 @@ class GravitinoAdminClient(GravitinoClientBase):
             resp = self._rest_client.delete(
                 self.API_METALAKES_IDENTIFIER_PATH + ident.name()
             )
-            dropResponse = DropResponse.from_json(resp.body, infer_missing=True)
+            drop_response = DropResponse.from_json(resp.body, infer_missing=True)
 
-            return dropResponse.dropped()
+            return drop_response.dropped()
         except Exception:
             logger.warning("Failed to drop metalake %s", ident)
             return False
