@@ -10,15 +10,20 @@ import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
 import com.datastrato.gravitino.spark.connector.catalog.BaseCatalog;
 import java.util.Map;
+import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.spark.SparkCatalog;
+import org.apache.iceberg.spark.source.HasIcebergCatalog;
 import org.apache.iceberg.spark.source.SparkTable;
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
+import org.apache.spark.sql.catalyst.analysis.NoSuchProcedureException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.FunctionCatalog;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.connector.catalog.functions.UnboundFunction;
+import org.apache.spark.sql.connector.iceberg.catalog.Procedure;
+import org.apache.spark.sql.connector.iceberg.catalog.ProcedureCatalog;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
 /**
@@ -87,13 +92,13 @@ public class GravitinoIcebergCatalog extends BaseCatalog
     return ((SparkCatalog) sparkCatalog).loadFunction(ident);
   }
 
-    @Override
-    public Procedure loadProcedure(Identifier identifier) throws NoSuchProcedureException {
-        return ((SparkCatalog) sparkCatalog).loadProcedure(identifier);
-    }
+  @Override
+  public Procedure loadProcedure(Identifier identifier) throws NoSuchProcedureException {
+    return ((SparkCatalog) sparkCatalog).loadProcedure(identifier);
+  }
 
-    @Override
-    public Catalog icebergCatalog() {
-        return ((SparkCatalog) sparkCatalog).icebergCatalog();
-    }
+  @Override
+  public Catalog icebergCatalog() {
+    return ((SparkCatalog) sparkCatalog).icebergCatalog();
+  }
 }
