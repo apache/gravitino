@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.doris.utils;
 
+import com.datastrato.gravitino.catalog.doris.operation.DorisTablePartitionOperations.PartitionType;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -67,11 +68,5 @@ public final class DorisUtils {
       }
     }
     return PartitionType.NONE;
-  }
-
-  enum PartitionType {
-    RANGE,
-    LIST,
-    NONE
   }
 }
