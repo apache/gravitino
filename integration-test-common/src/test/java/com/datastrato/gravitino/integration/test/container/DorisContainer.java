@@ -61,7 +61,7 @@ public class DorisContainer extends BaseContainer {
   @Override
   public void start() {
     super.start();
-    Preconditions.check("Doris container startup failed!", checkContainerStatus(4));
+    Preconditions.check("Doris container startup failed!", checkContainerStatus(5));
     Preconditions.check("Doris container password change failed!", changePassword());
   }
 
