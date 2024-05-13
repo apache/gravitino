@@ -14,6 +14,7 @@ public class ConnectorConstants {
   public static final String LOCATION = "location";
 
   public static final String DOT = ".";
+  public static final String COMMA = ",";
 
   private ConnectorConstants() {}
 }

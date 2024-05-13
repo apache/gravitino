@@ -9,6 +9,7 @@ import com.datastrato.gravitino.integration.test.util.spark.SparkMetadataColumnI
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -17,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import lombok.Data;
 import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.Column;
 import org.apache.spark.sql.Dataset;
@@ -34,8 +36,15 @@ import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructField;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
+
+  private static final String ICEBERG_FORMAT_VERSION = "format-version";
+  private static final String ICEBERG_DELETE_MODE = "write.delete.mode";
+  private static final String ICEBERG_UPDATE_MODE = "write.update.mode";
+  private static final String ICEBERG_MERGE_MODE = "write.merge.mode";
 
   @Override
   protected String getCatalogName() {
@@ -54,6 +63,11 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
 
   @Override
   protected boolean supportsPartition() {
+    return true;
+  }
+
+  @Override
+  protected boolean supportsDelete() {
     return true;
   }
 
@@ -214,6 +228,15 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     testPartitionMetadataColumnWithUnPartitionedTable();
     testFileMetadataColumn();
     testDeleteMetadataColumn();
+  }
+
+  @ParameterizedTest
+  @MethodSource("getIcebergTablePropertyValues")
+  void testIcebergTableRowLevelOperations(IcebergTableWriteProperties icebergTableWriteProperties) {
+    testIcebergDeleteOperation(icebergTableWriteProperties);
+    testIcebergUpdateOperation(icebergTableWriteProperties);
+    testIcebergMergeIntoDeleteOperation(icebergTableWriteProperties);
+    testIcebergMergeIntoUpdateOperation(icebergTableWriteProperties);
   }
 
   private void testMetadataColumns() {
@@ -386,6 +409,84 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     Assertions.assertEquals(0, queryResult1.size());
   }
 
+  private void testIcebergDeleteOperation(IcebergTableWriteProperties icebergTableWriteProperties) {
+    String tableName =
+        String.format(
+            "test_iceberg_%s_%s_delete_operation",
+            icebergTableWriteProperties.isPartitionedTable,
+            icebergTableWriteProperties.formatVersion);
+    dropTableIfExists(tableName);
+    createIcebergTableWithTableProperties(
+        tableName,
+        icebergTableWriteProperties.isPartitionedTable,
+        ImmutableMap.of(
+            ICEBERG_FORMAT_VERSION,
+            String.valueOf(icebergTableWriteProperties.formatVersion),
+            ICEBERG_DELETE_MODE,
+            icebergTableWriteProperties.writeMode));
+    checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
+    checkRowLevelDelete(tableName);
+  }
+
+  private void testIcebergUpdateOperation(IcebergTableWriteProperties icebergTableWriteProperties) {
+    String tableName =
+        String.format(
+            "test_iceberg_%s_%s_update_operation",
+            icebergTableWriteProperties.isPartitionedTable,
+            icebergTableWriteProperties.formatVersion);
+    dropTableIfExists(tableName);
+    createIcebergTableWithTableProperties(
+        tableName,
+        icebergTableWriteProperties.isPartitionedTable,
+        ImmutableMap.of(
+            ICEBERG_FORMAT_VERSION,
+            String.valueOf(icebergTableWriteProperties.formatVersion),
+            ICEBERG_UPDATE_MODE,
+            icebergTableWriteProperties.writeMode));
+    checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
+    checkRowLevelUpdate(tableName);
+  }
+
+  private void testIcebergMergeIntoDeleteOperation(
+      IcebergTableWriteProperties icebergTableWriteProperties) {
+    String tableName =
+        String.format(
+            "test_iceberg_%s_%s_mergeinto_delete_operation",
+            icebergTableWriteProperties.isPartitionedTable,
+            icebergTableWriteProperties.formatVersion);
+    dropTableIfExists(tableName);
+    createIcebergTableWithTableProperties(
+        tableName,
+        icebergTableWriteProperties.isPartitionedTable,
+        ImmutableMap.of(
+            ICEBERG_FORMAT_VERSION,
+            String.valueOf(icebergTableWriteProperties.formatVersion),
+            ICEBERG_MERGE_MODE,
+            icebergTableWriteProperties.writeMode));
+    checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
+    checkDeleteByMergeInto(tableName);
+  }
+
+  private void testIcebergMergeIntoUpdateOperation(
+      IcebergTableWriteProperties icebergTableWriteProperties) {
+    String tableName =
+        String.format(
+            "test_iceberg_%s_%s_mergeinto_update_operation",
+            icebergTableWriteProperties.isPartitionedTable,
+            icebergTableWriteProperties.formatVersion);
+    dropTableIfExists(tableName);
+    createIcebergTableWithTableProperties(
+        tableName,
+        icebergTableWriteProperties.isPartitionedTable,
+        ImmutableMap.of(
+            ICEBERG_FORMAT_VERSION,
+            String.valueOf(icebergTableWriteProperties.formatVersion),
+            ICEBERG_MERGE_MODE,
+            icebergTableWriteProperties.writeMode));
+    checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
+    checkTableUpdateByMergeInto(tableName);
+  }
+
   private List<SparkTableInfo.SparkColumnInfo> getIcebergSimpleTableColumn() {
     return Arrays.asList(
         SparkTableInfo.SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment"),
@@ -415,5 +516,47 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
       new SparkMetadataColumnInfo("_pos", DataTypes.LongType, false),
       new SparkMetadataColumnInfo("_deleted", DataTypes.BooleanType, false)
     };
+  }
+
+  private List<IcebergTableWriteProperties> getIcebergTablePropertyValues() {
+    return Arrays.asList(
+        IcebergTableWriteProperties.of(false, 1, "copy-on-write"),
+        IcebergTableWriteProperties.of(false, 2, "merge-on-read"),
+        IcebergTableWriteProperties.of(true, 1, "copy-on-write"),
+        IcebergTableWriteProperties.of(true, 2, "merge-on-read"));
+  }
+
+  private void createIcebergTableWithTableProperties(
+      String tableName, boolean isPartitioned, ImmutableMap<String, String> tblProperties) {
+    String partitionedClause = isPartitioned ? " PARTITIONED BY (name) " : "";
+    String tblPropertiesStr =
+        tblProperties.entrySet().stream()
+            .map(e -> String.format("'%s'='%s'", e.getKey(), e.getValue()))
+            .collect(Collectors.joining(","));
+    String createSql =
+        String.format(
+            "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', age INT) %s TBLPROPERTIES(%s)",
+            tableName, partitionedClause, tblPropertiesStr);
+    sql(createSql);
+  }
+
+  @Data
+  private static class IcebergTableWriteProperties {
+
+    private boolean isPartitionedTable;
+    private int formatVersion;
+    private String writeMode;
+
+    private IcebergTableWriteProperties(
+        boolean isPartitionedTable, int formatVersion, String writeMode) {
+      this.isPartitionedTable = isPartitionedTable;
+      this.formatVersion = formatVersion;
+      this.writeMode = writeMode;
+    }
+
+    static IcebergTableWriteProperties of(
+        boolean isPartitionedTable, int formatVersion, String writeMode) {
+      return new IcebergTableWriteProperties(isPartitionedTable, formatVersion, writeMode);
+    }
   }
 }

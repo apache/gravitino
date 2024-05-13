@@ -6,7 +6,8 @@
 package com.datastrato.gravitino.integration.test.util.spark;
 
 import com.datastrato.gravitino.spark.connector.ConnectorConstants;
-import com.datastrato.gravitino.spark.connector.table.SparkBaseTable;
+import com.datastrato.gravitino.spark.connector.hive.SparkHiveTable;
+import com.datastrato.gravitino.spark.connector.iceberg.SparkIcebergTable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -18,6 +19,7 @@ import javax.ws.rs.NotSupportedException;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.spark.sql.connector.catalog.SupportsMetadataColumns;
+import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.connector.expressions.ApplyTransform;
 import org.apache.spark.sql.connector.expressions.BucketTransform;
@@ -29,6 +31,7 @@ import org.apache.spark.sql.connector.expressions.SortedBucketTransform;
 import org.apache.spark.sql.connector.expressions.Transform;
 import org.apache.spark.sql.connector.expressions.YearsTransform;
 import org.apache.spark.sql.types.DataType;
+import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.Assertions;
 
 /** SparkTableInfo is used to check the result in test. */
@@ -89,7 +92,7 @@ public class SparkTableInfo {
     }
   }
 
-  static SparkTableInfo create(SparkBaseTable baseTable) {
+  static SparkTableInfo create(Table baseTable) {
     SparkTableInfo sparkTableInfo = new SparkTableInfo();
     String identifier = baseTable.name();
     String[] items = identifier.split("\\.");
@@ -98,7 +101,9 @@ public class SparkTableInfo {
     sparkTableInfo.tableName = items[1];
     sparkTableInfo.database = items[0];
     sparkTableInfo.columns =
-        Arrays.stream(baseTable.schema().fields())
+        // using `baseTable.schema()` directly will failed because the method named `schema` is
+        // Deprecated in Spark Table interface
+        Arrays.stream(getSchema(baseTable).fields())
             .map(
                 sparkField ->
                     new SparkColumnInfo(
@@ -109,14 +114,12 @@ public class SparkTableInfo {
             .collect(Collectors.toList());
     sparkTableInfo.comment = baseTable.properties().remove(ConnectorConstants.COMMENT);
     sparkTableInfo.tableProperties = baseTable.properties();
-    boolean supportsBucketPartition =
-        baseTable.getSparkTransformConverter().isSupportsBucketPartition();
     Arrays.stream(baseTable.partitioning())
         .forEach(
             transform -> {
               if (transform instanceof BucketTransform
                   || transform instanceof SortedBucketTransform) {
-                if (isBucketPartition(supportsBucketPartition, transform)) {
+                if (isBucketPartition(baseTable, transform)) {
                   sparkTableInfo.addPartition(transform);
                 } else {
                   sparkTableInfo.setBucket(transform);
@@ -149,10 +152,6 @@ public class SparkTableInfo {
     return sparkTableInfo;
   }
 
-  private static boolean isBucketPartition(boolean supportsBucketPartition, Transform transform) {
-    return supportsBucketPartition && !(transform instanceof SortedBucketTransform);
-  }
-
   public List<SparkColumnInfo> getUnPartitionedColumns() {
     return columns.stream()
         .filter(column -> !partitionColumnNames.contains(column.name))
@@ -163,6 +162,21 @@ public class SparkTableInfo {
     return columns.stream()
         .filter(column -> partitionColumnNames.contains(column.name))
         .collect(Collectors.toList());
+  }
+
+  private static boolean isBucketPartition(Table baseTable, Transform transform) {
+    return baseTable instanceof SparkIcebergTable && !(transform instanceof SortedBucketTransform);
+  }
+
+  private static StructType getSchema(Table baseTable) {
+    if (baseTable instanceof SparkHiveTable) {
+      return ((SparkHiveTable) baseTable).schema();
+    } else if (baseTable instanceof SparkIcebergTable) {
+      return ((SparkIcebergTable) baseTable).schema();
+    } else {
+      throw new IllegalArgumentException(
+          "Doesn't support Spark table: " + baseTable.getClass().getName());
+    }
   }
 
   @Data

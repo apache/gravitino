@@ -20,7 +20,6 @@
 package com.datastrato.gravitino.integration.test.util.spark;
 
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
-import com.datastrato.gravitino.spark.connector.table.SparkBaseTable;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
@@ -130,8 +129,7 @@ public abstract class SparkUtilIT extends AbstractIT {
     CommandResult result = (CommandResult) ds.logicalPlan();
     DescribeRelation relation = (DescribeRelation) result.commandLogicalPlan();
     ResolvedTable table = (ResolvedTable) relation.child();
-    SparkBaseTable baseTable = (SparkBaseTable) table.table();
-    return SparkTableInfo.create(baseTable);
+    return SparkTableInfo.create(table.table());
   }
 
   protected void dropTableIfExists(String tableName) {
@@ -157,6 +155,10 @@ public abstract class SparkUtilIT extends AbstractIT {
 
   protected void insertTableAsSelect(String tableName, String newName) {
     sql(String.format("INSERT INTO TABLE %s SELECT * FROM %s", newName, tableName));
+  }
+
+  protected static String getSelectAllSqlWithOrder(String tableName, String orderByColumn) {
+    return String.format("SELECT * FROM %s ORDER BY %s", tableName, orderByColumn);
   }
 
   private static String getSelectAllSql(String tableName) {
