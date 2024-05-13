@@ -36,7 +36,7 @@ public class DorisExceptionConverter extends JdbcExceptionConverter {
       Pattern.compile(DATABASE_ALREADY_EXISTS_PATTERN_STRING);
 
   private static final String DATABASE_NOT_EXISTS_PATTERN_STRING =
-      ".*detailMessage = Can't drop database '.*'; database doesn't exist";
+      ".*?detailMessage = Can't drop database '.*?'; database doesn't exist";
   private static final Pattern DATABASE_NOT_EXISTS_PATTERN =
       Pattern.compile(DATABASE_NOT_EXISTS_PATTERN_STRING);
 
