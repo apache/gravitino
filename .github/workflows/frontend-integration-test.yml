@@ -82,13 +82,13 @@ jobs:
           ./gradlew build -x test -PjdkVersion=${{ matrix.java-version }}
           ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
 
-      - name: Free up disk space
-        run: |
-          dev/ci/util_free_space.sh
-
       - name: Setup debug Github Action
         if: ${{ contains(github.event.pull_request.labels.*.name, 'debug action') }}
         uses: csexton/debugger-action@master
+
+      - name: Free up disk space
+        run: |
+          dev/ci/util_free_space.sh
 
       - name: Frontend Integration Test
         id: integrationTest
