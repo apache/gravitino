@@ -21,6 +21,7 @@ Maintainers may be added once approved by the existing maintainers (see [Governa
 | Clearvive     | Clearvive           | Datastrato       |
 | Cheyne        | ch3yne              | Datastrato       |
 | Jerry Shao    | jerryshao           | Datastrato       |
+| Shaofeng Shi  | shaofengshi         | Datastrato       |
 
 
 # Contribitors
