@@ -463,6 +463,12 @@ public class CatalogsPageTest extends AbstractWebIT {
 
   @Test
   @Order(15)
+  public void testShowColumnTooltip() {
+    Assertions.assertTrue(catalogsPage.verifyTableProperty(COLUMN_NAME));
+  }
+
+  @Test
+  @Order(16)
   public void testRefreshTablePage() {
     driver.navigate().refresh();
     Assertions.assertEquals(WEB_TITLE, driver.getTitle());
@@ -483,7 +489,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(16)
+  @Order(17)
   public void testRelationalHiveCatalogTreeNode() throws InterruptedException {
     String hiveNode =
         String.format(
@@ -514,7 +520,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(17)
+  @Order(18)
   public void testTreeNodeRefresh() throws InterruptedException {
     createHiveTableAndColumn(METALAKE_NAME, MODIFIED_HIVE_CATALOG_NAME, SCHEMA_NAME, TABLE_NAME_2);
     String hiveNode =
@@ -542,7 +548,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(18)
+  @Order(19)
   public void testOtherRelationaCatalogTreeNode() throws InterruptedException {
     String icebergNode =
         String.format(
@@ -562,7 +568,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(19)
+  @Order(20)
   public void testSelectMetalake() throws InterruptedException {
     catalogsPage.metalakeSelectChange(METALAKE_SELECT_NAME);
     Assertions.assertTrue(catalogsPage.verifyEmptyTableData());
@@ -572,7 +578,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(20)
+  @Order(21)
   public void testFilesetCatalogTreeNode() throws InterruptedException {
     // 1. create schema and fileset of fileset catalog
     createSchema(METALAKE_NAME, FILESET_CATALOG_NAME, SCHEMA_NAME_FILESET);
@@ -634,7 +640,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(21)
+  @Order(22)
   public void testBackHomePage() throws InterruptedException {
     clickAndWait(catalogsPage.backHomeBtn);
     Assertions.assertTrue(catalogsPage.verifyBackHomePage());

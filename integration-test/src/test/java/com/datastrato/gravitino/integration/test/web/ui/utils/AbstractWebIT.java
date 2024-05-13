@@ -45,6 +45,11 @@ public class AbstractWebIT extends AbstractIT {
     }
   }
 
+  protected void moveTo(final Object locator) {
+    Actions action = new Actions(driver);
+    action.moveToElement(locatorElement(locator)).build().perform();
+  }
+
   protected WebElement pollingWait(final By locator, final long maxTimeout) {
     Wait<WebDriver> wait =
         new FluentWait<>(driver)

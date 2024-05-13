@@ -548,6 +548,24 @@ public class CatalogsPage extends AbstractWebIT {
     }
   }
 
+  public boolean verifyTableProperty(String colName) {
+    try {
+      moveTo("col-icon-" + colName);
+      String xpath = "*[@data-refer='tip-item-" + colName + "']";
+      waitShowText("", By.xpath(xpath));
+      WebElement item = driver.findElement(By.xpath(xpath));
+      boolean matches = Objects.equals(item.getText(), "HASH[10](" + colName + ")");
+      if (!matches) {
+        LOG.error("Tooltip item {} does not match, expected '{}'", colName, item.getText());
+        return false;
+      }
+      return true;
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+      return false;
+    }
+  }
+
   public boolean verifyBackHomePage() {
     try {
       WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
