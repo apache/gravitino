@@ -3,6 +3,8 @@ Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
 
+from typing import ClassVar
+
 from dataclasses import dataclass, field
 
 from dataclasses_json import DataClassJsonMixin, config
@@ -21,10 +23,10 @@ class NameIdentifier(DataClassJsonMixin):
     schema.
     """
 
+    _DOT: ClassVar[str] = "."
+
     _name: str = field(metadata=config(field_name="name"))
     _namespace: Namespace = field(metadata=config(field_name="namespace"))
-
-    DOT: str = "."
 
     @classmethod
     def builder(cls, namespace: Namespace, name: str):
@@ -241,7 +243,7 @@ class NameIdentifier(DataClassJsonMixin):
             "Cannot parse a null or empty identifier",
         )
 
-        parts = identifier.split(NameIdentifier.DOT)
+        parts = identifier.split(NameIdentifier._DOT)
         return NameIdentifier.of(*parts)
 
     def has_namespace(self):
