@@ -199,11 +199,13 @@ public class CapabilityHelpers {
 
     } else if (transform instanceof Transforms.ListTransform) {
       return Transforms.list(
-          applyCapabilities(((Transforms.ListTransform) transform).fieldNames(), capabilities));
+          applyCapabilities(((Transforms.ListTransform) transform).fieldNames(), capabilities),
+          ((Transforms.ListTransform) transform).assignments());
 
     } else if (transform instanceof Transforms.RangeTransform) {
       return Transforms.range(
-          applyCapabilities(((Transforms.RangeTransform) transform).fieldName(), capabilities));
+          applyCapabilities(((Transforms.RangeTransform) transform).fieldName(), capabilities),
+          ((Transforms.RangeTransform) transform).assignments());
 
     } else if (transform instanceof Transforms.ApplyTransform) {
       return Transforms.apply(
