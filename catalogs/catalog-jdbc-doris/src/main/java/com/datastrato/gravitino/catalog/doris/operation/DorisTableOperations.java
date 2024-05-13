@@ -197,6 +197,8 @@ public class DorisTableOperations extends JdbcTableOperations {
     if (ArrayUtils.isEmpty(partitioning)) {
       return;
     }
+    Preconditions.checkArgument(
+        partitioning.length == 1, "Composite partition type is not supported");
 
     StringBuilder partitionSqlBuilder = new StringBuilder();
     Set<String> columnNames =
