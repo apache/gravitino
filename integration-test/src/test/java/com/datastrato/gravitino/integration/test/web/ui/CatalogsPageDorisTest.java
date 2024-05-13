@@ -47,7 +47,7 @@ public class CatalogsPageDorisTest extends AbstractWebIT {
   private static GravitinoMetalake metalake;
 
   protected static String gravitinoUri = "http://127.0.0.1:8090";
-  protected static String dorisUri = "http://127.0.0.1:9030";
+  protected static String dorisJdbcConnectionUri;
 
   private static final String CATALOG_TABLE_TITLE = "Schemas";
   private static final String SCHEMA_TABLE_TITLE = "Tables";
@@ -85,12 +85,12 @@ public class CatalogsPageDorisTest extends AbstractWebIT {
 
     containerSuite.startDorisContainer();
 
-    dorisUri =
+    dorisJdbcConnectionUri =
         String.format(
             "jdbc:mysql://%s:%d/",
             containerSuite.getDorisContainer().getContainerIpAddress(),
             DorisContainer.FE_MYSQL_PORT);
-    LOG.info("Doris jdbc url: {}", dorisUri);
+    LOG.info("Doris jdbc url: {}", dorisJdbcConnectionUri);
   }
 
   /**
@@ -161,7 +161,7 @@ public class CatalogsPageDorisTest extends AbstractWebIT {
     catalogsPage.setCatalogCommentField("doris catalog comment");
     // set doris catalog props
     catalogsPage.setCatalogFixedProp("jdbc-driver", DORIS_JDBC_DRIVER);
-    catalogsPage.setCatalogFixedProp("jdbc-url", dorisUri);
+    catalogsPage.setCatalogFixedProp("jdbc-url", dorisJdbcConnectionUri);
     catalogsPage.setCatalogFixedProp("jdbc-user", USER_NAME);
     catalogsPage.setCatalogFixedProp("jdbc-password", PASSWORD);
     clickAndWait(catalogsPage.handleSubmitCatalogBtn);
