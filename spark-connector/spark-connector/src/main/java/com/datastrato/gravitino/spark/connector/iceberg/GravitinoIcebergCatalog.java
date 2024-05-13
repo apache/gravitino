@@ -9,14 +9,12 @@ import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
 import com.datastrato.gravitino.spark.connector.catalog.BaseCatalog;
-import com.google.common.base.Preconditions;
-import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.iceberg.spark.SparkCatalog;
+import org.apache.iceberg.spark.source.SparkTable;
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
+import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.FunctionCatalog;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
@@ -35,32 +33,10 @@ public class GravitinoIcebergCatalog extends BaseCatalog implements FunctionCata
   @Override
   protected TableCatalog createAndInitSparkCatalog(
       String name, CaseInsensitiveStringMap options, Map<String, String> properties) {
-    Preconditions.checkArgument(
-        properties != null, "Iceberg Catalog properties should not be null");
-
-    String catalogBackend =
-        properties.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND);
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(catalogBackend), "Iceberg Catalog backend should not be empty.");
-
-    HashMap<String, String> all = new HashMap<>(options);
-
-    switch (catalogBackend.toLowerCase(Locale.ENGLISH)) {
-      case IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND_HIVE:
-        initHiveProperties(catalogBackend, properties, all);
-        break;
-      case IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND_JDBC:
-        initJdbcProperties(catalogBackend, properties, all);
-        break;
-      default:
-        // SparkCatalog does not support Memory type catalog
-        throw new IllegalArgumentException(
-            "Unsupported Iceberg Catalog backend: " + catalogBackend);
-    }
-
+    Map<String, String> all =
+        getPropertiesConverter().toSparkCatalogProperties(options, properties);
     TableCatalog icebergCatalog = new SparkCatalog();
     icebergCatalog.initialize(name, new CaseInsensitiveStringMap(all));
-
     return icebergCatalog;
   }
 
@@ -68,22 +44,31 @@ public class GravitinoIcebergCatalog extends BaseCatalog implements FunctionCata
   protected org.apache.spark.sql.connector.catalog.Table createSparkTable(
       Identifier identifier,
       Table gravitinoTable,
-      org.apache.spark.sql.connector.catalog.Table sparkTable,
       TableCatalog sparkIcebergCatalog,
       PropertiesConverter propertiesConverter,
       SparkTransformConverter sparkTransformConverter) {
+    org.apache.spark.sql.connector.catalog.Table sparkTable;
+    try {
+      sparkTable = sparkIcebergCatalog.loadTable(identifier);
+    } catch (NoSuchTableException e) {
+      throw new RuntimeException(
+          String.format(
+              "Failed to load the real sparkTable: %s",
+              String.join(".", getDatabase(identifier), identifier.name())),
+          e);
+    }
     return new SparkIcebergTable(
         identifier,
         gravitinoTable,
-        sparkTable,
-        sparkIcebergCatalog,
+        (SparkTable) sparkTable,
+        (SparkCatalog) sparkIcebergCatalog,
         propertiesConverter,
         sparkTransformConverter);
   }
 
   @Override
   protected PropertiesConverter getPropertiesConverter() {
-    return new IcebergPropertiesConverter();
+    return IcebergPropertiesConverter.getInstance();
   }
 
   @Override
@@ -99,80 +84,5 @@ public class GravitinoIcebergCatalog extends BaseCatalog implements FunctionCata
   @Override
   public UnboundFunction loadFunction(Identifier ident) throws NoSuchFunctionException {
     return ((SparkCatalog) sparkCatalog).loadFunction(ident);
-  }
-
-  private void initHiveProperties(
-      String catalogBackend,
-      Map<String, String> gravitinoProperties,
-      HashMap<String, String> icebergProperties) {
-    String metastoreUri =
-        gravitinoProperties.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI);
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(metastoreUri),
-        "Couldn't get "
-            + IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI
-            + " from Iceberg Catalog properties");
-    String hiveWarehouse =
-        gravitinoProperties.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE);
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(hiveWarehouse),
-        "Couldn't get "
-            + IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE
-            + " from Iceberg Catalog properties");
-    icebergProperties.put(
-        IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_TYPE,
-        catalogBackend.toLowerCase(Locale.ENGLISH));
-    icebergProperties.put(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI, metastoreUri);
-    icebergProperties.put(
-        IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE, hiveWarehouse);
-  }
-
-  private void initJdbcProperties(
-      String catalogBackend,
-      Map<String, String> gravitinoProperties,
-      HashMap<String, String> icebergProperties) {
-    String jdbcUri =
-        gravitinoProperties.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI);
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(jdbcUri),
-        "Couldn't get "
-            + IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI
-            + " from Iceberg Catalog properties");
-    String jdbcWarehouse =
-        gravitinoProperties.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE);
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(jdbcWarehouse),
-        "Couldn't get "
-            + IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE
-            + " from Iceberg Catalog properties");
-    String jdbcUser = gravitinoProperties.get(IcebergPropertiesConstants.GRAVITINO_JDBC_USER);
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(jdbcUser),
-        "Couldn't get "
-            + IcebergPropertiesConstants.GRAVITINO_JDBC_USER
-            + " from Iceberg Catalog properties");
-    String jdbcPassword =
-        gravitinoProperties.get(IcebergPropertiesConstants.GRAVITINO_JDBC_PASSWORD);
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(jdbcPassword),
-        "Couldn't get "
-            + IcebergPropertiesConstants.GRAVITINO_JDBC_PASSWORD
-            + " from Iceberg Catalog properties");
-    String jdbcDriver =
-        gravitinoProperties.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_JDBC_DRIVER);
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(jdbcDriver),
-        "Couldn't get "
-            + IcebergPropertiesConstants.GRAVITINO_ICEBERG_JDBC_DRIVER
-            + " from Iceberg Catalog properties");
-    icebergProperties.put(
-        IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_TYPE,
-        catalogBackend.toLowerCase(Locale.ROOT));
-    icebergProperties.put(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI, jdbcUri);
-    icebergProperties.put(
-        IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE, jdbcWarehouse);
-    icebergProperties.put(IcebergPropertiesConstants.GRAVITINO_ICEBERG_JDBC_USER, jdbcUser);
-    icebergProperties.put(IcebergPropertiesConstants.GRAVITINO_ICEBERG_JDBC_PASSWORD, jdbcPassword);
-    icebergProperties.put(IcebergPropertiesConstants.GRAVITINO_ICEBERG_JDBC_DRIVER, jdbcDriver);
   }
 }

@@ -16,18 +16,17 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.auth.AuthConstants;
-import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergSchemaPropertiesMetadata;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper;
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.utils.IcebergCatalogUtil;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
-import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.Column;
@@ -61,14 +60,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.iceberg.NullOrder;
 import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.SortField;
+import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NoSuchNamespaceException;
-import org.apache.iceberg.hive.HiveCatalog;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
@@ -76,78 +74,54 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-@Tag("gravitino-docker-it")
-public class CatalogIcebergIT extends AbstractIT {
-  public static String metalakeName = GravitinoITUtils.genRandomName("iceberg_it_metalake");
-  public static String catalogName = GravitinoITUtils.genRandomName("iceberg_it_catalog");
-  public static String schemaName = GravitinoITUtils.genRandomName("iceberg_it_schema");
-  public static String tableName = GravitinoITUtils.genRandomName("iceberg_it_table");
-  public static String alertTableName = "alert_table_name";
-  public static String table_comment = "table_comment";
+public abstract class CatalogIcebergBaseIT extends AbstractIT {
 
-  public static String schema_comment = "schema_comment";
-  public static String ICEBERG_COL_NAME1 = "iceberg_col_name1";
-  public static String ICEBERG_COL_NAME2 = "iceberg_col_name2";
-  public static String ICEBERG_COL_NAME3 = "iceberg_col_name3";
-  public static String ICEBERG_COL_NAME4 = "iceberg_col_name4";
+  protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  protected String WAREHOUSE;
+  protected String URIS;
+  protected String TYPE;
+
+  private static final String alertTableName = "alert_table_name";
+  private static final String table_comment = "table_comment";
+  private static final String schema_comment = "schema_comment";
+  private static final String ICEBERG_COL_NAME1 = "iceberg_col_name1";
+  private static final String ICEBERG_COL_NAME2 = "iceberg_col_name2";
+  private static final String ICEBERG_COL_NAME3 = "iceberg_col_name3";
+  private static final String ICEBERG_COL_NAME4 = "iceberg_col_name4";
   private static final String provider = "lakehouse-iceberg";
-
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
-  private static String WAREHOUSE;
-  private static String HIVE_METASTORE_URIS;
-
-  private static String SELECT_ALL_TEMPLATE = "SELECT * FROM iceberg.%s";
+  private static final String SELECT_ALL_TEMPLATE = "SELECT * FROM iceberg.%s";
   private static String INSERT_BATCH_WITHOUT_PARTITION_TEMPLATE =
       "INSERT INTO iceberg.%s VALUES %s";
-  private static GravitinoMetalake metalake;
-
-  private static Catalog catalog;
-
-  private static HiveCatalog hiveCatalog;
-
-  private static SparkSession spark;
+  private String metalakeName = GravitinoITUtils.genRandomName("iceberg_it_metalake");
+  private String catalogName = GravitinoITUtils.genRandomName("iceberg_it_catalog");
+  private String schemaName = GravitinoITUtils.genRandomName("iceberg_it_schema");
+  private String tableName = GravitinoITUtils.genRandomName("iceberg_it_table");
+  private GravitinoMetalake metalake;
+  private Catalog catalog;
+  private org.apache.iceberg.catalog.Catalog icebergCatalog;
+  private org.apache.iceberg.catalog.SupportsNamespaces icebergSupportsNamespaces;
+  private SparkSession spark;
 
   @BeforeAll
-  public static void startup() {
+  public void startup() throws Exception {
+    ignoreIcebergRestService = false;
+    AbstractIT.startIntegrationTest();
     containerSuite.startHiveContainer();
-    HIVE_METASTORE_URIS =
-        String.format(
-            "thrift://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
-
-    WAREHOUSE =
-        String.format(
-            "hdfs://%s:%d/user/hive/warehouse-catalog-iceberg/",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HDFS_DEFAULTFS_PORT);
-
+    initIcebergCatalogProperties();
     createMetalake();
     createCatalog();
     createSchema();
-    spark =
-        SparkSession.builder()
-            .master("local[1]")
-            .appName("Iceberg Catalog integration test")
-            .config("spark.sql.warehouse.dir", WAREHOUSE)
-            .config("spark.sql.catalog.iceberg", "org.apache.iceberg.spark.SparkCatalog")
-            .config("spark.sql.catalog.iceberg.uri", HIVE_METASTORE_URIS)
-            .config("spark.sql.catalog.iceberg.type", "hive")
-            .config(
-                "spark.sql.extensions",
-                "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
-            .enableHiveSupport()
-            .getOrCreate();
+    initSparkEnv();
   }
 
   @AfterAll
-  public static void stop() {
+  public void stop() throws Exception {
     clearTableAndSchema();
     client.dropMetalake(NameIdentifier.of(metalakeName));
     spark.close();
+    AbstractIT.stopIntegrationTest();
   }
 
   @AfterEach
@@ -156,7 +130,34 @@ public class CatalogIcebergIT extends AbstractIT {
     createSchema();
   }
 
-  private static void clearTableAndSchema() {
+  // AbstractIT#startIntegrationTest() is static, so we couldn't inject catalog info
+  // if startIntegrationTest() is auto invoked by Junit. So here we override
+  // startIntegrationTest() to disable the auto invoke by junit.
+  @BeforeAll
+  public static void startIntegrationTest() {}
+
+  @AfterAll
+  public static void stopIntegrationTest() {}
+
+  protected abstract void initIcebergCatalogProperties();
+
+  private void initSparkEnv() {
+    spark =
+        SparkSession.builder()
+            .master("local[1]")
+            .appName("Iceberg Catalog integration test")
+            .config("spark.sql.warehouse.dir", WAREHOUSE)
+            .config("spark.sql.catalog.iceberg", "org.apache.iceberg.spark.SparkCatalog")
+            .config("spark.sql.catalog.iceberg.uri", URIS)
+            .config("spark.sql.catalog.iceberg.type", TYPE)
+            .config(
+                "spark.sql.extensions",
+                "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
+            .enableHiveSupport()
+            .getOrCreate();
+  }
+
+  private void clearTableAndSchema() {
     NameIdentifier[] nameIdentifiers =
         catalog.asTableCatalog().listTables(Namespace.of(metalakeName, catalogName, schemaName));
     for (NameIdentifier nameIdentifier : nameIdentifiers) {
@@ -165,7 +166,7 @@ public class CatalogIcebergIT extends AbstractIT {
     catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), false);
   }
 
-  private static void createMetalake() {
+  private void createMetalake() {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
@@ -177,23 +178,23 @@ public class CatalogIcebergIT extends AbstractIT {
     metalake = loadMetalake;
   }
 
-  private static void createCatalog() {
+  private void createCatalog() {
     Map<String, String> catalogProperties = Maps.newHashMap();
     catalogProperties.put("key1", "val1");
     catalogProperties.put("key2", "val2");
 
-    catalogProperties.put(
-        IcebergConfig.CATALOG_BACKEND.getKey(), IcebergCatalogBackend.HIVE.name());
-    catalogProperties.put(IcebergConfig.CATALOG_URI.getKey(), HIVE_METASTORE_URIS);
+    catalogProperties.put(IcebergConfig.CATALOG_BACKEND.getKey(), TYPE);
+    catalogProperties.put(IcebergConfig.CATALOG_URI.getKey(), URIS);
     catalogProperties.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), WAREHOUSE);
 
-    Map<String, String> hiveProperties = Maps.newHashMap();
-    hiveProperties.put(IcebergConfig.CATALOG_URI.getKey(), HIVE_METASTORE_URIS);
-    hiveProperties.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), WAREHOUSE);
+    Map<String, String> icebergCatalogProperties = Maps.newHashMap();
+    icebergCatalogProperties.put(IcebergConfig.CATALOG_URI.getKey(), URIS);
+    icebergCatalogProperties.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), WAREHOUSE);
 
-    hiveCatalog = new HiveCatalog();
-    hiveCatalog.setConf(new HdfsConfiguration());
-    hiveCatalog.initialize("hive", hiveProperties);
+    icebergCatalog = IcebergCatalogUtil.loadCatalogBackend(TYPE, icebergCatalogProperties);
+    if (icebergCatalog instanceof SupportsNamespaces) {
+      icebergSupportsNamespaces = (org.apache.iceberg.catalog.SupportsNamespaces) icebergCatalog;
+    }
 
     Catalog createdCatalog =
         metalake.createCatalog(
@@ -208,7 +209,7 @@ public class CatalogIcebergIT extends AbstractIT {
     catalog = loadCatalog;
   }
 
-  private static void createSchema() {
+  private void createSchema() {
     NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
     Map<String, String> prop = Maps.newHashMap();
     prop.put("key1", "val1");
@@ -257,7 +258,7 @@ public class CatalogIcebergIT extends AbstractIT {
     Assertions.assertTrue(schemaNames.contains(schemaName));
 
     List<org.apache.iceberg.catalog.Namespace> icebergNamespaces =
-        hiveCatalog.listNamespaces(IcebergTableOpsHelper.getIcebergNamespace());
+        icebergSupportsNamespaces.listNamespaces(IcebergTableOpsHelper.getIcebergNamespace());
     schemaNames =
         icebergNamespaces.stream().map(ns -> ns.level(ns.length() - 1)).collect(Collectors.toSet());
     Assertions.assertTrue(schemaNames.contains(schemaName));
@@ -271,7 +272,8 @@ public class CatalogIcebergIT extends AbstractIT {
         Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v -> v));
     Assertions.assertTrue(schemaMap.containsKey(testSchemaName));
 
-    icebergNamespaces = hiveCatalog.listNamespaces(IcebergTableOpsHelper.getIcebergNamespace());
+    icebergNamespaces =
+        icebergSupportsNamespaces.listNamespaces(IcebergTableOpsHelper.getIcebergNamespace());
     schemaNames =
         icebergNamespaces.stream().map(ns -> ns.level(ns.length() - 1)).collect(Collectors.toSet());
     Assertions.assertTrue(schemaNames.contains(testSchemaName));
@@ -283,7 +285,7 @@ public class CatalogIcebergIT extends AbstractIT {
     Assertions.assertEquals("v1", val);
 
     Map<String, String> hiveCatalogProps =
-        hiveCatalog.loadNamespaceMetadata(
+        icebergSupportsNamespaces.loadNamespaceMetadata(
             IcebergTableOpsHelper.getIcebergNamespace(schemaIdent.name()));
     Assertions.assertTrue(hiveCatalogProps.containsKey("t1"));
 
@@ -300,7 +302,7 @@ public class CatalogIcebergIT extends AbstractIT {
     Assertions.assertThrows(
         NoSuchNamespaceException.class,
         () -> {
-          hiveCatalog.loadNamespaceMetadata(icebergNamespace);
+          icebergSupportsNamespaces.loadNamespaceMetadata(icebergNamespace);
         });
 
     nameIdentifiers = schemas.listSchemas(Namespace.of(metalakeName, catalogName));
@@ -329,7 +331,8 @@ public class CatalogIcebergIT extends AbstractIT {
     Assertions.assertFalse(schemas.dropSchema(schemaIdent, true));
     Assertions.assertFalse(schemas.dropSchema(schemaIdent, false));
     Assertions.assertFalse(tableCatalog.dropTable(table));
-    icebergNamespaces = hiveCatalog.listNamespaces(IcebergTableOpsHelper.getIcebergNamespace());
+    icebergNamespaces =
+        icebergSupportsNamespaces.listNamespaces(IcebergTableOpsHelper.getIcebergNamespace());
     schemaNames =
         icebergNamespaces.stream().map(ns -> ns.level(ns.length() - 1)).collect(Collectors.toSet());
     Assertions.assertTrue(schemaNames.contains(schemaName));
@@ -413,7 +416,8 @@ public class CatalogIcebergIT extends AbstractIT {
 
     // catalog load check
     org.apache.iceberg.Table table =
-        hiveCatalog.loadTable(IcebergTableOpsHelper.buildIcebergTableIdentifier(tableIdentifier));
+        icebergCatalog.loadTable(
+            IcebergTableOpsHelper.buildIcebergTableIdentifier(tableIdentifier));
     Assertions.assertEquals(tableName, table.name().substring(table.name().lastIndexOf(".") + 1));
     Assertions.assertEquals(
         table_comment, table.properties().get(IcebergTable.ICEBERG_COMMENT_FIELD_NAME));
@@ -485,7 +489,8 @@ public class CatalogIcebergIT extends AbstractIT {
     Assertions.assertEquals("col_2_comment", loadTable.columns()[1].comment());
 
     org.apache.iceberg.Table table =
-        hiveCatalog.loadTable(IcebergTableOpsHelper.buildIcebergTableIdentifier(tableIdentifier));
+        icebergCatalog.loadTable(
+            IcebergTableOpsHelper.buildIcebergTableIdentifier(tableIdentifier));
     org.apache.iceberg.Schema icebergSchema = table.schema();
     Assertions.assertEquals("iceberg_column_1", icebergSchema.columns().get(0).name());
     Assertions.assertEquals(
@@ -522,7 +527,7 @@ public class CatalogIcebergIT extends AbstractIT {
     Assertions.assertEquals("table_1", nameIdentifiers[0].name());
 
     List<TableIdentifier> tableIdentifiers =
-        hiveCatalog.listTables(IcebergTableOpsHelper.getIcebergNamespace(schemaName));
+        icebergCatalog.listTables(IcebergTableOpsHelper.getIcebergNamespace(schemaName));
     Assertions.assertEquals(1, tableIdentifiers.size());
     Assertions.assertEquals("table_1", tableIdentifiers.get(0).name());
 
@@ -541,7 +546,7 @@ public class CatalogIcebergIT extends AbstractIT {
     Assertions.assertEquals("table_2", nameIdentifiers[1].name());
 
     tableIdentifiers =
-        hiveCatalog.listTables(IcebergTableOpsHelper.getIcebergNamespace(schemaName));
+        icebergCatalog.listTables(IcebergTableOpsHelper.getIcebergNamespace(schemaName));
     Assertions.assertEquals(2, tableIdentifiers.size());
     Assertions.assertEquals("table_1", tableIdentifiers.get(0).name());
     Assertions.assertEquals("table_2", tableIdentifiers.get(1).name());
@@ -558,7 +563,7 @@ public class CatalogIcebergIT extends AbstractIT {
     Assertions.assertEquals(0, nameIdentifiers.length);
 
     tableIdentifiers =
-        hiveCatalog.listTables(IcebergTableOpsHelper.getIcebergNamespace(schemaName));
+        icebergCatalog.listTables(IcebergTableOpsHelper.getIcebergNamespace(schemaName));
     Assertions.assertEquals(0, tableIdentifiers.size());
   }
 
@@ -757,7 +762,7 @@ public class CatalogIcebergIT extends AbstractIT {
             sortOrders);
 
     TableIdentifier tableIdentifier = TableIdentifier.of(schemaName, testTableName);
-    org.apache.iceberg.Table table = hiveCatalog.loadTable(tableIdentifier);
+    org.apache.iceberg.Table table = icebergCatalog.loadTable(tableIdentifier);
     PartitionSpec spec = table.spec();
     Map<Integer, String> idToName = table.schema().idToName();
     List<PartitionField> fields = spec.fields();

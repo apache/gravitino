@@ -10,7 +10,7 @@ import static com.datastrato.gravitino.dto.util.DTOConverters.toDTOs;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.catalog.TableDispatcher;
+import com.datastrato.gravitino.catalog.PartitionDispatcher;
 import com.datastrato.gravitino.dto.rel.partitions.PartitionDTO;
 import com.datastrato.gravitino.dto.requests.AddPartitionsRequest;
 import com.datastrato.gravitino.dto.responses.DropResponse;
@@ -21,7 +21,6 @@ import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.lock.LockType;
 import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.metrics.MetricNames;
-import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.partitions.Partition;
 import com.datastrato.gravitino.server.web.Utils;
 import com.google.common.base.Preconditions;
@@ -44,11 +43,11 @@ import org.slf4j.LoggerFactory;
 public class PartitionOperations {
   private static final Logger LOG = LoggerFactory.getLogger(PartitionOperations.class);
 
-  private final TableDispatcher dispatcher;
+  private final PartitionDispatcher dispatcher;
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public PartitionOperations(TableDispatcher dispatcher) {
+  public PartitionOperations(PartitionDispatcher dispatcher) {
     this.dispatcher = dispatcher;
   }
 
@@ -71,12 +70,11 @@ public class PartitionOperations {
                 tableIdent,
                 LockType.READ,
                 () -> {
-                  Table loadTable = dispatcher.loadTable(tableIdent);
                   if (verbose) {
-                    Partition[] partitions = loadTable.supportPartitions().listPartitions();
+                    Partition[] partitions = dispatcher.listPartitions(tableIdent);
                     return Utils.ok(new PartitionListResponse(toDTOs(partitions)));
                   } else {
-                    String[] partitionNames = loadTable.supportPartitions().listPartitionNames();
+                    String[] partitionNames = dispatcher.listPartitionNames(tableIdent);
                     return Utils.ok(new PartitionNameListResponse((partitionNames)));
                   }
                 });
@@ -106,8 +104,7 @@ public class PartitionOperations {
                 tableIdent,
                 LockType.READ,
                 () -> {
-                  Table loadTable = dispatcher.loadTable(tableIdent);
-                  Partition p = loadTable.supportPartitions().getPartition(partition);
+                  Partition p = dispatcher.getPartition(tableIdent, partition);
                   return Utils.ok(new PartitionResponse(DTOConverters.toDTO(p)));
                 });
           });
@@ -138,11 +135,8 @@ public class PartitionOperations {
                 tableIdent,
                 LockType.WRITE,
                 () -> {
-                  Table loadTable = dispatcher.loadTable(tableIdent);
                   Partition p =
-                      loadTable
-                          .supportPartitions()
-                          .addPartition(fromDTO(request.getPartitions()[0]));
+                      dispatcher.addPartition(tableIdent, fromDTO(request.getPartitions()[0]));
                   return Utils.ok(
                       new PartitionListResponse(new PartitionDTO[] {DTOConverters.toDTO(p)}));
                 });
@@ -173,11 +167,10 @@ public class PartitionOperations {
                 tableIdent,
                 LockType.WRITE,
                 () -> {
-                  Table loadTable = dispatcher.loadTable(tableIdent);
                   boolean dropped =
                       purge
-                          ? loadTable.supportPartitions().purgePartition(partition)
-                          : loadTable.supportPartitions().dropPartition(partition);
+                          ? dispatcher.purgePartition(tableIdent, partition)
+                          : dispatcher.dropPartition(tableIdent, partition);
                   if (!dropped) {
                     LOG.warn(
                         "Failed to drop partition {} under table {} under schema {}",

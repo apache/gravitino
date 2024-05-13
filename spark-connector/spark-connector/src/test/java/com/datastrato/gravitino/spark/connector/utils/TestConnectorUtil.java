@@ -5,6 +5,8 @@
 
 package com.datastrato.gravitino.spark.connector.utils;
 
+import static com.datastrato.gravitino.spark.connector.ConnectorConstants.COMMA;
+
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -13,19 +15,25 @@ import org.junit.jupiter.api.TestInstance;
 public class TestConnectorUtil {
 
   @Test
-  void testRemoveDuplicates() {
-    String[] elements = {"a", "b", "c"};
-    String otherElements = "a,d,e";
-    String result = ConnectorUtil.removeDuplicates(elements, otherElements);
+  void testRemoveDuplicateSparkExtensions() {
+    String[] extensions = {"a", "b", "c"};
+    String addedExtensions = "a,d,e";
+    String result =
+        ConnectorUtil.removeDuplicateSparkExtensions(extensions, addedExtensions.split(COMMA));
     Assertions.assertEquals(result, "a,b,c,d,e");
 
-    elements = new String[] {"a", "a", "b", "c"};
-    otherElements = "";
-    result = ConnectorUtil.removeDuplicates(elements, otherElements);
+    extensions = new String[] {"a", "a", "b", "c"};
+    addedExtensions = "";
+    result = ConnectorUtil.removeDuplicateSparkExtensions(extensions, addedExtensions.split(COMMA));
     Assertions.assertEquals(result, "a,b,c");
 
-    elements = new String[] {"a", "a", "b", "c"};
-    result = ConnectorUtil.removeDuplicates(elements, null);
+    extensions = new String[] {"a", "a", "b", "c"};
+    addedExtensions = "b";
+    result = ConnectorUtil.removeDuplicateSparkExtensions(extensions, addedExtensions.split(COMMA));
+    Assertions.assertEquals(result, "a,b,c");
+
+    extensions = new String[] {"a", "a", "b", "c"};
+    result = ConnectorUtil.removeDuplicateSparkExtensions(extensions, null);
     Assertions.assertEquals(result, "a,b,c");
   }
 }

@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import lombok.Data;
 import org.apache.hadoop.fs.Path;
 import org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions;
 import org.apache.spark.SparkConf;
@@ -41,8 +42,8 @@ import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructField;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.junit.platform.commons.util.StringUtils;
-import scala.Tuple3;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
 
@@ -235,81 +236,72 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     testDeleteMetadataColumn();
   }
 
-  @Test
-  void testInjectSparkExtensions() {
-    SparkSession sparkSession = getSparkSession();
-    SparkConf conf = sparkSession.sparkContext().getConf();
-    Assertions.assertTrue(conf.contains(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key()));
-    String extensions = conf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key());
-    Assertions.assertTrue(StringUtils.isNotBlank(extensions));
-    Assertions.assertEquals(IcebergSparkSessionExtensions.class.getName(), extensions);
+  @ParameterizedTest
+  @MethodSource("getIcebergTablePropertyValues")
+  void testIcebergTableRowLevelOperations(IcebergTableWriteProperties icebergTableWriteProperties) {
+    testIcebergDeleteOperation(icebergTableWriteProperties);
+    testIcebergUpdateOperation(icebergTableWriteProperties);
+    testIcebergMergeIntoDeleteOperation(icebergTableWriteProperties);
+    testIcebergMergeIntoUpdateOperation(icebergTableWriteProperties);
   }
 
-  @Test
-  void testIcebergTableRowLevelOperations() {
-    testIcebergDeleteOperation();
-    testIcebergUpdateOperation();
-    testIcebergMergeIntoDeleteOperation();
-    testIcebergMergeIntoUpdateOperation();
-  }
+    @Test
+    void testIcebergAsOfQuery() {
+        String tableName = "test_iceberg_as_of_query";
+        String fullTableName =
+                String.format("%s.%s.%s", getCatalogName(), getDefaultDatabase(), tableName);
+        dropTableIfExists(tableName);
+        createSimpleTable(tableName);
 
-  @Test
-  void testIcebergAsOfQuery() {
-    String tableName = "test_iceberg_as_of_query";
-    String fullTableName =
-        String.format("%s.%s.%s", getCatalogName(), getDefaultDatabase(), tableName);
-    dropTableIfExists(tableName);
-    createSimpleTable(tableName);
+        checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
 
-    checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
+        sql(String.format("INSERT INTO %s VALUES (1, '1', 1)", tableName));
+        List<Row> snapshots =
+                getSparkSession()
+                        .sql(String.format("SELECT snapshot_id FROM %s.snapshots", fullTableName))
+                        .collectAsList();
+        Assertions.assertEquals(1, snapshots.size());
+        long snapshotId = snapshots.get(0).getLong(0);
+        List<Row> timestamp =
+                getSparkSession()
+                        .sql(String.format("SELECT committed_at FROM %s.snapshots", fullTableName))
+                        .collectAsList();
+        Assertions.assertEquals(1, timestamp.size());
+        Timestamp timestampAt = timestamp.get(0).getTimestamp(0);
+        waitUntilAfter(timestampAt.getTime());
+        Timestamp firstSnapshotTimestamp =
+                Timestamp.from(Instant.ofEpochMilli(System.currentTimeMillis()));
+        sql(String.format("INSERT INTO %s VALUES (2, '2', 2)", tableName));
 
-    sql(String.format("INSERT INTO %s VALUES (1, '1', 1)", tableName));
-    List<Row> snapshots =
-        getSparkSession()
-            .sql(String.format("SELECT snapshot_id FROM %s.snapshots", fullTableName))
-            .collectAsList();
-    Assertions.assertEquals(1, snapshots.size());
-    long snapshotId = snapshots.get(0).getLong(0);
-    List<Row> timestamp =
-        getSparkSession()
-            .sql(String.format("SELECT committed_at FROM %s.snapshots", fullTableName))
-            .collectAsList();
-    Assertions.assertEquals(1, timestamp.size());
-    Timestamp timestampAt = timestamp.get(0).getTimestamp(0);
-    waitUntilAfter(timestampAt.getTime());
-    Timestamp firstSnapshotTimestamp =
-        Timestamp.from(Instant.ofEpochMilli(System.currentTimeMillis()));
-    sql(String.format("INSERT INTO %s VALUES (2, '2', 2)", tableName));
+        List<String> tableData = getQueryData(getSelectAllSqlWithOrder(tableName));
+        Assertions.assertEquals(2, tableData.size());
+        Assertions.assertEquals("1,1,1;2,2,2", String.join(";", tableData));
 
-    List<String> tableData = getQueryData(getSelectAllSqlWithOrder(tableName));
-    Assertions.assertEquals(2, tableData.size());
-    Assertions.assertEquals("1,1,1;2,2,2", String.join(";", tableData));
+        tableData =
+                getQueryData(
+                        String.format(
+                                "SELECT * FROM %s TIMESTAMP AS OF '%s'", tableName, firstSnapshotTimestamp));
+        Assertions.assertEquals(1, tableData.size());
+        Assertions.assertEquals("1,1,1", tableData.get(0));
+        tableData =
+                getQueryData(
+                        String.format(
+                                "SELECT * FROM %s FOR SYSTEM_TIME AS OF '%s'", tableName, firstSnapshotTimestamp));
+        Assertions.assertEquals(1, tableData.size());
+        Assertions.assertEquals("1,1,1", tableData.get(0));
 
-    tableData =
-        getQueryData(
-            String.format(
-                "SELECT * FROM %s TIMESTAMP AS OF '%s'", tableName, firstSnapshotTimestamp));
-    Assertions.assertEquals(1, tableData.size());
-    Assertions.assertEquals("1,1,1", tableData.get(0));
-    tableData =
-        getQueryData(
-            String.format(
-                "SELECT * FROM %s FOR SYSTEM_TIME AS OF '%s'", tableName, firstSnapshotTimestamp));
-    Assertions.assertEquals(1, tableData.size());
-    Assertions.assertEquals("1,1,1", tableData.get(0));
+        tableData =
+                getQueryData(String.format("SELECT * FROM %s VERSION AS OF %d", tableName, snapshotId));
+        Assertions.assertEquals(1, tableData.size());
+        Assertions.assertEquals("1,1,1", tableData.get(0));
+        tableData =
+                getQueryData(
+                        String.format("SELECT * FROM %s FOR SYSTEM_VERSION AS OF %d", tableName, snapshotId));
+        Assertions.assertEquals(1, tableData.size());
+        Assertions.assertEquals("1,1,1", tableData.get(0));
+    }
 
-    tableData =
-        getQueryData(String.format("SELECT * FROM %s VERSION AS OF %d", tableName, snapshotId));
-    Assertions.assertEquals(1, tableData.size());
-    Assertions.assertEquals("1,1,1", tableData.get(0));
-    tableData =
-        getQueryData(
-            String.format("SELECT * FROM %s FOR SYSTEM_VERSION AS OF %d", tableName, snapshotId));
-    Assertions.assertEquals(1, tableData.size());
-    Assertions.assertEquals("1,1,1", tableData.get(0));
-  }
-
-  private void testMetadataColumns() {
+    private void testMetadataColumns() {
     String tableName = "test_metadata_columns";
     dropTableIfExists(tableName);
     String createTableSQL = getCreateSimpleTableString(tableName);
@@ -479,86 +471,82 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     Assertions.assertEquals(0, queryResult1.size());
   }
 
-  private void testIcebergDeleteOperation() {
-    getIcebergTablePropertyValues()
-        .forEach(
-            tuple -> {
-              String tableName =
-                  String.format("test_iceberg_%s_%s_delete_operation", tuple._1(), tuple._2());
-              dropTableIfExists(tableName);
-              createIcebergTableWithTabProperties(
-                  tableName,
-                  tuple._1(),
-                  ImmutableMap.of(
-                      ICEBERG_FORMAT_VERSION,
-                      String.valueOf(tuple._2()),
-                      ICEBERG_DELETE_MODE,
-                      tuple._3()));
-              checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
-              checkTableRowLevelDelete(tableName);
-            });
+  private void testIcebergDeleteOperation(IcebergTableWriteProperties icebergTableWriteProperties) {
+    String tableName =
+        String.format(
+            "test_iceberg_%s_%s_delete_operation",
+            icebergTableWriteProperties.isPartitionedTable,
+            icebergTableWriteProperties.formatVersion);
+    dropTableIfExists(tableName);
+    createIcebergTableWithTableProperties(
+        tableName,
+        icebergTableWriteProperties.isPartitionedTable,
+        ImmutableMap.of(
+            ICEBERG_FORMAT_VERSION,
+            String.valueOf(icebergTableWriteProperties.formatVersion),
+            ICEBERG_DELETE_MODE,
+            icebergTableWriteProperties.writeMode));
+    checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
+    checkRowLevelDelete(tableName);
   }
 
-  private void testIcebergUpdateOperation() {
-    getIcebergTablePropertyValues()
-        .forEach(
-            tuple -> {
-              String tableName =
-                  String.format("test_iceberg_%s_%s_update_operation", tuple._1(), tuple._2());
-              dropTableIfExists(tableName);
-              createIcebergTableWithTabProperties(
-                  tableName,
-                  tuple._1(),
-                  ImmutableMap.of(
-                      ICEBERG_FORMAT_VERSION,
-                      String.valueOf(tuple._2()),
-                      ICEBERG_UPDATE_MODE,
-                      tuple._3()));
-              checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
-              checkTableRowLevelUpdate(tableName);
-            });
+  private void testIcebergUpdateOperation(IcebergTableWriteProperties icebergTableWriteProperties) {
+    String tableName =
+        String.format(
+            "test_iceberg_%s_%s_update_operation",
+            icebergTableWriteProperties.isPartitionedTable,
+            icebergTableWriteProperties.formatVersion);
+    dropTableIfExists(tableName);
+    createIcebergTableWithTableProperties(
+        tableName,
+        icebergTableWriteProperties.isPartitionedTable,
+        ImmutableMap.of(
+            ICEBERG_FORMAT_VERSION,
+            String.valueOf(icebergTableWriteProperties.formatVersion),
+            ICEBERG_UPDATE_MODE,
+            icebergTableWriteProperties.writeMode));
+    checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
+    checkRowLevelUpdate(tableName);
   }
 
-  private void testIcebergMergeIntoDeleteOperation() {
-    getIcebergTablePropertyValues()
-        .forEach(
-            tuple -> {
-              String tableName =
-                  String.format(
-                      "test_iceberg_%s_%s_mergeinto_delete_operation", tuple._1(), tuple._2());
-              dropTableIfExists(tableName);
-              createIcebergTableWithTabProperties(
-                  tableName,
-                  tuple._1(),
-                  ImmutableMap.of(
-                      ICEBERG_FORMAT_VERSION,
-                      String.valueOf(tuple._2()),
-                      ICEBERG_MERGE_MODE,
-                      tuple._3()));
-              checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
-              checkTableDeleteByMergeInto(tableName);
-            });
+  private void testIcebergMergeIntoDeleteOperation(
+      IcebergTableWriteProperties icebergTableWriteProperties) {
+    String tableName =
+        String.format(
+            "test_iceberg_%s_%s_mergeinto_delete_operation",
+            icebergTableWriteProperties.isPartitionedTable,
+            icebergTableWriteProperties.formatVersion);
+    dropTableIfExists(tableName);
+    createIcebergTableWithTableProperties(
+        tableName,
+        icebergTableWriteProperties.isPartitionedTable,
+        ImmutableMap.of(
+            ICEBERG_FORMAT_VERSION,
+            String.valueOf(icebergTableWriteProperties.formatVersion),
+            ICEBERG_MERGE_MODE,
+            icebergTableWriteProperties.writeMode));
+    checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
+    checkDeleteByMergeInto(tableName);
   }
 
-  private void testIcebergMergeIntoUpdateOperation() {
-    getIcebergTablePropertyValues()
-        .forEach(
-            tuple -> {
-              String tableName =
-                  String.format(
-                      "test_iceberg_%s_%s_mergeinto_update_operation", tuple._1(), tuple._2());
-              dropTableIfExists(tableName);
-              createIcebergTableWithTabProperties(
-                  tableName,
-                  tuple._1(),
-                  ImmutableMap.of(
-                      ICEBERG_FORMAT_VERSION,
-                      String.valueOf(tuple._2()),
-                      ICEBERG_MERGE_MODE,
-                      tuple._3()));
-              checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
-              checkTableUpdateByMergeInto(tableName);
-            });
+  private void testIcebergMergeIntoUpdateOperation(
+      IcebergTableWriteProperties icebergTableWriteProperties) {
+    String tableName =
+        String.format(
+            "test_iceberg_%s_%s_mergeinto_update_operation",
+            icebergTableWriteProperties.isPartitionedTable,
+            icebergTableWriteProperties.formatVersion);
+    dropTableIfExists(tableName);
+    createIcebergTableWithTableProperties(
+        tableName,
+        icebergTableWriteProperties.isPartitionedTable,
+        ImmutableMap.of(
+            ICEBERG_FORMAT_VERSION,
+            String.valueOf(icebergTableWriteProperties.formatVersion),
+            ICEBERG_MERGE_MODE,
+            icebergTableWriteProperties.writeMode));
+    checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
+    checkTableUpdateByMergeInto(tableName);
   }
 
   private List<SparkTableInfo.SparkColumnInfo> getIcebergSimpleTableColumn() {
@@ -592,15 +580,15 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     };
   }
 
-  private List<Tuple3<Boolean, Integer, String>> getIcebergTablePropertyValues() {
+  private List<IcebergTableWriteProperties> getIcebergTablePropertyValues() {
     return Arrays.asList(
-        new Tuple3<>(false, 1, "copy-on-write"),
-        new Tuple3<>(false, 2, "merge-on-read"),
-        new Tuple3<>(true, 1, "copy-on-write"),
-        new Tuple3<>(true, 2, "merge-on-read"));
+        IcebergTableWriteProperties.of(false, 1, "copy-on-write"),
+        IcebergTableWriteProperties.of(false, 2, "merge-on-read"),
+        IcebergTableWriteProperties.of(true, 1, "copy-on-write"),
+        IcebergTableWriteProperties.of(true, 2, "merge-on-read"));
   }
 
-  private void createIcebergTableWithTabProperties(
+  private void createIcebergTableWithTableProperties(
       String tableName, boolean isPartitioned, ImmutableMap<String, String> tblProperties) {
     String partitionedClause = isPartitioned ? " PARTITIONED BY (name) " : "";
     String tblPropertiesStr =
@@ -614,10 +602,23 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     sql(createSql);
   }
 
-  private void waitUntilAfter(Long timestampMillis) {
-    long current = System.currentTimeMillis();
-    while (current <= timestampMillis) {
-      current = System.currentTimeMillis();
+  @Data
+  private static class IcebergTableWriteProperties {
+
+    private boolean isPartitionedTable;
+    private int formatVersion;
+    private String writeMode;
+
+    private IcebergTableWriteProperties(
+        boolean isPartitionedTable, int formatVersion, String writeMode) {
+      this.isPartitionedTable = isPartitionedTable;
+      this.formatVersion = formatVersion;
+      this.writeMode = writeMode;
+    }
+
+    static IcebergTableWriteProperties of(
+        boolean isPartitionedTable, int formatVersion, String writeMode) {
+      return new IcebergTableWriteProperties(isPartitionedTable, formatVersion, writeMode);
     }
   }
 }

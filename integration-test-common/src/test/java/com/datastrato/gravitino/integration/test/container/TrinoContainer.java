@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.integration.test.container;
 
 import static java.lang.String.format;
+import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
 import com.google.common.collect.ImmutableSet;
 import java.sql.Connection;
@@ -17,6 +18,7 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.rnorth.ducttape.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,23 +67,20 @@ public class TrinoContainer extends BaseContainer {
 
   @Override
   protected boolean checkContainerStatus(int retryLimit) {
-    int nRetry = 0;
-    boolean isTrinoJdbcConnectionReady = false;
-    int sleepTime = 5000;
-    while (nRetry++ < retryLimit && !isTrinoJdbcConnectionReady) {
-      isTrinoJdbcConnectionReady = testTrinoJdbcConnection();
-      if (isTrinoJdbcConnectionReady) {
-        break;
-      } else {
-        try {
-          Thread.sleep(sleepTime);
-          LOG.warn("Waiting for trino server to be ready... ({}ms)", nRetry * sleepTime);
-        } catch (InterruptedException e) {
-          // ignore
-        }
-      }
-    }
-    return isTrinoJdbcConnectionReady;
+    await()
+        .atMost(30, TimeUnit.SECONDS)
+        .pollInterval(30 / retryLimit, TimeUnit.SECONDS)
+        .until(
+            () -> {
+              try {
+                return testTrinoJdbcConnection();
+              } catch (Exception e) {
+                LOG.error("Trino container startup failed!", e);
+              }
+              return false;
+            });
+
+    return true;
   }
 
   @Override
@@ -118,27 +117,23 @@ public class TrinoContainer extends BaseContainer {
 
   // Check tha Trino has synchronized the catalog from Gravitino
   public boolean checkSyncCatalogFromGravitino(int retryLimit, String catalogName) {
-    int nRetry = 0;
-    int sleepTime = 5000;
-    while (nRetry++ < retryLimit) {
-      ArrayList<ArrayList<String>> queryData =
-          executeQuerySQL(format("SHOW CATALOGS LIKE '%s'", catalogName));
-      for (ArrayList<String> record : queryData) {
-        String columnValue = record.get(0);
-        if (columnValue.equals(catalogName)) {
-          return true;
-        }
-      }
-      try {
-        Thread.sleep(sleepTime);
-        LOG.warn(
-            "Waiting for Trino synchronized the catalog from Gravitino... ({}ms)",
-            nRetry * sleepTime);
-      } catch (InterruptedException e) {
-        // ignore
-      }
-    }
-    return false;
+    await()
+        .atMost(30, TimeUnit.SECONDS)
+        .pollInterval(60 / retryLimit, TimeUnit.SECONDS)
+        .until(
+            () -> {
+              ArrayList<ArrayList<String>> queryData =
+                  executeQuerySQL(format("SHOW CATALOGS LIKE '%s'", catalogName));
+              for (ArrayList<String> record : queryData) {
+                String columnValue = record.get(0);
+                if (columnValue.equals(catalogName)) {
+                  return true;
+                }
+              }
+              return false;
+            });
+
+    return true;
   }
 
   private boolean testTrinoJdbcConnection() {

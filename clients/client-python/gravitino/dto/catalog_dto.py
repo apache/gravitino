@@ -2,6 +2,7 @@
 Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
+
 from typing import Dict
 from dataclasses import dataclass, field
 
@@ -15,16 +16,22 @@ from ..api.catalog import Catalog
 class CatalogDTO(Catalog):
     """Data transfer object representing catalog information."""
 
-    _name: str = field(metadata=config(field_name='name'))
-    _type: Catalog.Type = field(metadata=config(field_name='type'))
-    _provider: str = field(metadata=config(field_name='provider'))
-    _comment: str = field(metadata=config(field_name='comment'))
-    _properties: Dict[str, str] = field(metadata=config(field_name='properties'))
-    _audit: AuditDTO = field(default=None, metadata=config(field_name='audit'))
+    _name: str = field(metadata=config(field_name="name"))
+    _type: Catalog.Type = field(metadata=config(field_name="type"))
+    _provider: str = field(metadata=config(field_name="provider"))
+    _comment: str = field(metadata=config(field_name="comment"))
+    _properties: Dict[str, str] = field(metadata=config(field_name="properties"))
+    _audit: AuditDTO = field(default=None, metadata=config(field_name="audit"))
 
-    def builder(self, name: str = None, type: Catalog.Type = Catalog.Type.UNSUPPORTED,
-                provider: str = None, comment: str = None, properties: Dict[str, str] = None,
-                audit: AuditDTO = None):
+    def builder(
+        self,
+        name: str = None,
+        type: Catalog.Type = Catalog.Type.UNSUPPORTED,
+        provider: str = None,
+        comment: str = None,
+        properties: Dict[str, str] = None,
+        audit: AuditDTO = None,
+    ):
         self._name = name
         self._type = type
         self._provider = provider

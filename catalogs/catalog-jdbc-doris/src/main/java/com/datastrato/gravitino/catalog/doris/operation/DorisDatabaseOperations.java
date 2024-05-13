@@ -10,6 +10,7 @@ import com.datastrato.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.meta.AuditInfo;
+import com.google.common.collect.ImmutableSet;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -18,11 +19,15 @@ import java.sql.Statement;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 
 /** Database operations for Doris. */
 public class DorisDatabaseOperations extends JdbcDatabaseOperations {
   public static final String COMMENT_KEY = "comment";
+
+  private static final Set<String> DORIS_SYSTEM_DATABASE_NAMES =
+      ImmutableSet.of("information_schema");
 
   @Override
   public String generateCreateDatabaseSql(
@@ -115,5 +120,10 @@ public class DorisDatabaseOperations extends JdbcDatabaseOperations {
     }
 
     return DorisUtils.extractPropertiesFromSql(createDatabaseSql);
+  }
+
+  @Override
+  protected boolean isSystemDatabase(String dbName) {
+    return DORIS_SYSTEM_DATABASE_NAMES.contains(dbName);
   }
 }

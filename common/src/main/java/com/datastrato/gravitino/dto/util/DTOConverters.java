@@ -301,20 +301,30 @@ public class DTOConverters {
         default:
           throw new IllegalArgumentException("Unsupported transform: " + transform.name());
       }
+
     } else if (transform instanceof Transforms.BucketTransform) {
       return BucketPartitioningDTO.of(
           ((Transforms.BucketTransform) transform).numBuckets(),
           ((Transforms.BucketTransform) transform).fieldNames());
+
     } else if (transform instanceof Transforms.TruncateTransform) {
       return TruncatePartitioningDTO.of(
           ((Transforms.TruncateTransform) transform).width(),
           ((Transforms.TruncateTransform) transform).fieldName());
+
     } else if (transform instanceof Transforms.ListTransform) {
-      return ListPartitioningDTO.of(((Transforms.ListTransform) transform).fieldNames());
+      Transforms.ListTransform listTransform = (Transforms.ListTransform) transform;
+      return ListPartitioningDTO.of(
+          listTransform.fieldNames(), (ListPartitionDTO[]) toDTOs(listTransform.assignments()));
+
     } else if (transform instanceof Transforms.RangeTransform) {
-      return RangePartitioningDTO.of(((Transforms.RangeTransform) transform).fieldName());
+      Transforms.RangeTransform rangeTransform = (Transforms.RangeTransform) transform;
+      return RangePartitioningDTO.of(
+          rangeTransform.fieldName(), (RangePartitionDTO[]) toDTOs(rangeTransform.assignments()));
+
     } else if (transform instanceof Transforms.ApplyTransform) {
       return FunctionPartitioningDTO.of(transform.name(), toFunctionArg(transform.arguments()));
+
     } else {
       throw new IllegalArgumentException("Unsupported transform: " + transform.name());
     }
@@ -840,9 +850,19 @@ public class DTOConverters {
             ((TruncatePartitioningDTO) partitioning).width(),
             ((TruncatePartitioningDTO) partitioning).fieldName());
       case LIST:
-        return Transforms.list(((ListPartitioningDTO) partitioning).fieldNames());
+        ListPartitioningDTO listPartitioningDTO = (ListPartitioningDTO) partitioning;
+        ListPartition[] listPartitions =
+            Arrays.stream(listPartitioningDTO.assignments())
+                .map(p -> (ListPartition) fromDTO(p))
+                .toArray(ListPartition[]::new);
+        return Transforms.list(listPartitioningDTO.fieldNames(), listPartitions);
       case RANGE:
-        return Transforms.range(((RangePartitioningDTO) partitioning).fieldName());
+        RangePartitioningDTO rangePartitioningDTO = (RangePartitioningDTO) partitioning;
+        RangePartition[] rangePartitions =
+            Arrays.stream(rangePartitioningDTO.assignments())
+                .map(p -> (RangePartition) fromDTO(p))
+                .toArray(RangePartition[]::new);
+        return Transforms.range(rangePartitioningDTO.fieldName(), rangePartitions);
       case FUNCTION:
         return Transforms.apply(
             ((FunctionPartitioningDTO) partitioning).functionName(),

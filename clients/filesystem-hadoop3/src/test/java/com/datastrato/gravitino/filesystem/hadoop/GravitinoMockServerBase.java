@@ -40,7 +40,7 @@ import org.mockserver.model.Parameter;
 public abstract class GravitinoMockServerBase {
   private static final ObjectMapper MAPPER = JsonUtils.objectMapper();
   private static ClientAndServer mockServer;
-  private static final String MOCK_SERVER_HOST = "http://127.0.0.1:";
+  private static final String MOCK_SERVER_HOST = "http://localhost:";
   private static int port;
   protected static final String metalakeName = "metalake_1";
   protected static final String catalogName = "fileset_catalog_1";

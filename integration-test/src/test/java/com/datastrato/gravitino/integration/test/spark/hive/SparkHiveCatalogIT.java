@@ -23,6 +23,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @Tag("gravitino-docker-it")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -61,7 +63,7 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
   }
 
   @Test
-  public void testCreateHiveFormatPartitionTable() {
+  void testCreateHiveFormatPartitionTable() {
     String tableName = "hive_partition_table";
 
     dropTableIfExists(tableName);
@@ -85,8 +87,9 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
     checkPartitionDirExists(tableInfo);
   }
 
-  @Test
-  public void testWriteHiveDynamicPartition() {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testWriteHiveDynamicPartition(boolean isInsertOverWrite) {
     String tableName = "hive_dynamic_partition_table";
 
     dropTableIfExists(tableName);
@@ -99,7 +102,8 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
     // write data to dynamic partition
     String insertData =
         String.format(
-            "INSERT OVERWRITE %s PARTITION(age_p1=1, age_p2) values(1,'a',3,'b');", tableName);
+            "INSERT %s %s PARTITION(age_p1=1, age_p2) values(1,'a',3,'b');",
+            isInsertOverWrite ? "OVERWRITE" : "INTO", tableName);
     sql(insertData);
     List<String> queryResult = getTableData(tableName);
     Assertions.assertTrue(queryResult.size() == 1);
@@ -111,7 +115,7 @@ public class SparkHiveCatalogIT extends SparkCommonIT {
   }
 
   @Test
-  public void testInsertHiveFormatPartitionTableAsSelect() {
+  void testInsertHiveFormatPartitionTableAsSelect() {
     String tableName = "insert_hive_partition_table";
     String newTableName = "new_" + tableName;
 
