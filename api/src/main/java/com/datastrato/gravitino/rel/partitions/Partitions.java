@@ -12,6 +12,9 @@ import java.util.Objects;
 /** The helper class for partition expressions. */
 public class Partitions {
 
+  /** An empty array of partitions. */
+  public static Partition[] EMPTY_PARTITIONS = new Partition[0];
+
   /**
    * Creates a range partition.
    *

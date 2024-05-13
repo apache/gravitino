@@ -8,6 +8,8 @@ import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
 import com.datastrato.gravitino.rel.expressions.literals.Literals;
+import com.datastrato.gravitino.rel.partitions.ListPartition;
+import com.datastrato.gravitino.rel.partitions.RangePartition;
 import com.google.common.collect.ObjectArrays;
 import java.util.Arrays;
 import java.util.Objects;
@@ -166,8 +168,20 @@ public class Transforms {
    * @return The created transform
    */
   public static ListTransform list(String[]... fieldNames) {
+    return list(fieldNames, new ListPartition[0]);
+  }
+
+  /**
+   * Create a transform that includes multiple fields in a list with preassigned list partitions.
+   *
+   * @param fieldNames The field names to include in the list
+   * @param assignments The preassigned list partitions
+   * @return The created transform
+   */
+  public static ListTransform list(String[][] fieldNames, ListPartition[] assignments) {
     return new ListTransform(
-        Arrays.stream(fieldNames).map(NamedReference::field).toArray(NamedReference[]::new));
+        Arrays.stream(fieldNames).map(NamedReference::field).toArray(NamedReference[]::new),
+        assignments);
   }
 
   /**
@@ -177,7 +191,18 @@ public class Transforms {
    * @return The created transform
    */
   public static RangeTransform range(String[] fieldName) {
-    return new RangeTransform(NamedReference.field(fieldName));
+    return range(fieldName, new RangePartition[0]);
+  }
+
+  /**
+   * Create a transform that returns the range of the input value with preassigned range partitions.
+   *
+   * @param fieldName The field name to transform
+   * @param assignments The preassigned range partitions
+   * @return The created transform
+   */
+  public static RangeTransform range(String[] fieldName, RangePartition[] assignments) {
+    return new RangeTransform(NamedReference.field(fieldName), assignments);
   }
 
   /**
@@ -486,9 +511,16 @@ public class Transforms {
   public static final class ListTransform implements Transform {
 
     private final NamedReference[] fields;
+    private final ListPartition[] assignments;
 
     private ListTransform(NamedReference[] fields) {
       this.fields = fields;
+      this.assignments = new ListPartition[0];
+    }
+
+    private ListTransform(NamedReference[] fields, ListPartition[] assignments) {
+      this.fields = fields;
+      this.assignments = assignments;
     }
 
     /** @return The field names to include in the list. */
@@ -510,9 +542,8 @@ public class Transforms {
 
     /** @return The assignments to the transform. */
     @Override
-    public Expression[] assignments() {
-      // todo: resolve this
-      return Transform.super.assignments();
+    public ListPartition[] assignments() {
+      return assignments;
     }
 
     @Override
@@ -537,9 +568,16 @@ public class Transforms {
   public static final class RangeTransform implements Transform {
 
     private final NamedReference field;
+    private final RangePartition[] assignments;
 
     private RangeTransform(NamedReference field) {
       this.field = field;
+      this.assignments = new RangePartition[0];
+    }
+
+    private RangeTransform(NamedReference field, RangePartition[] assignments) {
+      this.field = field;
+      this.assignments = assignments;
     }
 
     /** @return The field name to transform. */
@@ -561,9 +599,8 @@ public class Transforms {
 
     /** @return The assignments to the transform. */
     @Override
-    public Expression[] assignments() {
-      // todo: resolve this
-      return Transform.super.assignments();
+    public RangePartition[] assignments() {
+      return assignments;
     }
 
     @Override

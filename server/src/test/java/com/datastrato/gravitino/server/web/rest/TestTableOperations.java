@@ -27,7 +27,9 @@ import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
 import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
 import com.datastrato.gravitino.dto.rel.indexes.IndexDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.IdentityPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.ListPartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
+import com.datastrato.gravitino.dto.rel.partitions.ListPartitionDTO;
 import com.datastrato.gravitino.dto.requests.TableCreateRequest;
 import com.datastrato.gravitino.dto.requests.TableUpdateRequest;
 import com.datastrato.gravitino.dto.requests.TableUpdatesRequest;
@@ -416,6 +418,61 @@ public class TestTableOperations extends JerseyTest {
     ErrorResponse errorResp3 = resp.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResp3.getCode());
     Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), errorResp3.getType());
+
+    // Test partitioning with assignments
+    Partitioning[] partitioningWithAssignments = {
+      ListPartitioningDTO.of(
+          new String[][] {{"col1"}, {"col2"}},
+          new ListPartitionDTO[] {
+            ListPartitionDTO.builder()
+                .withName("v1")
+                .withLists(
+                    new LiteralDTO[][] {
+                      {
+                        LiteralDTO.builder()
+                            .withDataType(Types.StringType.get())
+                            .withValue("a")
+                            .build(),
+                        LiteralDTO.builder()
+                            .withDataType(Types.ByteType.get())
+                            .withValue("1")
+                            .build()
+                      }
+                    })
+                .build()
+          })
+    };
+    Table tableWithAssignments =
+        mockTable(
+            "table1",
+            columns,
+            "mock comment",
+            ImmutableMap.of("k1", "v1"),
+            partitioningWithAssignments);
+    when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(tableWithAssignments);
+
+    req =
+        new TableCreateRequest(
+            "table1",
+            "mock comment",
+            Arrays.stream(columns).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new),
+            ImmutableMap.of("k1", "v1"),
+            SortOrderDTO.EMPTY_SORT,
+            DistributionDTO.NONE,
+            partitioningWithAssignments,
+            IndexDTO.EMPTY_INDEXES);
+    resp =
+        target(tablePath(metalake, catalog, schema))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+
+    tableResp = resp.readEntity(TableResponse.class);
+    Assertions.assertEquals(0, tableResp.getCode());
+    Assertions.assertArrayEquals(partitioningWithAssignments, tableResp.getTable().partitioning());
   }
 
   @Test
