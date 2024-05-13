@@ -42,6 +42,9 @@ The Hive catalog supports creating, updating, and deleting databases and tables 
 
 When you use the Gravitino with Trino. You can pass the Trino Hive connector configuration using prefix `trino.bypass.`. For example, using `trino.bypass.hive.config.resources` to pass the `hive.config.resources` to the Gravitino Hive catalog in Trino runtime.
 
+When you use the Gravitino with Spark. You can pass the Spark Hive connector configuration using prefix `spark.bypass.`. For example, using `spark.bypass.hive.exec.dynamic.partition.mode` to pass the `hive.exec.dynamic.partition.mode` to the Spark Hive connector in Spark runtime.
+
+
 ### Catalog operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
