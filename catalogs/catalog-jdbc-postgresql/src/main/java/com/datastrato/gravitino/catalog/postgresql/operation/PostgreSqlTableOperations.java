@@ -72,6 +72,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
         "The `jdbc-database` configuration item is mandatory in PostgreSQL.");
   }
 
+  @Override
   protected JdbcTable.Builder getTableBuilder(
       ResultSet tablesResult, String databaseName, String tableName) throws SQLException {
     boolean found = false;

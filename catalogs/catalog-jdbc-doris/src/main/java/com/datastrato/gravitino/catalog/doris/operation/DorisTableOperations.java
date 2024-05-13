@@ -249,7 +249,6 @@ public class DorisTableOperations extends JdbcTableOperations {
   protected void correctJdbcTableFields(
       Connection connection, String databaseName, String tableName, JdbcTable.Builder tableBuilder)
       throws SQLException {
-
     if (StringUtils.isNotEmpty(tableBuilder.comment())) {
       return;
     }
@@ -268,6 +267,48 @@ public class DorisTableOperations extends JdbcTableOperations {
         }
       }
       tableBuilder.withComment(comment.toString());
+    } catch (SQLException e) {
+      throw exceptionMapper.toGravitinoException(e);
+    }
+
+    getTableStatus(connection, databaseName, tableName);
+  }
+
+  protected void getTableStatus(Connection connection, String databaseName, String tableName) {
+    // sql is `SHOW ALTER TABLE COLUMN WHERE TableName = 'test_table'`
+    // database name must be specified in connection, so the SQL do not need to specify database
+    // name
+    String sql =
+        String.format(
+            "SHOW ALTER TABLE COLUMN WHERE TableName = '%s' ORDER BY JobId DESC limit 1",
+            tableName);
+
+    // Just print each column name and type from resultSet
+    // TODO: add to table properties or other fields
+    try (PreparedStatement preparedStatement = connection.prepareStatement(sql);
+        ResultSet resultSet = preparedStatement.executeQuery()) {
+
+      StringBuilder jobStatus = new StringBuilder();
+      while (resultSet.next()) {
+        int columnCount = resultSet.getMetaData().getColumnCount();
+        for (int i = 1; i <= columnCount; i++) {
+          jobStatus
+              .append(resultSet.getMetaData().getColumnName(i))
+              .append(" : ")
+              .append(resultSet.getString(i))
+              .append(", ");
+        }
+        jobStatus.append(" | ");
+      }
+
+      if (jobStatus.length() > 0) {
+        LOG.info(
+            "Table {}.{} schema-change execution status: {}",
+            databaseName,
+            tableName,
+            jobStatus.toString());
+      }
+
     } catch (SQLException e) {
       throw exceptionMapper.toGravitinoException(e);
     }

@@ -7,6 +7,7 @@ package com.datastrato.gravitino.catalog.doris.integration.test;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.utils.RandomNameUtils;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
@@ -31,5 +32,11 @@ public class TestDorisDatabaseOperations extends TestDorisAbstractIT {
         () -> DATABASE_OPERATIONS.create(databaseName, "", properties));
 
     testDropDatabase(databaseName);
+  }
+
+  @Test
+  void testListSystemDatabase() {
+    List<String> databaseNames = DATABASE_OPERATIONS.listDatabases();
+    Assertions.assertFalse(databaseNames.contains("information_schema"));
   }
 }

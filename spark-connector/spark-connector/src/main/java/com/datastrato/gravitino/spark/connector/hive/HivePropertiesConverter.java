@@ -6,18 +6,31 @@
 package com.datastrato.gravitino.spark.connector.hive;
 
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
+import com.datastrato.gravitino.spark.connector.GravitinoSparkConfig;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.ws.rs.NotSupportedException;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 
 /** Transform hive catalog properties between Spark and Gravitino. */
 public class HivePropertiesConverter implements PropertiesConverter {
+  public static class HivePropertiesConverterHolder {
+    private static final HivePropertiesConverter INSTANCE = new HivePropertiesConverter();
+  }
+
+  private HivePropertiesConverter() {}
+
+  public static HivePropertiesConverter getInstance() {
+    return HivePropertiesConverterHolder.INSTANCE;
+  }
 
   // Transform Spark hive file format to Gravitino hive file format
   static final Map<String, String> fileFormatMap =
@@ -47,6 +60,20 @@ public class HivePropertiesConverter implements PropertiesConverter {
       ImmutableMap.of(
           HivePropertiesConstants.GRAVITINO_HIVE_TABLE_LOCATION,
           HivePropertiesConstants.SPARK_HIVE_LOCATION);
+
+  @Override
+  public Map<String, String> toSparkCatalogProperties(Map<String, String> properties) {
+    Preconditions.checkArgument(properties != null, "Hive Catalog properties should not be null");
+    String metastoreUri = properties.get(GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(metastoreUri),
+        "Couldn't get "
+            + GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI
+            + " from hive catalog properties");
+    HashMap<String, String> all = new HashMap<>();
+    all.put(GravitinoSparkConfig.SPARK_HIVE_METASTORE_URI, metastoreUri);
+    return all;
+  }
 
   /**
    * CREATE TABLE xxx STORED AS PARQUET will save "hive.stored-as" = "PARQUET" in property.

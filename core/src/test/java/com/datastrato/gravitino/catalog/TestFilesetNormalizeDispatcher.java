@@ -19,15 +19,17 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-public class TestFilesetNormalizeDispatcher extends TestFilesetOperationDispatcher {
+public class TestFilesetNormalizeDispatcher extends TestOperationDispatcher {
   private static FilesetNormalizeDispatcher filesetNormalizeDispatcher;
   private static SchemaNormalizeDispatcher schemaNormalizeDispatcher;
 
   @BeforeAll
   public static void initialize() throws IOException {
     TestFilesetOperationDispatcher.initialize();
-    filesetNormalizeDispatcher = new FilesetNormalizeDispatcher(filesetOperationDispatcher);
-    schemaNormalizeDispatcher = new SchemaNormalizeDispatcher(schemaOperationDispatcher);
+    filesetNormalizeDispatcher =
+        new FilesetNormalizeDispatcher(TestFilesetOperationDispatcher.filesetOperationDispatcher);
+    schemaNormalizeDispatcher =
+        new SchemaNormalizeDispatcher(TestFilesetOperationDispatcher.schemaOperationDispatcher);
   }
 
   @Test

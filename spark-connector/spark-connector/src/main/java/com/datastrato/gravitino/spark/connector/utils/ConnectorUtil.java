@@ -14,10 +14,11 @@ import org.apache.commons.lang3.StringUtils;
 
 public class ConnectorUtil {
 
-  public static String removeDuplicates(String[] elements, String otherElements) {
-    Set<String> uniqueElements = new LinkedHashSet<>(Arrays.asList(elements));
-    if (StringUtils.isNotBlank(otherElements)) {
-      uniqueElements.addAll(Arrays.asList(otherElements.split(COMMA)));
+  public static String removeDuplicateSparkExtensions(
+      String[] extensions, String[] addedExtensions) {
+    Set<String> uniqueElements = new LinkedHashSet<>(Arrays.asList(extensions));
+    if (addedExtensions != null && StringUtils.isNoneBlank(addedExtensions)) {
+      uniqueElements.addAll(Arrays.asList(addedExtensions));
     }
     return uniqueElements.stream()
         .reduce((element1, element2) -> element1 + COMMA + element2)

@@ -5,10 +5,13 @@
 
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.web.metrics;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
+
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import com.google.common.collect.ImmutableMap;
-import java.time.Instant;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.iceberg.metrics.ImmutableCommitMetricsResult;
 import org.apache.iceberg.metrics.ImmutableCommitReport;
 import org.apache.iceberg.metrics.MetricsReport;
@@ -31,12 +34,11 @@ public class TestIcebergMetricsManager {
     return metricsReport;
   }
 
-  private MetricsReport tryGetIcebergMetrics(MemoryMetricsStore memoryMetricsStore)
-      throws InterruptedException {
-    Instant waitTime = Instant.now().plusSeconds(20);
-    while (memoryMetricsStore.getMetricsReport() == null && Instant.now().isBefore(waitTime)) {
-      Thread.sleep(100);
-    }
+  private MetricsReport tryGetIcebergMetrics(MemoryMetricsStore memoryMetricsStore) {
+    await()
+        .atMost(20, TimeUnit.SECONDS)
+        .pollInterval(100, TimeUnit.MILLISECONDS)
+        .untilAsserted(() -> assertTrue(memoryMetricsStore.getMetricsReport() != null));
     return memoryMetricsStore.getMetricsReport();
   }
 

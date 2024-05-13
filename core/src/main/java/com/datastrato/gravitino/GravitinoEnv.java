@@ -11,6 +11,9 @@ import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.catalog.FilesetDispatcher;
 import com.datastrato.gravitino.catalog.FilesetNormalizeDispatcher;
 import com.datastrato.gravitino.catalog.FilesetOperationDispatcher;
+import com.datastrato.gravitino.catalog.PartitionDispatcher;
+import com.datastrato.gravitino.catalog.PartitionNormalizeDispatcher;
+import com.datastrato.gravitino.catalog.PartitionOperationDispatcher;
 import com.datastrato.gravitino.catalog.SchemaDispatcher;
 import com.datastrato.gravitino.catalog.SchemaNormalizeDispatcher;
 import com.datastrato.gravitino.catalog.SchemaOperationDispatcher;
@@ -58,6 +61,8 @@ public class GravitinoEnv {
   private SchemaDispatcher schemaDispatcher;
 
   private TableDispatcher tableDispatcher;
+
+  private PartitionDispatcher partitionDispatcher;
 
   private FilesetDispatcher filesetDispatcher;
 
@@ -169,6 +174,11 @@ public class GravitinoEnv {
         new TableNormalizeDispatcher(tableOperationDispatcher);
     this.tableDispatcher = new TableEventDispatcher(eventBus, tableNormalizeDispatcher);
 
+    PartitionOperationDispatcher partitionOperationDispatcher =
+        new PartitionOperationDispatcher(catalogManager, entityStore, idGenerator);
+    // todo: support PartitionEventDispatcher
+    this.partitionDispatcher = new PartitionNormalizeDispatcher(partitionOperationDispatcher);
+
     FilesetOperationDispatcher filesetOperationDispatcher =
         new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator);
     FilesetNormalizeDispatcher filesetNormalizeDispatcher =
@@ -242,6 +252,10 @@ public class GravitinoEnv {
    */
   public TableDispatcher tableDispatcher() {
     return tableDispatcher;
+  }
+
+  public PartitionDispatcher partitionDispatcher() {
+    return partitionDispatcher;
   }
 
   /**

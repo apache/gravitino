@@ -10,38 +10,40 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.client.GravitinoMetalake;
+import com.datastrato.gravitino.integration.test.container.ContainerSuite;
+import com.datastrato.gravitino.integration.test.container.MySQLContainer;
+import com.datastrato.gravitino.integration.test.container.PostgreSQLContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.integration.test.util.JdbcDriverDownloader;
+import com.datastrato.gravitino.integration.test.util.TestDatabaseName;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.types.Types;
 import com.datastrato.gravitino.utils.RandomNameUtils;
 import com.google.common.collect.Maps;
 import java.io.IOException;
-import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.SQLException;
 import java.util.Collections;
 import java.util.Map;
-import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.MySQLContainer;
-import org.testcontainers.containers.PostgreSQLContainer;
 
 @Tag("gravitino-docker-it")
 public class TestMultipleJDBCLoad extends AbstractIT {
-  private static String TEST_DB_NAME = RandomNameUtils.genRandomName("ct_db");
+  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  private static final TestDatabaseName TEST_DB_NAME =
+      TestDatabaseName.PG_TEST_PG_CATALOG_MULTIPLE_JDBC_LOAD;
 
   private static MySQLContainer mySQLContainer;
   private static PostgreSQLContainer postgreSQLContainer;
 
   private static final String DOWNLOAD_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar";
-  private static final String MYSQL_DEFAULT_IMAGE_NAME = "mysql:8.0";
 
   @BeforeAll
   public static void startup() throws IOException {
@@ -72,33 +74,24 @@ public class TestMultipleJDBCLoad extends AbstractIT {
           DOWNLOAD_JDBC_DRIVER_URL, pgDirPath.toString(), icebergLibsPath.toString());
     }
 
-    mySQLContainer =
-        new MySQLContainer<>(MYSQL_DEFAULT_IMAGE_NAME)
-            .withDatabaseName(TEST_DB_NAME)
-            .withUsername("root")
-            .withPassword("root");
-    mySQLContainer.start();
-    postgreSQLContainer =
-        new PostgreSQLContainer<>(CatalogPostgreSqlIT.DEFAULT_POSTGRES_IMAGE)
-            .withDatabaseName(TEST_DB_NAME)
-            .withUsername("root")
-            .withPassword("root");
-    postgreSQLContainer.start();
+    containerSuite.startMySQLContainer(TEST_DB_NAME);
+    mySQLContainer = containerSuite.getMySQLContainer();
+    containerSuite.startPostgreSQLContainer(TEST_DB_NAME);
+    postgreSQLContainer = containerSuite.getPostgreSQLContainer();
   }
 
   @Test
-  public void testCreateMultipleJdbc() throws URISyntaxException {
+  public void testCreateMultipleJdbc() throws URISyntaxException, SQLException {
     String metalakeName = RandomNameUtils.genRandomName("it_metalake");
     String postgreSqlCatalogName = RandomNameUtils.genRandomName("it_postgresql");
     GravitinoMetalake metalake =
         client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
 
     Map<String, String> pgConf = Maps.newHashMap();
-    String jdbcUrl = postgreSQLContainer.getJdbcUrl();
-    String database = new URI(jdbcUrl.substring(jdbcUrl.lastIndexOf("/") + 1)).getPath();
-    pgConf.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
-    pgConf.put(JdbcConfig.JDBC_DATABASE.getKey(), database);
-    pgConf.put(JdbcConfig.JDBC_DRIVER.getKey(), postgreSQLContainer.getDriverClassName());
+    pgConf.put(JdbcConfig.JDBC_URL.getKey(), postgreSQLContainer.getJdbcUrl(TEST_DB_NAME));
+    pgConf.put(JdbcConfig.JDBC_DATABASE.getKey(), TEST_DB_NAME.toString());
+    pgConf.put(
+        JdbcConfig.JDBC_DRIVER.getKey(), postgreSQLContainer.getDriverClassName(TEST_DB_NAME));
     pgConf.put(JdbcConfig.USERNAME.getKey(), postgreSQLContainer.getUsername());
     pgConf.put(JdbcConfig.PASSWORD.getKey(), postgreSQLContainer.getPassword());
 
@@ -112,11 +105,8 @@ public class TestMultipleJDBCLoad extends AbstractIT {
 
     Map<String, String> mysqlConf = Maps.newHashMap();
 
-    mysqlConf.put(
-        JdbcConfig.JDBC_URL.getKey(),
-        StringUtils.substring(
-            mySQLContainer.getJdbcUrl(), 0, mySQLContainer.getJdbcUrl().lastIndexOf("/")));
-    mysqlConf.put(JdbcConfig.JDBC_DRIVER.getKey(), mySQLContainer.getDriverClassName());
+    mysqlConf.put(JdbcConfig.JDBC_URL.getKey(), mySQLContainer.getJdbcUrl());
+    mysqlConf.put(JdbcConfig.JDBC_DRIVER.getKey(), mySQLContainer.getDriverClassName(TEST_DB_NAME));
     mysqlConf.put(JdbcConfig.USERNAME.getKey(), mySQLContainer.getUsername());
     mysqlConf.put(JdbcConfig.PASSWORD.getKey(), mySQLContainer.getPassword());
     String mysqlCatalogName = RandomNameUtils.genRandomName("it_mysql");

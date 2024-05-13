@@ -2,6 +2,7 @@
 Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
+
 import logging
 from typing import Dict, List
 
@@ -9,7 +10,6 @@ from gravitino.client.gravitino_admin_client import GravitinoAdminClient
 from gravitino.client.gravitino_metalake import GravitinoMetalake
 from gravitino.dto.dto_converters import DTOConverters
 from gravitino.dto.requests.metalake_updates_request import MetalakeUpdatesRequest
-from gravitino.dto.responses.metalake_response import MetalakeResponse
 from gravitino.api.metalake_change import MetalakeChange
 from gravitino.name_identifier import NameIdentifier
 from tests.integration.integration_test_env import IntegrationTestEnv
@@ -26,17 +26,29 @@ class TestMetalake(IntegrationTestEnv):
     metalake_properties_value1: str = "metalake_properties_value1"
     metalake_properties_key2: str = "metalake_properties_key2"
     metalake_properties_value2: str = "metalake_properties_value2"
-    metalake_properties: Dict[str, str] = {metalake_properties_key1: metalake_properties_value1,
-                                           metalake_properties_key2: metalake_properties_value2}
+    metalake_properties: Dict[str, str] = {
+        metalake_properties_key1: metalake_properties_value1,
+        metalake_properties_key2: metalake_properties_value2,
+    }
 
-    gravitino_admin_client: GravitinoAdminClient = GravitinoAdminClient(uri="http://localhost:8090")
+    gravitino_admin_client: GravitinoAdminClient = GravitinoAdminClient(
+        uri="http://localhost:8090"
+    )
 
     def tearDown(self):
         self.clean_test_data()
 
     def clean_test_data(self):
-        logger.info("Drop metalake %s[%s]", self.metalake_name, self.drop_metalake(self.metalake_name))
-        logger.info("Drop metalake %s[%s]", self.metalake_new_name, self.drop_metalake(self.metalake_new_name))
+        logger.info(
+            "Drop metalake %s[%s]",
+            self.metalake_name,
+            self.drop_metalake(self.metalake_name),
+        )
+        logger.info(
+            "Drop metalake %s[%s]",
+            self.metalake_new_name,
+            self.drop_metalake(self.metalake_new_name),
+        )
 
     def test_create_metalake(self):
         metalake = self.create_metalake(self.metalake_name)
@@ -46,9 +58,11 @@ class TestMetalake(IntegrationTestEnv):
         self.assertEqual(metalake.audit_info().creator(), "anonymous")
 
     def create_metalake(self, metalake_name) -> GravitinoMetalake:
-        return self.gravitino_admin_client.create_metalake(NameIdentifier.of(metalake_name),
-                                                           self.metalake_comment,
-                                                           self.metalake_properties)
+        return self.gravitino_admin_client.create_metalake(
+            NameIdentifier.of(metalake_name),
+            self.metalake_comment,
+            self.metalake_properties,
+        )
 
     def test_alter_metalake(self):
         self.create_metalake(self.metalake_name)
@@ -61,13 +75,20 @@ class TestMetalake(IntegrationTestEnv):
             MetalakeChange.rename(metalake_new_name),
             MetalakeChange.update_comment(metalake_new_comment),
             MetalakeChange.remove_property(self.metalake_properties_key1),
-            MetalakeChange.set_property(self.metalake_properties_key2, metalake_propertie_new_value),
+            MetalakeChange.set_property(
+                self.metalake_properties_key2, metalake_propertie_new_value
+            ),
         )
 
-        metalake = self.gravitino_admin_client.alter_metalake(NameIdentifier.of(self.metalake_name), *changes)
+        metalake = self.gravitino_admin_client.alter_metalake(
+            NameIdentifier.of(self.metalake_name), *changes
+        )
         self.assertEqual(metalake.name(), metalake_new_name)
         self.assertEqual(metalake.comment(), metalake_new_comment)
-        self.assertEqual(metalake.properties().get(self.metalake_properties_key2), metalake_propertie_new_value)
+        self.assertEqual(
+            metalake.properties().get(self.metalake_properties_key2),
+            metalake_propertie_new_value,
+        )
         self.assertTrue(self.metalake_properties_key1 not in metalake.properties())
 
     def drop_metalake(self, metalake_name: str) -> bool:
@@ -85,39 +106,26 @@ class TestMetalake(IntegrationTestEnv):
         )
         reqs = [DTOConverters.to_metalake_update_request(change) for change in changes]
         updates_request = MetalakeUpdatesRequest(reqs)
-        valid_json = (f'{{"updates": [{{"@type": "rename", "newName": "my_metalake_new"}}, '
-                      f'{{"@type": "updateComment", "newComment": "new metalake comment"}}]}}')
+        valid_json = (
+            '{"updates": [{"@type": "rename", "newName": "my_metalake_new"}, '
+            '{"@type": "updateComment", "newComment": "new metalake comment"}]}'
+        )
         self.assertEqual(updates_request.to_json(), valid_json)
-
-    def test_from_json_metalake_response(self):
-        str_json = (b'{"code":0,"metalake":{"name":"example_name18","comment":"This is a sample comment",'
-                    b'"properties":{"key1":"value1","key2":"value2"},'
-                    b'"audit":{"creator":"anonymous","createTime":"2024-04-05T10:10:35.218Z"}}}')
-        metalake_response = MetalakeResponse.from_json(str_json, infer_missing=True)
-        self.assertEqual(metalake_response.code(), 0)
-        self.assertIsNotNone(metalake_response._metalake)
-        self.assertEqual(metalake_response._metalake.name(), "example_name18")
-        self.assertEqual(metalake_response._metalake.audit_info().creator(), "anonymous")
-
-    def test_from_error_json_metalake_response(self):
-        str_json = (b'{"code":0, "undefine-key1":"undefine-value1", '
-                    b'"metalake":{"undefine-key2":1, "name":"example_name18","comment":"This is a sample comment",'
-                    b'"properties":{"key1":"value1","key2":"value2"},'
-                    b'"audit":{"creator":"anonymous","createTime":"2024-04-05T10:10:35.218Z"}}}')
-        metalake_response = MetalakeResponse.from_json(str_json, infer_missing=True)
-        self.assertEqual(metalake_response.code(), 0)
-        self.assertIsNotNone(metalake_response._metalake)
-        self.assertEqual(metalake_response._metalake.name(), "example_name18")
-        self.assertEqual(metalake_response._metalake.audit_info().creator(), "anonymous")
 
     def test_list_metalakes(self):
         self.create_metalake(self.metalake_name)
-        metalake_list: List[GravitinoMetalake] = self.gravitino_admin_client.list_metalakes()
-        self.assertTrue(any(item.name() == self.metalake_name for item in metalake_list))
+        metalake_list: List[GravitinoMetalake] = (
+            self.gravitino_admin_client.list_metalakes()
+        )
+        self.assertTrue(
+            any(item.name() == self.metalake_name for item in metalake_list)
+        )
 
     def test_load_metalakes(self):
         self.create_metalake(self.metalake_name)
-        metalake = self.gravitino_admin_client.load_metalake(NameIdentifier.of(self.metalake_name))
+        metalake = self.gravitino_admin_client.load_metalake(
+            NameIdentifier.of(self.metalake_name)
+        )
         self.assertIsNotNone(metalake)
         self.assertEqual(metalake.name(), self.metalake_name)
         self.assertEqual(metalake.comment(), self.metalake_comment)

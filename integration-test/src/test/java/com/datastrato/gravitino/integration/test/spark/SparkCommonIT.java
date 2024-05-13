@@ -810,24 +810,24 @@ public abstract class SparkCommonIT extends SparkEnvIT {
         .collect(Collectors.joining(","));
   }
 
-  protected void checkTableRowLevelUpdate(String tableName) {
+  protected void checkRowLevelUpdate(String tableName) {
     writeToEmptyTableAndCheckData(tableName);
     String updatedValues = "id = 6, name = '6', age = 6";
     sql(getUpdateTableSql(tableName, updatedValues, "id = 5"));
-    List<String> queryResult = getQueryData(getSelectAllSqlWithOrder(tableName));
+    List<String> queryResult = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
     Assertions.assertEquals(5, queryResult.size());
     Assertions.assertEquals("1,1,1;2,2,2;3,3,3;4,4,4;6,6,6", String.join(";", queryResult));
   }
 
-  protected void checkTableRowLevelDelete(String tableName) {
+  protected void checkRowLevelDelete(String tableName) {
     writeToEmptyTableAndCheckData(tableName);
     sql(getDeleteSql(tableName, "id <= 2"));
-    List<String> queryResult = getQueryData(getSelectAllSqlWithOrder(tableName));
+    List<String> queryResult = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
     Assertions.assertEquals(3, queryResult.size());
     Assertions.assertEquals("3,3,3;4,4,4;5,5,5", String.join(";", queryResult));
   }
 
-  protected void checkTableDeleteByMergeInto(String tableName) {
+  protected void checkDeleteByMergeInto(String tableName) {
     writeToEmptyTableAndCheckData(tableName);
 
     String sourceTableName = "source_table";
@@ -835,7 +835,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
         "SELECT 1 AS id, '1' AS name, 1 AS age UNION ALL SELECT 6 AS id, '6' AS name, 6 AS age";
     String onClause = String.format("%s.id = %s.id", tableName, sourceTableName);
     sql(getRowLevelDeleteTableSql(tableName, selectClause, sourceTableName, onClause));
-    List<String> queryResult = getQueryData(getSelectAllSqlWithOrder(tableName));
+    List<String> queryResult = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
     Assertions.assertEquals(5, queryResult.size());
     Assertions.assertEquals("2,2,2;3,3,3;4,4,4;5,5,5;6,6,6", String.join(";", queryResult));
   }
@@ -848,7 +848,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
         "SELECT 1 AS id, '2' AS name, 2 AS age UNION ALL SELECT 6 AS id, '6' AS name, 6 AS age";
     String onClause = String.format("%s.id = %s.id", tableName, sourceTableName);
     sql(getRowLevelUpdateTableSql(tableName, selectClause, sourceTableName, onClause));
-    List<String> queryResult = getQueryData(getSelectAllSqlWithOrder(tableName));
+    List<String> queryResult = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
     Assertions.assertEquals(6, queryResult.size());
     Assertions.assertEquals("1,2,2;2,2,2;3,3,3;4,4,4;5,5,5;6,6,6", String.join(";", queryResult));
   }

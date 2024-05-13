@@ -2,6 +2,7 @@
 Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
+
 from abc import ABC
 from dataclasses import field
 
@@ -65,7 +66,7 @@ class FilesetChange(ABC):
     class RenameFileset:
         """A fileset change to rename the fileset."""
 
-        _new_name: str = field(metadata=config(field_name='new_name'))
+        _new_name: str = field(metadata=config(field_name="new_name"))
 
         def __init__(self, new_name):
             self._new_name = new_name
@@ -113,7 +114,7 @@ class FilesetChange(ABC):
     class UpdateFilesetComment:
         """A fileset change to update the fileset comment."""
 
-        _new_comment: str = field(metadata=config(field_name='new_comment'))
+        _new_comment: str = field(metadata=config(field_name="new_comment"))
 
         def __init__(self, new_comment):
             self._new_comment = new_comment
@@ -161,8 +162,8 @@ class FilesetChange(ABC):
     class SetProperty:
         """A fileset change to set the property and value for the fileset."""
 
-        _property: str = field(metadata=config(field_name='property'))
-        _value: str = field(metadata=config(field_name='value'))
+        _property: str = field(metadata=config(field_name="property"))
+        _value: str = field(metadata=config(field_name="value"))
 
         def __init__(self, property: str, value: str):
             self._property = property
@@ -219,7 +220,7 @@ class FilesetChange(ABC):
     class RemoveProperty:
         """A fileset change to remove a property from the fileset."""
 
-        _property: str = field(metadata=config(field_name='property'))
+        _property: str = field(metadata=config(field_name="property"))
 
         def __init__(self, property: str):
             self._property = property
