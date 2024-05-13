@@ -11,6 +11,7 @@ import com.datastrato.gravitino.catalog.doris.utils.DorisUtils;
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
+import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
 import com.datastrato.gravitino.exceptions.NoSuchColumnException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
@@ -18,10 +19,12 @@ import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
+import com.datastrato.gravitino.rel.expressions.literals.Literal;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
+import com.datastrato.gravitino.rel.partitions.RangePartition;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
@@ -216,8 +219,19 @@ public class DorisTableOperations extends JdbcTableOperations {
           "The partition field must be one of the columns");
 
       String partitionColumn = BACK_QUOTE + rangePartition.fieldName()[0] + BACK_QUOTE;
-      // TODO we currently do not support pre-assign partition when creating range partitioning
-      partitionSqlBuilder.append(partitionColumn).append(") () ");
+      partitionSqlBuilder.append(partitionColumn).append(") ");
+
+      // pre-assign partition when creating range partitioning
+      partitionSqlBuilder.append("(").append(NEW_LINE);
+      RangePartition[] assignments = rangePartition.assignments();
+      if (!ArrayUtils.isEmpty(assignments)) {
+        for (RangePartition part : assignments) {
+          partitionSqlBuilder.append("PARTITION ").append(part.name()).append(" VALUES ");
+          Literal<?> lower = part.lower();
+          if (LiteralDTO.NULL.equals(lower)) {}
+        }
+      }
+      partitionSqlBuilder.append(")");
     } else if (partitioning[0] instanceof Transforms.ListTransform) {
       Transforms.ListTransform listPartition = (Transforms.ListTransform) partitioning[0];
       partitionSqlBuilder.append(" PARTITION BY LIST(");
