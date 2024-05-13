@@ -2,6 +2,7 @@
 Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
+
 import logging
 from typing import List, Dict
 
@@ -47,8 +48,12 @@ class GravitinoMetalake(MetalakeDTO):
     API_METALAKES_CATALOGS_PATH = "api/metalakes/{}/catalogs/{}"
 
     def __init__(self, metalake: MetalakeDTO = None, client: HTTPClient = None):
-        super().__init__(_name=metalake.name(), _comment=metalake.comment(), _properties=metalake.properties(),
-                         _audit=metalake.audit_info())
+        super().__init__(
+            _name=metalake.name(),
+            _comment=metalake.comment(),
+            _properties=metalake.properties(),
+            _audit=metalake.audit_info(),
+        )
         self.rest_client = client
 
     def list_catalogs(self, namespace: Namespace) -> List[NameIdentifier]:
@@ -88,7 +93,10 @@ class GravitinoMetalake(MetalakeDTO):
         response = self.rest_client.get(url, params=params)
         catalog_list = CatalogListResponse.from_json(response.body, infer_missing=True)
 
-        return [DTOConverters.to_catalog(catalog, self.rest_client) for catalog in catalog_list.catalogs()]
+        return [
+            DTOConverters.to_catalog(catalog, self.rest_client)
+            for catalog in catalog_list.catalogs()
+        ]
 
     def load_catalog(self, ident: NameIdentifier) -> Catalog:
         """Load the catalog with specified identifier.
@@ -103,17 +111,22 @@ class GravitinoMetalake(MetalakeDTO):
             The Catalog with specified identifier.
         """
         NameIdentifier.check_catalog(ident)
-        url = self.API_METALAKES_CATALOGS_PATH.format(ident.namespace().level(0), ident.name())
+        url = self.API_METALAKES_CATALOGS_PATH.format(
+            ident.namespace().level(0), ident.name()
+        )
         response = self.rest_client.get(url)
         catalog_resp = CatalogResponse.from_json(response.body, infer_missing=True)
 
         return DTOConverters.to_catalog(catalog_resp.catalog(), self.rest_client)
 
-    def create_catalog(self, ident: NameIdentifier,
-                       type: Catalog.Type,
-                       provider: str,
-                       comment: str,
-                       properties: Dict[str, str]) -> Catalog:
+    def create_catalog(
+        self,
+        ident: NameIdentifier,
+        type: Catalog.Type,
+        provider: str,
+        comment: str,
+        properties: Dict[str, str],
+    ) -> Catalog:
         """Create a new catalog with specified identifier, type, comment and properties.
 
         Args:
@@ -132,11 +145,13 @@ class GravitinoMetalake(MetalakeDTO):
         """
         NameIdentifier.check_catalog(ident)
 
-        catalog_create_request = CatalogCreateRequest(name=ident.name(),
-                                                      type=type,
-                                                      provider=provider,
-                                                      comment=comment,
-                                                      properties=properties)
+        catalog_create_request = CatalogCreateRequest(
+            name=ident.name(),
+            type=type,
+            provider=provider,
+            comment=comment,
+            properties=properties,
+        )
         catalog_create_request.validate()
 
         url = f"api/metalakes/{ident.namespace().level(0)}/catalogs"
@@ -165,7 +180,9 @@ class GravitinoMetalake(MetalakeDTO):
         updates_request = CatalogUpdatesRequest(reqs)
         updates_request.validate()
 
-        url = self.API_METALAKES_CATALOGS_PATH.format(ident.namespace().level(0), ident.name())
+        url = self.API_METALAKES_CATALOGS_PATH.format(
+            ident.namespace().level(0), ident.name()
+        )
         response = self.rest_client.put(url, json=updates_request)
         catalog_response = CatalogResponse.from_json(response.body, infer_missing=True)
         catalog_response.validate()
@@ -177,12 +194,14 @@ class GravitinoMetalake(MetalakeDTO):
 
         Args:
             ident the identifier of the catalog.
-        
+
         Returns:
             true if the catalog is dropped successfully, false otherwise.
         """
         try:
-            url = self.API_METALAKES_CATALOGS_PATH.format(ident.namespace().level(0), ident.name())
+            url = self.API_METALAKES_CATALOGS_PATH.format(
+                ident.namespace().level(0), ident.name()
+            )
             response = self.rest_client.delete(url)
 
             drop_response = DropResponse.from_json(response.body, infer_missing=True)

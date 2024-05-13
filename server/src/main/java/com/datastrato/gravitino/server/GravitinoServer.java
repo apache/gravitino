@@ -8,6 +8,7 @@ import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.catalog.CatalogDispatcher;
 import com.datastrato.gravitino.catalog.FilesetDispatcher;
+import com.datastrato.gravitino.catalog.PartitionDispatcher;
 import com.datastrato.gravitino.catalog.SchemaDispatcher;
 import com.datastrato.gravitino.catalog.TableDispatcher;
 import com.datastrato.gravitino.catalog.TopicDispatcher;
@@ -82,6 +83,7 @@ public class GravitinoServer extends ResourceConfig {
 
             bind(gravitinoEnv.schemaDispatcher()).to(SchemaDispatcher.class).ranked(1);
             bind(gravitinoEnv.tableDispatcher()).to(TableDispatcher.class).ranked(1);
+            bind(gravitinoEnv.partitionDispatcher()).to(PartitionDispatcher.class).ranked(1);
             bind(gravitinoEnv.filesetDispatcher()).to(FilesetDispatcher.class).ranked(1);
             bind(gravitinoEnv.topicDispatcher()).to(TopicDispatcher.class).ranked(1);
           }
