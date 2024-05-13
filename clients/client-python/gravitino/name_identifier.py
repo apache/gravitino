@@ -2,6 +2,7 @@
 Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
+
 from typing import ClassVar
 
 from dataclasses import dataclass, field
@@ -21,11 +22,11 @@ class NameIdentifier(DataClassJsonMixin):
     "metalake1.catalog1" can represent a catalog, "metalake1.catalog1.schema1" can represent a
     schema.
     """
+
     _DOT: ClassVar[str] = "."
 
     _name: str = field(metadata=config(field_name="name"))
     _namespace: Namespace = field(metadata=config(field_name="namespace"))
-
 
     @classmethod
     def builder(cls, namespace: Namespace, name: str):
