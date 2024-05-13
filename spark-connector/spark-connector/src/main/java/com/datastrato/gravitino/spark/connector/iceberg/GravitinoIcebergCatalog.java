@@ -14,7 +14,6 @@ import org.apache.iceberg.spark.SparkCatalog;
 import org.apache.iceberg.spark.source.SparkTable;
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
-import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.FunctionCatalog;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
@@ -40,23 +39,18 @@ public class GravitinoIcebergCatalog extends BaseCatalog implements FunctionCata
     return icebergCatalog;
   }
 
+  /**
+   * Migrated `loadTable(identifier)` to the BaseCatalog class and execute `loadTable(identifier)`
+   * before createSparkTable to load sparkTable with different parameters easily.
+   */
   @Override
   protected org.apache.spark.sql.connector.catalog.Table createSparkTable(
       Identifier identifier,
       Table gravitinoTable,
+      org.apache.spark.sql.connector.catalog.Table sparkTable,
       TableCatalog sparkIcebergCatalog,
       PropertiesConverter propertiesConverter,
       SparkTransformConverter sparkTransformConverter) {
-    org.apache.spark.sql.connector.catalog.Table sparkTable;
-    try {
-      sparkTable = sparkIcebergCatalog.loadTable(identifier);
-    } catch (NoSuchTableException e) {
-      throw new RuntimeException(
-          String.format(
-              "Failed to load the real sparkTable: %s",
-              String.join(".", getDatabase(identifier), identifier.name())),
-          e);
-    }
     return new SparkIcebergTable(
         identifier,
         gravitinoTable,
