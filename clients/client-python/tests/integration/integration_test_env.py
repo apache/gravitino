@@ -53,14 +53,14 @@ class IntegrationTestEnv(unittest.TestCase):
                 logger.error("ERROR: Can't find online Gravitino server!")
             return
 
-        GravitinoHome = os.environ.get("GRAVITINO_HOME")
-        if GravitinoHome is None:
+        gravitino_home = os.environ.get("GRAVITINO_HOME")
+        if gravitino_home is None:
             logger.error(
                 "Gravitino Python client integration test must configure `GRAVITINO_HOME`"
             )
             sys.exit(0)
 
-        cls.gravitino_startup_script = os.path.join(GravitinoHome, "bin/gravitino.sh")
+        cls.gravitino_startup_script = os.path.join(gravitino_home, "bin/gravitino.sh")
         if not os.path.exists(cls.gravitino_startup_script):
             logger.error(
                 "Can't find Gravitino startup script: %s, "

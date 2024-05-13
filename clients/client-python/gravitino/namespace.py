@@ -3,7 +3,7 @@ Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
 
-from typing import List
+from typing import List, ClassVar
 
 
 class Namespace:
@@ -12,7 +12,7 @@ class Namespace:
     "metalake1.catalog1.schema1" are all valid namespaces.
     """
 
-    _DOT: str = "."
+    _DOT: ClassVar[str] = "."
 
     _levels: List[str] = []
 
