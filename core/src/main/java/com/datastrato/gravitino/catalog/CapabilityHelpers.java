@@ -389,7 +389,7 @@ public class CapabilityHelpers {
     return standardizeName;
   }
 
-  private static String applyCaseSensitiveOnName(
+  public static String applyCaseSensitiveOnName(
       Capability.Scope scope, String name, Capability capabilities) {
     return capabilities.caseSensitiveOnName(scope).supported() ? name : name.toLowerCase();
   }

@@ -20,7 +20,7 @@ class GravitinoVirtualFileSystemConfiguration {
 
   public static final String SIMPLE_AUTH_TYPE = "simple";
   public static final String OAUTH2_AUTH_TYPE = "oauth2";
-
+  public static final String KERBEROS_AUTH_TYPE = "kerberos";
   // oauth2
   /** The configuration key for the URI of the default OAuth server. */
   public static final String FS_GRAVITINO_CLIENT_OAUTH2_SERVER_URI_KEY =
@@ -37,6 +37,14 @@ class GravitinoVirtualFileSystemConfiguration {
   /** The configuration key for the scope of the token. */
   public static final String FS_GRAVITINO_CLIENT_OAUTH2_SCOPE_KEY =
       "fs.gravitino.client.oauth2.scope";
+
+  /** The configuration key for the principal. */
+  public static final String FS_GRAVITINO_CLIENT_KERBEROS_PRINCIPAL_KEY =
+      "fs.gravitino.client.kerberos.principal";
+
+  /** The configuration key for the keytab file path corresponding to the principal. */
+  public static final String FS_GRAVITINO_CLIENT_KERBEROS_KEYTAB_FILE_PATH_KEY =
+      "fs.gravitino.client.kerberos.keytabFilePath";
 
   /** The configuration key for the maximum capacity of the Gravitino fileset cache. */
   public static final String FS_GRAVITINO_FILESET_CACHE_MAX_CAPACITY_KEY =

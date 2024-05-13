@@ -16,10 +16,14 @@ import com.datastrato.gravitino.catalog.postgresql.integration.test.service.Post
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
+import com.datastrato.gravitino.integration.test.container.ContainerSuite;
+import com.datastrato.gravitino.integration.test.container.PGImageName;
+import com.datastrato.gravitino.integration.test.container.PostgreSQLContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.integration.test.util.JdbcDriverDownloader;
+import com.datastrato.gravitino.integration.test.util.TestDatabaseName;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SupportsSchemas;
@@ -42,11 +46,10 @@ import com.datastrato.gravitino.rel.types.Types.IntegerType;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
@@ -63,12 +66,12 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
-import org.testcontainers.containers.PostgreSQLContainer;
 
 @Tag("gravitino-docker-it")
 @TestInstance(Lifecycle.PER_CLASS)
 public class CatalogPostgreSqlIT extends AbstractIT {
-  public static final String DEFAULT_POSTGRES_IMAGE = "postgres:13";
+  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  public static final PGImageName DEFAULT_POSTGRES_IMAGE = PGImageName.VERSION_13;
   public static final String DOWNLOAD_JDBC_DRIVER_URL =
       "https://jdbc.postgresql.org/download/postgresql-42.7.0.jar";
 
@@ -90,28 +93,24 @@ public class CatalogPostgreSqlIT extends AbstractIT {
 
   private PostgreSqlService postgreSqlService;
 
-  private PostgreSQLContainer<?> POSTGRESQL_CONTAINER;
+  private PostgreSQLContainer POSTGRESQL_CONTAINER;
 
-  protected final String TEST_DB_NAME = GravitinoITUtils.genRandomName("test_db");
+  protected final TestDatabaseName TEST_DB_NAME = TestDatabaseName.PG_CATALOG_POSTGRESQL_IT;
 
-  protected String postgreImageName = DEFAULT_POSTGRES_IMAGE;
+  protected PGImageName postgreImageName = DEFAULT_POSTGRES_IMAGE;
 
   @BeforeAll
-  public void startup() throws IOException {
+  public void startup() throws IOException, SQLException {
 
     if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
       String gravitinoHome = System.getenv("GRAVITINO_HOME");
       Path tmpPath = Paths.get(gravitinoHome, "/catalogs/jdbc-postgresql/libs");
       JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_JDBC_DRIVER_URL, tmpPath.toString());
     }
+    containerSuite.startPostgreSQLContainer(TEST_DB_NAME, postgreImageName);
+    POSTGRESQL_CONTAINER = containerSuite.getPostgreSQLContainer(postgreImageName);
 
-    POSTGRESQL_CONTAINER =
-        new PostgreSQLContainer<>(postgreImageName)
-            .withDatabaseName(TEST_DB_NAME)
-            .withUsername("root")
-            .withPassword("root");
-    POSTGRESQL_CONTAINER.start();
-    postgreSqlService = new PostgreSqlService(POSTGRESQL_CONTAINER);
+    postgreSqlService = new PostgreSqlService(POSTGRESQL_CONTAINER, TEST_DB_NAME);
     createMetalake();
     createCatalog();
     createSchema();
@@ -122,11 +121,10 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     clearTableAndSchema();
     client.dropMetalake(NameIdentifier.of(metalakeName));
     postgreSqlService.close();
-    POSTGRESQL_CONTAINER.stop();
   }
 
   @AfterEach
-  private void resetSchema() {
+  public void resetSchema() {
     clearTableAndSchema();
     createSchema();
   }
@@ -152,21 +150,16 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     metalake = loadMetalake;
   }
 
-  private void createCatalog() {
+  private void createCatalog() throws SQLException {
     Map<String, String> catalogProperties = Maps.newHashMap();
 
-    try {
-      String jdbcUrl = POSTGRESQL_CONTAINER.getJdbcUrl();
-      String database = new URI(jdbcUrl.substring(jdbcUrl.lastIndexOf("/") + 1)).getPath();
-      catalogProperties.put(
-          JdbcConfig.JDBC_DRIVER.getKey(), POSTGRESQL_CONTAINER.getDriverClassName());
-      catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
-      catalogProperties.put(JdbcConfig.JDBC_DATABASE.getKey(), database);
-      catalogProperties.put(JdbcConfig.USERNAME.getKey(), POSTGRESQL_CONTAINER.getUsername());
-      catalogProperties.put(JdbcConfig.PASSWORD.getKey(), POSTGRESQL_CONTAINER.getPassword());
-    } catch (URISyntaxException e) {
-      throw new RuntimeException(e);
-    }
+    String jdbcUrl = POSTGRESQL_CONTAINER.getJdbcUrl(TEST_DB_NAME);
+    catalogProperties.put(
+        JdbcConfig.JDBC_DRIVER.getKey(), POSTGRESQL_CONTAINER.getDriverClassName(TEST_DB_NAME));
+    catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
+    catalogProperties.put(JdbcConfig.JDBC_DATABASE.getKey(), TEST_DB_NAME.toString());
+    catalogProperties.put(JdbcConfig.USERNAME.getKey(), POSTGRESQL_CONTAINER.getUsername());
+    catalogProperties.put(JdbcConfig.PASSWORD.getKey(), POSTGRESQL_CONTAINER.getPassword());
 
     Catalog createdCatalog =
         metalake.createCatalog(
@@ -853,7 +846,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   void testColumnDefaultValueConverter() {
     // test convert from MySQL to Gravitino
     String tableName = GravitinoITUtils.genRandomName("test_default_value");
-    String fullTableName = TEST_DB_NAME + "." + schemaName + "." + tableName;
+    String fullTableName = String.format("%s.%s.%s", TEST_DB_NAME, schemaName, tableName);
     String sql =
         "CREATE TABLE "
             + fullTableName

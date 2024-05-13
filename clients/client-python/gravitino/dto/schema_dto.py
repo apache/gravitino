@@ -2,6 +2,7 @@
 Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
+
 from dataclasses import dataclass, field
 from typing import Optional, Dict
 
@@ -16,16 +17,18 @@ from gravitino.dto.audit_dto import AuditDTO
 class SchemaDTO(Schema):
     """Represents a Schema DTO (Data Transfer Object)."""
 
-    _name: str = field(metadata=config(field_name='name'))
+    _name: str = field(metadata=config(field_name="name"))
     """The name of the Metalake DTO."""
 
-    _comment: Optional[str] = field(metadata=config(field_name='comment'))
+    _comment: Optional[str] = field(metadata=config(field_name="comment"))
     """The comment of the Metalake DTO."""
 
-    _properties: Optional[Dict[str, str]] = field(metadata=config(field_name='properties'))
+    _properties: Optional[Dict[str, str]] = field(
+        metadata=config(field_name="properties")
+    )
     """The properties of the Metalake DTO."""
 
-    _audit: AuditDTO = field(metadata=config(field_name='audit'))
+    _audit: AuditDTO = field(metadata=config(field_name="audit"))
     """The audit information of the Metalake DTO."""
 
     def name(self) -> str:

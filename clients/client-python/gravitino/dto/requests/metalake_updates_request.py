@@ -2,6 +2,7 @@
 Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
+
 from dataclasses import dataclass, field
 from typing import List
 
@@ -15,7 +16,7 @@ from gravitino.rest.rest_message import RESTRequest
 class MetalakeUpdatesRequest(RESTRequest):
     """Represents a request containing multiple Metalake updates."""
 
-    _updates: List[MetalakeUpdateRequest] = field(metadata=config(field_name='updates'))
+    _updates: List[MetalakeUpdateRequest] = field(metadata=config(field_name="updates"))
 
     def __init__(self, updates: List[MetalakeUpdateRequest]):
         """Constructor for MetalakeUpdatesRequest.

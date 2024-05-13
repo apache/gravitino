@@ -8,7 +8,8 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.jdbc.JdbcSchema;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
-import java.net.URI;
+import com.datastrato.gravitino.integration.test.container.PostgreSQLContainer;
+import com.datastrato.gravitino.integration.test.util.TestDatabaseName;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -18,7 +19,6 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.lang3.ArrayUtils;
-import org.testcontainers.containers.PostgreSQLContainer;
 
 public class PostgreSqlService {
 
@@ -26,13 +26,13 @@ public class PostgreSqlService {
 
   private final String database;
 
-  public PostgreSqlService(PostgreSQLContainer<?> postgreSQLContainer) {
+  public PostgreSqlService(PostgreSQLContainer postgreSQLContainer, TestDatabaseName testDBName) {
     String username = postgreSQLContainer.getUsername();
     String password = postgreSQLContainer.getPassword();
 
     try {
-      String jdbcUrl = postgreSQLContainer.getJdbcUrl();
-      String database = new URI(jdbcUrl.substring(jdbcUrl.lastIndexOf("/") + 1)).getPath();
+      String jdbcUrl = postgreSQLContainer.getJdbcUrl(testDBName);
+      String database = testDBName.toString();
       this.connection = DriverManager.getConnection(jdbcUrl, username, password);
       connection.setCatalog(database);
       this.database = database;

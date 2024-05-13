@@ -2,6 +2,7 @@
 Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
+
 from abc import abstractmethod
 from enum import Enum
 from typing import Dict, Optional
@@ -14,6 +15,7 @@ class Catalog(Auditable):
     """The interface of a catalog. The catalog is the second level entity in the gravitino system,
     containing a set of tables.
     """
+
     class Type(Enum):
         """The type of the catalog."""
 
@@ -92,9 +94,11 @@ class Catalog(Auditable):
         Returns:
             The {@link SupportsSchemas} if the catalog supports schema operations.
         """
-        raise UnsupportedOperationException("Catalog does not support schema operations")
+        raise UnsupportedOperationException(
+            "Catalog does not support schema operations"
+        )
 
-    def as_table_catalog(self) -> 'TableCatalog':
+    def as_table_catalog(self) -> "TableCatalog":
         """
         Raises:
             UnsupportedOperationException if the catalog does not support table operations.
@@ -104,7 +108,7 @@ class Catalog(Auditable):
         """
         raise UnsupportedOperationException("Catalog does not support table operations")
 
-    def as_fileset_catalog(self) -> 'FilesetCatalog':
+    def as_fileset_catalog(self) -> "FilesetCatalog":
         """
         Raises:
             UnsupportedOperationException if the catalog does not support fileset operations.
@@ -112,9 +116,11 @@ class Catalog(Auditable):
         Returns:
             the FilesetCatalog if the catalog supports fileset operations.
         """
-        raise UnsupportedOperationException("Catalog does not support fileset operations")
+        raise UnsupportedOperationException(
+            "Catalog does not support fileset operations"
+        )
 
-    def as_topic_catalog(self) -> 'TopicCatalog':
+    def as_topic_catalog(self) -> "TopicCatalog":
         """
         Returns:
             the {@link TopicCatalog} if the catalog supports topic operations.

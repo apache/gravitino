@@ -38,36 +38,55 @@ tasks {
     args = listOf("install", "-e", ".[dev]")
   }
 
+  val black by registering(VenvTask::class) {
+    dependsOn(pipInstall)
+    venvExec = "black"
+    args = listOf("./gravitino", "./tests")
+  }
+
   val pylint by registering(VenvTask::class) {
+    dependsOn(pipInstall)
+    mustRunAfter(black)
     venvExec = "pylint"
     args = listOf("./gravitino", "./tests")
   }
 
+  val integrationTest by registering(VenvTask::class) {
+    doFirst {
+      gravitinoServer("start")
+    }
+
+    venvExec = "python"
+    args = listOf("-m", "unittest")
+    workingDir = projectDir.resolve("./tests/integration")
+    environment = mapOf(
+      "PROJECT_VERSION" to project.version,
+      "GRAVITINO_HOME" to project.rootDir.path + "/distribution/package",
+      "START_EXTERNAL_GRAVITINO" to "true"
+    )
+
+    doLast {
+      gravitinoServer("stop")
+    }
+  }
+
+  val unitTests by registering(VenvTask::class) {
+    venvExec = "python"
+    args = listOf("-m", "unittest")
+    workingDir = projectDir.resolve("./tests/unittests")
+  }
+
   val test by registering(VenvTask::class) {
+    dependsOn(pipInstall, pylint, unitTests)
+
     val skipPyClientITs = project.hasProperty("skipPyClientITs")
-    if (!skipPyClientITs) {
-      doFirst {
-        gravitinoServer("start")
-      }
-
-      dependsOn(pipInstall, pylint)
-      venvExec = "python"
-      args = listOf("-m", "unittest")
-      workingDir = projectDir.resolve(".")
-      environment = mapOf(
-        "PROJECT_VERSION" to project.version,
-        "GRAVITINO_HOME" to project.rootDir.path + "/distribution/package",
-        "START_EXTERNAL_GRAVITINO" to "true"
-      )
-
-      doLast {
-        gravitinoServer("stop")
-      }
+    val skipITs = project.hasProperty("skipITs")
+    if (!skipITs && !skipPyClientITs) {
+      dependsOn(integrationTest)
     }
   }
 
   val build by registering(VenvTask::class) {
-    dependsOn(pipInstall, pylint)
   }
 
   val clean by registering(Delete::class) {
@@ -78,5 +97,12 @@ tasks {
       deleteCacheDir(".pytest_cache")
       deleteCacheDir("__pycache__")
     }
+  }
+
+  matching {
+    it.name.endsWith("envSetup")
+  }.all {
+    // add install package and code formatting before any tasks
+    finalizedBy(pipInstall, black, pylint)
   }
 }

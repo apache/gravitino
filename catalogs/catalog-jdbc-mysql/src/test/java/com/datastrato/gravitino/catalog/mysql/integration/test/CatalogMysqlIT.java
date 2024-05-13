@@ -104,6 +104,8 @@ public class CatalogMysqlIT extends AbstractIT {
 
   protected String mysqlImageName = defaultMysqlImageName;
 
+  protected String mysqlDriverDownloadUrl = DOWNLOAD_JDBC_DRIVER_URL;
+
   boolean SupportColumnDefaultValueExpression() {
     return true;
   }
@@ -114,7 +116,7 @@ public class CatalogMysqlIT extends AbstractIT {
     if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
       String gravitinoHome = System.getenv("GRAVITINO_HOME");
       Path tmpPath = Paths.get(gravitinoHome, "/catalogs/jdbc-mysql/libs");
-      JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_JDBC_DRIVER_URL, tmpPath.toString());
+      JdbcDriverDownloader.downloadJdbcDriver(mysqlDriverDownloadUrl, tmpPath.toString());
     }
 
     TEST_DB_NAME = TestDatabaseName.MYSQL_CATALOG_MYSQL_IT;
@@ -1054,6 +1056,7 @@ public class CatalogMysqlIT extends AbstractIT {
     Assertions.assertTrue(StringUtils.isEmpty(schema.comment()));
     schema = catalog.asSchemas().loadSchema(ident);
     Assertions.assertTrue(StringUtils.isEmpty(schema.comment()));
+    catalog.asSchemas().dropSchema(ident, true);
   }
 
   @Test
@@ -1287,6 +1290,7 @@ public class CatalogMysqlIT extends AbstractIT {
     Assertions.assertTrue(catalog.asTableCatalog().dropTable(tableIdent));
     Assertions.assertFalse(catalog.asTableCatalog().tableExists(tableIdent));
     Assertions.assertFalse(catalog.asTableCatalog().purgeTable(tableIdent));
+    catalog.asSchemas().dropSchema(schemaIdent, true);
   }
 
   @Test
@@ -1350,6 +1354,11 @@ public class CatalogMysqlIT extends AbstractIT {
               .collect(Collectors.toSet())
               .stream()
               .anyMatch(n -> n.equals(tableName)));
+    }
+
+    for (String schema : schemas) {
+      NameIdentifier schemaIdentifier = NameIdentifier.of(metalakeName, catalogName, schema);
+      schemaSupport.dropSchema(schemaIdentifier, true);
     }
   }
 

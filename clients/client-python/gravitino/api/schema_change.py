@@ -2,6 +2,7 @@
 Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
+
 from abc import ABC
 from dataclasses import field
 
@@ -39,8 +40,8 @@ class SchemaChange(ABC):
     class SetProperty:
         """SchemaChange class to set the property and value pairs for the schema."""
 
-        _property: str = field(metadata=config(field_name='property'))
-        _value: str = field(metadata=config(field_name='value'))
+        _property: str = field(metadata=config(field_name="property"))
+        _value: str = field(metadata=config(field_name="value"))
 
         def __init__(self, property: str, value: str):
             self._property = property
@@ -97,7 +98,7 @@ class SchemaChange(ABC):
     class RemoveProperty:
         """SchemaChange class to remove a property from the schema."""
 
-        _property: str = field(metadata=config(field_name='property'))
+        _property: str = field(metadata=config(field_name="property"))
 
         def __init__(self, property: str):
             self._property = property
