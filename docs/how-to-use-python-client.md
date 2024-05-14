@@ -26,7 +26,7 @@ to build Gravitino service from source code and install it in your local.
 2. [Manage fileset metadata using Gravitino Python API](https://datastrato.ai/docs/latest/manage-fileset-metadata-using-gravitino?language=python)
 
 ### Gravitino Fileset Sample
-We proved a Fileset playground environment to help you quickly understand how to use Gravitino Python client to manage HDFS in Gravitino service.
+We provided a Fileset playground environment to help you quickly understand how to use Gravitino Python client to manage HDFS in Gravitino service.
 You can refer document of [How to use the playground#Launch AI components of playground](https://datastrato.ai/docs/latest/how-to-use-the-playground#launch-ai-components-of-playground) to launch a Gravitino service, HDFS and Jupyter notebook environment in you local Docker environment.
 
 Waiting for the playground Docker environment to start, you can directly open http://localhost:8888/lab/tree/gravitino-fileset-sample.ipynb in the browser and execute it.
@@ -37,7 +37,7 @@ The [gravitino-fileset-sample.ipynb](https://github.com/datastrato/gravitino-pla
 3. Install Gravitino Python client
 4. Initialize Gravitino admin client and create a Gravitino metalake
 5. Initialize Gravitino client and list metalakes
-6. Create a Gravitino `Catalog` and special `type` is `Catalog.Type.FILESET` and `proved` is [hadoop](https://datastrato.ai/docs/latest/hadoop-catalog)
+6. Create a Gravitino `Catalog` and special `type` is `Catalog.Type.FILESET` and `provider` is [hadoop](https://datastrato.ai/docs/latest/hadoop-catalog)
 7. Create a Gravitino `Schema` and special `location`'s HDFS path, and use `hdfs client` to check if the schema location was successfully created in HDFS
 8. Create a `Fileset` and special `type` is [Fileset.Type.MANAGED](https://datastrato.ai/docs/latest/manage-fileset-metadata-using-gravitino#fileset-operations) and `location`'s HDFS path, and use `hdfs client` to check if the fileset location was successfully created in HDFS
 9. Drop this `Fileset.Type.MANAGED` type fileset and check if the fileset location was successfully deleted in HDFS
