@@ -11,3 +11,4 @@ venv
 .idea
 dist
 build
+README.md
