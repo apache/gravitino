@@ -20,7 +20,7 @@ public class SparkIcebergCatalogHiveBackendIT extends SparkIcebergCatalogIT {
     Map<String, String> catalogProperties = Maps.newHashMap();
     catalogProperties.put(
         IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
-        IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND_HIVE);
+        IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_HIVE);
     catalogProperties.put(
         IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE, warehouse);
     catalogProperties.put(

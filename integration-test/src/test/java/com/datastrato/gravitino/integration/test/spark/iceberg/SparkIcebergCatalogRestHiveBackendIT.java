@@ -23,7 +23,7 @@ public class SparkIcebergCatalogRestHiveBackendIT extends SparkIcebergCatalogIT 
     Map<String, String> catalogProperties = Maps.newHashMap();
     catalogProperties.put(
         IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
-        IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND_REST);
+        IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_REST);
     catalogProperties.put(
         IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI, icebergRestServiceUri);
     catalogProperties.put(
@@ -34,7 +34,7 @@ public class SparkIcebergCatalogRestHiveBackendIT extends SparkIcebergCatalogIT 
             + icebergRestServiceName
             + "."
             + IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
-        IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND_HIVE);
+        IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_HIVE);
     catalogProperties.put(
         AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
             + icebergRestServiceName
