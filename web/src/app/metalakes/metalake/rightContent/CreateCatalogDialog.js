@@ -236,7 +236,7 @@ const CreateCatalogDialog = props => {
         let properties = {}
 
         const prevProperties = innerProps
-          .filter(i => i.key.trim() !== '')
+          .filter(i => typeSelect === 'fileset' && i.key === 'location' ? i.value.trim() !== '' : i.key.trim() !== '')
           .reduce((acc, item) => {
             acc[item.key] = item.value
 
@@ -363,7 +363,7 @@ const CreateCatalogDialog = props => {
       setProviderTypes(providersItems)
 
       const providerItem = providersItems.find(i => i.value === data.provider)
-      let propsItems = [...providerItem.defaultProps]
+      let propsItems = [...providerItem.defaultProps].filter(i => i.required)
 
       propsItems = propsItems.map((it, idx) => {
         let propItem = {
