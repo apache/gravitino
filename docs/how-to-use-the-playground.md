@@ -8,7 +8,7 @@ This software is licensed under the Apache License version 2."
 
 ## Playground introduction
 
-The playground is a complete Gravitino Docker runtime environment with `Hive`, `HDFS`, `Trino`, `MySQL`, `PostgreSQL`, `Jupter`, and a `Gravitino` server.
+The playground is a complete Gravitino Docker runtime environment with `Hive`, `HDFS`, `Trino`, `MySQL`, `PostgreSQL`, `Jupyter`, and a `Gravitino` server.
 
 Depending on your network and computer, startup time may take 3-5 minutes. Once the playground environment has started, you can open [http://localhost:8090](http://localhost:8090) in a browser to access the Gravitino Web UI.
 
@@ -55,7 +55,6 @@ cd gravitino-playground
 # equivalent to
 ./launch-playground.sh hive gravitino mysql jupyter
 ```
-you can open [http://localhost:8888](http://localhost:8888) in a browser to access the Jupyter Web UI.
 
 ### Launch special component or components of playground
 ```shell
@@ -63,6 +62,25 @@ git clone git@github.com:datastrato/gravitino-playground.git
 cd gravitino-playground
 ./launch-playground.sh hive|gravitino|trino|postgresql|mysql|spark|jupyter
 ```
+
+### Experiencing Gravitino Fileset with Jupyter
+We proved a Fileset playground environment to help you quickly understand how to use Gravitino Python client to manage HDFS in Gravitino service.
+You can refer document of [How to use the playground#Launch AI components of playground](https://datastrato.ai/docs/latest/how-to-use-the-playground#launch-ai-components-of-playground) to launch a Gravitino service, HDFS and Jupyter notebook environment in you local Docker environment.
+
+Waiting for the playground Docker environment to start, you can directly open http://localhost:8888/lab/tree/gravitino-fileset-sample.ipynb in the browser and execute it.
+
+The [gravitino-fileset-sample.ipynb](https://github.com/datastrato/gravitino-playground/blob/main/init/jupyter/gravitino-fileset-sample.ipynb) contains the following code paragraphs:
+1. Install HDFS Python client
+2. Create a HDFS client to connect HDFS and to do some test operations
+3. Install Gravitino Python client
+4. Initialize Gravitino admin client and create a Gravitino metalake
+5. Initialize Gravitino client and list metalakes
+6. Create a Gravitino `Catalog` and special `type` is `Catalog.Type.FILESET` and `proved` is [hadoop](https://datastrato.ai/docs/latest/hadoop-catalog)
+7. Create a Gravitino `Schema` and special `location`'s HDFS path, and use `hdfs client` to check if the schema location was successfully created in HDFS
+8. Create a `Fileset` and special `type` is [Fileset.Type.MANAGED](https://datastrato.ai/docs/latest/manage-fileset-metadata-using-gravitino#fileset-operations) and `location`'s HDFS path, and use `hdfs client` to check if the fileset location was successfully created in HDFS
+9. Drop this `Fileset.Type.MANAGED` type fileset and check if the fileset location was successfully deleted in HDFS
+10. Create a `Fileset` and special `type` is [Fileset.Type.EXTERNAL](https://datastrato.ai/docs/latest/manage-fileset-metadata-using-gravitino#fileset-operations) and special `location` to exist HDFS path
+11. Drop this `Fileset.Type.EXTERNAL` type fileset and check if the fileset location was not deleted in HDFS
 
 ## Experiencing Gravitino with Trino SQL
 

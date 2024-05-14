@@ -84,7 +84,7 @@ You can ues any like IDE to develop Gravitino Python Client. Directly open the c
 5. Distribute the Gravitino Python client module
 
     ```shell
-    ./gradlew :clients:client-python:distribute
+    ./gradlew :clients:client-python:distribution
     ```
 
 6. Deploy the Gravitino Python client to https://pypi.org/project/gravitino/
