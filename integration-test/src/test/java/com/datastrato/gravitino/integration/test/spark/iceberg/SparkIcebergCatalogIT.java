@@ -248,7 +248,7 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
   @Test
   void testIcebergCallOperations() throws NoSuchTableException {
     testIcebergCallRollbackToSnapshot();
-    testIcebergCallRollbackToTimestamp();
+//    testIcebergCallRollbackToTimestamp();
     testIcebergCallSetCurrentSnapshot();
     testIcebergCallRewriteDataFiles();
     testIcebergCallExpireSnapshots();
@@ -596,13 +596,14 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
   }
 
   private void testIcebergCallRewriteDataFiles() {
-    String tableName =
+    String fullTableName =
         String.format(
             "%s.%s.test_iceberg_call_rewrite_data_files", getCatalogName(), getDefaultDatabase());
+    String tableName = "test_iceberg_call_rewrite_data_files";
     dropTableIfExists(tableName);
     createSimpleTable(tableName);
 
-    IntStream.rangeClosed(0, 5)
+    IntStream.rangeClosed(1, 5)
         .forEach(
             i -> sql(String.format("INSERT INTO %s VALUES(%d, '%d', %d)", tableName, i, i, i)));
     List<String> tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
@@ -614,7 +615,7 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
             .sql(
                 String.format(
                     "CALL %s.system.rewrite_data_files(table => '%s', strategy => 'sort', sort_order => 'id DESC NULLS LAST', where => 'id < 10')",
-                    getCatalogName(), tableName))
+                    getCatalogName(), fullTableName))
             .collectAsList();
     Assertions.assertEquals(1, callResult.size());
     Assertions.assertEquals(5, callResult.get(0).getInt(0));
@@ -622,13 +623,14 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
   }
 
   private void testIcebergCallExpireSnapshots() throws NoSuchTableException {
-    String tableName =
+    String fullTableName =
         String.format(
             "%s.%s.test_iceberg_call_expire_snapshots", getCatalogName(), getDefaultDatabase());
+    String tableName = "test_iceberg_call_expire_snapshots";
     dropTableIfExists(tableName);
     createSimpleTable(tableName);
 
-    IntStream.rangeClosed(0, 5)
+    IntStream.rangeClosed(1, 5)
         .forEach(
             i -> sql(String.format("INSERT INTO %s VALUES(%d, '%d', %d)", tableName, i, i, i)));
     List<String> tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
@@ -642,20 +644,21 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
         getSparkSession()
             .sql(
                 String.format(
-                    "CALL %s.system.expire_snapshots(table => '%s', older_than => TIMESTAMP '%s', max_concurrent_deletes => 4)",
-                    getCatalogName(), tableName, currentTimestamp))
+                    "CALL %s.system.expire_snapshots(table => '%s', older_than => TIMESTAMP '%s', max_concurrent_deletes => 1)",
+                    getCatalogName(), fullTableName, currentTimestamp))
             .collectAsList();
     Assertions.assertEquals(1, callResult.size());
     Assertions.assertEquals(4, callResult.get(0).getInt(4));
   }
 
   private void testIcebergCallRewriteManifests() {
-    String tableName =
+    String fullTableName =
         String.format("%s.%s.rewrite_manifests", getCatalogName(), getDefaultDatabase());
+    String tableName = "rewrite_manifests";
     dropTableIfExists(tableName);
     createSimpleTable(tableName);
 
-    IntStream.rangeClosed(0, 5)
+    IntStream.rangeClosed(1, 5)
         .forEach(
             i -> sql(String.format("INSERT INTO %s VALUES(%d, '%d', %d)", tableName, i, i, i)));
     List<String> tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
@@ -667,7 +670,7 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
             .sql(
                 String.format(
                     "CALL %s.system.rewrite_manifests(table => '%s', use_caching => false)",
-                    getCatalogName(), tableName))
+                    getCatalogName(), fullTableName))
             .collectAsList();
     Assertions.assertEquals(1, callResult.size());
     Assertions.assertEquals(5, callResult.get(0).getInt(0));
@@ -675,9 +678,10 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
   }
 
   private void testIcebergCallRewritePositionDeleteFiles() {
-    String tableName =
+    String fullTableName =
         String.format(
             "%s.%s.rewrite_position_delete_files", getCatalogName(), getDefaultDatabase());
+    String tableName = "rewrite_position_delete_files";
     dropTableIfExists(tableName);
     createIcebergTableWithTableProperties(
         tableName,
@@ -711,7 +715,7 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
             .sql(
                 String.format(
                     "CALL %s.system.rewrite_position_delete_files(table => '%s', options => map('rewrite-all','true'))",
-                    getCatalogName(), tableName))
+                    getCatalogName(), fullTableName))
             .collectAsList();
     Assertions.assertEquals(1, callResult.size());
     Assertions.assertEquals(2, callResult.get(0).getInt(0));

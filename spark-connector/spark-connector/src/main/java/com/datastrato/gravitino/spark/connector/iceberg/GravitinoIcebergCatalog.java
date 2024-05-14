@@ -12,6 +12,7 @@ import com.datastrato.gravitino.spark.connector.catalog.BaseCatalog;
 import java.util.Map;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.spark.SparkCatalog;
+import org.apache.iceberg.spark.procedures.SparkProcedures;
 import org.apache.iceberg.spark.source.HasIcebergCatalog;
 import org.apache.iceberg.spark.source.SparkTable;
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
@@ -94,11 +95,27 @@ public class GravitinoIcebergCatalog extends BaseCatalog
 
   @Override
   public Procedure loadProcedure(Identifier identifier) throws NoSuchProcedureException {
-    return ((SparkCatalog) sparkCatalog).loadProcedure(identifier);
+    String[] namespace = identifier.namespace();
+    String name = identifier.name();
+
+    // namespace resolution is case insensitive until we have a way to configure case sensitivity in
+    // catalogs
+    if (isSystemNamespace(namespace)) {
+      SparkProcedures.ProcedureBuilder builder = SparkProcedures.newBuilder(name);
+      if (builder != null) {
+        return builder.withTableCatalog(this).build();
+      }
+    }
+
+    throw new NoSuchProcedureException(identifier);
   }
 
   @Override
   public Catalog icebergCatalog() {
     return ((SparkCatalog) sparkCatalog).icebergCatalog();
+  }
+
+  private static boolean isSystemNamespace(String[] namespace) {
+    return namespace.length == 1 && namespace[0].equalsIgnoreCase("system");
   }
 }
