@@ -19,11 +19,11 @@ import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
-import com.datastrato.gravitino.rel.expressions.literals.Literal;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
+import com.datastrato.gravitino.rel.partitions.ListPartition;
 import com.datastrato.gravitino.rel.partitions.RangePartition;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -50,7 +50,7 @@ import org.apache.commons.lang3.StringUtils;
 public class DorisTableOperations extends JdbcTableOperations {
   private static final String BACK_QUOTE = "`";
   private static final String DORIS_AUTO_INCREMENT = "AUTO_INCREMENT";
-
+  private static final String DOUBLE_QUOTE = "\"";
   private static final String NEW_LINE = "\n";
 
   @Override
@@ -219,19 +219,50 @@ public class DorisTableOperations extends JdbcTableOperations {
           "The partition field must be one of the columns");
 
       String partitionColumn = BACK_QUOTE + rangePartition.fieldName()[0] + BACK_QUOTE;
-      partitionSqlBuilder.append(partitionColumn).append(") ");
-
+      partitionSqlBuilder.append(partitionColumn).append(") ").append(NEW_LINE).append("(").append(NEW_LINE);
       // pre-assign partition when creating range partitioning
-      partitionSqlBuilder.append("(").append(NEW_LINE);
       RangePartition[] assignments = rangePartition.assignments();
       if (!ArrayUtils.isEmpty(assignments)) {
+        ImmutableList.Builder<String> partitions = ImmutableList.builder();
         for (RangePartition part : assignments) {
-          partitionSqlBuilder.append("PARTITION ").append(part.name()).append(" VALUES ");
-          Literal<?> lower = part.lower();
-          if (LiteralDTO.NULL.equals(lower)) {}
+          StringBuilder partitionAssignSqlBuilder = new StringBuilder();
+          partitionAssignSqlBuilder.append("PARTITION ").append(part.name()).append(" VALUES ");
+          LiteralDTO upper = (LiteralDTO) part.upper();
+          LiteralDTO lower = (LiteralDTO) part.lower();
+          if (LiteralDTO.NULL.equals(upper) && LiteralDTO.NULL.equals(lower)) {
+            partitionAssignSqlBuilder.append("LESS THAN MAXVALUE");
+          } else if (LiteralDTO.NULL.equals(lower)) {
+            partitionAssignSqlBuilder
+                .append("LESS THAN (")
+                .append(DOUBLE_QUOTE)
+                .append(upper.value())
+                .append(DOUBLE_QUOTE)
+                .append(")");
+          } else if (LiteralDTO.NULL.equals(upper)) {
+            partitionAssignSqlBuilder
+                .append("[(")
+                .append(DOUBLE_QUOTE)
+                .append(lower.value())
+                .append(DOUBLE_QUOTE)
+                .append("), (MAXVALUE))");
+          } else {
+            partitionAssignSqlBuilder
+                .append("[(")
+                .append(DOUBLE_QUOTE)
+                .append(lower.value())
+                .append(DOUBLE_QUOTE)
+                .append("), (")
+                .append(DOUBLE_QUOTE)
+                .append(upper.value())
+                .append(DOUBLE_QUOTE)
+                .append("))");
+          }
+          partitions.add(partitionAssignSqlBuilder.toString());
         }
+        partitionSqlBuilder.append(
+            partitions.build().stream().collect(Collectors.joining("," + NEW_LINE)));
       }
-      partitionSqlBuilder.append(")");
+      partitionSqlBuilder.append(NEW_LINE).append(")");
     } else if (partitioning[0] instanceof Transforms.ListTransform) {
       Transforms.ListTransform listPartition = (Transforms.ListTransform) partitioning[0];
       partitionSqlBuilder.append(" PARTITION BY LIST(");
@@ -248,8 +279,16 @@ public class DorisTableOperations extends JdbcTableOperations {
       }
       String partitionColumns =
           partitionColumnsBuilder.build().stream().collect(Collectors.joining(","));
-      // TODO we currently do not support pre-assign partition when creating list partitioning table
-      partitionSqlBuilder.append(partitionColumns).append(") () ");
+      partitionSqlBuilder.append(partitionColumns).append(") ").append(NEW_LINE).append("(").append(NEW_LINE);
+      // pre-assign partition when creating range partitioning
+      ListPartition[] assignments = listPartition.assignments();
+      if (!ArrayUtils.isEmpty(assignments)) {
+        ImmutableList.Builder<String> partitions = ImmutableList.builder();
+        for (ListPartition part : assignments) {
+
+        }
+      }
+      partitionSqlBuilder.append(NEW_LINE).append(")");
     } else {
       throw new IllegalArgumentException("Unsupported partition type of Doris");
     }
