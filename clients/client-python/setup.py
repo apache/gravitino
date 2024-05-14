@@ -10,7 +10,7 @@ try:
     with open("README.md") as f:
         long_description = f.read()
 except FileNotFoundError:
-    long_description = "No README.md file found"
+    long_description = "Gravitino Python client"
 
 setup(
     name="gravitino",

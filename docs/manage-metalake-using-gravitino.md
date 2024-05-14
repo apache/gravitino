@@ -54,7 +54,6 @@ GravitinoMetaLake newMetalake = gravitinoAdminClient.createMetalake(
 
 ```python
 gravitino_admin_client: GravitinoAdminClient = GravitinoAdminClient(uri="http://localhost:8090")
-
 gravitino_admin_client.create_metalake(ident=NameIdentifier.of("metalake"), 
                                        comment="This is a new metalake", 
                                        properties={})

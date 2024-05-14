@@ -37,8 +37,9 @@ fun generateReadmeFile() {
     val inputFile = file("${project.rootDir}/docs/how-to-use-python-client.md")
     val outputFile = file("README.md")
 
-    // Front matter is the metadata at the beginning of the file between two sets of three dashes (---)
-    // Because the https://pypi.org/project/gravitino/README.md file cannot contain the front matter
+    // Copy the contents of the how-to-use-python-client.md file to the README.md file for PyPi
+    // release, remove the front matter as PyPi doesn't support README file contains front
+    // matter.
     val lines = inputFile.readLines()
     var skipFrontMatterHead = false
     var skipFrontMatterEnd = false
