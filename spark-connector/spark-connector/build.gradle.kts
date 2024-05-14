@@ -19,6 +19,7 @@ val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
 val icebergVersion: String = libs.versions.iceberg.get()
 val kyuubiVersion: String = libs.versions.kyuubi.get()
 val scalaJava8CompatVersion: String = libs.versions.scala.java.compat.get()
+val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
 dependencies {
   implementation(project(":catalogs:bundled-catalog", configuration = "shadow"))
@@ -77,6 +78,7 @@ dependencies {
     exclude("org.glassfish.jersey.containers")
     exclude("org.glassfish.jersey.inject")
   }
+  testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
