@@ -7,7 +7,6 @@ package com.datastrato.gravitino.client;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
@@ -93,8 +92,7 @@ public class TestGravitinoMetalake extends TestBase {
     ErrorResponse errorResp = ErrorResponse.internalError("mock error");
     buildMockResource(Method.GET, path, null, errorResp, HttpStatus.SC_INTERNAL_SERVER_ERROR);
     Throwable ex =
-        Assertions.assertThrows(
-            RuntimeException.class, () -> gravitinoClient.listCatalogs());
+        Assertions.assertThrows(RuntimeException.class, () -> gravitinoClient.listCatalogs());
     Assertions.assertTrue(ex.getMessage().contains("mock error"));
 
     // Test return unparsed system error
@@ -201,13 +199,15 @@ public class TestGravitinoMetalake extends TestBase {
     ErrorResponse errorResp = ErrorResponse.internalError("mock error");
     buildMockResource(Method.GET, path, null, errorResp, HttpStatus.SC_INTERNAL_SERVER_ERROR);
     Throwable ex1 =
-        Assertions.assertThrows(RuntimeException.class, () -> gravitinoClient.loadCatalog(catalogName));
+        Assertions.assertThrows(
+            RuntimeException.class, () -> gravitinoClient.loadCatalog(catalogName));
     Assertions.assertTrue(ex1.getMessage().contains("mock error"));
 
     // Test return unparsed system error
     buildMockResource(Method.GET, path, null, "mock error", HttpStatus.SC_CONFLICT);
     Throwable ex2 =
-        Assertions.assertThrows(RESTException.class, () -> gravitinoClient.loadCatalog(catalogName));
+        Assertions.assertThrows(
+            RESTException.class, () -> gravitinoClient.loadCatalog(catalogName));
     Assertions.assertTrue(ex2.getMessage().contains("Error code: " + HttpStatus.SC_CONFLICT));
   }
 
@@ -233,11 +233,7 @@ public class TestGravitinoMetalake extends TestBase {
 
     Catalog catalog =
         gravitinoClient.createCatalog(
-            NameIdentifier.of(metalakeName, catalogName),
-            Catalog.Type.RELATIONAL,
-            provider,
-            "comment",
-            Collections.emptyMap());
+            catalogName, Catalog.Type.RELATIONAL, provider, "comment", Collections.emptyMap());
     Assertions.assertEquals(catalogName, catalog.name());
     Assertions.assertEquals("comment", catalog.comment());
     Assertions.assertEquals(Catalog.Type.RELATIONAL, catalog.type());
@@ -264,7 +260,7 @@ public class TestGravitinoMetalake extends TestBase {
         UnsupportedOperationException.class,
         () ->
             gravitinoClient.createCatalog(
-                id, Catalog.Type.MESSAGING, provider, "comment", emptyMap));
+                id.name(), Catalog.Type.MESSAGING, provider, "comment", emptyMap));
 
     // Test return NoSuchMetalakeException
     ErrorResponse errorResponse =
@@ -275,7 +271,7 @@ public class TestGravitinoMetalake extends TestBase {
             NoSuchMetalakeException.class,
             () ->
                 gravitinoClient.createCatalog(
-                    id, Catalog.Type.RELATIONAL, provider, "comment", emptyMap));
+                    id.name(), Catalog.Type.RELATIONAL, provider, "comment", emptyMap));
     Assertions.assertTrue(ex.getMessage().contains("mock error"));
 
     // Test return CatalogAlreadyExistsException
@@ -288,7 +284,7 @@ public class TestGravitinoMetalake extends TestBase {
             CatalogAlreadyExistsException.class,
             () ->
                 gravitinoClient.createCatalog(
-                    id, Catalog.Type.RELATIONAL, provider, "comment", emptyMap));
+                    id.name(), Catalog.Type.RELATIONAL, provider, "comment", emptyMap));
     Assertions.assertTrue(ex1.getMessage().contains("mock error"));
 
     // Test return internal error
@@ -299,7 +295,7 @@ public class TestGravitinoMetalake extends TestBase {
             RuntimeException.class,
             () ->
                 gravitinoClient.createCatalog(
-                    id, Catalog.Type.RELATIONAL, provider, "comment", emptyMap));
+                    id.name(), Catalog.Type.RELATIONAL, provider, "comment", emptyMap));
     Assertions.assertTrue(ex2.getMessage().contains("mock error"));
   }
 
@@ -328,8 +324,7 @@ public class TestGravitinoMetalake extends TestBase {
     CatalogUpdatesRequest updatesRequest = new CatalogUpdatesRequest(reqs);
 
     buildMockResource(Method.PUT, path, updatesRequest, resp, HttpStatus.SC_OK);
-    NameIdentifier id = NameIdentifier.of(metalakeName, catalogName);
-    Catalog catalog = gravitinoClient.alterCatalog(id, change1, change2);
+    Catalog catalog = gravitinoClient.alterCatalog(catalogName, change1, change2);
     Assertions.assertEquals("mock1", catalog.name());
     Assertions.assertEquals("comment1", catalog.comment());
     Assertions.assertEquals(Catalog.Type.RELATIONAL, catalog.type());
@@ -340,7 +335,8 @@ public class TestGravitinoMetalake extends TestBase {
     buildMockResource(Method.PUT, path, updatesRequest, errorResponse, HttpStatus.SC_NOT_FOUND);
     Throwable ex =
         Assertions.assertThrows(
-            NoSuchCatalogException.class, () -> gravitinoClient.alterCatalog(id, change1, change2));
+            NoSuchCatalogException.class,
+            () -> gravitinoClient.alterCatalog(catalogName, change1, change2));
     Assertions.assertTrue(ex.getMessage().contains("mock error"));
 
     // Test return IllegalArgumentException
@@ -349,7 +345,7 @@ public class TestGravitinoMetalake extends TestBase {
     Throwable ex1 =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> gravitinoClient.alterCatalog(id, change1, change2));
+            () -> gravitinoClient.alterCatalog(catalogName, change1, change2));
     Assertions.assertTrue(ex1.getMessage().contains("mock error"));
 
     // Test return internal error
@@ -358,7 +354,8 @@ public class TestGravitinoMetalake extends TestBase {
         Method.PUT, path, updatesRequest, errorResp, HttpStatus.SC_INTERNAL_SERVER_ERROR);
     Throwable ex2 =
         Assertions.assertThrows(
-            RuntimeException.class, () -> gravitinoClient.alterCatalog(id, change1, change2));
+            RuntimeException.class,
+            () -> gravitinoClient.alterCatalog(catalogName, change1, change2));
     Assertions.assertTrue(ex2.getMessage().contains("mock error"));
   }
 

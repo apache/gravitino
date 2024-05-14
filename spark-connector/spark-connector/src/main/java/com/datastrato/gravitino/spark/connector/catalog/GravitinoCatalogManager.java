@@ -5,8 +5,6 @@
 package com.datastrato.gravitino.spark.connector.catalog;
 
 import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.google.common.base.Preconditions;

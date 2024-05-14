@@ -96,7 +96,7 @@ public class TestMultipleJDBCLoad extends AbstractIT {
 
     Catalog postgreSqlCatalog =
         metalake.createCatalog(
-            NameIdentifier.of(metalakeName, postgreSqlCatalogName),
+            postgreSqlCatalogName,
             Catalog.Type.RELATIONAL,
             "lakehouse-iceberg",
             "comment",
@@ -115,7 +115,7 @@ public class TestMultipleJDBCLoad extends AbstractIT {
     String mysqlCatalogName = RandomNameUtils.genRandomName("it_iceberg_mysql");
     Catalog mysqlCatalog =
         metalake.createCatalog(
-            NameIdentifier.of(metalakeName, mysqlCatalogName),
+            mysqlCatalogName,
             Catalog.Type.RELATIONAL,
             "lakehouse-iceberg",
             "comment",

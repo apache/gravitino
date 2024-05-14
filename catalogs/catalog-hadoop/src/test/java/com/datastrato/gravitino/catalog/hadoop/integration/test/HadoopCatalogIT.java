@@ -94,11 +94,7 @@ public class HadoopCatalogIT extends AbstractIT {
 
   private static void createCatalog() {
     metalake.createCatalog(
-        NameIdentifier.of(metalakeName, catalogName),
-        Catalog.Type.FILESET,
-        provider,
-        "comment",
-        ImmutableMap.of());
+        catalogName, Catalog.Type.FILESET, provider, "comment", ImmutableMap.of());
 
     catalog = metalake.loadCatalog(catalogName);
   }
@@ -547,11 +543,7 @@ public class HadoopCatalogIT extends AbstractIT {
     // Create a catalog without specifying location.
     Catalog filesetCatalog =
         metalake.createCatalog(
-            NameIdentifier.of(metalakeName, catalogName),
-            Catalog.Type.FILESET,
-            provider,
-            "comment",
-            ImmutableMap.of());
+            catalogName, Catalog.Type.FILESET, provider, "comment", ImmutableMap.of());
 
     // Create a schema without specifying location.
     String schemaName =
@@ -576,9 +568,7 @@ public class HadoopCatalogIT extends AbstractIT {
     // Drop the catalog.
     dropped = metalake.dropCatalog(catalogName);
     Assertions.assertTrue(dropped, "catalog should be dropped");
-    Assertions.assertFalse(
-        metalake.catalogExists(catalogName),
-        "catalog should not be exists");
+    Assertions.assertFalse(metalake.catalogExists(catalogName), "catalog should not be exists");
   }
 
   private Fileset createFileset(

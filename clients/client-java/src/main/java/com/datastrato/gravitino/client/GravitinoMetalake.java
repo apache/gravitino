@@ -122,7 +122,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
   /**
    * Create a new catalog with specified identifier, type, comment and properties.
    *
-   * @param ident The identifier of the catalog.
+   * @param catalogName The identifier of the catalog.
    * @param type The type of the catalog.
    * @param provider The provider of the catalog.
    * @param comment The comment of the catalog.
@@ -133,21 +133,20 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
    */
   @Override
   public Catalog createCatalog(
-      NameIdentifier ident,
+      String catalogName,
       Catalog.Type type,
       String provider,
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
-    NameIdentifier.checkCatalog(ident);
 
     CatalogCreateRequest req =
-        new CatalogCreateRequest(ident.name(), type, provider, comment, properties);
+        new CatalogCreateRequest(catalogName, type, provider, comment, properties);
     req.validate();
 
     CatalogResponse resp =
         restClient.post(
-            String.format("api/metalakes/%s/catalogs", ident.namespace().level(0)),
+            String.format("api/metalakes/%s/catalogs", this.name()),
             req,
             CatalogResponse.class,
             Collections.emptyMap(),
@@ -160,16 +159,15 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
   /**
    * Alter the catalog with specified identifier by applying the changes.
    *
-   * @param ident the identifier of the catalog.
+   * @param catalogName the identifier of the catalog.
    * @param changes the changes to apply to the catalog.
    * @return the altered {@link Catalog}.
    * @throws NoSuchCatalogException if the catalog with specified identifier does not exist.
    * @throws IllegalArgumentException if the changes are invalid.
    */
   @Override
-  public Catalog alterCatalog(NameIdentifier ident, CatalogChange... changes)
+  public Catalog alterCatalog(String catalogName, CatalogChange... changes)
       throws NoSuchCatalogException, IllegalArgumentException {
-    NameIdentifier.checkCatalog(ident);
 
     List<CatalogUpdateRequest> reqs =
         Arrays.stream(changes)
@@ -180,7 +178,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
 
     CatalogResponse resp =
         restClient.put(
-            String.format(API_METALAKES_CATALOGS_PATH, ident.namespace().level(0), ident.name()),
+            String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName),
             updatesRequest,
             CatalogResponse.class,
             Collections.emptyMap(),

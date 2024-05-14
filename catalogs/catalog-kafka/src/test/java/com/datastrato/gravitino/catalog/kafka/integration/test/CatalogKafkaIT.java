@@ -128,7 +128,7 @@ public class CatalogKafkaIT extends AbstractIT {
     // test alter catalog
     Catalog alteredCatalog =
         metalake.alterCatalog(
-            NameIdentifier.of(METALAKE_NAME, catalogName),
+            catalogName,
             CatalogChange.updateComment("new comment"),
             CatalogChange.removeProperty("key1"));
     Assertions.assertEquals("new comment", alteredCatalog.comment());
@@ -139,8 +139,7 @@ public class CatalogKafkaIT extends AbstractIT {
     Assertions.assertTrue(dropped);
     Exception exception =
         Assertions.assertThrows(
-            NoSuchCatalogException.class,
-            () -> metalake.loadCatalog(catalogName));
+            NoSuchCatalogException.class, () -> metalake.loadCatalog(catalogName));
     Assertions.assertTrue(exception.getMessage().contains(catalogName));
     // assert topic exists in Kafka after catalog dropped
     Assertions.assertFalse(adminClient.listTopics().names().get().isEmpty());
@@ -154,7 +153,7 @@ public class CatalogKafkaIT extends AbstractIT {
             IllegalArgumentException.class,
             () ->
                 metalake.createCatalog(
-                    NameIdentifier.of(METALAKE_NAME, catalogName),
+                    catalogName,
                     Catalog.Type.MESSAGING,
                     PROVIDER,
                     "comment",
@@ -166,7 +165,7 @@ public class CatalogKafkaIT extends AbstractIT {
             IllegalArgumentException.class,
             () ->
                 metalake.createCatalog(
-                    NameIdentifier.of(METALAKE_NAME, catalogName),
+                    catalogName,
                     Catalog.Type.MESSAGING,
                     PROVIDER,
                     "comment",
@@ -492,12 +491,7 @@ public class CatalogKafkaIT extends AbstractIT {
 
   private static Catalog createCatalog(
       String catalogName, String comment, Map<String, String> properties) {
-    metalake.createCatalog(
-        NameIdentifier.of(METALAKE_NAME, catalogName),
-        Catalog.Type.MESSAGING,
-        PROVIDER,
-        comment,
-        properties);
+    metalake.createCatalog(catalogName, Catalog.Type.MESSAGING, PROVIDER, comment, properties);
     return metalake.loadCatalog(catalogName);
   }
 }

@@ -309,12 +309,7 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     properties.put(METASTORE_URIS, HIVE_METASTORE_URIS);
     properties.put(IMPERSONATION_ENABLE, "true");
 
-    metalake.createCatalog(
-        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME),
-        Catalog.Type.RELATIONAL,
-        PROVIDER,
-        "comment",
-        properties);
+    metalake.createCatalog(CATALOG_NAME, Catalog.Type.RELATIONAL, PROVIDER, "comment", properties);
 
     catalog = metalake.loadCatalog(CATALOG_NAME);
   }

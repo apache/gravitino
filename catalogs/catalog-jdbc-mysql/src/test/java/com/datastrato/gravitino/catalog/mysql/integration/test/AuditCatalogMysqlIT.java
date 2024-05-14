@@ -89,10 +89,7 @@ public class AuditCatalogMysqlIT extends AbstractIT {
     Assertions.assertEquals(catalog.auditInfo().creator(), catalog.auditInfo().lastModifier());
     Assertions.assertEquals(
         catalog.auditInfo().createTime(), catalog.auditInfo().lastModifiedTime());
-    catalog =
-        metalake.alterCatalog(
-            NameIdentifier.of(metalakeName, catalogName),
-            CatalogChange.setProperty("key1", "value1"));
+    catalog = metalake.alterCatalog(catalogName, CatalogChange.setProperty("key1", "value1"));
     Assertions.assertEquals(expectUser, catalog.auditInfo().creator());
     Assertions.assertEquals(expectUser, catalog.auditInfo().lastModifier());
   }
@@ -157,11 +154,7 @@ public class AuditCatalogMysqlIT extends AbstractIT {
     catalogProperties.put(JdbcConfig.PASSWORD.getKey(), MYSQL_CONTAINER.getPassword());
 
     return metalake.createCatalog(
-        NameIdentifier.of(metalakeName, catalogName),
-        Catalog.Type.RELATIONAL,
-        provider,
-        "comment",
-        catalogProperties);
+        catalogName, Catalog.Type.RELATIONAL, provider, "comment", catalogProperties);
   }
 
   private static void createMetalake() {

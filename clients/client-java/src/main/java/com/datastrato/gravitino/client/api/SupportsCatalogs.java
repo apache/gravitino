@@ -12,7 +12,6 @@ import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
-
 import java.util.Map;
 
 /**
@@ -69,17 +68,17 @@ public interface SupportsCatalogs {
    * catalog should be created. The short name should be the same as the {@link CatalogProvider}
    * interface provided.
    *
-   * @param ident the identifier of the catalog.
+   * @param catalogName the name of the catalog.
    * @param type the type of the catalog.
-   * @param comment the comment of the catalog.
    * @param provider the provider of the catalog.
+   * @param comment the comment of the catalog.
    * @param properties the properties of the catalog.
    * @return The created catalog.
    * @throws NoSuchMetalakeException If the metalake does not exist.
    * @throws CatalogAlreadyExistsException If the catalog already exists.
    */
   Catalog createCatalog(
-      NameIdentifier ident,
+      String catalogName,
       Catalog.Type type,
       String provider,
       String comment,
@@ -89,13 +88,13 @@ public interface SupportsCatalogs {
   /**
    * Alter a catalog with specified identifier.
    *
-   * @param ident the identifier of the catalog.
+   * @param catalogName the identifier of the catalog.
    * @param changes the changes to apply to the catalog.
    * @return The altered catalog.
    * @throws NoSuchCatalogException If the catalog does not exist.
    * @throws IllegalArgumentException If the changes cannot be applied to the catalog.
    */
-  Catalog alterCatalog(NameIdentifier ident, CatalogChange... changes)
+  Catalog alterCatalog(String catalogName, CatalogChange... changes)
       throws NoSuchCatalogException, IllegalArgumentException;
 
   /**

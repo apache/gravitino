@@ -56,12 +56,11 @@ public class GravitinoVirtualFileSystemIT extends AbstractIT {
     metalake = client.createMetalake(metalakeName, "metalake comment", Collections.emptyMap());
     Assertions.assertTrue(client.metalakeExists(metalakeName));
 
-    NameIdentifier catalogIdent = NameIdentifier.of(metalakeName, catalogName);
     Map<String, String> properties = Maps.newHashMap();
     Catalog catalog =
         metalake.createCatalog(
-            catalogIdent, Catalog.Type.FILESET, "hadoop", "catalog comment", properties);
-    Assertions.assertTrue(metalake.catalogExists(catalogIdent.name()));
+            catalogName, Catalog.Type.FILESET, "hadoop", "catalog comment", properties);
+    Assertions.assertTrue(metalake.catalogExists(catalogName));
 
     NameIdentifier schemaIdent = NameIdentifier.of(metalakeName, catalogName, schemaName);
     catalog.asSchemas().createSchema(schemaIdent, "schema comment", properties);

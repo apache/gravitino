@@ -444,7 +444,7 @@ public class TrinoConnectorIT extends AbstractIT {
     GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
     Catalog catalog =
         createdMetalake.createCatalog(
-            NameIdentifier.of(metalakeName, catalogName),
+            catalogName,
             Catalog.Type.RELATIONAL,
             "hive",
             "comment",
@@ -605,7 +605,7 @@ public class TrinoConnectorIT extends AbstractIT {
     String hiveHost = containerSuite.getHiveContainer().getContainerIpAddress();
 
     createdMetalake.createCatalog(
-        NameIdentifier.of(metalakeName, catalogName),
+        catalogName,
         Catalog.Type.RELATIONAL,
         "jdbc-mysql",
         "comment",
@@ -686,7 +686,7 @@ public class TrinoConnectorIT extends AbstractIT {
     GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
     Catalog catalog =
         createdMetalake.createCatalog(
-            NameIdentifier.of(metalakeName, catalogName),
+            catalogName,
             Catalog.Type.RELATIONAL,
             "hive",
             "comment",
@@ -820,7 +820,7 @@ public class TrinoConnectorIT extends AbstractIT {
     String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
     GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
     createdMetalake.createCatalog(
-        NameIdentifier.of(metalakeName, catalogName),
+        catalogName,
         Catalog.Type.RELATIONAL,
         "hive",
         "comment",
@@ -862,7 +862,7 @@ public class TrinoConnectorIT extends AbstractIT {
     String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
     GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
     createdMetalake.createCatalog(
-        NameIdentifier.of(metalakeName, catalogName),
+        catalogName,
         Catalog.Type.RELATIONAL,
         "hive",
         "comment",
@@ -906,7 +906,7 @@ public class TrinoConnectorIT extends AbstractIT {
     String hiveContainerIp = containerSuite.getHiveContainer().getContainerIpAddress();
     Catalog catalog =
         createdMetalake.createCatalog(
-            NameIdentifier.of(metalakeName, catalogName),
+            catalogName,
             Catalog.Type.RELATIONAL,
             "lakehouse-iceberg",
             "comment",
@@ -1030,7 +1030,7 @@ public class TrinoConnectorIT extends AbstractIT {
     String hiveHost = containerSuite.getHiveContainer().getContainerIpAddress();
 
     createdMetalake.createCatalog(
-        NameIdentifier.of(metalakeName, catalogName),
+        catalogName,
         Catalog.Type.RELATIONAL,
         "lakehouse-iceberg",
         "comment",
@@ -1113,7 +1113,7 @@ public class TrinoConnectorIT extends AbstractIT {
     String hiveHost = containerSuite.getHiveContainer().getContainerIpAddress();
 
     createdMetalake.createCatalog(
-        NameIdentifier.of(metalakeName, catalogName),
+        catalogName,
         Catalog.Type.RELATIONAL,
         "jdbc-mysql",
         "comment",
@@ -1156,7 +1156,7 @@ public class TrinoConnectorIT extends AbstractIT {
     String hiveHost = containerSuite.getHiveContainer().getContainerIpAddress();
 
     createdMetalake.createCatalog(
-        NameIdentifier.of(metalakeName, catalogName),
+        catalogName,
         Catalog.Type.RELATIONAL,
         "jdbc-mysql",
         "comment",
@@ -1270,7 +1270,7 @@ public class TrinoConnectorIT extends AbstractIT {
     String hiveHost = containerSuite.getHiveContainer().getContainerIpAddress();
 
     createdMetalake.createCatalog(
-        NameIdentifier.of(metalakeName, catalogName),
+        catalogName,
         Catalog.Type.RELATIONAL,
         "jdbc-mysql",
         "comment",
@@ -1393,7 +1393,7 @@ public class TrinoConnectorIT extends AbstractIT {
     // well.
     for (int i = 0; i < 3; i++) {
       createdMetalake.createCatalog(
-          NameIdentifier.of(metalakeName, catalogName),
+          catalogName,
           Catalog.Type.RELATIONAL,
           "jdbc-mysql",
           "comment",
@@ -1438,12 +1438,7 @@ public class TrinoConnectorIT extends AbstractIT {
     properties.put("metastore.uris", hiveMetastoreUris);
 
     Catalog createdCatalog =
-        metalake.createCatalog(
-            NameIdentifier.of(metalakeName, catalogName),
-            Catalog.Type.RELATIONAL,
-            "hive",
-            "comment",
-            properties);
+        metalake.createCatalog(catalogName, Catalog.Type.RELATIONAL, "hive", "comment", properties);
     Catalog loadCatalog = metalake.loadCatalog(catalogName);
     Assertions.assertEquals(createdCatalog, loadCatalog);
 

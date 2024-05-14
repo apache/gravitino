@@ -66,7 +66,7 @@ public class GravitinoMockServer implements AutoCloseable {
 
   public GravitinoMockServer() {
     createMetalake(testMetalake);
-    createCatalog(NameIdentifier.ofCatalog(testMetalake, testCatalog));
+    createCatalog(testMetalake, testCatalog);
   }
 
   public void setCatalogConnectorManager(CatalogConnectorManager catalogConnectorManager) {
@@ -138,14 +138,14 @@ public class GravitinoMockServer implements AutoCloseable {
             });
 
     when(metaLake.createCatalog(
-            any(NameIdentifier.class), any(Catalog.Type.class), anyString(), anyString(), anyMap()))
+            anyString(), any(Catalog.Type.class), anyString(), anyString(), anyMap()))
         .thenAnswer(
             new Answer<Catalog>() {
               @Override
               public Catalog answer(InvocationOnMock invocation) throws Throwable {
-                NameIdentifier catalogName = invocation.getArgument(0);
+                String catalogName = invocation.getArgument(0);
 
-                Catalog catalog = createCatalog(catalogName);
+                Catalog catalog = createCatalog(metalakeName, catalogName);
 
                 return catalog;
               }
@@ -200,9 +200,9 @@ public class GravitinoMockServer implements AutoCloseable {
     catalogConnectorManager.loadCatalogs(metaLake);
   }
 
-  private Catalog createCatalog(NameIdentifier catalogName) {
+  private Catalog createCatalog(String metalakeName, String catalogName) {
     Catalog catalog = mock(Catalog.class);
-    when(catalog.name()).thenReturn(catalogName.name());
+    when(catalog.name()).thenReturn(catalogName);
     when(catalog.provider()).thenReturn(testCatalogProvider);
     when(catalog.type()).thenReturn(Catalog.Type.RELATIONAL);
     when(catalog.properties()).thenReturn(Map.of("max_ttl", "10"));
@@ -216,7 +216,7 @@ public class GravitinoMockServer implements AutoCloseable {
     when(catalog.asTableCatalog()).thenAnswer(answer -> createTableCatalog(gravitinoCatalog));
 
     when(catalog.asSchemas()).thenAnswer(answer -> createSchemas(gravitinoCatalog));
-    metalakes.get(catalogName.namespace().toString()).catalogs.put(catalogName.name(), catalog);
+    metalakes.get(metalakeName).catalogs.put(catalogName, catalog);
     return catalog;
   }
 

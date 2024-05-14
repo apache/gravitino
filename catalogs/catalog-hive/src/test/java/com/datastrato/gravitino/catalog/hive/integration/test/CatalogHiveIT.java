@@ -243,12 +243,7 @@ public class CatalogHiveIT extends AbstractIT {
     Map<String, String> properties = Maps.newHashMap();
     properties.put(METASTORE_URIS, HIVE_METASTORE_URIS);
 
-    metalake.createCatalog(
-        NameIdentifier.of(metalakeName, catalogName),
-        Catalog.Type.RELATIONAL,
-        provider,
-        "comment",
-        properties);
+    metalake.createCatalog(catalogName, Catalog.Type.RELATIONAL, provider, "comment", properties);
 
     catalog = metalake.loadCatalog(catalogName);
   }
@@ -1361,7 +1356,7 @@ public class CatalogHiveIT extends AbstractIT {
 
     String catalogName = GravitinoITUtils.genRandomName("CatalogHiveIT_catalog");
     metalake.createCatalog(
-        NameIdentifier.of(metalakeName, catalogName),
+        catalogName,
         Catalog.Type.RELATIONAL,
         provider,
         "comment",
@@ -1373,16 +1368,17 @@ public class CatalogHiveIT extends AbstractIT {
     NameIdentifier newId2 = NameIdentifier.of(metalakeName, newMetalakeName);
     NameIdentifier oldId = NameIdentifier.of(metalakeName, catalogName);
     for (int i = 0; i < 2; i++) {
-      Assertions.assertThrows(NoSuchCatalogException.class, () -> metalake.loadCatalog(newId2.name()));
-      metalake.alterCatalog(
-          NameIdentifier.of(metalakeName, catalogName), CatalogChange.rename(newCatalogName));
+      Assertions.assertThrows(
+          NoSuchCatalogException.class, () -> metalake.loadCatalog(newId2.name()));
+      metalake.alterCatalog(catalogName, CatalogChange.rename(newCatalogName));
       metalake.loadCatalog(newCatalogName);
-      Assertions.assertThrows(NoSuchCatalogException.class, () -> metalake.loadCatalog(oldId.name()));
+      Assertions.assertThrows(
+          NoSuchCatalogException.class, () -> metalake.loadCatalog(oldId.name()));
 
-      metalake.alterCatalog(
-          NameIdentifier.of(metalakeName, newCatalogName), CatalogChange.rename(catalogName));
+      metalake.alterCatalog(newCatalogName, CatalogChange.rename(catalogName));
       catalog = metalake.loadCatalog(oldId.name());
-      Assertions.assertThrows(NoSuchCatalogException.class, () -> metalake.loadCatalog(newId2.name()));
+      Assertions.assertThrows(
+          NoSuchCatalogException.class, () -> metalake.loadCatalog(newId2.name()));
     }
 
     // Schema does not have the rename operation.
@@ -1647,11 +1643,6 @@ public class CatalogHiveIT extends AbstractIT {
     properties.put(METASTORE_URIS, HIVE_METASTORE_URIS);
     properties.put(BaseCatalog.CATALOG_OPERATION_IMPL, customImpl);
 
-    metalake.createCatalog(
-        NameIdentifier.of(metalakeName, catalogName),
-        Catalog.Type.RELATIONAL,
-        provider,
-        "comment",
-        properties);
+    metalake.createCatalog(catalogName, Catalog.Type.RELATIONAL, provider, "comment", properties);
   }
 }

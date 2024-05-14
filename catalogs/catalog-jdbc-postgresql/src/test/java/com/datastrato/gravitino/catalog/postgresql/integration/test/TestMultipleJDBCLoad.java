@@ -97,11 +97,7 @@ public class TestMultipleJDBCLoad extends AbstractIT {
 
     Catalog postgreSqlCatalog =
         metalake.createCatalog(
-            NameIdentifier.of(metalakeName, postgreSqlCatalogName),
-            Catalog.Type.RELATIONAL,
-            "jdbc-postgresql",
-            "comment",
-            pgConf);
+            postgreSqlCatalogName, Catalog.Type.RELATIONAL, "jdbc-postgresql", "comment", pgConf);
 
     Map<String, String> mysqlConf = Maps.newHashMap();
 
@@ -112,11 +108,7 @@ public class TestMultipleJDBCLoad extends AbstractIT {
     String mysqlCatalogName = RandomNameUtils.genRandomName("it_mysql");
     Catalog mysqlCatalog =
         metalake.createCatalog(
-            NameIdentifier.of(metalakeName, mysqlCatalogName),
-            Catalog.Type.RELATIONAL,
-            "jdbc-mysql",
-            "comment",
-            mysqlConf);
+            mysqlCatalogName, Catalog.Type.RELATIONAL, "jdbc-mysql", "comment", mysqlConf);
 
     NameIdentifier[] nameIdentifiers =
         mysqlCatalog.asSchemas().listSchemas(Namespace.of(metalakeName, mysqlCatalogName));

@@ -6,7 +6,6 @@ package com.datastrato.gravitino.integration.test.trino;
 
 import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import java.io.FileOutputStream;
 import java.io.IOException;

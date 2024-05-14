@@ -156,7 +156,7 @@ public class CatalogDorisIT extends AbstractIT {
 
     Catalog createdCatalog =
         metalake.createCatalog(
-            NameIdentifier.of(metalakeName, catalogName),
+            catalogName,
             Catalog.Type.RELATIONAL,
             provider,
             "doris catalog comment",

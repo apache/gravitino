@@ -163,11 +163,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
 
     Catalog createdCatalog =
         metalake.createCatalog(
-            NameIdentifier.of(metalakeName, catalogName),
-            Catalog.Type.RELATIONAL,
-            provider,
-            "comment",
-            catalogProperties);
+            catalogName, Catalog.Type.RELATIONAL, provider, "comment", catalogProperties);
     Catalog loadCatalog = metalake.loadCatalog(catalogName);
     Assertions.assertEquals(createdCatalog, loadCatalog);
 

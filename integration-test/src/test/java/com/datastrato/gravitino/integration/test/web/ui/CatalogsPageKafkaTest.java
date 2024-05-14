@@ -69,8 +69,7 @@ public class CatalogsPageKafkaTest extends AbstractWebIT {
    * @param topicName The name of the Kafka topic.
    */
   void createTopic(String metalakeName, String catalogName, String schemaName, String topicName) {
-    Catalog catalog_kafka =
-        metalake.loadCatalog(catalogName);
+    Catalog catalog_kafka = metalake.loadCatalog(catalogName);
     catalog_kafka
         .asTopicCatalog()
         .createTopic(
@@ -89,8 +88,7 @@ public class CatalogsPageKafkaTest extends AbstractWebIT {
    * @param topicName The name of the Kafka topic to be dropped.
    */
   void dropTopic(String metalakeName, String catalogName, String schemaName, String topicName) {
-    Catalog catalog_kafka =
-        metalake.loadCatalog(catalogName);
+    Catalog catalog_kafka = metalake.loadCatalog(catalogName);
     catalog_kafka
         .asTopicCatalog()
         .dropTopic(NameIdentifier.of(metalakeName, catalogName, schemaName, topicName));

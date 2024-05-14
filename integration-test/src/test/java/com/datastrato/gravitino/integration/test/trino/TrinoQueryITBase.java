@@ -148,11 +148,7 @@ public class TrinoQueryITBase {
     if (!exists) {
       Catalog createdCatalog =
           metalake.createCatalog(
-              NameIdentifier.of(metalakeName, catalogName),
-              Catalog.Type.RELATIONAL,
-              provider,
-              "comment",
-              properties);
+              catalogName, Catalog.Type.RELATIONAL, provider, "comment", properties);
       Assertions.assertNotNull(createdCatalog);
     }
 

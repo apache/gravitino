@@ -212,8 +212,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     Map<String, String> properties = Maps.newHashMap();
     properties.put(PROPERTIES_KEY1, PROPERTIES_VALUE1);
     String storageLocation = storageLocation(schemaName, filesetName);
-    Catalog catalog_fileset =
-        metalake.loadCatalog(catalogName);
+    Catalog catalog_fileset = metalake.loadCatalog(catalogName);
     catalog_fileset
         .asFilesetCatalog()
         .createFileset(

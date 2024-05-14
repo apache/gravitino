@@ -74,19 +74,19 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
 
   @Override
   public Catalog createCatalog(
-      NameIdentifier ident,
+      String catalogName,
       Catalog.Type type,
       String provider,
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
-    return getMetalake().createCatalog(ident, type, provider, comment, properties);
+    return getMetalake().createCatalog(catalogName, type, provider, comment, properties);
   }
 
   @Override
-  public Catalog alterCatalog(NameIdentifier ident, CatalogChange... changes)
+  public Catalog alterCatalog(String catalogName, CatalogChange... changes)
       throws NoSuchCatalogException, IllegalArgumentException {
-    return getMetalake().alterCatalog(ident, changes);
+    return getMetalake().alterCatalog(catalogName, changes);
   }
 
   @Override
