@@ -25,17 +25,14 @@ public class PostgreSQLConnectorAdapter implements CatalogConnectorAdapter {
   }
 
   @Override
-  public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog)
+  public Map<String, String> buildInternalConnectorConfig(GravitinoCatalog catalog)
       throws Exception {
-    Map<String, Object> config = new HashMap<>();
-    config.put(
-        "catalogHandle",
-        String.format("%s_v%d:normal:default", catalog.getName(), VERSION.getAndIncrement()));
-    config.put("connectorName", "postgresql");
+    Map<String, String> config = new HashMap<>();
+    config.put("connector.name", "postgresql");
 
     Map<String, String> properties =
         catalogConverter.gravitinoToEngineProperties(catalog.getProperties());
-    config.put("properties", properties);
+    config.putAll(properties);
     return config;
   }
 

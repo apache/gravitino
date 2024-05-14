@@ -151,26 +151,20 @@ public class GravitinoMetadata implements ConnectorMetadata {
   @Override
   public Map<String, ColumnHandle> getColumnHandles(
       ConnectorSession session, ConnectorTableHandle tableHandle) {
-    if (!(tableHandle instanceof GravitinoTableHandle)) {
-      return internalMetadata.getColumnHandles(session, tableHandle);
-    }
-
-    GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) tableHandle;
     Map<String, ColumnHandle> internalColumnHandles =
-        internalMetadata.getColumnHandles(session, gravitinoTableHandle.getInternalTableHandle());
-    return internalColumnHandles;
+        internalMetadata.getColumnHandles(session, GravitinoHandle.unWrap(tableHandle));
+    return internalColumnHandles.entrySet().stream()
+        .collect(
+            Collectors.toMap(
+                Map.Entry::getKey,
+                (entry) -> new GravitinoColumnHandle(entry.getKey(), entry.getValue())));
   }
 
   @Override
   public ColumnMetadata getColumnMetadata(
       ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle columnHandle) {
-    if (!(tableHandle instanceof GravitinoTableHandle)) {
-      return internalMetadata.getColumnMetadata(session, tableHandle, columnHandle);
-    }
-
-    GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) tableHandle;
     return internalMetadata.getColumnMetadata(
-        session, gravitinoTableHandle.getInternalTableHandle(), columnHandle);
+        session, GravitinoHandle.unWrap(tableHandle), GravitinoHandle.unWrap(columnHandle));
   }
 
   @Override
@@ -220,7 +214,7 @@ public class GravitinoMetadata implements ConnectorMetadata {
     GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) tableHandle;
     ConnectorInsertTableHandle insertTableHandle =
         internalMetadata.beginInsert(
-            session, gravitinoTableHandle.getInternalTableHandle(), columns, retryMode);
+            session, gravitinoTableHandle.getInternalHandle(), columns, retryMode);
     return new GravitinoInsertTableHandle(insertTableHandle);
   }
 
@@ -362,8 +356,8 @@ public class GravitinoMetadata implements ConnectorMetadata {
     return internalMetadata.applyJoin(
         session,
         joinType,
-        gravitinoLeftTableHandle.getInternalTableHandle(),
-        gravitinoRightTableHandle.getInternalTableHandle(),
+        gravitinoLeftTableHandle.getInternalHandle(),
+        gravitinoRightTableHandle.getInternalHandle(),
         joinCondition,
         leftAssignments,
         rightAssignments,
@@ -382,7 +376,7 @@ public class GravitinoMetadata implements ConnectorMetadata {
 
     GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) handle;
     return internalMetadata.applyProjection(
-        session, gravitinoTableHandle.getInternalTableHandle(), projections, assignments);
+        session, gravitinoTableHandle.getInternalHandle(), projections, assignments);
   }
 
   @Override
@@ -400,7 +394,7 @@ public class GravitinoMetadata implements ConnectorMetadata {
 
     GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) handle;
     return internalMetadata.applyFilter(
-        session, gravitinoTableHandle.getInternalTableHandle(), constraint);
+        session, gravitinoTableHandle.getInternalHandle(), constraint);
   }
 
   @Override
@@ -417,23 +411,13 @@ public class GravitinoMetadata implements ConnectorMetadata {
 
     GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) handle;
     return internalMetadata.applyAggregation(
-        session,
-        gravitinoTableHandle.getInternalTableHandle(),
-        aggregates,
-        assignments,
-        groupingSets);
+        session, gravitinoTableHandle.getInternalHandle(), aggregates, assignments, groupingSets);
   }
 
   @Override
   public Optional<LimitApplicationResult<ConnectorTableHandle>> applyLimit(
       ConnectorSession session, ConnectorTableHandle handle, long limit) {
-    if (!(handle instanceof GravitinoTableHandle)) {
-      return internalMetadata.applyLimit(session, handle, limit);
-    }
-
-    GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) handle;
-    return internalMetadata.applyLimit(
-        session, gravitinoTableHandle.getInternalTableHandle(), limit);
+    return internalMetadata.applyLimit(session, GravitinoHandle.unWrap(handle), limit);
   }
 
   @Override
@@ -447,28 +431,21 @@ public class GravitinoMetadata implements ConnectorMetadata {
       return internalMetadata.applyTopN(session, handle, topNCount, sortItems, assignments);
     }
 
-    GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) handle;
     return internalMetadata.applyTopN(
-        session, gravitinoTableHandle.getInternalTableHandle(), topNCount, sortItems, assignments);
+        session, GravitinoHandle.unWrap(handle), topNCount, sortItems, assignments);
   }
 
   @Override
   public TableStatistics getTableStatistics(
       ConnectorSession session, ConnectorTableHandle tableHandle) {
-    if (!(tableHandle instanceof GravitinoTableHandle)) {
-      return internalMetadata.getTableStatistics(session, tableHandle);
-    }
-
-    GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) tableHandle;
-    return internalMetadata.getTableStatistics(
-        session, gravitinoTableHandle.getInternalTableHandle());
+    return internalMetadata.getTableStatistics(session, GravitinoHandle.unWrap(tableHandle));
   }
 
   private String getColumnName(
       ConnectorSession session, GravitinoTableHandle tableHandle, ColumnHandle columnHandle) {
     ColumnMetadata internalMetadataColumnMetadata =
         internalMetadata.getColumnMetadata(
-            session, tableHandle.getInternalTableHandle(), columnHandle);
+            session, GravitinoHandle.unWrap(tableHandle), columnHandle);
     if (internalMetadataColumnMetadata == null) {
       throw new TrinoException(
           GRAVITINO_COLUMN_NOT_EXISTS,

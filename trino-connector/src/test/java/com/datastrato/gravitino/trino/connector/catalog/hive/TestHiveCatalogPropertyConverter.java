@@ -63,26 +63,24 @@ public class TestHiveCatalogPropertyConverter {
         TestGravitinoCatalog.mockCatalog(
             name, "hive", "test catalog", Catalog.Type.RELATIONAL, properties);
     HiveConnectorAdapter adapter = new HiveConnectorAdapter();
-    Map<String, Object> stringObjectMap =
+    Map<String, String> config =
         adapter.buildInternalConnectorConfig(new GravitinoCatalog("test", mockCatalog));
 
     // test connector attributes
-    Assert.assertEquals(stringObjectMap.get("connectorName"), "hive");
-
-    Map<String, Object> propertiesMap = (Map<String, Object>) stringObjectMap.get("properties");
+    Assert.assertEquals(config.get("connector.name"), "hive");
 
     // test converted properties
-    Assert.assertEquals(propertiesMap.get("hive.metastore.uri"), "thrift://localhost:9083");
+    Assert.assertEquals(config.get("hive.metastore.uri"), "thrift://localhost:9083");
 
     // test fixed properties
-    Assert.assertEquals(propertiesMap.get("hive.security"), "allow-all");
+    Assert.assertEquals(config.get("hive.security"), "allow-all");
 
     // test trino passing properties
     Assert.assertEquals(
-        propertiesMap.get("hive.config.resources"), "/tmp/hive-site.xml, /tmp/core-site.xml");
+        config.get("hive.config.resources"), "/tmp/hive-site.xml, /tmp/core-site.xml");
 
     // test unknown properties
-    Assert.assertNull(propertiesMap.get("hive.unknown-key"));
-    Assert.assertNull(propertiesMap.get("trino.bypass.unknown-key"));
+    Assert.assertNull(config.get("hive.unknown-key"));
+    Assert.assertNull(config.get("trino.bypass.unknown-key"));
   }
 }

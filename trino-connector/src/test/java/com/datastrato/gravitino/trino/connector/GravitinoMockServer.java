@@ -193,14 +193,6 @@ public class GravitinoMockServer implements AutoCloseable {
     return metaLake;
   }
 
-  void reloadCatalogs() {
-    GravitinoMetalake metaLake = mock(GravitinoMetalake.class);
-    when(metaLake.name()).thenReturn(testMetalake);
-    when(metaLake.listCatalogs(any()))
-        .thenReturn(new NameIdentifier[] {NameIdentifier.ofCatalog(testMetalake, testCatalog)});
-    catalogConnectorManager.loadCatalogs(metaLake);
-  }
-
   private Catalog createCatalog(NameIdentifier catalogName) {
     Catalog catalog = mock(Catalog.class);
     when(catalog.name()).thenReturn(catalogName.name());

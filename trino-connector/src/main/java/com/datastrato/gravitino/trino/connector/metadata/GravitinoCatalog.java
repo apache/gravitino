@@ -8,6 +8,8 @@ import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVIT
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.trino.spi.TrinoException;
 import java.time.Instant;
 import java.util.Map;
@@ -17,47 +19,75 @@ import org.apache.logging.log4j.util.Strings;
 public class GravitinoCatalog {
 
   private final String metalake;
-  private final Catalog catalog;
+  private final String provider;
+  private final String name;
+  private final Map<String, String> properties;
+  private final long lastModifiedTime;
 
   public GravitinoCatalog(String metalake, Catalog catalog) {
     this.metalake = metalake;
-    this.catalog = catalog;
+    this.provider = catalog.provider();
+    this.name = catalog.name();
+    this.properties = catalog.properties();
+    Instant time =
+        catalog.auditInfo().lastModifiedTime() == null
+            ? catalog.auditInfo().createTime()
+            : catalog.auditInfo().lastModifiedTime();
+    lastModifiedTime = time.toEpochMilli();
   }
 
+  @JsonCreator
+  public GravitinoCatalog(
+      @JsonProperty("metalake") String metalake,
+      @JsonProperty("provider") String provider,
+      @JsonProperty("name") String name,
+      @JsonProperty("properties") Map<String, String> properties,
+      @JsonProperty("lastModifiedTime") long lastModifiedTime) {
+    this.metalake = metalake;
+    this.provider = provider;
+    this.name = name;
+    this.properties = properties;
+    this.lastModifiedTime = lastModifiedTime;
+  }
+
+  @JsonProperty
   public String getProvider() {
-    return catalog.provider();
+    return provider;
   }
 
+  @JsonProperty
   public String getName() {
-    return catalog.name();
+    return name;
   }
 
+  @JsonProperty
   public String getMetalake() {
     return metalake;
   }
 
   public NameIdentifier geNameIdentifier() {
-    return NameIdentifier.ofCatalog(metalake, catalog.name());
+    return NameIdentifier.ofCatalog(metalake, name);
   }
 
   public String getProperty(String name, String defaultValue) {
-    return catalog.properties().getOrDefault(name, defaultValue);
+    return properties.getOrDefault(name, defaultValue);
   }
 
   public String getRequiredProperty(String name) throws Exception {
-    String value = catalog.properties().getOrDefault(name, "");
+    String value = properties.getOrDefault(name, "");
     if (Strings.isBlank(value)) {
       throw new TrinoException(GRAVITINO_MISSING_CONFIG, "Missing required config: " + name);
     }
     return value;
   }
 
+  @JsonProperty
   public Map<String, String> getProperties() {
-    return catalog.properties();
+    return properties;
   }
 
-  public Instant getLastModifiedTime() {
-    Instant time = catalog.auditInfo().lastModifiedTime();
-    return time == null ? catalog.auditInfo().createTime() : time;
+  @JsonProperty
+  public long getLastModifiedTime() {
+    return lastModifiedTime;
   }
 }

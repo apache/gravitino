@@ -35,7 +35,6 @@ scala-java-compat = "1.0.2"
 sqlite-jdbc = "3.42.0.0"
 testng = "7.5.1"
 testcontainers = "1.19.0"
-trino-jdbc = "426"
 jwt = "0.11.1"
 jline = "3.21.0"
 okhttp3 = "4.11.0"
@@ -135,7 +134,7 @@ testcontainers = { group = "org.testcontainers", name = "testcontainers", versio
 testcontainers-mysql = { group = "org.testcontainers", name = "mysql", version.ref = "testcontainers" }
 testcontainers-postgresql = { group = "org.testcontainers", name = "postgresql", version.ref = "testcontainers" }
 testcontainers-junit-jupiter = { group = "org.testcontainers", name = "junit-jupiter", version.ref = "testcontainers" }
-trino-jdbc = { group = "io.trino", name = "trino-jdbc", version.ref = "trino-jdbc" }
+trino-jdbc = { group = "io.trino", name = "trino-jdbc", version.ref = "trino" }
 jwt-api = { group = "io.jsonwebtoken", name = "jjwt-api", version.ref = "jwt"}
 jwt-impl = { group = "io.jsonwebtoken", name = "jjwt-impl", version.ref = "jwt"}
 jwt-gson = { group = "io.jsonwebtoken", name = "jjwt-gson", version.ref = "jwt"}

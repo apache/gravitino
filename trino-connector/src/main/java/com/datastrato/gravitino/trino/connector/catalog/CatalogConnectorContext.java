@@ -82,19 +82,24 @@ public class CatalogConnectorContext {
 
   static class Builder {
     private final CatalogConnectorAdapter connectorAdapter;
+    private GravitinoCatalog catalog;
     private GravitinoMetalake metalake;
     private Connector internalConnector;
-    private GravitinoCatalog catalog;
 
     Builder(CatalogConnectorAdapter connectorAdapter) {
       this.connectorAdapter = connectorAdapter;
     }
 
-    public Builder clone() {
-      return new Builder(connectorAdapter);
+    private Builder(CatalogConnectorAdapter connectorAdapter, GravitinoCatalog catalog) {
+      this.connectorAdapter = connectorAdapter;
+      this.catalog = catalog;
     }
 
-    public Map<String, Object> buildConfig(GravitinoCatalog catalog) throws Exception {
+    public Builder clone(GravitinoCatalog catalog) {
+      return new Builder(connectorAdapter, catalog);
+    }
+
+    public Map<String, String> buildConfig() throws Exception {
       return connectorAdapter.buildInternalConnectorConfig(catalog);
     }
 
@@ -105,11 +110,6 @@ public class CatalogConnectorContext {
 
     Builder withInternalConnector(Connector internalConnector) {
       this.internalConnector = internalConnector;
-      return this;
-    }
-
-    Builder withCatalog(GravitinoCatalog catalog) {
-      this.catalog = catalog;
       return this;
     }
 

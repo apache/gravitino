@@ -30,22 +30,14 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
   }
 
   @Override
-  public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog)
+  public Map<String, String> buildInternalConnectorConfig(GravitinoCatalog catalog)
       throws Exception {
-    Map<String, Object> config = new HashMap<>();
-    config.put(
-        "catalogHandle",
-        String.format("%s_v%d:normal:default", catalog.getName(), VERSION.getAndIncrement()));
-    config.put("connectorName", "hive");
-
-    Map<String, Object> properties = new HashMap<>();
-    properties.put("hive.metastore.uri", catalog.getRequiredProperty("metastore.uris"));
-    properties.put("hive.security", "allow-all");
+    Map<String, String> config = new HashMap<>();
+    config.put("hive.metastore.uri", catalog.getRequiredProperty("metastore.uris"));
+    config.put("hive.security", "allow-all");
     Map<String, String> trinoProperty =
         catalogConverter.gravitinoToEngineProperties(catalog.getProperties());
-    properties.putAll(trinoProperty);
-
-    config.put("properties", properties);
+    config.putAll(trinoProperty);
     return config;
   }
 

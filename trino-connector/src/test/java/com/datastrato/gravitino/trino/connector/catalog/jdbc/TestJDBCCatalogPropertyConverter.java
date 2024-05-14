@@ -68,26 +68,23 @@ public class TestJDBCCatalogPropertyConverter {
             name, "jdbc-postgresql", "test catalog", Catalog.Type.RELATIONAL, properties);
     PostgreSQLConnectorAdapter adapter = new PostgreSQLConnectorAdapter();
 
-    Map<String, Object> stringObjectMap =
+    Map<String, String> config =
         adapter.buildInternalConnectorConfig(new GravitinoCatalog("test", mockCatalog));
 
     // test connector attributes
-    Assert.assertEquals(stringObjectMap.get("connectorName"), "postgresql");
-
-    Map<String, Object> propertiesMap = (Map<String, Object>) stringObjectMap.get("properties");
+    Assert.assertEquals(config.get("connector.name"), "postgresql");
 
     // test converted properties
-    Assert.assertEquals(
-        propertiesMap.get("connection-url"), "jdbc:postgresql://localhost:5432/test");
-    Assert.assertEquals(propertiesMap.get("connection-user"), "test");
-    Assert.assertEquals(propertiesMap.get("connection-password"), "test");
+    Assert.assertEquals(config.get("connection-url"), "jdbc:postgresql://localhost:5432/test");
+    Assert.assertEquals(config.get("connection-user"), "test");
+    Assert.assertEquals(config.get("connection-password"), "test");
 
     // test trino passing properties
-    Assert.assertEquals(propertiesMap.get("join-pushdown.strategy"), "EAGER");
+    Assert.assertEquals(config.get("join-pushdown.strategy"), "EAGER");
 
     // test unknown properties
-    Assert.assertNull(propertiesMap.get("hive.unknown-key"));
-    Assert.assertNull(propertiesMap.get("trino.bypass.unknown-key"));
+    Assert.assertNull(config.get("hive.unknown-key"));
+    Assert.assertNull(config.get("trino.bypass.unknown-key"));
   }
 
   @Test
@@ -108,24 +105,22 @@ public class TestJDBCCatalogPropertyConverter {
             name, "jdbc-postgresql", "test catalog", Catalog.Type.RELATIONAL, properties);
     MySQLConnectorAdapter adapter = new MySQLConnectorAdapter();
 
-    Map<String, Object> stringObjectMap =
+    Map<String, String> config =
         adapter.buildInternalConnectorConfig(new GravitinoCatalog("test", mockCatalog));
 
     // test connector attributes
-    Assert.assertEquals(stringObjectMap.get("connectorName"), "mysql");
-
-    Map<String, Object> propertiesMap = (Map<String, Object>) stringObjectMap.get("properties");
+    Assert.assertEquals(config.get("connector.name"), "mysql");
 
     // test converted properties
-    Assert.assertEquals(propertiesMap.get("connection-url"), "jdbc:mysql://localhost:5432/test");
-    Assert.assertEquals(propertiesMap.get("connection-user"), "test");
-    Assert.assertEquals(propertiesMap.get("connection-password"), "test");
+    Assert.assertEquals(config.get("connection-url"), "jdbc:mysql://localhost:5432/test");
+    Assert.assertEquals(config.get("connection-user"), "test");
+    Assert.assertEquals(config.get("connection-password"), "test");
 
     // test trino passing properties
-    Assert.assertEquals(propertiesMap.get("join-pushdown.strategy"), "EAGER");
+    Assert.assertEquals(config.get("join-pushdown.strategy"), "EAGER");
 
     // test unknown properties
-    Assert.assertNull(propertiesMap.get("hive.unknown-key"));
-    Assert.assertNull(propertiesMap.get("trino.bypass.unknown-key"));
+    Assert.assertNull(config.get("hive.unknown-key"));
+    Assert.assertNull(config.get("trino.bypass.unknown-key"));
   }
 }

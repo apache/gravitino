@@ -107,24 +107,22 @@ public class TestIcebergCatalogPropertyConverter {
             name, "lakehouse-iceberg", "test catalog", Catalog.Type.RELATIONAL, properties);
     IcebergConnectorAdapter adapter = new IcebergConnectorAdapter();
 
-    Map<String, Object> stringObjectMap =
+    Map<String, String> config =
         adapter.buildInternalConnectorConfig(new GravitinoCatalog("test", mockCatalog));
 
     // test connector attributes
-    Assert.assertEquals(stringObjectMap.get("connectorName"), "iceberg");
-
-    Map<String, Object> propertiesMap = (Map<String, Object>) stringObjectMap.get("properties");
+    Assert.assertEquals(config.get("connector.name"), "iceberg");
 
     // test converted properties
-    Assert.assertEquals(propertiesMap.get("hive.metastore.uri"), "thrift://localhost:9083");
-    Assert.assertEquals(propertiesMap.get("iceberg.catalog.type"), "hive_metastore");
+    Assert.assertEquals(config.get("hive.metastore.uri"), "thrift://localhost:9083");
+    Assert.assertEquals(config.get("iceberg.catalog.type"), "hive_metastore");
 
     // test trino passing properties
-    Assert.assertEquals(propertiesMap.get("iceberg.table-statistics-enabled"), "true");
+    Assert.assertEquals(config.get("iceberg.table-statistics-enabled"), "true");
 
     // test unknown properties
-    Assert.assertNull(propertiesMap.get("hive.unknown-key"));
-    Assert.assertNull(propertiesMap.get("trino.bypass.unknown-key"));
+    Assert.assertNull(config.get("hive.unknown-key"));
+    Assert.assertNull(config.get("trino.bypass.unknown-key"));
   }
 
   @Test
@@ -148,29 +146,27 @@ public class TestIcebergCatalogPropertyConverter {
             name, "lakehouse-iceberg", "test catalog", Catalog.Type.RELATIONAL, properties);
     IcebergConnectorAdapter adapter = new IcebergConnectorAdapter();
 
-    Map<String, Object> stringObjectMap =
+    Map<String, String> config =
         adapter.buildInternalConnectorConfig(new GravitinoCatalog("test", mockCatalog));
 
     // test connector attributes
-    Assert.assertEquals(stringObjectMap.get("connectorName"), "iceberg");
-
-    Map<String, Object> propertiesMap = (Map<String, Object>) stringObjectMap.get("properties");
+    Assert.assertEquals(config.get("connector.name"), "iceberg");
 
     // test converted properties
     Assert.assertEquals(
-        propertiesMap.get("iceberg.jdbc-catalog.connection-url"),
+        config.get("iceberg.jdbc-catalog.connection-url"),
         "jdbc:mysql://%s:3306/metastore_db?createDatabaseIfNotExist=true");
-    Assert.assertEquals(propertiesMap.get("iceberg.jdbc-catalog.connection-user"), "root");
-    Assert.assertEquals(propertiesMap.get("iceberg.jdbc-catalog.connection-password"), "ds123");
+    Assert.assertEquals(config.get("iceberg.jdbc-catalog.connection-user"), "root");
+    Assert.assertEquals(config.get("iceberg.jdbc-catalog.connection-password"), "ds123");
     Assert.assertEquals(
-        propertiesMap.get("iceberg.jdbc-catalog.driver-class"), "com.mysql.cj.jdbc.Driver");
-    Assert.assertEquals(propertiesMap.get("iceberg.catalog.type"), "jdbc");
+        config.get("iceberg.jdbc-catalog.driver-class"), "com.mysql.cj.jdbc.Driver");
+    Assert.assertEquals(config.get("iceberg.catalog.type"), "jdbc");
 
     // test trino passing properties
-    Assert.assertEquals(propertiesMap.get("iceberg.table-statistics-enabled"), "true");
+    Assert.assertEquals(config.get("iceberg.table-statistics-enabled"), "true");
 
     // test unknown properties
-    Assert.assertNull(propertiesMap.get("hive.unknown-key"));
-    Assert.assertNull(propertiesMap.get("trino.bypass.unknown-key"));
+    Assert.assertNull(config.get("hive.unknown-key"));
+    Assert.assertNull(config.get("trino.bypass.unknown-key"));
   }
 }

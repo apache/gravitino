@@ -6,6 +6,7 @@ package com.datastrato.gravitino.trino.connector;
 
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_MISSING_CONFIG;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import io.trino.spi.TrinoException;
 import java.util.HashMap;
 import java.util.Map;
@@ -13,6 +14,8 @@ import java.util.Map;
 public class GravitinoConfig {
 
   public static String GRAVITINO_DYNAMIC_CONNECTOR = "__gravitino.dynamic.connector";
+  public static String GRAVITINO_DYNAMIC_CONNECTOR_CATALOG_CONFIG =
+      "__gravitino.dynamic.connector.catalog.config";
   private static final Map<String, ConfigEntry> CONFIG_DEFINITIONS = new HashMap<>();
 
   private final Map<String, String> config;
@@ -69,6 +72,10 @@ public class GravitinoConfig {
     // in which case the connector's configuration is set to '__gravitino.dynamic.connector=true'.
     // It is dynamic and will create an instance of GravitinoConnector.
     return config.getOrDefault(GRAVITINO_DYNAMIC_CONNECTOR, "false").equals("true");
+  }
+
+  public String getCatalogConfig() throws JsonProcessingException {
+    return config.get(GRAVITINO_DYNAMIC_CONNECTOR_CATALOG_CONFIG);
   }
 
   static class ConfigEntry {
