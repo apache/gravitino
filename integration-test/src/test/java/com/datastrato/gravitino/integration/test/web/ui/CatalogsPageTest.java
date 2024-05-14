@@ -165,6 +165,8 @@ public class CatalogsPageTest extends AbstractWebIT {
   private SortOrder[] createSortOrder() {
     return new SortOrders.SortImpl[] {
       SortOrders.of(
+          NamedReference.field(COLUMN_NAME), SortDirection.DESCENDING, NullOrdering.NULLS_FIRST),
+      SortOrders.of(
           NamedReference.field(COLUMN_NAME_2), SortDirection.DESCENDING, NullOrdering.NULLS_FIRST)
     };
   }
@@ -464,11 +466,14 @@ public class CatalogsPageTest extends AbstractWebIT {
 
   @Test
   @Order(15)
-  public void testShowColumnTooltip() {
+  public void testShowTablePropertiesTooltip() {
     mouseMoveTo(By.xpath("//*[@data-refer='col-icon-distribution-" + COLUMN_NAME + "']"));
-    Assertions.assertTrue(catalogsPage.verifyTableProperty("distribution", COLUMN_NAME));
+    Assertions.assertTrue(catalogsPage.verifyTableProperties("distribution", COLUMN_NAME));
     mouseMoveTo(By.xpath("//*[@data-refer='col-icon-sortOrders-" + COLUMN_NAME_2 + "']"));
-    Assertions.assertTrue(catalogsPage.verifyTableProperty("sortOrders", COLUMN_NAME_2));
+    Assertions.assertTrue(catalogsPage.verifyTableProperties("sortOrders", COLUMN_NAME_2));
+    mouseMoveTo(By.xpath("//*[@data-refer='overview-tip-sortOrders']"));
+    Assertions.assertTrue(
+        catalogsPage.verifyTablePropertiesOverview(Arrays.asList(COLUMN_NAME, COLUMN_NAME_2)));
   }
 
   @Test

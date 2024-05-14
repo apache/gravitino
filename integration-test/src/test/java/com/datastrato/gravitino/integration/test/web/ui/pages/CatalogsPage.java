@@ -548,7 +548,7 @@ public class CatalogsPage extends AbstractWebIT {
     }
   }
 
-  public boolean verifyTableProperty(String type, String colName) {
+  public boolean verifyTableProperties(String type, String colName) {
     try {
       String xpath = "";
       String formattedColName = "";
@@ -559,13 +559,41 @@ public class CatalogsPage extends AbstractWebIT {
         xpath = "//*[@data-refer='tip-sortOrders-item-" + colName + "']";
         formattedColName = colName + " desc nulls_last";
       }
-      WebElement tooltipItem = driver.findElement(By.xpath(xpath));
+      List<WebElement> tooltipItems = driver.findElements(By.xpath(xpath));
       new WebDriverWait(driver, MAX_TIMEOUT)
           .until(ExpectedConditions.visibilityOfElementLocated(By.xpath(xpath)));
-      waitShowText(formattedColName, tooltipItem);
-      boolean matches = Objects.equals(tooltipItem.getText(), formattedColName);
-      if (!matches) {
-        LOG.error("Tooltip item {} does not match, expected '{}'", colName, tooltipItem.getText());
+      List<String> texts = new ArrayList<>();
+      for (WebElement text: tooltipItems) {
+        texts.add(text.getText());
+      }
+      if (!texts.contains(formattedColName)) {
+        LOG.error("Tooltip item {} does not match, expected '{}'", colName, texts);
+        return false;
+      }
+      return true;
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+      return false;
+    }
+  }
+
+  public boolean verifyTablePropertiesOverview(List<String> cols) {
+    try {
+      WebElement columnsText =
+          driver.findElement(By.xpath("//*[@data-refer='overview-sortOrders-items']"));
+      boolean isMatchText = columnsText.getText().contains(",");
+      List<WebElement> tooltipCols =
+          driver.findElements(By.xpath("//*[@data-refer='overview-tip-sortOrders-items']"));
+      List<String> texts = new ArrayList<>();
+      for (WebElement text : tooltipCols) {
+        texts.add(text.getText());
+      }
+      List<String> colsTexts = new ArrayList<>();
+      for (String col: cols) {
+        colsTexts.add(col + " desc nulls_last");
+      }
+      if (!isMatchText || !texts.containsAll(colsTexts)) {
+        LOG.error("Overview tooltip {} does not match, expected '{}'", colsTexts, texts);
         return false;
       }
       return true;
