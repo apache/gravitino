@@ -22,6 +22,10 @@ to build Gravitino service from source code and install it in your local.
 
 ### Gravitino Python client API
 
+```python
+pip install gravitino
+```
+
 1. [Manage metalake using Gravitino Python API](https://datastrato.ai/docs/latest/manage-metalake-using-gravitino?language=python)
 2. [Manage fileset metadata using Gravitino Python API](https://datastrato.ai/docs/latest/manage-fileset-metadata-using-gravitino?language=python)
 
