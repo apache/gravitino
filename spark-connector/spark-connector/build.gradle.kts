@@ -77,7 +77,6 @@ dependencies {
     exclude("org.glassfish.jersey.containers")
     exclude("org.glassfish.jersey.inject")
   }
-  testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
