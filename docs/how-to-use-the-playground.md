@@ -93,7 +93,7 @@ contains the following code snippets:
    use `hdfs client` to check if the fileset location was successfully created in HDFS.
 9. Drop this `Fileset.Type.MANAGED` type fileset and check if the fileset location was
    successfully deleted in HDFS.
-10. Create a `Fileset` with `type` is [Fileset.Type.EXTERNAL](./manage-fileset-metadata-using-gravitino#fileset-operations)
+10. Create a `Fileset` with `type` is [Fileset.Type.EXTERNAL](./manage-fileset-metadata-using-gravitino.md#fileset-operations)
     and `location` pointed to exist HDFS path
 11. Drop this `Fileset.Type.EXTERNAL` type fileset and check if the fileset location was
     not deleted in HDFS.

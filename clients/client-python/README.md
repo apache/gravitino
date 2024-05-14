@@ -1,10 +1,3 @@
----
-title: "How to use Gravitino Python client"
-slug: /how-to-use-gravitino-python-client
-date: 2024-05-09
-keyword: Gravitino Python client
-license: Copyright 2024 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2.
----
 ## Introduction
 
 Gravitino is a high-performance, geo-distributed, and federated metadata lake.
@@ -13,14 +6,14 @@ the unified metadata access for data and AI assets.
 
 Gravitino Python client helps data scientists easily manage metadata using Python language.
 
-![gravitino-python-client-introduction](./assets/gravitino-python-client-introduction.png)
+![gravitino-python-client-introduction](https://raw.githubusercontent.com/datastrato/gravitino/main/docs/assets/gravitino-python-client-introduction.png)
 
 ## Use Guidance
 
 You can use Gravitino Python client library with Spark, PyTorch, Tensorflow, Ray and Python environment.
 
 First of all, You must have a Gravitino server set up and run, You can refer document of
-[How to install Gravitino](./how-to-install.md) to build Gravitino server from source code and
+[How to install Gravitino](https://datastrato.ai/docs/latest/how-to-install/) to build Gravitino server from source code and
 install it in your local.
 
 ### Gravitino Python client API
@@ -29,14 +22,14 @@ install it in your local.
 pip install gravitino
 ```
 
-1. [Manage metalake using Gravitino Python API](./manage-metalake-using-gravitino.md)
-2. [Manage fileset metadata using Gravitino Python API](./manage-fileset-metadata-using-gravitino.md)
+1. [Manage metalake using Gravitino Python API](https://datastrato.ai/docs/latest/manage-metalake-using-gravitino/)
+2. [Manage fileset metadata using Gravitino Python API](https://datastrato.ai/docs/latest/manage-fileset-metadata-using-gravitino/)
 
 ### Gravitino Fileset Example
 
 We offer a playground environment to help you quickly understand how to use Gravitino Python
 client to manage non-tabular data on HDFS via Fileset in Gravitino. You can refer to the
-document [How to use the playground#Launch AI components of playground](./how-to-use-the-playground.md#launch-ai-components-of-playground)
+document [How to use the playground#Launch AI components of playground](https://datastrato.ai/docs/latest/how-to-use-the-playground/#launch-ai-components-of-playground)
 to launch a Gravitino server, HDFS and Jupyter notebook environment in you local Docker environment.
 
 Waiting for the playground Docker environment to start, you can directly open
@@ -51,14 +44,14 @@ contains the following code snippets:
 4. Initialize Gravitino admin client and create a Gravitino metalake.
 5. Initialize Gravitino client and list metalakes.
 6. Create a Gravitino `Catalog` and special `type` is `Catalog.Type.FILESET` and `provider` is
-   [hadoop](./hadoop-catalog.md)
+   [hadoop](https://datastrato.ai/docs/latest/hadoop-catalog/)
 7. Create a Gravitino `Schema` with the `location` pointed to a HDFS path, and use `hdfs client` to
    check if the schema location is successfully created in HDFS.
-8. Create a `Fileset` with `type` is [Fileset.Type.MANAGED](./manage-fileset-metadata-using-gravitino.md#fileset-operations),
+8. Create a `Fileset` with `type` is [Fileset.Type.MANAGED](https://datastrato.ai/docs/latest/manage-fileset-metadata-using-gravitino/#fileset-operations),
    use `hdfs client` to check if the fileset location was successfully created in HDFS.
 9. Drop this `Fileset.Type.MANAGED` type fileset and check if the fileset location was
    successfully deleted in HDFS.
-10. Create a `Fileset` with `type` is [Fileset.Type.EXTERNAL](./manage-fileset-metadata-using-gravitino.md#fileset-operations)
+10. Create a `Fileset` with `type` is [Fileset.Type.EXTERNAL](https://datastrato.ai/docs/latest/manage-fileset-metadata-using-gravitino/#fileset-operations)
     and `location` pointed to exist HDFS path
 11. Drop this `Fileset.Type.EXTERNAL` type fileset and check if the fileset location was
     not deleted in HDFS.
@@ -70,7 +63,7 @@ You can ues any IDE to develop Gravitino Python Client. Directly open the client
 ### Prerequisites
 
 + Python 3.8+
-+ Refer to [How to build Gravitino](./how-to-build.md#prerequisites) to have necessary build
++ Refer to [How to build Gravitino](https://datastrato.ai/docs/latest/how-to-build/#prerequisites) to have necessary build
   environment ready for building.
 
 ### Build and testing
