@@ -40,6 +40,7 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.openqa.selenium.By;
 
 @Tag("gravitino-docker-it")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -464,7 +465,10 @@ public class CatalogsPageTest extends AbstractWebIT {
   @Test
   @Order(15)
   public void testShowColumnTooltip() {
-    Assertions.assertTrue(catalogsPage.verifyTableProperty(COLUMN_NAME));
+    mouseMoveTo(By.xpath("//*[@data-refer='col-icon-distribution-" + COLUMN_NAME + "']"));
+    Assertions.assertTrue(catalogsPage.verifyTableProperty("distribution", COLUMN_NAME));
+    mouseMoveTo(By.xpath("//*[@data-refer='col-icon-sortOrders-" + COLUMN_NAME_2 + "']"));
+    Assertions.assertTrue(catalogsPage.verifyTableProperty("sortOrders", COLUMN_NAME_2));
   }
 
   @Test

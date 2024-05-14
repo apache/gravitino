@@ -548,15 +548,24 @@ public class CatalogsPage extends AbstractWebIT {
     }
   }
 
-  public boolean verifyTableProperty(String colName) {
+  public boolean verifyTableProperty(String type, String colName) {
     try {
-      moveTo("col-icon-" + colName);
-      String xpath = "*[@data-refer='tip-item-" + colName + "']";
-      waitShowText("", By.xpath(xpath));
-      WebElement item = driver.findElement(By.xpath(xpath));
-      boolean matches = Objects.equals(item.getText(), "HASH[10](" + colName + ")");
+      String xpath = "";
+      String formattedColName = "";
+      if (type.equals("distribution")) {
+        xpath = "//*[@data-refer='tip-distribution-item-" + colName + "']";
+        formattedColName = "hash[10](" + colName + ")";
+      } else if (type.equals("sortOrders")) {
+        xpath = "//*[@data-refer='tip-sortOrders-item-" + colName + "']";
+        formattedColName = colName + " desc nulls_last";
+      }
+      WebElement tooltipItem = driver.findElement(By.xpath(xpath));
+      new WebDriverWait(driver, MAX_TIMEOUT)
+          .until(ExpectedConditions.visibilityOfElementLocated(By.xpath(xpath)));
+      waitShowText(formattedColName, tooltipItem);
+      boolean matches = Objects.equals(tooltipItem.getText(), formattedColName);
       if (!matches) {
-        LOG.error("Tooltip item {} does not match, expected '{}'", colName, item.getText());
+        LOG.error("Tooltip item {} does not match, expected '{}'", colName, tooltipItem.getText());
         return false;
       }
       return true;

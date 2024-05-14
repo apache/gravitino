@@ -119,7 +119,7 @@ const TableView = () => {
                           color='white'
                           className={fonts.className}
                           sx={{ display: 'flex', flexDirection: 'column' }}
-                          data-refer={`tip-item-${it.name}`}
+                          data-refer={`tip-${type}-item-${name}`}
                         >
                           {it.text || it.fields}
                         </Typography>
@@ -140,7 +140,7 @@ const TableView = () => {
               </>
             }
           >
-            <Box sx={{ display: 'flex', alignItems: 'center' }} data-refer={`col-icon-${name}`}>
+            <Box sx={{ display: 'flex', alignItems: 'center' }} data-refer={`col-icon-${type}-${name}`}>
               <Icon icon={icon} />
             </Box>
           </CustomTooltip>
