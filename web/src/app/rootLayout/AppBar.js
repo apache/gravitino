@@ -90,6 +90,7 @@ const AppBar = () => {
                       data-refer='select-metalake'
                       value={metalake}
                       label='Metalake'
+                      disabled={store.metalakes.length === 1} 
                       sx={{ width: '100%' }}
                     >
                       {metalakes.map(item => {
