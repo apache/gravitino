@@ -9,8 +9,8 @@ import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
 import com.datastrato.gravitino.trino.connector.util.GeneralDataTypeTransformer;
 import io.trino.spi.TrinoException;
-import org.testng.Assert;
-import org.testng.annotations.Test;
+import org.junit.Assert;
+import org.junit.jupiter.api.Test;
 
 public class TestMySQLDataTypeTransformer {
 
@@ -24,7 +24,7 @@ public class TestMySQLDataTypeTransformer {
 
     io.trino.spi.type.Type charTypeWithLength = io.trino.spi.type.CharType.createCharType(256);
     Exception e =
-        Assert.expectThrows(
+        Assert.assertThrows(
             TrinoException.class,
             () -> generalDataTypeTransformer.getGravitinoType(charTypeWithLength));
     Assert.assertTrue(
@@ -38,7 +38,7 @@ public class TestMySQLDataTypeTransformer {
     io.trino.spi.type.Type varcharTypeWithLength =
         io.trino.spi.type.VarcharType.createVarcharType(16384);
     e =
-        Assert.expectThrows(
+        Assert.assertThrows(
             TrinoException.class,
             () -> generalDataTypeTransformer.getGravitinoType(varcharTypeWithLength));
     Assert.assertTrue(

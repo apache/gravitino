@@ -28,20 +28,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import io.opentelemetry.api.OpenTelemetry;
-import io.opentelemetry.api.trace.Tracer;
-import io.trino.spi.NodeManager;
-import io.trino.spi.PageIndexerFactory;
-import io.trino.spi.PageSorter;
 import io.trino.spi.Plugin;
 import io.trino.spi.TrinoException;
-import io.trino.spi.VersionEmbedder;
 import io.trino.spi.classloader.ThreadContextClassLoader;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorContext;
 import io.trino.spi.connector.ConnectorFactory;
-import io.trino.spi.connector.MetadataProvider;
-import io.trino.spi.type.TypeManager;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -460,10 +452,7 @@ public class CatalogConnectorManager {
       Connector connector = null;
       try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
         ConnectorFactory connectorFactory = plugin.getConnectorFactories().iterator().next();
-        GravitinoConnectorContext connectorContext =
-            new GravitinoConnectorContext(context, classLoader);
-        connector =
-            connectorFactory.create(connectorName, internalConnectorConfig, connectorContext);
+        connector = connectorFactory.create(connectorName, internalConnectorConfig, context);
       } catch (Exception e) {
         LOG.error("Failed to create connector: {}", connectorName, e);
         throw new TrinoException(GRAVITINO_CREATE_INTERNAL_CONNECTOR_ERROR, e);
@@ -480,67 +469,6 @@ public class CatalogConnectorManager {
       LOG.error("Failed to create connector: {}", connectorName, e);
       throw new TrinoException(
           GRAVITINO_OPERATION_FAILED, "Failed to create connector: " + connectorName, e);
-    }
-  }
-
-  class GravitinoConnectorContext implements ConnectorContext {
-
-    private final ConnectorContext context;
-    private final ClassLoader classLoader;
-
-    public GravitinoConnectorContext(ConnectorContext context, ClassLoader classLoader) {
-      this.context = context;
-      this.classLoader = classLoader;
-    }
-
-    @Override
-    public ClassLoader duplicatePluginClassLoader() {
-      return classLoader;
-    }
-
-    @Override
-    public NodeManager getNodeManager() {
-      return context.getNodeManager();
-    }
-
-    @Override
-    public MetadataProvider getMetadataProvider() {
-      return context.getMetadataProvider();
-    }
-
-    @Override
-    public Tracer getTracer() {
-      return context.getTracer();
-    }
-
-    @Override
-    public PageSorter getPageSorter() {
-      return context.getPageSorter();
-    }
-
-    @Override
-    public VersionEmbedder getVersionEmbedder() {
-      return context.getVersionEmbedder();
-    }
-
-    @Override
-    public TypeManager getTypeManager() {
-      return context.getTypeManager();
-    }
-
-    @Override
-    public PageIndexerFactory getPageIndexerFactory() {
-      return context.getPageIndexerFactory();
-    }
-
-    @Override
-    public OpenTelemetry getOpenTelemetry() {
-      return context.getOpenTelemetry();
-    }
-
-    @Override
-    public String getSpiVersion() {
-      return context.getSpiVersion();
     }
   }
 }

@@ -6,7 +6,7 @@ package com.datastrato.gravitino.trino.connector.util;
 
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_UNSUPPORTED_GRAVITINO_DATATYPE;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_UNSUPPORTED_TRINO_DATATYPE;
-import static org.testng.Assert.assertEquals;
+import static org.junit.Assert.assertEquals;
 
 import com.datastrato.gravitino.rel.types.Types;
 import io.trino.spi.TrinoException;
@@ -31,8 +31,8 @@ import io.trino.spi.type.TypeOperators;
 import io.trino.spi.type.UuidType;
 import io.trino.spi.type.VarcharType;
 import java.util.Optional;
+import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableList;
-import org.testng.annotations.Test;
 
 public class TestDataTypeTransformer {
 

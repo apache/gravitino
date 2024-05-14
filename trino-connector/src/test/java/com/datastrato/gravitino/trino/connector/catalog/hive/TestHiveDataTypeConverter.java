@@ -8,8 +8,8 @@ package com.datastrato.gravitino.trino.connector.catalog.hive;
 import com.datastrato.gravitino.rel.types.Types;
 import com.datastrato.gravitino.trino.connector.util.GeneralDataTypeTransformer;
 import io.trino.spi.TrinoException;
-import org.testng.Assert;
-import org.testng.annotations.Test;
+import org.junit.Assert;
+import org.junit.jupiter.api.Test;
 
 public class TestHiveDataTypeConverter {
 
@@ -28,7 +28,7 @@ public class TestHiveDataTypeConverter {
 
     io.trino.spi.type.Type charLengthIsOverflow = io.trino.spi.type.CharType.createCharType(256);
     Exception e =
-        Assert.expectThrows(
+        Assert.assertThrows(
             TrinoException.class,
             () -> generalDataTypeTransformer.getGravitinoType(charLengthIsOverflow));
     Assert.assertTrue(
@@ -48,7 +48,7 @@ public class TestHiveDataTypeConverter {
     io.trino.spi.type.Type varcharLengthIsOverflow =
         io.trino.spi.type.VarcharType.createVarcharType(65536);
     e =
-        Assert.expectThrows(
+        Assert.assertThrows(
             TrinoException.class,
             () -> generalDataTypeTransformer.getGravitinoType(varcharLengthIsOverflow));
     Assert.assertTrue(

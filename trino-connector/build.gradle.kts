@@ -20,16 +20,12 @@ dependencies {
   // implementation(libs.guava)
   implementation(libs.httpclient5)
   implementation("io.airlift:json:237")
-  // implementation(libs.jackson.annotations)
-  // implementation(libs.jackson.databind)
-  // implementation(libs.jackson.datatype.jdk8)
   implementation(libs.trino.jdbc)
   compileOnly(libs.trino.spi) {
     exclude("org.apache.logging.log4j")
   }
   testImplementation(libs.awaitility)
   testImplementation(libs.mockito.core)
-  // testImplementation(libs.mysql.driver)
   testImplementation(libs.trino.memory) {
     exclude("org.antlr")
     exclude("org.apache.logging.log4j")

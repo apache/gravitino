@@ -16,9 +16,9 @@ import com.datastrato.gravitino.trino.connector.catalog.jdbc.postgresql.PostgreS
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
 import com.datastrato.gravitino.trino.connector.metadata.TestGravitinoCatalog;
 import java.util.Map;
+import org.junit.Assert;
+import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
-import org.testng.Assert;
-import org.testng.annotations.Test;
 
 public class TestJDBCCatalogPropertyConverter {
 

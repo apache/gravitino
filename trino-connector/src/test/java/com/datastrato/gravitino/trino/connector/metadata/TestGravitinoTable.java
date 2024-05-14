@@ -4,11 +4,11 @@
  */
 package com.datastrato.gravitino.trino.connector.metadata;
 
+import static junit.framework.TestCase.assertEquals;
+import static junit.framework.TestCase.assertNull;
+import static junit.framework.TestCase.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
 
 import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.rel.Column;
@@ -25,7 +25,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import org.testng.annotations.Test;
+import org.junit.jupiter.api.Test;
 
 public class TestGravitinoTable {
 

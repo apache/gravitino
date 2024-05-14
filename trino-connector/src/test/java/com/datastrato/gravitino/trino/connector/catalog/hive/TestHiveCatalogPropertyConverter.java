@@ -12,9 +12,9 @@ import com.datastrato.gravitino.trino.connector.metadata.TestGravitinoCatalog;
 import com.google.common.collect.Sets;
 import java.util.Map;
 import java.util.Set;
+import org.junit.Assert;
+import org.junit.Test;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
-import org.testng.Assert;
-import org.testng.annotations.Test;
 
 public class TestHiveCatalogPropertyConverter {
 

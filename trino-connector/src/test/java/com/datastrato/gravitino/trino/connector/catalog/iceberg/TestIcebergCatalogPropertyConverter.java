@@ -10,15 +10,15 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTableProperties
 import com.datastrato.gravitino.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
 import com.datastrato.gravitino.trino.connector.metadata.TestGravitinoCatalog;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import io.trino.spi.TrinoException;
 import java.util.Map;
 import java.util.Set;
 import org.assertj.core.api.Assertions;
+import org.junit.Assert;
+import org.junit.Test;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
-import org.testng.Assert;
-import org.testng.annotations.Test;
-import org.testng.collections.Maps;
 
 public class TestIcebergCatalogPropertyConverter {
 
