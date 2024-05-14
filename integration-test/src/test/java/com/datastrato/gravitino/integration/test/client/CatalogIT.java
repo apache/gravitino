@@ -156,7 +156,7 @@ public class CatalogIT extends AbstractIT {
             "file catalog comment",
             Collections.emptyMap());
 
-    Catalog[] catalogs = metalake.listCatalogsInfo(relCatalogIdent.namespace());
+    Catalog[] catalogs = metalake.listCatalogsInfo();
     for (Catalog catalog : catalogs) {
       if (catalog.name().equals(relCatalogName)) {
         assertCatalogEquals(relCatalog, catalog);

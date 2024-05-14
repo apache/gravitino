@@ -126,7 +126,7 @@ public class GravitinoMockServer implements AutoCloseable {
   private GravitinoMetalake createMetalake(String metalakeName) {
     GravitinoMetalake metaLake = mock(GravitinoMetalake.class);
     when(metaLake.name()).thenReturn(metalakeName);
-    when(metaLake.listCatalogs(any(Namespace.class)))
+    when(metaLake.listCatalogs())
         .thenAnswer(
             new Answer<NameIdentifier[]>() {
               @Override
@@ -195,7 +195,7 @@ public class GravitinoMockServer implements AutoCloseable {
   void reloadCatalogs() {
     GravitinoMetalake metaLake = mock(GravitinoMetalake.class);
     when(metaLake.name()).thenReturn(testMetalake);
-    when(metaLake.listCatalogs(any()))
+    when(metaLake.listCatalogs())
         .thenReturn(new NameIdentifier[] {NameIdentifier.ofCatalog(testMetalake, testCatalog)});
     catalogConnectorManager.loadCatalogs(metaLake);
   }

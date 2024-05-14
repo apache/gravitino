@@ -141,7 +141,7 @@ public class CatalogConnectorManager {
   public void loadCatalogs(GravitinoMetalake metalake) {
     NameIdentifier[] catalogNames;
     try {
-      catalogNames = metalake.listCatalogs(Namespace.ofCatalog(metalake.name()));
+      catalogNames = metalake.listCatalogs();
     } catch (Exception e) {
       LOG.error("Failed to list catalogs in metalake {}.", metalake.name(), e);
       return;

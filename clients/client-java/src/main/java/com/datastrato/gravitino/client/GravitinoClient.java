@@ -9,7 +9,7 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.SupportsCatalogs;
+import com.datastrato.gravitino.client.api.SupportsCatalogs;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
@@ -59,13 +59,13 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
   }
 
   @Override
-  public NameIdentifier[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException {
-    return getMetalake().listCatalogs(namespace);
+  public NameIdentifier[] listCatalogs() throws NoSuchMetalakeException {
+    return getMetalake().listCatalogs();
   }
 
   @Override
-  public Catalog[] listCatalogsInfo(Namespace namespace) throws NoSuchMetalakeException {
-    return getMetalake().listCatalogsInfo(namespace);
+  public Catalog[] listCatalogsInfo() throws NoSuchMetalakeException {
+    return getMetalake().listCatalogsInfo();
   }
 
   @Override

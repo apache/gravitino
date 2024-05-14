@@ -74,11 +74,10 @@ public class TestGravitinoMetalake extends TestBase {
 
     NameIdentifier ident1 = NameIdentifier.of(metalakeName, "mock");
     NameIdentifier ident2 = NameIdentifier.of(metalakeName, "mock2");
-    Namespace namespace = Namespace.of(metalakeName);
 
     EntityListResponse resp = new EntityListResponse(new NameIdentifier[] {ident1, ident2});
     buildMockResource(Method.GET, path, null, resp, HttpStatus.SC_OK);
-    NameIdentifier[] catalogs = gravitinoClient.listCatalogs(namespace);
+    NameIdentifier[] catalogs = gravitinoClient.listCatalogs();
 
     Assertions.assertEquals(2, catalogs.length);
     Assertions.assertEquals(ident1, catalogs[0]);
@@ -87,7 +86,7 @@ public class TestGravitinoMetalake extends TestBase {
     // Test return empty catalog list
     EntityListResponse resp1 = new EntityListResponse(new NameIdentifier[] {});
     buildMockResource(Method.GET, path, null, resp1, HttpStatus.SC_OK);
-    NameIdentifier[] catalogs1 = gravitinoClient.listCatalogs(namespace);
+    NameIdentifier[] catalogs1 = gravitinoClient.listCatalogs();
     Assertions.assertEquals(0, catalogs1.length);
 
     // Test return internal error
@@ -95,13 +94,13 @@ public class TestGravitinoMetalake extends TestBase {
     buildMockResource(Method.GET, path, null, errorResp, HttpStatus.SC_INTERNAL_SERVER_ERROR);
     Throwable ex =
         Assertions.assertThrows(
-            RuntimeException.class, () -> gravitinoClient.listCatalogs(namespace));
+            RuntimeException.class, () -> gravitinoClient.listCatalogs());
     Assertions.assertTrue(ex.getMessage().contains("mock error"));
 
     // Test return unparsed system error
     buildMockResource(Method.GET, path, null, "mock error", HttpStatus.SC_CONFLICT);
     Throwable ex1 =
-        Assertions.assertThrows(RESTException.class, () -> gravitinoClient.listCatalogs(namespace));
+        Assertions.assertThrows(RESTException.class, () -> gravitinoClient.listCatalogs());
     Assertions.assertTrue(ex1.getMessage().contains("Error code: " + HttpStatus.SC_CONFLICT));
   }
 
@@ -109,8 +108,6 @@ public class TestGravitinoMetalake extends TestBase {
   public void testListCatalogsInfo() throws JsonProcessingException {
     String path = "/api/metalakes/" + metalakeName + "/catalogs";
     Map<String, String> params = Collections.singletonMap("details", "true");
-
-    Namespace namespace = Namespace.of(metalakeName);
 
     CatalogDTO mockCatalog1 =
         CatalogDTO.builder()
@@ -134,7 +131,7 @@ public class TestGravitinoMetalake extends TestBase {
         new CatalogListResponse(new CatalogDTO[] {mockCatalog1, mockCatalog2});
     buildMockResource(Method.GET, path, null, resp, HttpStatus.SC_OK);
 
-    Catalog[] catalogs = gravitinoClient.listCatalogsInfo(namespace);
+    Catalog[] catalogs = gravitinoClient.listCatalogsInfo();
     Assertions.assertEquals(2, catalogs.length);
     Assertions.assertEquals("mock", catalogs[0].name());
     Assertions.assertEquals("comment", catalogs[0].comment());
@@ -149,7 +146,7 @@ public class TestGravitinoMetalake extends TestBase {
     buildMockResource(Method.GET, path, params, null, errorResponse, HttpStatus.SC_NOT_FOUND);
     Throwable ex =
         Assertions.assertThrows(
-            NoSuchMetalakeException.class, () -> gravitinoClient.listCatalogsInfo(namespace));
+            NoSuchMetalakeException.class, () -> gravitinoClient.listCatalogsInfo());
     Assertions.assertTrue(ex.getMessage().contains("mock error"));
   }
 

@@ -8,7 +8,7 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.SupportsCatalogs;
+import com.datastrato.gravitino.client.api.SupportsCatalogs;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
 import com.datastrato.gravitino.dto.requests.CatalogCreateRequest;
@@ -56,19 +56,17 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
   }
 
   /**
-   * List all the catalogs under this metalake with specified namespace.
+   * List all the catalogs under this metalake.
    *
-   * @param namespace The namespace to list the catalogs under it.
    * @return A list of {@link NameIdentifier} of the catalogs under the specified namespace.
    * @throws NoSuchMetalakeException if the metalake with specified namespace does not exist.
    */
   @Override
-  public NameIdentifier[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException {
-    Namespace.checkCatalog(namespace);
+  public NameIdentifier[] listCatalogs() throws NoSuchMetalakeException {
 
     EntityListResponse resp =
         restClient.get(
-            String.format("api/metalakes/%s/catalogs", namespace.level(0)),
+            String.format("api/metalakes/%s/catalogs", this.name()),
             EntityListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.catalogErrorHandler());
@@ -78,21 +76,19 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
   }
 
   /**
-   * List all the catalogs with their information under this metalake with specified namespace.
+   * List all the catalogs with their information under this metalake.
    *
-   * @param namespace The namespace to list the catalogs under it.
    * @return A list of {@link Catalog} under the specified namespace.
    * @throws NoSuchMetalakeException if the metalake with specified namespace does not exist.
    */
   @Override
-  public Catalog[] listCatalogsInfo(Namespace namespace) throws NoSuchMetalakeException {
-    Namespace.checkCatalog(namespace);
+  public Catalog[] listCatalogsInfo() throws NoSuchMetalakeException {
 
     Map<String, String> params = new HashMap<>();
     params.put("details", "true");
     CatalogListResponse resp =
         restClient.get(
-            String.format("api/metalakes/%s/catalogs", namespace.level(0)),
+            String.format("api/metalakes/%s/catalogs", this.name()),
             params,
             CatalogListResponse.class,
             Collections.emptyMap(),

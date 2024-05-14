@@ -79,7 +79,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
 
   private static void cleanupTestEnv() throws Exception {
     try {
-      Arrays.stream(TrinoQueryITBase.metalake.listCatalogs(Namespace.of(metalakeName)))
+      Arrays.stream(TrinoQueryITBase.metalake.listCatalogs())
           .filter(catalog -> catalog.name().startsWith("gt_"))
           .forEach(catalog -> TrinoQueryITBase.dropCatalog(catalog.name()));
 
