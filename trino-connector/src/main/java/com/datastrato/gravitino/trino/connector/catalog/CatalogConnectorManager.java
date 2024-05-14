@@ -178,7 +178,7 @@ public class CatalogConnectorManager {
         .forEach(
             (NameIdentifier nameIdentifier) -> {
               try {
-                Catalog catalog = metalake.loadCatalog(nameIdentifier);
+                Catalog catalog = metalake.loadCatalog(nameIdentifier.name());
                 GravitinoCatalog gravitinoCatalog = new GravitinoCatalog(metalake.name(), catalog);
                 if (catalogConnectors.containsKey(getTrinoCatalogName(gravitinoCatalog))) {
                   // Reload catalogs that have been updated in Gravitino server.
@@ -307,19 +307,19 @@ public class CatalogConnectorManager {
     try {
       GravitinoMetalake metalake = gravitinoClient.loadMetalake(metalakeName);
 
-      NameIdentifier catalog = NameIdentifier.of(metalakeName, catalogName);
-      if (!metalake.catalogExists(catalog)) {
+//      NameIdentifier catalog = NameIdentifier.of(metalakeName, catalogName);
+      if (!metalake.catalogExists(catalogName)) {
         if (ignoreNotExist) {
           return;
         }
 
         throw new TrinoException(
-            GRAVITINO_CATALOG_NOT_EXISTS, "Catalog " + catalog + " not exists.");
+            GRAVITINO_CATALOG_NOT_EXISTS, "Catalog " + catalogName + " not exists.");
       }
-      boolean dropped = metalake.dropCatalog(catalog);
+      boolean dropped = metalake.dropCatalog(catalogName);
       if (!dropped) {
         throw new TrinoException(
-            GRAVITINO_UNSUPPORTED_OPERATION, "Drop catalog " + catalog + " does not support.");
+            GRAVITINO_UNSUPPORTED_OPERATION, "Drop catalog " + catalogName + " does not support.");
       }
       LOG.info("Drop catalog {} in metalake {} successfully.", catalogName, metalake);
 

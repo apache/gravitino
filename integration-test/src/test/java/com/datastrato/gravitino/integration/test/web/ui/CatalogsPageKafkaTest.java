@@ -70,7 +70,7 @@ public class CatalogsPageKafkaTest extends AbstractWebIT {
    */
   void createTopic(String metalakeName, String catalogName, String schemaName, String topicName) {
     Catalog catalog_kafka =
-        metalake.loadCatalog(NameIdentifier.ofCatalog(metalakeName, catalogName));
+        metalake.loadCatalog(catalogName);
     catalog_kafka
         .asTopicCatalog()
         .createTopic(
@@ -90,7 +90,7 @@ public class CatalogsPageKafkaTest extends AbstractWebIT {
    */
   void dropTopic(String metalakeName, String catalogName, String schemaName, String topicName) {
     Catalog catalog_kafka =
-        metalake.loadCatalog(NameIdentifier.ofCatalog(metalakeName, catalogName));
+        metalake.loadCatalog(catalogName);
     catalog_kafka
         .asTopicCatalog()
         .dropTopic(NameIdentifier.of(metalakeName, catalogName, schemaName, topicName));

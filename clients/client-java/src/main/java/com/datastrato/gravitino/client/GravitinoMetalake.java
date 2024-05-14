@@ -7,7 +7,6 @@ package com.datastrato.gravitino.client;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.client.api.SupportsCatalogs;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
@@ -102,17 +101,16 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
   /**
    * Load the catalog with specified identifier.
    *
-   * @param ident The identifier of the catalog to load.
+   * @param catalogName The identifier of the catalog to load.
    * @return The {@link Catalog} with specified identifier.
    * @throws NoSuchCatalogException if the catalog with specified identifier does not exist.
    */
   @Override
-  public Catalog loadCatalog(NameIdentifier ident) throws NoSuchCatalogException {
-    NameIdentifier.checkCatalog(ident);
+  public Catalog loadCatalog(String catalogName) throws NoSuchCatalogException {
 
     CatalogResponse resp =
         restClient.get(
-            String.format(API_METALAKES_CATALOGS_PATH, ident.namespace().level(0), ident.name()),
+            String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName),
             CatalogResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.catalogErrorHandler());
@@ -195,17 +193,16 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
   /**
    * Drop the catalog with specified identifier.
    *
-   * @param ident the identifier of the catalog.
+   * @param catalogName the name of the catalog.
    * @return true if the catalog is dropped successfully, false otherwise.
    */
   @Override
-  public boolean dropCatalog(NameIdentifier ident) {
-    NameIdentifier.checkCatalog(ident);
+  public boolean dropCatalog(String catalogName) {
 
     try {
       DropResponse resp =
           restClient.delete(
-              String.format(API_METALAKES_CATALOGS_PATH, ident.namespace().level(0), ident.name()),
+              String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName),
               DropResponse.class,
               Collections.emptyMap(),
               ErrorHandlers.catalogErrorHandler());
@@ -213,7 +210,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
       return resp.dropped();
 
     } catch (Exception e) {
-      LOG.warn("Failed to drop catalog {}", ident, e);
+      LOG.warn("Failed to drop catalog {}", catalogName, e);
       return false;
     }
   }

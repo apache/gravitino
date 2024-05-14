@@ -61,7 +61,7 @@ public class GravitinoVirtualFileSystemIT extends AbstractIT {
     Catalog catalog =
         metalake.createCatalog(
             catalogIdent, Catalog.Type.FILESET, "hadoop", "catalog comment", properties);
-    Assertions.assertTrue(metalake.catalogExists(catalogIdent));
+    Assertions.assertTrue(metalake.catalogExists(catalogIdent.name()));
 
     NameIdentifier schemaIdent = NameIdentifier.of(metalakeName, catalogName, schemaName);
     catalog.asSchemas().createSchema(schemaIdent, "schema comment", properties);
@@ -104,7 +104,7 @@ public class GravitinoVirtualFileSystemIT extends AbstractIT {
     String filesetName = "test_fileset_create";
     NameIdentifier filesetIdent =
         NameIdentifier.ofFileset(metalakeName, catalogName, schemaName, filesetName);
-    Catalog catalog = metalake.loadCatalog(NameIdentifier.ofCatalog(metalakeName, catalogName));
+    Catalog catalog = metalake.loadCatalog(catalogName);
     String storageLocation = genStorageLocation(filesetName);
     catalog
         .asFilesetCatalog()
@@ -139,7 +139,7 @@ public class GravitinoVirtualFileSystemIT extends AbstractIT {
     String filesetName = "test_fileset_append";
     NameIdentifier filesetIdent =
         NameIdentifier.ofFileset(metalakeName, catalogName, schemaName, filesetName);
-    Catalog catalog = metalake.loadCatalog(NameIdentifier.ofCatalog(metalakeName, catalogName));
+    Catalog catalog = metalake.loadCatalog(catalogName);
     String storageLocation = genStorageLocation(filesetName);
     catalog
         .asFilesetCatalog()
@@ -199,7 +199,7 @@ public class GravitinoVirtualFileSystemIT extends AbstractIT {
     String filesetName = "test_fileset_delete";
     NameIdentifier filesetIdent =
         NameIdentifier.ofFileset(metalakeName, catalogName, schemaName, filesetName);
-    Catalog catalog = metalake.loadCatalog(NameIdentifier.ofCatalog(metalakeName, catalogName));
+    Catalog catalog = metalake.loadCatalog(catalogName);
     String storageLocation = genStorageLocation(filesetName);
     catalog
         .asFilesetCatalog()
@@ -239,7 +239,7 @@ public class GravitinoVirtualFileSystemIT extends AbstractIT {
     String filesetName = "test_fileset_get_status";
     NameIdentifier filesetIdent =
         NameIdentifier.ofFileset(metalakeName, catalogName, schemaName, filesetName);
-    Catalog catalog = metalake.loadCatalog(NameIdentifier.ofCatalog(metalakeName, catalogName));
+    Catalog catalog = metalake.loadCatalog(catalogName);
     String storageLocation = genStorageLocation(filesetName);
     catalog
         .asFilesetCatalog()
@@ -282,7 +282,7 @@ public class GravitinoVirtualFileSystemIT extends AbstractIT {
     String filesetName = "test_fileset_list_status";
     NameIdentifier filesetIdent =
         NameIdentifier.ofFileset(metalakeName, catalogName, schemaName, filesetName);
-    Catalog catalog = metalake.loadCatalog(NameIdentifier.ofCatalog(metalakeName, catalogName));
+    Catalog catalog = metalake.loadCatalog(catalogName);
     String storageLocation = genStorageLocation(filesetName);
     catalog
         .asFilesetCatalog()
@@ -339,7 +339,7 @@ public class GravitinoVirtualFileSystemIT extends AbstractIT {
     String filesetName = "test_fileset_mkdirs";
     NameIdentifier filesetIdent =
         NameIdentifier.ofFileset(metalakeName, catalogName, schemaName, filesetName);
-    Catalog catalog = metalake.loadCatalog(NameIdentifier.ofCatalog(metalakeName, catalogName));
+    Catalog catalog = metalake.loadCatalog(catalogName);
     String storageLocation = genStorageLocation(filesetName);
     catalog
         .asFilesetCatalog()
@@ -374,7 +374,7 @@ public class GravitinoVirtualFileSystemIT extends AbstractIT {
     String filesetName = "test_fileset_rename";
     NameIdentifier filesetIdent =
         NameIdentifier.ofFileset(metalakeName, catalogName, schemaName, filesetName);
-    Catalog catalog = metalake.loadCatalog(NameIdentifier.ofCatalog(metalakeName, catalogName));
+    Catalog catalog = metalake.loadCatalog(catalogName);
     String storageLocation = genStorageLocation(filesetName);
     catalog
         .asFilesetCatalog()

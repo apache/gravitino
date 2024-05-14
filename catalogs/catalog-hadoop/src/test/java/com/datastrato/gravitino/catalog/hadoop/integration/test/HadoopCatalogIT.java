@@ -100,7 +100,7 @@ public class HadoopCatalogIT extends AbstractIT {
         "comment",
         ImmutableMap.of());
 
-    catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    catalog = metalake.loadCatalog(catalogName);
   }
 
   private static void createSchema() {
@@ -574,10 +574,10 @@ public class HadoopCatalogIT extends AbstractIT {
         "schema should not be exists");
 
     // Drop the catalog.
-    dropped = metalake.dropCatalog(NameIdentifier.of(metalakeName, catalogName));
+    dropped = metalake.dropCatalog(catalogName);
     Assertions.assertTrue(dropped, "catalog should be dropped");
     Assertions.assertFalse(
-        metalake.catalogExists(NameIdentifier.of(metalakeName, catalogName)),
+        metalake.catalogExists(catalogName),
         "catalog should not be exists");
   }
 

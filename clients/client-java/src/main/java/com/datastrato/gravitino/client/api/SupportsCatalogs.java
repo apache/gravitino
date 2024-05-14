@@ -8,7 +8,6 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.CatalogProvider;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
@@ -42,21 +41,21 @@ public interface SupportsCatalogs {
   /**
    * Load a catalog by its identifier.
    *
-   * @param ident the identifier of the catalog.
+   * @param catalogName the identifier of the catalog.
    * @return The catalog.
    * @throws NoSuchCatalogException If the catalog does not exist.
    */
-  Catalog loadCatalog(NameIdentifier ident) throws NoSuchCatalogException;
+  Catalog loadCatalog(String catalogName) throws NoSuchCatalogException;
 
   /**
    * Check if a catalog exists.
    *
-   * @param ident The identifier of the catalog.
+   * @param catalogName The identifier of the catalog.
    * @return True if the catalog exists, false otherwise.
    */
-  default boolean catalogExists(NameIdentifier ident) {
+  default boolean catalogExists(String catalogName) {
     try {
-      loadCatalog(ident);
+      loadCatalog(catalogName);
       return true;
     } catch (NoSuchCatalogException e) {
       return false;
@@ -102,8 +101,8 @@ public interface SupportsCatalogs {
   /**
    * Drop a catalog with specified identifier.
    *
-   * @param ident the identifier of the catalog.
+   * @param catalogName the name of the catalog.
    * @return True if the catalog was dropped, false otherwise.
    */
-  boolean dropCatalog(NameIdentifier ident);
+  boolean dropCatalog(String catalogName);
 }

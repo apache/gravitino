@@ -151,41 +151,41 @@ public class GravitinoMockServer implements AutoCloseable {
               }
             });
 
-    when(metaLake.dropCatalog(any(NameIdentifier.class)))
+    when(metaLake.dropCatalog(anyString()))
         .thenAnswer(
             new Answer<Boolean>() {
               @Override
               public Boolean answer(InvocationOnMock invocation) throws Throwable {
-                NameIdentifier catalogName = invocation.getArgument(0);
-                if (!metalakes.get(metalakeName).catalogs.containsKey(catalogName.name())) {
+                String catalogName = invocation.getArgument(0);
+                if (!metalakes.get(metalakeName).catalogs.containsKey(catalogName)) {
                   throw new NoSuchCatalogException("catalog does not be found");
                 }
-                metalakes.get(metalakeName).catalogs.remove(catalogName.name());
+                metalakes.get(metalakeName).catalogs.remove(catalogName);
                 return true;
               }
             });
 
-    when(metaLake.catalogExists(any(NameIdentifier.class)))
+    when(metaLake.catalogExists(anyString()))
         .thenAnswer(
             new Answer<Boolean>() {
               @Override
               public Boolean answer(InvocationOnMock invocation) throws Throwable {
-                NameIdentifier catalogName = invocation.getArgument(0);
-                return metalakes.get(metalakeName).catalogs.containsKey(catalogName.name());
+                String catalogName = invocation.getArgument(0);
+                return metalakes.get(metalakeName).catalogs.containsKey(catalogName);
               }
             });
 
-    when(metaLake.loadCatalog(any(NameIdentifier.class)))
+    when(metaLake.loadCatalog(anyString()))
         .thenAnswer(
             new Answer<Catalog>() {
               @Override
               public Catalog answer(InvocationOnMock invocation) throws Throwable {
-                NameIdentifier catalogName = invocation.getArgument(0);
-                if (!metalakes.get(metalakeName).catalogs.containsKey(catalogName.name())) {
+                String catalogName = invocation.getArgument(0);
+                if (!metalakes.get(metalakeName).catalogs.containsKey(catalogName)) {
                   throw new NoSuchCatalogException("catalog does not be found");
                 }
 
-                return metalakes.get(metalakeName).catalogs.get(catalogName.name());
+                return metalakes.get(metalakeName).catalogs.get(catalogName);
               }
             });
     metalakes.put(metalakeName, new Metalake(metaLake));

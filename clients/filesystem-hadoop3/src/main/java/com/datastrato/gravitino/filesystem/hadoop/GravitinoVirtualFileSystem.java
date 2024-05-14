@@ -379,7 +379,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
   private Fileset loadFileset(NameIdentifier identifier) {
     Catalog catalog =
-        client.loadCatalog(NameIdentifier.ofCatalog(metalakeName, identifier.namespace().level(1)));
+        client.loadCatalog(identifier.namespace().level(1));
     return catalog.asFilesetCatalog().loadFileset(identifier);
   }
 

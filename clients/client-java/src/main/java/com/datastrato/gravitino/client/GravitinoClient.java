@@ -8,7 +8,6 @@ package com.datastrato.gravitino.client;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.client.api.SupportsCatalogs;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
@@ -69,8 +68,8 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
   }
 
   @Override
-  public Catalog loadCatalog(NameIdentifier ident) throws NoSuchCatalogException {
-    return getMetalake().loadCatalog(ident);
+  public Catalog loadCatalog(String catalogName) throws NoSuchCatalogException {
+    return getMetalake().loadCatalog(catalogName);
   }
 
   @Override
@@ -91,8 +90,8 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
   }
 
   @Override
-  public boolean dropCatalog(NameIdentifier ident) {
-    return getMetalake().dropCatalog(ident);
+  public boolean dropCatalog(String catalogName) {
+    return getMetalake().dropCatalog(catalogName);
   }
 
   /**

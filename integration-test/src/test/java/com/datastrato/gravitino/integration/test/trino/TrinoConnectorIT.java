@@ -836,7 +836,7 @@ public class TrinoConnectorIT extends AbstractIT {
             .put("trino.bypass.hive.create-empty-bucket-files", "true")
             .put("trino.bypass.hive.validate-bucketing", "true")
             .build());
-    Catalog catalog = createdMetalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Catalog catalog = createdMetalake.loadCatalog(catalogName);
     Assertions.assertEquals(
         "true", catalog.properties().get("trino.bypass.hive.immutable-partitions"));
     Assertions.assertEquals(
@@ -879,7 +879,7 @@ public class TrinoConnectorIT extends AbstractIT {
             .put("trino.bypass.hive.create-empty-bucket-files", "true")
             .put("trino.bypass.hive.validate-bucketing", "true")
             .build());
-    Catalog catalog = createdMetalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Catalog catalog = createdMetalake.loadCatalog(catalogName);
     Assertions.assertEquals(
         "true", catalog.properties().get("trino.bypass.hive.immutable-partitions"));
     Assertions.assertEquals(
@@ -1045,7 +1045,7 @@ public class TrinoConnectorIT extends AbstractIT {
             .put("jdbc-password", "ds123")
             .put("jdbc-driver", "com.mysql.cj.jdbc.Driver")
             .build());
-    Catalog catalog = createdMetalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Catalog catalog = createdMetalake.loadCatalog(catalogName);
     Assertions.assertEquals("root", catalog.properties().get("jdbc-user"));
 
     String sql = String.format("show catalogs like '%s'", catalogName);
@@ -1123,7 +1123,7 @@ public class TrinoConnectorIT extends AbstractIT {
             .put("jdbc-password", "ds123")
             .put("jdbc-url", String.format("jdbc:mysql://%s:3306?useSSL=false", hiveHost))
             .build());
-    Catalog catalog = createdMetalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Catalog catalog = createdMetalake.loadCatalog(catalogName);
     Assertions.assertEquals("root", catalog.properties().get("jdbc-user"));
 
     String sql = String.format("show catalogs like '%s'", catalogName);
@@ -1166,7 +1166,7 @@ public class TrinoConnectorIT extends AbstractIT {
             .put("jdbc-password", "ds123")
             .put("jdbc-url", String.format("jdbc:mysql://%s:3306?useSSL=false", hiveHost))
             .build());
-    Catalog catalog = createdMetalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Catalog catalog = createdMetalake.loadCatalog(catalogName);
     Assertions.assertEquals("root", catalog.properties().get("jdbc-user"));
 
     String sql = String.format("show catalogs like '%s'", catalogName);
@@ -1280,7 +1280,7 @@ public class TrinoConnectorIT extends AbstractIT {
             .put("jdbc-password", "ds123")
             .put("jdbc-url", String.format("jdbc:mysql://%s:3306?useSSL=false", hiveHost))
             .build());
-    Catalog catalog = createdMetalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Catalog catalog = createdMetalake.loadCatalog(catalogName);
     Assertions.assertEquals("root", catalog.properties().get("jdbc-user"));
 
     String sql = String.format("show catalogs like '%s'", catalogName);
@@ -1408,7 +1408,7 @@ public class TrinoConnectorIT extends AbstractIT {
       boolean success = checkTrinoHasLoaded(sql, 30);
       Assertions.assertTrue(success, "Trino should load the catalog: " + sql);
 
-      createdMetalake.dropCatalog(NameIdentifier.of(metalakeName, catalogName));
+      createdMetalake.dropCatalog(catalogName);
       // We need to test we can't load this catalog any more by Trino.
       success = checkTrinoHasRemoved(sql, 30);
       Assertions.assertTrue(success, "Trino should not load the catalog any more: " + sql);
@@ -1444,7 +1444,7 @@ public class TrinoConnectorIT extends AbstractIT {
             "hive",
             "comment",
             properties);
-    Catalog loadCatalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Catalog loadCatalog = metalake.loadCatalog(catalogName);
     Assertions.assertEquals(createdCatalog, loadCatalog);
 
     catalog = loadCatalog;

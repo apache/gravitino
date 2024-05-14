@@ -144,7 +144,7 @@ public class TrinoQueryITBase {
 
   private static void createCatalog(
       String catalogName, String provider, Map<String, String> properties) throws Exception {
-    boolean exists = metalake.catalogExists(NameIdentifier.of(metalakeName, catalogName));
+    boolean exists = metalake.catalogExists(catalogName);
     if (!exists) {
       Catalog createdCatalog =
           metalake.createCatalog(
@@ -182,11 +182,11 @@ public class TrinoQueryITBase {
     if (metalake == null) {
       return;
     }
-    boolean exists = metalake.catalogExists(NameIdentifier.of(metalakeName, catalogName));
+    boolean exists = metalake.catalogExists(catalogName);
     if (!exists) {
       return;
     }
-    Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Catalog catalog = metalake.loadCatalog(catalogName);
     SupportsSchemas schemas = catalog.asSchemas();
     Arrays.stream(schemas.listSchemas(Namespace.ofSchema(metalakeName, catalogName)))
         .filter(schema -> schema.name().startsWith("gt_"))
@@ -222,7 +222,7 @@ public class TrinoQueryITBase {
               LOG.info("Drop schema \"{}.{}\".{}", metalakeName, catalogName, schema.name());
             });
 
-    metalake.dropCatalog(NameIdentifier.of(metalakeName, catalogName));
+    metalake.dropCatalog(catalogName);
     LOG.info("Drop catalog \"{}.{}\"", metalakeName, catalogName);
   }
 

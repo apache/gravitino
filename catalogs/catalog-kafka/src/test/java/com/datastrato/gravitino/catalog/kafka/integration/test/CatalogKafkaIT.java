@@ -122,7 +122,7 @@ public class CatalogKafkaIT extends AbstractIT {
     Assertions.assertEquals(properties, createdCatalog.properties());
 
     // test load catalog
-    Catalog loadedCatalog = metalake.loadCatalog(NameIdentifier.of(METALAKE_NAME, catalogName));
+    Catalog loadedCatalog = metalake.loadCatalog(catalogName);
     Assertions.assertEquals(createdCatalog, loadedCatalog);
 
     // test alter catalog
@@ -135,12 +135,12 @@ public class CatalogKafkaIT extends AbstractIT {
     Assertions.assertFalse(alteredCatalog.properties().containsKey("key1"));
 
     // test drop catalog
-    boolean dropped = metalake.dropCatalog(NameIdentifier.of(METALAKE_NAME, catalogName));
+    boolean dropped = metalake.dropCatalog(catalogName);
     Assertions.assertTrue(dropped);
     Exception exception =
         Assertions.assertThrows(
             NoSuchCatalogException.class,
-            () -> metalake.loadCatalog(NameIdentifier.of(METALAKE_NAME, catalogName)));
+            () -> metalake.loadCatalog(catalogName));
     Assertions.assertTrue(exception.getMessage().contains(catalogName));
     // assert topic exists in Kafka after catalog dropped
     Assertions.assertFalse(adminClient.listTopics().names().get().isEmpty());
@@ -498,6 +498,6 @@ public class CatalogKafkaIT extends AbstractIT {
         PROVIDER,
         comment,
         properties);
-    return metalake.loadCatalog(NameIdentifier.of(METALAKE_NAME, catalogName));
+    return metalake.loadCatalog(catalogName);
   }
 }

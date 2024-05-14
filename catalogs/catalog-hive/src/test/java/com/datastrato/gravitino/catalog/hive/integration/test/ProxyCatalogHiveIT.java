@@ -316,12 +316,12 @@ public class ProxyCatalogHiveIT extends AbstractIT {
         "comment",
         properties);
 
-    catalog = metalake.loadCatalog(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME));
+    catalog = metalake.loadCatalog(CATALOG_NAME);
   }
 
   private static void loadCatalogWithAnotherClient() {
     GravitinoMetalake metaLake = anotherClient.loadMetalake(METALAKE_NAME);
-    anotherCatalog = metaLake.loadCatalog(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME));
+    anotherCatalog = metaLake.loadCatalog(CATALOG_NAME);
   }
 
   public static void setEnv(String key, String value) {

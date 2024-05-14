@@ -213,7 +213,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     properties.put(PROPERTIES_KEY1, PROPERTIES_VALUE1);
     String storageLocation = storageLocation(schemaName, filesetName);
     Catalog catalog_fileset =
-        metalake.loadCatalog(NameIdentifier.ofCatalog(metalakeName, catalogName));
+        metalake.loadCatalog(catalogName);
     catalog_fileset
         .asFilesetCatalog()
         .createFileset(
@@ -272,7 +272,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     catalogsPage.setCatalogPropsAt(2, "key2", "value2");
     clickAndWait(catalogsPage.handleSubmitCatalogBtn);
     // load catalog
-    catalog = metalake.loadCatalog(NameIdentifier.of(METALAKE_NAME, HIVE_CATALOG_NAME));
+    catalog = metalake.loadCatalog(HIVE_CATALOG_NAME);
 
     Assertions.assertTrue(catalogsPage.verifyGetCatalog(HIVE_CATALOG_NAME));
   }

@@ -161,7 +161,7 @@ public class CatalogDorisIT extends AbstractIT {
             provider,
             "doris catalog comment",
             catalogProperties);
-    Catalog loadCatalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Catalog loadCatalog = metalake.loadCatalog(catalogName);
     Assertions.assertEquals(createdCatalog, loadCatalog);
 
     catalog = loadCatalog;
