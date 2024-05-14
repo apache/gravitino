@@ -13,6 +13,8 @@ plugins {
 
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark.get()
+val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
+val kyuubiVersion: String = libs.versions.kyuubi.get()
 val icebergVersion: String = libs.versions.iceberg.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
@@ -114,8 +116,8 @@ dependencies {
     exclude("io.dropwizard.metrics")
     exclude("org.rocksdb")
   }
-  testImplementation("org.apache.iceberg:iceberg-core:$icebergVersion")
-  testImplementation("org.apache.iceberg:iceberg-hive-metastore:$icebergVersion")
+  testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
+  testImplementation("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
 
   testImplementation(libs.okhttp3.loginterceptor)
   testImplementation(libs.postgresql.driver)

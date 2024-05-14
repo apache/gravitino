@@ -3,9 +3,11 @@
   This software is licensed under the Apache License version 2.
 -->
 
+This document lists the maintainers and contribitors of the Project.
+
 # Maintainers
 
-This document lists the maintainers of the Project. Maintainers may be added once approved by the existing maintainers (see [Governance document](GOVERNANCE.md)). By adding your name to this list you agree to follow the project's guidelines and governance including the [Code of Conduct](CODE-OF-CONDUCT.md) and that you have permission to contribute from your employer. All contributions are licensed under the Apache License version 2.
+Maintainers may be added once approved by the existing maintainers (see [Governance document](GOVERNANCE.md)). By adding your name to this list you agree to follow the project's guidelines and governance including the [Code of Conduct](CODE-OF-CONDUCT.md) and that you have permission to contribute from your employer. All contributions are licensed under the Apache License version 2.
 
 | **NAME**      | **GitHub Username** | **Organization** |
 |---------------|---------------------|------------------|
@@ -19,6 +21,17 @@ This document lists the maintainers of the Project. Maintainers may be added onc
 | Clearvive     | Clearvive           | Datastrato       |
 | Cheyne        | ch3yne              | Datastrato       |
 | Jerry Shao    | jerryshao           | Datastrato       |
+| Shaofeng Shi  | shaofengshi         | Datastrato       |
+| Qian Xia      | LauraXia123         | Datastrato       |
+
+
+# Contribitors
+
+Contribitors may be added by existing maintainers (see [Governance document](GOVERNANCE.md)). By adding your name to this list you agree to follow the project's guidelines and governance including the [Code of Conduct](CODE-OF-CONDUCT.md) and that you have permission to contribute from your employer. All contributions are licensed under the Apache License version 2.
+
+| **NAME**      | **GitHub Username** | **Organization** |
+|---------------|---------------------|------------------|
+|               |                     |                  |
 
 ## Review process
 

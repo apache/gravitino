@@ -19,7 +19,6 @@ import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter.DistributionAndSortOrdersInfo;
 import com.datastrato.gravitino.spark.connector.SparkTypeConverter;
-import com.datastrato.gravitino.spark.connector.table.SparkBaseTable;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
@@ -99,7 +98,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
    *     Spark
    * @return a specific Spark table
    */
-  protected abstract SparkBaseTable createSparkTable(
+  protected abstract Table createSparkTable(
       Identifier identifier,
       com.datastrato.gravitino.rel.Table gravitinoTable,
       TableCatalog sparkCatalog,
@@ -184,7 +183,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
         sparkTransformConverter.toGravitinoPartitionings(transforms);
 
     try {
-      com.datastrato.gravitino.rel.Table table =
+      com.datastrato.gravitino.rel.Table gravitinoTable =
           gravitinoCatalogClient
               .asTableCatalog()
               .createTable(
@@ -196,7 +195,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
                   distributionAndSortOrdersInfo.getDistribution(),
                   distributionAndSortOrdersInfo.getSortOrders());
       return createSparkTable(
-          ident, table, sparkCatalog, propertiesConverter, sparkTransformConverter);
+          ident, gravitinoTable, sparkCatalog, propertiesConverter, sparkTransformConverter);
     } catch (NoSuchSchemaException e) {
       throw new NoSuchNamespaceException(ident.namespace());
     } catch (com.datastrato.gravitino.exceptions.TableAlreadyExistsException e) {
@@ -208,13 +207,13 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
   public Table loadTable(Identifier ident) throws NoSuchTableException {
     try {
       String database = getDatabase(ident);
-      com.datastrato.gravitino.rel.Table table =
+      com.datastrato.gravitino.rel.Table gravitinoTable =
           gravitinoCatalogClient
               .asTableCatalog()
               .loadTable(NameIdentifier.of(metalakeName, catalogName, database, ident.name()));
       // Will create a catalog specific table
       return createSparkTable(
-          ident, table, sparkCatalog, propertiesConverter, sparkTransformConverter);
+          ident, gravitinoTable, sparkCatalog, propertiesConverter, sparkTransformConverter);
     } catch (com.datastrato.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(ident);
     }
@@ -235,14 +234,14 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
             .map(BaseCatalog::transformTableChange)
             .toArray(com.datastrato.gravitino.rel.TableChange[]::new);
     try {
-      com.datastrato.gravitino.rel.Table table =
+      com.datastrato.gravitino.rel.Table gravitinoTable =
           gravitinoCatalogClient
               .asTableCatalog()
               .alterTable(
                   NameIdentifier.of(metalakeName, catalogName, getDatabase(ident), ident.name()),
                   gravitinoTableChanges);
       return createSparkTable(
-          ident, table, sparkCatalog, propertiesConverter, sparkTransformConverter);
+          ident, gravitinoTable, sparkCatalog, propertiesConverter, sparkTransformConverter);
     } catch (com.datastrato.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(ident);
     }
@@ -404,7 +403,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
         com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET);
   }
 
-  private String getDatabase(Identifier sparkIdentifier) {
+  protected String getDatabase(Identifier sparkIdentifier) {
     if (sparkIdentifier.namespace().length > 0) {
       return sparkIdentifier.namespace()[0];
     }
