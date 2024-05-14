@@ -100,7 +100,7 @@ public class TestGravitinoClient extends TestBase {
     MetalakeResponse resp = new MetalakeResponse(mockMetalake);
     buildMockResource(Method.GET, "/api/metalakes/mock", null, resp, HttpStatus.SC_OK);
     NameIdentifier id = NameIdentifier.of("mock");
-    GravitinoMetalake metaLake = client.loadMetalake(id);
+    GravitinoMetalake metaLake = client.loadMetalake(id.name());
     Assertions.assertEquals("mock", metaLake.name());
     Assertions.assertEquals("comment", metaLake.comment());
     Assertions.assertEquals("creator", metaLake.auditInfo().creator());
@@ -110,20 +110,23 @@ public class TestGravitinoClient extends TestBase {
         ErrorResponse.notFound(NoSuchMetalakeException.class.getSimpleName(), "mock error");
     buildMockResource(Method.GET, "/api/metalakes/mock", null, errorResp, HttpStatus.SC_NOT_FOUND);
     Throwable excep =
-        Assertions.assertThrows(NoSuchMetalakeException.class, () -> client.loadMetalake(id));
+        Assertions.assertThrows(
+            NoSuchMetalakeException.class, () -> client.loadMetalake(id.name()));
     Assertions.assertTrue(excep.getMessage().contains("mock error"));
 
     // Test illegal metalake name identifier
     NameIdentifier badName = NameIdentifier.parse("mock.mock");
 
     Throwable excep1 =
-        Assertions.assertThrows(IllegalArgumentException.class, () -> client.loadMetalake(badName));
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> client.loadMetalake(badName.name()));
     Assertions.assertTrue(
         excep1.getMessage().contains("Metalake namespace must be non-null and empty"));
 
     // Test return unparsed system error
     buildMockResource(Method.GET, "/api/metalakes/mock", null, null, HttpStatus.SC_CONFLICT);
-    Throwable excep2 = Assertions.assertThrows(RESTException.class, () -> client.loadMetalake(id));
+    Throwable excep2 =
+        Assertions.assertThrows(RESTException.class, () -> client.loadMetalake(id.name()));
     Assertions.assertTrue(excep2.getMessage().contains("Error code: " + HttpStatus.SC_CONFLICT));
   }
 
@@ -142,7 +145,8 @@ public class TestGravitinoClient extends TestBase {
     MetalakeResponse resp = new MetalakeResponse(mockMetalake);
     buildMockResource(Method.POST, "/api/metalakes", req, resp, HttpStatus.SC_OK);
     NameIdentifier id = NameIdentifier.parse("mock");
-    GravitinoMetalake metaLake = client.createMetalake(id, "comment", Collections.emptyMap());
+    GravitinoMetalake metaLake =
+        client.createMetalake(id.name(), "comment", Collections.emptyMap());
     Map<String, String> emptyMap = Collections.emptyMap();
 
     Assertions.assertEquals("mock", metaLake.name());
@@ -157,14 +161,14 @@ public class TestGravitinoClient extends TestBase {
     Throwable excep =
         Assertions.assertThrows(
             MetalakeAlreadyExistsException.class,
-            () -> client.createMetalake(id, "comment", emptyMap));
+            () -> client.createMetalake(id.name(), "comment", emptyMap));
     Assertions.assertTrue(excep.getMessage().contains("mock error"));
 
     // Test return unparsed system error
     buildMockResource(Method.POST, "/api/metalakes", req, null, HttpStatus.SC_CONFLICT);
     Throwable excep1 =
         Assertions.assertThrows(
-            RESTException.class, () -> client.createMetalake(id, "comment", emptyMap));
+            RESTException.class, () -> client.createMetalake(id.name(), "comment", emptyMap));
     Assertions.assertTrue(excep1.getMessage().contains("Error code: " + HttpStatus.SC_CONFLICT));
   }
 
@@ -191,7 +195,7 @@ public class TestGravitinoClient extends TestBase {
 
     buildMockResource(Method.PUT, "/api/metalakes/mock", req, resp, HttpStatus.SC_OK);
     NameIdentifier id = NameIdentifier.of("mock");
-    GravitinoMetalake metaLake = client.alterMetalake(id, changes);
+    GravitinoMetalake metaLake = client.alterMetalake(id.name(), changes);
     Assertions.assertEquals("newName", metaLake.name());
     Assertions.assertEquals("newComment", metaLake.comment());
     Assertions.assertEquals("creator", metaLake.auditInfo().creator());
@@ -202,14 +206,14 @@ public class TestGravitinoClient extends TestBase {
     buildMockResource(Method.PUT, "/api/metalakes/mock", req, errorResp, HttpStatus.SC_NOT_FOUND);
     Throwable excep =
         Assertions.assertThrows(
-            NoSuchMetalakeException.class, () -> client.alterMetalake(id, changes));
+            NoSuchMetalakeException.class, () -> client.alterMetalake(id.name(), changes));
     Assertions.assertTrue(excep.getMessage().contains("mock error"));
 
     // Test illegal argument
     NameIdentifier id2 = NameIdentifier.parse("mock.mock");
     Throwable excep1 =
         Assertions.assertThrows(
-            IllegalArgumentException.class, () -> client.alterMetalake(id2, changes));
+            IllegalArgumentException.class, () -> client.alterMetalake(id2.name(), changes));
     Assertions.assertTrue(
         excep1.getMessage().contains("Metalake namespace must be non-null and empty"));
   }
@@ -218,22 +222,23 @@ public class TestGravitinoClient extends TestBase {
   public void testDropMetalake() throws JsonProcessingException {
     DropResponse resp = new DropResponse(true);
     buildMockResource(Method.DELETE, "/api/metalakes/mock", null, resp, HttpStatus.SC_OK);
-    Assertions.assertTrue(client.dropMetalake(NameIdentifier.of("mock")));
+    Assertions.assertTrue(client.dropMetalake("mock"));
 
     DropResponse resp1 = new DropResponse(false);
     buildMockResource(Method.DELETE, "/api/metalakes/mock", null, resp1, HttpStatus.SC_OK);
-    Assertions.assertFalse(client.dropMetalake(NameIdentifier.of("mock")));
+    Assertions.assertFalse(client.dropMetalake("mock"));
 
     // Test return internal error
     ErrorResponse errorResp = ErrorResponse.internalError("mock error");
     buildMockResource(
         Method.DELETE, "/api/metalakes/mock", null, errorResp, HttpStatus.SC_INTERNAL_SERVER_ERROR);
-    Assertions.assertFalse(client.dropMetalake(NameIdentifier.of("mock")));
+    Assertions.assertFalse(client.dropMetalake("mock"));
 
     // Test illegal metalake name identifier
     NameIdentifier id = NameIdentifier.parse("mock.mock");
     Throwable excep1 =
-        Assertions.assertThrows(IllegalArgumentException.class, () -> client.dropMetalake(id));
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> client.dropMetalake(id.name()));
     Assertions.assertTrue(
         excep1.getMessage().contains("Metalake namespace must be non-null and empty"));
   }

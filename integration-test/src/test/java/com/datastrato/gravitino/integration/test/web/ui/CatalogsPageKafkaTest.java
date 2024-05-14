@@ -104,7 +104,7 @@ public class CatalogsPageKafkaTest extends AbstractWebIT {
     metalakePage.setMetalakeNameField(METALAKE_NAME);
     clickAndWait(metalakePage.submitHandleMetalakeBtn);
     // load metalake
-    metalake = gravitinoClient.loadMetalake(NameIdentifier.of(METALAKE_NAME));
+    metalake = gravitinoClient.loadMetalake(METALAKE_NAME);
     metalakePage.clickMetalakeLink(METALAKE_NAME);
     // create kafka catalog actions
     clickAndWait(catalogsPage.createCatalogBtn);

@@ -45,7 +45,7 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
       boolean checkVersion,
       Map<String, String> headers) {
     super(uri, authDataProvider, checkVersion, headers);
-    this.metalake = loadMetalake(NameIdentifier.of(metalakeName));
+    this.metalake = loadMetalake(metalakeName);
   }
 
   /**

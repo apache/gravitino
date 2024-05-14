@@ -85,7 +85,7 @@ public class TestMultipleJDBCLoad extends AbstractIT {
     String metalakeName = RandomNameUtils.genRandomName("it_metalake");
     String postgreSqlCatalogName = RandomNameUtils.genRandomName("it_postgresql");
     GravitinoMetalake metalake =
-        client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
+        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
 
     Map<String, String> pgConf = Maps.newHashMap();
     pgConf.put(JdbcConfig.JDBC_URL.getKey(), postgreSQLContainer.getJdbcUrl(TEST_DB_NAME));

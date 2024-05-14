@@ -48,15 +48,14 @@ public class CatalogIT extends AbstractIT {
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HIVE_METASTORE_PORT);
 
-    NameIdentifier ident = NameIdentifier.of(metalakeName);
-    Assertions.assertFalse(client.metalakeExists(ident));
-    metalake = client.createMetalake(ident, "metalake comment", Collections.emptyMap());
-    Assertions.assertTrue(client.metalakeExists(ident));
+    Assertions.assertFalse(client.metalakeExists(metalakeName));
+    metalake = client.createMetalake(metalakeName, "metalake comment", Collections.emptyMap());
+    Assertions.assertTrue(client.metalakeExists(metalakeName));
   }
 
   @AfterAll
   public static void tearDown() {
-    client.dropMetalake(NameIdentifier.of(metalakeName));
+    client.dropMetalake(metalakeName);
 
     if (client != null) {
       client.close();

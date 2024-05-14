@@ -441,7 +441,7 @@ public class TrinoConnectorIT extends AbstractIT {
     String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
 
-    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
     Catalog catalog =
         createdMetalake.createCatalog(
             NameIdentifier.of(metalakeName, catalogName),
@@ -590,7 +590,7 @@ public class TrinoConnectorIT extends AbstractIT {
   @Test
   void testColumnTypeNotNullByTrino() {
     String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
-    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
     String[] command = {
       "mysql",
       "-h127.0.0.1",
@@ -683,7 +683,7 @@ public class TrinoConnectorIT extends AbstractIT {
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
     String tableName = GravitinoITUtils.genRandomName("table").toLowerCase();
 
-    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
     Catalog catalog =
         createdMetalake.createCatalog(
             NameIdentifier.of(metalakeName, catalogName),
@@ -818,7 +818,7 @@ public class TrinoConnectorIT extends AbstractIT {
   @Test
   void testHiveCatalogCreatedByGravitino() {
     String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
-    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
     createdMetalake.createCatalog(
         NameIdentifier.of(metalakeName, catalogName),
         Catalog.Type.RELATIONAL,
@@ -860,7 +860,7 @@ public class TrinoConnectorIT extends AbstractIT {
   @Test
   void testWrongHiveCatalogProperty() {
     String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
-    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
     createdMetalake.createCatalog(
         NameIdentifier.of(metalakeName, catalogName),
         Catalog.Type.RELATIONAL,
@@ -902,7 +902,7 @@ public class TrinoConnectorIT extends AbstractIT {
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
     String tableName = GravitinoITUtils.genRandomName("table").toLowerCase();
 
-    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
     String hiveContainerIp = containerSuite.getHiveContainer().getContainerIpAddress();
     Catalog catalog =
         createdMetalake.createCatalog(
@@ -1015,7 +1015,7 @@ public class TrinoConnectorIT extends AbstractIT {
   void testIcebergCatalogCreatedByGravitino() {
     String catalogName = GravitinoITUtils.genRandomName("iceberg_catalog").toLowerCase();
     String schemaName = GravitinoITUtils.genRandomName("iceberg_catalog").toLowerCase();
-    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
     String[] command = {
       "mysql",
       "-h127.0.0.1",
@@ -1098,7 +1098,7 @@ public class TrinoConnectorIT extends AbstractIT {
   @Test
   void testMySQLCatalogCreatedByGravitino() {
     String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
-    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
     String[] command = {
       "mysql",
       "-h127.0.0.1",
@@ -1141,7 +1141,7 @@ public class TrinoConnectorIT extends AbstractIT {
     String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
     String schemaName = GravitinoITUtils.genRandomName("mysql_schema").toLowerCase();
     String tableName = GravitinoITUtils.genRandomName("mysql_table").toLowerCase();
-    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
     String[] command = {
       "mysql",
       "-h127.0.0.1",
@@ -1255,7 +1255,7 @@ public class TrinoConnectorIT extends AbstractIT {
     String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
     String schemaName = GravitinoITUtils.genRandomName("mysql_schema").toLowerCase();
     String tableName = GravitinoITUtils.genRandomName("mysql_table").toLowerCase();
-    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
     String[] command = {
       "mysql",
       "-h127.0.0.1",
@@ -1375,7 +1375,7 @@ public class TrinoConnectorIT extends AbstractIT {
   @Test
   void testDropCatalogAndCreateAgain() {
     String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
-    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
     String[] command = {
       "mysql",
       "-h127.0.0.1",
@@ -1420,8 +1420,8 @@ public class TrinoConnectorIT extends AbstractIT {
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
     GravitinoMetalake createdMetalake =
-        client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
-    GravitinoMetalake loadMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
     Assertions.assertEquals(createdMetalake, loadMetalake);
 
     metalake = loadMetalake;

@@ -125,7 +125,7 @@ public class CatalogConnectorManager {
     for (String usedMetalake : usedMetalakes) {
       GravitinoMetalake metalake;
       try {
-        metalake = gravitinoClient.loadMetalake(NameIdentifier.ofMetalake(usedMetalake));
+        metalake = gravitinoClient.loadMetalake(usedMetalake);
 
         LOG.info("Load metalake: {}", usedMetalake);
         loadCatalogs(metalake);
@@ -277,8 +277,7 @@ public class CatalogConnectorManager {
     }
 
     try {
-      GravitinoMetalake metalake =
-          gravitinoClient.loadMetalake(NameIdentifier.ofMetalake(catalog.namespace().toString()));
+      GravitinoMetalake metalake = gravitinoClient.loadMetalake(catalog.namespace().toString());
       metalake.createCatalog(
           catalog, Catalog.Type.RELATIONAL, provider, "Trino created", properties);
 
@@ -306,8 +305,7 @@ public class CatalogConnectorManager {
 
   public void dropCatalog(String metalakeName, String catalogName, boolean ignoreNotExist) {
     try {
-      GravitinoMetalake metalake =
-          gravitinoClient.loadMetalake(NameIdentifier.ofMetalake(metalakeName));
+      GravitinoMetalake metalake = gravitinoClient.loadMetalake(metalakeName);
 
       NameIdentifier catalog = NameIdentifier.of(metalakeName, catalogName);
       if (!metalake.catalogExists(catalog)) {
@@ -380,8 +378,7 @@ public class CatalogConnectorManager {
         return;
       }
 
-      GravitinoMetalake metalake =
-          gravitinoClient.loadMetalake(NameIdentifier.ofMetalake(metalakeName));
+      GravitinoMetalake metalake = gravitinoClient.loadMetalake(metalakeName);
       metalake.alterCatalog(catalog, changes.toArray(changes.toArray(new CatalogChange[0])));
 
       Future<?> future = executorService.submit(this::loadMetalakeImpl);

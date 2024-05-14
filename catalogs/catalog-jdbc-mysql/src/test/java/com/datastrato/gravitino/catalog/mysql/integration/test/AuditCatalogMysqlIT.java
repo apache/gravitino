@@ -76,7 +76,7 @@ public class AuditCatalogMysqlIT extends AbstractIT {
   @AfterAll
   public static void stopIntegrationTest() throws IOException, InterruptedException {
     AbstractIT.stopIntegrationTest();
-    client.dropMetalake(NameIdentifier.of(metalakeName));
+    client.dropMetalake(metalakeName);
     mysqlService.close();
   }
 
@@ -169,8 +169,8 @@ public class AuditCatalogMysqlIT extends AbstractIT {
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
     GravitinoMetalake createdMetalake =
-        client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
-    GravitinoMetalake loadMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
     Assertions.assertEquals(createdMetalake, loadMetalake);
     metalake = loadMetalake;
   }

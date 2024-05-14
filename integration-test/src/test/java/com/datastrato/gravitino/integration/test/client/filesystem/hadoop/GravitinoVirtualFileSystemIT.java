@@ -52,10 +52,9 @@ public class GravitinoVirtualFileSystemIT extends AbstractIT {
   @BeforeAll
   public static void startUp() {
     containerSuite.startHiveContainer();
-    NameIdentifier ident = NameIdentifier.of(metalakeName);
-    Assertions.assertFalse(client.metalakeExists(ident));
-    metalake = client.createMetalake(ident, "metalake comment", Collections.emptyMap());
-    Assertions.assertTrue(client.metalakeExists(ident));
+    Assertions.assertFalse(client.metalakeExists(metalakeName));
+    metalake = client.createMetalake(metalakeName, "metalake comment", Collections.emptyMap());
+    Assertions.assertTrue(client.metalakeExists(metalakeName));
 
     NameIdentifier catalogIdent = NameIdentifier.of(metalakeName, catalogName);
     Map<String, String> properties = Maps.newHashMap();
@@ -78,7 +77,7 @@ public class GravitinoVirtualFileSystemIT extends AbstractIT {
 
   @AfterAll
   public static void tearDown() throws IOException {
-    client.dropMetalake(NameIdentifier.of(metalakeName));
+    client.dropMetalake(metalakeName);
 
     if (client != null) {
       client.close();

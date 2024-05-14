@@ -97,7 +97,7 @@ public class CatalogKafkaIT extends AbstractIT {
 
   @AfterAll
   public static void shutdown() {
-    client.dropMetalake(NameIdentifier.of(METALAKE_NAME));
+    client.dropMetalake(METALAKE_NAME);
     if (adminClient != null) {
       adminClient.close();
     }
@@ -483,8 +483,8 @@ public class CatalogKafkaIT extends AbstractIT {
 
   private static void createMetalake() {
     GravitinoMetalake createdMetalake =
-        client.createMetalake(NameIdentifier.of(METALAKE_NAME), "comment", Collections.emptyMap());
-    GravitinoMetalake loadMetalake = client.loadMetalake(NameIdentifier.of(METALAKE_NAME));
+        client.createMetalake(METALAKE_NAME, "comment", Collections.emptyMap());
+    GravitinoMetalake loadMetalake = client.loadMetalake(METALAKE_NAME);
     Assertions.assertEquals(createdMetalake, loadMetalake);
 
     metalake = loadMetalake;

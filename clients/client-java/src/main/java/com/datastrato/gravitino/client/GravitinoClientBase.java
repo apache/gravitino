@@ -5,7 +5,6 @@
 
 package com.datastrato.gravitino.client;
 
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Version;
 import com.datastrato.gravitino.dto.responses.MetalakeResponse;
 import com.datastrato.gravitino.dto.responses.VersionResponse;
@@ -102,16 +101,14 @@ public abstract class GravitinoClientBase implements Closeable {
   /**
    * Loads a specific Metalake from the Gravitino API.
    *
-   * @param ident The identifier of the Metalake to be loaded.
+   * @param name The name of the Metalake to be loaded.
    * @return A GravitinoMetalake instance representing the loaded Metalake.
    * @throws NoSuchMetalakeException If the specified Metalake does not exist.
    */
-  public GravitinoMetalake loadMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
-    NameIdentifier.checkMetalake(ident);
-
+  public GravitinoMetalake loadMetalake(String name) throws NoSuchMetalakeException {
     MetalakeResponse resp =
         restClient.get(
-            API_METALAKES_IDENTIFIER_PATH + ident.name(),
+            API_METALAKES_IDENTIFIER_PATH + name,
             MetalakeResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.metalakeErrorHandler());

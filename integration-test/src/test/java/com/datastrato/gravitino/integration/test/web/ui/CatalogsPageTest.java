@@ -245,7 +245,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     metalakePage.setMetalakeNameField(METALAKE_SELECT_NAME);
     clickAndWait(metalakePage.submitHandleMetalakeBtn);
     // load metalake
-    metalake = gravitinoClient.loadMetalake(NameIdentifier.of(METALAKE_NAME));
+    metalake = gravitinoClient.loadMetalake(METALAKE_NAME);
     metalakePage.clickMetalakeLink(METALAKE_NAME);
     // create catalog
     clickAndWait(catalogsPage.createCatalogBtn);

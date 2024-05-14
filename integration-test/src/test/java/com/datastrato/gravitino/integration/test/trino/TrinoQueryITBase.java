@@ -111,16 +111,15 @@ public class TrinoQueryITBase {
     int tries = 180;
     while (!created && tries-- >= 0) {
       try {
-        boolean exists = gravitinoClient.metalakeExists(NameIdentifier.of(metalakeName));
+        boolean exists = gravitinoClient.metalakeExists(metalakeName);
 
         if (exists) {
-          metalake = gravitinoClient.loadMetalake(NameIdentifier.of(metalakeName));
+          metalake = gravitinoClient.loadMetalake(metalakeName);
           return;
         }
 
         GravitinoMetalake createdMetalake =
-            gravitinoClient.createMetalake(
-                NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
+            gravitinoClient.createMetalake(metalakeName, "comment", Collections.emptyMap());
         Assertions.assertNotNull(createdMetalake);
         metalake = createdMetalake;
         created = true;
@@ -136,11 +135,11 @@ public class TrinoQueryITBase {
   }
 
   private static void dropMetalake() {
-    boolean exists = gravitinoClient.metalakeExists(NameIdentifier.of(metalakeName));
+    boolean exists = gravitinoClient.metalakeExists(metalakeName);
     if (!exists) {
       return;
     }
-    gravitinoClient.dropMetalake(NameIdentifier.of(metalakeName));
+    gravitinoClient.dropMetalake(metalakeName);
   }
 
   private static void createCatalog(

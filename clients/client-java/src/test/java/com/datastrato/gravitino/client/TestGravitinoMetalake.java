@@ -397,7 +397,6 @@ public class TestGravitinoMetalake extends TestBase {
     MetalakeResponse resp = new MetalakeResponse(mockMetalake);
     buildMockResource(Method.POST, "/api/metalakes", req, resp, HttpStatus.SC_OK);
 
-    return client.createMetalake(
-        NameIdentifier.parse(metalakeName), "comment", Collections.emptyMap());
+    return client.createMetalake(metalakeName, "comment", Collections.emptyMap());
   }
 }
