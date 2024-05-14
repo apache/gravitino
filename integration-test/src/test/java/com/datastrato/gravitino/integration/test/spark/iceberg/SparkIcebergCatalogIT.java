@@ -513,7 +513,7 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     Assertions.assertEquals(1, tableData.size());
     Assertions.assertEquals("1,1,1", tableData.get(0));
 
-    long snapshotId = getSnapshotId(tableName);
+    long snapshotId = getCurrentSnapshotId(tableName);
 
     sql(String.format("INSERT INTO %s VALUES(2, '2', 2)", tableName));
     tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
@@ -542,7 +542,7 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     Assertions.assertEquals(1, tableData.size());
     Assertions.assertEquals("1,1,1", tableData.get(0));
 
-    long snapshotId = getSnapshotId(tableName);
+    long snapshotId = getCurrentSnapshotId(tableName);
 
     sql(String.format("INSERT INTO %s VALUES(2, '2', 2)", tableName));
     tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
@@ -722,7 +722,7 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     }
   }
 
-  private long getSnapshotId(String tableName) throws NoSuchTableException {
+  private long getCurrentSnapshotId(String tableName) throws NoSuchTableException {
     CatalogPlugin catalogPlugin =
         getSparkSession().sessionState().catalogManager().catalog(getCatalogName());
     Assertions.assertInstanceOf(TableCatalog.class, catalogPlugin);
