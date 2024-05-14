@@ -25,7 +25,7 @@ install it in your local.
 
 ### Gravitino Python client API
 
-```python
+```shell
 pip install gravitino
 ```
 
@@ -70,10 +70,8 @@ You can ues any IDE to develop Gravitino Python Client. Directly open the client
 ### Prerequisites
 
 + Python 3.8+
-
-### Compile tools
-
-+ [Gradle](https://gradle.org/)
++ Refer to [How to build Gravitino](./how-to-build.md#prerequisites) to have necessary build
+  environment ready for building.
 
 ### Build and testing
 
@@ -97,11 +95,11 @@ You can ues any IDE to develop Gravitino Python Client. Directly open the client
 
 4. Run integration tests
 
-   Because Python client will connect Gravitino Server to execute integration tests,
-   So we let Gradle automatic execute `./gradlew compileDistribution -x test` command to compile the
-   Gravitino project in the `distribution` directory. When you execute integration test via Gradle
-   command or IDE, Gravitino integration test environment framework (`integration_test_env.py`)
-   will automatically start and stop Gravitino server.
+   Because Python client connects to Gravitino Server to run integration tests,
+   So it runs `./gradlew compileDistribution -x test` command automatically to compile the
+   Gravitino project in the `distribution` directory. When you run integration tests via Gradle
+   command or IDE, Gravitino integration test framework (`integration_test_env.py`)
+   will start and stop Gravitino server automatically.
 
     ```shell
     ./gradlew :clients:client-python:test
