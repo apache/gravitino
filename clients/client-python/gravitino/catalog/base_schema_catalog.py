@@ -152,13 +152,13 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
         reqs = [
             BaseSchemaCatalog.to_schema_update_request(change) for change in changes
         ]
-        updatesRequest = SchemaUpdatesRequest(reqs)
-        updatesRequest.validate()
+        updates_request = SchemaUpdatesRequest(reqs)
+        updates_request.validate()
         resp = self.rest_client.put(
             BaseSchemaCatalog.format_schema_request_path(ident.namespace())
             + "/"
             + ident.name(),
-            updatesRequest,
+            updates_request,
         )
         schema_response = SchemaResponse.from_json(resp.body, infer_missing=True)
         schema_response.validate()
