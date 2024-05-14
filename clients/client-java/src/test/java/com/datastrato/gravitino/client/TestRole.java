@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.client;
 
+import static com.datastrato.gravitino.dto.util.DTOConverters.toDTO;
 import static javax.servlet.http.HttpServletResponse.SC_CONFLICT;
 import static javax.servlet.http.HttpServletResponse.SC_NOT_FOUND;
 import static javax.servlet.http.HttpServletResponse.SC_OK;
@@ -14,6 +15,7 @@ import com.datastrato.gravitino.authorization.Role;
 import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.dto.AuditDTO;
+import com.datastrato.gravitino.dto.authorization.PrivilegeDTO;
 import com.datastrato.gravitino.dto.authorization.RoleDTO;
 import com.datastrato.gravitino.dto.authorization.SecurableObjectDTO;
 import com.datastrato.gravitino.dto.requests.RoleCreateRequest;
@@ -49,25 +51,29 @@ public class TestRole extends TestBase {
         new RoleCreateRequest(
             roleName,
             ImmutableMap.of("k1", "v1"),
-            Lists.newArrayList("USE_CATALOG"),
-            SecurableObjectDTO.builder()
-                .withFullName("catalog")
-                .withType(SecurableObject.Type.CATALOG)
-                .build());
+            new SecurableObjectDTO[] {
+              SecurableObjectDTO.builder()
+                  .withFullName("catalog")
+                  .withType(SecurableObject.Type.CATALOG)
+                  .withPrivileges(new PrivilegeDTO[] {toDTO(Privileges.UseCatalog.allow())})
+                  .build()
+            });
 
     RoleDTO mockRole = mockRoleDTO(roleName);
     RoleResponse roleResponse = new RoleResponse(mockRole);
     buildMockResource(Method.POST, rolePath, request, roleResponse, SC_OK);
+
+    SecurableObject securableObject = SecurableObjects.ofCatalog("catalog");
+    securableObject.bindPrivileges(Lists.newArrayList(Privileges.UseCatalog.allow()));
 
     Role createdRole =
         client.createRole(
             metalakeName,
             roleName,
             ImmutableMap.of("k1", "v1"),
-            SecurableObjects.ofCatalog("catalog"),
-            Lists.newArrayList(Privileges.UseCatalog.get()));
-    Assertions.assertEquals(1L, Privileges.CreateCatalog.get().name().getLowBits());
-    Assertions.assertEquals(0L, Privileges.CreateCatalog.get().name().getHighBits());
+            Lists.newArrayList(securableObject));
+    Assertions.assertEquals(1L, Privileges.CreateCatalog.allow().name().getLowBits());
+    Assertions.assertEquals(0L, Privileges.CreateCatalog.allow().name().getHighBits());
     Assertions.assertNotNull(createdRole);
     assertRole(createdRole, mockRole);
 
@@ -84,8 +90,7 @@ public class TestRole extends TestBase {
                     metalakeName,
                     roleName,
                     ImmutableMap.of("k1", "v1"),
-                    SecurableObjects.ofCatalog("catalog"),
-                    Lists.newArrayList(Privileges.UseCatalog.get())));
+                    Lists.newArrayList(securableObject)));
     Assertions.assertEquals("role already exists", ex.getMessage());
 
     // test NoSuchMetalakeException
@@ -100,8 +105,7 @@ public class TestRole extends TestBase {
                     metalakeName,
                     roleName,
                     ImmutableMap.of("k1", "v1"),
-                    SecurableObjects.ofCatalog("catalog"),
-                    Lists.newArrayList(Privileges.UseCatalog.get())));
+                    Lists.newArrayList(securableObject)));
     Assertions.assertEquals("metalake not found", ex.getMessage());
 
     // test RuntimeException
@@ -114,8 +118,7 @@ public class TestRole extends TestBase {
                 metalakeName,
                 roleName,
                 ImmutableMap.of("k1", "v1"),
-                SecurableObjects.ofCatalog("catalog"),
-                Lists.newArrayList(Privileges.UseCatalog.get())),
+                Lists.newArrayList(securableObject)),
         "internal error");
   }
 
@@ -158,12 +161,14 @@ public class TestRole extends TestBase {
 
     // test SecurableDTO use parent method
     Role testParentRole = mockHasParentRoleDTO("test");
-    Assertions.assertEquals("schema", testParentRole.securableObject().name());
-    Assertions.assertEquals(SecurableObject.Type.SCHEMA, testParentRole.securableObject().type());
-    Assertions.assertEquals("catalog", testParentRole.securableObject().parent().fullName());
-    Assertions.assertEquals("catalog", testParentRole.securableObject().parent().name());
+    Assertions.assertEquals("schema", testParentRole.securableObjects().get(0).name());
     Assertions.assertEquals(
-        SecurableObject.Type.CATALOG, testParentRole.securableObject().parent().type());
+        SecurableObject.Type.SCHEMA, testParentRole.securableObjects().get(0).type());
+    Assertions.assertEquals(
+        "catalog", testParentRole.securableObjects().get(0).parent().fullName());
+    Assertions.assertEquals("catalog", testParentRole.securableObjects().get(0).parent().name());
+    Assertions.assertEquals(
+        SecurableObject.Type.CATALOG, testParentRole.securableObjects().get(0).parent().type());
   }
 
   @Test
@@ -188,31 +193,45 @@ public class TestRole extends TestBase {
   }
 
   private RoleDTO mockRoleDTO(String name) {
+    SecurableObject securableObject = SecurableObjects.ofCatalog("catalog");
+    securableObject.bindPrivileges(Lists.newArrayList(Privileges.UseCatalog.allow()));
+
     return RoleDTO.builder()
         .withName(name)
         .withProperties(ImmutableMap.of("k1", "v1"))
-        .withSecurableObject(DTOConverters.toSecurableObject(SecurableObjects.ofCatalog("catalog")))
-        .withPrivileges(Lists.newArrayList(Privileges.UseCatalog.get()))
+        .withSecurableObjects(
+            new SecurableObjectDTO[] {DTOConverters.toSecurableObject(securableObject)})
         .withAudit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .build();
   }
 
   private RoleDTO mockHasParentRoleDTO(String name) {
     SecurableObject catalog = SecurableObjects.ofCatalog("catalog");
+    SecurableObject schema = SecurableObjects.ofSchema(catalog, "schema");
+    schema.bindPrivileges(Lists.newArrayList(Privileges.UseSchema.allow()));
     return RoleDTO.builder()
         .withName(name)
         .withProperties(ImmutableMap.of("k1", "v1"))
-        .withSecurableObject(
-            DTOConverters.toSecurableObject(SecurableObjects.ofSchema(catalog, "schema")))
-        .withPrivileges(Lists.newArrayList(Privileges.UseSchema.get()))
+        .withSecurableObjects(new SecurableObjectDTO[] {DTOConverters.toSecurableObject(schema)})
         .withAudit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .build();
   }
 
   private void assertRole(Role expected, Role actual) {
     Assertions.assertEquals(expected.name(), actual.name());
-    Assertions.assertEquals(expected.privileges(), actual.privileges());
     Assertions.assertEquals(
-        expected.securableObject().fullName(), actual.securableObject().fullName());
+        expected.securableObjects().get(0).privileges().size(),
+        actual.securableObjects().get(0).privileges().size());
+    SecurableObject expectObject = expected.securableObjects().get(0);
+    SecurableObject actualObject = actual.securableObjects().get(0);
+    int size = expectObject.privileges().size();
+    for (int index = 0; index < size; index++) {
+      Assertions.assertEquals(
+          expectObject.privileges().get(0).name(), actualObject.privileges().get(0).name());
+      Assertions.assertEquals(
+          expectObject.privileges().get(0).effect(), actualObject.privileges().get(0).effect());
+    }
+    Assertions.assertEquals(
+        expected.securableObjects().get(0).fullName(), actual.securableObjects().get(0).fullName());
   }
 }

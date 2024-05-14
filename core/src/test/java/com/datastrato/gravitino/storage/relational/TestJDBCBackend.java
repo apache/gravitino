@@ -765,14 +765,16 @@ public class TestJDBCBackend {
 
   public static RoleEntity createRoleEntity(
       Long id, Namespace namespace, String name, AuditInfo auditInfo) {
+    SecurableObject securableObject = SecurableObjects.ofCatalog("catalog");
+    securableObject.bindPrivileges(Lists.newArrayList(Privileges.UseCatalog.allow()));
+
     return RoleEntity.builder()
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
         .withProperties(null)
         .withAuditInfo(auditInfo)
-        .withSecurableObject(SecurableObjects.ofCatalog("catalog"))
-        .withPrivileges(Lists.newArrayList(Privileges.fromName(Privilege.Name.USE_CATALOG)))
+        .withSecurableObject(securableObject)
         .build();
   }
 
@@ -813,6 +815,8 @@ public class TestJDBCBackend {
       SecurableObject securableObject,
       List<Privilege> privileges,
       Map<String, String> properties) {
+    securableObject.bindPrivileges(privileges);
+
     return RoleEntity.builder()
         .withId(id)
         .withName(name)
@@ -820,7 +824,6 @@ public class TestJDBCBackend {
         .withNamespace(namespace)
         .withAuditInfo(auditInfo)
         .withSecurableObject(securableObject)
-        .withPrivileges(privileges)
         .build();
   }
 }

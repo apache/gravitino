@@ -5,10 +5,13 @@
 package com.datastrato.gravitino.proto;
 
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.authorization.Privilege;
 import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.meta.RoleEntity;
+import com.google.common.collect.Lists;
+import java.util.List;
 import java.util.stream.Collectors;
 
 public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
@@ -27,11 +30,15 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
             .setName(roleEntity.name())
             .setAuditInfo(new AuditInfoSerDe().serialize(roleEntity.auditInfo()))
             .addAllPrivileges(
-                roleEntity.privileges().stream()
+                roleEntity.securableObjects().get(0).privileges().stream()
                     .map(privilege -> privilege.name().toString())
                     .collect(Collectors.toList()))
-            .setSecurableObjectFullName(roleEntity.securableObject().fullName())
-            .setSecurableObjectType(roleEntity.securableObject().type().name());
+            .addAllPrivilegeEffects(
+                roleEntity.securableObjects().get(0).privileges().stream()
+                    .map(privilege -> privilege.effect().toString())
+                    .collect(Collectors.toList()))
+            .setSecurableObjectFullName(roleEntity.securableObjects().get(0).fullName())
+            .setSecurableObjectType(roleEntity.securableObjects().get(0).type().name());
 
     if (roleEntity.properties() != null && !roleEntity.properties().isEmpty()) {
       builder.putAllProperties(roleEntity.properties());
@@ -48,19 +55,31 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
    */
   @Override
   public RoleEntity deserialize(Role role, Namespace namespace) {
+    SecurableObject securableObject =
+        SecurableObjects.parse(
+            role.getSecurableObjectFullName(),
+            SecurableObject.Type.valueOf(role.getSecurableObjectType()));
+
+    if (!role.getPrivilegesList().isEmpty()) {
+      List<Privilege> privileges = Lists.newArrayList();
+
+      for (int index = 0; index < role.getPrivilegeEffectsCount(); index++) {
+        if (Privilege.Effect.ALLOW.name().equals(role.getPrivilegeEffects(index))) {
+          privileges.add(Privileges.allowPrivilegeFromString(role.getPrivileges(index)));
+        } else {
+          privileges.add(Privileges.denyPrivilegeFromString(role.getPrivileges(index)));
+        }
+      }
+
+      securableObject.bindPrivileges(privileges);
+    }
+
     RoleEntity.Builder builder =
         RoleEntity.builder()
             .withId(role.getId())
             .withName(role.getName())
             .withNamespace(namespace)
-            .withPrivileges(
-                role.getPrivilegesList().stream()
-                    .map(Privileges::fromString)
-                    .collect(Collectors.toList()))
-            .withSecurableObject(
-                SecurableObjects.parse(
-                    role.getSecurableObjectFullName(),
-                    SecurableObject.Type.valueOf(role.getSecurableObjectType())))
+            .withSecurableObject(securableObject)
             .withAuditInfo(new AuditInfoSerDe().deserialize(role.getAuditInfo(), namespace));
 
     if (!role.getPropertiesMap().isEmpty()) {

@@ -7,6 +7,7 @@ package com.datastrato.gravitino.storage.relational.utils;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.authorization.Privilege;
 import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.SecurableObjects;
@@ -782,13 +783,19 @@ public class POConverters {
           .withRoleId(roleEntity.id())
           .withRoleName(roleEntity.name())
           .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(roleEntity.properties()))
-          .withSecurableObjectFullName(roleEntity.securableObject().fullName())
-          .withSecurableObjectType(roleEntity.securableObject().type().name())
+          .withSecurableObjectFullName(roleEntity.securableObjects().get(0).fullName())
+          .withSecurableObjectType(roleEntity.securableObjects().get(0).type().name())
           .withPrivileges(
               JsonUtils.anyFieldMapper()
                   .writeValueAsString(
-                      roleEntity.privileges().stream()
+                      roleEntity.securableObjects().get(0).privileges().stream()
                           .map(privilege -> privilege.name().toString())
+                          .collect(Collectors.toList())))
+          .withPrivilegeEffects(
+              JsonUtils.anyFieldMapper()
+                  .writeValueAsString(
+                      roleEntity.securableObjects().get(0).privileges().stream()
+                          .map(privilege -> privilege.effect().toString())
                           .collect(Collectors.toList())))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(roleEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
@@ -881,20 +888,34 @@ public class POConverters {
 
   public static RoleEntity fromRolePO(RolePO rolePO, Namespace namespace) {
     try {
+      SecurableObject securableObject =
+          SecurableObjects.parse(
+              rolePO.getSecurableObjectFullName(),
+              SecurableObject.Type.valueOf(rolePO.getSecurableObjectType()));
+
+      List<String> privilegeNames =
+          JsonUtils.anyFieldMapper()
+              .readValue(rolePO.getPrivileges(), new TypeReference<List<String>>() {});
+      List<String> privilegeEffects =
+          JsonUtils.anyFieldMapper()
+              .readValue(rolePO.getPrivilegeEffects(), new TypeReference<List<String>>() {});
+
+      List<Privilege> privileges = Lists.newArrayList();
+      for (int index = 0; index < privilegeNames.size(); index++) {
+        if (Privilege.Effect.ALLOW.name().equals(privilegeEffects.get(index))) {
+          privileges.add(Privileges.allowPrivilegeFromString(privilegeNames.get(index)));
+        } else {
+          privileges.add(Privileges.allowPrivilegeFromString(privilegeNames.get(index)));
+        }
+      }
+      securableObject.bindPrivileges(privileges);
+
       return RoleEntity.builder()
           .withId(rolePO.getRoleId())
           .withName(rolePO.getRoleName())
           .withNamespace(namespace)
           .withProperties(JsonUtils.anyFieldMapper().readValue(rolePO.getProperties(), Map.class))
-          .withPrivileges(
-              JsonUtils.anyFieldMapper()
-                  .readValue(rolePO.getPrivileges(), new TypeReference<List<String>>() {}).stream()
-                  .map(Privileges::fromString)
-                  .collect(Collectors.toList()))
-          .withSecurableObject(
-              SecurableObjects.parse(
-                  rolePO.getSecurableObjectFullName(),
-                  SecurableObject.Type.valueOf(rolePO.getSecurableObjectType())))
+          .withSecurableObject(securableObject)
           .withAuditInfo(
               JsonUtils.anyFieldMapper().readValue(rolePO.getAuditInfo(), AuditInfo.class))
           .build();

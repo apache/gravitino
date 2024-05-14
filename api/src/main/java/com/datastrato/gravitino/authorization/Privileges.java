@@ -43,109 +43,219 @@ import static com.datastrato.gravitino.authorization.Privilege.Name.WRITE_TOPIC;
 public class Privileges {
 
   /**
-   * Returns the Privilege from the string representation.
+   * Returns the Privilege with allow effect from the string representation.
    *
    * @param privilege The string representation of the privilege.
    * @return The Privilege.
    */
-  public static Privilege fromString(String privilege) {
+  public static Privilege allowPrivilegeFromString(String privilege) {
     Privilege.Name name = Privilege.Name.valueOf(privilege);
-    return fromName(name);
+    return allowPrivilegeFromName(name);
   }
 
   /**
-   * Returns the Privilege from the `Privilege.Name`.
+   * Returns the Privilege with allow effect from the `Privilege.Name`.
    *
    * @param name The `Privilege.Name` of the privilege.
    * @return The Privilege.
    */
-  public static Privilege fromName(Privilege.Name name) {
+  public static Privilege allowPrivilegeFromName(Privilege.Name name) {
     switch (name) {
         // Catalog
       case CREATE_CATALOG:
-        return CreateCatalog.get();
+        return CreateCatalog.allow();
       case DROP_CATALOG:
-        return DropCatalog.get();
+        return DropCatalog.allow();
       case ALTER_CATALOG:
-        return AlterCatalog.get();
+        return AlterCatalog.allow();
       case USE_CATALOG:
-        return UseCatalog.get();
+        return UseCatalog.allow();
 
         // Schema
       case CREATE_SCHEMA:
-        return CreateSchema.get();
+        return CreateSchema.allow();
       case DROP_SCHEMA:
-        return DropSchema.get();
+        return DropSchema.allow();
       case ALTER_SCHEMA:
-        return AlterSchema.get();
+        return AlterSchema.allow();
       case USE_SCHEMA:
-        return UseSchema.get();
+        return UseSchema.allow();
 
         // Table
       case CREATE_TABLE:
-        return CreateTable.get();
+        return CreateTable.allow();
       case DROP_TABLE:
-        return DropTable.get();
+        return DropTable.allow();
       case WRITE_TABLE:
-        return WriteTable.get();
+        return WriteTable.allow();
       case READ_TABLE:
-        return ReadTable.get();
+        return ReadTable.allow();
 
         // Fileset
       case CREATE_FILESET:
-        return CreateFileset.get();
+        return CreateFileset.allow();
       case DROP_FILESET:
-        return DropFileset.get();
+        return DropFileset.allow();
       case WRITE_FILESET:
-        return WriteFileset.get();
+        return WriteFileset.allow();
       case READ_FILESET:
-        return ReadFileset.get();
+        return ReadFileset.allow();
 
         // Topic
       case CREATE_TOPIC:
-        return CreateTopic.get();
+        return CreateTopic.allow();
       case DROP_TOPIC:
-        return DropTopic.get();
+        return DropTopic.allow();
       case WRITE_TOPIC:
-        return WriteTopic.get();
+        return WriteTopic.allow();
       case READ_TOPIC:
-        return ReadTopic.get();
+        return ReadTopic.allow();
 
         // Metalake
       case CREATE_METALAKE:
-        return CreateMetalake.get();
+        return CreateMetalake.allow();
       case MANAGE_METALAKE:
-        return ManageMetalake.get();
+        return ManageMetalake.allow();
       case USE_METALAKE:
-        return UseMetalake.get();
+        return UseMetalake.allow();
 
         // User
       case ADD_USER:
-        return AddUser.get();
+        return AddUser.allow();
       case REMOVE_USER:
-        return RemoveUser.get();
+        return RemoveUser.allow();
       case GET_USER:
-        return GetUser.get();
+        return GetUser.allow();
 
         // Group
       case ADD_GROUP:
-        return AddGroup.get();
+        return AddGroup.allow();
       case REMOVE_GROUP:
-        return RemoveGroup.get();
+        return RemoveGroup.allow();
       case GET_GROUP:
-        return GetGroup.get();
+        return GetGroup.allow();
 
         // Role
       case CREATE_ROLE:
-        return CreateRole.get();
+        return CreateRole.allow();
       case DELETE_ROLE:
-        return DeleteRole.get();
+        return DeleteRole.allow();
       case GRANT_ROLE:
-        return GrantRole.get();
+        return GrantRole.allow();
       case REVOKE_ROLE:
-        return RevokeRole.get();
+        return RevokeRole.allow();
       case GET_ROLE:
-        return GetRole.get();
+        return GetRole.allow();
+
+      default:
+        throw new IllegalArgumentException("Don't support the privilege: " + name);
+    }
+  }
+
+  /**
+   * Returns the Privilege with deny effect from the string representation.
+   *
+   * @param privilege The string representation of the privilege.
+   * @return The Privilege.
+   */
+  public static Privilege denyPrivilegeFromString(String privilege) {
+    Privilege.Name name = Privilege.Name.valueOf(privilege);
+    return denyPrivilegeFromName(name);
+  }
+
+  /**
+   * Returns the Privilege with deny effect from the `Privilege.Name`.
+   *
+   * @param name The `Privilege.Name` of the privilege.
+   * @return The Privilege.
+   */
+  public static Privilege denyPrivilegeFromName(Privilege.Name name) {
+    switch (name) {
+        // Catalog
+      case CREATE_CATALOG:
+        return CreateCatalog.deny();
+      case DROP_CATALOG:
+        return DropCatalog.deny();
+      case ALTER_CATALOG:
+        return AlterCatalog.deny();
+      case USE_CATALOG:
+        return UseCatalog.deny();
+
+        // Schema
+      case CREATE_SCHEMA:
+        return CreateSchema.deny();
+      case DROP_SCHEMA:
+        return DropSchema.deny();
+      case ALTER_SCHEMA:
+        return AlterSchema.deny();
+      case USE_SCHEMA:
+        return UseSchema.deny();
+
+        // Table
+      case CREATE_TABLE:
+        return CreateTable.deny();
+      case DROP_TABLE:
+        return DropTable.deny();
+      case WRITE_TABLE:
+        return WriteTable.deny();
+      case READ_TABLE:
+        return ReadTable.deny();
+
+        // Fileset
+      case CREATE_FILESET:
+        return CreateFileset.deny();
+      case DROP_FILESET:
+        return DropFileset.deny();
+      case WRITE_FILESET:
+        return WriteFileset.deny();
+      case READ_FILESET:
+        return ReadFileset.deny();
+
+        // Topic
+      case CREATE_TOPIC:
+        return CreateTopic.deny();
+      case DROP_TOPIC:
+        return DropTopic.deny();
+      case WRITE_TOPIC:
+        return WriteTopic.deny();
+      case READ_TOPIC:
+        return ReadTopic.deny();
+
+        // Metalake
+      case CREATE_METALAKE:
+        return CreateMetalake.deny();
+      case MANAGE_METALAKE:
+        return ManageMetalake.deny();
+      case USE_METALAKE:
+        return UseMetalake.deny();
+
+        // User
+      case ADD_USER:
+        return AddUser.deny();
+      case REMOVE_USER:
+        return RemoveUser.deny();
+      case GET_USER:
+        return GetUser.deny();
+
+        // Group
+      case ADD_GROUP:
+        return AddGroup.deny();
+      case REMOVE_GROUP:
+        return RemoveGroup.deny();
+      case GET_GROUP:
+        return GetGroup.deny();
+
+        // Role
+      case CREATE_ROLE:
+        return CreateRole.deny();
+      case DELETE_ROLE:
+        return DeleteRole.deny();
+      case GRANT_ROLE:
+        return GrantRole.deny();
+      case REVOKE_ROLE:
+        return RevokeRole.deny();
+      case GET_ROLE:
+        return GetRole.deny();
 
       default:
         throw new IllegalArgumentException("Don't support the privilege: " + name);
@@ -153,15 +263,34 @@ public class Privileges {
   }
 
   /** The privilege to create a catalog. */
-  public static class CreateCatalog implements Privilege {
+  public abstract static class CreateCatalog implements Privilege {
 
-    private static final CreateCatalog INSTANCE = new CreateCatalog();
+    private static final CreateCatalog ALLOW_INSTANCE =
+        new CreateCatalog() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
+
+    private static final CreateCatalog DENY_INSTANCE =
+        new CreateCatalog() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
 
     private CreateCatalog() {}
 
-    /** @return The instance of the privilege. */
-    public static CreateCatalog get() {
-      return INSTANCE;
+    /** @return The instance with allow effect of the privilege. */
+    public static CreateCatalog allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static CreateCatalog deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -173,20 +302,39 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "create catalog";
+      return effect().name() + " create catalog";
     }
   }
 
   /** The privilege to alter a catalog. */
-  public static class AlterCatalog implements Privilege {
+  public abstract static class AlterCatalog implements Privilege {
 
-    private static final AlterCatalog INSTANCE = new AlterCatalog();
+    private static final AlterCatalog ALLOW_INSTANCE =
+        new AlterCatalog() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
+
+    private static final AlterCatalog DENY_INSTANCE =
+        new AlterCatalog() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
 
     private AlterCatalog() {}
 
-    /** @return The instance of the privilege. */
-    public static AlterCatalog get() {
-      return INSTANCE;
+    /** @return The instance with allow effect of the privilege. */
+    public static AlterCatalog allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static AlterCatalog deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -198,20 +346,39 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "alter catalog";
+      return effect().name() + " alter catalog";
     }
   }
 
   /** The privilege to drop a catalog. */
-  public static class DropCatalog implements Privilege {
+  public abstract static class DropCatalog implements Privilege {
 
-    private static final DropCatalog INSTANCE = new DropCatalog();
+    private static final DropCatalog ALLOW_INSTANCE =
+        new DropCatalog() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
+
+    private static final DropCatalog DENY_INSTANCE =
+        new DropCatalog() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
 
     private DropCatalog() {}
 
-    /** @return The instance of the privilege. */
-    public static DropCatalog get() {
-      return INSTANCE;
+    /** @return The instance with allow effect of the privilege. */
+    public static DropCatalog allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static DropCatalog deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -223,20 +390,39 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "drop catalog";
+      return effect().name() + " drop catalog";
     }
   }
 
   /** The privilege to use a catalog. */
-  public static class UseCatalog implements Privilege {
-    private static final UseCatalog INSTANCE = new UseCatalog();
+  public abstract static class UseCatalog implements Privilege {
+    private static final UseCatalog ALLOW_INSTANCE =
+        new UseCatalog() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
 
-    /** @return The instance of the privilege. */
-    public static UseCatalog get() {
-      return INSTANCE;
-    }
+    private static final UseCatalog DENY_INSTANCE =
+        new UseCatalog() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
 
     private UseCatalog() {}
+
+    /** @return The instance with allow effect of the privilege. */
+    public static UseCatalog allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static UseCatalog deny() {
+      return DENY_INSTANCE;
+    }
 
     /** @return The generic name of the privilege. */
     @Override
@@ -247,18 +433,39 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "use catalog";
+      return effect().name() + " use catalog";
     }
   }
 
   /** The privilege to use a schema. */
-  public static class UseSchema implements Privilege {
+  public abstract static class UseSchema implements Privilege {
 
-    private static final UseSchema INSTANCE = new UseSchema();
+    private static final UseSchema ALLOW_INSTANCE =
+        new UseSchema() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
 
-    /** @return The instance of the privilege. */
-    public static UseSchema get() {
-      return INSTANCE;
+    private static final UseSchema DENY_INSTANCE =
+        new UseSchema() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
+
+    private UseSchema() {}
+
+    /** @return The instance with allow effect of the privilege. */
+    public static UseSchema allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static UseSchema deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -270,18 +477,39 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "use schema";
+      return effect().name() + " use schema";
     }
   }
 
   /** The privilege to create a schema. */
-  public static class CreateSchema implements Privilege {
+  public abstract static class CreateSchema implements Privilege {
 
-    private static final CreateSchema INSTANCE = new CreateSchema();
+    private static final CreateSchema ALLOW_INSTANCE =
+        new CreateSchema() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
 
-    /** @return The instance of the privilege. */
-    public static CreateSchema get() {
-      return INSTANCE;
+    private static final CreateSchema DENY_INSTANCE =
+        new CreateSchema() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
+
+    private CreateSchema() {}
+
+    /** @return The instance with allow effect of the privilege. */
+    public static CreateSchema allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static CreateSchema deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -293,18 +521,39 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "create schema";
+      return effect().name() + " create schema";
     }
   }
 
   /** The privilege to alter a schema. */
-  public static class AlterSchema implements Privilege {
+  public abstract static class AlterSchema implements Privilege {
 
-    private static final AlterSchema INSTANCE = new AlterSchema();
+    private static final AlterSchema ALLOW_INSTANCE =
+        new AlterSchema() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
 
-    /** @return The instance of the privilege. */
-    public static AlterSchema get() {
-      return INSTANCE;
+    private static final AlterSchema DENY_INSTANCE =
+        new AlterSchema() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
+
+    private AlterSchema() {}
+
+    /** @return The instance with allow effect of the privilege. */
+    public static AlterSchema allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static AlterSchema deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -316,18 +565,39 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "alter schema";
+      return effect().name() + " alter schema";
     }
   }
 
   /** The privilege to drop a schema. */
-  public static class DropSchema implements Privilege {
+  public abstract static class DropSchema implements Privilege {
 
-    private static final DropSchema INSTANCE = new DropSchema();
+    private static final DropSchema ALLOW_INSTANCE =
+        new DropSchema() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
 
-    /** @return The instance of the privilege. */
-    public static DropSchema get() {
-      return INSTANCE;
+    private static final DropSchema DENY_INSTANCE =
+        new DropSchema() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
+
+    private DropSchema() {}
+
+    /** @return The instance with allow effect of the privilege. */
+    public static DropSchema allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static DropSchema deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -339,20 +609,39 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "drop schema";
+      return effect().name() + " drop schema";
     }
   }
 
   /** The privilege to create a table. */
-  public static class CreateTable implements Privilege {
+  public abstract static class CreateTable implements Privilege {
 
-    private static final CreateTable INSTANCE = new CreateTable();
+    private static final CreateTable ALLOW_INSTANCE =
+        new CreateTable() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
+
+    private static final CreateTable DENY_INSTANCE =
+        new CreateTable() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
 
     private CreateTable() {}
 
-    /** @return The instance of the privilege. */
-    public static CreateTable get() {
-      return INSTANCE;
+    /** @return The instance with allow effect of the privilege. */
+    public static CreateTable allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static CreateTable deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -364,20 +653,37 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "create table";
+      return effect().name() + " create table";
     }
   }
 
   /** The privilege to drop a table. */
-  public static class DropTable implements Privilege {
+  public abstract static class DropTable implements Privilege {
 
-    private static final DropTable INSTANCE = new DropTable();
+    private static final DropTable ALLOW_INSTANCE =
+        new DropTable() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
 
-    private DropTable() {}
+    private static final DropTable DENY_INSTANCE =
+        new DropTable() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
 
-    /** @return The instance of the privilege. */
-    public static DropTable get() {
-      return INSTANCE;
+    /** @return The instance with allow effect of the privilege. */
+    public static DropTable allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static DropTable deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -389,20 +695,37 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "drop table";
+      return effect().name() + " drop table";
     }
   }
 
   /** The privilege to read a table. */
-  public static class ReadTable implements Privilege {
+  public abstract static class ReadTable implements Privilege {
 
-    private static final ReadTable INSTANCE = new ReadTable();
+    private static final ReadTable ALLOW_INSTANCE =
+        new ReadTable() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
 
-    private ReadTable() {}
+    private static final ReadTable DENY_INSTANCE =
+        new ReadTable() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
 
-    /** @return The instance of the privilege. */
-    public static ReadTable get() {
-      return INSTANCE;
+    /** @return The instance with allow effect of the privilege. */
+    public static ReadTable allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static ReadTable deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -414,20 +737,37 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "read table";
+      return effect().name() + " read table";
     }
   }
 
   /** The privilege to write a table. */
-  public static class WriteTable implements Privilege {
+  public abstract static class WriteTable implements Privilege {
 
-    private static final WriteTable INSTANCE = new WriteTable();
+    private static final WriteTable ALLOW_INSTANCE =
+        new WriteTable() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
 
-    private WriteTable() {}
+    private static final WriteTable DENY_INSTANCE =
+        new WriteTable() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
 
-    /** @return The instance of the privilege. */
-    public static WriteTable get() {
-      return INSTANCE;
+    /** @return The instance with allow effect of the privilege. */
+    public static WriteTable allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static WriteTable deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -439,20 +779,37 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "write table";
+      return effect().name() + " write table";
     }
   }
 
   /** The privilege to create a fileset. */
-  public static class CreateFileset implements Privilege {
+  public abstract static class CreateFileset implements Privilege {
 
-    private static final CreateFileset INSTANCE = new CreateFileset();
+    private static final CreateFileset ALLOW_INSTANCE =
+        new CreateFileset() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
 
-    private CreateFileset() {}
+    private static final CreateFileset DENY_INSTANCE =
+        new CreateFileset() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
 
-    /** @return The instance of the privilege. */
-    public static CreateFileset get() {
-      return INSTANCE;
+    /** @return The instance with allow effect of the privilege. */
+    public static CreateFileset allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static CreateFileset deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -464,20 +821,37 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "create fileset";
+      return effect().name() + " create fileset";
     }
   }
 
   /** The privilege to drop a fileset. */
-  public static class DropFileset implements Privilege {
+  public abstract static class DropFileset implements Privilege {
 
-    private static final DropFileset INSTANCE = new DropFileset();
+    private static final DropFileset ALLOW_INSTANCE =
+        new DropFileset() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
 
-    private DropFileset() {}
+    private static final DropFileset DENY_INSTANCE =
+        new DropFileset() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
 
-    /** @return The instance of the privilege. */
-    public static DropFileset get() {
-      return INSTANCE;
+    /** @return The instance with allow effect of the privilege. */
+    public static DropFileset allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static DropFileset deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -489,20 +863,37 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "drop fileset";
+      return effect().name() + " drop fileset";
     }
   }
 
   /** The privilege to read a fileset. */
-  public static class ReadFileset implements Privilege {
+  public abstract static class ReadFileset implements Privilege {
 
-    private static final ReadFileset INSTANCE = new ReadFileset();
+    private static final ReadFileset ALLOW_INSTANCE =
+        new ReadFileset() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
 
-    private ReadFileset() {}
+    private static final ReadFileset DENY_INSTANCE =
+        new ReadFileset() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
 
-    /** @return The instance of the privilege. */
-    public static ReadFileset get() {
-      return INSTANCE;
+    /** @return The instance with allow effect of the privilege. */
+    public static ReadFileset allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static ReadFileset deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -514,20 +905,37 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "read fileset";
+      return effect().name() + " read fileset";
     }
   }
 
   /** The privilege to write a fileset. */
-  public static class WriteFileset implements Privilege {
+  public abstract static class WriteFileset implements Privilege {
 
-    private static final WriteFileset INSTANCE = new WriteFileset();
+    private static final WriteFileset ALLOW_INSTANCE =
+        new WriteFileset() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
 
-    private WriteFileset() {}
+    private static final WriteFileset DENY_INSTANCE =
+        new WriteFileset() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
 
-    /** @return The instance of the privilege. */
-    public static WriteFileset get() {
-      return INSTANCE;
+    /** @return The instance with allow effect of the privilege. */
+    public static WriteFileset allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static WriteFileset deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -539,20 +947,39 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "write fileset";
+      return effect().name() + " write fileset";
     }
   }
 
   /** The privilege to create a topic. */
-  public static class CreateTopic implements Privilege {
+  public abstract static class CreateTopic implements Privilege {
 
-    private static final CreateTopic INSTANCE = new CreateTopic();
+    private static final CreateTopic ALLOW_INSTANCE =
+        new CreateTopic() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
+
+    private static final CreateTopic DENY_INSTANCE =
+        new CreateTopic() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
 
     private CreateTopic() {}
 
-    /** @return The instance of the privilege. */
-    public static CreateTopic get() {
-      return INSTANCE;
+    /** @return The instance with allow effect of the privilege. */
+    public static CreateTopic allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static CreateTopic deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -564,20 +991,37 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "create topic";
+      return effect().name() + " create topic";
     }
   }
 
   /** The privilege to drop a topic. */
-  public static class DropTopic implements Privilege {
+  public abstract static class DropTopic implements Privilege {
 
-    private static final DropTopic INSTANCE = new DropTopic();
+    private static final DropTopic ALLOW_INSTANCE =
+        new DropTopic() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
 
-    private DropTopic() {}
+    private static final DropTopic DENY_INSTANCE =
+        new DropTopic() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
 
-    /** @return The instance of the privilege. */
-    public static DropTopic get() {
-      return INSTANCE;
+    /** @return The instance with allow effect of the privilege. */
+    public static DropTopic allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static DropTopic deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -589,20 +1033,37 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "drop topic";
+      return effect().name() + " drop topic";
     }
   }
 
   /** The privilege to read a topic. */
-  public static class ReadTopic implements Privilege {
+  public abstract static class ReadTopic implements Privilege {
 
-    private static final ReadTopic INSTANCE = new ReadTopic();
+    private static final ReadTopic ALLOW_INSTANCE =
+        new ReadTopic() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
 
-    private ReadTopic() {}
+    private static final ReadTopic DENY_INSTANCE =
+        new ReadTopic() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
 
-    /** @return The instance of the privilege. */
-    public static ReadTopic get() {
-      return INSTANCE;
+    /** @return The instance with allow effect of the privilege. */
+    public static ReadTopic allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static ReadTopic deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -614,20 +1075,37 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "read topic";
+      return effect().name() + " read topic";
     }
   }
 
   /** The privilege to write a topic. */
-  public static class WriteTopic implements Privilege {
+  public abstract static class WriteTopic implements Privilege {
 
-    private static final WriteTopic INSTANCE = new WriteTopic();
+    private static final WriteTopic ALLOW_INSTANCE =
+        new WriteTopic() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
 
-    private WriteTopic() {}
+    private static final WriteTopic DENY_INSTANCE =
+        new WriteTopic() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
 
-    /** @return The instance of the privilege. */
-    public static WriteTopic get() {
-      return INSTANCE;
+    /** @return The instance with allow effect of the privilege. */
+    public static WriteTopic allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static WriteTopic deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -639,20 +1117,37 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "write topic";
+      return effect().name() + " write topic";
     }
   }
 
   /** The privilege to manage a metalake. */
-  public static class ManageMetalake implements Privilege {
+  public abstract static class ManageMetalake implements Privilege {
 
-    private static final ManageMetalake INSTANCE = new ManageMetalake();
+    private static final ManageMetalake ALLOW_INSTANCE =
+        new ManageMetalake() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
 
-    private ManageMetalake() {}
+    private static final ManageMetalake DENY_INSTANCE =
+        new ManageMetalake() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
 
-    /** @return The instance of the privilege. */
-    public static ManageMetalake get() {
-      return INSTANCE;
+    /** @return The instance with allow effect of the privilege. */
+    public static ManageMetalake allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static ManageMetalake deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -664,20 +1159,37 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "manage metalake";
+      return effect().name() + " manage metalake";
     }
   }
 
   /** The privilege to manage a metalake. */
-  public static class CreateMetalake implements Privilege {
+  public abstract static class CreateMetalake implements Privilege {
 
-    private static final CreateMetalake INSTANCE = new CreateMetalake();
+    private static final CreateMetalake ALLOW_INSTANCE =
+        new CreateMetalake() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
 
-    private CreateMetalake() {}
+    private static final CreateMetalake DENY_INSTANCE =
+        new CreateMetalake() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
 
-    /** @return The instance of the privilege. */
-    public static CreateMetalake get() {
-      return INSTANCE;
+    /** @return The instance with allow effect of the privilege. */
+    public static CreateMetalake allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static CreateMetalake deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -689,20 +1201,39 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "create metalake";
+      return effect().name() + " create metalake";
     }
   }
 
   /** The privilege to use a metalake. */
-  public static class UseMetalake implements Privilege {
+  public abstract static class UseMetalake implements Privilege {
 
-    private static final UseMetalake INSTANCE = new UseMetalake();
+    private static final UseMetalake ALLOW_INSTANCE =
+        new UseMetalake() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
+
+    private static final UseMetalake DENY_INSTANCE =
+        new UseMetalake() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
 
     private UseMetalake() {}
 
-    /** @return The instance of the privilege. */
-    public static UseMetalake get() {
-      return INSTANCE;
+    /** @return The instance with allow effect of the privilege. */
+    public static UseMetalake allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static UseMetalake deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -714,20 +1245,37 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "use metalake";
+      return effect().name() + " use metalake";
     }
   }
 
   /** The privilege to get a user. */
-  public static class GetUser implements Privilege {
+  public abstract static class GetUser implements Privilege {
 
-    private static final GetUser INSTANCE = new GetUser();
+    private static final GetUser ALLOW_INSTANCE =
+        new GetUser() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
 
-    private GetUser() {}
+    private static final GetUser DENY_INSTANCE =
+        new GetUser() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
 
-    /** @return The instance of the privilege. */
-    public static GetUser get() {
-      return INSTANCE;
+    /** @return The instance with allow effect of the privilege. */
+    public static GetUser allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static GetUser deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -739,20 +1287,39 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "get user";
+      return effect().name() + " get user";
     }
   }
 
   /** The privilege to add a user. */
-  public static class AddUser implements Privilege {
+  public abstract static class AddUser implements Privilege {
 
-    private static final AddUser INSTANCE = new AddUser();
+    private static final AddUser ALLOW_INSTANCE =
+        new AddUser() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
+
+    private static final AddUser DENY_INSTANCE =
+        new AddUser() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
 
     private AddUser() {}
 
-    /** @return The instance of the privilege. */
-    public static AddUser get() {
-      return INSTANCE;
+    /** @return The instance with allow effect of the privilege. */
+    public static AddUser allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static AddUser deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -764,20 +1331,37 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "add user";
+      return effect().name() + " add user";
     }
   }
 
   /** The privilege to remove a user. */
-  public static class RemoveUser implements Privilege {
+  public abstract static class RemoveUser implements Privilege {
 
-    private static final RemoveUser INSTANCE = new RemoveUser();
+    private static final RemoveUser ALLOW_INSTANCE =
+        new RemoveUser() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
 
-    private RemoveUser() {}
+    private static final RemoveUser DENY_INSTANCE =
+        new RemoveUser() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
 
-    /** @return The instance of the privilege. */
-    public static RemoveUser get() {
-      return INSTANCE;
+    /** @return The instance with allow effect of the privilege. */
+    public static RemoveUser allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static RemoveUser deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -789,20 +1373,39 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "remove user";
+      return effect().name() + " remove user";
     }
   }
 
   /** The privilege to add a group. */
-  public static class AddGroup implements Privilege {
+  public abstract static class AddGroup implements Privilege {
 
-    private static final AddGroup INSTANCE = new AddGroup();
+    private static final AddGroup ALLOW_INSTANCE =
+        new AddGroup() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
+
+    private static final AddGroup DENY_INSTANCE =
+        new AddGroup() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
 
     private AddGroup() {}
 
-    /** @return The instance of the privilege. */
-    public static AddGroup get() {
-      return INSTANCE;
+    /** @return The instance with allow effect of the privilege. */
+    public static AddGroup allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static AddGroup deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -814,20 +1417,39 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "add group";
+      return effect().name() + " add group";
     }
   }
 
   /** The privilege to remove a group. */
-  public static class RemoveGroup implements Privilege {
+  public abstract static class RemoveGroup implements Privilege {
 
-    private static final RemoveGroup INSTANCE = new RemoveGroup();
+    private static final RemoveGroup ALLOW_INSTANCE =
+        new RemoveGroup() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
+
+    private static final RemoveGroup DENY_INSTANCE =
+        new RemoveGroup() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
 
     private RemoveGroup() {}
 
-    /** @return The instance of the privilege. */
-    public static RemoveGroup get() {
-      return INSTANCE;
+    /** @return The instance with allow effect of the privilege. */
+    public static RemoveGroup allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static RemoveGroup deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -839,20 +1461,39 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "remove group";
+      return effect().name() + " remove group";
     }
   }
 
   /** The privilege to get a group. */
-  public static class GetGroup implements Privilege {
+  public abstract static class GetGroup implements Privilege {
 
-    private static final GetGroup INSTANCE = new GetGroup();
+    private static final GetGroup ALLOW_INSTANCE =
+        new GetGroup() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
+
+    private static final GetGroup DENY_INSTANCE =
+        new GetGroup() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
 
     private GetGroup() {}
 
-    /** @return The instance of the privilege. */
-    public static GetGroup get() {
-      return INSTANCE;
+    /** @return The instance with allow effect of the privilege. */
+    public static GetGroup allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static GetGroup deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -864,20 +1505,37 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "get group";
+      return effect().name() + " get group";
     }
   }
 
   /** The privilege to create a role. */
-  public static class CreateRole implements Privilege {
+  public abstract static class CreateRole implements Privilege {
 
-    private static final CreateRole INSTANCE = new CreateRole();
+    private static final CreateRole ALLOW_INSTANCE =
+        new CreateRole() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
 
-    private CreateRole() {}
+    private static final CreateRole DENY_INSTANCE =
+        new CreateRole() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
 
-    /** @return The instance of the privilege. */
-    public static CreateRole get() {
-      return INSTANCE;
+    /** @return The instance with allow effect of the privilege. */
+    public static CreateRole allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static CreateRole deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -889,20 +1547,39 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "create role";
+      return effect().name() + " create role";
     }
   }
 
   /** The privilege to get a role. */
-  public static class GetRole implements Privilege {
+  public abstract static class GetRole implements Privilege {
 
-    private static final GetRole INSTANCE = new GetRole();
+    private static final GetRole ALLOW_INSTANCE =
+        new GetRole() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
+
+    private static final GetRole DENY_INSTANCE =
+        new GetRole() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
 
     private GetRole() {}
 
-    /** @return The instance of the privilege. */
-    public static GetRole get() {
-      return INSTANCE;
+    /** @return The instance with allow effect of the privilege. */
+    public static GetRole allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static GetRole deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -914,20 +1591,39 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "get role";
+      return effect().name() + " get role";
     }
   }
 
   /** The privilege to delete a role. */
-  public static class DeleteRole implements Privilege {
+  public abstract static class DeleteRole implements Privilege {
 
-    private static final DeleteRole INSTANCE = new DeleteRole();
+    private static final DeleteRole ALLOW_INSTANCE =
+        new DeleteRole() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
+
+    private static final DeleteRole DENY_INSTANCE =
+        new DeleteRole() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
 
     private DeleteRole() {}
 
-    /** @return The instance of the privilege. */
-    public static DeleteRole get() {
-      return INSTANCE;
+    /** @return The instance with allow effect of the privilege. */
+    public static DeleteRole allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static DeleteRole deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -939,20 +1635,39 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "delete role";
+      return effect().name() + " delete role";
     }
   }
 
   /** The privilege to grant a role to the user or the group. */
-  public static class GrantRole implements Privilege {
+  public abstract static class GrantRole implements Privilege {
 
-    private static final GrantRole INSTANCE = new GrantRole();
+    private static final GrantRole ALLOW_INSTANCE =
+        new GrantRole() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
+
+    private static final GrantRole DENY_INSTANCE =
+        new GrantRole() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
 
     private GrantRole() {}
 
-    /** @return The instance of the privilege. */
-    public static GrantRole get() {
-      return INSTANCE;
+    /** @return The instance with allow effect of the privilege. */
+    public static GrantRole allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static GrantRole deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -964,20 +1679,39 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "grant role";
+      return effect().name() + " grant role";
     }
   }
 
   /** The privilege to revoke a role from the user or the group. */
-  public static class RevokeRole implements Privilege {
+  public abstract static class RevokeRole implements Privilege {
 
-    private static final RevokeRole INSTANCE = new RevokeRole();
+    private static final RevokeRole ALLOW_INSTANCE =
+        new RevokeRole() {
+          @Override
+          public Effect effect() {
+            return Effect.ALLOW;
+          }
+        };
+
+    private static final RevokeRole DENY_INSTANCE =
+        new RevokeRole() {
+          @Override
+          public Effect effect() {
+            return Effect.DENY;
+          }
+        };
 
     private RevokeRole() {}
 
-    /** @return The instance of the privilege. */
-    public static RevokeRole get() {
-      return INSTANCE;
+    /** @return The instance with allow effect of the privilege. */
+    public static RevokeRole allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny effect of the privilege. */
+    public static RevokeRole deny() {
+      return DENY_INSTANCE;
     }
 
     /** @return The generic name of the privilege. */
@@ -989,7 +1723,7 @@ public class Privileges {
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
-      return "revoke role";
+      return effect().name() + " revoke role";
     }
   }
 }

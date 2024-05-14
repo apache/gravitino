@@ -17,8 +17,10 @@ import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.Role;
+import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.dto.authorization.RoleDTO;
+import com.datastrato.gravitino.dto.authorization.SecurableObjectDTO;
 import com.datastrato.gravitino.dto.requests.RoleCreateRequest;
 import com.datastrato.gravitino.dto.responses.DeleteResponse;
 import com.datastrato.gravitino.dto.responses.ErrorConstants;
@@ -97,15 +99,17 @@ public class TestRoleOperations extends JerseyTest {
 
   @Test
   public void testCreateRole() {
+    SecurableObject securableObject = SecurableObjects.ofCatalog("catalog");
+    securableObject.bindPrivileges(Lists.newArrayList(Privileges.UseCatalog.allow()));
+
     RoleCreateRequest req =
         new RoleCreateRequest(
             "role",
             Collections.emptyMap(),
-            Lists.newArrayList(Privileges.UseCatalog.get().name().toString()),
-            DTOConverters.toDTO(SecurableObjects.ofCatalog("catalog")));
+            new SecurableObjectDTO[] {DTOConverters.toDTO(securableObject)});
     Role role = buildRole("role1");
 
-    when(manager.createRole(any(), any(), any(), any(), any())).thenReturn(role);
+    when(manager.createRole(any(), any(), any(), any())).thenReturn(role);
 
     Response resp =
         target("/metalakes/metalake1/roles")
@@ -122,13 +126,20 @@ public class TestRoleOperations extends JerseyTest {
     RoleDTO roleDTO = roleResponse.getRole();
     Assertions.assertEquals("role1", roleDTO.name());
     Assertions.assertEquals(
-        SecurableObjects.ofCatalog("catalog").fullName(), roleDTO.securableObject().fullName());
-    Assertions.assertEquals(Lists.newArrayList(Privileges.UseCatalog.get()), roleDTO.privileges());
+        SecurableObjects.ofCatalog("catalog").fullName(),
+        roleDTO.securableObjects().get(0).fullName());
+    Assertions.assertEquals(1, roleDTO.securableObjects().get(0).privileges().size());
+    Assertions.assertEquals(
+        Privileges.UseCatalog.allow().name(),
+        roleDTO.securableObjects().get(0).privileges().get(0).name());
+    Assertions.assertEquals(
+        Privileges.UseCatalog.allow().effect(),
+        roleDTO.securableObjects().get(0).privileges().get(0).effect());
 
     // Test to throw NoSuchMetalakeException
     doThrow(new NoSuchMetalakeException("mock error"))
         .when(manager)
-        .createRole(any(), any(), any(), any(), any());
+        .createRole(any(), any(), any(), any());
     Response resp1 =
         target("/metalakes/metalake1/roles")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -145,7 +156,7 @@ public class TestRoleOperations extends JerseyTest {
     // Test to throw RoleAlreadyExistsException
     doThrow(new RoleAlreadyExistsException("mock error"))
         .when(manager)
-        .createRole(any(), any(), any(), any(), any());
+        .createRole(any(), any(), any(), any());
     Response resp2 =
         target("/metalakes/metalake1/roles")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -162,7 +173,7 @@ public class TestRoleOperations extends JerseyTest {
     // Test to throw internal RuntimeException
     doThrow(new RuntimeException("mock error"))
         .when(manager)
-        .createRole(any(), any(), any(), any(), any());
+        .createRole(any(), any(), any(), any());
     Response resp3 =
         target("/metalakes/metalake1/roles")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -197,8 +208,15 @@ public class TestRoleOperations extends JerseyTest {
     Assertions.assertEquals("role1", roleDTO.name());
     Assertions.assertTrue(role.properties().isEmpty());
     Assertions.assertEquals(
-        SecurableObjects.ofCatalog("catalog").fullName(), roleDTO.securableObject().fullName());
-    Assertions.assertEquals(Lists.newArrayList(Privileges.UseCatalog.get()), roleDTO.privileges());
+        SecurableObjects.ofCatalog("catalog").fullName(),
+        roleDTO.securableObjects().get(0).fullName());
+    Assertions.assertEquals(1, roleDTO.securableObjects().get(0).privileges().size());
+    Assertions.assertEquals(
+        Privileges.UseCatalog.allow().name(),
+        roleDTO.securableObjects().get(0).privileges().get(0).name());
+    Assertions.assertEquals(
+        Privileges.UseCatalog.allow().effect(),
+        roleDTO.securableObjects().get(0).privileges().get(0).effect());
 
     // Test to throw NoSuchMetalakeException
     doThrow(new NoSuchMetalakeException("mock error")).when(manager).getRole(any(), any());
@@ -245,12 +263,13 @@ public class TestRoleOperations extends JerseyTest {
   }
 
   private Role buildRole(String role) {
+    SecurableObject catalog = SecurableObjects.ofCatalog("catalog");
+    catalog.bindPrivileges(Lists.newArrayList(Privileges.UseCatalog.allow()));
     return RoleEntity.builder()
         .withId(1L)
         .withName(role)
-        .withPrivileges(Lists.newArrayList(Privileges.UseCatalog.get()))
         .withProperties(Collections.emptyMap())
-        .withSecurableObject(SecurableObjects.ofCatalog("catalog"))
+        .withSecurableObject(catalog)
         .withAuditInfo(
             AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .build();

@@ -19,6 +19,12 @@ public interface Privilege {
   /** @return A readable string representation for the privilege. */
   String simpleString();
 
+  /**
+   * @return The effect of the privilege. `ALLOW` means that you are allowed to use the privilege,
+   *     `DENY` means that you are denied to use the privilege
+   */
+  Effect effect();
+
   /** The name of this privilege. */
   enum Name {
     /** The privilege to create a catalog. */
@@ -115,5 +121,17 @@ public interface Privilege {
     public long getHighBits() {
       return highBits;
     }
+  }
+
+  /**
+   * The effect of this privilege. `ALLOW` means that you are allowed to use the privilege, `DENY`
+   * means that you are denied to use the privilege. If you have `ALLOW` and `DENY` for the same
+   * privilege name of the same securable object, the `DENY` will take effect.
+   */
+  enum Effect {
+    /** Allow to use the privilege */
+    ALLOW,
+    /** Deny to use the privilege */
+    DENY
   }
 }

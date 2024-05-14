@@ -72,11 +72,7 @@ class RoleManager {
   }
 
   RoleEntity createRole(
-      String metalake,
-      String role,
-      Map<String, String> properties,
-      SecurableObject securableObject,
-      List<Privilege> privileges)
+      String metalake, String role, Map<String, String> properties, SecurableObject securableObject)
       throws RoleAlreadyExistsException {
     AuthorizationUtils.checkMetalakeExists(metalake);
     RoleEntity roleEntity =
@@ -85,7 +81,6 @@ class RoleManager {
             .withName(role)
             .withProperties(properties)
             .withSecurableObject(securableObject)
-            .withPrivileges(privileges)
             .withNamespace(AuthorizationUtils.ofRoleNamespace(metalake))
             .withAuditInfo(
                 AuditInfo.builder()

@@ -31,6 +31,7 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.authorization.AuthorizationUtils;
 import com.datastrato.gravitino.authorization.Privileges;
+import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
@@ -1261,13 +1262,15 @@ public class TestEntityStorage {
   }
 
   private static RoleEntity createRole(Long id, String metalake, String name, AuditInfo auditInfo) {
+    SecurableObject securableObject = SecurableObjects.ofCatalog("catalog");
+    securableObject.bindPrivileges(Lists.newArrayList(Privileges.UseCatalog.allow()));
+
     return RoleEntity.builder()
         .withId(id)
         .withNamespace(AuthorizationUtils.ofRoleNamespace(metalake))
         .withName(name)
         .withAuditInfo(auditInfo)
-        .withSecurableObject(SecurableObjects.ofCatalog("catalog"))
-        .withPrivileges(Lists.newArrayList(Privileges.UseCatalog.get()))
+        .withSecurableObject(securableObject)
         .withProperties(null)
         .build();
   }

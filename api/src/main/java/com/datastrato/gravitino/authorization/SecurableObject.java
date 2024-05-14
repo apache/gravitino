@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.authorization;
 
 import com.datastrato.gravitino.annotation.Unstable;
+import java.util.List;
 import javax.annotation.Nullable;
 
 /**
@@ -72,6 +73,22 @@ public interface SecurableObject {
    * @return The type of securable object.
    */
   Type type();
+
+  /**
+   * The privileges of the securable object. For example: If the securable object is a table, the
+   * privileges could be `READ TABLE`, `WRITE TABLE`, etc. If a schema has the privilege of `LOAD
+   * TABLE`. It means the role can all tables of the schema.
+   *
+   * @return The privileges of the role.
+   */
+  List<Privilege> privileges();
+
+  /**
+   * After creating the securable object, you can bind some privileges for this securable object.
+   *
+   * @param privileges The privileges will bind to the securable object.
+   */
+  void bindPrivileges(List<Privilege> privileges);
 
   /**
    * The type of securable object in the Gravitino system. Every type will map one kind of the

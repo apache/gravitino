@@ -4,7 +4,9 @@
  */
 package com.datastrato.gravitino.authorization;
 
+import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import java.util.Collections;
@@ -146,6 +148,7 @@ public class SecurableObjects {
     private final SecurableObject parent;
     private final String name;
     private final Type type;
+    private List<Privilege> privileges;
 
     SecurableObjectImpl(SecurableObject parent, String name, Type type) {
       this.parent = parent;
@@ -174,8 +177,20 @@ public class SecurableObjects {
     }
 
     @Override
+    public List<Privilege> privileges() {
+      return privileges;
+    }
+
+    @Override
+    public void bindPrivileges(List<Privilege> privileges) {
+      Preconditions.checkArgument(
+          privileges != null && !privileges.isEmpty(), "Privileges can't be null or empty");
+      this.privileges = ImmutableList.copyOf(privileges);
+    }
+
+    @Override
     public int hashCode() {
-      return Objects.hash(parent, name, type);
+      return Objects.hash(parent, name, type, privileges);
     }
 
     @Override
@@ -196,7 +211,8 @@ public class SecurableObjects {
       SecurableObject otherSecurableObject = (SecurableObject) other;
       return Objects.equals(parent, otherSecurableObject.parent())
           && Objects.equals(name, otherSecurableObject.name())
-          && Objects.equals(type, otherSecurableObject.type());
+          && Objects.equals(type, otherSecurableObject.type())
+          && Objects.equals(privileges, otherSecurableObject.privileges());
     }
   }
 
