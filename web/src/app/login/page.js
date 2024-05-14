@@ -67,7 +67,7 @@ const LoginPage = () => {
           <CardContent className={`twc-p-12`}>
             <Box className={`twc-mb-8 twc-flex twc-items-center twc-justify-center`}>
               <Image
-                src={`${process.env.NEXT_PUBLIC_BASE_PATH}/icons/gravitino.svg`}
+                src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/icons/gravitino.svg`}
                 width={24}
                 height={24}
                 alt='logo'

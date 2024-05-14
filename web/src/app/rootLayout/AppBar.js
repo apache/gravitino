@@ -70,7 +70,7 @@ const AppBar = () => {
           >
             <Link href='/metalakes' className={'twc-flex twc-items-center twc-no-underline twc-mr-8'}>
               <Image
-                src={process.env.NEXT_PUBLIC_BASE_PATH + '/icons/gravitino.svg'}
+                src={process.env.NEXT_PUBLIC_BASE_PATH ?? '' + '/icons/gravitino.svg'}
                 width={32}
                 height={32}
                 alt='logo'
