@@ -563,7 +563,7 @@ public class CatalogsPage extends AbstractWebIT {
       new WebDriverWait(driver, MAX_TIMEOUT)
           .until(ExpectedConditions.visibilityOfElementLocated(By.xpath(xpath)));
       List<String> texts = new ArrayList<>();
-      for (WebElement text: tooltipItems) {
+      for (WebElement text : tooltipItems) {
         texts.add(text.getText());
       }
       if (!texts.contains(formattedColName)) {
@@ -589,7 +589,7 @@ public class CatalogsPage extends AbstractWebIT {
         texts.add(text.getText());
       }
       List<String> colsTexts = new ArrayList<>();
-      for (String col: cols) {
+      for (String col : cols) {
         colsTexts.add(col + " desc nulls_last");
       }
       if (!isMatchText || !texts.containsAll(colsTexts)) {
