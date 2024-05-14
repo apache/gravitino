@@ -155,7 +155,7 @@ tasks {
     args = listOf("setup.py", "sdist")
 
     doLast {
-//      delete("README.md")
+      delete("README.md")
     }
   }
 
