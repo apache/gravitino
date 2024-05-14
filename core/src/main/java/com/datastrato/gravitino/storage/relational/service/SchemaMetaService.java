@@ -158,64 +158,59 @@ public class SchemaMetaService {
     NameIdentifier.checkSchema(identifier);
 
     String schemaName = identifier.name();
+    Long catalogId =
+        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
+    Long schemaId = getSchemaIdByCatalogIdAndName(catalogId, schemaName);
 
-    try {
-      Long catalogId =
-          CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
-      Long schemaId = getSchemaIdByCatalogIdAndName(catalogId, schemaName);
-
-      if (schemaId != null) {
-        if (cascade) {
-          SessionUtils.doMultipleWithCommit(
-              () ->
-                  SessionUtils.doWithoutCommit(
-                      SchemaMetaMapper.class,
-                      mapper -> mapper.softDeleteSchemaMetasBySchemaId(schemaId)),
-              () ->
-                  SessionUtils.doWithoutCommit(
-                      TableMetaMapper.class,
-                      mapper -> mapper.softDeleteTableMetasBySchemaId(schemaId)),
-              () ->
-                  SessionUtils.doWithoutCommit(
-                      FilesetMetaMapper.class,
-                      mapper -> mapper.softDeleteFilesetMetasBySchemaId(schemaId)),
-              () ->
-                  SessionUtils.doWithoutCommit(
-                      FilesetVersionMapper.class,
-                      mapper -> mapper.softDeleteFilesetVersionsBySchemaId(schemaId)),
-              () ->
-                  SessionUtils.doWithoutCommit(
-                      TopicMetaMapper.class,
-                      mapper -> mapper.softDeleteTopicMetasBySchemaId(schemaId)));
-        } else {
-          List<TableEntity> tableEntities =
-              TableMetaService.getInstance()
-                  .listTablesByNamespace(
-                      Namespace.ofTable(
-                          identifier.namespace().level(0),
-                          identifier.namespace().level(1),
-                          schemaName));
-          if (!tableEntities.isEmpty()) {
-            throw new NonEmptyEntityException(
-                "Entity %s has sub-entities, you should remove sub-entities first", identifier);
-          }
-          List<FilesetEntity> filesetEntities =
-              FilesetMetaService.getInstance()
-                  .listFilesetsByNamespace(
-                      Namespace.ofFileset(
-                          identifier.namespace().level(0),
-                          identifier.namespace().level(1),
-                          schemaName));
-          if (!filesetEntities.isEmpty()) {
-            throw new NonEmptyEntityException(
-                "Entity %s has sub-entities, you should remove sub-entities first", identifier);
-          }
-          SessionUtils.doWithCommit(
-              SchemaMetaMapper.class, mapper -> mapper.softDeleteSchemaMetasBySchemaId(schemaId));
+    if (schemaId != null) {
+      if (cascade) {
+        SessionUtils.doMultipleWithCommit(
+            () ->
+                SessionUtils.doWithoutCommit(
+                    SchemaMetaMapper.class,
+                    mapper -> mapper.softDeleteSchemaMetasBySchemaId(schemaId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    TableMetaMapper.class,
+                    mapper -> mapper.softDeleteTableMetasBySchemaId(schemaId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    FilesetMetaMapper.class,
+                    mapper -> mapper.softDeleteFilesetMetasBySchemaId(schemaId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    FilesetVersionMapper.class,
+                    mapper -> mapper.softDeleteFilesetVersionsBySchemaId(schemaId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    TopicMetaMapper.class,
+                    mapper -> mapper.softDeleteTopicMetasBySchemaId(schemaId)));
+      } else {
+        List<TableEntity> tableEntities =
+            TableMetaService.getInstance()
+                .listTablesByNamespace(
+                    Namespace.ofTable(
+                        identifier.namespace().level(0),
+                        identifier.namespace().level(1),
+                        schemaName));
+        if (!tableEntities.isEmpty()) {
+          throw new NonEmptyEntityException(
+              "Entity %s has sub-entities, you should remove sub-entities first", identifier);
         }
+        List<FilesetEntity> filesetEntities =
+            FilesetMetaService.getInstance()
+                .listFilesetsByNamespace(
+                    Namespace.ofFileset(
+                        identifier.namespace().level(0),
+                        identifier.namespace().level(1),
+                        schemaName));
+        if (!filesetEntities.isEmpty()) {
+          throw new NonEmptyEntityException(
+              "Entity %s has sub-entities, you should remove sub-entities first", identifier);
+        }
+        SessionUtils.doWithCommit(
+            SchemaMetaMapper.class, mapper -> mapper.softDeleteSchemaMetasBySchemaId(schemaId));
       }
-    } catch (NoSuchEntityException e) {
-      return false;
     }
     return true;
   }

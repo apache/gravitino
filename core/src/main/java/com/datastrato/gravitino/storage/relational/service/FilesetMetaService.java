@@ -199,24 +199,22 @@ public class FilesetMetaService {
 
     String filesetName = identifier.name();
 
-    try {
-      Long schemaId =
-          CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
-      Long filesetId = getFilesetIdBySchemaIdAndName(schemaId, filesetName);
+    Long schemaId =
+        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
 
-      // We should delete meta and version info
-      SessionUtils.doMultipleWithCommit(
-          () ->
-              SessionUtils.doWithoutCommit(
-                  FilesetMetaMapper.class,
-                  mapper -> mapper.softDeleteFilesetMetasByFilesetId(filesetId)),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  FilesetVersionMapper.class,
-                  mapper -> mapper.softDeleteFilesetVersionsByFilesetId(filesetId)));
-    } catch (NoSuchEntityException e) {
-      return false;
-    }
+    Long filesetId = getFilesetIdBySchemaIdAndName(schemaId, filesetName);
+
+    // We should delete meta and version info
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            SessionUtils.doWithoutCommit(
+                FilesetMetaMapper.class,
+                mapper -> mapper.softDeleteFilesetMetasByFilesetId(filesetId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                FilesetVersionMapper.class,
+                mapper -> mapper.softDeleteFilesetVersionsByFilesetId(filesetId)));
+
     return true;
   }
 

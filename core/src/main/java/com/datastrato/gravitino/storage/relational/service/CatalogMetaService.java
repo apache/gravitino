@@ -163,53 +163,50 @@ public class CatalogMetaService {
     NameIdentifier.checkCatalog(identifier);
 
     String catalogName = identifier.name();
+    Long metalakeId =
+        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
 
-    try {
-      Long metalakeId =
-          CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
-      Long catalogId = getCatalogIdByMetalakeIdAndName(metalakeId, catalogName);
+    Long catalogId = getCatalogIdByMetalakeIdAndName(metalakeId, catalogName);
 
-      if (cascade) {
-        SessionUtils.doMultipleWithCommit(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    CatalogMetaMapper.class,
-                    mapper -> mapper.softDeleteCatalogMetasByCatalogId(catalogId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    SchemaMetaMapper.class,
-                    mapper -> mapper.softDeleteSchemaMetasByCatalogId(catalogId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    TableMetaMapper.class,
-                    mapper -> mapper.softDeleteTableMetasByCatalogId(catalogId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    FilesetMetaMapper.class,
-                    mapper -> mapper.softDeleteFilesetMetasByCatalogId(catalogId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    FilesetVersionMapper.class,
-                    mapper -> mapper.softDeleteFilesetVersionsByCatalogId(catalogId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    TopicMetaMapper.class,
-                    mapper -> mapper.softDeleteTopicMetasByCatalogId(catalogId)));
-      } else {
-        List<SchemaEntity> schemaEntities =
-            SchemaMetaService.getInstance()
-                .listSchemasByNamespace(
-                    Namespace.ofSchema(identifier.namespace().level(0), catalogName));
-        if (!schemaEntities.isEmpty()) {
-          throw new NonEmptyEntityException(
-              "Entity %s has sub-entities, you should remove sub-entities first", identifier);
-        }
-        SessionUtils.doWithCommit(
-            CatalogMetaMapper.class, mapper -> mapper.softDeleteCatalogMetasByCatalogId(catalogId));
+    if (cascade) {
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              SessionUtils.doWithoutCommit(
+                  CatalogMetaMapper.class,
+                  mapper -> mapper.softDeleteCatalogMetasByCatalogId(catalogId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  SchemaMetaMapper.class,
+                  mapper -> mapper.softDeleteSchemaMetasByCatalogId(catalogId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  TableMetaMapper.class,
+                  mapper -> mapper.softDeleteTableMetasByCatalogId(catalogId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  FilesetMetaMapper.class,
+                  mapper -> mapper.softDeleteFilesetMetasByCatalogId(catalogId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  FilesetVersionMapper.class,
+                  mapper -> mapper.softDeleteFilesetVersionsByCatalogId(catalogId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  TopicMetaMapper.class,
+                  mapper -> mapper.softDeleteTopicMetasByCatalogId(catalogId)));
+    } else {
+      List<SchemaEntity> schemaEntities =
+          SchemaMetaService.getInstance()
+              .listSchemasByNamespace(
+                  Namespace.ofSchema(identifier.namespace().level(0), catalogName));
+      if (!schemaEntities.isEmpty()) {
+        throw new NonEmptyEntityException(
+            "Entity %s has sub-entities, you should remove sub-entities first", identifier);
       }
-    } catch (NoSuchEntityException e) {
-      return false;
+      SessionUtils.doWithCommit(
+          CatalogMetaMapper.class, mapper -> mapper.softDeleteCatalogMetasByCatalogId(catalogId));
     }
+
     return true;
   }
 
