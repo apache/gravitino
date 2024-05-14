@@ -12,6 +12,8 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Type;
@@ -410,5 +412,73 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
                   String.format(
                       "Couldn't convert Gravitino type %s to Doris type", type.simpleString())));
     }
+  }
+
+  @Test
+  public void testCreateTableWithPartition() {
+    String tableComment = "partition_table_comment";
+    JdbcColumn col1 =
+        JdbcColumn.builder()
+            .withName("col_1")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .build();
+    JdbcColumn col2 =
+        JdbcColumn.builder().withName("col_2").withType(Types.BooleanType.get()).build();
+    JdbcColumn col3 =
+        JdbcColumn.builder().withName("col_3").withType(Types.DoubleType.get()).build();
+    JdbcColumn col4 =
+        JdbcColumn.builder()
+            .withName("col_4")
+            .withType(Types.DateType.get())
+            .withNullable(false)
+            .build();
+    List<JdbcColumn> columns = Arrays.asList(col1, col2, col3, col4);
+    Distribution distribution =
+        Distributions.hash(DEFAULT_BUCKET_SIZE, NamedReference.field("col_1"));
+    Index[] indexes = new Index[] {};
+
+    // create table with range partition
+    String rangePartitionTableName = GravitinoITUtils.genRandomName("range_partition_table");
+    Transform[] rangePartition = new Transform[] {Transforms.range(new String[] {col4.name()})};
+    TABLE_OPERATIONS.create(
+        databaseName,
+        rangePartitionTableName,
+        columns.toArray(new JdbcColumn[] {}),
+        tableComment,
+        createProperties(),
+        rangePartition,
+        distribution,
+        indexes);
+    JdbcTable rangePartitionTable = TABLE_OPERATIONS.load(databaseName, rangePartitionTableName);
+    assertionsTableInfo(
+        rangePartitionTableName,
+        tableComment,
+        columns,
+        Collections.emptyMap(),
+        null,
+        rangePartitionTable);
+
+    // create table with list partition
+    String listPartitionTableName = GravitinoITUtils.genRandomName("list_partition_table");
+    Transform[] listPartition =
+        new Transform[] {Transforms.list(new String[] {col1.name()}, new String[] {col4.name()})};
+    TABLE_OPERATIONS.create(
+        databaseName,
+        listPartitionTableName,
+        columns.toArray(new JdbcColumn[] {}),
+        tableComment,
+        createProperties(),
+        listPartition,
+        distribution,
+        indexes);
+    JdbcTable listPartitionTable = TABLE_OPERATIONS.load(databaseName, listPartitionTableName);
+    assertionsTableInfo(
+        listPartitionTableName,
+        tableComment,
+        columns,
+        Collections.emptyMap(),
+        null,
+        listPartitionTable);
   }
 }
