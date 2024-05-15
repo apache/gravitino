@@ -7,7 +7,14 @@ export const filesetProviders = [
   {
     label: 'hadoop',
     value: 'hadoop',
-    defaultProps: []
+    defaultProps: [
+      {
+        key: 'location',
+        value: '',
+        required: false,
+        description: 'The storage location of the fileset'
+      }
+    ]
   }
 ]
 
