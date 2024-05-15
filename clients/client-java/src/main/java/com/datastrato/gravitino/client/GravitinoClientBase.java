@@ -18,6 +18,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collections;
 import java.util.Map;
+import org.apache.logging.log4j.util.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -101,14 +102,18 @@ public abstract class GravitinoClientBase implements Closeable {
   /**
    * Loads a specific Metalake from the Gravitino API.
    *
-   * @param name The name of the Metalake to be loaded.
+   * @param metalakeName The name of the Metalake to be loaded.
    * @return A GravitinoMetalake instance representing the loaded Metalake.
    * @throws NoSuchMetalakeException If the specified Metalake does not exist.
    */
-  public GravitinoMetalake loadMetalake(String name) throws NoSuchMetalakeException {
+  public GravitinoMetalake loadMetalake(String metalakeName) throws NoSuchMetalakeException {
+    if (Strings.isEmpty(metalakeName)) {
+      throw new IllegalArgumentException("Metalake name cannot be null or empty");
+    }
+
     MetalakeResponse resp =
         restClient.get(
-            API_METALAKES_IDENTIFIER_PATH + name,
+            API_METALAKES_IDENTIFIER_PATH + metalakeName,
             MetalakeResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.metalakeErrorHandler());

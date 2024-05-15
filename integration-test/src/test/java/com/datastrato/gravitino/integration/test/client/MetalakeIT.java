@@ -13,8 +13,6 @@ import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.client.GravitinoMetalake;
-import com.datastrato.gravitino.exceptions.IllegalNameIdentifierException;
-import com.datastrato.gravitino.exceptions.IllegalNamespaceException;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
@@ -84,11 +82,7 @@ public class MetalakeIT extends AbstractIT {
         });
 
     // metalake empty name - note it's NameIdentifier.of("") that fails not the load
-    assertThrows(IllegalNameIdentifierException.class, () -> client.loadMetalake(""));
-
-    // metalake bad name
-    NameIdentifier abc = NameIdentifier.of("A", "B", "C");
-    assertThrows(IllegalNamespaceException.class, () -> client.loadMetalake(abc.name()));
+    assertThrows(IllegalArgumentException.class, () -> client.loadMetalake(""));
   }
 
   @Test
@@ -183,14 +177,6 @@ public class MetalakeIT extends AbstractIT {
 
     // Metalake does not exist, so we return false
     assertFalse(client.dropMetalake(metalakeA.name()));
-
-    // Bad metalake name
-    NameIdentifier badname = NameIdentifier.of("A", "B");
-    assertThrows(
-        IllegalNamespaceException.class,
-        () -> {
-          client.dropMetalake(badname.name());
-        });
   }
 
   public void dropMetalakes() {
