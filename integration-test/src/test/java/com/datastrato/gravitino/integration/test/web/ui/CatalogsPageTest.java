@@ -94,6 +94,9 @@ public class CatalogsPageTest extends AbstractWebIT {
   private static final String COMMON_JDBC_USER = "trino";
   private static final String COMMON_JDBC_PWD = "ds123";
 
+  public static final String DISTRIBUTION = "distribution";
+  public static final String SORT_ORDERS = "sortOrders";
+
   private static String defaultBaseLocation;
 
   @BeforeAll
@@ -467,11 +470,11 @@ public class CatalogsPageTest extends AbstractWebIT {
   @Test
   @Order(15)
   public void testShowTablePropertiesTooltip() {
-    mouseMoveTo(By.xpath("//*[@data-refer='col-icon-distribution-" + COLUMN_NAME + "']"));
-    Assertions.assertTrue(catalogsPage.verifyTableProperties("distribution", COLUMN_NAME));
-    mouseMoveTo(By.xpath("//*[@data-refer='col-icon-sortOrders-" + COLUMN_NAME_2 + "']"));
-    Assertions.assertTrue(catalogsPage.verifyTableProperties("sortOrders", COLUMN_NAME_2));
-    mouseMoveTo(By.xpath("//*[@data-refer='overview-tip-sortOrders']"));
+    mouseMoveTo(By.xpath("//*[@data-refer='col-icon-" + DISTRIBUTION + "-" + COLUMN_NAME + "']"));
+    Assertions.assertTrue(catalogsPage.verifyTableProperties(DISTRIBUTION, COLUMN_NAME));
+    mouseMoveTo(By.xpath("//*[@data-refer='col-icon-" + SORT_ORDERS + "-" + COLUMN_NAME_2 + "']"));
+    Assertions.assertTrue(catalogsPage.verifyTableProperties(SORT_ORDERS, COLUMN_NAME_2));
+    mouseMoveTo(By.xpath("//*[@data-refer='overview-tip-" + SORT_ORDERS + "']"));
     Assertions.assertTrue(
         catalogsPage.verifyTablePropertiesOverview(Arrays.asList(COLUMN_NAME, COLUMN_NAME_2)));
   }

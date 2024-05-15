@@ -5,6 +5,9 @@
 
 package com.datastrato.gravitino.integration.test.web.ui.pages;
 
+import static com.datastrato.gravitino.integration.test.web.ui.CatalogsPageTest.DISTRIBUTION;
+import static com.datastrato.gravitino.integration.test.web.ui.CatalogsPageTest.SORT_ORDERS;
+
 import com.datastrato.gravitino.integration.test.web.ui.utils.AbstractWebIT;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -552,11 +555,11 @@ public class CatalogsPage extends AbstractWebIT {
     try {
       String xpath = "";
       String formattedColName = "";
-      if (type.equals("distribution")) {
-        xpath = "//*[@data-refer='tip-distribution-item-" + colName + "']";
+      if (type.equals(DISTRIBUTION)) {
+        xpath = "//*[@data-refer='tip-" + DISTRIBUTION + "-item-" + colName + "']";
         formattedColName = "hash[10](" + colName + ")";
-      } else if (type.equals("sortOrders")) {
-        xpath = "//*[@data-refer='tip-sortOrders-item-" + colName + "']";
+      } else if (type.equals(SORT_ORDERS)) {
+        xpath = "//*[@data-refer='tip-" + SORT_ORDERS + "-item-" + colName + "']";
         formattedColName = colName + " desc nulls_last";
       }
       List<WebElement> tooltipItems = driver.findElements(By.xpath(xpath));
