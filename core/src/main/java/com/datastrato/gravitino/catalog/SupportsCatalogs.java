@@ -82,7 +82,7 @@ public interface SupportsCatalogs {
    */
   Catalog createCatalog(
       NameIdentifier ident,
-      Catalog.Type type,
+      CatalogBasic.Type type,
       String provider,
       String comment,
       Map<String, String> properties)

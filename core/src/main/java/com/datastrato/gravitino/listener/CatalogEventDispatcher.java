@@ -6,6 +6,7 @@
 package com.datastrato.gravitino.listener;
 
 import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.CatalogBasic;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
@@ -94,7 +95,7 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
   @Override
   public Catalog createCatalog(
       NameIdentifier ident,
-      Catalog.Type type,
+      CatalogBasic.Type type,
       String provider,
       String comment,
       Map<String, String> properties)

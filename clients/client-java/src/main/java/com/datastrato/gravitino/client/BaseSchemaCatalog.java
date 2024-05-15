@@ -6,6 +6,7 @@ package com.datastrato.gravitino.client;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.client.api.Catalog;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.requests.SchemaCreateRequest;
@@ -20,7 +21,7 @@ import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
-import com.datastrato.gravitino.rel.SupportsSchemas;
+import com.datastrato.gravitino.client.api.SupportsSchemas;
 import com.datastrato.gravitino.rest.RESTUtils;
 import java.util.Arrays;
 import java.util.Collections;
@@ -35,7 +36,7 @@ import org.slf4j.LoggerFactory;
  * common methods for managing schemas in a catalog. With {@link BaseSchemaCatalog}, users can list,
  * create, load, alter and drop a schema with specified identifier.
  */
-abstract class BaseSchemaCatalog extends CatalogDTO implements SupportsSchemas {
+abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, SupportsSchemas {
   private static final Logger LOG = LoggerFactory.getLogger(BaseSchemaCatalog.class);
 
   /** The REST client to send the requests. */

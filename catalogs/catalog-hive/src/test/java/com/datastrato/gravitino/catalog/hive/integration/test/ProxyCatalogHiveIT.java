@@ -8,7 +8,7 @@ import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.IM
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 import static com.datastrato.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
-import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.client.api.Catalog;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.auth.AuthenticatorType;
@@ -21,7 +21,7 @@ import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.SupportsSchemas;
+import com.datastrato.gravitino.client.api.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.expressions.literals.Literal;

@@ -6,7 +6,7 @@ package com.datastrato.gravitino.client;
 
 import static com.datastrato.gravitino.dto.util.DTOConverters.toFunctionArg;
 
-import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.client.api.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.authorization.SecurableObject;

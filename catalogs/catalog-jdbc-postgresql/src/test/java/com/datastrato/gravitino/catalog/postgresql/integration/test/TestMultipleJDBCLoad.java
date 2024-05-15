@@ -5,7 +5,7 @@
 
 package com.datastrato.gravitino.catalog.postgresql.integration.test;
 
-import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.client.api.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;

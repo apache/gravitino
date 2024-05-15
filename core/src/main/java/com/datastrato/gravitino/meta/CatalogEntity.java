@@ -7,6 +7,7 @@ package com.datastrato.gravitino.meta;
 import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Auditable;
 import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.CatalogBasic;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Field;
 import com.datastrato.gravitino.HasIdentifier;
@@ -43,7 +44,7 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
 
   private String name;
 
-  @Getter private Catalog.Type type;
+  @Getter private CatalogBasic.Type type;
 
   @Getter private String provider;
 
@@ -181,7 +182,7 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
      * @param type the type of the catalog.
      * @return the builder instance.
      */
-    public Builder withType(Catalog.Type type) {
+    public Builder withType(CatalogBasic.Type type) {
       catalog.type = type;
       return this;
     }

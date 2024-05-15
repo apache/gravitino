@@ -9,10 +9,12 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 
 import com.datastrato.gravitino.Audit;
-import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.client.api.Catalog;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Map;
+
+import com.datastrato.gravitino.CatalogBasic;
 import org.testng.annotations.Test;
 
 public class TestGravitinoCatalog {
@@ -33,7 +35,7 @@ public class TestGravitinoCatalog {
       String name,
       String provider,
       String comments,
-      Catalog.Type type,
+      CatalogBasic.Type type,
       Map<String, String> properties) {
     Catalog mockCatalog = mock(Catalog.class);
     when(mockCatalog.name()).thenReturn(name);

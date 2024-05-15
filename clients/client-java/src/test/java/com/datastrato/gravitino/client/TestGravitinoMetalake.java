@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.client;
 
-import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.client.api.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.dto.AuditDTO;

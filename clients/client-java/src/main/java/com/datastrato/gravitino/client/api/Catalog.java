@@ -2,14 +2,14 @@
  * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino;
+package com.datastrato.gravitino.client.api;
 
+import com.datastrato.gravitino.CatalogBasic;
 import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.file.FilesetCatalog;
 import com.datastrato.gravitino.messaging.TopicCatalog;
-import com.datastrato.gravitino.rel.SupportsSchemas;
+import com.datastrato.gravitino.client.api.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
-import java.util.Map;
 
 /**
  * The interface of a catalog. The catalog is the second level entity in the gravitino system,

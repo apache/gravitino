@@ -6,7 +6,7 @@ package com.datastrato.gravitino.integration.test.client.filesystem.hadoop;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.client.api.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.file.Fileset;

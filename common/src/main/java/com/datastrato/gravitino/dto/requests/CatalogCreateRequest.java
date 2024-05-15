@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.dto.requests;
 
 import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.CatalogBasic;
 import com.datastrato.gravitino.rest.RESTRequest;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
@@ -25,7 +26,7 @@ public class CatalogCreateRequest implements RESTRequest {
   private final String name;
 
   @JsonProperty("type")
-  private final Catalog.Type type;
+  private final CatalogBasic.Type type;
 
   @JsonProperty("provider")
   private final String provider;
@@ -54,7 +55,7 @@ public class CatalogCreateRequest implements RESTRequest {
    */
   public CatalogCreateRequest(
       String name,
-      Catalog.Type type,
+      CatalogBasic.Type type,
       String provider,
       String comment,
       Map<String, String> properties) {

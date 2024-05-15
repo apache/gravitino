@@ -12,7 +12,7 @@ import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable.PR
 import static org.apache.iceberg.TableProperties.DEFAULT_FILE_FORMAT;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.client.api.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.auth.AuthConstants;
@@ -32,7 +32,7 @@ import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
-import com.datastrato.gravitino.rel.SupportsSchemas;
+import com.datastrato.gravitino.client.api.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;

@@ -6,6 +6,7 @@ package com.datastrato.gravitino.dto;
 
 import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.CatalogBasic;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;
@@ -17,7 +18,7 @@ import org.apache.commons.lang3.StringUtils;
 /** Data transfer object representing catalog information. */
 @EqualsAndHashCode
 @ToString
-public class CatalogDTO implements Catalog {
+public class CatalogDTO implements CatalogBasic {
 
   @JsonProperty("name")
   private String name;

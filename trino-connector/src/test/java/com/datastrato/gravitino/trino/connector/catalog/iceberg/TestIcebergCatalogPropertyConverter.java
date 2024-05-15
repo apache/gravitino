@@ -5,7 +5,7 @@
 
 package com.datastrato.gravitino.trino.connector.catalog.iceberg;
 
-import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.client.api.Catalog;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata;
 import com.datastrato.gravitino.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
