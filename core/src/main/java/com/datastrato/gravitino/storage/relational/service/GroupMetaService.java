@@ -210,4 +210,17 @@ public class GroupMetaService {
     }
     return newEntity;
   }
+
+  public int deleteGroupMetasByLegacyTimeLine(long legacyTimeLine, int limit) {
+    int groupDeletedCount =
+        SessionUtils.doWithCommitAndFetchResult(
+            GroupMetaMapper.class,
+            mapper -> mapper.deleteGroupMetasByLegacyTimeLine(legacyTimeLine, limit));
+
+    int groupRoleRelDeletedCount =
+        SessionUtils.doWithCommitAndFetchResult(
+            GroupRoleRelMapper.class,
+            mapper -> mapper.deleteGroupRoleRelMetasByLegacyTimeLine(legacyTimeLine, limit));
+    return groupDeletedCount + groupRoleRelDeletedCount;
+  }
 }

@@ -123,4 +123,22 @@ public class RoleMetaService {
                 GroupRoleRelMapper.class, mapper -> mapper.softDeleteGroupRoleRelByRoleId(roleId)));
     return true;
   }
+
+  public int deleteRoleMetasByLegacyTimeLine(long legacyTimeLine, int limit) {
+    int roleDeletedCount =
+        SessionUtils.doWithCommitAndFetchResult(
+            RoleMetaMapper.class,
+            mapper -> mapper.deleteRoleMetasByLegacyTimeLine(legacyTimeLine, limit));
+
+    int userRoleRelDeletedCount =
+        SessionUtils.doWithCommitAndFetchResult(
+            UserRoleRelMapper.class,
+            mapper -> mapper.deleteUserRoleRelMetasByLegacyTimeLine(legacyTimeLine, limit));
+
+    int groupRoleRelDeletedCount =
+        SessionUtils.doWithCommitAndFetchResult(
+            GroupRoleRelMapper.class,
+            mapper -> mapper.deleteGroupRoleRelMetasByLegacyTimeLine(legacyTimeLine, limit));
+    return roleDeletedCount + userRoleRelDeletedCount + groupRoleRelDeletedCount;
+  }
 }
