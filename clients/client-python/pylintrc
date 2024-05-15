@@ -32,7 +32,6 @@ disable=missing-class-docstring,
         protected-access,               #TODO-fix
         too-many-arguments,             #TODO-fix
         inconsistent-return-statements, #TODO-fix
-        invalid-name,                   #TODO-config
 
 [LOGGING]
 
@@ -64,3 +63,23 @@ indent-after-paren=4
 
 # String used as indentation unit.
 indent-string='    '
+
+[BASIC]
+
+# Naming Style for Const
+const-naming-style=UPPER_CASE
+
+# Naming Style for Class
+class-naming-style=PascalCase
+class-const-naming-style=UPPER_CASE
+class-attribute-naming-style=any
+attr-naming-style=snake_case
+
+# Naming Style for Function and Method
+function-naming-style=snake_case
+method-naming-style=snake_case
+argument-naming-style=snake_case
+variable-naming-style=snake_case
+
+# Naming Style for Module
+module-naming-style=snake_case
