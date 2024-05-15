@@ -15,9 +15,11 @@ import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.spark.SparkUtilIT;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.datastrato.gravitino.spark.connector.GravitinoSparkConfig;
+import com.datastrato.gravitino.spark.connector.iceberg.IcebergPropertiesConstants;
 import com.datastrato.gravitino.spark.connector.plugin.GravitinoSparkPlugin;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -61,8 +63,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
     // initialize the hiveMetastoreUri and warehouse at first to inject properties to
     // IcebergRestService
     if ("lakehouse-iceberg".equalsIgnoreCase(getProvider())) {
-      ignoreIcebergRestService = false;
-      AbstractIT.registerCustomConfigs(getCatalogConfigs());
+      initIcebergRestServiceEnv();
     }
     // Start Gravitino server
     AbstractIT.startIntegrationTest();
@@ -132,6 +133,30 @@ public abstract class SparkEnvIT extends SparkUtilIT {
             "hdfs://%s:%d/user/hive/warehouse",
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HDFS_DEFAULTFS_PORT);
+  }
+
+  private void initIcebergRestServiceEnv() {
+    ignoreIcebergRestService = false;
+    Map<String, String> icebergRestServiceConfigs = new HashMap<>();
+    icebergRestServiceConfigs.put(
+        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+            + icebergRestServiceName
+            + "."
+            + IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
+        IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_HIVE);
+    icebergRestServiceConfigs.put(
+        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+            + icebergRestServiceName
+            + "."
+            + IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI,
+        hiveMetastoreUri);
+    icebergRestServiceConfigs.put(
+        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+            + icebergRestServiceName
+            + "."
+            + IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE,
+        warehouse);
+    AbstractIT.registerCustomConfigs(icebergRestServiceConfigs);
   }
 
   private void initHdfsFileSystem() {
