@@ -7,8 +7,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Alata&display=swap');
-
 html,
 body {
   min-height: 100%;
@@ -16,8 +14,4 @@ body {
 
 a {
   -webkit-user-drag: none;
-}
-
-.logoText {
-  font-family: 'Alata' !important;
 }
