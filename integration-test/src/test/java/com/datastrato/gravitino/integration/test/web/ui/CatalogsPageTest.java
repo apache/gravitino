@@ -5,6 +5,8 @@
 
 package com.datastrato.gravitino.integration.test.web.ui;
 
+import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.identity;
+
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.client.GravitinoAdminClient;
@@ -17,6 +19,14 @@ import com.datastrato.gravitino.integration.test.web.ui.pages.CatalogsPage;
 import com.datastrato.gravitino.integration.test.web.ui.pages.MetalakePage;
 import com.datastrato.gravitino.integration.test.web.ui.utils.AbstractWebIT;
 import com.datastrato.gravitino.rel.Column;
+import com.datastrato.gravitino.rel.expressions.NamedReference;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
+import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.Maps;
 import java.util.Arrays;
@@ -30,6 +40,7 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.openqa.selenium.By;
 
 @Tag("gravitino-docker-it")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -83,6 +94,9 @@ public class CatalogsPageTest extends AbstractWebIT {
   private static final String COMMON_JDBC_USER = "trino";
   private static final String COMMON_JDBC_PWD = "ds123";
 
+  public static final String DISTRIBUTION = "distribution";
+  public static final String SORT_ORDERS = "sortOrders";
+
   private static String defaultBaseLocation;
 
   @BeforeAll
@@ -124,23 +138,40 @@ public class CatalogsPageTest extends AbstractWebIT {
    * @param catalogName The name of the Catalog where the table will be created.
    * @param schemaName The name of the Schema where the table will be created.
    * @param tableName The name of the Table to be created.
-   * @param colName The name of the Column to be created in the Table.
    */
-  void createTableAndColumn(
-      String metalakeName,
-      String catalogName,
-      String schemaName,
-      String tableName,
-      String colName) {
+  void createHiveTableAndColumn(
+      String metalakeName, String catalogName, String schemaName, String tableName) {
     Map<String, String> properties = Maps.newHashMap();
-    Column column = Column.of(colName, Types.IntegerType.get(), "column comment");
+    Column col1 = Column.of(COLUMN_NAME, Types.ByteType.get(), "col1 comment");
+    Column col2 = Column.of(COLUMN_NAME_2, Types.ByteType.get(), "col2 comment");
+    Column[] columns = new Column[] {col1, col2};
+    Distribution distribution = createDistribution();
+    SortOrder[] sortOrders = createSortOrder();
+    Transform[] partitions = new Transform[] {identity(col2.name())};
+
     catalog
         .asTableCatalog()
         .createTable(
             NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
-            new Column[] {column},
+            columns,
             "comment",
-            properties);
+            properties,
+            partitions,
+            distribution,
+            sortOrders);
+  }
+
+  private Distribution createDistribution() {
+    return Distributions.hash(10, NamedReference.field(COLUMN_NAME));
+  }
+
+  private SortOrder[] createSortOrder() {
+    return new SortOrders.SortImpl[] {
+      SortOrders.of(
+          NamedReference.field(COLUMN_NAME), SortDirection.DESCENDING, NullOrdering.NULLS_FIRST),
+      SortOrders.of(
+          NamedReference.field(COLUMN_NAME_2), SortDirection.DESCENDING, NullOrdering.NULLS_FIRST)
+    };
   }
 
   /**
@@ -372,7 +403,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   @Order(11)
   public void testRefreshCatalogPage() {
     driver.navigate().refresh();
-    Assertions.assertEquals(driver.getTitle(), WEB_TITLE);
+    Assertions.assertEquals(WEB_TITLE, driver.getTitle());
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(CATALOG_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(SCHEMA_NAME, false));
     List<String> treeNodes =
@@ -392,8 +423,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   @Order(12)
   public void testClickSchemaLink() {
     // create table
-    createTableAndColumn(
-        METALAKE_NAME, MODIFIED_HIVE_CATALOG_NAME, SCHEMA_NAME, TABLE_NAME, COLUMN_NAME);
+    createHiveTableAndColumn(METALAKE_NAME, MODIFIED_HIVE_CATALOG_NAME, SCHEMA_NAME, TABLE_NAME);
     catalogsPage.clickSchemaLink(
         METALAKE_NAME, MODIFIED_HIVE_CATALOG_NAME, CATALOG_TYPE_RELATIONAL, SCHEMA_NAME);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(SCHEMA_TABLE_TITLE));
@@ -405,7 +435,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   @Order(13)
   public void testRefreshSchemaPage() {
     driver.navigate().refresh();
-    Assertions.assertEquals(driver.getTitle(), WEB_TITLE);
+    Assertions.assertEquals(WEB_TITLE, driver.getTitle());
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(SCHEMA_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TABLE_NAME, false));
     List<String> treeNodes =
@@ -439,9 +469,21 @@ public class CatalogsPageTest extends AbstractWebIT {
 
   @Test
   @Order(15)
+  public void testShowTablePropertiesTooltip() {
+    mouseMoveTo(By.xpath("//*[@data-refer='col-icon-" + DISTRIBUTION + "-" + COLUMN_NAME + "']"));
+    Assertions.assertTrue(catalogsPage.verifyTableProperties(DISTRIBUTION, COLUMN_NAME));
+    mouseMoveTo(By.xpath("//*[@data-refer='col-icon-" + SORT_ORDERS + "-" + COLUMN_NAME_2 + "']"));
+    Assertions.assertTrue(catalogsPage.verifyTableProperties(SORT_ORDERS, COLUMN_NAME_2));
+    mouseMoveTo(By.xpath("//*[@data-refer='overview-tip-" + SORT_ORDERS + "']"));
+    Assertions.assertTrue(
+        catalogsPage.verifyTablePropertiesOverview(Arrays.asList(COLUMN_NAME, COLUMN_NAME_2)));
+  }
+
+  @Test
+  @Order(16)
   public void testRefreshTablePage() {
     driver.navigate().refresh();
-    Assertions.assertEquals(driver.getTitle(), WEB_TITLE);
+    Assertions.assertEquals(WEB_TITLE, driver.getTitle());
     Assertions.assertTrue(catalogsPage.verifyRefreshPage());
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(TABLE_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyTableColumns());
@@ -459,7 +501,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(16)
+  @Order(17)
   public void testRelationalHiveCatalogTreeNode() throws InterruptedException {
     String hiveNode =
         String.format(
@@ -490,10 +532,9 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(17)
+  @Order(18)
   public void testTreeNodeRefresh() throws InterruptedException {
-    createTableAndColumn(
-        METALAKE_NAME, MODIFIED_HIVE_CATALOG_NAME, SCHEMA_NAME, TABLE_NAME_2, COLUMN_NAME_2);
+    createHiveTableAndColumn(METALAKE_NAME, MODIFIED_HIVE_CATALOG_NAME, SCHEMA_NAME, TABLE_NAME_2);
     String hiveNode =
         String.format(
             "{{%s}}{{%s}}{{%s}}",
@@ -519,7 +560,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(18)
+  @Order(19)
   public void testOtherRelationaCatalogTreeNode() throws InterruptedException {
     String icebergNode =
         String.format(
@@ -539,7 +580,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(19)
+  @Order(20)
   public void testSelectMetalake() throws InterruptedException {
     catalogsPage.metalakeSelectChange(METALAKE_SELECT_NAME);
     Assertions.assertTrue(catalogsPage.verifyEmptyTableData());
@@ -549,7 +590,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(20)
+  @Order(21)
   public void testFilesetCatalogTreeNode() throws InterruptedException {
     // 1. create schema and fileset of fileset catalog
     createSchema(METALAKE_NAME, FILESET_CATALOG_NAME, SCHEMA_NAME_FILESET);
@@ -611,7 +652,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(21)
+  @Order(22)
   public void testBackHomePage() throws InterruptedException {
     clickAndWait(catalogsPage.backHomeBtn);
     Assertions.assertTrue(catalogsPage.verifyBackHomePage());

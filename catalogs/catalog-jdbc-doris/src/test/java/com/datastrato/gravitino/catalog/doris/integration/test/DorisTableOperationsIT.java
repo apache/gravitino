@@ -12,6 +12,8 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Type;
@@ -38,14 +40,16 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
 
   private static final Type INT = Types.IntegerType.get();
 
+  private static final Integer DEFAULT_BUCKET_SIZE = 1;
+
   private static final String databaseName = GravitinoITUtils.genRandomName("doris_test_db");
 
-  // Because the creation of Schema Change is an asynchronous process, we need wait for a while
+  // Because the creation of Schema Change is an asynchronous process, we need to wait for a while
   // For more information, you can refer to the comment in
   // DorisTableOperations.generateAlterTableSql().
-  private static final long MAX_WAIT = 30;
+  private static final long MAX_WAIT_IN_SECONDS = 30;
 
-  private static final long WAIT_INTERVAL = 1;
+  private static final long WAIT_INTERVAL_IN_SECONDS = 1;
 
   @BeforeAll
   public static void startup() {
@@ -79,7 +83,8 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
     columns.add(col_3);
     Map<String, String> properties = new HashMap<>();
 
-    Distribution distribution = Distributions.hash(32, NamedReference.field("col_1"));
+    Distribution distribution =
+        Distributions.hash(DEFAULT_BUCKET_SIZE, NamedReference.field("col_1"));
     Index[] indexes = new Index[] {};
 
     // create table
@@ -128,7 +133,8 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
     columns.add(col_3);
     Map<String, String> properties = new HashMap<>();
 
-    Distribution distribution = Distributions.hash(32, NamedReference.field("col_1"));
+    Distribution distribution =
+        Distributions.hash(DEFAULT_BUCKET_SIZE, NamedReference.field("col_1"));
     Index[] indexes = new Index[] {};
 
     // create table
@@ -162,8 +168,8 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
     columns.add(col_3);
 
     Awaitility.await()
-        .atMost(MAX_WAIT, TimeUnit.SECONDS)
-        .pollInterval(WAIT_INTERVAL, TimeUnit.SECONDS)
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
         .untilAsserted(
             () ->
                 assertionsTableInfo(
@@ -209,8 +215,8 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
     columns.add(col_3);
     columns.add(col_4);
     Awaitility.await()
-        .atMost(MAX_WAIT, TimeUnit.SECONDS)
-        .pollInterval(WAIT_INTERVAL, TimeUnit.SECONDS)
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
         .untilAsserted(
             () ->
                 assertionsTableInfo(
@@ -234,8 +240,8 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
     columns.add(col_4);
     columns.add(col_3);
     Awaitility.await()
-        .atMost(MAX_WAIT, TimeUnit.SECONDS)
-        .pollInterval(WAIT_INTERVAL, TimeUnit.SECONDS)
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
         .untilAsserted(
             () ->
                 assertionsTableInfo(
@@ -254,8 +260,8 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
     columns.add(col_2);
     columns.add(col_3);
     Awaitility.await()
-        .atMost(MAX_WAIT, TimeUnit.SECONDS)
-        .pollInterval(WAIT_INTERVAL, TimeUnit.SECONDS)
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
         .untilAsserted(
             () ->
                 assertionsTableInfo(
@@ -293,8 +299,8 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
     Index[] newIndexes =
         new Index[] {Indexes.primary("k2_index", new String[][] {{"col_2"}, {"col_3"}})};
     Awaitility.await()
-        .atMost(MAX_WAIT, TimeUnit.SECONDS)
-        .pollInterval(WAIT_INTERVAL, TimeUnit.SECONDS)
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
         .untilAsserted(
             () ->
                 assertionsTableInfo(
@@ -309,8 +315,8 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
     TABLE_OPERATIONS.alterTable(databaseName, tableName, TableChange.deleteIndex("k2_index", true));
 
     Awaitility.await()
-        .atMost(MAX_WAIT, TimeUnit.SECONDS)
-        .pollInterval(WAIT_INTERVAL, TimeUnit.SECONDS)
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
         .untilAsserted(
             () ->
                 assertionsTableInfo(
@@ -343,7 +349,8 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
     columns.add(JdbcColumn.builder().withName("col_12").withType(Types.VarCharType.of(10)).build());
     columns.add(JdbcColumn.builder().withName("col_13").withType(Types.StringType.get()).build());
 
-    Distribution distribution = Distributions.hash(32, NamedReference.field("col_1"));
+    Distribution distribution =
+        Distributions.hash(DEFAULT_BUCKET_SIZE, NamedReference.field("col_1"));
     Index[] indexes = new Index[] {};
     // create table
     TABLE_OPERATIONS.create(
@@ -395,7 +402,7 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
                     tableComment,
                     createProperties(),
                     null,
-                    Distributions.hash(32, NamedReference.field("col_1")),
+                    Distributions.hash(DEFAULT_BUCKET_SIZE, NamedReference.field("col_1")),
                     Indexes.EMPTY_INDEXES);
               });
       Assertions.assertTrue(
@@ -405,5 +412,73 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
                   String.format(
                       "Couldn't convert Gravitino type %s to Doris type", type.simpleString())));
     }
+  }
+
+  @Test
+  public void testCreateTableWithPartition() {
+    String tableComment = "partition_table_comment";
+    JdbcColumn col1 =
+        JdbcColumn.builder()
+            .withName("col_1")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .build();
+    JdbcColumn col2 =
+        JdbcColumn.builder().withName("col_2").withType(Types.BooleanType.get()).build();
+    JdbcColumn col3 =
+        JdbcColumn.builder().withName("col_3").withType(Types.DoubleType.get()).build();
+    JdbcColumn col4 =
+        JdbcColumn.builder()
+            .withName("col_4")
+            .withType(Types.DateType.get())
+            .withNullable(false)
+            .build();
+    List<JdbcColumn> columns = Arrays.asList(col1, col2, col3, col4);
+    Distribution distribution =
+        Distributions.hash(DEFAULT_BUCKET_SIZE, NamedReference.field("col_1"));
+    Index[] indexes = new Index[] {};
+
+    // create table with range partition
+    String rangePartitionTableName = GravitinoITUtils.genRandomName("range_partition_table");
+    Transform[] rangePartition = new Transform[] {Transforms.range(new String[] {col4.name()})};
+    TABLE_OPERATIONS.create(
+        databaseName,
+        rangePartitionTableName,
+        columns.toArray(new JdbcColumn[] {}),
+        tableComment,
+        createProperties(),
+        rangePartition,
+        distribution,
+        indexes);
+    JdbcTable rangePartitionTable = TABLE_OPERATIONS.load(databaseName, rangePartitionTableName);
+    assertionsTableInfo(
+        rangePartitionTableName,
+        tableComment,
+        columns,
+        Collections.emptyMap(),
+        null,
+        rangePartitionTable);
+
+    // create table with list partition
+    String listPartitionTableName = GravitinoITUtils.genRandomName("list_partition_table");
+    Transform[] listPartition =
+        new Transform[] {Transforms.list(new String[] {col1.name()}, new String[] {col4.name()})};
+    TABLE_OPERATIONS.create(
+        databaseName,
+        listPartitionTableName,
+        columns.toArray(new JdbcColumn[] {}),
+        tableComment,
+        createProperties(),
+        listPartition,
+        distribution,
+        indexes);
+    JdbcTable listPartitionTable = TABLE_OPERATIONS.load(databaseName, listPartitionTableName);
+    assertionsTableInfo(
+        listPartitionTableName,
+        tableComment,
+        columns,
+        Collections.emptyMap(),
+        null,
+        listPartitionTable);
   }
 }

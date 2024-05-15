@@ -20,9 +20,12 @@
 
 package com.datastrato.gravitino.rel.expressions.transforms;
 
+import static com.datastrato.gravitino.rel.partitions.Partitions.EMPTY_PARTITIONS;
+
 import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
+import com.datastrato.gravitino.rel.partitions.Partition;
 import java.util.Objects;
 
 /**
@@ -40,11 +43,12 @@ public interface Transform extends Expression {
   Expression[] arguments();
 
   /**
-   * @return The preassigned partitions in the partitioning. Currently, only ListTransform and
-   *     RangeTransform need to deal with assignments
+   * @return The preassigned partitions in the partitioning. Currently, only {@link
+   *     Transforms.ListTransform} and {@link Transforms.RangeTransform} need to deal with
+   *     assignments
    */
-  default Expression[] assignments() {
-    return Expression.EMPTY_EXPRESSION;
+  default Partition[] assignments() {
+    return EMPTY_PARTITIONS;
   }
 
   @Override

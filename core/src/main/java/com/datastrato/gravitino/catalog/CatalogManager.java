@@ -37,7 +37,9 @@ import com.datastrato.gravitino.messaging.TopicCatalog;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
+import com.datastrato.gravitino.rel.SupportsPartitions;
 import com.datastrato.gravitino.rel.SupportsSchemas;
+import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.IsolatedClassLoader;
@@ -132,6 +134,19 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
               throw new UnsupportedOperationException("Catalog does not support topic operations");
             }
             return fn.apply(asTopics());
+          });
+    }
+
+    public <R> R doWithPartitionOps(
+        NameIdentifier tableIdent, ThrowableFunction<SupportsPartitions, R> fn) throws Exception {
+      return classLoader.withClassLoader(
+          cl -> {
+            Preconditions.checkArgument(
+                asTables() != null, "Catalog does not support table operations");
+            Table table = asTables().loadTable(tableIdent);
+            Preconditions.checkArgument(
+                table.supportPartitions() != null, "Table does not support partition operations");
+            return fn.apply(table.supportPartitions());
           });
     }
 

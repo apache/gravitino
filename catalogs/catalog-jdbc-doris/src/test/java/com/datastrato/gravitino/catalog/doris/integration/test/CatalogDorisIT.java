@@ -88,13 +88,15 @@ public class CatalogDorisIT extends AbstractIT {
 
   protected Catalog catalog;
 
+  protected String mysqlDriverDownloadUrl = DOWNLOAD_JDBC_DRIVER_URL;
+
   @BeforeAll
   public void startup() throws IOException {
 
     if (!ITUtils.EMBEDDED_TEST_MODE.equals(AbstractIT.testMode)) {
       String gravitinoHome = System.getenv("GRAVITINO_HOME");
       Path tmpPath = Paths.get(gravitinoHome, "/catalogs/jdbc-doris/libs");
-      JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_JDBC_DRIVER_URL, tmpPath.toString());
+      JdbcDriverDownloader.downloadJdbcDriver(mysqlDriverDownloadUrl, tmpPath.toString());
     }
 
     containerSuite.startDorisContainer();

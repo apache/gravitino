@@ -2,6 +2,7 @@
 Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
+
 from dataclasses import dataclass, field
 from typing import Optional, List
 
@@ -14,7 +15,10 @@ from gravitino.rest.rest_message import RESTRequest
 @dataclass
 class CatalogUpdatesRequest(RESTRequest):
     """Represents a request containing multiple catalog updates."""
-    _updates: Optional[List[CatalogUpdateRequest]] = field(metadata=config(field_name='updates'), default_factory=list)
+
+    _updates: Optional[List[CatalogUpdateRequest]] = field(
+        metadata=config(field_name="updates"), default_factory=list
+    )
 
     def __init__(self, updates: List[CatalogUpdateRequest] = None):
         self._updates = updates

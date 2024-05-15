@@ -25,6 +25,8 @@ import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.dto.rel.partitioning.RangePartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.TruncatePartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.YearPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitions.ListPartitionDTO;
+import com.datastrato.gravitino.dto.rel.partitions.RangePartitionDTO;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
@@ -312,24 +314,66 @@ public class TestDTOJsonSerDe {
     Partitioning yearPart = YearPartitioningDTO.of(field1);
 
     // construct list partition
-    // TODO: support assign partition value
-    // String[][] p1Value = {{"2023-04-01", "San Francisco"}, {"2023-04-01", "San Francisco"}};
-    // String[][] p2Value = {{"2023-04-01", "Houston"}, {"2023-04-01", "Dallas"}};
-    Partitioning listPart =
-        ListPartitioningDTO.builder()
-            .withFieldNames(new String[][] {field1, field2})
-            // .withAssignment("p202304_California", p1Value)
-            // .withAssignment("p202304_Texas", p2Value)
+    LiteralDTO[][] pCaliforniaValue = {
+      {
+        LiteralDTO.builder().withValue("2023-04-01").withDataType(Types.DateType.get()).build(),
+        LiteralDTO.builder().withValue("San Francisco").withDataType(Types.StringType.get()).build()
+      },
+      {
+        LiteralDTO.builder().withValue("2023-04-01").withDataType(Types.DateType.get()).build(),
+        LiteralDTO.builder().withValue("San Diego").withDataType(Types.StringType.get()).build()
+      }
+    };
+    ListPartitionDTO pCalifornia =
+        ListPartitionDTO.builder()
+            .withName("p202304_California")
+            .withLists(pCaliforniaValue)
             .build();
 
+    LiteralDTO[][] pTexasValue = {
+      {
+        LiteralDTO.builder().withValue("2023-04-01").withDataType(Types.DateType.get()).build(),
+        LiteralDTO.builder().withValue("Houston").withDataType(Types.StringType.get()).build()
+      },
+      {
+        LiteralDTO.builder().withValue("2023-04-01").withDataType(Types.DateType.get()).build(),
+        LiteralDTO.builder().withValue("Dallas").withDataType(Types.StringType.get()).build()
+      }
+    };
+    ListPartitionDTO pTexas =
+        ListPartitionDTO.builder().withName("p202304_Texas").withLists(pTexasValue).build();
+
+    Partitioning listPart =
+        ListPartitioningDTO.of(
+            new String[][] {field1, field2}, new ListPartitionDTO[] {pCalifornia, pTexas});
+
     // construct range partition
-    // TODO: support assign partition value
-    Partitioning rangePart =
-        RangePartitioningDTO.builder()
-            .withFieldName(field1)
-            // .withRange("p20230101", "2023-01-01T00:00:00", "2023-01-02T00:00:00")
-            // .withRange("p20230102", "2023-01-01T00:00:00", null)
+    RangePartitionDTO p20230101 =
+        RangePartitionDTO.builder()
+            .withName("p20230101")
+            .withUpper(
+                LiteralDTO.builder()
+                    .withValue("2023-01-01")
+                    .withDataType(Types.DateType.get())
+                    .build())
+            .withLower(
+                LiteralDTO.builder()
+                    .withValue("2023-01-01")
+                    .withDataType(Types.DateType.get())
+                    .build())
             .build();
+    RangePartitionDTO p20230102 =
+        RangePartitionDTO.builder()
+            .withName("p20230102")
+            .withUpper(
+                LiteralDTO.builder()
+                    .withValue("2023-01-02")
+                    .withDataType(Types.DateType.get())
+                    .build())
+            .withLower(LiteralDTO.NULL)
+            .build();
+    Partitioning rangePart =
+        RangePartitioningDTO.of(field1, new RangePartitionDTO[] {p20230101, p20230102});
 
     // construct function partitioning, toYYYYMM(toDate(ts, ‘Asia/Shanghai’))
     FunctionArg arg1 = FieldReferenceDTO.of(field1);
@@ -368,7 +412,7 @@ public class TestDTOJsonSerDe {
   }
 
   @Test
-  public void testPartitioningDTOSerDeFail() throws Exception {
+  public void testPartitioningDTOSerDeFail() {
     // test `strategy` value null
     String wrongJson1 = "{\"strategy\": null,\"fieldName\":[\"dt\"]}";
     ObjectMapper map = JsonUtils.objectMapper();
@@ -393,5 +437,64 @@ public class TestDTOJsonSerDe {
         Assertions.assertThrows(
             IllegalArgumentException.class, () -> map.readValue(wrongJson6, Partitioning.class));
     Assertions.assertTrue(exception.getMessage().contains("Invalid partitioning strategy"));
+
+    // test invalid arguments for partitioning
+    String wrongJson3 =
+        "{\n"
+            + "    \"strategy\": \"list\",\n"
+            + "    \"fieldNames\": [\n"
+            + "        [\n"
+            + "            \"dt\"\n"
+            + "        ],\n"
+            + "        [\n"
+            + "            \"city\"\n"
+            + "        ]\n"
+            + "    ],\n"
+            + "    \"assignments\": \"partitions\"\n"
+            + "}";
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> map.readValue(wrongJson3, Partitioning.class));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("Cannot parse list partitioning from non-array assignments"),
+        exception.getMessage());
+
+    String wrong4 =
+        "{\n"
+            + "    \"strategy\": \"list\",\n"
+            + "    \"fieldNames\": [\n"
+            + "        [\n"
+            + "            \"dt\"\n"
+            + "        ],\n"
+            + "        [\n"
+            + "            \"city\"\n"
+            + "        ]\n"
+            + "    ],\n"
+            + "    \"assignments\": [\n"
+            + "        {\n"
+            + "            \"type\": \"range\",\n"
+            + "            \"name\": \"p20230101\",\n"
+            + "            \"upper\": {\n"
+            + "                \"type\": \"literal\",\n"
+            + "                \"dataType\": \"date\",\n"
+            + "                \"value\": \"2023-01-01\"\n"
+            + "            },\n"
+            + "            \"lower\": {\n"
+            + "                \"type\": \"literal\",\n"
+            + "                \"dataType\": \"date\",\n"
+            + "                \"value\": \"2023-01-01\"\n"
+            + "            },\n"
+            + "            \"properties\": null\n"
+            + "        }\n"
+            + "    ]\n"
+            + "}";
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> map.readValue(wrong4, Partitioning.class));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Cannot parse list partitioning from non-list assignment"),
+        exception.getMessage());
   }
 }

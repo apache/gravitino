@@ -2,6 +2,7 @@
 Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
+
 import logging
 from typing import Dict
 
@@ -34,11 +35,24 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
     rest_client: HTTPClient
     """The REST client to send the requests."""
 
-    def __init__(self, name: str = None, type: Catalog.Type = Catalog.Type.UNSUPPORTED, provider: str = None,
-                 comment: str = None, properties: Dict[str, str] = None, audit: AuditDTO = None,
-                 rest_client: HTTPClient = None):
-        super().__init__(_name=name, _type=type, _provider=provider, _comment=comment, _properties=properties,
-                         _audit=audit)
+    def __init__(
+        self,
+        name: str = None,
+        type: Catalog.Type = Catalog.Type.UNSUPPORTED,
+        provider: str = None,
+        comment: str = None,
+        properties: Dict[str, str] = None,
+        audit: AuditDTO = None,
+        rest_client: HTTPClient = None,
+    ):
+        super().__init__(
+            _name=name,
+            _type=type,
+            _provider=provider,
+            _comment=comment,
+            _properties=properties,
+            _audit=audit,
+        )
         self.rest_client = rest_client
 
     def as_schemas(self):
@@ -57,12 +71,21 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
              A list of {@link NameIdentifier} of the schemas under the given catalog namespace.
         """
         Namespace.check_schema(namespace)
-        resp = self.rest_client.get(BaseSchemaCatalog.format_schema_request_path(namespace))
-        entity_list_response = EntityListResponse.from_json(resp.body, infer_missing=True)
+        resp = self.rest_client.get(
+            BaseSchemaCatalog.format_schema_request_path(namespace)
+        )
+        entity_list_response = EntityListResponse.from_json(
+            resp.body, infer_missing=True
+        )
         entity_list_response.validate()
         return entity_list_response.identifiers()
 
-    def create_schema(self, ident: NameIdentifier = None, comment: str = None, properties: Dict[str, str] = None) -> Schema:
+    def create_schema(
+        self,
+        ident: NameIdentifier = None,
+        comment: str = None,
+        properties: Dict[str, str] = None,
+    ) -> Schema:
         """Create a new schema with specified identifier, comment and metadata.
 
         Args:
@@ -81,7 +104,9 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
         req = SchemaCreateRequest(ident.name(), comment, properties)
         req.validate()
 
-        resp = self.rest_client.post(BaseSchemaCatalog.format_schema_request_path(ident.namespace()), json=req)
+        resp = self.rest_client.post(
+            BaseSchemaCatalog.format_schema_request_path(ident.namespace()), json=req
+        )
         schema_response = SchemaResponse.from_json(resp.body, infer_missing=True)
         schema_response.validate()
 
@@ -101,7 +126,10 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
         """
         NameIdentifier.check_schema(ident)
         resp = self.rest_client.get(
-            BaseSchemaCatalog.format_schema_request_path(ident.namespace()) + "/" + ident.name())
+            BaseSchemaCatalog.format_schema_request_path(ident.namespace())
+            + "/"
+            + ident.name()
+        )
         schema_response = SchemaResponse.from_json(resp.body, infer_missing=True)
         schema_response.validate()
 
@@ -121,11 +149,17 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
             The altered Schema.
         """
         NameIdentifier.check_schema(ident)
-        reqs = [BaseSchemaCatalog.to_schema_update_request(change) for change in changes]
-        updatesRequest = SchemaUpdatesRequest(reqs)
-        updatesRequest.validate()
+        reqs = [
+            BaseSchemaCatalog.to_schema_update_request(change) for change in changes
+        ]
+        updates_request = SchemaUpdatesRequest(reqs)
+        updates_request.validate()
         resp = self.rest_client.put(
-            BaseSchemaCatalog.format_schema_request_path(ident.namespace()) + "/" + ident.name(), updatesRequest)
+            BaseSchemaCatalog.format_schema_request_path(ident.namespace())
+            + "/"
+            + ident.name(),
+            updates_request,
+        )
         schema_response = SchemaResponse.from_json(resp.body, infer_missing=True)
         schema_response.validate()
         return schema_response.schema()
@@ -147,12 +181,16 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
         try:
             params = {"cascade": str(cascade)}
             resp = self.rest_client.delete(
-                BaseSchemaCatalog.format_schema_request_path(ident.namespace()) + "/" + ident.name(), params=params)
+                BaseSchemaCatalog.format_schema_request_path(ident.namespace())
+                + "/"
+                + ident.name(),
+                params=params,
+            )
             drop_resp = DropResponse.from_json(resp.body, infer_missing=True)
             drop_resp.validate()
             return drop_resp.dropped()
-        except Exception as e:
-            logger.warning(f"Failed to drop schema {ident}")
+        except Exception:
+            logger.warning("Failed to drop schema %s", ident)
             return False
 
     @staticmethod
@@ -162,8 +200,9 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
     @staticmethod
     def to_schema_update_request(change: SchemaChange):
         if isinstance(change, SchemaChange.SetProperty):
-            return SchemaUpdateRequest.SetSchemaPropertyRequest(change.property(), change.value())
-        elif isinstance(change, SchemaChange.RemoveProperty):
+            return SchemaUpdateRequest.SetSchemaPropertyRequest(
+                change.property(), change.value()
+            )
+        if isinstance(change, SchemaChange.RemoveProperty):
             return SchemaUpdateRequest.RemoveSchemaPropertyRequest(change.property())
-        else:
-            raise ValueError(f"Unknown change type: {type(change).__name__}")
+        raise ValueError(f"Unknown change type: {type(change).__name__}")
