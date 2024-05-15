@@ -34,6 +34,13 @@ public class GravitinoConfig {
           "true",
           false);
 
+  private static final ConfigEntry DISCOVERY_URI =
+      new ConfigEntry("discovery.uri", "The uri of Trino server", "", false);
+
+  private static final ConfigEntry CATALOG_STORE =
+      new ConfigEntry(
+          "catalog.store", "The directory of stored catalogs Trino", "etc/catalog", false);
+
   public GravitinoConfig(Map<String, String> requiredConfig) {
     config = requiredConfig;
 
@@ -76,6 +83,14 @@ public class GravitinoConfig {
 
   public String getCatalogConfig() throws JsonProcessingException {
     return config.get(GRAVITINO_DYNAMIC_CONNECTOR_CATALOG_CONFIG);
+  }
+
+  public String getTrinoURI() {
+    return config.getOrDefault(DISCOVERY_URI.key, DISCOVERY_URI.defaultValue);
+  }
+
+  public String getCatalogStoreDirectory() {
+    return config.getOrDefault(CATALOG_STORE.key, CATALOG_STORE.defaultValue);
   }
 
   static class ConfigEntry {

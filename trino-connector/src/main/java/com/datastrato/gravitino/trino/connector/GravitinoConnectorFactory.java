@@ -10,7 +10,7 @@ import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVIT
 import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorFactory;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
-import com.datastrato.gravitino.trino.connector.catalog.CatalogInjector;
+import com.datastrato.gravitino.trino.connector.catalog.CatalogRegister;
 import com.datastrato.gravitino.trino.connector.system.GravitinoSystemConnector;
 import com.datastrato.gravitino.trino.connector.system.storedprocdure.GravitinoStoredProcedureFactory;
 import com.datastrato.gravitino.trino.connector.system.table.GravitinoSystemTableFactory;
@@ -64,19 +64,19 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
     synchronized (this) {
       if (catalogConnectorManager == null) {
         try {
-          CatalogInjector catalogInjector = new CatalogInjector();
-          // catalogInjector.init(context);
+          CatalogRegister catalogRegister = new CatalogRegister();
+          catalogRegister.init(context, config);
           CatalogConnectorFactory catalogConnectorFactory = new CatalogConnectorFactory();
 
           catalogConnectorManager =
-              new CatalogConnectorManager(catalogInjector, catalogConnectorFactory);
+              new CatalogConnectorManager(catalogRegister, catalogConnectorFactory);
           catalogConnectorManager.config(config);
           catalogConnectorManager.start(clientProvider().get(), context);
 
           gravitinoSystemTableFactory = new GravitinoSystemTableFactory(catalogConnectorManager);
         } catch (Exception e) {
           LOG.error("Initialization of the GravitinoConnector failed.", e);
-          throw e;
+          throw new RuntimeException(e);
         }
       }
     }
@@ -100,8 +100,6 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
       catalogConnectorManager.addMetalake(metalake);
       GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory =
           new GravitinoStoredProcedureFactory(catalogConnectorManager, metalake);
-
-      // catalogConnectorManager.loadMetalakeSync();
       return new GravitinoSystemConnector(gravitinoStoredProcedureFactory);
     }
   }
