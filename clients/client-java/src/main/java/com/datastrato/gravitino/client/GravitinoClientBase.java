@@ -10,6 +10,7 @@ import com.datastrato.gravitino.Version;
 import com.datastrato.gravitino.dto.responses.MetalakeResponse;
 import com.datastrato.gravitino.dto.responses.VersionResponse;
 import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
+import com.datastrato.gravitino.exceptions.IllegalNameIdentifierException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
@@ -121,6 +122,12 @@ public abstract class GravitinoClientBase implements Closeable {
     return DTOConverters.toMetaLake(resp.getMetalake(), restClient);
   }
 
+  /**
+   * Checks the validity of the Metalake name.
+   *
+   * @param metalakeName the name of the Metalake to be checked.
+   * @throws IllegalNameIdentifierException If the Metalake name is invalid.
+   */
   public void checkMetalakeName(String metalakeName) {
     NameIdentifier.checkMetalake(NameIdentifier.parse(metalakeName));
   }
