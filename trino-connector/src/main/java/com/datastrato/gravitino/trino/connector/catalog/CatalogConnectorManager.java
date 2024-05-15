@@ -270,7 +270,7 @@ public class CatalogConnectorManager {
       if (!ignoreExist) {
         throw new TrinoException(
             GRAVITINO_CATALOG_ALREADY_EXISTS,
-            String.format("Catalog %s already exists.", catalogName));
+            String.format("Catalog %s already exists.", NameIdentifier.of(metalakeName, catalogName)));
       }
       return;
     }
@@ -295,7 +295,7 @@ public class CatalogConnectorManager {
     } catch (CatalogAlreadyExistsException e) {
       throw new TrinoException(
           GRAVITINO_CATALOG_ALREADY_EXISTS,
-          "Catalog " + catalogName + " already exists in the server.");
+          "Catalog " + NameIdentifier.of(metalakeName, catalogName) + " already exists in the server.");
     } catch (Exception e) {
       throw new TrinoException(
           GRAVITINO_UNSUPPORTED_OPERATION, "Create catalog failed. " + e.getMessage(), e);
@@ -313,7 +313,7 @@ public class CatalogConnectorManager {
         }
 
         throw new TrinoException(
-            GRAVITINO_CATALOG_NOT_EXISTS, "Catalog " + catalogName + " not exists.");
+            GRAVITINO_CATALOG_NOT_EXISTS, "Catalog " + NameIdentifier.of(metalakeName, catalogName) + " not exists.");
       }
       boolean dropped = metalake.dropCatalog(catalogName);
       if (!dropped) {
