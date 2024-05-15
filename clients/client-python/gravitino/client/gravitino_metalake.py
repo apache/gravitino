@@ -71,9 +71,9 @@ class GravitinoMetalake(MetalakeDTO):
         Namespace.check_catalog(namespace)
         url = f"api/metalakes/{namespace.level(0)}/catalogs"
         response = self.rest_client.get(url)
-        entityList = EntityListResponse.from_json(response.body, infer_missing=True)
-        entityList.validate()
-        return entityList.identifiers()
+        entity_list = EntityListResponse.from_json(response.body, infer_missing=True)
+        entity_list.validate()
+        return entity_list.identifiers()
 
     def list_catalogs_info(self, namespace: Namespace) -> List[Catalog]:
         """List all the catalogs with their information under this metalake with specified namespace.
