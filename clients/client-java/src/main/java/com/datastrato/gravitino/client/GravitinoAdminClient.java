@@ -113,6 +113,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
   public GravitinoMetalake createMetalake(
       String name, String comment, Map<String, String> properties)
       throws MetalakeAlreadyExistsException {
+    checkMetalakeName(name);
 
     MetalakeCreateRequest req = new MetalakeCreateRequest(name, comment, properties);
     req.validate();
@@ -141,6 +142,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
   @Override
   public GravitinoMetalake alterMetalake(String name, MetalakeChange... changes)
       throws NoSuchMetalakeException, IllegalArgumentException {
+    checkMetalakeName(name);
     List<MetalakeUpdateRequest> reqs =
         Arrays.stream(changes)
             .map(DTOConverters::toMetalakeUpdateRequest)
@@ -168,7 +170,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
    */
   @Override
   public boolean dropMetalake(String name) {
-
+    checkMetalakeName(name);
     try {
       DropResponse resp =
           restClient.delete(

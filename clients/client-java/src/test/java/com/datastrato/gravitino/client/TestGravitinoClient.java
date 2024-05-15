@@ -18,6 +18,7 @@ import com.datastrato.gravitino.dto.responses.MetalakeListResponse;
 import com.datastrato.gravitino.dto.responses.MetalakeResponse;
 import com.datastrato.gravitino.dto.responses.VersionResponse;
 import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
+import com.datastrato.gravitino.exceptions.IllegalNamespaceException;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.exceptions.RESTException;
@@ -115,11 +116,11 @@ public class TestGravitinoClient extends TestBase {
     Assertions.assertTrue(excep.getMessage().contains("mock error"));
 
     // Test illegal metalake name identifier
-    NameIdentifier badName = NameIdentifier.parse("mock.mock");
+    String badName = "mock.mock";
 
     Throwable excep1 =
         Assertions.assertThrows(
-            IllegalArgumentException.class, () -> client.loadMetalake(badName.name()));
+            IllegalNamespaceException.class, () -> client.loadMetalake(badName));
     Assertions.assertTrue(
         excep1.getMessage().contains("Metalake namespace must be non-null and empty"));
 
@@ -210,10 +211,10 @@ public class TestGravitinoClient extends TestBase {
     Assertions.assertTrue(excep.getMessage().contains("mock error"));
 
     // Test illegal argument
-    NameIdentifier id2 = NameIdentifier.parse("mock.mock");
+    String id2 = "mock.mock";
     Throwable excep1 =
         Assertions.assertThrows(
-            IllegalArgumentException.class, () -> client.alterMetalake(id2.name(), changes));
+            IllegalArgumentException.class, () -> client.alterMetalake(id2, changes));
     Assertions.assertTrue(
         excep1.getMessage().contains("Metalake namespace must be non-null and empty"));
   }
@@ -235,10 +236,9 @@ public class TestGravitinoClient extends TestBase {
     Assertions.assertFalse(client.dropMetalake("mock"));
 
     // Test illegal metalake name identifier
-    NameIdentifier id = NameIdentifier.parse("mock.mock");
+    String badName = "mock.mock";
     Throwable excep1 =
-        Assertions.assertThrows(
-            IllegalArgumentException.class, () -> client.dropMetalake(id.name()));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> client.dropMetalake(badName));
     Assertions.assertTrue(
         excep1.getMessage().contains("Metalake namespace must be non-null and empty"));
   }

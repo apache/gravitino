@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.client;
 
+import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Version;
 import com.datastrato.gravitino.dto.responses.MetalakeResponse;
 import com.datastrato.gravitino.dto.responses.VersionResponse;
@@ -18,7 +19,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collections;
 import java.util.Map;
-import org.apache.logging.log4j.util.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -107,9 +107,8 @@ public abstract class GravitinoClientBase implements Closeable {
    * @throws NoSuchMetalakeException If the specified Metalake does not exist.
    */
   public GravitinoMetalake loadMetalake(String metalakeName) throws NoSuchMetalakeException {
-    if (Strings.isEmpty(metalakeName)) {
-      throw new IllegalArgumentException("Metalake name cannot be null or empty");
-    }
+
+    checkMetalakeName(metalakeName);
 
     MetalakeResponse resp =
         restClient.get(
@@ -120,6 +119,10 @@ public abstract class GravitinoClientBase implements Closeable {
     resp.validate();
 
     return DTOConverters.toMetaLake(resp.getMetalake(), restClient);
+  }
+
+  public void checkMetalakeName(String metalakeName) {
+    NameIdentifier.checkMetalake(NameIdentifier.parse(metalakeName));
   }
 
   /**
