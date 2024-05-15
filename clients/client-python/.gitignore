@@ -9,3 +9,6 @@ venv
 .vevn
 .venv
 .idea
+dist
+build
+README.md

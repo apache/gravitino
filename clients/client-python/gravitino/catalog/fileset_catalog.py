@@ -188,7 +188,7 @@ class FilesetCatalog(BaseSchemaCatalog):
 
             return drop_resp.dropped()
         except Exception as e:
-            logger.warning(f"Failed to drop fileset {ident}: {e}")
+            logger.warning("Failed to drop fileset %s: %s", ident, e)
             return False
 
     @staticmethod
@@ -200,15 +200,14 @@ class FilesetCatalog(BaseSchemaCatalog):
     def to_fileset_update_request(change: FilesetChange):
         if isinstance(change, FilesetChange.RenameFileset):
             return FilesetUpdateRequest.RenameFilesetRequest(change.new_name())
-        elif isinstance(change, FilesetChange.UpdateFilesetComment):
+        if isinstance(change, FilesetChange.UpdateFilesetComment):
             return FilesetUpdateRequest.UpdateFilesetCommentRequest(
                 change.new_comment()
             )
-        elif isinstance(change, FilesetChange.SetProperty):
+        if isinstance(change, FilesetChange.SetProperty):
             return FilesetUpdateRequest.SetFilesetPropertyRequest(
                 change.property(), change.value()
             )
-        elif isinstance(change, FilesetChange.RemoveProperty):
+        if isinstance(change, FilesetChange.RemoveProperty):
             return FilesetUpdateRequest.RemoveFilesetPropertyRequest(change.property())
-        else:
-            raise ValueError(f"Unknown change type: {type(change).__name__}")
+        raise ValueError(f"Unknown change type: {type(change).__name__}")
