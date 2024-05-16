@@ -9,6 +9,8 @@ import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
 import com.datastrato.gravitino.spark.connector.catalog.BaseCatalog;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.Map;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.spark.SparkCatalog;
@@ -104,11 +106,15 @@ public class GravitinoIcebergCatalog extends BaseCatalog
     String[] namespace = identifier.namespace();
     String name = identifier.name();
 
-    if (isSystemNamespace(namespace)) {
-      SparkProcedures.ProcedureBuilder builder = SparkProcedures.newBuilder(name);
-      if (builder != null) {
-        return builder.withTableCatalog(this).build();
+    try {
+      if (isSystemNamespace(namespace)) {
+        SparkProcedures.ProcedureBuilder builder = SparkProcedures.newBuilder(name);
+        if (builder != null) {
+          return builder.withTableCatalog(this).build();
+        }
       }
+    } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+      throw new RuntimeException("Failed to load Iceberg Procedure.", e);
     }
 
     throw new NoSuchProcedureException(identifier);
@@ -119,7 +125,11 @@ public class GravitinoIcebergCatalog extends BaseCatalog
     return ((SparkCatalog) sparkCatalog).icebergCatalog();
   }
 
-  private static boolean isSystemNamespace(String[] namespace) {
-    return namespace.length == 1 && namespace[0].equalsIgnoreCase("system");
+  private boolean isSystemNamespace(String[] namespace)
+      throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+    Method isSystemNamespace =
+        ((SparkCatalog) sparkCatalog).getClass().getMethod("isSystemNamespace", String[].class);
+    isSystemNamespace.setAccessible(true);
+    return (Boolean) isSystemNamespace.invoke(sparkCatalog, (Object) namespace);
   }
 }
