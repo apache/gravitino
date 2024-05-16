@@ -14,7 +14,6 @@ import java.util.concurrent.TimeUnit;
 import org.glassfish.jersey.server.ResourceConfig;
 
 public class HttpServerMetricsSource extends MetricsSource {
-
   public HttpServerMetricsSource(String name, ResourceConfig resourceConfig, JettyServer server) {
     super(name);
     resourceConfig.register(

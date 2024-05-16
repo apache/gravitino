@@ -31,7 +31,6 @@ import org.slf4j.LoggerFactory;
  * report metrics from MetricsSources registered to MetricsSystem.
  */
 public class MetricsSystem implements Closeable {
-
   private static final Logger LOG = LoggerFactory.getLogger(MetricsSystem.class);
   private final String name;
   private final MetricRegistry metricRegistry;
