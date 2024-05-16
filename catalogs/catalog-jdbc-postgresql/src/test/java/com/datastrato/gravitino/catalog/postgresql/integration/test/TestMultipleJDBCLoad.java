@@ -85,7 +85,7 @@ public class TestMultipleJDBCLoad extends AbstractIT {
     String metalakeName = RandomNameUtils.genRandomName("it_metalake");
     String postgreSqlCatalogName = RandomNameUtils.genRandomName("it_postgresql");
     GravitinoMetalake metalake =
-        client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
+        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
 
     Map<String, String> pgConf = Maps.newHashMap();
     pgConf.put(JdbcConfig.JDBC_URL.getKey(), postgreSQLContainer.getJdbcUrl(TEST_DB_NAME));
@@ -97,11 +97,7 @@ public class TestMultipleJDBCLoad extends AbstractIT {
 
     Catalog postgreSqlCatalog =
         metalake.createCatalog(
-            NameIdentifier.of(metalakeName, postgreSqlCatalogName),
-            Catalog.Type.RELATIONAL,
-            "jdbc-postgresql",
-            "comment",
-            pgConf);
+            postgreSqlCatalogName, Catalog.Type.RELATIONAL, "jdbc-postgresql", "comment", pgConf);
 
     Map<String, String> mysqlConf = Maps.newHashMap();
 
@@ -112,11 +108,7 @@ public class TestMultipleJDBCLoad extends AbstractIT {
     String mysqlCatalogName = RandomNameUtils.genRandomName("it_mysql");
     Catalog mysqlCatalog =
         metalake.createCatalog(
-            NameIdentifier.of(metalakeName, mysqlCatalogName),
-            Catalog.Type.RELATIONAL,
-            "jdbc-mysql",
-            "comment",
-            mysqlConf);
+            mysqlCatalogName, Catalog.Type.RELATIONAL, "jdbc-mysql", "comment", mysqlConf);
 
     NameIdentifier[] nameIdentifiers =
         mysqlCatalog.asSchemas().listSchemas(Namespace.of(metalakeName, mysqlCatalogName));

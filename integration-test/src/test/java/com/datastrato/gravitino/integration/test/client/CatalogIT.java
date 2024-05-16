@@ -6,7 +6,6 @@
 package com.datastrato.gravitino.integration.test.client;
 
 import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
@@ -48,15 +47,14 @@ public class CatalogIT extends AbstractIT {
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HIVE_METASTORE_PORT);
 
-    NameIdentifier ident = NameIdentifier.of(metalakeName);
-    Assertions.assertFalse(client.metalakeExists(ident));
-    metalake = client.createMetalake(ident, "metalake comment", Collections.emptyMap());
-    Assertions.assertTrue(client.metalakeExists(ident));
+    Assertions.assertFalse(client.metalakeExists(metalakeName));
+    metalake = client.createMetalake(metalakeName, "metalake comment", Collections.emptyMap());
+    Assertions.assertTrue(client.metalakeExists(metalakeName));
   }
 
   @AfterAll
   public static void tearDown() {
-    client.dropMetalake(NameIdentifier.of(metalakeName));
+    client.dropMetalake(metalakeName);
 
     if (client != null) {
       client.close();
@@ -73,15 +71,14 @@ public class CatalogIT extends AbstractIT {
   @Test
   public void testCreateCatalog() {
     String catalogName = GravitinoITUtils.genRandomName("catalog");
-    NameIdentifier catalogIdent = NameIdentifier.of(metalakeName, catalogName);
-    Assertions.assertFalse(metalake.catalogExists(catalogIdent));
+    Assertions.assertFalse(metalake.catalogExists(catalogName));
 
     Map<String, String> properties = Maps.newHashMap();
     properties.put("metastore.uris", hmsUri);
     Catalog catalog =
         metalake.createCatalog(
-            catalogIdent, Catalog.Type.RELATIONAL, "hive", "catalog comment", properties);
-    Assertions.assertTrue(metalake.catalogExists(catalogIdent));
+            catalogName, Catalog.Type.RELATIONAL, "hive", "catalog comment", properties);
+    Assertions.assertTrue(metalake.catalogExists(catalogName));
 
     Assertions.assertEquals(catalogName, catalog.name());
     Assertions.assertEquals(Catalog.Type.RELATIONAL, catalog.type());
@@ -89,19 +86,18 @@ public class CatalogIT extends AbstractIT {
     Assertions.assertEquals("catalog comment", catalog.comment());
     Assertions.assertTrue(catalog.properties().containsKey("metastore.uris"));
 
-    metalake.dropCatalog(catalogIdent);
+    metalake.dropCatalog(catalogName);
   }
 
   @Test
   public void testCreateCatalogWithoutProperties() {
     String catalogName = GravitinoITUtils.genRandomName("catalog");
-    NameIdentifier catalogIdent = NameIdentifier.of(metalakeName, catalogName);
-    Assertions.assertFalse(metalake.catalogExists(catalogIdent));
+    Assertions.assertFalse(metalake.catalogExists(catalogName));
 
     Catalog catalog =
         metalake.createCatalog(
-            catalogIdent, Catalog.Type.FILESET, "hadoop", "catalog comment", null);
-    Assertions.assertTrue(metalake.catalogExists(catalogIdent));
+            catalogName, Catalog.Type.FILESET, "hadoop", "catalog comment", null);
+    Assertions.assertTrue(metalake.catalogExists(catalogName));
 
     Assertions.assertEquals(catalogName, catalog.name());
     Assertions.assertEquals(Catalog.Type.FILESET, catalog.type());
@@ -109,55 +105,51 @@ public class CatalogIT extends AbstractIT {
     Assertions.assertEquals("catalog comment", catalog.comment());
     Assertions.assertTrue(catalog.properties().isEmpty());
 
-    metalake.dropCatalog(catalogIdent);
+    metalake.dropCatalog(catalogName);
   }
 
   @Test
   public void testCreateCatalogWithChinese() {
     String catalogName = GravitinoITUtils.genRandomName("catalogz");
-    NameIdentifier catalogIdent = NameIdentifier.of(metalakeName, catalogName);
-    Assertions.assertFalse(metalake.catalogExists(catalogIdent));
+    Assertions.assertFalse(metalake.catalogExists(catalogName));
 
     Map<String, String> properties = Maps.newHashMap();
     properties.put("metastore.uris", hmsUri);
-    metalake.createCatalog(
-        catalogIdent, Catalog.Type.RELATIONAL, "hive", "这是中文comment", properties);
-    Assertions.assertTrue(metalake.catalogExists(catalogIdent));
-    Catalog catalog = metalake.loadCatalog(catalogIdent);
+    metalake.createCatalog(catalogName, Catalog.Type.RELATIONAL, "hive", "这是中文comment", properties);
+    Assertions.assertTrue(metalake.catalogExists(catalogName));
+    Catalog catalog = metalake.loadCatalog(catalogName);
     Assertions.assertEquals(catalogName, catalog.name());
     Assertions.assertEquals(Catalog.Type.RELATIONAL, catalog.type());
     Assertions.assertEquals("hive", catalog.provider());
     Assertions.assertEquals("这是中文comment", catalog.comment());
     Assertions.assertTrue(catalog.properties().containsKey("metastore.uris"));
 
-    metalake.dropCatalog(catalogIdent);
+    metalake.dropCatalog(catalogName);
   }
 
   @Test
   public void testListCatalogsInfo() {
     String relCatalogName = GravitinoITUtils.genRandomName("rel_catalog_");
-    NameIdentifier relCatalogIdent = NameIdentifier.of(metalakeName, relCatalogName);
     Map<String, String> properties = Maps.newHashMap();
     properties.put("metastore.uris", hmsUri);
     Catalog relCatalog =
         metalake.createCatalog(
-            relCatalogIdent,
+            relCatalogName,
             Catalog.Type.RELATIONAL,
             "hive",
             "relational catalog comment",
             properties);
 
     String fileCatalogName = GravitinoITUtils.genRandomName("file_catalog_");
-    NameIdentifier fileCatalogIdent = NameIdentifier.of(metalakeName, fileCatalogName);
     Catalog fileCatalog =
         metalake.createCatalog(
-            fileCatalogIdent,
+            fileCatalogName,
             Catalog.Type.FILESET,
             "hadoop",
             "file catalog comment",
             Collections.emptyMap());
 
-    Catalog[] catalogs = metalake.listCatalogsInfo(relCatalogIdent.namespace());
+    Catalog[] catalogs = metalake.listCatalogsInfo();
     for (Catalog catalog : catalogs) {
       if (catalog.name().equals(relCatalogName)) {
         assertCatalogEquals(relCatalog, catalog);
@@ -180,8 +172,7 @@ public class CatalogIT extends AbstractIT {
   @DisabledIfSystemProperty(named = "testMode", matches = "embedded")
   public void testCreateCatalogWithPackage() {
     String catalogName = GravitinoITUtils.genRandomName("catalog");
-    NameIdentifier catalogIdent = NameIdentifier.of(metalakeName, catalogName);
-    Assertions.assertFalse(metalake.catalogExists(catalogIdent));
+    Assertions.assertFalse(metalake.catalogExists(catalogName));
 
     Map<String, String> properties = Maps.newHashMap();
     properties.put("metastore.uris", hmsUri);
@@ -193,8 +184,8 @@ public class CatalogIT extends AbstractIT {
 
     Catalog catalog =
         metalake.createCatalog(
-            catalogIdent, Catalog.Type.RELATIONAL, "hive", "catalog comment", properties);
-    Assertions.assertTrue(metalake.catalogExists(catalogIdent));
+            catalogName, Catalog.Type.RELATIONAL, "hive", "catalog comment", properties);
+    Assertions.assertTrue(metalake.catalogExists(catalogName));
 
     Assertions.assertEquals(catalogName, catalog.name());
     Assertions.assertEquals(Catalog.Type.RELATIONAL, catalog.type());
@@ -202,18 +193,17 @@ public class CatalogIT extends AbstractIT {
     Assertions.assertEquals("catalog comment", catalog.comment());
     Assertions.assertTrue(catalog.properties().containsKey("package"));
 
-    metalake.dropCatalog(catalogIdent);
+    metalake.dropCatalog(catalogName);
 
     // Test using invalid package path
     String catalogName1 = GravitinoITUtils.genRandomName("catalog");
-    NameIdentifier catalogIdent1 = NameIdentifier.of(metalakeName, catalogName1);
     properties.put("package", "/tmp/none_exist_path_to_package");
     Exception exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () ->
                 metalake.createCatalog(
-                    catalogIdent1, Catalog.Type.RELATIONAL, "hive", "catalog comment", properties));
+                    catalogName1, Catalog.Type.RELATIONAL, "hive", "catalog comment", properties));
     Assertions.assertTrue(
         exception.getMessage().contains("Invalid package path: /tmp/none_exist_path_to_package"));
   }

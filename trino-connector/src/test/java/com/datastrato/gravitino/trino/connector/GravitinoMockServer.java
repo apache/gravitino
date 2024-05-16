@@ -65,8 +65,8 @@ public class GravitinoMockServer implements AutoCloseable {
   private GeneralDataTypeTransformer dataTypeTransformer = new HiveDataTypeTransformer();
 
   public GravitinoMockServer() {
-    createMetalake(NameIdentifier.ofMetalake(testMetalake));
-    createCatalog(NameIdentifier.ofCatalog(testMetalake, testCatalog));
+    createMetalake(testMetalake);
+    createCatalog(testMetalake, testCatalog);
   }
 
   public void setCatalogConnectorManager(CatalogConnectorManager catalogConnectorManager) {
@@ -76,133 +76,133 @@ public class GravitinoMockServer implements AutoCloseable {
   public GravitinoAdminClient createGravitinoClient() {
     GravitinoAdminClient client = mock(GravitinoAdminClient.class);
 
-    when(client.createMetalake(any(NameIdentifier.class), anyString(), anyMap()))
+    when(client.createMetalake(anyString(), anyString(), anyMap()))
         .thenAnswer(
             new Answer<GravitinoMetalake>() {
               @Override
               public GravitinoMetalake answer(InvocationOnMock invocation) throws Throwable {
-                NameIdentifier metalakeName = invocation.getArgument(0);
+                String metalakeName = invocation.getArgument(0);
                 return createMetalake(metalakeName);
               }
             });
 
-    when(client.dropMetalake(any(NameIdentifier.class)))
+    when(client.dropMetalake(anyString()))
         .thenAnswer(
             new Answer<Boolean>() {
               @Override
               public Boolean answer(InvocationOnMock invocation) throws Throwable {
-                NameIdentifier metalakeName = invocation.getArgument(0);
-                metalakes.remove(metalakeName.name());
+                String metalakeName = invocation.getArgument(0);
+                metalakes.remove(metalakeName);
                 return true;
               }
             });
 
-    when(client.loadMetalake(any(NameIdentifier.class)))
+    when(client.loadMetalake(anyString()))
         .thenAnswer(
             new Answer<GravitinoMetalake>() {
               @Override
               public GravitinoMetalake answer(InvocationOnMock invocation) throws Throwable {
-                NameIdentifier metalakeName = invocation.getArgument(0);
-                if (!metalakes.containsKey(metalakeName.name())) {
+                String metalakeName = invocation.getArgument(0);
+                if (!metalakes.containsKey(metalakeName)) {
                   throw new NoSuchMetalakeException("metalake does not be found");
                 }
-                return metalakes.get(metalakeName.name()).metalake;
+                return metalakes.get(metalakeName).metalake;
               }
             });
 
-    when(client.metalakeExists(any(NameIdentifier.class)))
+    when(client.metalakeExists(anyString()))
         .thenAnswer(
             new Answer<Boolean>() {
               @Override
               public Boolean answer(InvocationOnMock invocation) throws Throwable {
-                NameIdentifier metalakeName = invocation.getArgument(0);
-                return metalakes.containsKey(metalakeName.name());
+                String metalakeName = invocation.getArgument(0);
+                return metalakes.containsKey(metalakeName);
               }
             });
 
     return client;
   }
 
-  private GravitinoMetalake createMetalake(NameIdentifier metalakeName) {
+  private GravitinoMetalake createMetalake(String metalakeName) {
     GravitinoMetalake metaLake = mock(GravitinoMetalake.class);
-    when(metaLake.name()).thenReturn(metalakeName.name());
-    when(metaLake.listCatalogs(any(Namespace.class)))
+    when(metaLake.name()).thenReturn(metalakeName);
+    when(metaLake.listCatalogs())
         .thenAnswer(
             new Answer<NameIdentifier[]>() {
               @Override
               public NameIdentifier[] answer(InvocationOnMock invocation) throws Throwable {
-                return metalakes.get(metalakeName.name()).catalogs.keySet().stream()
-                    .map(catalogName -> NameIdentifier.ofCatalog(metalakeName.name(), catalogName))
+                return metalakes.get(metalakeName).catalogs.keySet().stream()
+                    .map(catalogName -> NameIdentifier.ofCatalog(metalakeName, catalogName))
                     .toArray(NameIdentifier[]::new);
               };
             });
 
     when(metaLake.createCatalog(
-            any(NameIdentifier.class), any(Catalog.Type.class), anyString(), anyString(), anyMap()))
+            anyString(), any(Catalog.Type.class), anyString(), anyString(), anyMap()))
         .thenAnswer(
             new Answer<Catalog>() {
               @Override
               public Catalog answer(InvocationOnMock invocation) throws Throwable {
-                NameIdentifier catalogName = invocation.getArgument(0);
+                String catalogName = invocation.getArgument(0);
 
-                Catalog catalog = createCatalog(catalogName);
+                Catalog catalog = createCatalog(metalakeName, catalogName);
 
                 return catalog;
               }
             });
 
-    when(metaLake.dropCatalog(any(NameIdentifier.class)))
+    when(metaLake.dropCatalog(anyString()))
         .thenAnswer(
             new Answer<Boolean>() {
               @Override
               public Boolean answer(InvocationOnMock invocation) throws Throwable {
-                NameIdentifier catalogName = invocation.getArgument(0);
-                if (!metalakes.get(metalakeName.name()).catalogs.containsKey(catalogName.name())) {
+                String catalogName = invocation.getArgument(0);
+                if (!metalakes.get(metalakeName).catalogs.containsKey(catalogName)) {
                   throw new NoSuchCatalogException("catalog does not be found");
                 }
-                metalakes.get(metalakeName.name()).catalogs.remove(catalogName.name());
+                metalakes.get(metalakeName).catalogs.remove(catalogName);
                 return true;
               }
             });
 
-    when(metaLake.catalogExists(any(NameIdentifier.class)))
+    when(metaLake.catalogExists(anyString()))
         .thenAnswer(
             new Answer<Boolean>() {
               @Override
               public Boolean answer(InvocationOnMock invocation) throws Throwable {
-                NameIdentifier catalogName = invocation.getArgument(0);
-                return metalakes.get(metalakeName.name()).catalogs.containsKey(catalogName.name());
+                String catalogName = invocation.getArgument(0);
+                return metalakes.get(metalakeName).catalogs.containsKey(catalogName);
               }
             });
 
-    when(metaLake.loadCatalog(any(NameIdentifier.class)))
+    when(metaLake.loadCatalog(anyString()))
         .thenAnswer(
             new Answer<Catalog>() {
               @Override
               public Catalog answer(InvocationOnMock invocation) throws Throwable {
-                NameIdentifier catalogName = invocation.getArgument(0);
-                if (!metalakes.get(metalakeName.name()).catalogs.containsKey(catalogName.name())) {
+                String catalogName = invocation.getArgument(0);
+                if (!metalakes.get(metalakeName).catalogs.containsKey(catalogName)) {
                   throw new NoSuchCatalogException("catalog does not be found");
                 }
 
-                return metalakes.get(metalakeName.name()).catalogs.get(catalogName.name());
+                return metalakes.get(metalakeName).catalogs.get(catalogName);
               }
             });
-    metalakes.put(metalakeName.name(), new Metalake(metaLake));
+    metalakes.put(metalakeName, new Metalake(metaLake));
     return metaLake;
   }
 
   void reloadCatalogs() {
     GravitinoMetalake metaLake = mock(GravitinoMetalake.class);
     when(metaLake.name()).thenReturn(testMetalake);
-    when(metaLake.listCatalogs(any()))
+    when(metaLake.listCatalogs())
         .thenReturn(new NameIdentifier[] {NameIdentifier.ofCatalog(testMetalake, testCatalog)});
     catalogConnectorManager.loadCatalogs(metaLake);
   }
 
-  private Catalog createCatalog(NameIdentifier catalogName) {
+  private Catalog createCatalog(String metalakeName, String catalogName) {
     Catalog catalog = mock(Catalog.class);
-    when(catalog.name()).thenReturn(catalogName.name());
+    when(catalog.name()).thenReturn(catalogName);
     when(catalog.provider()).thenReturn(testCatalogProvider);
     when(catalog.type()).thenReturn(Catalog.Type.RELATIONAL);
     when(catalog.properties()).thenReturn(Map.of("max_ttl", "10"));
@@ -216,7 +216,7 @@ public class GravitinoMockServer implements AutoCloseable {
     when(catalog.asTableCatalog()).thenAnswer(answer -> createTableCatalog(gravitinoCatalog));
 
     when(catalog.asSchemas()).thenAnswer(answer -> createSchemas(gravitinoCatalog));
-    metalakes.get(catalogName.namespace().toString()).catalogs.put(catalogName.name(), catalog);
+    metalakes.get(metalakeName).catalogs.put(catalogName, catalog);
     return catalog;
   }
 

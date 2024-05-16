@@ -119,7 +119,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
   @AfterAll
   public void stop() throws Exception {
     clearTableAndSchema();
-    client.dropMetalake(NameIdentifier.of(metalakeName));
+    client.dropMetalake(metalakeName);
     spark.close();
     AbstractIT.stopIntegrationTest();
   }
@@ -171,8 +171,8 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
     GravitinoMetalake createdMetalake =
-        client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
-    GravitinoMetalake loadMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
     Assertions.assertEquals(createdMetalake, loadMetalake);
 
     metalake = loadMetalake;
@@ -198,12 +198,8 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
 
     Catalog createdCatalog =
         metalake.createCatalog(
-            NameIdentifier.of(metalakeName, catalogName),
-            Catalog.Type.RELATIONAL,
-            provider,
-            "comment",
-            catalogProperties);
-    Catalog loadCatalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+            catalogName, Catalog.Type.RELATIONAL, provider, "comment", catalogProperties);
+    Catalog loadCatalog = metalake.loadCatalog(catalogName);
     Assertions.assertEquals(createdCatalog, loadCatalog);
 
     catalog = loadCatalog;

@@ -97,7 +97,7 @@ public class CatalogKafkaIT extends AbstractIT {
 
   @AfterAll
   public static void shutdown() {
-    client.dropMetalake(NameIdentifier.of(METALAKE_NAME));
+    client.dropMetalake(METALAKE_NAME);
     if (adminClient != null) {
       adminClient.close();
     }
@@ -122,25 +122,24 @@ public class CatalogKafkaIT extends AbstractIT {
     Assertions.assertEquals(properties, createdCatalog.properties());
 
     // test load catalog
-    Catalog loadedCatalog = metalake.loadCatalog(NameIdentifier.of(METALAKE_NAME, catalogName));
+    Catalog loadedCatalog = metalake.loadCatalog(catalogName);
     Assertions.assertEquals(createdCatalog, loadedCatalog);
 
     // test alter catalog
     Catalog alteredCatalog =
         metalake.alterCatalog(
-            NameIdentifier.of(METALAKE_NAME, catalogName),
+            catalogName,
             CatalogChange.updateComment("new comment"),
             CatalogChange.removeProperty("key1"));
     Assertions.assertEquals("new comment", alteredCatalog.comment());
     Assertions.assertFalse(alteredCatalog.properties().containsKey("key1"));
 
     // test drop catalog
-    boolean dropped = metalake.dropCatalog(NameIdentifier.of(METALAKE_NAME, catalogName));
+    boolean dropped = metalake.dropCatalog(catalogName);
     Assertions.assertTrue(dropped);
     Exception exception =
         Assertions.assertThrows(
-            NoSuchCatalogException.class,
-            () -> metalake.loadCatalog(NameIdentifier.of(METALAKE_NAME, catalogName)));
+            NoSuchCatalogException.class, () -> metalake.loadCatalog(catalogName));
     Assertions.assertTrue(exception.getMessage().contains(catalogName));
     // assert topic exists in Kafka after catalog dropped
     Assertions.assertFalse(adminClient.listTopics().names().get().isEmpty());
@@ -154,7 +153,7 @@ public class CatalogKafkaIT extends AbstractIT {
             IllegalArgumentException.class,
             () ->
                 metalake.createCatalog(
-                    NameIdentifier.of(METALAKE_NAME, catalogName),
+                    catalogName,
                     Catalog.Type.MESSAGING,
                     PROVIDER,
                     "comment",
@@ -166,7 +165,7 @@ public class CatalogKafkaIT extends AbstractIT {
             IllegalArgumentException.class,
             () ->
                 metalake.createCatalog(
-                    NameIdentifier.of(METALAKE_NAME, catalogName),
+                    catalogName,
                     Catalog.Type.MESSAGING,
                     PROVIDER,
                     "comment",
@@ -483,8 +482,8 @@ public class CatalogKafkaIT extends AbstractIT {
 
   private static void createMetalake() {
     GravitinoMetalake createdMetalake =
-        client.createMetalake(NameIdentifier.of(METALAKE_NAME), "comment", Collections.emptyMap());
-    GravitinoMetalake loadMetalake = client.loadMetalake(NameIdentifier.of(METALAKE_NAME));
+        client.createMetalake(METALAKE_NAME, "comment", Collections.emptyMap());
+    GravitinoMetalake loadMetalake = client.loadMetalake(METALAKE_NAME);
     Assertions.assertEquals(createdMetalake, loadMetalake);
 
     metalake = loadMetalake;
@@ -492,12 +491,7 @@ public class CatalogKafkaIT extends AbstractIT {
 
   private static Catalog createCatalog(
       String catalogName, String comment, Map<String, String> properties) {
-    metalake.createCatalog(
-        NameIdentifier.of(METALAKE_NAME, catalogName),
-        Catalog.Type.MESSAGING,
-        PROVIDER,
-        comment,
-        properties);
-    return metalake.loadCatalog(NameIdentifier.of(METALAKE_NAME, catalogName));
+    metalake.createCatalog(catalogName, Catalog.Type.MESSAGING, PROVIDER, comment, properties);
+    return metalake.loadCatalog(catalogName);
   }
 }
