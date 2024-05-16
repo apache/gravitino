@@ -23,6 +23,7 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.connector.BaseCatalog;
+import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;
 import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.connector.PropertyEntry;
@@ -279,7 +280,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           .map(
               e ->
                   e.toCatalogInfoWithoutHiddenProps(
-                      hiddenPropertyCache.asMap().get(e.getProvider())))
+                      hiddenPropertyCache.get(e.getProvider(), p -> getHiddenPropertyNames(e))))
           .toArray(Catalog[]::new);
     } catch (IOException ioe) {
       LOG.error("Failed to list catalogs in metalake {}", metalakeIdent, ioe);
@@ -607,6 +608,29 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         IllegalArgumentException.class);
 
     return wrapper;
+  }
+
+  private Set<String> getHiddenPropertyNames(CatalogEntity entity) {
+    Map<String, String> conf = entity.getProperties();
+    String provider = entity.getProvider();
+
+    try (IsolatedClassLoader classLoader = createClassLoader(provider, conf)) {
+      BaseCatalog<?> catalog = createBaseCatalog(classLoader, entity);
+      return classLoader.withClassLoader(
+          cl -> {
+            try (CatalogOperations ops = catalog.ops()) {
+              PropertiesMetadata catalogPropertiesMetadata = ops.catalogPropertiesMetadata();
+              return catalogPropertiesMetadata.propertyEntries().values().stream()
+                  .filter(PropertyEntry::isHidden)
+                  .map(PropertyEntry::getName)
+                  .collect(Collectors.toSet());
+            } catch (Exception e) {
+              LOG.error("Failed to get hidden property names", e);
+              throw e;
+            }
+          },
+          RuntimeException.class);
+    }
   }
 
   private BaseCatalog<?> createBaseCatalog(IsolatedClassLoader classLoader, CatalogEntity entity) {
