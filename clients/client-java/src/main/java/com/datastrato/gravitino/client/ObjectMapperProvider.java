@@ -32,7 +32,7 @@ public class ObjectMapperProvider {
   /**
    * Retrieves a globally shared {@link ObjectMapper} instance.
    *
-   * <p>Note: This ObjectMapper is shared across all users. If you need to modify the default
+   * <p>Note: This ObjectMapper is a global singe instance. If you need to modify the default
    * serialization/deserialization settings, make changes within the INSTANCE builder directly.
    * Avoid modifying properties of the returned {@code ObjectMapper} instance to prevent unintended
    * side effects.
@@ -42,4 +42,6 @@ public class ObjectMapperProvider {
   public static ObjectMapper objectMapper() {
     return ObjectMapperHolder.INSTANCE;
   }
+
+  private ObjectMapperProvider() {}
 }

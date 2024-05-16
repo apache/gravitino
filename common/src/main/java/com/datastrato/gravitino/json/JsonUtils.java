@@ -236,13 +236,17 @@ public class JsonUtils {
   }
 
   /**
-   * Get the shared ObjectMapper instance for JSON serialization/deserialization.
+   * Returns a shared {@link ObjectMapper} instance for JSON serialization/deserialization test.
    *
-   * <p>This instance should only be used for testing. For production or other environments, obtain
-   * an {@link ObjectMapper} from the appropriate {@code ObjectMapperProvider} on the server or
-   * client side.
+   * <p>Note: This instance is intended for testing purposes only. For production use, obtain an
+   * {@link ObjectMapper} from the following providers:
    *
-   * @return the shared {@link ObjectMapper} instance for tests.
+   * <ul>
+   *   <li>Client side: {@code com.datastrato.gravitino.client.ObjectMapperProvider}
+   *   <li>Server side: {@code com.datastrato.gravitino.server.web.ObjectMapperProvider}
+   * </ul>
+   *
+   * @return the shared {@link ObjectMapper} instance for testing.
    */
   @VisibleForTesting
   public static ObjectMapper objectMapper() {
