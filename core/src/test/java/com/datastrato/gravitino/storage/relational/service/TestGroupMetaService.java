@@ -725,13 +725,13 @@ class TestGroupMetaService extends TestJDBCBackend {
     // hard delete after soft delete
     deletedCount =
         groupMetaService.deleteGroupMetasByLegacyTimeLine(Instant.now().toEpochMilli() + 1000, 3);
-    Assertions.assertEquals(6, deletedCount); // delete 3 user + 3 userRoleRel
+    Assertions.assertEquals(6, deletedCount); // delete 3 group + 3 groupRoleRel
     Assertions.assertEquals(1, countGroups(metalake.id())); // 4 - 3
     Assertions.assertEquals(5, countGroupRoleRels()); // 8 - 3
 
     deletedCount =
         groupMetaService.deleteGroupMetasByLegacyTimeLine(Instant.now().toEpochMilli() + 1000, 3);
-    Assertions.assertEquals(4, deletedCount); // delete 1 user + 3 userRoleRel
+    Assertions.assertEquals(4, deletedCount); // delete 1 group + 3 groupRoleRel
     Assertions.assertEquals(0, countGroups(metalake.id()));
     Assertions.assertEquals(2, countGroupRoleRels()); // 5 - 3
 
