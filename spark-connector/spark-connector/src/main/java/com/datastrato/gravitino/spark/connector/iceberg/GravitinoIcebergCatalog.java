@@ -93,13 +93,18 @@ public class GravitinoIcebergCatalog extends BaseCatalog
     return ((SparkCatalog) sparkCatalog).loadFunction(ident);
   }
 
+  /**
+   * 1. The GravitinoIcebergCatalog does not extend the SparkCatalog, and it also cannot extend the
+   * SparkCatalog because the initialize method of the SparkCatalog is final and cannot be
+   * overrided. 2. If directly using `((SparkCatalog) sparkCatalog).loadProcedure()`, it will cause
+   * a Preconditions check failed, please referred to
+   * https://github.com/apache/iceberg/blob/ea916c1700ef37377d3e8bba1197b3fe32d1a248/spark/v3.4/spark/src/main/java/org/apache/iceberg/spark/procedures/BaseProcedure.java#L121
+   */
   @Override
   public Procedure loadProcedure(Identifier identifier) throws NoSuchProcedureException {
     String[] namespace = identifier.namespace();
     String name = identifier.name();
 
-    // namespace resolution is case insensitive until we have a way to configure case sensitivity in
-    // catalogs
     if (isSystemNamespace(namespace)) {
       SparkProcedures.ProcedureBuilder builder = SparkProcedures.newBuilder(name);
       if (builder != null) {
