@@ -152,15 +152,14 @@ public class TableMetaService {
 
     String tableName = identifier.name();
 
-    try {
-      Long schemaId =
-          CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
-      Long tableId = getTableIdBySchemaIdAndName(schemaId, tableName);
-      SessionUtils.doWithCommit(
-          TableMetaMapper.class, mapper -> mapper.softDeleteTableMetasByTableId(tableId));
-    } catch (NoSuchEntityException e) {
-      return false;
-    }
+    Long schemaId =
+        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
+
+    Long tableId = getTableIdBySchemaIdAndName(schemaId, tableName);
+
+    SessionUtils.doWithCommit(
+        TableMetaMapper.class, mapper -> mapper.softDeleteTableMetasByTableId(tableId));
+
     return true;
   }
 
