@@ -44,6 +44,9 @@ public class IcebergPropertiesConverter implements PropertiesConverter {
       case IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND_JDBC:
         initJdbcProperties(properties, all);
         break;
+      case IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND_REST:
+        initRestProperties(properties, all);
+        break;
       default:
         // SparkCatalog does not support Memory type catalog
         throw new IllegalArgumentException(
@@ -122,5 +125,26 @@ public class IcebergPropertiesConverter implements PropertiesConverter {
     icebergProperties.put(IcebergPropertiesConstants.ICEBERG_CATALOG_WAREHOUSE, jdbcWarehouse);
     icebergProperties.put(IcebergPropertiesConstants.ICEBERG_CATALOG_JDBC_USER, jdbcUser);
     icebergProperties.put(IcebergPropertiesConstants.ICEBERG_CATALOG_JDBC_PASSWORD, jdbcPassword);
+  }
+
+  private void initRestProperties(
+      Map<String, String> gravitinoProperties, HashMap<String, String> icebergProperties) {
+    String restUri =
+        gravitinoProperties.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(restUri),
+        "Couldn't get "
+            + IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI
+            + " from Iceberg Catalog properties");
+    icebergProperties.put(
+        IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE,
+        IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_REST);
+    icebergProperties.put(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI, restUri);
+    if (gravitinoProperties.containsKey(
+        IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE)) {
+      icebergProperties.put(
+          IcebergPropertiesConstants.ICEBERG_CATALOG_WAREHOUSE,
+          gravitinoProperties.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE));
+    }
   }
 }
