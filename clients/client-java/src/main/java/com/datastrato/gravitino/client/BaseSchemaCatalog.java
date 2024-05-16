@@ -22,7 +22,6 @@ import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rest.RESTUtils;
-import com.google.common.annotations.VisibleForTesting;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -199,7 +198,6 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements SupportsSchemas {
     }
   }
 
-  @VisibleForTesting
   static String formatSchemaRequestPath(Namespace ns) {
     return new StringBuilder()
         .append("api/metalakes/")

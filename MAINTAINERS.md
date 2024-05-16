@@ -22,8 +22,8 @@ Maintainers may be added once approved by the existing maintainers (see [Governa
 | Cheyne        | ch3yne              | Datastrato       |
 | Jerry Shao    | jerryshao           | Datastrato       |
 | Shaofeng Shi  | shaofengshi         | Datastrato       |
+| Lisa Cao      | lisancao            | Datastrato       |
 | Qian Xia      | LauraXia123         | Datastrato       |
-
 
 # Contribitors
 

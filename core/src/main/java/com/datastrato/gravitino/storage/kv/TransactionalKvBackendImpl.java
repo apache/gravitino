@@ -340,7 +340,6 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   }
 
   /** Generate a key of data for a specific transaction id. */
-  @VisibleForTesting
   static byte[] generateKey(byte[] key, long transactionId) {
     return generateKey(key, revertByteArray(ByteUtils.longToByte(transactionId)));
   }
