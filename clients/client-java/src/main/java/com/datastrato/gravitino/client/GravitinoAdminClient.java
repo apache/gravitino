@@ -52,8 +52,6 @@ import org.slf4j.LoggerFactory;
  * <p>Normal users should use {@link GravitinoClient} to connect with the Gravitino server.
  */
 public class GravitinoAdminClient extends GravitinoClientBase implements SupportsMetalakes {
-
-  private static final Logger LOG = LoggerFactory.getLogger(GravitinoAdminClient.class);
   private static final String API_METALAKES_USERS_PATH = "api/metalakes/%s/users/%s";
   private static final String API_METALAKES_GROUPS_PATH = "api/metalakes/%s/groups/%s";
   private static final String API_METALAKES_ROLES_PATH = "api/metalakes/%s/roles/%s";
@@ -165,12 +163,11 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
    * Drops a specific Metalake using the Gravitino API.
    *
    * @param name The name of the Metalake to be dropped.
-   * @return True if the Metalake was successfully dropped, false otherwise.
+   * @return True if the Metalake was successfully dropped, false if the Metalake does not exist.
    */
   @Override
   public boolean dropMetalake(String name) {
     checkMetalakeName(name);
-    try {
       DropResponse resp =
           restClient.delete(
               API_METALAKES_IDENTIFIER_PATH + name,
@@ -179,11 +176,6 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
               ErrorHandlers.metalakeErrorHandler());
       resp.validate();
       return resp.dropped();
-
-    } catch (Exception e) {
-      LOG.warn("Failed to drop metadata {}", name, e);
-      return false;
-    }
   }
 
   /**

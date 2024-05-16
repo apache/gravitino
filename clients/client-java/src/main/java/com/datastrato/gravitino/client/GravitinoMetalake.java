@@ -37,9 +37,6 @@ import org.slf4j.LoggerFactory;
  * alter and drop a catalog with specified identifier.
  */
 public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
-
-  private static final Logger LOG = LoggerFactory.getLogger(GravitinoMetalake.class);
-
   private static final String API_METALAKES_CATALOGS_PATH = "api/metalakes/%s/catalogs/%s";
 
   private final RESTClient restClient;
@@ -192,12 +189,11 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
    * Drop the catalog with specified identifier.
    *
    * @param catalogName the name of the catalog.
-   * @return true if the catalog is dropped successfully, false otherwise.
+   * @return true if the catalog is dropped successfully, false if the catalog does not exist.
    */
   @Override
   public boolean dropCatalog(String catalogName) {
 
-    try {
       DropResponse resp =
           restClient.delete(
               String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName),
@@ -206,11 +202,6 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
               ErrorHandlers.catalogErrorHandler());
       resp.validate();
       return resp.dropped();
-
-    } catch (Exception e) {
-      LOG.warn("Failed to drop catalog {}", catalogName, e);
-      return false;
-    }
   }
 
   static class Builder extends MetalakeDTO.Builder<Builder> {

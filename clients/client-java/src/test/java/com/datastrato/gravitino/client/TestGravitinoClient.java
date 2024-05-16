@@ -223,11 +223,11 @@ public class TestGravitinoClient extends TestBase {
   public void testDropMetalake() throws JsonProcessingException {
     DropResponse resp = new DropResponse(true);
     buildMockResource(Method.DELETE, "/api/metalakes/mock", null, resp, HttpStatus.SC_OK);
-    Assertions.assertTrue(client.dropMetalake("mock"));
+    Assertions.assertTrue(client.dropMetalake("mock"), "metalake should be dropped");
 
     DropResponse resp1 = new DropResponse(false);
     buildMockResource(Method.DELETE, "/api/metalakes/mock", null, resp1, HttpStatus.SC_OK);
-    Assertions.assertFalse(client.dropMetalake("mock"));
+    Assertions.assertFalse(client.dropMetalake("mock"), "metalake should be non-existent");
 
     // Test return internal error
     ErrorResponse errorResp = ErrorResponse.internalError("mock error");
