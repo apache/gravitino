@@ -36,11 +36,11 @@ public class GravitinoDriverPlugin implements DriverPlugin {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoDriverPlugin.class);
 
   private GravitinoCatalogManager catalogManager;
-    private static final String[] GRAVITINO_DRIVER_EXTENSIONS =
-            new String[] {
-                    GravitinoIcebergSparkSessionExtensions.class.getName(),
-                    IcebergSparkSessionExtensions.class.getName()
-            };
+  private static final String[] GRAVITINO_DRIVER_EXTENSIONS =
+      new String[] {
+        GravitinoIcebergSparkSessionExtensions.class.getName(),
+        IcebergSparkSessionExtensions.class.getName()
+      };
 
   @Override
   public Map<String, String> init(SparkContext sc, PluginContext pluginContext) {

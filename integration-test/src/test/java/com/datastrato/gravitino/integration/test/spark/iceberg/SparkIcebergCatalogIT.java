@@ -8,18 +8,23 @@ import com.datastrato.gravitino.integration.test.spark.SparkCommonIT;
 import com.datastrato.gravitino.integration.test.util.spark.SparkMetadataColumnInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
+import com.datastrato.gravitino.spark.connector.iceberg.SparkIcebergTable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.Data;
 import org.apache.hadoop.fs.Path;
+import org.apache.iceberg.NullOrder;
+import org.apache.iceberg.SortOrder;
 import org.apache.iceberg.exceptions.ValidationException;
 import org.apache.spark.sql.Column;
 import org.apache.spark.sql.Dataset;
@@ -32,6 +37,8 @@ import org.apache.spark.sql.catalyst.expressions.Literal;
 import org.apache.spark.sql.connector.catalog.CatalogPlugin;
 import org.apache.spark.sql.connector.catalog.FunctionCatalog;
 import org.apache.spark.sql.connector.catalog.Identifier;
+import org.apache.spark.sql.connector.catalog.Table;
+import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.connector.catalog.functions.UnboundFunction;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructField;
@@ -48,7 +55,6 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
   private static final String ICEBERG_MERGE_MODE = "write.merge.mode";
   private static final String ICEBERG_WRITE_DISTRIBUTION_MODE = "write.distribution-mode";
   private static final String ICEBERG_SORT_ORDER = "sort-order";
-  private static final String ICEBERG_IDENTIFIER_FIELDS = "identifier-fields";
 
   @Override
   protected String getCatalogName() {
@@ -243,14 +249,14 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     testIcebergMergeIntoUpdateOperation(icebergTableWriteProperties);
   }
 
-    @Test
-    void testIcebergSQLExtensions() {
-        testIcebergPartitionFieldOperations();
-        testIcebergBranchOperations();
-        testIcebergTagOperations();
-        testIcebergIdentifierOperations();
-        testIcebergDistributionAndOrderingOperations();
-    }
+  @Test
+  void testIcebergSQLExtensions() throws NoSuchTableException, IOException {
+    testIcebergPartitionFieldOperations();
+    testIcebergBranchOperations();
+    testIcebergTagOperations();
+    testIcebergIdentifierOperations();
+    testIcebergDistributionAndOrderingOperations();
+  }
 
   private void testMetadataColumns() {
     String tableName = "test_metadata_columns";
@@ -500,259 +506,283 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     checkTableUpdateByMergeInto(tableName);
   }
 
-    private void testIcebergPartitionFieldOperations() {
-        List<String> partitionFields =
-                Arrays.asList("name", "truncate(1, name)", "bucket(16, id)", "days(ts)");
-        String partitionExpression = "name=a/name_trunc=a/id_bucket=4/ts_day=2024-01-01";
-        String tableName = "test_iceberg_partition_field_operations";
-        dropTableIfExists(tableName);
-        sql(getCreateIcebergSimpleTableString(tableName));
+  private void testIcebergPartitionFieldOperations() {
+    List<String> partitionFields =
+        Arrays.asList("name", "truncate(1, name)", "bucket(16, id)", "days(ts)");
+    String partitionExpression = "name=a/name_trunc_1=a/id_bucket_16=4/ts_day=2024-01-01";
+    String tableName = "test_iceberg_partition_field_operations";
+    dropTableIfExists(tableName);
+    sql(getCreateIcebergSimpleTableString(tableName));
 
-        // add partition fields
-        SparkTableInfo tableInfo = getTableInfo(tableName);
-        SparkTableInfoChecker checker =
-                SparkTableInfoChecker.create()
-                        .withName(tableName)
-                        .withColumns(getIcebergSimpleTableColumn());
-        checker.check(tableInfo);
+    // add partition fields
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withColumns(getIcebergSimpleTableColumn());
+    checker.check(tableInfo);
 
-        partitionFields.forEach(
-                partitionField ->
-                        sql(String.format("ALTER TABLE %s ADD PARTITION FIELD %s", tableName, partitionField)));
+    partitionFields.forEach(
+        partitionField ->
+            sql(String.format("ALTER TABLE %s ADD PARTITION FIELD %s", tableName, partitionField)));
 
-        tableInfo = getTableInfo(tableName);
-        checker =
-                SparkTableInfoChecker.create()
-                        .withName(tableName)
-                        .withColumns(getIcebergSimpleTableColumn())
-                        .withIdentifyPartition(Collections.singletonList("name"))
-                        .withTruncatePartition(1, "name")
-                        .withBucketPartition(16, Collections.singletonList("id"))
-                        .withDayPartition("ts");
-        checker.check(tableInfo);
+    tableInfo = getTableInfo(tableName);
+    checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withColumns(getIcebergSimpleTableColumn())
+            .withIdentifyPartition(Collections.singletonList("name"))
+            .withTruncatePartition(1, "name")
+            .withBucketPartition(16, Collections.singletonList("id"))
+            .withDayPartition("ts");
+    checker.check(tableInfo);
 
-        sql(
-                String.format(
-                        "INSERT INTO %s VALUES(2,'a',cast('2024-01-01 12:00:00' as timestamp));", tableName));
-        List<String> queryResult = getTableData(tableName);
-        Assertions.assertEquals(1, queryResult.size());
-        Assertions.assertEquals("2,a,2024-01-01 12:00:00", queryResult.get(0));
-        Path partitionPath = new Path(getTableLocation(tableInfo), partitionExpression);
-        checkDirExists(partitionPath);
+    sql(
+        String.format(
+            "INSERT INTO %s VALUES(2,'a',cast('2024-01-01 12:00:00' as timestamp));", tableName));
+    List<String> queryResult = getTableData(tableName);
+    Assertions.assertEquals(1, queryResult.size());
+    Assertions.assertEquals("2,a,2024-01-01 12:00:00", queryResult.get(0));
+    Path partitionPath = new Path(getTableLocation(tableInfo), partitionExpression);
+    checkDirExists(partitionPath);
 
-        // replace partition fields
-        sql(String.format("ALTER TABLE %s REPLACE PARTITION FIELD ts_day WITH months(ts)", tableName));
-        tableInfo = getTableInfo(tableName);
-        checker =
-                SparkTableInfoChecker.create()
-                        .withName(tableName)
-                        .withColumns(getIcebergSimpleTableColumn())
-                        .withIdentifyPartition(Collections.singletonList("name"))
-                        .withTruncatePartition(1, "name")
-                        .withBucketPartition(16, Collections.singletonList("id"))
-                        .withMonthPartition("ts");
-        checker.check(tableInfo);
+    // replace partition fields
+    sql(String.format("ALTER TABLE %s REPLACE PARTITION FIELD ts_day WITH months(ts)", tableName));
+    tableInfo = getTableInfo(tableName);
+    checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withColumns(getIcebergSimpleTableColumn())
+            .withIdentifyPartition(Collections.singletonList("name"))
+            .withTruncatePartition(1, "name")
+            .withBucketPartition(16, Collections.singletonList("id"))
+            .withMonthPartition("ts");
+    checker.check(tableInfo);
 
-        // drop partition fields
-        sql(String.format("ALTER TABLE %s DROP PARTITION FIELD months(ts)", tableName));
-        tableInfo = getTableInfo(tableName);
-        checker =
-                SparkTableInfoChecker.create()
-                        .withName(tableName)
-                        .withColumns(getIcebergSimpleTableColumn())
-                        .withIdentifyPartition(Collections.singletonList("name"))
-                        .withTruncatePartition(1, "name")
-                        .withBucketPartition(16, Collections.singletonList("id"));
-        checker.check(tableInfo);
-    }
+    // drop partition fields
+    sql(String.format("ALTER TABLE %s DROP PARTITION FIELD months(ts)", tableName));
+    tableInfo = getTableInfo(tableName);
+    checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withColumns(getIcebergSimpleTableColumn())
+            .withIdentifyPartition(Collections.singletonList("name"))
+            .withTruncatePartition(1, "name")
+            .withBucketPartition(16, Collections.singletonList("id"));
+    checker.check(tableInfo);
+  }
 
-    private void testIcebergBranchOperations() {
-        String tableName = "test_iceberg_branch_operations";
-        String fullTableName =
-                String.format("%s.%s.%s", getCatalogName(), getDefaultDatabase(), tableName);
-        String branch1 = "branch1";
-        dropTableIfExists(tableName);
-        createSimpleTable(tableName);
+  private void testIcebergBranchOperations() throws NoSuchTableException {
+    String tableName = "test_iceberg_branch_operations";
+    String branch1 = "branch1";
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
 
-        // create branch and query data using branch
-        sql(String.format("INSERT INTO %s VALUES(1, '1', 1);", tableName));
-        List<String> tableData = getTableData(tableName);
-        Assertions.assertEquals(1, tableData.size());
-        Assertions.assertEquals("1,1,1", tableData.get(0));
-        List<Row> snapshots =
-                getSparkSession()
-                        .sql(String.format("SELECT snapshot_id FROM %s.snapshots", fullTableName))
-                        .collectAsList();
-        Assertions.assertEquals(1, snapshots.size());
-        long snapshotId = snapshots.get(0).getLong(0);
+    // create branch and query data using branch
+    sql(String.format("INSERT INTO %s VALUES(1, '1', 1);", tableName));
+    List<String> tableData = getTableData(tableName);
+    Assertions.assertEquals(1, tableData.size());
+    Assertions.assertEquals("1,1,1", tableData.get(0));
 
-        sql(String.format("ALTER TABLE %s CREATE BRANCH IF NOT EXISTS `%s`", tableName, branch1));
-        sql(String.format("INSERT INTO %s VALUES(2, '2', 2);", tableName));
-        tableData = getQueryData(getSelectAllSqlWithOrder(tableName));
-        Assertions.assertEquals(2, tableData.size());
-        Assertions.assertEquals("1,1,1;2,2,2", String.join(";", tableData));
+    long snapshotId = getCurrentSnapshotId(tableName);
+    sql(String.format("ALTER TABLE %s CREATE BRANCH IF NOT EXISTS `%s`", tableName, branch1));
 
-        tableData =
-                getQueryData(String.format("SELECT * FROM %s VERSION AS OF '%s'", tableName, branch1));
-        Assertions.assertEquals(1, tableData.size());
-        Assertions.assertEquals("1,1,1", tableData.get(0));
+    sql(String.format("INSERT INTO %s VALUES(2, '2', 2);", tableName));
+    tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
+    Assertions.assertEquals(2, tableData.size());
+    Assertions.assertEquals("1,1,1;2,2,2", String.join(";", tableData));
 
-        sql(String.format("ALTER TABLE %s CREATE OR REPLACE BRANCH `%s`", tableName, branch1));
-        tableData =
-                getQueryData(
-                        String.format("SELECT * FROM %s VERSION AS OF '%s' ORDER BY id", tableName, branch1));
-        Assertions.assertEquals(2, tableData.size());
-        Assertions.assertEquals("1,1,1;2,2,2", String.join(";", tableData));
+    tableData =
+        getQueryData(String.format("SELECT * FROM %s VERSION AS OF '%s'", tableName, branch1));
+    Assertions.assertEquals(1, tableData.size());
+    Assertions.assertEquals("1,1,1", tableData.get(0));
 
-        // replace branch
-        sql(
-                String.format(
-                        "ALTER TABLE %s REPLACE BRANCH `%s` AS OF VERSION %d RETAIN 1 DAYS",
-                        tableName, branch1, snapshotId));
-        tableData =
-                getQueryData(String.format("SELECT * FROM %s VERSION AS OF '%s'", tableName, branch1));
-        Assertions.assertEquals(1, tableData.size());
-        Assertions.assertEquals("1,1,1", tableData.get(0));
+    sql(String.format("ALTER TABLE %s CREATE OR REPLACE BRANCH `%s`", tableName, branch1));
+    tableData =
+        getQueryData(
+            String.format("SELECT * FROM %s VERSION AS OF '%s' ORDER BY id", tableName, branch1));
+    Assertions.assertEquals(2, tableData.size());
+    Assertions.assertEquals("1,1,1;2,2,2", String.join(";", tableData));
 
-        // drop branch
-        sql(String.format("ALTER TABLE %s DROP BRANCH `%s`", tableName, branch1));
-        Assertions.assertThrows(
-                ValidationException.class,
-                () -> sql(String.format("SELECT * FROM %s VERSION AS OF '%s'", tableName, branch1)));
-    }
+    // replace branch
+    sql(
+        String.format(
+            "ALTER TABLE %s REPLACE BRANCH `%s` AS OF VERSION %d RETAIN 1 DAYS",
+            tableName, branch1, snapshotId));
+    tableData =
+        getQueryData(String.format("SELECT * FROM %s VERSION AS OF '%s'", tableName, branch1));
+    Assertions.assertEquals(1, tableData.size());
+    Assertions.assertEquals("1,1,1", tableData.get(0));
 
-    private void testIcebergTagOperations() {
-        String tableName = "test_iceberg_tag_operations";
-        String fullTableName =
-                String.format("%s.%s.%s", getCatalogName(), getDefaultDatabase(), tableName);
-        String tag1 = "tag1";
-        dropTableIfExists(tableName);
-        createSimpleTable(tableName);
+    // drop branch
+    sql(String.format("ALTER TABLE %s DROP BRANCH `%s`", tableName, branch1));
+    Assertions.assertThrows(
+        ValidationException.class,
+        () -> sql(String.format("SELECT * FROM %s VERSION AS OF '%s'", tableName, branch1)));
+  }
 
-        // create tag and query data using tag
-        sql(String.format("INSERT INTO %s VALUES(1, '1', 1);", tableName));
-        List<String> tableData = getTableData(tableName);
-        Assertions.assertEquals(1, tableData.size());
-        Assertions.assertEquals("1,1,1", tableData.get(0));
-        List<Row> snapshots =
-                getSparkSession()
-                        .sql(String.format("SELECT snapshot_id FROM %s.snapshots", fullTableName))
-                        .collectAsList();
-        Assertions.assertEquals(1, snapshots.size());
-        long snapshotId = snapshots.get(0).getLong(0);
+  private void testIcebergTagOperations() throws NoSuchTableException {
+    String tableName = "test_iceberg_tag_operations";
+    String tag1 = "tag1";
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
 
-        sql(String.format("ALTER TABLE %s CREATE TAG IF NOT EXISTS `%s`", tableName, tag1));
-        sql(String.format("INSERT INTO %s VALUES(2, '2', 2);", tableName));
-        tableData = getQueryData(getSelectAllSqlWithOrder(tableName));
-        Assertions.assertEquals(2, tableData.size());
-        Assertions.assertEquals("1,1,1;2,2,2", String.join(";", tableData));
+    // create tag and query data using tag
+    sql(String.format("INSERT INTO %s VALUES(1, '1', 1);", tableName));
+    List<String> tableData = getTableData(tableName);
+    Assertions.assertEquals(1, tableData.size());
+    Assertions.assertEquals("1,1,1", tableData.get(0));
 
-        tableData = getQueryData(String.format("SELECT * FROM %s VERSION AS OF '%s'", tableName, tag1));
-        Assertions.assertEquals(1, tableData.size());
-        Assertions.assertEquals("1,1,1", tableData.get(0));
+    long snapshotId = getCurrentSnapshotId(tableName);
+    sql(String.format("ALTER TABLE %s CREATE TAG IF NOT EXISTS `%s`", tableName, tag1));
 
-        sql(String.format("ALTER TABLE %s CREATE OR REPLACE TAG `%s`", tableName, tag1));
-        tableData =
-                getQueryData(
-                        String.format("SELECT * FROM %s VERSION AS OF '%s' ORDER BY id", tableName, tag1));
-        Assertions.assertEquals(2, tableData.size());
-        Assertions.assertEquals("1,1,1;2,2,2", String.join(";", tableData));
+    sql(String.format("INSERT INTO %s VALUES(2, '2', 2);", tableName));
+    tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
+    Assertions.assertEquals(2, tableData.size());
+    Assertions.assertEquals("1,1,1;2,2,2", String.join(";", tableData));
 
-        // replace tag
-        sql(
-                String.format(
-                        "ALTER TABLE %s REPLACE TAG `%s` AS OF VERSION %d RETAIN 1 DAYS",
-                        tableName, tag1, snapshotId));
-        tableData = getQueryData(String.format("SELECT * FROM %s VERSION AS OF '%s'", tableName, tag1));
-        Assertions.assertEquals(1, tableData.size());
-        Assertions.assertEquals("1,1,1", tableData.get(0));
+    tableData = getQueryData(String.format("SELECT * FROM %s VERSION AS OF '%s'", tableName, tag1));
+    Assertions.assertEquals(1, tableData.size());
+    Assertions.assertEquals("1,1,1", tableData.get(0));
 
-        // drop tag
-        sql(String.format("ALTER TABLE %s DROP TAG `%s`", tableName, tag1));
-        Assertions.assertThrows(
-                ValidationException.class,
-                () -> sql(String.format("SELECT * FROM %s VERSION AS OF '%s'", tableName, tag1)));
-    }
+    sql(String.format("ALTER TABLE %s CREATE OR REPLACE TAG `%s`", tableName, tag1));
+    tableData =
+        getQueryData(
+            String.format("SELECT * FROM %s VERSION AS OF '%s' ORDER BY id", tableName, tag1));
+    Assertions.assertEquals(2, tableData.size());
+    Assertions.assertEquals("1,1,1;2,2,2", String.join(";", tableData));
 
-    private void testIcebergIdentifierOperations() {
-        String tableName = "test_iceberg_identifier_operations";
-        List<SparkTableInfo.SparkColumnInfo> columnInfos =
-                Arrays.asList(
-                        SparkTableInfo.SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment", false),
-                        SparkTableInfo.SparkColumnInfo.of("name", DataTypes.StringType, "", false),
-                        SparkTableInfo.SparkColumnInfo.of("ts", DataTypes.TimestampType, null, true));
-        dropTableIfExists(tableName);
-        sql(
-                String.format(
-                        "CREATE TABLE %s (id INT COMMENT 'id comment' NOT NULL, name STRING COMMENT '' NOT NULL, age INT)",
-                        tableName));
-        SparkTableInfo tableInfo = getTableInfo(tableName);
-        SparkTableInfoChecker checker =
-                SparkTableInfoChecker.create().withName(tableName).withColumns(columnInfos);
-        checker.check(tableInfo);
-        Map<String, String> tableProperties = tableInfo.getTableProperties();
-        Assertions.assertNull(tableProperties.get(ICEBERG_IDENTIFIER_FIELDS));
+    // replace tag
+    sql(
+        String.format(
+            "ALTER TABLE %s REPLACE TAG `%s` AS OF VERSION %d RETAIN 1 DAYS",
+            tableName, tag1, snapshotId));
+    tableData = getQueryData(String.format("SELECT * FROM %s VERSION AS OF '%s'", tableName, tag1));
+    Assertions.assertEquals(1, tableData.size());
+    Assertions.assertEquals("1,1,1", tableData.get(0));
 
-        // add identifier
-        sql(String.format("ALTER TABLE %s SET IDENTIFIER FIELDS id, name", tableName));
-        tableInfo = getTableInfo(tableName);
-        tableProperties = tableInfo.getTableProperties();
-        Assertions.assertEquals("[name,id]", tableProperties.get(ICEBERG_IDENTIFIER_FIELDS));
+    // drop tag
+    sql(String.format("ALTER TABLE %s DROP TAG `%s`", tableName, tag1));
+    Assertions.assertThrows(
+        ValidationException.class,
+        () -> sql(String.format("SELECT * FROM %s VERSION AS OF '%s'", tableName, tag1)));
+  }
 
-        // drop identifier
-        sql(String.format("ALTER TABLE %s DROP IDENTIFIER 'id1'", tableName));
-        tableInfo = getTableInfo(tableName);
-        tableProperties = tableInfo.getTableProperties();
-        Assertions.assertNull(tableProperties.get(ICEBERG_IDENTIFIER_FIELDS));
-    }
+  private void testIcebergIdentifierOperations() throws NoSuchTableException {
+    String tableName = "test_iceberg_identifier_operations";
+    // The Identifier fields must be non-null, so a new schema with non-null fields is created here.
+    List<SparkTableInfo.SparkColumnInfo> columnInfos =
+        Arrays.asList(
+            SparkTableInfo.SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment", false),
+            SparkTableInfo.SparkColumnInfo.of("name", DataTypes.StringType, "", false),
+            SparkTableInfo.SparkColumnInfo.of("age", DataTypes.IntegerType, null, true));
+    dropTableIfExists(tableName);
 
-    private void testIcebergDistributionAndOrderingOperations() {
-        String tableName = "test_iceberg_distribution_and_ordering_operations";
-        dropTableIfExists(tableName);
-        createSimpleTable(tableName);
+    sql(
+        String.format(
+            "CREATE TABLE %s (id INT COMMENT 'id comment' NOT NULL, name STRING COMMENT '' NOT NULL, age INT)",
+            tableName));
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create().withName(tableName).withColumns(columnInfos);
+    checker.check(tableInfo);
 
-        SparkTableInfo tableInfo = getTableInfo(tableName);
-        Map<String, String> tableProperties = tableInfo.getTableProperties();
-        Assertions.assertNull(tableProperties.get(ICEBERG_WRITE_DISTRIBUTION_MODE));
-        Assertions.assertNull(tableProperties.get(ICEBERG_SORT_ORDER));
+    SparkIcebergTable sparkIcebergTable = getSparkIcebergTableInstance(tableName);
+    org.apache.iceberg.Table icebergTable = sparkIcebergTable.table();
+    Set<String> identifierFieldNames = icebergTable.schema().identifierFieldNames();
+    Assertions.assertEquals(0, identifierFieldNames.size());
 
-        // set globally ordering
-        sql(String.format("ALTER TABLE %s WRITE ORDERED BY id DESC", tableName));
-        tableInfo = getTableInfo(tableName);
-        tableProperties = tableInfo.getTableProperties();
-        Assertions.assertEquals("range", tableProperties.get(ICEBERG_WRITE_DISTRIBUTION_MODE));
-        Assertions.assertEquals("id DESC NULLS LAST", tableProperties.get(ICEBERG_SORT_ORDER));
+    // add identifier fields
+    sql(String.format("ALTER TABLE %s SET IDENTIFIER FIELDS id, name", tableName));
+    icebergTable.refresh();
+    identifierFieldNames = icebergTable.schema().identifierFieldNames();
+    Assertions.assertTrue(identifierFieldNames.contains("id"));
+    Assertions.assertTrue(identifierFieldNames.contains("name"));
 
-        // set locally ordering
-        sql(String.format("ALTER TABLE %s WRITE LOCALLY ORDERED BY id DESC", tableName));
-        tableInfo = getTableInfo(tableName);
-        tableProperties = tableInfo.getTableProperties();
-        Assertions.assertEquals("none", tableProperties.get(ICEBERG_WRITE_DISTRIBUTION_MODE));
-        Assertions.assertEquals("id DESC NULLS LAST", tableProperties.get(ICEBERG_SORT_ORDER));
+    // drop identifier fields
+    sql(String.format("ALTER TABLE %s DROP IDENTIFIER FIELDS name", tableName));
+    icebergTable.refresh();
+    identifierFieldNames = icebergTable.schema().identifierFieldNames();
+    Assertions.assertTrue(identifierFieldNames.contains("id"));
+    Assertions.assertFalse(identifierFieldNames.contains("name"));
+  }
 
-        // set distribution
-        sql(String.format("ALTER TABLE %s WRITE DISTRIBUTED BY PARTITION", tableName));
-        tableInfo = getTableInfo(tableName);
-        tableProperties = tableInfo.getTableProperties();
-        Assertions.assertEquals("hash", tableProperties.get(ICEBERG_WRITE_DISTRIBUTION_MODE));
-        Assertions.assertNull(tableProperties.get(ICEBERG_SORT_ORDER));
+  private void testIcebergDistributionAndOrderingOperations() throws NoSuchTableException {
+    String tableName = "test_iceberg_distribution_and_ordering_operations";
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
 
-        // set distribution with locally ordering
-        sql(
-                String.format(
-                        "ALTER TABLE %s WRITE DISTRIBUTED BY PARTITION LOCALLY ORDERED BY id desc", tableName));
-        tableInfo = getTableInfo(tableName);
-        tableProperties = tableInfo.getTableProperties();
-        Assertions.assertEquals("hash", tableProperties.get(ICEBERG_WRITE_DISTRIBUTION_MODE));
-        Assertions.assertEquals("id DESC NULLS LAST", tableProperties.get(ICEBERG_SORT_ORDER));
-    }
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+    Map<String, String> tableProperties = tableInfo.getTableProperties();
+    Assertions.assertEquals("none", tableProperties.get(ICEBERG_WRITE_DISTRIBUTION_MODE));
+    Assertions.assertNull(tableProperties.get(ICEBERG_SORT_ORDER));
 
-    private List<SparkTableInfo.SparkColumnInfo> getIcebergSimpleTableColumn() {
-        return Arrays.asList(
-                SparkTableInfo.SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment"),
-                SparkTableInfo.SparkColumnInfo.of("name", DataTypes.StringType, ""),
-                SparkTableInfo.SparkColumnInfo.of("ts", DataTypes.TimestampType, null));
-    }
+    SparkIcebergTable sparkIcebergTable = getSparkIcebergTableInstance(tableName);
+    org.apache.iceberg.Table icebergTable = sparkIcebergTable.table();
+
+    // set globally ordering
+    sql(String.format("ALTER TABLE %s WRITE ORDERED BY id DESC", tableName));
+    icebergTable.refresh();
+    tableInfo = getTableInfo(tableName);
+    tableProperties = tableInfo.getTableProperties();
+    Assertions.assertEquals("range", tableProperties.get(ICEBERG_WRITE_DISTRIBUTION_MODE));
+    SortOrder sortOrder =
+        SortOrder.builderFor(icebergTable.schema())
+            .withOrderId(1)
+            .desc("id", NullOrder.NULLS_LAST)
+            .build();
+    Assertions.assertEquals(sortOrder, icebergTable.sortOrder());
+
+    // set locally ordering
+    sql(String.format("ALTER TABLE %s WRITE LOCALLY ORDERED BY id DESC", tableName));
+    icebergTable.refresh();
+    tableInfo = getTableInfo(tableName);
+    tableProperties = tableInfo.getTableProperties();
+    Assertions.assertEquals("none", tableProperties.get(ICEBERG_WRITE_DISTRIBUTION_MODE));
+    sortOrder =
+        SortOrder.builderFor(icebergTable.schema())
+            .withOrderId(1)
+            .desc("id", NullOrder.NULLS_LAST)
+            .build();
+    Assertions.assertEquals(sortOrder, icebergTable.sortOrder());
+
+    // set distribution
+    sql(
+        String.format(
+            "ALTER TABLE %s WRITE ORDERED BY id DESC DISTRIBUTED BY PARTITION", tableName));
+    icebergTable.refresh();
+    tableInfo = getTableInfo(tableName);
+    tableProperties = tableInfo.getTableProperties();
+    Assertions.assertEquals("hash", tableProperties.get(ICEBERG_WRITE_DISTRIBUTION_MODE));
+    sortOrder =
+        SortOrder.builderFor(icebergTable.schema())
+            .withOrderId(1)
+            .desc("id", NullOrder.NULLS_LAST)
+            .build();
+    Assertions.assertEquals(sortOrder, icebergTable.sortOrder());
+
+    // set distribution with locally ordering
+    sql(
+        String.format(
+            "ALTER TABLE %s WRITE DISTRIBUTED BY PARTITION LOCALLY ORDERED BY id desc", tableName));
+    icebergTable.refresh();
+    tableInfo = getTableInfo(tableName);
+    tableProperties = tableInfo.getTableProperties();
+    Assertions.assertEquals("hash", tableProperties.get(ICEBERG_WRITE_DISTRIBUTION_MODE));
+    sortOrder =
+        SortOrder.builderFor(icebergTable.schema())
+            .withOrderId(1)
+            .desc("id", NullOrder.NULLS_LAST)
+            .build();
+    Assertions.assertEquals(sortOrder, icebergTable.sortOrder());
+  }
+
+  private List<SparkTableInfo.SparkColumnInfo> getIcebergSimpleTableColumn() {
+    return Arrays.asList(
+        SparkTableInfo.SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment"),
+        SparkTableInfo.SparkColumnInfo.of("name", DataTypes.StringType, ""),
+        SparkTableInfo.SparkColumnInfo.of("ts", DataTypes.TimestampType, null));
+  }
 
   /**
    * Here we build a new `createIcebergSql` String for creating a table with a field of timestamp
@@ -798,6 +828,21 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
             "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', age INT) %s TBLPROPERTIES(%s)",
             tableName, partitionedClause, tblPropertiesStr);
     sql(createSql);
+  }
+
+  private SparkIcebergTable getSparkIcebergTableInstance(String tableName)
+      throws NoSuchTableException {
+    CatalogPlugin catalogPlugin =
+        getSparkSession().sessionState().catalogManager().catalog(getCatalogName());
+    Assertions.assertInstanceOf(TableCatalog.class, catalogPlugin);
+    TableCatalog catalog = (TableCatalog) catalogPlugin;
+    Table table = catalog.loadTable(Identifier.of(new String[] {getDefaultDatabase()}, tableName));
+    return (SparkIcebergTable) table;
+  }
+
+  private long getCurrentSnapshotId(String tableName) throws NoSuchTableException {
+    SparkIcebergTable sparkIcebergTable = getSparkIcebergTableInstance(tableName);
+    return sparkIcebergTable.table().currentSnapshot().snapshotId();
   }
 
   @Data

@@ -36,7 +36,6 @@ import org.apache.spark.sql.execution.datasources.v2.SetIdentifierFieldsExec;
 import org.apache.spark.sql.execution.datasources.v2.SetWriteDistributionAndOrderingExec;
 import scala.Option;
 import scala.Some;
-import scala.Tuple2;
 import scala.collection.JavaConverters;
 import scala.collection.Seq;
 
@@ -56,12 +55,10 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
       return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(spark, addPartitionField.table())
           .map(
               catalogAndIdentifier -> {
-                TableCatalog catalog = catalogAndIdentifier._1();
-                Identifier identifier = catalogAndIdentifier._2();
                 AddPartitionFieldExec addPartitionFieldExec =
                     new AddPartitionFieldExec(
-                        catalog,
-                        identifier,
+                        catalogAndIdentifier.catalog,
+                        catalogAndIdentifier.identifier,
                         addPartitionField.transform(),
                         addPartitionField.name());
                 return toSeq(addPartitionFieldExec);
@@ -73,12 +70,10 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
               spark, createOrReplaceBranch.table())
           .map(
               catalogAndIdentifier -> {
-                TableCatalog catalog = catalogAndIdentifier._1();
-                Identifier identifier = catalogAndIdentifier._2();
                 CreateOrReplaceBranchExec createOrReplaceBranchExec =
                     new CreateOrReplaceBranchExec(
-                        catalog,
-                        identifier,
+                        catalogAndIdentifier.catalog,
+                        catalogAndIdentifier.identifier,
                         createOrReplaceBranch.branch(),
                         createOrReplaceBranch.branchOptions(),
                         createOrReplaceBranch.replace(),
@@ -92,12 +87,10 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
               spark, createOrReplaceTag.table())
           .map(
               catalogAndIdentifier -> {
-                TableCatalog catalog = catalogAndIdentifier._1();
-                Identifier identifier = catalogAndIdentifier._2();
                 CreateOrReplaceTagExec createOrReplaceTagExec =
                     new CreateOrReplaceTagExec(
-                        catalog,
-                        identifier,
+                        catalogAndIdentifier.catalog,
+                        catalogAndIdentifier.identifier,
                         createOrReplaceTag.tag(),
                         createOrReplaceTag.tagOptions(),
                         createOrReplaceTag.replace(),
@@ -110,11 +103,12 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
       return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(spark, dropBranch.table())
           .map(
               catalogAndIdentifier -> {
-                TableCatalog catalog = catalogAndIdentifier._1();
-                Identifier identifier = catalogAndIdentifier._2();
                 DropBranchExec dropBranchExec =
                     new DropBranchExec(
-                        catalog, identifier, dropBranch.branch(), dropBranch.ifExists());
+                        catalogAndIdentifier.catalog,
+                        catalogAndIdentifier.identifier,
+                        dropBranch.branch(),
+                        dropBranch.ifExists());
                 return toSeq(dropBranchExec);
               })
           .getOrElse(() -> super.apply(plan));
@@ -123,10 +117,12 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
       return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(spark, dropTag.table())
           .map(
               catalogAndIdentifier -> {
-                TableCatalog catalog = catalogAndIdentifier._1();
-                Identifier identifier = catalogAndIdentifier._2();
                 DropTagExec dropTagExec =
-                    new DropTagExec(catalog, identifier, dropTag.tag(), dropTag.ifExists());
+                    new DropTagExec(
+                        catalogAndIdentifier.catalog,
+                        catalogAndIdentifier.identifier,
+                        dropTag.tag(),
+                        dropTag.ifExists());
                 return toSeq(dropTagExec);
               })
           .getOrElse(() -> super.apply(plan));
@@ -136,10 +132,11 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
               spark, dropPartitionField.table())
           .map(
               catalogAndIdentifier -> {
-                TableCatalog catalog = catalogAndIdentifier._1();
-                Identifier identifier = catalogAndIdentifier._2();
                 DropPartitionFieldExec dropPartitionFieldExec =
-                    new DropPartitionFieldExec(catalog, identifier, dropPartitionField.transform());
+                    new DropPartitionFieldExec(
+                        catalogAndIdentifier.catalog,
+                        catalogAndIdentifier.identifier,
+                        dropPartitionField.transform());
                 return toSeq(dropPartitionFieldExec);
               })
           .getOrElse(() -> super.apply(plan));
@@ -149,12 +146,10 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
               spark, replacePartitionField.table())
           .map(
               catalogAndIdentifier -> {
-                TableCatalog catalog = catalogAndIdentifier._1();
-                Identifier identifier = catalogAndIdentifier._2();
                 ReplacePartitionFieldExec replacePartitionFieldExec =
                     new ReplacePartitionFieldExec(
-                        catalog,
-                        identifier,
+                        catalogAndIdentifier.catalog,
+                        catalogAndIdentifier.identifier,
                         replacePartitionField.transformFrom(),
                         replacePartitionField.transformTo(),
                         replacePartitionField.name());
@@ -167,10 +162,11 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
               spark, setIdentifierFields.table())
           .map(
               catalogAndIdentifier -> {
-                TableCatalog catalog = catalogAndIdentifier._1();
-                Identifier identifier = catalogAndIdentifier._2();
                 SetIdentifierFieldsExec setIdentifierFieldsExec =
-                    new SetIdentifierFieldsExec(catalog, identifier, setIdentifierFields.fields());
+                    new SetIdentifierFieldsExec(
+                        catalogAndIdentifier.catalog,
+                        catalogAndIdentifier.identifier,
+                        setIdentifierFields.fields());
                 return toSeq(setIdentifierFieldsExec);
               })
           .getOrElse(() -> super.apply(plan));
@@ -180,11 +176,11 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
               spark, dropIdentifierFields.table())
           .map(
               catalogAndIdentifier -> {
-                TableCatalog catalog = catalogAndIdentifier._1();
-                Identifier identifier = catalogAndIdentifier._2();
                 DropIdentifierFieldsExec dropIdentifierFieldsExec =
                     new DropIdentifierFieldsExec(
-                        catalog, identifier, dropIdentifierFields.fields());
+                        catalogAndIdentifier.catalog,
+                        catalogAndIdentifier.identifier,
+                        dropIdentifierFields.fields());
                 return toSeq(dropIdentifierFieldsExec);
               })
           .getOrElse(() -> super.apply(plan));
@@ -195,12 +191,10 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
               spark, setWriteDistributionAndOrdering.table())
           .map(
               catalogAndIdentifier -> {
-                TableCatalog catalog = catalogAndIdentifier._1();
-                Identifier identifier = catalogAndIdentifier._2();
                 SetWriteDistributionAndOrderingExec setWriteDistributionAndOrderingExec =
                     new SetWriteDistributionAndOrderingExec(
-                        catalog,
-                        identifier,
+                        catalogAndIdentifier.catalog,
+                        catalogAndIdentifier.identifier,
                         setWriteDistributionAndOrdering.distributionMode(),
                         setWriteDistributionAndOrdering.sortOrder());
                 return toSeq(setWriteDistributionAndOrderingExec);
@@ -218,17 +212,32 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
   }
 
   static class IcebergCatalogAndIdentifier {
-    static Option<Tuple2<TableCatalog, Identifier>> buildCatalogAndIdentifier(
-        SparkSession spark, Seq<String> identifier) {
+
+    private final TableCatalog catalog;
+    private final Identifier identifier;
+
+    private IcebergCatalogAndIdentifier(TableCatalog catalog, Identifier identifier) {
+      this.catalog = catalog;
+      this.identifier = identifier;
+    }
+
+    private static IcebergCatalogAndIdentifier of(TableCatalog catalog, Identifier identifier) {
+      return new IcebergCatalogAndIdentifier(catalog, identifier);
+    }
+
+    static Option<IcebergCatalogAndIdentifier> buildCatalogAndIdentifier(
+        SparkSession spark, Seq<String> identifiers) {
       Spark3Util.CatalogAndIdentifier catalogAndIdentifier =
-          Spark3Util.catalogAndIdentifier(
-              spark, scala.collection.JavaConversions.seqAsJavaList(identifier));
+          Spark3Util.catalogAndIdentifier(spark, JavaConverters.<String>seqAsJavaList(identifiers));
       CatalogPlugin catalog = catalogAndIdentifier.catalog();
       if (catalog instanceof GravitinoIcebergCatalog) {
-        return Some.apply(new Tuple2<>((TableCatalog) catalog, catalogAndIdentifier.identifier()));
+        return new Some<>(
+            IcebergCatalogAndIdentifier.of(
+                (TableCatalog) catalog, catalogAndIdentifier.identifier()));
       } else {
         // TODO: support SparkSessionCatalog
-        return Option.empty();
+        throw new UnsupportedOperationException(
+            "Unsupported catalog type: " + catalog.getClass().getName());
       }
     }
   }
