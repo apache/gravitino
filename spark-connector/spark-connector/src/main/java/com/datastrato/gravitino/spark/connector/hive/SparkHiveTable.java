@@ -21,7 +21,6 @@ import org.apache.spark.sql.types.StructType;
 public class SparkHiveTable extends HiveTable {
 
   private GravitinoTableInfoHelper gravitinoTableInfoHelper;
-  private org.apache.spark.sql.connector.catalog.Table sparkTable;
 
   public SparkHiveTable(
       Identifier identifier,
@@ -34,7 +33,6 @@ public class SparkHiveTable extends HiveTable {
     this.gravitinoTableInfoHelper =
         new GravitinoTableInfoHelper(
             false, identifier, gravitinoTable, propertiesConverter, sparkTransformConverter);
-    this.sparkTable = hiveTable;
   }
 
   @Override
