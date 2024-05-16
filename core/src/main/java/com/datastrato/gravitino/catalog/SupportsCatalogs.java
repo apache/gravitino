@@ -2,8 +2,13 @@
  * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino;
+package com.datastrato.gravitino.catalog;
 
+import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.CatalogChange;
+import com.datastrato.gravitino.CatalogProvider;
+import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;

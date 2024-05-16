@@ -13,10 +13,10 @@ import java.util.Map;
 
 /**
  * Client interface for supporting metalakes. It includes methods for listing, loading, creating,
- * altering and dropping metalakes. This class is forked from {@link
- * com.datastrato.gravitino.SupportsMetalakes}, which was designed for Gravitino server side. The
- * difference is that this interface uses simple types instead of complex types in the method
- * signatures, which will be easier for client side to use.
+ * altering and dropping metalakes. This class is forked from
+ * com.datastrato.gravitino.metalake.SupportsMetalakes, which was designed for Gravitino server
+ * side. The difference is that this interface uses simple types instead of complex types in the
+ * method signatures, which will be easier for client side to use.
  */
 @Evolving
 public interface SupportsMetalakes {
