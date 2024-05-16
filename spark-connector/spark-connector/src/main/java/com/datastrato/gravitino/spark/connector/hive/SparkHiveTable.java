@@ -15,9 +15,7 @@ import org.apache.kyuubi.spark.connector.hive.HiveTableCatalog;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.expressions.Transform;
-import org.apache.spark.sql.connector.read.ScanBuilder;
 import org.apache.spark.sql.types.StructType;
-import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
 /** Keep consistent behavior with the SparkIcebergTable */
 public class SparkHiveTable extends HiveTable {
@@ -58,11 +56,5 @@ public class SparkHiveTable extends HiveTable {
   @Override
   public Transform[] partitioning() {
     return gravitinoTableInfoHelper.partitioning();
-  }
-
-  /** to keep consistent behavior with SparkIcebergTable. */
-  @Override
-  public ScanBuilder newScanBuilder(CaseInsensitiveStringMap options) {
-    return ((HiveTable) sparkTable).newScanBuilder(options);
   }
 }

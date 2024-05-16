@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.spark.connector.iceberg;
 
+import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
@@ -14,6 +15,7 @@ import org.apache.iceberg.spark.SparkCatalog;
 import org.apache.iceberg.spark.source.SparkTable;
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
+import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.FunctionCatalog;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
@@ -39,10 +41,6 @@ public class GravitinoIcebergCatalog extends BaseCatalog implements FunctionCata
     return icebergCatalog;
   }
 
-  /**
-   * Migrated `loadTable(identifier)` to the BaseCatalog class and execute `loadTable(identifier)`
-   * before createSparkTable to load sparkTable with different parameters easily.
-   */
   @Override
   protected org.apache.spark.sql.connector.catalog.Table createSparkTable(
       Identifier identifier,
@@ -78,5 +76,81 @@ public class GravitinoIcebergCatalog extends BaseCatalog implements FunctionCata
   @Override
   public UnboundFunction loadFunction(Identifier ident) throws NoSuchFunctionException {
     return ((SparkCatalog) sparkCatalog).loadFunction(ident);
+  }
+
+  @Override
+  public org.apache.spark.sql.connector.catalog.Table loadTable(Identifier ident, String version)
+      throws NoSuchTableException {
+    try {
+      com.datastrato.gravitino.rel.Table gravitinoTable = loadGravitinoTable(ident);
+      org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident, version);
+      // Will create a catalog specific table
+      return createSparkTable(
+          ident,
+          gravitinoTable,
+          sparkTable,
+          sparkCatalog,
+          propertiesConverter,
+          sparkTransformConverter);
+    } catch (com.datastrato.gravitino.exceptions.NoSuchTableException e) {
+      throw new NoSuchTableException(ident);
+    }
+  }
+
+  @Override
+  public org.apache.spark.sql.connector.catalog.Table loadTable(Identifier ident, long timestamp)
+      throws NoSuchTableException {
+    try {
+      com.datastrato.gravitino.rel.Table gravitinoTable = loadGravitinoTable(ident);
+      org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident, timestamp);
+      // Will create a catalog specific table
+      return createSparkTable(
+          ident,
+          gravitinoTable,
+          sparkTable,
+          sparkCatalog,
+          propertiesConverter,
+          sparkTransformConverter);
+    } catch (com.datastrato.gravitino.exceptions.NoSuchTableException e) {
+      throw new NoSuchTableException(ident);
+    }
+  }
+
+  private com.datastrato.gravitino.rel.Table loadGravitinoTable(Identifier ident)
+      throws NoSuchTableException {
+    try {
+      String database = getDatabase(ident);
+      return gravitinoCatalogClient
+          .asTableCatalog()
+          .loadTable(NameIdentifier.of(metalakeName, catalogName, database, ident.name()));
+    } catch (com.datastrato.gravitino.exceptions.NoSuchTableException e) {
+      throw new NoSuchTableException(ident);
+    }
+  }
+
+  private org.apache.spark.sql.connector.catalog.Table loadSparkTable(
+      Identifier ident, String version) {
+    try {
+      return sparkCatalog.loadTable(ident, version);
+    } catch (NoSuchTableException e) {
+      throw new RuntimeException(
+          String.format(
+              "Failed to load the real sparkTable: %s",
+              String.join(".", getDatabase(ident), ident.name())),
+          e);
+    }
+  }
+
+  private org.apache.spark.sql.connector.catalog.Table loadSparkTable(
+      Identifier ident, long timestamp) {
+    try {
+      return sparkCatalog.loadTable(ident, timestamp);
+    } catch (NoSuchTableException e) {
+      throw new RuntimeException(
+          String.format(
+              "Failed to load the real sparkTable: %s",
+              String.join(".", getDatabase(ident), ident.name())),
+          e);
+    }
   }
 }
