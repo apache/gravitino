@@ -36,10 +36,10 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   protected static final String icebergRestServiceName = "iceberg-rest";
-  protected String icebergRestServiceUri = "http://%s:%d/iceberg/";
   protected String hiveMetastoreUri = "thrift://127.0.0.1:9083";
   protected String warehouse;
   protected FileSystem hdfs;
+  protected String icebergRestServiceUri;
 
   private final String metalakeName = "test";
   private SparkSession sparkSession;
@@ -196,6 +196,6 @@ public abstract class SparkEnvIT extends SparkUtilIT {
             serverConfig,
             AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX + icebergRestServiceName + ".");
     return String.format(
-        icebergRestServiceUri, jettyServerConfig.getHost(), jettyServerConfig.getHttpPort());
+        "http://%s:%d/iceberg/", jettyServerConfig.getHost(), jettyServerConfig.getHttpPort());
   }
 }

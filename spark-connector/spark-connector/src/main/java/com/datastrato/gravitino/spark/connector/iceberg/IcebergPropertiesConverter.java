@@ -140,5 +140,11 @@ public class IcebergPropertiesConverter implements PropertiesConverter {
         IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE,
         IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_REST);
     icebergProperties.put(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI, restUri);
+    if (gravitinoProperties.containsKey(
+        IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE)) {
+      icebergProperties.put(
+          IcebergPropertiesConstants.ICEBERG_CATALOG_WAREHOUSE,
+          gravitinoProperties.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE));
+    }
   }
 }

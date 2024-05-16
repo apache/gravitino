@@ -38,13 +38,17 @@ public class IcebergPropertiesConstants {
   static final String ICEBERG_CATALOG_JDBC_PASSWORD =
       IcebergCatalogPropertiesMetadata.ICEBERG_JDBC_PASSWORD;
 
+  @VisibleForTesting
   public static final String ICEBERG_CATALOG_BACKEND_HIVE = CatalogUtil.ICEBERG_CATALOG_TYPE_HIVE;
+
   static final String GRAVITINO_ICEBERG_CATALOG_BACKEND_HIVE = "hive";
 
-  public static final String ICEBERG_CATALOG_BACKEND_JDBC = "jdbc";
   static final String GRAVITINO_ICEBERG_CATALOG_BACKEND_JDBC = "jdbc";
+  static final String ICEBERG_CATALOG_BACKEND_JDBC = "jdbc";
 
+  @VisibleForTesting
   public static final String ICEBERG_CATALOG_BACKEND_REST = CatalogUtil.ICEBERG_CATALOG_TYPE_REST;
+
   static final String GRAVITINO_ICEBERG_CATALOG_BACKEND_REST = "rest";
 
   private IcebergPropertiesConstants() {}
