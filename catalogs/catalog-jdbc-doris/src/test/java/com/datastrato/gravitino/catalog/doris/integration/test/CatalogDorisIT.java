@@ -6,7 +6,7 @@ package com.datastrato.gravitino.catalog.doris.integration.test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import com.datastrato.gravitino.client.api.Catalog;
+import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
@@ -21,7 +21,7 @@ import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.integration.test.util.JdbcDriverDownloader;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
-import com.datastrato.gravitino.client.api.SupportsSchemas;
+import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;

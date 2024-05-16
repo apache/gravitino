@@ -6,8 +6,8 @@ package com.datastrato.gravitino.trino.connector.metadata;
 
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_MISSING_CONFIG;
 
-import com.datastrato.gravitino.client.api.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Catalog;
 import io.trino.spi.TrinoException;
 import java.time.Instant;
 import java.util.Map;

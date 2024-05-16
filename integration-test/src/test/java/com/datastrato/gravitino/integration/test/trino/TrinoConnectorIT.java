@@ -6,7 +6,7 @@ package com.datastrato.gravitino.integration.test.trino;
 
 import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
-import com.datastrato.gravitino.client.api.Catalog;
+import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;

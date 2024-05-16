@@ -9,7 +9,7 @@ import static com.datastrato.gravitino.catalog.kafka.KafkaTopicPropertiesMetadat
 import static com.datastrato.gravitino.catalog.kafka.KafkaTopicPropertiesMetadata.REPLICATION_FACTOR;
 import static com.datastrato.gravitino.integration.test.container.KafkaContainer.DEFAULT_BROKER_PORT;
 
-import com.datastrato.gravitino.client.api.Catalog;
+import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;

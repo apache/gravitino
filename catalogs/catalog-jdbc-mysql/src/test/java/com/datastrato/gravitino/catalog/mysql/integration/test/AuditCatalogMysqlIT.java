@@ -5,7 +5,7 @@
 
 package com.datastrato.gravitino.catalog.mysql.integration.test;
 
-import com.datastrato.gravitino.client.api.Catalog;
+import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.NameIdentifier;

@@ -8,7 +8,7 @@ import static com.datastrato.gravitino.catalog.mysql.MysqlTablePropertiesMetadat
 import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.datastrato.gravitino.client.api.Catalog;
+import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.auth.AuthConstants;
@@ -28,7 +28,7 @@ import com.datastrato.gravitino.integration.test.util.TestDatabaseName;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Column.ColumnImpl;
 import com.datastrato.gravitino.rel.Schema;
-import com.datastrato.gravitino.client.api.SupportsSchemas;
+import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;

@@ -6,7 +6,7 @@ package com.datastrato.gravitino.integration.test.trino;
 
 import static java.lang.Thread.sleep;
 
-import com.datastrato.gravitino.client.api.Catalog;
+import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.client.GravitinoAdminClient;
@@ -15,7 +15,7 @@ import com.datastrato.gravitino.exceptions.RESTException;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.TrinoITContainers;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
-import com.datastrato.gravitino.client.api.SupportsSchemas;
+import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
 import java.io.File;
 import java.io.IOException;

@@ -11,7 +11,6 @@ import com.datastrato.gravitino.authorization.Privilege;
 import com.datastrato.gravitino.authorization.Role;
 import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.User;
-import com.datastrato.gravitino.client.api.SupportsMetalakes;
 import com.datastrato.gravitino.dto.requests.GroupAddRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeCreateRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeUpdateRequest;

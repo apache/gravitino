@@ -9,8 +9,8 @@ import static com.datastrato.gravitino.trino.connector.catalog.jdbc.JDBCCatalogP
 import static com.datastrato.gravitino.trino.connector.catalog.jdbc.JDBCCatalogPropertyConverter.JDBC_CONNECTION_URL_KEY;
 import static com.datastrato.gravitino.trino.connector.catalog.jdbc.JDBCCatalogPropertyConverter.JDBC_CONNECTION_USER_KEY;
 
-import com.datastrato.gravitino.client.api.Catalog;
 import com.datastrato.gravitino.catalog.property.PropertyConverter;
+import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.trino.connector.catalog.jdbc.mysql.MySQLConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.jdbc.postgresql.PostgreSQLConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
