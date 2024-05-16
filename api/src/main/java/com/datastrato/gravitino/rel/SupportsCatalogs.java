@@ -2,7 +2,7 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.client.api;
+package com.datastrato.gravitino.rel;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
@@ -16,10 +16,7 @@ import java.util.Map;
 
 /**
  * Client interface for supporting catalogs. It includes methods for listing, loading, creating,
- * altering and dropping catalogs. This class is forked from
- * com.datastrato.gravitino.catalog.SupportsCatalogs, which was designed for Gravitino server side.
- * The * difference is that this interface uses simple types instead of complex types in the method
- * * signatures, which will be easier for client side to use.
+ * altering and dropping catalogs.
  */
 @Evolving
 public interface SupportsCatalogs {
