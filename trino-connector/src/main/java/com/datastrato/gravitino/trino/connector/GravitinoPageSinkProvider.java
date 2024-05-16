@@ -36,15 +36,10 @@ public class GravitinoPageSinkProvider implements ConnectorPageSinkProvider {
       ConnectorSession session,
       ConnectorInsertTableHandle insertTableHandle,
       ConnectorPageSinkId pageSinkId) {
-    GravitinoTransactionHandle gravitinoTransactionHandle =
-        (GravitinoTransactionHandle) transactionHandle;
-    GravitinoInsertTableHandle gravitinoInsertTableHandle =
-        (GravitinoInsertTableHandle) insertTableHandle;
-
     return pageSinkProvider.createPageSink(
-        gravitinoTransactionHandle.getInternalHandle(),
+        GravitinoHandle.unWrap(transactionHandle),
         session,
-        gravitinoInsertTableHandle.innerHandler(),
+        GravitinoHandle.unWrap(insertTableHandle),
         pageSinkId);
   }
 }

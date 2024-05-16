@@ -9,6 +9,7 @@ import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVIT
 import com.datastrato.gravitino.trino.connector.util.JsonCodec;
 import io.trino.spi.TrinoException;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -19,18 +20,21 @@ interface GravitinoHandle<T> {
 
   public T getInternalHandle();
 
-  public static <S, T> T wrap(S handle) {
-    return (T) ((GravitinoHandle) handle).getInternalHandle();
+  public static <T> T unWrap(T handle) {
+    return ((GravitinoHandle<T>) handle).getInternalHandle();
   }
 
-  public static <S, T> T unWrap(S handle) {
-    return (T) ((GravitinoHandle) handle).getInternalHandle();
-  }
-
-  public static <S, T> List<T> unWrap(List<S> handles) {
+  public static <T> List<T> unWrap(List<T> handles) {
     return handles.stream()
-        .map(handle -> (T) (((GravitinoHandle) handle).getInternalHandle()))
+        .map(handle -> (((GravitinoHandle<T>) handle).getInternalHandle()))
         .collect(Collectors.toList());
+  }
+
+  public static <T> Map<String, T> unWrap(Map<String, T> handleMap) {
+    return handleMap.entrySet().stream()
+        .collect(
+            Collectors.toMap(
+                Map.Entry::getKey, e -> ((GravitinoHandle<T>) e.getValue()).getInternalHandle()));
   }
 
   class HandleWrapper<T> {

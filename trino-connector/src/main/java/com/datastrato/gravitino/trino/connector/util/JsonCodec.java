@@ -16,6 +16,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import io.airlift.json.RecordAutoDetectModule;
 import io.trino.spi.connector.ColumnHandle;
+import io.trino.spi.connector.ConnectorInsertTableHandle;
 import io.trino.spi.connector.ConnectorSplit;
 import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.ConnectorTransactionHandle;
@@ -36,7 +37,7 @@ public class JsonCodec {
   private static JsonCodec INSTANCE;
   private ObjectMapper mapper;
 
-  public static JsonCodec instance(ClassLoader appClassLoader) {
+  public static synchronized JsonCodec instance(ClassLoader appClassLoader) {
     if (INSTANCE != null) {
       return INSTANCE;
     }
@@ -122,7 +123,7 @@ public class JsonCodec {
           pluginClass.getConstructor(String.class, List.class, ClassLoader.class, List.class);
       Object classLoader =
           constructor.newInstance(
-              "hive",
+              "gravitino-hive",
               files,
               this.getClass().getClassLoader(),
               List.of(
@@ -133,7 +134,7 @@ public class JsonCodec {
                   "io.opentelemetry.api.",
                   "io.opentelemetry.context."));
 
-      classLoaders.put("hive", (ClassLoader) classLoader);
+      classLoaders.put("gravitino-hive", (ClassLoader) classLoader);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -170,6 +171,10 @@ public class JsonCodec {
 
     objectMapper.registerModule(
         new AbstractTypedJacksonModule<>(
+            ConnectorTransactionHandle.class, nameResolver, classResolver) {});
+
+    objectMapper.registerModule(
+        new AbstractTypedJacksonModule<>(
             ConnectorTableHandle.class, nameResolver, classResolver) {});
 
     objectMapper.registerModule(
@@ -180,7 +185,7 @@ public class JsonCodec {
 
     objectMapper.registerModule(
         new AbstractTypedJacksonModule<>(
-            ConnectorTransactionHandle.class, nameResolver, classResolver) {});
+            ConnectorInsertTableHandle.class, nameResolver, classResolver) {});
 
     SimpleModule module = new SimpleModule();
     objectMapper.registerModule(new Jdk8Module());
@@ -202,7 +207,7 @@ public class JsonCodec {
   }
 
   public ClassLoader getClassLoader(String name) {
-    return classLoaders.get(name);
+    return classLoaders.get("gravitino-" + name);
   }
 
   public ObjectMapper getMapper() {
