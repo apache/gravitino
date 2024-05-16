@@ -12,15 +12,14 @@ import com.datastrato.gravitino.spark.connector.iceberg.SparkIcebergTable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import lombok.Data;
 import org.apache.hadoop.fs.Path;
@@ -319,16 +318,16 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     Assertions.assertEquals("1,1,1", tableData.get(0));
   }
 
-    @Test
-    void testIcebergSQLExtensions() throws NoSuchTableException, IOException {
-        testIcebergPartitionFieldOperations();
-        testIcebergBranchOperations();
-        testIcebergTagOperations();
-        testIcebergIdentifierOperations();
-        testIcebergDistributionAndOrderingOperations();
-    }
+  @Test
+  void testIcebergSQLExtensions() throws NoSuchTableException {
+    testIcebergPartitionFieldOperations();
+    testIcebergBranchOperations();
+    testIcebergTagOperations();
+    testIcebergIdentifierOperations();
+    testIcebergDistributionAndOrderingOperations();
+  }
 
-    private void testMetadataColumns() {
+  private void testMetadataColumns() {
     String tableName = "test_metadata_columns";
     dropTableIfExists(tableName);
     String createTableSQL = getCreateSimpleTableString(tableName);
@@ -900,34 +899,33 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     sql(createSql);
   }
 
+  private SparkIcebergTable getSparkIcebergTableInstance(String tableName)
+      throws NoSuchTableException {
+    CatalogPlugin catalogPlugin =
+        getSparkSession().sessionState().catalogManager().catalog(getCatalogName());
+    Assertions.assertInstanceOf(TableCatalog.class, catalogPlugin);
+    TableCatalog catalog = (TableCatalog) catalogPlugin;
+    Table table = catalog.loadTable(Identifier.of(new String[] {getDefaultDatabase()}, tableName));
+    return (SparkIcebergTable) table;
+  }
 
-    private SparkIcebergTable getSparkIcebergTableInstance(String tableName)
-            throws NoSuchTableException {
-        CatalogPlugin catalogPlugin =
-                getSparkSession().sessionState().catalogManager().catalog(getCatalogName());
-        Assertions.assertInstanceOf(TableCatalog.class, catalogPlugin);
-        TableCatalog catalog = (TableCatalog) catalogPlugin;
-        Table table = catalog.loadTable(Identifier.of(new String[] {getDefaultDatabase()}, tableName));
-        return (SparkIcebergTable) table;
-    }
+  private long getCurrentSnapshotTimestamp(String tableName) throws NoSuchTableException {
+    SparkIcebergTable sparkIcebergTable = getSparkIcebergTableInstance(tableName);
+    return sparkIcebergTable.table().currentSnapshot().timestampMillis();
+  }
 
-    private long getCurrentSnapshotTimestamp(String tableName) throws NoSuchTableException {
-        SparkIcebergTable sparkIcebergTable = getSparkIcebergTableInstance(tableName);
-        return sparkIcebergTable.table().currentSnapshot().timestampMillis();
-    }
+  private long getCurrentSnapshotId(String tableName) throws NoSuchTableException {
+    SparkIcebergTable sparkIcebergTable = getSparkIcebergTableInstance(tableName);
+    return sparkIcebergTable.table().currentSnapshot().snapshotId();
+  }
 
-    private long getCurrentSnapshotId(String tableName) throws NoSuchTableException {
-        SparkIcebergTable sparkIcebergTable = getSparkIcebergTableInstance(tableName);
-        return sparkIcebergTable.table().currentSnapshot().snapshotId();
+  private long waitUntilAfter(Long timestampMillis) {
+    long current = System.currentTimeMillis();
+    while (current <= timestampMillis) {
+      current = System.currentTimeMillis();
     }
-
-    private long waitUntilAfter(Long timestampMillis) {
-        long current = System.currentTimeMillis();
-        while (current <= timestampMillis) {
-            current = System.currentTimeMillis();
-        }
-        return current;
-    }
+    return current;
+  }
 
   @Data
   private static class IcebergTableWriteProperties {
