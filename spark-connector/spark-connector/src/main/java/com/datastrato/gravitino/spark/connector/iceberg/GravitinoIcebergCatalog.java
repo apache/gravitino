@@ -94,11 +94,10 @@ public class GravitinoIcebergCatalog extends BaseCatalog
   }
 
   /**
-   * 1. The GravitinoIcebergCatalog does not extend the SparkCatalog, and it also cannot extend the
-   * SparkCatalog because the initialize method of the SparkCatalog is final and cannot be
-   * overrided. 2. If directly using `((SparkCatalog) sparkCatalog).loadProcedure()`, it will cause
-   * a Preconditions check failed, please referred to
-   * https://github.com/apache/iceberg/blob/ea916c1700ef37377d3e8bba1197b3fe32d1a248/spark/v3.4/spark/src/main/java/org/apache/iceberg/spark/procedures/BaseProcedure.java#L121
+   * Proceduers will validate the equality of the catalog registered to Spark catalogManager and the
+   * catalog passed to `ProcedureBuilder` which invokes loadProceduer(). To meet the requirement ,
+   * override the method to pass `GravitinoIcebergCatalog` to the `ProcedureBuilder` instead of the
+   * internal spark catalog.
    */
   @Override
   public Procedure loadProcedure(Identifier identifier) throws NoSuchProcedureException {
