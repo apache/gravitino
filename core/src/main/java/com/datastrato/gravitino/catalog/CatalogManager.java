@@ -23,7 +23,6 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.connector.BaseCatalog;
-import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;
 import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.connector.PropertyEntry;
@@ -53,7 +52,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Multimaps;
 import com.google.common.collect.Streams;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
@@ -197,6 +195,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   @VisibleForTesting final Cache<NameIdentifier, CatalogWrapper> catalogCache;
 
+  private final Cache<String, Set<String>> hiddenPropertyCache;
+
   private final EntityStore store;
 
   private final IdGenerator idGenerator;
@@ -231,6 +231,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                             .setNameFormat("catalog-cleaner-%d")
                             .build())))
             .build();
+    this.hiddenPropertyCache = Caffeine.newBuilder().build();
   }
 
   /**
@@ -274,14 +275,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       List<CatalogEntity> catalogEntities =
           store.list(namespace, CatalogEntity.class, EntityType.CATALOG);
 
-      // Using provider as key to avoid loading the same type catalog instance multiple times
-      Map<String, Set<String>> hiddenProps = new HashMap<>();
-      Multimaps.index(catalogEntities, CatalogEntity::getProvider)
-          .asMap()
-          .forEach((p, e) -> hiddenProps.put(p, getHiddenPropertyNames(e.iterator().next())));
-
       return catalogEntities.stream()
-          .map(e -> e.toCatalogInfoWithoutHiddenProps(hiddenProps.get(e.getProvider())))
+          .map(
+              e ->
+                  e.toCatalogInfoWithoutHiddenProps(
+                      hiddenPropertyCache.asMap().get(e.getProvider())))
           .toArray(Catalog[]::new);
     } catch (IOException ioe) {
       LOG.error("Failed to list catalogs in metalake {}", metalakeIdent, ioe);
@@ -586,7 +584,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         cl -> {
           Map<String, String> configWithoutId = Maps.newHashMap(conf);
           configWithoutId.remove(ID_KEY);
-          validatePropertyForCreate(catalog.ops().catalogPropertiesMetadata(), configWithoutId);
+          PropertiesMetadata propertiesMetadata = catalog.ops().catalogPropertiesMetadata();
+          validatePropertyForCreate(propertiesMetadata, configWithoutId);
 
           // Call wrapper.catalog.properties() to make BaseCatalog#properties in IsolatedClassLoader
           // not null. Why we do this? Because wrapper.catalog.properties() need to be called in the
@@ -595,34 +594,19 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           // the value of properties.
           wrapper.catalog.properties();
           wrapper.catalog.capability();
+          // cache the catalog hidden property names for listCatalogInfo use
+          hiddenPropertyCache.get(
+              provider,
+              p ->
+                  propertiesMetadata.propertyEntries().values().stream()
+                      .filter(PropertyEntry::isHidden)
+                      .map(PropertyEntry::getName)
+                      .collect(Collectors.toSet()));
           return null;
         },
         IllegalArgumentException.class);
 
     return wrapper;
-  }
-
-  private Set<String> getHiddenPropertyNames(CatalogEntity entity) {
-    Map<String, String> conf = entity.getProperties();
-    String provider = entity.getProvider();
-
-    try (IsolatedClassLoader classLoader = createClassLoader(provider, conf)) {
-      BaseCatalog<?> catalog = createBaseCatalog(classLoader, entity);
-      return classLoader.withClassLoader(
-          cl -> {
-            try (CatalogOperations ops = catalog.ops()) {
-              PropertiesMetadata catalogPropertiesMetadata = ops.catalogPropertiesMetadata();
-              return catalogPropertiesMetadata.propertyEntries().values().stream()
-                  .filter(PropertyEntry::isHidden)
-                  .map(PropertyEntry::getName)
-                  .collect(Collectors.toSet());
-            } catch (Exception e) {
-              LOG.error("Failed to get hidden property names", e);
-              throw e;
-            }
-          },
-          RuntimeException.class);
-    }
   }
 
   private BaseCatalog<?> createBaseCatalog(IsolatedClassLoader classLoader, CatalogEntity entity) {
