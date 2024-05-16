@@ -29,7 +29,6 @@ import static org.mockserver.model.HttpResponse.response;
 
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
 import com.datastrato.gravitino.exceptions.NotFoundException;
-import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.rest.RESTRequest;
 import com.datastrato.gravitino.rest.RESTResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -58,7 +57,7 @@ import org.mockserver.model.HttpResponse;
  */
 public class TestHTTPClient {
 
-  private static final ObjectMapper MAPPER = JsonUtils.objectMapper();
+  private static final ObjectMapper MAPPER = ObjectMapperProvider.objectMapper();
 
   private static ClientAndServer mockServer;
   private static RESTClient restClient;
