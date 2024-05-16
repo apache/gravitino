@@ -13,6 +13,8 @@ plugins {
 
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark.get()
+val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
+val kyuubiVersion: String = libs.versions.kyuubi.get()
 val icebergVersion: String = libs.versions.iceberg.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
@@ -114,6 +116,10 @@ dependencies {
     exclude("io.dropwizard.metrics")
     exclude("org.rocksdb")
   }
+  testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
+  testImplementation("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
+  testImplementation("org.apache.iceberg:iceberg-core:$icebergVersion")
+  testImplementation("org.apache.iceberg:iceberg-hive-metastore:$icebergVersion")
 
   testImplementation(libs.okhttp3.loginterceptor)
   testImplementation(libs.postgresql.driver)
@@ -157,6 +163,7 @@ tasks.test {
       environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.10")
       environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "datastrato/gravitino-ci-trino:0.1.5")
       environment("GRAVITINO_CI_KAFKA_DOCKER_IMAGE", "apache/kafka:3.7.0")
+      environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "datastrato/gravitino-ci-doris:0.1.3")
 
       copy {
         from("${project.rootDir}/dev/docker/trino/conf")

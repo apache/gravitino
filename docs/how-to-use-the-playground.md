@@ -8,7 +8,7 @@ This software is licensed under the Apache License version 2."
 
 ## Playground introduction
 
-The playground is a complete Gravitino Docker runtime environment with `Hive`, `HDFS`, `Trino`, `MySQL`, `PostgreSQL`, and a `Gravitino` server.
+The playground is a complete Gravitino Docker runtime environment with `Hive`, `HDFS`, `Trino`, `MySQL`, `PostgreSQL`, `Jupyter`, and a `Gravitino` server.
 
 Depending on your network and computer, startup time may take 3-5 minutes. Once the playground environment has started, you can open [http://localhost:8090](http://localhost:8090) in a browser to access the Gravitino Web UI.
 
@@ -27,14 +27,76 @@ The playground runs a number of services. The TCP ports used may clash with exis
 | playground-mysql      | 3306           |
 | playground-postgresql | 5342           |
 | playground-trino      | 8080           |
+| playground-jupyter    | 8888           |
 
 ## Start playground
+
+### Launch all components of playground
 
 ```shell
 git clone git@github.com:datastrato/gravitino-playground.git
 cd gravitino-playground
 ./launch-playground.sh
 ```
+
+### Launch big data components of playground
+
+```shell
+git clone git@github.com:datastrato/gravitino-playground.git
+cd gravitino-playground
+./launch-playground.sh bigdata
+# equivalent to
+./launch-playground.sh hive gravitino trino postgresql mysql spark
+```
+
+### Launch AI components of playground
+
+```shell
+git clone git@github.com:datastrato/gravitino-playground.git
+cd gravitino-playground
+./launch-playground.sh ai
+# equivalent to
+./launch-playground.sh hive gravitino mysql jupyter
+```
+
+### Launch special component or components of playground
+
+```shell
+git clone git@github.com:datastrato/gravitino-playground.git
+cd gravitino-playground
+./launch-playground.sh hive|gravitino|trino|postgresql|mysql|spark|jupyter
+```
+
+### Experiencing Gravitino Fileset with Jupyter
+
+We provide a Fileset playground environment to help you quickly understand how to use Gravitino
+Python client to manage non-tabular data on HDFS via fileset in Gravitino service.
+You can refer document of [Launch AI components of playground](#launch-ai-components-of-playground)
+to launch a Gravitino server, HDFS and Jupyter notebook environment in you local Docker environment.
+
+Waiting for the playground Docker environment to start, you can directly open
+`http://localhost:8888/lab/tree/gravitino-fileset-sample.ipynb` in the browser and run the example.
+
+The [gravitino-fileset-example](https://github.com/datastrato/gravitino-playground/blob/main/init/jupyter/gravitino-fileset-sample.ipynb)
+contains the following code snippets:
+
+1. Install HDFS Python client.
+2. Create a HDFS client to connect HDFS and to do some test operations.
+3. Install Gravitino Python client.
+4. Initialize Gravitino admin client and create a Gravitino metalake.
+5. Initialize Gravitino client and list metalakes.
+6. Create a Gravitino `Catalog` and special `type` is `Catalog.Type.FILESET` and `provider` is
+   [hadoop](./hadoop-catalog.md)
+7. Create a Gravitino `Schema` with the `location` pointed to a HDFS path, and use `hdfs client` to
+   check if the schema location is successfully created in HDFS.
+8. Create a `Fileset` with `type` is [Fileset.Type.MANAGED](./manage-fileset-metadata-using-gravitino.md#fileset-operations),
+   use `hdfs client` to check if the fileset location was successfully created in HDFS.
+9. Drop this `Fileset.Type.MANAGED` type fileset and check if the fileset location was
+   successfully deleted in HDFS.
+10. Create a `Fileset` with `type` is [Fileset.Type.EXTERNAL](./manage-fileset-metadata-using-gravitino.md#fileset-operations)
+    and `location` pointed to exist HDFS path
+11. Drop this `Fileset.Type.EXTERNAL` type fileset and check if the fileset location was
+    not deleted in HDFS.
 
 ## Experiencing Gravitino with Trino SQL
 
@@ -47,7 +109,7 @@ docker exec -it playground-trino bash
 2. Open the Trino CLI in the container.
 
 ```shell
-trino@d2bbfccc7432:/$ trino
+trino@container_id:/$ trino
 ```
 
 ## Example
@@ -115,7 +177,7 @@ ORDER BY location, SUM(total_amount) DESC;
 To know the employee's average performance rating and total sales, run this SQL:
 
 ```SQL
-SELECT e.employee_id, given_name, family_name, AVG(rating) AS average_rating,  SUM(total_amount) AS total_sales
+SELECT e.employee_id, given_name, family_name, AVG(rating) AS average_rating, SUM(total_amount) AS total_sales
 FROM catalog_postgres.hr.employees AS e,
   catalog_postgres.hr.employee_performance AS p,
   catalog_hive.sales.sales AS s
@@ -146,7 +208,7 @@ docker exec -it playground-spark bash
 ```
 
 ```shell
-spark@7a495f27b92e:/$ cd /opt/spark && /bin/bash bin/spark-sql 
+spark@container_id:/$ cd /opt/spark && /bin/bash bin/spark-sql
 ```
 
 ```SQL
@@ -154,7 +216,7 @@ use catalog_iceberg;
 create database sales;
 use sales;
 create table customers (customer_id int, customer_name varchar(100), customer_email varchar(100));
-describe extended customers;    
+describe extended customers;
 insert into customers (customer_id, customer_name, customer_email) values (11,'Rory Brown','rory@123.com');
 insert into customers (customer_id, customer_name, customer_email) values (12,'Jerry Washington','jerry@dt.com');
 ```
@@ -167,7 +229,7 @@ docker exec -it playground-trino bash
 ```
 
 ```shell
-trino@d2bbfccc7432:/$ trino  
+trino@container_id:/$ trino
 ```
 
 ```SQL
