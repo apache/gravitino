@@ -69,4 +69,28 @@ public class TestIcebergPropertiesConverter {
             "passwd"),
         properties);
   }
+
+  @Test
+  void testCatalogPropertiesWithRestBackend() {
+    Map<String, String> properties =
+        icebergPropertiesConverter.toSparkCatalogProperties(
+            ImmutableMap.of(
+                IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
+                IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_REST,
+                IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI,
+                "rest-uri",
+                IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE,
+                "rest-warehouse",
+                "key1",
+                "value1"));
+    Assertions.assertEquals(
+        ImmutableMap.of(
+            IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE,
+            IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_REST,
+            IcebergPropertiesConstants.ICEBERG_CATALOG_URI,
+            "rest-uri",
+            IcebergPropertiesConstants.ICEBERG_CATALOG_WAREHOUSE,
+            "rest-warehouse"),
+        properties);
+  }
 }
