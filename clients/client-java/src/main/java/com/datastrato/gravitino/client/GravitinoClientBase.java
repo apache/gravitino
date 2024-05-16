@@ -11,8 +11,6 @@ import com.datastrato.gravitino.dto.responses.MetalakeResponse;
 import com.datastrato.gravitino.dto.responses.VersionResponse;
 import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
-import com.datastrato.gravitino.json.JsonUtils;
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 import com.google.errorprone.annotations.InlineMe;
@@ -53,8 +51,7 @@ public abstract class GravitinoClientBase implements Closeable {
       AuthDataProvider authDataProvider,
       boolean checkVersion,
       Map<String, String> headers) {
-    ObjectMapper mapper = JsonUtils.objectMapper();
-    mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+    ObjectMapper mapper = ObjectMapperProvider.objectMapper();
 
     if (checkVersion) {
       this.restClient =
