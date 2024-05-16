@@ -6,7 +6,6 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
 import { Alata } from 'next/font/google'
 
 import { useState, useEffect } from 'react'
@@ -25,6 +24,7 @@ import {
 
 import clsx from 'clsx'
 
+import LogoIcon from '@/components/LogoIcon'
 import VersionView from './VersionView'
 import LogoutButton from './Logout'
 import { useSearchParams } from 'next/navigation'
@@ -69,12 +69,7 @@ const AppBar = () => {
             }
           >
             <Link href='/metalakes' className={'twc-flex twc-items-center twc-no-underline twc-mr-8'}>
-              <Image
-                src={process.env.NEXT_PUBLIC_BASE_PATH ?? '' + '/icons/gravitino.svg'}
-                width={32}
-                height={32}
-                alt='logo'
-              />
+              <LogoIcon />
               <Typography
                 variant='h5'
                 className={clsx(

@@ -16,7 +16,7 @@ export const metadata = {
   title: 'Gravitino',
   description: 'A high-performance, geo-distributed and federated metadata lake.',
   icons: {
-    icon: process.env.NEXT_PUBLIC_BASE_PATH + '/icons/gravitino.svg'
+    icon: process.env.NEXT_PUBLIC_BASE_PATH + 'icons/gravitino.svg'
   }
 }
 
