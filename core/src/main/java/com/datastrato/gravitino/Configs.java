@@ -14,6 +14,8 @@ import org.apache.commons.lang3.StringUtils;
 
 public class Configs {
 
+  private Configs() {}
+
   public static final String DEFAULT_ENTITY_STORE = "kv";
   public static final String RELATIONAL_ENTITY_STORE = "relational";
   public static final String ENTITY_STORE_KEY = "gravitino.entity.store";
