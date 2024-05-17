@@ -44,6 +44,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
   /** The namespace of current catalog, which is the metalake name. */
   protected final Namespace namespace;
 
+  /** The namespace of the schemas, which is the metalake name with catalog name. */
   protected final Namespace schemaNamespace;
 
   BaseSchemaCatalog(
