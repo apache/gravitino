@@ -6,7 +6,7 @@
 
 # start KDC
 nohup /usr/sbin/krb5kdc -P /var/run/krb5kdc.pid -n &
-sleep 5
+sleep 1
 
 echo "addprinc -randkey hdfs/localhost@EXAMPLE.COM" | kadmin.local
 echo "ktadd -k /tmp/server.keytab hdfs/localhost@EXAMPLE.COM" | kadmin.local
@@ -29,6 +29,12 @@ ${HADOOP_HOME}/sbin/hadoop-daemon.sh start namenode
 
 echo "Starting DataNode..."
 ${HADOOP_HOME}/sbin/hadoop-daemon.sh start datanode
+
+sleep 5
+
+# mkdir /user/client for user client
+hadoop fs -mkdir -p /user/client
+hadoop fs -chown client:hdfs /user/client
 
 # persist the container
 tail -f /dev/null

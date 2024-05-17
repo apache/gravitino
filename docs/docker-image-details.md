@@ -206,3 +206,4 @@ Changelog
   - Docker image `datastrato/gravitino-ci-kerberosized-hdfs:0.1.0`
   - Start a kdc service in the contianer
   - Start HDFS with kerberos enabled
+  - Add user "client(client@EXAMPLE.COM)" and keytab file "/tmp/client.keytab", and the home directory is "/user/client" in HDFS

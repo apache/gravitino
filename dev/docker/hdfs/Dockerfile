@@ -124,6 +124,7 @@ ADD check-status.sh /tmp/check-status.sh
 # add users and groups
 RUN groupadd hdfs && groupadd hadoop && groupadd mapred
 RUN useradd -g hdfs hdfs
+RUN useradd -g hdfs client
 RUN chown -R hdfs:hdfs ${HADOOP_HOME}
 
 ################################################################################
