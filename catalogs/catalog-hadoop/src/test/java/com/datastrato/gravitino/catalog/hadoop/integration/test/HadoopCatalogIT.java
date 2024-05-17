@@ -67,7 +67,7 @@ public class HadoopCatalogIT extends AbstractIT {
 
   @AfterAll
   public static void stop() throws IOException {
-    client.dropMetalake(NameIdentifier.of(metalakeName));
+    client.dropMetalake(metalakeName);
 
     if (hdfs != null) {
       hdfs.close();
@@ -85,8 +85,8 @@ public class HadoopCatalogIT extends AbstractIT {
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
     GravitinoMetalake createdMetalake =
-        client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
-    GravitinoMetalake loadMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
     Assertions.assertEquals(createdMetalake, loadMetalake);
 
     metalake = loadMetalake;
@@ -94,13 +94,9 @@ public class HadoopCatalogIT extends AbstractIT {
 
   private static void createCatalog() {
     metalake.createCatalog(
-        NameIdentifier.of(metalakeName, catalogName),
-        Catalog.Type.FILESET,
-        provider,
-        "comment",
-        ImmutableMap.of());
+        catalogName, Catalog.Type.FILESET, provider, "comment", ImmutableMap.of());
 
-    catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    catalog = metalake.loadCatalog(catalogName);
   }
 
   private static void createSchema() {
@@ -198,6 +194,33 @@ public class HadoopCatalogIT extends AbstractIT {
   }
 
   @Test
+  public void testCreateFilesetWithChinese() throws IOException {
+    // create fileset
+    String filesetName = "test_create_fileset_with_chinese";
+    String storageLocation = storageLocation(filesetName) + "/中文目录test";
+    Assertions.assertFalse(
+        hdfs.exists(new Path(storageLocation)), "storage location should not exists");
+    Fileset fileset =
+        createFileset(
+            filesetName,
+            "这是中文comment",
+            Fileset.Type.MANAGED,
+            storageLocation,
+            ImmutableMap.of("k1", "v1", "test", "中文测试test", "中文key", "test1"));
+
+    // verify fileset is created
+    assertFilesetExists(filesetName);
+    Assertions.assertNotNull(fileset, "fileset should be created");
+    Assertions.assertEquals("这是中文comment", fileset.comment());
+    Assertions.assertEquals(Fileset.Type.MANAGED, fileset.type());
+    Assertions.assertEquals(storageLocation, fileset.storageLocation());
+    Assertions.assertEquals(3, fileset.properties().size());
+    Assertions.assertEquals("v1", fileset.properties().get("k1"));
+    Assertions.assertEquals("中文测试test", fileset.properties().get("test"));
+    Assertions.assertEquals("test1", fileset.properties().get("中文key"));
+  }
+
+  @Test
   public void testExternalFileset() throws IOException {
     // create fileset
     String filesetName = "test_external_fileset";
@@ -229,6 +252,17 @@ public class HadoopCatalogIT extends AbstractIT {
             createFileset(
                 filesetName2, "comment", Fileset.Type.EXTERNAL, null, ImmutableMap.of("k1", "v1")),
         "Should throw IllegalArgumentException when storage location is null");
+  }
+
+  @Test
+  void testNameSpec() {
+    String illegalName = "/%~?*";
+
+    NameIdentifier nameIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, illegalName);
+
+    Assertions.assertThrows(
+        NoSuchFilesetException.class, () -> catalog.asFilesetCatalog().loadFileset(nameIdentifier));
   }
 
   @Test
@@ -500,6 +534,41 @@ public class HadoopCatalogIT extends AbstractIT {
     Assertions.assertEquals(
         storageLocation, newFileset.storageLocation(), "storage location should not be change");
     Assertions.assertEquals(0, newFileset.properties().size(), "properties should be removed");
+  }
+
+  @Test
+  public void testDropCatalogWithEmptySchema() {
+    String catalogName =
+        GravitinoITUtils.genRandomName("test_drop_catalog_with_empty_schema_catalog");
+    // Create a catalog without specifying location.
+    Catalog filesetCatalog =
+        metalake.createCatalog(
+            catalogName, Catalog.Type.FILESET, provider, "comment", ImmutableMap.of());
+
+    // Create a schema without specifying location.
+    String schemaName =
+        GravitinoITUtils.genRandomName("test_drop_catalog_with_empty_schema_schema");
+    filesetCatalog
+        .asSchemas()
+        .createSchema(
+            NameIdentifier.of(metalakeName, catalogName, schemaName), "comment", ImmutableMap.of());
+
+    // Drop the empty schema.
+    boolean dropped =
+        filesetCatalog
+            .asSchemas()
+            .dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), true);
+    Assertions.assertTrue(dropped, "schema should be dropped");
+    Assertions.assertFalse(
+        filesetCatalog
+            .asSchemas()
+            .schemaExists(NameIdentifier.of(metalakeName, catalogName, schemaName)),
+        "schema should not be exists");
+
+    // Drop the catalog.
+    dropped = metalake.dropCatalog(catalogName);
+    Assertions.assertTrue(dropped, "catalog should be dropped");
+    Assertions.assertFalse(metalake.catalogExists(catalogName), "catalog should not be exists");
   }
 
   private Fileset createFileset(

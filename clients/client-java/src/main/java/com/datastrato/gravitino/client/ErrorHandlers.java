@@ -155,6 +155,14 @@ public class ErrorHandlers {
   public static Consumer<ErrorResponse> roleErrorHandler() {
     return RoleErrorHandler.INSTANCE;
   }
+  /**
+   * Creates an error handler specific to permission operations.
+   *
+   * @return A Consumer representing the permission error handler.
+   */
+  public static Consumer<ErrorResponse> permissionOperationErrorHandler() {
+    return PermissionOperationErrorHandler.INSTANCE;
+  }
 
   private ErrorHandlers() {}
 
@@ -185,7 +193,7 @@ public class ErrorHandlers {
     if (stack.isEmpty()) {
       return message;
     } else {
-      return String.format("%s\n%s", message, stack);
+      return String.format("%s%n%s", message, stack);
     }
   }
 
@@ -587,6 +595,43 @@ public class ErrorHandlers {
 
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new RoleAlreadyExistsException(errorMessage);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMessage);
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
+  /** Error handler specific to Permission operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class PermissionOperationErrorHandler extends RestErrorHandler {
+
+    private static final PermissionOperationErrorHandler INSTANCE =
+        new PermissionOperationErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMessage);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchMetalakeException.class.getSimpleName())) {
+            throw new NoSuchMetalakeException(errorMessage);
+          } else if (errorResponse.getType().equals(NoSuchUserException.class.getSimpleName())) {
+            throw new NoSuchUserException(errorMessage);
+          } else if (errorResponse.getType().equals(NoSuchGroupException.class.getSimpleName())) {
+            throw new NoSuchGroupException(errorMessage);
+          } else if (errorResponse.getType().equals(NoSuchRoleException.class.getSimpleName())) {
+            throw new NoSuchRoleException(errorMessage);
+          } else {
+            throw new NotFoundException(errorMessage);
+          }
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);

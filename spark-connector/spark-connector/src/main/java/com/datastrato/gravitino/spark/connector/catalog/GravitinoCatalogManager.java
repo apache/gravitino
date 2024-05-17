@@ -5,8 +5,6 @@
 package com.datastrato.gravitino.spark.connector.catalog;
 
 import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.google.common.base.Preconditions;
@@ -34,7 +32,7 @@ public class GravitinoCatalogManager {
     this.gravitinoClient = GravitinoAdminClient.builder(gravitinoUri).build();
     // Will not evict catalog by default
     this.gravitinoCatalogs = CacheBuilder.newBuilder().build();
-    this.metalake = gravitinoClient.loadMetalake(NameIdentifier.ofMetalake(metalakeName));
+    this.metalake = gravitinoClient.loadMetalake(metalakeName);
   }
 
   public static GravitinoCatalogManager create(String gravitinoUrl, String metalakeName) {
@@ -73,7 +71,7 @@ public class GravitinoCatalogManager {
   }
 
   public void loadRelationalCatalogs() {
-    Catalog[] catalogs = metalake.listCatalogsInfo(Namespace.ofCatalog(metalake.name()));
+    Catalog[] catalogs = metalake.listCatalogsInfo();
     Arrays.stream(catalogs)
         .filter(catalog -> Catalog.Type.RELATIONAL.equals(catalog.type()))
         .forEach(catalog -> gravitinoCatalogs.put(catalog.name(), catalog));
@@ -84,7 +82,7 @@ public class GravitinoCatalogManager {
   }
 
   private Catalog loadCatalog(String catalogName) {
-    Catalog catalog = metalake.loadCatalog(NameIdentifier.ofCatalog(metalakeName, catalogName));
+    Catalog catalog = metalake.loadCatalog(catalogName);
     Preconditions.checkArgument(
         Catalog.Type.RELATIONAL.equals(catalog.type()), "Only support relational catalog");
     LOG.info("Load catalog {} from Gravitino successfully.", catalogName);

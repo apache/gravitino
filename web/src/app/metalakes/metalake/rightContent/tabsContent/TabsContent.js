@@ -13,6 +13,8 @@ import { styled, Box, Divider, List, ListItem, ListItemText, Stack, Tab, Typogra
 import Tooltip, { tooltipClasses } from '@mui/material/Tooltip'
 import { TabContext, TabList, TabPanel } from '@mui/lab'
 
+import clsx from 'clsx'
+
 import { useAppSelector } from '@/lib/hooks/useStore'
 
 import { useSearchParams } from 'next/navigation'
@@ -165,22 +167,54 @@ const TabsContent = () => {
                             <Box sx={{ p: 1.5, px: 4 }}>
                               {item.items.map((it, idx) => {
                                 return (
-                                  <Typography
-                                    key={idx}
-                                    variant='caption'
-                                    color='white'
-                                    className={fonts.className}
-                                    sx={{ display: 'flex', flexDirection: 'column' }}
-                                  >
-                                    {item.type === 'sortOrders' ? it.text : it.fields.join('.')}
-                                  </Typography>
+                                  <Fragment key={idx}>
+                                    <Typography
+                                      variant='caption'
+                                      color='white'
+                                      className={fonts.className}
+                                      sx={{ display: 'flex', flexDirection: 'column' }}
+                                      data-refer={`overview-tip-${item.type}-items`}
+                                    >
+                                      {item.type === 'sortOrders'
+                                        ? it.text
+                                        : it.fields.map((v, vi) => {
+                                            return (
+                                              <Fragment key={vi}>
+                                                <Box component={'span'} sx={{}}>
+                                                  {Array.isArray(v) ? v.join('.') : v}
+                                                </Box>
+                                                {vi < it.fields.length - 1 && (
+                                                  <Box
+                                                    component={'span'}
+                                                    sx={{
+                                                      display: 'block',
+                                                      my: 1,
+                                                      borderTop: theme => `1px solid ${theme.palette.grey[800]}`
+                                                    }}
+                                                  ></Box>
+                                                )}
+                                              </Fragment>
+                                            )
+                                          })}
+                                    </Typography>
+                                    {idx < item.items.length - 1 && (
+                                      <Box
+                                        component={'span'}
+                                        sx={{
+                                          display: 'block',
+                                          my: 1,
+                                          borderTop: theme => `1px solid ${theme.palette.grey[800]}`
+                                        }}
+                                      ></Box>
+                                    )}
+                                  </Fragment>
                                 )
                               })}
                             </Box>
                           </>
                         }
                       >
-                        <ListItem sx={{ maxWidth: 140, py: 0 }}>
+                        <ListItem sx={{ maxWidth: 140, py: 0 }} data-refer={`overview-tip-${item.type}`}>
                           <ListItemText
                             sx={{ m: 0 }}
                             primary={
@@ -215,14 +249,17 @@ const TabsContent = () => {
                                   whiteSpace: 'nowrap',
                                   textOverflow: 'ellipsis'
                                 }}
+                                data-refer={`overview-${item.type}-items`}
                               >
                                 {item.items.map((it, idx) => {
                                   return (
                                     <Fragment key={idx}>
                                       <Typography variant='caption' className={fonts.className}>
-                                        {it.fields.join('.')}
+                                        {it.fields.map(v => (Array.isArray(v) ? v.join('.') : v)).join(',')}
                                       </Typography>
-                                      {idx < item.items.length - 1 && <span>, </span>}
+                                      {idx < item.items.length - 1 && (
+                                        <span className={clsx(fonts.className, 'twc-text-[12px]')}>,</span>
+                                      )}
                                     </Fragment>
                                   )
                                 })}

@@ -104,11 +104,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   // will only need to set the configuration 'METASTORE_URL' in Gravitino and Gravitino will change
   // it to `METASTOREURIS` automatically and pass it to Hive.
   public static final Map<String, String> GRAVITINO_CONFIG_TO_HIVE =
-      ImmutableMap.of(
-          METASTORE_URIS,
-          ConfVars.METASTOREURIS.varname,
-          PRINCIPAL,
-          ConfVars.METASTORE_KERBEROS_PRINCIPAL.varname);
+      ImmutableMap.of(METASTORE_URIS, ConfVars.METASTOREURIS.varname);
 
   /**
    * Initializes the Hive catalog operations with the provided configuration.
@@ -218,8 +214,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             () -> {
               try {
                 kerberosLoginUgi.checkTGTAndReloginFromKeytab();
-              } catch (Throwable throwable) {
-                LOG.error("Fail to refresh ugi token: ", throwable);
+              } catch (Exception e) {
+                LOG.error("Fail to refresh ugi token: ", e);
               }
             },
             checkInterval,

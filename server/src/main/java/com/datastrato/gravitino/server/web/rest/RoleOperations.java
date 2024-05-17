@@ -65,6 +65,7 @@ public class RoleOperations {
   @ResponseMetered(name = "create-role", absolute = true)
   public Response createRole(@PathParam("metalake") String metalake, RoleCreateRequest request) {
     try {
+
       return Utils.doAs(
           httpRequest,
           () ->
@@ -75,7 +76,9 @@ public class RoleOperations {
                               metalake,
                               request.getName(),
                               request.getProperties(),
-                              SecurableObjects.parse(request.getSecurableObject()),
+                              SecurableObjects.parse(
+                                  request.getSecurableObject().fullName(),
+                                  request.getSecurableObject().type()),
                               request.getPrivileges().stream()
                                   .map(Privileges::fromString)
                                   .collect(Collectors.toList()))))));
@@ -96,11 +99,11 @@ public class RoleOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            boolean deteted = accessControlManager.deleteRole(metalake, role);
-            if (!deteted) {
+            boolean deleted = accessControlManager.deleteRole(metalake, role);
+            if (!deleted) {
               LOG.warn("Failed to delete role {} under metalake {}", role, metalake);
             }
-            return Utils.ok(new DeleteResponse(deteted));
+            return Utils.ok(new DeleteResponse(deleted));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleRoleException(OperationType.DELETE, role, metalake, e);

@@ -2,8 +2,9 @@
 Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
+
 from abc import ABC, abstractmethod
-from typing import List, Dict, Optional
+from typing import List, Dict
 
 from gravitino.api.schema import Schema
 from gravitino.api.schema_change import SchemaChange
@@ -13,6 +14,7 @@ from gravitino.namespace import Namespace
 
 class NoSuchSchemaException(Exception):
     """Exception raised if the schema does not exist."""
+
     pass
 
 
@@ -60,7 +62,9 @@ class SupportsSchemas(ABC):
             return False
 
     @abstractmethod
-    def create_schema(self, ident: NameIdentifier, comment: Optional[str], properties: Dict[str, str]) -> Schema:
+    def create_schema(
+        self, ident: NameIdentifier, comment: str, properties: Dict[str, str]
+    ) -> Schema:
         """Create a schema in the catalog.
 
         Args:
@@ -93,7 +97,7 @@ class SupportsSchemas(ABC):
         pass
 
     @abstractmethod
-    def alter_schema(self, ident: NameIdentifier, changes: List[SchemaChange]) -> Schema:
+    def alter_schema(self, ident: NameIdentifier, *changes: SchemaChange) -> Schema:
         """Apply the metadata change to a schema in the catalog.
 
         Args:
@@ -110,7 +114,7 @@ class SupportsSchemas(ABC):
 
     @abstractmethod
     def drop_schema(self, ident: NameIdentifier, cascade: bool) -> bool:
-        """Drop a schema from the catalog. If cascade option is true, recursively 
+        """Drop a schema from the catalog. If cascade option is true, recursively
         drop all objects within the schema.
 
         Args:

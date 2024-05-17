@@ -105,7 +105,8 @@ const DetailsDrawer = props => {
                 'twc-py-2 twc-font-semibold twc-text-[1.2rem] twc-w-full twc-overflow-hidden twc-text-ellipsis'
               }
               sx={{
-                borderBottom: theme => `1px solid ${theme.palette.divider}`
+                borderBottom: theme => `1px solid ${theme.palette.divider}`,
+                whiteSpace: 'nowrap'
               }}
               data-refer='details-title'
             >

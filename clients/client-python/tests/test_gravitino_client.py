@@ -5,7 +5,7 @@ This software is licensed under the Apache License version 2.
 
 import unittest
 
-from gravitino import GravitinoClient, gravitino_metalake
+from gravitino.gravitino_client import gravitino_metalake, GravitinoClient
 from .utils import services_fixtures
 
 

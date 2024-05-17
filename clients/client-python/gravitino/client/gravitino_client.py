@@ -2,6 +2,7 @@
 Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
+
 from typing import List, Dict
 
 from gravitino.api.catalog import Catalog
@@ -30,7 +31,8 @@ class GravitinoClient(GravitinoClientBase):
 
     It uses an underlying {@link RESTClient} to send HTTP requests and receive responses from the API.
     """
-    metalake: GravitinoMetalake
+
+    _metalake: GravitinoMetalake
 
     def __init__(self, uri: str, metalake_name: str):
         """Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
@@ -44,7 +46,7 @@ class GravitinoClient(GravitinoClientBase):
             NoSuchMetalakeException if the metalake with specified name does not exist.
         """
         super().__init__(uri)
-        self.metalake = super().load_metalake(NameIdentifier.of(metalake_name))
+        self._metalake = super().load_metalake(NameIdentifier.of(metalake_name))
 
     def get_metalake(self) -> GravitinoMetalake:
         """Get the current metalake object
@@ -55,7 +57,7 @@ class GravitinoClient(GravitinoClientBase):
         Returns:
             the GravitinoMetalake object
         """
-        return self.metalake
+        return self._metalake
 
     def list_catalogs(self, namespace: Namespace) -> List[NameIdentifier]:
         return self.get_metalake().list_catalogs(namespace)
@@ -66,8 +68,17 @@ class GravitinoClient(GravitinoClientBase):
     def load_catalog(self, ident: NameIdentifier) -> Catalog:
         return self.get_metalake().load_catalog(ident)
 
-    def create_catalog(self, ident: NameIdentifier, type: Catalog.Type, provider: str, comment: str, properties: Dict[str, str]) -> Catalog:
-        return self.get_metalake().create_catalog(ident, type, provider, comment, properties)
+    def create_catalog(
+        self,
+        ident: NameIdentifier,
+        type: Catalog.Type,
+        provider: str,
+        comment: str,
+        properties: Dict[str, str],
+    ) -> Catalog:
+        return self.get_metalake().create_catalog(
+            ident, type, provider, comment, properties
+        )
 
     def alter_catalog(self, ident: NameIdentifier, *changes: CatalogChange):
         return self.get_metalake().alter_catalog(ident, *changes)

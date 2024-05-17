@@ -18,7 +18,6 @@ import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
-import com.datastrato.gravitino.connector.BasePropertiesMetadata;
 import com.datastrato.gravitino.connector.CatalogInfo;
 import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.PropertiesMetadata;
@@ -67,7 +66,9 @@ import org.apache.kafka.clients.admin.ListTopicsResult;
 import org.apache.kafka.clients.admin.NewPartitions;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.TopicDescription;
+import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.Uuid;
+import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.config.ConfigResource;
 import org.apache.kafka.common.errors.InvalidConfigurationException;
 import org.apache.kafka.common.errors.InvalidReplicationFactorException;
@@ -133,8 +134,16 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
         AdminClientConfig.CLIENT_ID_CONFIG,
         String.format(CLIENT_ID_TEMPLATE, config.get(ID_KEY), info.namespace(), info.name()));
 
+    try {
+      adminClient = AdminClient.create(adminClientConfig);
+    } catch (KafkaException e) {
+      if (e.getCause() instanceof ConfigException) {
+        throw new IllegalArgumentException(
+            "Invalid configuration for Kafka AdminClient: " + e.getCause().getMessage(), e);
+      }
+      throw new RuntimeException("Failed to create Kafka AdminClient", e);
+    }
     createDefaultSchemaIfNecessary();
-    adminClient = AdminClient.create(adminClientConfig);
   }
 
   @Override
@@ -148,7 +157,13 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
       return topicNames.stream()
           .map(name -> NameIdentifier.of(namespace, name))
           .toArray(NameIdentifier[]::new);
-    } catch (InterruptedException | ExecutionException e) {
+    } catch (ExecutionException e) {
+      throw new RuntimeException(
+          String.format(
+              "Failed to list topics under the schema %s: %s",
+              namespace, e.getCause().getMessage()),
+          e);
+    } catch (InterruptedException e) {
       throw new RuntimeException("Failed to list topics under the schema " + namespace, e);
     }
   }
@@ -216,7 +231,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
       LOG.info(
           "Created topic {}[id: {}] with {} partitions and replication factor {}",
           ident,
-          topicId.toString(),
+          topicId,
           createTopicsResult.numPartitions(ident.name()).get(),
           createTopicsResult.replicationFactor(ident.name()).get());
 
@@ -552,7 +567,6 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
     ImmutableMap<String, String> properties =
         ImmutableMap.<String, String>builder()
             .put(ID_KEY, StringIdentifier.fromId(uid).toString())
-            .put(BasePropertiesMetadata.GRAVITINO_MANAGED_ENTITY, Boolean.TRUE.toString())
             .build();
 
     SchemaEntity defaultSchema =

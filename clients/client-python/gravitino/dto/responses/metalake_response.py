@@ -2,8 +2,11 @@
 Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
-from dataclasses import dataclass
+
+from dataclasses import dataclass, field
 from typing import Optional
+
+from dataclasses_json import config
 
 from gravitino.dto.metalake_dto import MetalakeDTO
 from gravitino.dto.responses.base_response import BaseResponse
@@ -13,7 +16,10 @@ from gravitino.dto.responses.base_response import BaseResponse
 class MetalakeResponse(BaseResponse):
     """Represents a response containing metalake information."""
 
-    metalake: Optional[MetalakeDTO]
+    _metalake: Optional[MetalakeDTO] = field(metadata=config(field_name="metalake"))
+
+    def metalake(self) -> MetalakeDTO:
+        return self._metalake
 
     def validate(self):
         """Validates the response data.
@@ -21,6 +27,10 @@ class MetalakeResponse(BaseResponse):
         """
         super().validate()
 
-        assert self.metalake is not None, "metalake must not be null"
-        assert self.metalake.name is not None, "metalake 'name' must not be null and empty"
-        assert self.metalake.audit is not None, "metalake 'audit' must not be null"
+        assert self._metalake is not None, "metalake must not be null"
+        assert (
+            self._metalake.name() is not None
+        ), "metalake 'name' must not be null and empty"
+        assert (
+            self._metalake.audit_info() is not None
+        ), "metalake 'audit' must not be null"

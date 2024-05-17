@@ -10,14 +10,12 @@ import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
-import com.datastrato.gravitino.meta.CatalogEntity;
-import com.datastrato.gravitino.meta.SchemaEntity;
 import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /* The utilization class of authorization module*/
-class AuthorizationUtils {
+public class AuthorizationUtils {
 
   static final String USER_DOES_NOT_EXIST_MSG = "User %s does not exist in th metalake %s";
   static final String GROUP_DOES_NOT_EXIST_MSG = "Group %s does not exist in th metalake %s";
@@ -62,11 +60,46 @@ class AuthorizationUtils {
   }
 
   public static Namespace ofGroupNamespace(String metalake) {
-    return Namespace.of(
-        metalake, CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME, SchemaEntity.GROUP_SCHEMA_NAME);
+    return Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.GROUP_SCHEMA_NAME);
   }
 
   public static Namespace ofUserNamespace(String metalake) {
     return Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME);
+  }
+
+  public static void checkUser(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "User identifier must not be null");
+    checkUserNamespace(ident.namespace());
+  }
+
+  public static void checkGroup(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "Group identifier must not be null");
+    checkGroupNamespace(ident.namespace());
+  }
+
+  public static void checkRole(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "Role identifier must not be null");
+    checkRoleNamespace(ident.namespace());
+  }
+
+  public static void checkUserNamespace(Namespace namespace) {
+    Namespace.check(
+        namespace != null && namespace.length() == 3,
+        "User namespace must have 3 levels, the input namespace is %s",
+        namespace);
+  }
+
+  public static void checkGroupNamespace(Namespace namespace) {
+    Namespace.check(
+        namespace != null && namespace.length() == 3,
+        "Group namespace must have 3 levels, the input namespace is %s",
+        namespace);
+  }
+
+  public static void checkRoleNamespace(Namespace namespace) {
+    Namespace.check(
+        namespace != null && namespace.length() == 3,
+        "Role namespace must have 3 levels, the input namespace is %s",
+        namespace);
   }
 }

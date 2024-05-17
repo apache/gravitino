@@ -84,7 +84,7 @@ public interface RelationalBackend extends Closeable {
       throws IOException;
 
   /**
-   * Deletes the entity associated with the identifier and the entity type.
+   * Soft deletes the entity associated with the identifier and the entity type.
    *
    * @param ident The identifier of the entity.
    * @param entityType The type of the entity.
@@ -92,4 +92,24 @@ public interface RelationalBackend extends Closeable {
    * @return True, if the entity was successfully deleted, else false.
    */
   boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade);
+
+  /**
+   * Permanently deletes the legacy data that has been marked as deleted before the given legacy
+   * timeline.
+   *
+   * @param entityType The type of the entity.
+   * @param legacyTimeLine The time before which the data has been marked as deleted.
+   * @return The count of the deleted data.
+   */
+  int hardDeleteLegacyData(Entity.EntityType entityType, long legacyTimeLine);
+
+  /**
+   * Soft deletes the old version data that is older than or equal to the given version retention
+   * count.
+   *
+   * @param entityType The type of the entity.
+   * @param versionRetentionCount The count of versions to retain.
+   * @return The count of the deleted data.
+   */
+  int deleteOldVersionData(Entity.EntityType entityType, long versionRetentionCount);
 }

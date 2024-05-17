@@ -12,6 +12,7 @@ import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.FilesetEntity;
 import com.datastrato.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.FilesetVersionMapper;
+import com.datastrato.gravitino.storage.relational.po.FilesetMaxVersionPO;
 import com.datastrato.gravitino.storage.relational.po.FilesetPO;
 import com.datastrato.gravitino.storage.relational.utils.ExceptionUtils;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
@@ -21,6 +22,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The service class for fileset metadata and version info. It provides the basic database
@@ -28,6 +31,8 @@ import java.util.function.Function;
  */
 public class FilesetMetaService {
   private static final FilesetMetaService INSTANCE = new FilesetMetaService();
+
+  private static final Logger LOG = LoggerFactory.getLogger(FilesetMetaService.class);
 
   public static FilesetMetaService getInstance() {
     return INSTANCE;
@@ -211,6 +216,54 @@ public class FilesetMetaService {
                 mapper -> mapper.softDeleteFilesetVersionsByFilesetId(filesetId)));
 
     return true;
+  }
+
+  public int deleteFilesetAndVersionMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
+    int filesetDeletedCount =
+        SessionUtils.doWithCommitAndFetchResult(
+            FilesetMetaMapper.class,
+            mapper -> {
+              return mapper.deleteFilesetMetasByLegacyTimeLine(legacyTimeLine, limit);
+            });
+    int filesetVersionDeletedCount =
+        SessionUtils.doWithCommitAndFetchResult(
+            FilesetVersionMapper.class,
+            mapper -> {
+              return mapper.deleteFilesetVersionsByLegacyTimeLine(legacyTimeLine, limit);
+            });
+    return filesetDeletedCount + filesetVersionDeletedCount;
+  }
+
+  public int deleteFilesetVersionsByRetentionCount(Long versionRetentionCount, int limit) {
+    // get the current version of all filesets.
+    List<FilesetMaxVersionPO> filesetCurVersions =
+        SessionUtils.getWithoutCommit(
+            FilesetVersionMapper.class,
+            mapper -> mapper.selectFilesetVersionsByRetentionCount(versionRetentionCount));
+
+    // soft delete old versions that are older than or equal to (currentVersion -
+    // versionRetentionCount).
+    int totalDeletedCount = 0;
+    for (FilesetMaxVersionPO filesetCurVersion : filesetCurVersions) {
+      long versionRetentionLine = filesetCurVersion.getVersion() - versionRetentionCount;
+      int deletedCount =
+          SessionUtils.doWithCommitAndFetchResult(
+              FilesetVersionMapper.class,
+              mapper ->
+                  mapper.softDeleteFilesetVersionsByRetentionLine(
+                      filesetCurVersion.getFilesetId(), versionRetentionLine, limit));
+      totalDeletedCount += deletedCount;
+
+      // log the deletion by current fileset version.
+      LOG.info(
+          "Soft delete filesetVersions count: {} which versions are older than or equal to"
+              + " versionRetentionLine: {}, the current filesetId and version is: <{}, {}>.",
+          deletedCount,
+          versionRetentionLine,
+          filesetCurVersion.getFilesetId(),
+          filesetCurVersion.getVersion());
+    }
+    return totalDeletedCount;
   }
 
   private void fillFilesetPOBuilderParentEntityId(FilesetPO.Builder builder, Namespace namespace) {

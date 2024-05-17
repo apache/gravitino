@@ -39,7 +39,6 @@ public class TestConfigEntryList {
             .doc("test")
             .internal()
             .stringConf()
-            .checkValue(value -> value == null, "error")
             .toSequence()
             .checkValue(valueList -> valueList.stream().allMatch("test-string"::equals), "error")
             .createWithDefault(Lists.newArrayList("test-string", "test-string", "test-string"));
@@ -123,6 +122,7 @@ public class TestConfigEntryList {
     testConfDefault.writeTo(configMap, Lists.newArrayList(-10, 2));
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> testConfDefault.readFrom(configMap));
+
     ConfigEntry<List<String>> testConfNoDefault =
         new ConfigBuilder("gravitino.test.no.default")
             .stringConf()
@@ -130,6 +130,19 @@ public class TestConfigEntryList {
             .checkValue(Objects::nonNull, "error")
             .create();
     Assertions.assertThrows(
-        NullPointerException.class, () -> testConfNoDefault.readFrom(configMap));
+        IllegalArgumentException.class, () -> testConfNoDefault.readFrom(configMap));
+
+    // To test checkValue before calling `toSequence`
+    ConfigEntry<List<String>> testConfWithoutDefault =
+        new ConfigBuilder("gravitino.test.empty.check")
+            .doc("test")
+            .internal()
+            .stringConf()
+            .checkValue(value -> !value.isEmpty(), "error")
+            .toSequence()
+            .create();
+    testConfWithoutDefault.writeTo(configMap, Lists.newArrayList(""));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> testConfWithoutDefault.readFrom(configMap));
   }
 }

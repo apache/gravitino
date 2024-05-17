@@ -14,5 +14,7 @@ public enum OperationType {
   GET,
   ADD,
   REMOVE,
-  DELETE
+  DELETE,
+  GRANT,
+  REVOKE
 }

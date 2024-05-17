@@ -63,7 +63,7 @@ public class AccessControlManager {
    *
    * @param metalake The Metalake of the User.
    * @param user The name of the User.
-   * @return `true` if the User was successfully removed, `false` only when there's no such user,
+   * @return True if the User was successfully removed, false only when there's no such user,
    *     otherwise it will throw an exception.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If removing the User encounters storage issues.
@@ -107,7 +107,7 @@ public class AccessControlManager {
    *
    * @param metalake The Metalake of the Group.
    * @param group THe name of the Group.
-   * @return `true` if the Group was successfully removed, `false` only when there's no such group,
+   * @return True if the Group was successfully removed, false only when there's no such group,
    *     otherwise it will throw an exception.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If removing the Group encounters storage issues.
@@ -132,67 +132,71 @@ public class AccessControlManager {
   }
 
   /**
-   * Grant a role to a user.
+   * Grant roles to a user.
    *
    * @param metalake The metalake of the User.
    * @param user The name of the User.
-   * @return true` if the User was successfully granted, `false` otherwise.
-   * @throws NoSuchUserException If the User with the given identifier does not exist.
-   * @throws NoSuchRoleException If the Role with the given identifier does not exist.
-   * @throws RoleAlreadyExistsException If the Role with the given identifier already exists in the
-   *     User.
-   * @throws RuntimeException If granting a role to a user encounters storage issues.
+   * @param roles The names of the Role.
+   * @return The User after granted.
+   * @throws NoSuchUserException If the User with the given name does not exist.
+   * @throws NoSuchRoleException If the Role with the given name does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If granting roles to a user encounters storage issues.
    */
-  public boolean grantRoleToUser(String metalake, String role, String user) {
-    return doWithNonAdminLock(() -> permissionManager.grantRoleToUser(metalake, role, user));
+  public User grantRolesToUser(String metalake, List<String> roles, String user)
+      throws NoSuchUserException, NoSuchRoleException, NoSuchMetalakeException {
+    return doWithNonAdminLock(() -> permissionManager.grantRolesToUser(metalake, roles, user));
   }
 
   /**
-   * Grant a role to a group.
-   *
-   * @param metalake The metalake of the Group.
-   * @param group THe name of the Group.
-   * @return true` if the Group was successfully granted, `false` otherwise.
-   * @throws NoSuchGroupException If the Group with the given identifier does not exist.
-   * @throws NoSuchRoleException If the Role with the given identifier does not exist.
-   * @throws RoleAlreadyExistsException If the Role with the given identifier already exists in the
-   *     Group.
-   * @throws RuntimeException If granting a role to a group encounters storage issues.
-   */
-  public boolean grantRoleToGroup(String metalake, String role, String group) {
-    return doWithNonAdminLock(() -> permissionManager.grantRoleToGroup(metalake, role, group));
-  }
-
-  /**
-   * Revoke a role from a group.
+   * Grant roles to a group.
    *
    * @param metalake The metalake of the Group.
    * @param group The name of the Group.
-   * @return true` if the Group was successfully revoked, `false` otherwise.
-   * @throws NoSuchGroupException If the Group with the given identifier does not exist.
-   * @throws NoSuchRoleException If the Role with the given identifier does not exist.
-   * @throws RoleAlreadyExistsException If the Role with the given identifier already exists in the
-   *     Group.
-   * @throws RuntimeException If revoking a role from a group encounters storage issues.
+   * @param roles The names of the Role.
+   * @return The Group after granted.
+   * @throws NoSuchGroupException If the Group with the given name does not exist.
+   * @throws NoSuchRoleException If the Role with the given name does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If granting roles to a group encounters storage issues.
    */
-  public boolean revokeRoleFromGroup(String metalake, String role, String group) {
-    return doWithNonAdminLock(() -> permissionManager.revokeRoleFromGroup(metalake, role, group));
+  public Group grantRolesToGroup(String metalake, List<String> roles, String group)
+      throws NoSuchGroupException, NoSuchRoleException, NoSuchMetalakeException {
+    return doWithNonAdminLock(() -> permissionManager.grantRolesToGroup(metalake, roles, group));
   }
 
   /**
-   * Revoke a role from a user.
+   * Revoke roles from a group.
+   *
+   * @param metalake The metalake of the Group.
+   * @param group The name of the Group.
+   * @param roles The name of the Role.
+   * @return The Group after revoked.
+   * @throws NoSuchGroupException If the Group with the given name does not exist.
+   * @throws NoSuchRoleException If the Role with the given name does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If revoking roles from a group encounters storage issues.
+   */
+  public Group revokeRolesFromGroup(String metalake, List<String> roles, String group)
+      throws NoSuchGroupException, NoSuchRoleException, NoSuchMetalakeException {
+    return doWithNonAdminLock(() -> permissionManager.revokeRolesFromGroup(metalake, roles, group));
+  }
+
+  /**
+   * Revoke roles from a user.
    *
    * @param metalake The metalake of the User.
    * @param user The name of the User.
-   * @return true` if the User was successfully revoked, `false` otherwise.
-   * @throws NoSuchUserException If the User with the given identifier does not exist.
-   * @throws NoSuchRoleException If the Role with the given identifier does not exist.
-   * @throws RoleAlreadyExistsException If the Role with the given identifier already exists in the
-   *     User.
-   * @throws RuntimeException If revoking a role from a user encounters storage issues.
+   * @param roles The name of the Role.
+   * @return The User after revoked.
+   * @throws NoSuchUserException If the User with the given name does not exist.
+   * @throws NoSuchRoleException If the Role with the given name does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If revoking roles from a user encounters storage issues.
    */
-  public boolean revokeRoleFromUser(String metalake, String role, String user) {
-    return doWithNonAdminLock(() -> permissionManager.revokeRoleFromUser(metalake, role, user));
+  public User revokeRolesFromUser(String metalake, List<String> roles, String user)
+      throws NoSuchUserException, NoSuchRoleException, NoSuchMetalakeException {
+    return doWithNonAdminLock(() -> permissionManager.revokeRolesFromUser(metalake, roles, user));
   }
 
   /**
@@ -211,7 +215,7 @@ public class AccessControlManager {
    * Removes a metalake admin.
    *
    * @param user The name of the User.
-   * @return `true` if the User was successfully removed, `false` only when there's no such metalake
+   * @return True if the User was successfully removed, false only when there's no such metalake
    *     admin, otherwise it will throw an exception.
    * @throws RuntimeException If removing the User encounters storage issues.
    */
@@ -223,7 +227,7 @@ public class AccessControlManager {
    * Judges whether the user is the service admin.
    *
    * @param user the name of the user
-   * @return true, if the user is service admin, otherwise false.
+   * @return True if the user is service admin, otherwise false.
    */
   public boolean isServiceAdmin(String user) {
     return adminManager.isServiceAdmin(user);
@@ -233,7 +237,7 @@ public class AccessControlManager {
    * Judges whether the user is the metalake admin.
    *
    * @param user the name of the user
-   * @return true, if the user is metalake admin, otherwise false.
+   * @return True if the user is metalake admin, otherwise false.
    */
   public boolean isMetalakeAdmin(String user) {
     return doWithAdminLock(() -> adminManager.isMetalakeAdmin(user));
@@ -283,7 +287,7 @@ public class AccessControlManager {
    *
    * @param metalake The Metalake of the Role.
    * @param role The name of the Role.
-   * @return `true` if the Role was successfully deleted, `false` only when there's no such role,
+   * @return True if the Role was successfully deleted, false only when there's no such role,
    *     otherwise it will throw an exception.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If deleting the Role encounters storage issues.

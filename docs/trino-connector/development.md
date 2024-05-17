@@ -249,6 +249,7 @@ gravitino.uri=http://localhost:8090
 
 # The name of the metalake to which the connector is connected, you need to change it according to your environment
 gravitino.metalake=test
+
 ```
 - Trino configuration file: `config.properties`
 ```properties

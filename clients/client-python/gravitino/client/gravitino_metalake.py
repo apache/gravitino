@@ -2,11 +2,12 @@
 Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
+
 import logging
+from typing import List, Dict
 
 from gravitino.api.catalog import Catalog
 from gravitino.api.catalog_change import CatalogChange
-from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.dto_converters import DTOConverters
 from gravitino.dto.metalake_dto import MetalakeDTO
 from gravitino.dto.requests.catalog_create_request import CatalogCreateRequest
@@ -19,8 +20,6 @@ from gravitino.name_identifier import NameIdentifier
 from gravitino.namespace import Namespace
 from gravitino.utils import HTTPClient
 
-
-from typing import List, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -48,15 +47,14 @@ class GravitinoMetalake(MetalakeDTO):
 
     API_METALAKES_CATALOGS_PATH = "api/metalakes/{}/catalogs/{}"
 
-    def __init__(self, name: str = None, comment: str = None, properties: Dict[str, str] = None, audit: AuditDTO = None,
-                 rest_client: HTTPClient = None):
-        super().__init__(name=name, comment=comment, properties=properties, audit=audit)
-        self.rest_client = rest_client
-
-    @classmethod
-    def build(cls, metalake: MetalakeDTO = None, client: HTTPClient = None):
-        return cls(name=metalake.name, comment=metalake.comment, properties=metalake.properties,
-                   audit=metalake.audit, rest_client=client)
+    def __init__(self, metalake: MetalakeDTO = None, client: HTTPClient = None):
+        super().__init__(
+            _name=metalake.name(),
+            _comment=metalake.comment(),
+            _properties=metalake.properties(),
+            _audit=metalake.audit_info(),
+        )
+        self.rest_client = client
 
     def list_catalogs(self, namespace: Namespace) -> List[NameIdentifier]:
         """List all the catalogs under this metalake with specified namespace.
@@ -73,9 +71,9 @@ class GravitinoMetalake(MetalakeDTO):
         Namespace.check_catalog(namespace)
         url = f"api/metalakes/{namespace.level(0)}/catalogs"
         response = self.rest_client.get(url)
-        entityList = EntityListResponse.from_json(response.body, infer_missing=True)
-        entityList.validate()
-        return entityList.idents
+        entity_list = EntityListResponse.from_json(response.body, infer_missing=True)
+        entity_list.validate()
+        return entity_list.identifiers()
 
     def list_catalogs_info(self, namespace: Namespace) -> List[Catalog]:
         """List all the catalogs with their information under this metalake with specified namespace.
@@ -95,7 +93,10 @@ class GravitinoMetalake(MetalakeDTO):
         response = self.rest_client.get(url, params=params)
         catalog_list = CatalogListResponse.from_json(response.body, infer_missing=True)
 
-        return [DTOConverters.to_catalog(catalog, self.rest_client) for catalog in catalog_list.catalogs()]
+        return [
+            DTOConverters.to_catalog(catalog, self.rest_client)
+            for catalog in catalog_list.catalogs()
+        ]
 
     def load_catalog(self, ident: NameIdentifier) -> Catalog:
         """Load the catalog with specified identifier.
@@ -110,17 +111,22 @@ class GravitinoMetalake(MetalakeDTO):
             The Catalog with specified identifier.
         """
         NameIdentifier.check_catalog(ident)
-        url = self.API_METALAKES_CATALOGS_PATH.format(ident.namespace().level(0), ident.name())
+        url = self.API_METALAKES_CATALOGS_PATH.format(
+            ident.namespace().level(0), ident.name()
+        )
         response = self.rest_client.get(url)
         catalog_resp = CatalogResponse.from_json(response.body, infer_missing=True)
 
         return DTOConverters.to_catalog(catalog_resp.catalog(), self.rest_client)
 
-    def create_catalog(self, ident: NameIdentifier,
-                       type: Catalog.Type,
-                       provider: str,
-                       comment: str,
-                       properties: Dict[str, str]) -> Catalog:
+    def create_catalog(
+        self,
+        ident: NameIdentifier,
+        type: Catalog.Type,
+        provider: str,
+        comment: str,
+        properties: Dict[str, str],
+    ) -> Catalog:
         """Create a new catalog with specified identifier, type, comment and properties.
 
         Args:
@@ -139,11 +145,13 @@ class GravitinoMetalake(MetalakeDTO):
         """
         NameIdentifier.check_catalog(ident)
 
-        catalog_create_request = CatalogCreateRequest(name=ident.name(),
-                                                      type=type,
-                                                      provider=provider,
-                                                      comment=comment,
-                                                      properties=properties)
+        catalog_create_request = CatalogCreateRequest(
+            name=ident.name(),
+            type=type,
+            provider=provider,
+            comment=comment,
+            properties=properties,
+        )
         catalog_create_request.validate()
 
         url = f"api/metalakes/{ident.namespace().level(0)}/catalogs"
@@ -172,7 +180,9 @@ class GravitinoMetalake(MetalakeDTO):
         updates_request = CatalogUpdatesRequest(reqs)
         updates_request.validate()
 
-        url = self.API_METALAKES_CATALOGS_PATH.format(ident.namespace().level(0), ident.name())
+        url = self.API_METALAKES_CATALOGS_PATH.format(
+            ident.namespace().level(0), ident.name()
+        )
         response = self.rest_client.put(url, json=updates_request)
         catalog_response = CatalogResponse.from_json(response.body, infer_missing=True)
         catalog_response.validate()
@@ -184,18 +194,20 @@ class GravitinoMetalake(MetalakeDTO):
 
         Args:
             ident the identifier of the catalog.
-        
+
         Returns:
             true if the catalog is dropped successfully, false otherwise.
         """
         try:
-            url = self.API_METALAKES_CATALOGS_PATH.format(ident.namespace().level(0), ident.name())
+            url = self.API_METALAKES_CATALOGS_PATH.format(
+                ident.namespace().level(0), ident.name()
+            )
             response = self.rest_client.delete(url)
 
             drop_response = DropResponse.from_json(response.body, infer_missing=True)
             drop_response.validate()
 
             return drop_response.dropped()
-        except Exception as e:
-            logger.warning(f"Failed to drop catalog {ident}: {e}")
+        except Exception:
+            logger.warning("Failed to drop catalog %s", ident)
             return False

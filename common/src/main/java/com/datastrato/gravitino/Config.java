@@ -6,7 +6,6 @@ package com.datastrato.gravitino;
 
 import com.datastrato.gravitino.config.ConfigEntry;
 import com.datastrato.gravitino.utils.MapUtils;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
@@ -200,7 +199,6 @@ public abstract class Config {
    *
    * @param properties The properties object containing configuration key-value pairs.
    */
-  @VisibleForTesting
   public void loadFromProperties(Properties properties) {
     loadFromMap(
         Maps.fromProperties(properties),
@@ -226,7 +224,6 @@ public abstract class Config {
    * @return The loaded properties.
    * @throws IOException If there's an issue loading the properties.
    */
-  @VisibleForTesting
   public Properties loadPropertiesFromFile(File file) throws IOException {
     Properties properties = new Properties();
     try (InputStream in = Files.newInputStream(file.toPath())) {

@@ -2,8 +2,9 @@
 Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
+
 from dataclasses import dataclass, field
-from typing import Optional, List
+from typing import List
 
 from dataclasses_json import config
 
@@ -14,7 +15,11 @@ from gravitino.name_identifier import NameIdentifier
 @dataclass
 class EntityListResponse(BaseResponse):
     """Represents a response containing a list of catalogs."""
-    idents: Optional[List[NameIdentifier]] = field(metadata=config(field_name='identifiers'))
+
+    _idents: List[NameIdentifier] = field(metadata=config(field_name="identifiers"))
+
+    def identifiers(self) -> List[NameIdentifier]:
+        return self._idents
 
     def validate(self):
         """Validates the response data.
@@ -24,4 +29,4 @@ class EntityListResponse(BaseResponse):
         """
         super().validate()
 
-        assert self.idents is not None, "identifiers must not be null"
+        assert self._idents is not None, "identifiers must not be null"

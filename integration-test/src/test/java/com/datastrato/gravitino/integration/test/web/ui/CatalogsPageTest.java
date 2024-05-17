@@ -5,10 +5,13 @@
 
 package com.datastrato.gravitino.integration.test.web.ui;
 
+import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.identity;
+
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.client.GravitinoMetalake;
+import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.TrinoITContainers;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
@@ -16,6 +19,14 @@ import com.datastrato.gravitino.integration.test.web.ui.pages.CatalogsPage;
 import com.datastrato.gravitino.integration.test.web.ui.pages.MetalakePage;
 import com.datastrato.gravitino.integration.test.web.ui.utils.AbstractWebIT;
 import com.datastrato.gravitino.rel.Column;
+import com.datastrato.gravitino.rel.expressions.NamedReference;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
+import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.Maps;
 import java.util.Arrays;
@@ -29,6 +40,7 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.openqa.selenium.By;
 
 @Tag("gravitino-docker-it")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -47,26 +59,30 @@ public class CatalogsPageTest extends AbstractWebIT {
   protected static String hdfsUri = "hdfs://127.0.0.1:9000";
   protected static String mysqlUri = "jdbc:mysql://127.0.0.1";
   protected static String postgresqlUri = "jdbc:postgresql://127.0.0.1";
-  protected static String kafkaUri = "http://127.0.0.1:9092";
 
   private static final String WEB_TITLE = "Gravitino";
   private static final String CATALOG_TABLE_TITLE = "Schemas";
   private static final String SCHEMA_TABLE_TITLE = "Tables";
+  private static final String SCHEMA_FILESET_TITLE = "Filesets";
   private static final String TABLE_TABLE_TITLE = "Columns";
   private static final String METALAKE_NAME = "test";
   private static final String METALAKE_SELECT_NAME = "metalake_select_name";
-  private static final String CATALOG_TYPE = "relational";
+  private static final String CATALOG_TYPE_RELATIONAL = "relational";
+  private static final String CATALOG_TYPE_FILESET = "fileset";
   private static final String DEFAULT_CATALOG_NAME = "default_catalog";
   private static final String HIVE_CATALOG_NAME = "catalog_hive";
-  private static final String MODIFIED_CATALOG_NAME = HIVE_CATALOG_NAME + "_edited";
+  private static final String MODIFIED_HIVE_CATALOG_NAME = HIVE_CATALOG_NAME + "_edited";
   private static final String ICEBERG_CATALOG_NAME = "catalog_iceberg";
   private static final String FILESET_CATALOG_NAME = "catalog_fileset";
-  private static final String KAFKA_CATALOG_NAME = "catalog_kafka";
   private static final String SCHEMA_NAME = "default";
+  private static final String SCHEMA_NAME_FILESET = "schema_fileset";
+  private static final String FILESET_NAME = "fileset1";
   private static final String TABLE_NAME = "table1";
   private static final String TABLE_NAME_2 = "table2";
   private static final String COLUMN_NAME = "column";
   private static final String COLUMN_NAME_2 = "column_2";
+  private static final String PROPERTIES_KEY1 = "key1";
+  private static final String PROPERTIES_VALUE1 = "val1";
 
   private static final String MYSQL_CATALOG_NAME = "catalog_mysql";
   private static final String MYSQL_JDBC_DRIVER = "com.mysql.cj.jdbc.Driver";
@@ -77,6 +93,11 @@ public class CatalogsPageTest extends AbstractWebIT {
 
   private static final String COMMON_JDBC_USER = "trino";
   private static final String COMMON_JDBC_PWD = "ds123";
+
+  public static final String DISTRIBUTION = "distribution";
+  public static final String SORT_ORDERS = "sortOrders";
+
+  private static String defaultBaseLocation;
 
   @BeforeAll
   public static void before() throws Exception {
@@ -94,20 +115,111 @@ public class CatalogsPageTest extends AbstractWebIT {
     postgresqlUri = trinoITContainers.getPostgresqlUri();
   }
 
-  void createTableAndColumn(
-      String metalakeName,
-      String catalogName,
-      String schemaName,
-      String tableName,
-      String colName) {
+  /**
+   * Create the specified schema
+   *
+   * @param metalakeName The name of the Metalake where the schema will be created.
+   * @param catalogName The name of the Catalog where the schema will be created.
+   * @param schemaName The name of the Schema where the schema will be created.
+   */
+  void createSchema(String metalakeName, String catalogName, String schemaName) {
     Map<String, String> properties = Maps.newHashMap();
-    Column column = Column.of(colName, Types.IntegerType.get(), "column comment");
+    properties.put(PROPERTIES_KEY1, PROPERTIES_VALUE1);
+    catalog
+        .asSchemas()
+        .createSchema(
+            NameIdentifier.of(metalakeName, catalogName, schemaName), "comment", properties);
+  }
+
+  /**
+   * Creates a table with a single column in the specified Metalake, Catalog, Schema, and Table.
+   *
+   * @param metalakeName The name of the Metalake where the table will be created.
+   * @param catalogName The name of the Catalog where the table will be created.
+   * @param schemaName The name of the Schema where the table will be created.
+   * @param tableName The name of the Table to be created.
+   */
+  void createHiveTableAndColumn(
+      String metalakeName, String catalogName, String schemaName, String tableName) {
+    Map<String, String> properties = Maps.newHashMap();
+    Column col1 = Column.of(COLUMN_NAME, Types.ByteType.get(), "col1 comment");
+    Column col2 = Column.of(COLUMN_NAME_2, Types.ByteType.get(), "col2 comment");
+    Column[] columns = new Column[] {col1, col2};
+    Distribution distribution = createDistribution();
+    SortOrder[] sortOrders = createSortOrder();
+    Transform[] partitions = new Transform[] {identity(col2.name())};
+
     catalog
         .asTableCatalog()
         .createTable(
             NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
-            new Column[] {column},
+            columns,
             "comment",
+            properties,
+            partitions,
+            distribution,
+            sortOrders);
+  }
+
+  private Distribution createDistribution() {
+    return Distributions.hash(10, NamedReference.field(COLUMN_NAME));
+  }
+
+  private SortOrder[] createSortOrder() {
+    return new SortOrders.SortImpl[] {
+      SortOrders.of(
+          NamedReference.field(COLUMN_NAME), SortDirection.DESCENDING, NullOrdering.NULLS_FIRST),
+      SortOrders.of(
+          NamedReference.field(COLUMN_NAME_2), SortDirection.DESCENDING, NullOrdering.NULLS_FIRST)
+    };
+  }
+
+  /**
+   * Retrieves the default base location for the given schema name.
+   *
+   * @param schemaName The name of the schema.
+   * @return The default HDFS storage location for the schema.
+   */
+  private static String defaultBaseLocation(String schemaName) {
+    if (defaultBaseLocation == null) {
+      defaultBaseLocation =
+          String.format("%s/user/hadoop/%s.db", hdfsUri, schemaName.toLowerCase());
+    }
+    return defaultBaseLocation;
+  }
+
+  /**
+   * Retrieves the storage location for the given schema name and fileset name.
+   *
+   * @param schemaName The name of the schema.
+   * @param filesetName The name of the fileset.
+   * @return The storage path for the combination of schema and fileset.
+   */
+  private static String storageLocation(String schemaName, String filesetName) {
+    return defaultBaseLocation(schemaName) + "/" + filesetName;
+  }
+
+  /**
+   * Creates a fileset within the specified Metalake, Catalog, Schema, and Fileset names.
+   *
+   * @param metalakeName The name of the Metalake.
+   * @param catalogName The name of the Catalog.
+   * @param schemaName The name of the Schema.
+   * @param filesetName The name of the Fileset.
+   */
+  void createFileset(
+      String metalakeName, String catalogName, String schemaName, String filesetName) {
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(PROPERTIES_KEY1, PROPERTIES_VALUE1);
+    String storageLocation = storageLocation(schemaName, filesetName);
+    Catalog catalog_fileset = metalake.loadCatalog(catalogName);
+    catalog_fileset
+        .asFilesetCatalog()
+        .createFileset(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName),
+            "comment",
+            Fileset.Type.MANAGED,
+            storageLocation,
             properties);
   }
 
@@ -132,7 +244,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     metalakePage.setMetalakeNameField(METALAKE_SELECT_NAME);
     clickAndWait(metalakePage.submitHandleMetalakeBtn);
     // load metalake
-    metalake = gravitinoClient.loadMetalake(NameIdentifier.of(METALAKE_NAME));
+    metalake = gravitinoClient.loadMetalake(METALAKE_NAME);
     metalakePage.clickMetalakeLink(METALAKE_NAME);
     // create catalog
     clickAndWait(catalogsPage.createCatalogBtn);
@@ -142,7 +254,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     // delete catalog
     catalogsPage.clickDeleteCatalogBtn(DEFAULT_CATALOG_NAME);
     clickAndWait(catalogsPage.confirmDeleteBtn);
-    Assertions.assertTrue(catalogsPage.verifyEmptyCatalog());
+    Assertions.assertTrue(catalogsPage.verifyEmptyTableData());
   }
 
   @Test
@@ -159,7 +271,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     catalogsPage.setCatalogPropsAt(2, "key2", "value2");
     clickAndWait(catalogsPage.handleSubmitCatalogBtn);
     // load catalog
-    catalog = metalake.loadCatalog(NameIdentifier.of(METALAKE_NAME, HIVE_CATALOG_NAME));
+    catalog = metalake.loadCatalog(HIVE_CATALOG_NAME);
 
     Assertions.assertTrue(catalogsPage.verifyGetCatalog(HIVE_CATALOG_NAME));
   }
@@ -235,23 +347,9 @@ public class CatalogsPageTest extends AbstractWebIT {
 
   @Test
   @Order(6)
-  public void testCreateKafkaCatalog() throws InterruptedException {
-    clickAndWait(catalogsPage.createCatalogBtn);
-    catalogsPage.setCatalogNameField(KAFKA_CATALOG_NAME);
-    clickAndWait(catalogsPage.catalogTypeSelector);
-    catalogsPage.clickSelectType("messaging");
-    catalogsPage.setCatalogCommentField("kafka catalog comment");
-    // set kafka catalog props
-    catalogsPage.setCatalogFixedProp("bootstrap.servers", kafkaUri);
-    clickAndWait(catalogsPage.handleSubmitCatalogBtn);
-    Assertions.assertTrue(catalogsPage.verifyGetCatalog(KAFKA_CATALOG_NAME));
-  }
-
-  @Test
-  @Order(7)
   public void testRefreshPage() {
     driver.navigate().refresh();
-    Assertions.assertEquals(driver.getTitle(), WEB_TITLE);
+    Assertions.assertEquals(WEB_TITLE, driver.getTitle());
     Assertions.assertTrue(catalogsPage.verifyRefreshPage());
     List<String> catalogsNames =
         Arrays.asList(
@@ -259,13 +357,12 @@ public class CatalogsPageTest extends AbstractWebIT {
             ICEBERG_CATALOG_NAME,
             MYSQL_CATALOG_NAME,
             PG_CATALOG_NAME,
-            FILESET_CATALOG_NAME,
-            KAFKA_CATALOG_NAME);
+            FILESET_CATALOG_NAME);
     Assertions.assertTrue(catalogsPage.verifyCreatedCatalogs(catalogsNames));
   }
 
   @Test
-  @Order(8)
+  @Order(7)
   public void testViewTabMetalakeDetails() throws InterruptedException {
     clickAndWait(catalogsPage.tabDetailsBtn);
     Assertions.assertTrue(catalogsPage.verifyShowDetailsContent());
@@ -274,7 +371,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(9)
+  @Order(8)
   public void testViewCatalogDetails() throws InterruptedException {
     catalogsPage.clickViewCatalogBtn(HIVE_CATALOG_NAME);
     Assertions.assertTrue(
@@ -282,84 +379,87 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(10)
-  public void testEditCatalog() throws InterruptedException {
+  @Order(9)
+  public void testEditHiveCatalog() throws InterruptedException {
     catalogsPage.clickEditCatalogBtn(HIVE_CATALOG_NAME);
-    catalogsPage.setCatalogNameField(MODIFIED_CATALOG_NAME);
+    catalogsPage.setCatalogNameField(MODIFIED_HIVE_CATALOG_NAME);
     clickAndWait(catalogsPage.handleSubmitCatalogBtn);
-    Assertions.assertTrue(catalogsPage.verifyEditedCatalog(MODIFIED_CATALOG_NAME));
+    Assertions.assertTrue(catalogsPage.verifyEditedCatalog(MODIFIED_HIVE_CATALOG_NAME));
   }
 
   // test catalog show schema list
   @Test
-  @Order(11)
+  @Order(10)
   public void testClickCatalogLink() {
-    catalogsPage.clickCatalogLink(METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE);
+    catalogsPage.clickCatalogLink(
+        METALAKE_NAME, MODIFIED_HIVE_CATALOG_NAME, CATALOG_TYPE_RELATIONAL);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(CATALOG_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(SCHEMA_NAME, false));
-    Assertions.assertTrue(catalogsPage.verifySelectedNode(MODIFIED_CATALOG_NAME));
+    Assertions.assertTrue(catalogsPage.verifySelectedNode(MODIFIED_HIVE_CATALOG_NAME));
   }
 
   @Test
-  @Order(12)
+  @Order(11)
   public void testRefreshCatalogPage() {
     driver.navigate().refresh();
-    Assertions.assertEquals(driver.getTitle(), WEB_TITLE);
+    Assertions.assertEquals(WEB_TITLE, driver.getTitle());
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(CATALOG_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(SCHEMA_NAME, false));
     List<String> treeNodes =
         Arrays.asList(
-            MODIFIED_CATALOG_NAME,
+            MODIFIED_HIVE_CATALOG_NAME,
             SCHEMA_NAME,
             ICEBERG_CATALOG_NAME,
             MYSQL_CATALOG_NAME,
             PG_CATALOG_NAME,
-            FILESET_CATALOG_NAME,
-            KAFKA_CATALOG_NAME);
+            FILESET_CATALOG_NAME);
     Assertions.assertTrue(catalogsPage.verifyTreeNodes(treeNodes));
-    Assertions.assertTrue(catalogsPage.verifySelectedNode(MODIFIED_CATALOG_NAME));
+    Assertions.assertTrue(catalogsPage.verifySelectedNode(MODIFIED_HIVE_CATALOG_NAME));
   }
 
   // test schema show table list
   @Test
-  @Order(13)
+  @Order(12)
   public void testClickSchemaLink() {
     // create table
-    createTableAndColumn(
-        METALAKE_NAME, MODIFIED_CATALOG_NAME, SCHEMA_NAME, TABLE_NAME, COLUMN_NAME);
-    catalogsPage.clickSchemaLink(METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE, SCHEMA_NAME);
+    createHiveTableAndColumn(METALAKE_NAME, MODIFIED_HIVE_CATALOG_NAME, SCHEMA_NAME, TABLE_NAME);
+    catalogsPage.clickSchemaLink(
+        METALAKE_NAME, MODIFIED_HIVE_CATALOG_NAME, CATALOG_TYPE_RELATIONAL, SCHEMA_NAME);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(SCHEMA_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TABLE_NAME, false));
     Assertions.assertTrue(catalogsPage.verifySelectedNode(SCHEMA_NAME));
   }
 
   @Test
-  @Order(14)
+  @Order(13)
   public void testRefreshSchemaPage() {
     driver.navigate().refresh();
-    Assertions.assertEquals(driver.getTitle(), WEB_TITLE);
+    Assertions.assertEquals(WEB_TITLE, driver.getTitle());
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(SCHEMA_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TABLE_NAME, false));
     List<String> treeNodes =
         Arrays.asList(
-            MODIFIED_CATALOG_NAME,
+            MODIFIED_HIVE_CATALOG_NAME,
             SCHEMA_NAME,
             TABLE_NAME,
             ICEBERG_CATALOG_NAME,
             MYSQL_CATALOG_NAME,
             PG_CATALOG_NAME,
-            FILESET_CATALOG_NAME,
-            KAFKA_CATALOG_NAME);
+            FILESET_CATALOG_NAME);
     Assertions.assertTrue(catalogsPage.verifyTreeNodes(treeNodes));
     Assertions.assertTrue(catalogsPage.verifySelectedNode(SCHEMA_NAME));
   }
 
   // test table show column list
   @Test
-  @Order(15)
+  @Order(14)
   public void testClickTableLink() {
     catalogsPage.clickTableLink(
-        METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE, SCHEMA_NAME, TABLE_NAME);
+        METALAKE_NAME,
+        MODIFIED_HIVE_CATALOG_NAME,
+        CATALOG_TYPE_RELATIONAL,
+        SCHEMA_NAME,
+        TABLE_NAME);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(TABLE_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyTableColumns());
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(COLUMN_NAME, true));
@@ -367,72 +467,63 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
+  @Order(15)
+  public void testShowTablePropertiesTooltip() {
+    mouseMoveTo(By.xpath("//*[@data-refer='col-icon-" + DISTRIBUTION + "-" + COLUMN_NAME + "']"));
+    Assertions.assertTrue(catalogsPage.verifyTableProperties(DISTRIBUTION, COLUMN_NAME));
+    mouseMoveTo(By.xpath("//*[@data-refer='col-icon-" + SORT_ORDERS + "-" + COLUMN_NAME_2 + "']"));
+    Assertions.assertTrue(catalogsPage.verifyTableProperties(SORT_ORDERS, COLUMN_NAME_2));
+    mouseMoveTo(By.xpath("//*[@data-refer='overview-tip-" + SORT_ORDERS + "']"));
+    Assertions.assertTrue(
+        catalogsPage.verifyTablePropertiesOverview(Arrays.asList(COLUMN_NAME, COLUMN_NAME_2)));
+  }
+
+  @Test
   @Order(16)
   public void testRefreshTablePage() {
     driver.navigate().refresh();
-    Assertions.assertEquals(driver.getTitle(), WEB_TITLE);
+    Assertions.assertEquals(WEB_TITLE, driver.getTitle());
     Assertions.assertTrue(catalogsPage.verifyRefreshPage());
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(TABLE_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyTableColumns());
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(COLUMN_NAME, true));
     List<String> treeNodes =
         Arrays.asList(
-            MODIFIED_CATALOG_NAME,
+            MODIFIED_HIVE_CATALOG_NAME,
             SCHEMA_NAME,
             TABLE_NAME,
             ICEBERG_CATALOG_NAME,
             MYSQL_CATALOG_NAME,
             PG_CATALOG_NAME,
-            FILESET_CATALOG_NAME,
-            KAFKA_CATALOG_NAME);
+            FILESET_CATALOG_NAME);
     Assertions.assertTrue(catalogsPage.verifyTreeNodes(treeNodes));
   }
 
   @Test
   @Order(17)
-  public void testSelectMetalake() throws InterruptedException {
-    catalogsPage.metalakeSelectChange(METALAKE_SELECT_NAME);
-    Assertions.assertTrue(catalogsPage.verifyEmptyCatalog());
-
-    catalogsPage.metalakeSelectChange(METALAKE_NAME);
-    Assertions.assertTrue(catalogsPage.verifyGetCatalog(MODIFIED_CATALOG_NAME));
-  }
-
-  @Test
-  @Order(18)
-  public void testClickTreeList() throws InterruptedException {
-    String icebergNode =
-        String.format("{{%s}}{{%s}}{{%s}}", METALAKE_NAME, ICEBERG_CATALOG_NAME, CATALOG_TYPE);
-    catalogsPage.clickTreeNode(icebergNode);
-    Assertions.assertTrue(catalogsPage.verifyGetCatalog(ICEBERG_CATALOG_NAME));
-    String mysqlNode =
-        String.format("{{%s}}{{%s}}{{%s}}", METALAKE_NAME, MYSQL_CATALOG_NAME, CATALOG_TYPE);
-    catalogsPage.clickTreeNode(mysqlNode);
-    Assertions.assertTrue(catalogsPage.verifyGetCatalog(MYSQL_CATALOG_NAME));
-    String pgNode =
-        String.format("{{%s}}{{%s}}{{%s}}", METALAKE_NAME, PG_CATALOG_NAME, CATALOG_TYPE);
-    catalogsPage.clickTreeNode(pgNode);
-    Assertions.assertTrue(catalogsPage.verifyGetCatalog(PG_CATALOG_NAME));
-    String filesetNode =
-        String.format("{{%s}}{{%s}}{{%s}}", METALAKE_NAME, FILESET_CATALOG_NAME, "fileset");
-    catalogsPage.clickTreeNode(filesetNode);
-    Assertions.assertTrue(catalogsPage.verifyGetCatalog(FILESET_CATALOG_NAME));
+  public void testRelationalHiveCatalogTreeNode() throws InterruptedException {
     String hiveNode =
-        String.format("{{%s}}{{%s}}{{%s}}", METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE);
+        String.format(
+            "{{%s}}{{%s}}{{%s}}",
+            METALAKE_NAME, MODIFIED_HIVE_CATALOG_NAME, CATALOG_TYPE_RELATIONAL);
     catalogsPage.clickTreeNode(hiveNode);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(CATALOG_TABLE_TITLE));
-    Assertions.assertTrue(catalogsPage.verifyGetCatalog(MODIFIED_CATALOG_NAME));
+    Assertions.assertTrue(catalogsPage.verifyGetCatalog(MODIFIED_HIVE_CATALOG_NAME));
     String schemaNode =
         String.format(
             "{{%s}}{{%s}}{{%s}}{{%s}}",
-            METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE, SCHEMA_NAME);
+            METALAKE_NAME, MODIFIED_HIVE_CATALOG_NAME, CATALOG_TYPE_RELATIONAL, SCHEMA_NAME);
     catalogsPage.clickTreeNode(schemaNode);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(SCHEMA_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TABLE_NAME, false));
     String tableNode =
         String.format(
             "{{%s}}{{%s}}{{%s}}{{%s}}{{%s}}",
-            METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE, SCHEMA_NAME, TABLE_NAME);
+            METALAKE_NAME,
+            MODIFIED_HIVE_CATALOG_NAME,
+            CATALOG_TYPE_RELATIONAL,
+            SCHEMA_NAME,
+            TABLE_NAME);
     catalogsPage.clickTreeNode(tableNode);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(TABLE_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(COLUMN_NAME, true));
@@ -440,22 +531,27 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
-  @Order(19)
+  @Order(18)
   public void testTreeNodeRefresh() throws InterruptedException {
-    createTableAndColumn(
-        METALAKE_NAME, MODIFIED_CATALOG_NAME, SCHEMA_NAME, TABLE_NAME_2, COLUMN_NAME_2);
+    createHiveTableAndColumn(METALAKE_NAME, MODIFIED_HIVE_CATALOG_NAME, SCHEMA_NAME, TABLE_NAME_2);
     String hiveNode =
-        String.format("{{%s}}{{%s}}{{%s}}", METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE);
+        String.format(
+            "{{%s}}{{%s}}{{%s}}",
+            METALAKE_NAME, MODIFIED_HIVE_CATALOG_NAME, CATALOG_TYPE_RELATIONAL);
     catalogsPage.clickTreeNode(hiveNode);
     String schemaNode =
         String.format(
             "{{%s}}{{%s}}{{%s}}{{%s}}",
-            METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE, SCHEMA_NAME);
+            METALAKE_NAME, MODIFIED_HIVE_CATALOG_NAME, CATALOG_TYPE_RELATIONAL, SCHEMA_NAME);
     catalogsPage.clickTreeNodeRefresh(schemaNode);
     String tableNode =
         String.format(
             "{{%s}}{{%s}}{{%s}}{{%s}}{{%s}}",
-            METALAKE_NAME, MODIFIED_CATALOG_NAME, CATALOG_TYPE, SCHEMA_NAME, TABLE_NAME_2);
+            METALAKE_NAME,
+            MODIFIED_HIVE_CATALOG_NAME,
+            CATALOG_TYPE_RELATIONAL,
+            SCHEMA_NAME,
+            TABLE_NAME_2);
     catalogsPage.clickTreeNode(tableNode);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(TABLE_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(COLUMN_NAME_2, true));
@@ -463,7 +559,99 @@ public class CatalogsPageTest extends AbstractWebIT {
   }
 
   @Test
+  @Order(19)
+  public void testOtherRelationaCatalogTreeNode() throws InterruptedException {
+    String icebergNode =
+        String.format(
+            "{{%s}}{{%s}}{{%s}}", METALAKE_NAME, ICEBERG_CATALOG_NAME, CATALOG_TYPE_RELATIONAL);
+    catalogsPage.clickTreeNode(icebergNode);
+    Assertions.assertTrue(catalogsPage.verifyGetCatalog(ICEBERG_CATALOG_NAME));
+    String mysqlNode =
+        String.format(
+            "{{%s}}{{%s}}{{%s}}", METALAKE_NAME, MYSQL_CATALOG_NAME, CATALOG_TYPE_RELATIONAL);
+    catalogsPage.clickTreeNode(mysqlNode);
+    Assertions.assertTrue(catalogsPage.verifyGetCatalog(MYSQL_CATALOG_NAME));
+    String pgNode =
+        String.format(
+            "{{%s}}{{%s}}{{%s}}", METALAKE_NAME, PG_CATALOG_NAME, CATALOG_TYPE_RELATIONAL);
+    catalogsPage.clickTreeNode(pgNode);
+    Assertions.assertTrue(catalogsPage.verifyGetCatalog(PG_CATALOG_NAME));
+  }
+
+  @Test
   @Order(20)
+  public void testSelectMetalake() throws InterruptedException {
+    catalogsPage.metalakeSelectChange(METALAKE_SELECT_NAME);
+    Assertions.assertTrue(catalogsPage.verifyEmptyTableData());
+
+    catalogsPage.metalakeSelectChange(METALAKE_NAME);
+    driver.navigate().refresh();
+  }
+
+  @Test
+  @Order(21)
+  public void testFilesetCatalogTreeNode() throws InterruptedException {
+    // 1. create schema and fileset of fileset catalog
+    createSchema(METALAKE_NAME, FILESET_CATALOG_NAME, SCHEMA_NAME_FILESET);
+    createFileset(METALAKE_NAME, FILESET_CATALOG_NAME, SCHEMA_NAME_FILESET, FILESET_NAME);
+    // 2. click fileset catalog tree node
+    String filesetCatalogNode =
+        String.format(
+            "{{%s}}{{%s}}{{%s}}", METALAKE_NAME, FILESET_CATALOG_NAME, CATALOG_TYPE_FILESET);
+    catalogsPage.clickTreeNode(filesetCatalogNode);
+    // 3. verify show table title、 schema name and tree node
+    Assertions.assertTrue(catalogsPage.verifyShowTableTitle(CATALOG_TABLE_TITLE));
+    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(SCHEMA_NAME_FILESET, false));
+    List<String> treeNodes =
+        Arrays.asList(
+            MODIFIED_HIVE_CATALOG_NAME,
+            ICEBERG_CATALOG_NAME,
+            MYSQL_CATALOG_NAME,
+            PG_CATALOG_NAME,
+            FILESET_CATALOG_NAME,
+            SCHEMA_NAME_FILESET);
+    Assertions.assertTrue(catalogsPage.verifyTreeNodes(treeNodes));
+    // 4. click schema tree node
+    String filesetSchemaNode =
+        String.format(
+            "{{%s}}{{%s}}{{%s}}{{%s}}",
+            METALAKE_NAME, FILESET_CATALOG_NAME, CATALOG_TYPE_FILESET, SCHEMA_NAME_FILESET);
+    catalogsPage.clickTreeNode(filesetSchemaNode);
+    // 5. verify show table title、 fileset name and tree node
+    Assertions.assertTrue(catalogsPage.verifyShowTableTitle(SCHEMA_FILESET_TITLE));
+    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(FILESET_NAME, false));
+    treeNodes =
+        Arrays.asList(
+            MODIFIED_HIVE_CATALOG_NAME,
+            ICEBERG_CATALOG_NAME,
+            MYSQL_CATALOG_NAME,
+            PG_CATALOG_NAME,
+            FILESET_CATALOG_NAME,
+            SCHEMA_NAME_FILESET,
+            FILESET_NAME);
+    Assertions.assertTrue(catalogsPage.verifyTreeNodes(treeNodes));
+    // 6. click fileset tree node
+    String filesetNode =
+        String.format(
+            "{{%s}}{{%s}}{{%s}}{{%s}}{{%s}}",
+            METALAKE_NAME,
+            FILESET_CATALOG_NAME,
+            CATALOG_TYPE_FILESET,
+            SCHEMA_NAME_FILESET,
+            FILESET_NAME);
+    catalogsPage.clickTreeNode(filesetNode);
+    // 7. verify show tab details
+    Assertions.assertTrue(catalogsPage.verifyShowDetailsContent());
+    Assertions.assertTrue(
+        catalogsPage.verifyShowPropertiesItemInList(
+            "key", PROPERTIES_KEY1, PROPERTIES_KEY1, false));
+    Assertions.assertTrue(
+        catalogsPage.verifyShowPropertiesItemInList(
+            "value", PROPERTIES_KEY1, PROPERTIES_VALUE1, false));
+  }
+
+  @Test
+  @Order(22)
   public void testBackHomePage() throws InterruptedException {
     clickAndWait(catalogsPage.backHomeBtn);
     Assertions.assertTrue(catalogsPage.verifyBackHomePage());

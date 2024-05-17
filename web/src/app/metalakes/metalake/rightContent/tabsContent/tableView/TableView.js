@@ -7,7 +7,7 @@
 
 import { Inconsolata } from 'next/font/google'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 
 import Link from 'next/link'
 
@@ -113,22 +113,34 @@ const TableView = () => {
                 <Box sx={{ p: 1.5, px: 4 }}>
                   {items.map((it, idx) => {
                     return (
-                      <Typography
-                        key={idx}
-                        variant='caption'
-                        color='white'
-                        className={fonts.className}
-                        sx={{ display: 'flex', flexDirection: 'column' }}
-                      >
-                        {it.text || it.fields}
-                      </Typography>
+                      <Fragment key={idx}>
+                        <Typography
+                          variant='caption'
+                          color='white'
+                          className={fonts.className}
+                          sx={{ display: 'flex', flexDirection: 'column' }}
+                          data-refer={`tip-${type}-item-${name}`}
+                        >
+                          {it.text || it.fields}
+                        </Typography>
+                        {idx < items.length - 1 && (
+                          <Box
+                            component={'span'}
+                            sx={{
+                              display: 'block',
+                              my: 1,
+                              borderTop: theme => `1px solid ${theme.palette.grey[800]}`
+                            }}
+                          ></Box>
+                        )}
+                      </Fragment>
                     )
                   })}
                 </Box>
               </>
             }
           >
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center' }} data-refer={`col-icon-${type}-${name}`}>
               <Icon icon={icon} />
             </Box>
           </CustomTooltip>

@@ -7,6 +7,7 @@ package com.datastrato.gravitino.catalog.kafka.integration.test;
 import static com.datastrato.gravitino.catalog.kafka.KafkaCatalogPropertiesMetadata.BOOTSTRAP_SERVERS;
 import static com.datastrato.gravitino.catalog.kafka.KafkaTopicPropertiesMetadata.PARTITION_COUNT;
 import static com.datastrato.gravitino.catalog.kafka.KafkaTopicPropertiesMetadata.REPLICATION_FACTOR;
+import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static com.datastrato.gravitino.integration.test.container.KafkaContainer.DEFAULT_BROKER_PORT;
 
 import com.datastrato.gravitino.Catalog;
@@ -26,10 +27,12 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.Config;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.TopicDescription;
@@ -96,7 +99,7 @@ public class CatalogKafkaIT extends AbstractIT {
 
   @AfterAll
   public static void shutdown() {
-    client.dropMetalake(NameIdentifier.of(METALAKE_NAME));
+    client.dropMetalake(METALAKE_NAME);
     if (adminClient != null) {
       adminClient.close();
     }
@@ -118,31 +121,88 @@ public class CatalogKafkaIT extends AbstractIT {
     Catalog createdCatalog = createCatalog(catalogName, comment, properties);
     Assertions.assertEquals(catalogName, createdCatalog.name());
     Assertions.assertEquals(comment, createdCatalog.comment());
-    Assertions.assertEquals(properties, createdCatalog.properties());
+    Assertions.assertEquals(
+        kafkaBootstrapServers, createdCatalog.properties().get(BOOTSTRAP_SERVERS));
 
     // test load catalog
-    Catalog loadedCatalog = metalake.loadCatalog(NameIdentifier.of(METALAKE_NAME, catalogName));
+    Catalog loadedCatalog = metalake.loadCatalog(catalogName);
     Assertions.assertEquals(createdCatalog, loadedCatalog);
 
     // test alter catalog
     Catalog alteredCatalog =
         metalake.alterCatalog(
-            NameIdentifier.of(METALAKE_NAME, catalogName),
+            catalogName,
             CatalogChange.updateComment("new comment"),
             CatalogChange.removeProperty("key1"));
     Assertions.assertEquals("new comment", alteredCatalog.comment());
     Assertions.assertFalse(alteredCatalog.properties().containsKey("key1"));
 
     // test drop catalog
-    boolean dropped = metalake.dropCatalog(NameIdentifier.of(METALAKE_NAME, catalogName));
+    boolean dropped = metalake.dropCatalog(catalogName);
     Assertions.assertTrue(dropped);
     Exception exception =
         Assertions.assertThrows(
-            NoSuchCatalogException.class,
-            () -> metalake.loadCatalog(NameIdentifier.of(METALAKE_NAME, catalogName)));
+            NoSuchCatalogException.class, () -> metalake.loadCatalog(catalogName));
     Assertions.assertTrue(exception.getMessage().contains(catalogName));
     // assert topic exists in Kafka after catalog dropped
     Assertions.assertFalse(adminClient.listTopics().names().get().isEmpty());
+  }
+
+  @Test
+  public void testCatalogException() {
+    String catalogName = GravitinoITUtils.genRandomName("test-catalog");
+    Exception exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                metalake.createCatalog(
+                    catalogName,
+                    Catalog.Type.MESSAGING,
+                    PROVIDER,
+                    "comment",
+                    ImmutableMap.of(BOOTSTRAP_SERVERS, "2")));
+    Assertions.assertTrue(exception.getMessage().contains("Invalid url in bootstrap.servers: 2"));
+
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                metalake.createCatalog(
+                    catalogName,
+                    Catalog.Type.MESSAGING,
+                    PROVIDER,
+                    "comment",
+                    ImmutableMap.of("abc", "2")));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Missing configuration: bootstrap.servers"));
+
+    // Test BOOTSTRAP_SERVERS that cannot be linked
+    Catalog kafka =
+        metalake.createCatalog(
+            catalogName,
+            Catalog.Type.MESSAGING,
+            PROVIDER,
+            "comment",
+            ImmutableMap.of(
+                BOOTSTRAP_SERVERS,
+                "192.0.2.1:9999",
+                CATALOG_BYPASS_PREFIX + AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG,
+                "3000",
+                CATALOG_BYPASS_PREFIX + AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG,
+                "3000"));
+    exception =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                kafka
+                    .asTopicCatalog()
+                    .listTopics(
+                        Namespace.ofTopic(METALAKE_NAME, catalogName, DEFAULT_SCHEMA_NAME)));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("Timed out waiting for a node assignment. Call: listTopics"),
+        exception.getMessage());
   }
 
   @Test
@@ -280,7 +340,7 @@ public class CatalogKafkaIT extends AbstractIT {
   }
 
   @Test
-  public void testDropTopic() {
+  public void testDropTopic() throws ExecutionException, InterruptedException {
     String topicName = GravitinoITUtils.genRandomName("test-topic");
     Topic createdTopic =
         catalog
@@ -303,6 +363,61 @@ public class CatalogKafkaIT extends AbstractIT {
         Assertions.assertThrows(ExecutionException.class, () -> getTopicDesc(createdTopic.name()));
     Assertions.assertTrue(
         ex.getMessage().contains("This server does not host this topic-partition"));
+
+    // verify dropping non-exist topic
+    String topicName1 = GravitinoITUtils.genRandomName("test-topic");
+    catalog
+        .asTopicCatalog()
+        .createTopic(
+            NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, topicName1),
+            "comment",
+            null,
+            Collections.emptyMap());
+
+    adminClient.deleteTopics(Collections.singleton(topicName1)).all().get();
+    boolean dropped1 =
+        catalog
+            .asTopicCatalog()
+            .dropTopic(
+                NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, topicName1));
+    Assertions.assertFalse(dropped1, "Should return false when dropping non-exist topic");
+    Assertions.assertFalse(
+        catalog
+            .asTopicCatalog()
+            .topicExists(
+                NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, topicName1)),
+        "Topic should not exist after dropping");
+  }
+
+  @Test
+  public void testNameSpec() throws ExecutionException, InterruptedException {
+    // create topic in Kafka with special characters
+    String illegalName = "test.topic";
+    adminClient.createTopics(ImmutableList.of(new NewTopic(illegalName, 1, (short) 1))).all().get();
+
+    NameIdentifier ident =
+        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, illegalName);
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTopicCatalog()
+                    .createTopic(ident, "comment", null, Collections.emptyMap()));
+    Assertions.assertTrue(exception.getMessage().contains("Illegal name: test.topic"));
+
+    Topic loadedTopic = catalog.asTopicCatalog().loadTopic(ident);
+    Assertions.assertEquals(illegalName, loadedTopic.name());
+
+    NameIdentifier[] topics =
+        catalog
+            .asTopicCatalog()
+            .listTopics(Namespace.ofTopic(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME));
+    Assertions.assertTrue(
+        Arrays.stream(topics).anyMatch(topic -> topic.name().equals(illegalName)));
+
+    Assertions.assertTrue(catalog.asTopicCatalog().dropTopic(ident));
+    Assertions.assertFalse(catalog.asTopicCatalog().topicExists(ident));
   }
 
   private void assertTopicWithKafka(Topic createdTopic)
@@ -398,8 +513,8 @@ public class CatalogKafkaIT extends AbstractIT {
 
   private static void createMetalake() {
     GravitinoMetalake createdMetalake =
-        client.createMetalake(NameIdentifier.of(METALAKE_NAME), "comment", Collections.emptyMap());
-    GravitinoMetalake loadMetalake = client.loadMetalake(NameIdentifier.of(METALAKE_NAME));
+        client.createMetalake(METALAKE_NAME, "comment", Collections.emptyMap());
+    GravitinoMetalake loadMetalake = client.loadMetalake(METALAKE_NAME);
     Assertions.assertEquals(createdMetalake, loadMetalake);
 
     metalake = loadMetalake;
@@ -407,12 +522,7 @@ public class CatalogKafkaIT extends AbstractIT {
 
   private static Catalog createCatalog(
       String catalogName, String comment, Map<String, String> properties) {
-    metalake.createCatalog(
-        NameIdentifier.of(METALAKE_NAME, catalogName),
-        Catalog.Type.MESSAGING,
-        PROVIDER,
-        comment,
-        properties);
-    return metalake.loadCatalog(NameIdentifier.of(METALAKE_NAME, catalogName));
+    metalake.createCatalog(catalogName, Catalog.Type.MESSAGING, PROVIDER, comment, properties);
+    return metalake.loadCatalog(catalogName);
   }
 }

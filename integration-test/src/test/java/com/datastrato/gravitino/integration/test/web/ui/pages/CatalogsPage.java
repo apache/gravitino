@@ -5,6 +5,9 @@
 
 package com.datastrato.gravitino.integration.test.web.ui.pages;
 
+import static com.datastrato.gravitino.integration.test.web.ui.CatalogsPageTest.DISTRIBUTION;
+import static com.datastrato.gravitino.integration.test.web.ui.CatalogsPageTest.SORT_ORDERS;
+
 import com.datastrato.gravitino.integration.test.web.ui.utils.AbstractWebIT;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -196,6 +199,18 @@ public class CatalogsPage extends AbstractWebIT {
       WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
       wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
       clickAndWait(btn);
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+    }
+  }
+
+  public void clickMetalakeLink(String metalakeName) {
+    try {
+      String xpath = "//a[@href='?metalake=" + metalakeName + "']";
+      WebElement link = tableGrid.findElement(By.xpath(xpath));
+      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
+      clickAndWait(link);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
@@ -415,7 +430,7 @@ public class CatalogsPage extends AbstractWebIT {
     }
   }
 
-  public boolean verifyEmptyCatalog() {
+  public boolean verifyEmptyTableData() {
     try {
       // Check is empty table
       boolean isNoRows = waitShowText("No rows", tableWrapper);
@@ -443,6 +458,40 @@ public class CatalogsPage extends AbstractWebIT {
         LOG.error("table title: {} does not match with title: {}", text.getText(), title);
         return false;
       }
+      return true;
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+      return false;
+    }
+  }
+
+  /**
+   * Verifies if a given property item is present in a specified list.
+   *
+   * @param item The key or value item of the property.
+   * @param key The key of the property.
+   * @param value The value of key item of the property.
+   * @param isHighlight Whether to highlight the property item or not.
+   * @return True if the property item is found in the list, false otherwise.
+   */
+  public boolean verifyShowPropertiesItemInList(
+      String item, String key, String value, Boolean isHighlight) {
+    try {
+      Thread.sleep(ACTION_SLEEP_MILLIS);
+      String xpath;
+      if (isHighlight) {
+        xpath = "//div[@data-refer='props-" + item + "-" + key + "-highlight']";
+      } else {
+        xpath = "//div[@data-refer='props-" + item + "-" + key + "']";
+      }
+      WebElement propertyElement = driver.findElement(By.xpath(xpath));
+      boolean match = Objects.equals(propertyElement.getText(), value);
+
+      if (!match) {
+        LOG.error("Prop: does not include itemName: {}", value);
+        return false;
+      }
+
       return true;
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
@@ -495,6 +544,61 @@ public class CatalogsPage extends AbstractWebIT {
         }
       }
 
+      return true;
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+      return false;
+    }
+  }
+
+  public boolean verifyTableProperties(String type, String colName) {
+    try {
+      String xpath = "";
+      String formattedColName = "";
+      if (type.equals(DISTRIBUTION)) {
+        xpath = "//*[@data-refer='tip-" + DISTRIBUTION + "-item-" + colName + "']";
+        formattedColName = "hash[10](" + colName + ")";
+      } else if (type.equals(SORT_ORDERS)) {
+        xpath = "//*[@data-refer='tip-" + SORT_ORDERS + "-item-" + colName + "']";
+        formattedColName = colName + " desc nulls_last";
+      }
+      List<WebElement> tooltipItems = driver.findElements(By.xpath(xpath));
+      new WebDriverWait(driver, MAX_TIMEOUT)
+          .until(ExpectedConditions.visibilityOfElementLocated(By.xpath(xpath)));
+      List<String> texts = new ArrayList<>();
+      for (WebElement text : tooltipItems) {
+        texts.add(text.getText());
+      }
+      if (!texts.contains(formattedColName)) {
+        LOG.error("Tooltip item {} does not match, expected '{}'", colName, texts);
+        return false;
+      }
+      return true;
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+      return false;
+    }
+  }
+
+  public boolean verifyTablePropertiesOverview(List<String> cols) {
+    try {
+      WebElement columnsText =
+          driver.findElement(By.xpath("//*[@data-refer='overview-sortOrders-items']"));
+      boolean isMatchText = columnsText.getText().contains(",");
+      List<WebElement> tooltipCols =
+          driver.findElements(By.xpath("//*[@data-refer='overview-tip-sortOrders-items']"));
+      List<String> texts = new ArrayList<>();
+      for (WebElement text : tooltipCols) {
+        texts.add(text.getText());
+      }
+      List<String> colsTexts = new ArrayList<>();
+      for (String col : cols) {
+        colsTexts.add(col + " desc nulls_last");
+      }
+      if (!isMatchText || !texts.containsAll(colsTexts)) {
+        LOG.error("Overview tooltip {} does not match, expected '{}'", colsTexts, texts);
+        return false;
+      }
       return true;
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);

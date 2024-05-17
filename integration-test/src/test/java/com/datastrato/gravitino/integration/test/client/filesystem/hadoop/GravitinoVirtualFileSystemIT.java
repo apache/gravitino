@@ -52,17 +52,15 @@ public class GravitinoVirtualFileSystemIT extends AbstractIT {
   @BeforeAll
   public static void startUp() {
     containerSuite.startHiveContainer();
-    NameIdentifier ident = NameIdentifier.of(metalakeName);
-    Assertions.assertFalse(client.metalakeExists(ident));
-    metalake = client.createMetalake(ident, "metalake comment", Collections.emptyMap());
-    Assertions.assertTrue(client.metalakeExists(ident));
+    Assertions.assertFalse(client.metalakeExists(metalakeName));
+    metalake = client.createMetalake(metalakeName, "metalake comment", Collections.emptyMap());
+    Assertions.assertTrue(client.metalakeExists(metalakeName));
 
-    NameIdentifier catalogIdent = NameIdentifier.of(metalakeName, catalogName);
     Map<String, String> properties = Maps.newHashMap();
     Catalog catalog =
         metalake.createCatalog(
-            catalogIdent, Catalog.Type.FILESET, "hadoop", "catalog comment", properties);
-    Assertions.assertTrue(metalake.catalogExists(catalogIdent));
+            catalogName, Catalog.Type.FILESET, "hadoop", "catalog comment", properties);
+    Assertions.assertTrue(metalake.catalogExists(catalogName));
 
     NameIdentifier schemaIdent = NameIdentifier.of(metalakeName, catalogName, schemaName);
     catalog.asSchemas().createSchema(schemaIdent, "schema comment", properties);
@@ -78,7 +76,7 @@ public class GravitinoVirtualFileSystemIT extends AbstractIT {
 
   @AfterAll
   public static void tearDown() throws IOException {
-    client.dropMetalake(NameIdentifier.of(metalakeName));
+    client.dropMetalake(metalakeName);
 
     if (client != null) {
       client.close();
@@ -105,7 +103,7 @@ public class GravitinoVirtualFileSystemIT extends AbstractIT {
     String filesetName = "test_fileset_create";
     NameIdentifier filesetIdent =
         NameIdentifier.ofFileset(metalakeName, catalogName, schemaName, filesetName);
-    Catalog catalog = metalake.loadCatalog(NameIdentifier.ofCatalog(metalakeName, catalogName));
+    Catalog catalog = metalake.loadCatalog(catalogName);
     String storageLocation = genStorageLocation(filesetName);
     catalog
         .asFilesetCatalog()
@@ -140,7 +138,7 @@ public class GravitinoVirtualFileSystemIT extends AbstractIT {
     String filesetName = "test_fileset_append";
     NameIdentifier filesetIdent =
         NameIdentifier.ofFileset(metalakeName, catalogName, schemaName, filesetName);
-    Catalog catalog = metalake.loadCatalog(NameIdentifier.ofCatalog(metalakeName, catalogName));
+    Catalog catalog = metalake.loadCatalog(catalogName);
     String storageLocation = genStorageLocation(filesetName);
     catalog
         .asFilesetCatalog()
@@ -200,7 +198,7 @@ public class GravitinoVirtualFileSystemIT extends AbstractIT {
     String filesetName = "test_fileset_delete";
     NameIdentifier filesetIdent =
         NameIdentifier.ofFileset(metalakeName, catalogName, schemaName, filesetName);
-    Catalog catalog = metalake.loadCatalog(NameIdentifier.ofCatalog(metalakeName, catalogName));
+    Catalog catalog = metalake.loadCatalog(catalogName);
     String storageLocation = genStorageLocation(filesetName);
     catalog
         .asFilesetCatalog()
@@ -240,7 +238,7 @@ public class GravitinoVirtualFileSystemIT extends AbstractIT {
     String filesetName = "test_fileset_get_status";
     NameIdentifier filesetIdent =
         NameIdentifier.ofFileset(metalakeName, catalogName, schemaName, filesetName);
-    Catalog catalog = metalake.loadCatalog(NameIdentifier.ofCatalog(metalakeName, catalogName));
+    Catalog catalog = metalake.loadCatalog(catalogName);
     String storageLocation = genStorageLocation(filesetName);
     catalog
         .asFilesetCatalog()
@@ -283,7 +281,7 @@ public class GravitinoVirtualFileSystemIT extends AbstractIT {
     String filesetName = "test_fileset_list_status";
     NameIdentifier filesetIdent =
         NameIdentifier.ofFileset(metalakeName, catalogName, schemaName, filesetName);
-    Catalog catalog = metalake.loadCatalog(NameIdentifier.ofCatalog(metalakeName, catalogName));
+    Catalog catalog = metalake.loadCatalog(catalogName);
     String storageLocation = genStorageLocation(filesetName);
     catalog
         .asFilesetCatalog()
@@ -340,7 +338,7 @@ public class GravitinoVirtualFileSystemIT extends AbstractIT {
     String filesetName = "test_fileset_mkdirs";
     NameIdentifier filesetIdent =
         NameIdentifier.ofFileset(metalakeName, catalogName, schemaName, filesetName);
-    Catalog catalog = metalake.loadCatalog(NameIdentifier.ofCatalog(metalakeName, catalogName));
+    Catalog catalog = metalake.loadCatalog(catalogName);
     String storageLocation = genStorageLocation(filesetName);
     catalog
         .asFilesetCatalog()
@@ -375,7 +373,7 @@ public class GravitinoVirtualFileSystemIT extends AbstractIT {
     String filesetName = "test_fileset_rename";
     NameIdentifier filesetIdent =
         NameIdentifier.ofFileset(metalakeName, catalogName, schemaName, filesetName);
-    Catalog catalog = metalake.loadCatalog(NameIdentifier.ofCatalog(metalakeName, catalogName));
+    Catalog catalog = metalake.loadCatalog(catalogName);
     String storageLocation = genStorageLocation(filesetName);
     catalog
         .asFilesetCatalog()

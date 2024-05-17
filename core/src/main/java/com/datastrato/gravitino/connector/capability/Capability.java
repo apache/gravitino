@@ -4,7 +4,11 @@
  */
 package com.datastrato.gravitino.connector.capability;
 
+import static com.datastrato.gravitino.Entity.SECURABLE_ENTITY_RESERVED_NAME;
+
 import com.datastrato.gravitino.annotation.Evolving;
+import com.google.common.collect.ImmutableSet;
+import java.util.Set;
 
 /**
  * The Catalog interface to provide the capabilities of the catalog. If the implemented catalog has
@@ -17,7 +21,6 @@ public interface Capability {
 
   /** The scope of the capability. */
   enum Scope {
-    CATALOG,
     SCHEMA,
     TABLE,
     COLUMN,
@@ -77,6 +80,22 @@ public interface Capability {
 
   /** The default implementation of the capability. */
   class DefaultCapability implements Capability {
+
+    private static final Set<String> RESERVED_WORDS =
+        ImmutableSet.of(SECURABLE_ENTITY_RESERVED_NAME);
+
+    /**
+     * Regular expression explanation:
+     *
+     * <p>^[a-zA-Z_] - Starts with a letter, digit, or underscore
+     *
+     * <p>[a-zA-Z0-9_/=-]{0,63} - Followed by 0 to 63 characters (making the total length at most
+     * 64) of letters (both cases), digits, underscores, slashes, hyphens, or equals signs
+     *
+     * <p>$ - End of the string
+     */
+    private static final String DEFAULT_NAME_PATTERN = "^\\w[\\w/=-]{0,63}$";
+
     @Override
     public CapabilityResult columnNotNull() {
       return CapabilityResult.SUPPORTED;
@@ -94,6 +113,15 @@ public interface Capability {
 
     @Override
     public CapabilityResult specificationOnName(Scope scope, String name) {
+      if (RESERVED_WORDS.contains(name.toLowerCase())) {
+        return CapabilityResult.unsupported(
+            String.format("The %s name '%s' is reserved.", scope, name));
+      }
+
+      if (!name.matches(DEFAULT_NAME_PATTERN)) {
+        return CapabilityResult.unsupported(
+            String.format("The %s name '%s' is illegal.", scope, name));
+      }
       return CapabilityResult.SUPPORTED;
     }
 

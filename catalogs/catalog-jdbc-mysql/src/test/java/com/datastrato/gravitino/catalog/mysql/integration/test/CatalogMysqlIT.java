@@ -18,10 +18,13 @@ import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NotFoundException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
+import com.datastrato.gravitino.integration.test.container.ContainerSuite;
+import com.datastrato.gravitino.integration.test.container.MySQLContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.integration.test.util.JdbcDriverDownloader;
+import com.datastrato.gravitino.integration.test.util.TestDatabaseName;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Column.ColumnImpl;
 import com.datastrato.gravitino.rel.Schema;
@@ -46,6 +49,7 @@ import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
@@ -62,12 +66,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.junit.jupiter.api.condition.EnabledIf;
-import org.testcontainers.containers.MySQLContainer;
-import org.testcontainers.shaded.org.apache.commons.lang3.RandomUtils;
 
 @Tag("gravitino-docker-it")
 @TestInstance(Lifecycle.PER_CLASS)
 public class CatalogMysqlIT extends AbstractIT {
+  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static final String provider = "jdbc-mysql";
   public static final String DOWNLOAD_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar";
@@ -93,34 +96,40 @@ public class CatalogMysqlIT extends AbstractIT {
 
   private MysqlService mysqlService;
 
-  private MySQLContainer<?> MYSQL_CONTAINER;
+  private MySQLContainer MYSQL_CONTAINER;
 
-  protected final String TEST_DB_NAME = RandomUtils.nextInt(0, 10000) + "_test_db";
+  private TestDatabaseName TEST_DB_NAME;
 
   public static final String defaultMysqlImageName = "mysql:8.0";
 
   protected String mysqlImageName = defaultMysqlImageName;
+
+  protected String mysqlDriverDownloadUrl = DOWNLOAD_JDBC_DRIVER_URL;
 
   boolean SupportColumnDefaultValueExpression() {
     return true;
   }
 
   @BeforeAll
-  public void startup() throws IOException {
+  public void startup() throws IOException, SQLException {
 
     if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
       String gravitinoHome = System.getenv("GRAVITINO_HOME");
       Path tmpPath = Paths.get(gravitinoHome, "/catalogs/jdbc-mysql/libs");
-      JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_JDBC_DRIVER_URL, tmpPath.toString());
+      JdbcDriverDownloader.downloadJdbcDriver(mysqlDriverDownloadUrl, tmpPath.toString());
     }
 
-    MYSQL_CONTAINER =
-        new MySQLContainer<>(mysqlImageName)
-            .withDatabaseName(TEST_DB_NAME)
-            .withUsername("root")
-            .withPassword("root");
-    MYSQL_CONTAINER.start();
-    mysqlService = new MysqlService(MYSQL_CONTAINER);
+    TEST_DB_NAME = TestDatabaseName.MYSQL_CATALOG_MYSQL_IT;
+
+    if (mysqlImageName.equals("mysql:5.7")) {
+      containerSuite.startMySQLVersion5Container(TestDatabaseName.MYSQL_CATALOG_MYSQL_IT);
+      MYSQL_CONTAINER = containerSuite.getMySQLVersion5Container();
+    } else {
+      containerSuite.startMySQLContainer(TEST_DB_NAME);
+      MYSQL_CONTAINER = containerSuite.getMySQLContainer();
+    }
+
+    mysqlService = new MysqlService(MYSQL_CONTAINER, TEST_DB_NAME);
     createMetalake();
     createCatalog();
     createSchema();
@@ -129,13 +138,12 @@ public class CatalogMysqlIT extends AbstractIT {
   @AfterAll
   public void stop() {
     clearTableAndSchema();
-    client.dropMetalake(NameIdentifier.of(metalakeName));
+    client.dropMetalake(metalakeName);
     mysqlService.close();
-    MYSQL_CONTAINER.stop();
   }
 
   @AfterEach
-  private void resetSchema() {
+  public void resetSchema() {
     clearTableAndSchema();
     createSchema();
   }
@@ -154,32 +162,31 @@ public class CatalogMysqlIT extends AbstractIT {
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
     GravitinoMetalake createdMetalake =
-        client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
-    GravitinoMetalake loadMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
     Assertions.assertEquals(createdMetalake, loadMetalake);
 
     metalake = loadMetalake;
   }
 
-  private void createCatalog() {
+  private void createCatalog() throws SQLException {
     Map<String, String> catalogProperties = Maps.newHashMap();
 
     catalogProperties.put(
         JdbcConfig.JDBC_URL.getKey(),
         StringUtils.substring(
-            MYSQL_CONTAINER.getJdbcUrl(), 0, MYSQL_CONTAINER.getJdbcUrl().lastIndexOf("/")));
-    catalogProperties.put(JdbcConfig.JDBC_DRIVER.getKey(), MYSQL_CONTAINER.getDriverClassName());
+            MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME),
+            0,
+            MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME).lastIndexOf("/")));
+    catalogProperties.put(
+        JdbcConfig.JDBC_DRIVER.getKey(), MYSQL_CONTAINER.getDriverClassName(TEST_DB_NAME));
     catalogProperties.put(JdbcConfig.USERNAME.getKey(), MYSQL_CONTAINER.getUsername());
     catalogProperties.put(JdbcConfig.PASSWORD.getKey(), MYSQL_CONTAINER.getPassword());
 
     Catalog createdCatalog =
         metalake.createCatalog(
-            NameIdentifier.of(metalakeName, catalogName),
-            Catalog.Type.RELATIONAL,
-            provider,
-            "comment",
-            catalogProperties);
-    Catalog loadCatalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+            catalogName, Catalog.Type.RELATIONAL, provider, "comment", catalogProperties);
+    Catalog loadCatalog = metalake.loadCatalog(catalogName);
     Assertions.assertEquals(createdCatalog, loadCatalog);
 
     catalog = loadCatalog;
@@ -769,7 +776,8 @@ public class CatalogMysqlIT extends AbstractIT {
             "Created by gravitino client",
             ImmutableMap.<String, String>builder().build());
 
-    // Try to drop a database, and cascade equals to false, it should not be allowed.
+    // Try to drop a database, and cascade equals to false, it should not be
+    // allowed.
     catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), false);
     // Check the database still exists
     catalog.asSchemas().loadSchema(NameIdentifier.of(metalakeName, catalogName, schemaName));
@@ -1044,6 +1052,7 @@ public class CatalogMysqlIT extends AbstractIT {
     Assertions.assertTrue(StringUtils.isEmpty(schema.comment()));
     schema = catalog.asSchemas().loadSchema(ident);
     Assertions.assertTrue(StringUtils.isEmpty(schema.comment()));
+    catalog.asSchemas().dropSchema(ident, true);
   }
 
   @Test
@@ -1239,6 +1248,48 @@ public class CatalogMysqlIT extends AbstractIT {
   }
 
   @Test
+  void testNameSpec() {
+    // test operate illegal schema name from MySQL
+    String testSchemaName = "//";
+    String sql = String.format("CREATE DATABASE `%s`", testSchemaName);
+    mysqlService.executeQuery(sql);
+
+    NameIdentifier schemaIdent = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
+    Schema schema = catalog.asSchemas().loadSchema(schemaIdent);
+    Assertions.assertEquals(testSchemaName, schema.name());
+
+    NameIdentifier[] schemaIdents =
+        catalog.asSchemas().listSchemas(Namespace.of(metalakeName, catalogName));
+    Assertions.assertTrue(
+        Arrays.stream(schemaIdents).anyMatch(s -> s.name().equals(testSchemaName)));
+
+    Assertions.assertTrue(catalog.asSchemas().dropSchema(schemaIdent, false));
+    Assertions.assertFalse(catalog.asSchemas().schemaExists(schemaIdent));
+
+    // test operate illegal table name from MySQL
+    mysqlService.executeQuery(sql);
+    String testTableName = "//";
+    sql = String.format("CREATE TABLE `%s`.`%s` (id int)", testSchemaName, testTableName);
+    mysqlService.executeQuery(sql);
+    NameIdentifier tableIdent =
+        NameIdentifier.of(metalakeName, catalogName, testSchemaName, testTableName);
+
+    Table table = catalog.asTableCatalog().loadTable(tableIdent);
+    Assertions.assertEquals(testTableName, table.name());
+
+    NameIdentifier[] tableIdents =
+        catalog
+            .asTableCatalog()
+            .listTables(Namespace.of(metalakeName, catalogName, testSchemaName));
+    Assertions.assertTrue(Arrays.stream(tableIdents).anyMatch(t -> t.name().equals(testTableName)));
+
+    Assertions.assertTrue(catalog.asTableCatalog().dropTable(tableIdent));
+    Assertions.assertFalse(catalog.asTableCatalog().tableExists(tableIdent));
+    Assertions.assertFalse(catalog.asTableCatalog().purgeTable(tableIdent));
+    catalog.asSchemas().dropSchema(schemaIdent, true);
+  }
+
+  @Test
   void testMySQLSchemaNameCaseSensitive() {
     Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, false, null);
     Column col2 = Column.of("col_2", Types.VarCharType.of(255), "code", false, false, null);
@@ -1299,6 +1350,11 @@ public class CatalogMysqlIT extends AbstractIT {
               .collect(Collectors.toSet())
               .stream()
               .anyMatch(n -> n.equals(tableName)));
+    }
+
+    for (String schema : schemas) {
+      NameIdentifier schemaIdentifier = NameIdentifier.of(metalakeName, catalogName, schema);
+      schemaSupport.dropSchema(schemaIdentifier, true);
     }
   }
 

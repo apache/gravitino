@@ -20,11 +20,13 @@
 package com.datastrato.gravitino.integration.test.util.spark;
 
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
-import com.datastrato.gravitino.spark.connector.table.SparkBaseTable;
+import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.spark.sql.AnalysisException;
@@ -45,6 +47,8 @@ import org.junit.jupiter.api.Assertions;
 public abstract class SparkUtilIT extends AbstractIT {
 
   protected abstract SparkSession getSparkSession();
+
+  protected final String TIME_ZONE_UTC = "UTC";
 
   protected Set<String> getCatalogs() {
     return convertToStringSet(sql("SHOW CATALOGS"), 0);
@@ -89,23 +93,34 @@ public abstract class SparkUtilIT extends AbstractIT {
     return getQueryData(getSelectAllSql(tableName));
   }
 
+  private String sparkObjectToString(Object item) {
+    if (item instanceof Object[]) {
+      return Arrays.stream((Object[]) item)
+          .map(i -> sparkObjectToString(i))
+          .collect(Collectors.joining(","));
+    } else if (item instanceof Timestamp) {
+      Timestamp timestamp = (Timestamp) item;
+      SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+      sdf.setTimeZone(TimeZone.getTimeZone(TIME_ZONE_UTC));
+      return sdf.format(timestamp);
+    } else {
+      return item.toString();
+    }
+  }
+
   protected List<String> getQueryData(String querySql) {
     return sql(querySql).stream()
         .map(
             line ->
                 Arrays.stream(line)
-                    .map(
-                        item -> {
-                          if (item instanceof Object[]) {
-                            return Arrays.stream((Object[]) item)
-                                .map(Object::toString)
-                                .collect(Collectors.joining(","));
-                          } else {
-                            return item.toString();
-                          }
-                        })
+                    .map(item -> sparkObjectToString(item))
                     .collect(Collectors.joining(",")))
         .collect(Collectors.toList());
+  }
+
+  // columns data are joined by ','
+  protected List<String> getTableMetadata(String getTableMetadataSql) {
+    return getQueryData(getTableMetadataSql);
   }
 
   // Create SparkTableInfo from SparkBaseTable retrieved from LogicalPlan.
@@ -114,8 +129,7 @@ public abstract class SparkUtilIT extends AbstractIT {
     CommandResult result = (CommandResult) ds.logicalPlan();
     DescribeRelation relation = (DescribeRelation) result.commandLogicalPlan();
     ResolvedTable table = (ResolvedTable) relation.child();
-    SparkBaseTable baseTable = (SparkBaseTable) table.table();
-    return SparkTableInfo.create(baseTable);
+    return SparkTableInfo.create(table.table());
   }
 
   protected void dropTableIfExists(String tableName) {
@@ -141,6 +155,10 @@ public abstract class SparkUtilIT extends AbstractIT {
 
   protected void insertTableAsSelect(String tableName, String newName) {
     sql(String.format("INSERT INTO TABLE %s SELECT * FROM %s", newName, tableName));
+  }
+
+  protected static String getSelectAllSqlWithOrder(String tableName, String orderByColumn) {
+    return String.format("SELECT * FROM %s ORDER BY %s", tableName, orderByColumn);
   }
 
   private static String getSelectAllSql(String tableName) {
