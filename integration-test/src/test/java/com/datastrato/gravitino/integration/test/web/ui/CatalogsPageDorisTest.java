@@ -102,8 +102,7 @@ public class CatalogsPageDorisTest extends AbstractWebIT {
   void createSchema(String metalakeName, String catalogName, String schemaName) {
     Map<String, String> properties = Maps.newHashMap();
     properties.put(PROPERTIES_KEY1, PROPERTIES_VALUE1);
-    Catalog catalog_doris =
-        metalake.loadCatalog(NameIdentifier.ofCatalog(metalakeName, catalogName));
+    Catalog catalog_doris = metalake.loadCatalog(catalogName);
     catalog_doris
         .asSchemas()
         .createSchema(
@@ -128,8 +127,7 @@ public class CatalogsPageDorisTest extends AbstractWebIT {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("replication_allocation", "tag.location.default: 1");
     Column column = Column.of(colName, Types.IntegerType.get(), "column comment");
-    Catalog catalog_doris =
-        metalake.loadCatalog(NameIdentifier.ofCatalog(metalakeName, catalogName));
+    Catalog catalog_doris = metalake.loadCatalog(catalogName);
     catalog_doris
         .asTableCatalog()
         .createTable(
@@ -149,7 +147,7 @@ public class CatalogsPageDorisTest extends AbstractWebIT {
     metalakePage.setMetalakeNameField(METALAKE_NAME);
     clickAndWait(metalakePage.submitHandleMetalakeBtn);
     // load metalake
-    metalake = gravitinoClient.loadMetalake(NameIdentifier.of(METALAKE_NAME));
+    metalake = gravitinoClient.loadMetalake(METALAKE_NAME);
     metalakePage.clickMetalakeLink(METALAKE_NAME);
     // create doris catalog actions
     clickAndWait(catalogsPage.createCatalogBtn);

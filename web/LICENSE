@@ -215,3 +215,6 @@
    ./src/types/axios.d.ts
    ./src/lib/enums/httpEnum.ts
    ./src/lib/utils/index.js (parts of)
+
+   Third party SIL Open Font License v1.1 (OFL-1.1)
+   (SIL OPEN FONT LICENSE Version 1.1) The Alata font family (https://github.com/SorkinType/Alata)

@@ -173,6 +173,7 @@ const TabsContent = () => {
                                       color='white'
                                       className={fonts.className}
                                       sx={{ display: 'flex', flexDirection: 'column' }}
+                                      data-refer={`overview-tip-${item.type}-items`}
                                     >
                                       {item.type === 'sortOrders'
                                         ? it.text
@@ -213,7 +214,7 @@ const TabsContent = () => {
                           </>
                         }
                       >
-                        <ListItem sx={{ maxWidth: 140, py: 0 }}>
+                        <ListItem sx={{ maxWidth: 140, py: 0 }} data-refer={`overview-tip-${item.type}`}>
                           <ListItemText
                             sx={{ m: 0 }}
                             primary={
@@ -248,6 +249,7 @@ const TabsContent = () => {
                                   whiteSpace: 'nowrap',
                                   textOverflow: 'ellipsis'
                                 }}
+                                data-refer={`overview-${item.type}-items`}
                               >
                                 {item.items.map((it, idx) => {
                                   return (

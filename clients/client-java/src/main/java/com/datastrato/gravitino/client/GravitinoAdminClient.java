@@ -6,8 +6,6 @@
 package com.datastrato.gravitino.client;
 
 import com.datastrato.gravitino.MetalakeChange;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.SupportsMetalakes;
 import com.datastrato.gravitino.authorization.Group;
 import com.datastrato.gravitino.authorization.Privilege;
 import com.datastrato.gravitino.authorization.Role;
@@ -37,6 +35,7 @@ import com.datastrato.gravitino.exceptions.NoSuchRoleException;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
+import com.datastrato.gravitino.rel.SupportsMetalakes;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Collections;
@@ -103,7 +102,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
   /**
    * Creates a new Metalake using the Gravitino API.
    *
-   * @param ident The identifier of the new Metalake.
+   * @param name The name of the new Metalake.
    * @param comment The comment for the new Metalake.
    * @param properties The properties of the new Metalake.
    * @return A GravitinoMetalake instance representing the newly created Metalake.
@@ -112,11 +111,11 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
    */
   @Override
   public GravitinoMetalake createMetalake(
-      NameIdentifier ident, String comment, Map<String, String> properties)
+      String name, String comment, Map<String, String> properties)
       throws MetalakeAlreadyExistsException {
-    NameIdentifier.checkMetalake(ident);
+    checkMetalakeName(name);
 
-    MetalakeCreateRequest req = new MetalakeCreateRequest(ident.name(), comment, properties);
+    MetalakeCreateRequest req = new MetalakeCreateRequest(name, comment, properties);
     req.validate();
 
     MetalakeResponse resp =
@@ -134,17 +133,16 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
   /**
    * Alters a specific Metalake using the Gravitino API.
    *
-   * @param ident The identifier of the Metalake to be altered.
+   * @param name The name of the Metalake to be altered.
    * @param changes The changes to be applied to the Metalake.
    * @return A GravitinoMetalake instance representing the updated Metalake.
    * @throws NoSuchMetalakeException If the specified Metalake does not exist.
    * @throws IllegalArgumentException If the provided changes are invalid or not applicable.
    */
   @Override
-  public GravitinoMetalake alterMetalake(NameIdentifier ident, MetalakeChange... changes)
+  public GravitinoMetalake alterMetalake(String name, MetalakeChange... changes)
       throws NoSuchMetalakeException, IllegalArgumentException {
-    NameIdentifier.checkMetalake(ident);
-
+    checkMetalakeName(name);
     List<MetalakeUpdateRequest> reqs =
         Arrays.stream(changes)
             .map(DTOConverters::toMetalakeUpdateRequest)
@@ -154,7 +152,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
 
     MetalakeResponse resp =
         restClient.put(
-            API_METALAKES_IDENTIFIER_PATH + ident.name(),
+            API_METALAKES_IDENTIFIER_PATH + name,
             updatesRequest,
             MetalakeResponse.class,
             Collections.emptyMap(),
@@ -167,17 +165,16 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
   /**
    * Drops a specific Metalake using the Gravitino API.
    *
-   * @param ident The identifier of the Metalake to be dropped.
+   * @param name The name of the Metalake to be dropped.
    * @return True if the Metalake was successfully dropped, false otherwise.
    */
   @Override
-  public boolean dropMetalake(NameIdentifier ident) {
-    NameIdentifier.checkMetalake(ident);
-
+  public boolean dropMetalake(String name) {
+    checkMetalakeName(name);
     try {
       DropResponse resp =
           restClient.delete(
-              API_METALAKES_IDENTIFIER_PATH + ident.name(),
+              API_METALAKES_IDENTIFIER_PATH + name,
               DropResponse.class,
               Collections.emptyMap(),
               ErrorHandlers.metalakeErrorHandler());
@@ -185,7 +182,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
       return resp.dropped();
 
     } catch (Exception e) {
-      LOG.warn("Failed to drop metadata {}", ident, e);
+      LOG.warn("Failed to drop metadata {}", name, e);
       return false;
     }
   }

@@ -55,7 +55,7 @@ public class CatalogConnectorMetadata {
     try {
       this.catalogName = catalogIdentifier.name();
       this.metalake = metalake;
-      Catalog catalog = metalake.loadCatalog(catalogIdentifier);
+      Catalog catalog = metalake.loadCatalog(catalogName);
       // Make sure the catalog support schema operations.
       this.schemaCatalog = catalog.asSchemas();
       this.tableCatalog = catalog.asTableCatalog();

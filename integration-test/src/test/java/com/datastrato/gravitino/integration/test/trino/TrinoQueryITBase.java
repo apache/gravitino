@@ -111,16 +111,15 @@ public class TrinoQueryITBase {
     int tries = 180;
     while (!created && tries-- >= 0) {
       try {
-        boolean exists = gravitinoClient.metalakeExists(NameIdentifier.of(metalakeName));
+        boolean exists = gravitinoClient.metalakeExists(metalakeName);
 
         if (exists) {
-          metalake = gravitinoClient.loadMetalake(NameIdentifier.of(metalakeName));
+          metalake = gravitinoClient.loadMetalake(metalakeName);
           return;
         }
 
         GravitinoMetalake createdMetalake =
-            gravitinoClient.createMetalake(
-                NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
+            gravitinoClient.createMetalake(metalakeName, "comment", Collections.emptyMap());
         Assertions.assertNotNull(createdMetalake);
         metalake = createdMetalake;
         created = true;
@@ -136,24 +135,20 @@ public class TrinoQueryITBase {
   }
 
   private static void dropMetalake() {
-    boolean exists = gravitinoClient.metalakeExists(NameIdentifier.of(metalakeName));
+    boolean exists = gravitinoClient.metalakeExists(metalakeName);
     if (!exists) {
       return;
     }
-    gravitinoClient.dropMetalake(NameIdentifier.of(metalakeName));
+    gravitinoClient.dropMetalake(metalakeName);
   }
 
   private static void createCatalog(
       String catalogName, String provider, Map<String, String> properties) throws Exception {
-    boolean exists = metalake.catalogExists(NameIdentifier.of(metalakeName, catalogName));
+    boolean exists = metalake.catalogExists(catalogName);
     if (!exists) {
       Catalog createdCatalog =
           metalake.createCatalog(
-              NameIdentifier.of(metalakeName, catalogName),
-              Catalog.Type.RELATIONAL,
-              provider,
-              "comment",
-              properties);
+              catalogName, Catalog.Type.RELATIONAL, provider, "comment", properties);
       Assertions.assertNotNull(createdCatalog);
     }
 
@@ -183,11 +178,11 @@ public class TrinoQueryITBase {
     if (metalake == null) {
       return;
     }
-    boolean exists = metalake.catalogExists(NameIdentifier.of(metalakeName, catalogName));
+    boolean exists = metalake.catalogExists(catalogName);
     if (!exists) {
       return;
     }
-    Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Catalog catalog = metalake.loadCatalog(catalogName);
     SupportsSchemas schemas = catalog.asSchemas();
     Arrays.stream(schemas.listSchemas(Namespace.ofSchema(metalakeName, catalogName)))
         .filter(schema -> schema.name().startsWith("gt_"))
@@ -223,7 +218,7 @@ public class TrinoQueryITBase {
               LOG.info("Drop schema \"{}.{}\".{}", metalakeName, catalogName, schema.name());
             });
 
-    metalake.dropCatalog(NameIdentifier.of(metalakeName, catalogName));
+    metalake.dropCatalog(catalogName);
     LOG.info("Drop catalog \"{}.{}\"", metalakeName, catalogName);
   }
 
