@@ -29,8 +29,8 @@ install it in your local.
 pip install gravitino
 ```
 
-1. [Manage metalake using Gravitino Python API](./manage-metalake-using-gravitino.md)
-2. [Manage fileset metadata using Gravitino Python API](./manage-fileset-metadata-using-gravitino.md)
+1. [Manage metalake using Gravitino Python API](./manage-metalake-using-gravitino.md?language=python)
+2. [Manage fileset metadata using Gravitino Python API](./manage-fileset-metadata-using-gravitino.md?language=python)
 
 ### Gravitino Fileset Example
 

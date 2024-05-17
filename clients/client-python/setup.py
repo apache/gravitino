@@ -15,7 +15,7 @@ except FileNotFoundError:
 setup(
     name="gravitino",
     description="Python lib/client for Gravitino",
-    version="0.5.0.dev12",
+    version="0.5.0.dev20",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/datastrato/gravitino",
@@ -24,7 +24,7 @@ setup(
     python_requires=">=3.8",
     packages=find_packages(exclude=["tests*"]),
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: Apache Software License',
         'Programming Language :: Python :: 3.8',
@@ -37,4 +37,5 @@ setup(
     extras_require={
         "dev": open("requirements-dev.txt").read(),
     },
+    include_package_data=True,
 )
