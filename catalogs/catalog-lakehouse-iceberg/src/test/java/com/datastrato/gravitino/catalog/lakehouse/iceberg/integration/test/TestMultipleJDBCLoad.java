@@ -10,7 +10,6 @@ import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogP
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.integration.test.container.MySQLContainer;
@@ -122,12 +121,12 @@ public class TestMultipleJDBCLoad extends AbstractIT {
             icebergMysqlConf);
 
     NameIdentifier[] nameIdentifiers =
-        mysqlCatalog.asSchemas().listSchemas(Namespace.of(metalakeName, mysqlCatalogName));
+        mysqlCatalog.asSchemas().listSchemas();
     Assertions.assertEquals(0, nameIdentifiers.length);
     nameIdentifiers =
         postgreSqlCatalog
             .asSchemas()
-            .listSchemas(Namespace.of(metalakeName, postgreSqlCatalogName));
+            .listSchemas();
     Assertions.assertEquals(0, nameIdentifiers.length);
 
     String schemaName = RandomNameUtils.genRandomName("it_schema");

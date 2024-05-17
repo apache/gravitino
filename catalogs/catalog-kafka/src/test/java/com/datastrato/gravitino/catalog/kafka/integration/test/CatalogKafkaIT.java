@@ -177,7 +177,7 @@ public class CatalogKafkaIT extends AbstractIT {
   @Test
   public void testDefaultSchema() {
     NameIdentifier[] schemas =
-        catalog.asSchemas().listSchemas(Namespace.ofSchema(METALAKE_NAME, CATALOG_NAME));
+        catalog.asSchemas().listSchemas();
     Assertions.assertEquals(1, schemas.length);
     Assertions.assertEquals(DEFAULT_SCHEMA_NAME, schemas[0].name());
 
@@ -229,7 +229,7 @@ public class CatalogKafkaIT extends AbstractIT {
   @Test
   public void testListSchema() {
     NameIdentifier[] schemas =
-        catalog.asSchemas().listSchemas(Namespace.ofSchema(METALAKE_NAME, CATALOG_NAME));
+        catalog.asSchemas().listSchemas();
     Assertions.assertEquals(1, schemas.length);
     Assertions.assertEquals(DEFAULT_SCHEMA_NAME, schemas[0].name());
   }

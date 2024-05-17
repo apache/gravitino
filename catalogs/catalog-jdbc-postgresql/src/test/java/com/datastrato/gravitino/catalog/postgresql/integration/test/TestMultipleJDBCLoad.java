@@ -7,7 +7,6 @@ package com.datastrato.gravitino.catalog.postgresql.integration.test;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
@@ -111,12 +110,12 @@ public class TestMultipleJDBCLoad extends AbstractIT {
             mysqlCatalogName, Catalog.Type.RELATIONAL, "jdbc-mysql", "comment", mysqlConf);
 
     NameIdentifier[] nameIdentifiers =
-        mysqlCatalog.asSchemas().listSchemas(Namespace.of(metalakeName, mysqlCatalogName));
+        mysqlCatalog.asSchemas().listSchemas();
     Assertions.assertNotEquals(0, nameIdentifiers.length);
     nameIdentifiers =
         postgreSqlCatalog
             .asSchemas()
-            .listSchemas(Namespace.of(metalakeName, postgreSqlCatalogName));
+            .listSchemas();
     Assertions.assertEquals(1, nameIdentifiers.length);
     Assertions.assertEquals("public", nameIdentifiers[0].name());
 

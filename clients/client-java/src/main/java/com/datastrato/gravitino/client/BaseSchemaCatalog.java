@@ -62,13 +62,11 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
   /**
    * List all the schemas under the given catalog namespace.
    *
-   * @param namespace The namespace of the catalog.
    * @return A list of {@link NameIdentifier} of the schemas under the given catalog namespace.
    * @throws NoSuchCatalogException if the catalog with specified namespace does not exist.
    */
   @Override
-  public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
-    Namespace.checkSchema(namespace);
+  public NameIdentifier[] listSchemas() throws NoSuchCatalogException {
 
     EntityListResponse resp =
         restClient.get(
@@ -84,25 +82,25 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
   /**
    * Create a new schema with specified identifier, comment and metadata.
    *
-   * @param ident The name identifier of the schema.
-   * @param comment The comment of the schema.
+   * @param schemaName The name identifier of the schema.
+   * @param comment    The comment of the schema.
    * @param properties The properties of the schema.
    * @return The created {@link Schema}.
-   * @throws NoSuchCatalogException if the catalog with specified namespace does not exist.
+   * @throws NoSuchCatalogException       if the catalog with specified namespace does not exist.
    * @throws SchemaAlreadyExistsException if the schema with specified identifier already exists.
    */
   @Override
-  public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
+  public Schema createSchema(String schemaName, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    NameIdentifier.checkSchema(ident);
+    NameIdentifier.checkSchema(schemaName);
 
     SchemaCreateRequest req =
-        new SchemaCreateRequest(RESTUtils.encodeString(ident.name()), comment, properties);
+        new SchemaCreateRequest(RESTUtils.encodeString(schemaName.name()), comment, properties);
     req.validate();
 
     SchemaResponse resp =
         restClient.post(
-            formatSchemaRequestPath(ident.namespace()),
+            formatSchemaRequestPath(schemaName.namespace()),
             req,
             SchemaResponse.class,
             Collections.emptyMap(),
@@ -115,17 +113,17 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
   /**
    * Load the schema with specified identifier.
    *
-   * @param ident The name identifier of the schema.
+   * @param schemaName The name identifier of the schema.
    * @return The {@link Schema} with specified identifier.
    * @throws NoSuchSchemaException if the schema with specified identifier does not exist.
    */
   @Override
-  public Schema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
-    NameIdentifier.checkSchema(ident);
+  public Schema loadSchema(String schemaName) throws NoSuchSchemaException {
+    NameIdentifier.checkSchema(schemaName);
 
     SchemaResponse resp =
         restClient.get(
-            formatSchemaRequestPath(ident.namespace()) + "/" + RESTUtils.encodeString(ident.name()),
+            formatSchemaRequestPath(schemaName.namespace()) + "/" + RESTUtils.encodeString(schemaName.name()),
             SchemaResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.schemaErrorHandler());
@@ -137,15 +135,15 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
   /**
    * Alter the schema with specified identifier by applying the changes.
    *
-   * @param ident The name identifier of the schema.
-   * @param changes The metadata changes to apply.
+   * @param schemaName The name identifier of the schema.
+   * @param changes    The metadata changes to apply.
    * @return The altered {@link Schema}.
    * @throws NoSuchSchemaException if the schema with specified identifier does not exist.
    */
   @Override
-  public Schema alterSchema(NameIdentifier ident, SchemaChange... changes)
+  public Schema alterSchema(String schemaName, SchemaChange... changes)
       throws NoSuchSchemaException {
-    NameIdentifier.checkSchema(ident);
+    NameIdentifier.checkSchema(schemaName);
 
     List<SchemaUpdateRequest> reqs =
         Arrays.stream(changes)
@@ -156,7 +154,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
 
     SchemaResponse resp =
         restClient.put(
-            formatSchemaRequestPath(ident.namespace()) + "/" + RESTUtils.encodeString(ident.name()),
+            formatSchemaRequestPath(schemaName.namespace()) + "/" + RESTUtils.encodeString(schemaName.name()),
             updatesRequest,
             SchemaResponse.class,
             Collections.emptyMap(),
@@ -169,21 +167,21 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
   /**
    * Drop the schema with specified identifier.
    *
-   * @param ident The name identifier of the schema.
-   * @param cascade Whether to drop all the tables under the schema.
+   * @param schemaName The name identifier of the schema.
+   * @param cascade    Whether to drop all the tables under the schema.
    * @return true if the schema is dropped successfully, false otherwise.
    * @throws NonEmptySchemaException if the schema is not empty and cascade is false.
    */
   @Override
-  public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
-    NameIdentifier.checkSchema(ident);
+  public boolean dropSchema(String schemaName, boolean cascade) throws NonEmptySchemaException {
+    NameIdentifier.checkSchema(schemaName);
 
     try {
       DropResponse resp =
           restClient.delete(
-              formatSchemaRequestPath(ident.namespace())
+              formatSchemaRequestPath(schemaName.namespace())
                   + "/"
-                  + RESTUtils.encodeString(ident.name()),
+                  + RESTUtils.encodeString(schemaName.name()),
               Collections.singletonMap("cascade", String.valueOf(cascade)),
               DropResponse.class,
               Collections.emptyMap(),
@@ -194,7 +192,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
     } catch (NonEmptySchemaException e) {
       throw e;
     } catch (Exception e) {
-      LOG.warn("Failed to drop schema {}", ident, e);
+      LOG.warn("Failed to drop schema {}", schemaName, e);
       return false;
     }
   }

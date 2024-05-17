@@ -295,7 +295,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     SupportsSchemas schemas = catalog.asSchemas();
     Namespace namespace = Namespace.of(metalakeName, catalogName);
     // list schema check.
-    NameIdentifier[] nameIdentifiers = schemas.listSchemas(namespace);
+    NameIdentifier[] nameIdentifiers = schemas.listSchemas();
     Set<String> schemaNames =
         Arrays.stream(nameIdentifiers).map(NameIdentifier::name).collect(Collectors.toSet());
     Assertions.assertTrue(schemaNames.contains(schemaName));
@@ -309,7 +309,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     String testSchemaName = GravitinoITUtils.genRandomName("test_schema_1");
     NameIdentifier schemaIdent = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
     schemas.createSchema(schemaIdent, schema_comment, Collections.emptyMap());
-    nameIdentifiers = schemas.listSchemas(Namespace.of(metalakeName, catalogName));
+    nameIdentifiers = schemas.listSchemas();
     Map<String, NameIdentifier> schemaMap =
         Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v -> v));
     Assertions.assertTrue(schemaMap.containsKey(testSchemaName));
@@ -332,7 +332,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Assertions.assertThrows(
         NoSuchSchemaException.class, () -> postgreSqlService.loadSchema(schemaIdent));
 
-    nameIdentifiers = schemas.listSchemas(Namespace.of(metalakeName, catalogName));
+    nameIdentifiers = schemas.listSchemas();
     schemaMap =
         Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v -> v));
     Assertions.assertFalse(schemaMap.containsKey(testSchemaName));
@@ -554,7 +554,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   @Test
   void testListSchema() {
     NameIdentifier[] nameIdentifiers =
-        catalog.asSchemas().listSchemas(Namespace.of(metalakeName, catalogName));
+        catalog.asSchemas().listSchemas();
     Set<String> schemaNames =
         Arrays.stream(nameIdentifiers).map(NameIdentifier::name).collect(Collectors.toSet());
     Assertions.assertTrue(schemaNames.contains("public"));
@@ -1233,7 +1233,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     }
 
     Set<String> schemaNames =
-        Arrays.stream(schemaSupport.listSchemas(Namespace.of(metalakeName, catalogName)))
+        Arrays.stream(schemaSupport.listSchemas())
             .map(NameIdentifier::name)
             .collect(Collectors.toSet());
 

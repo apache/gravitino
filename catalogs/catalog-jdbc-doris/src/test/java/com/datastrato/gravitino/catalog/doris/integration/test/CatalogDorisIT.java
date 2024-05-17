@@ -205,7 +205,7 @@ public class CatalogDorisIT extends AbstractIT {
     Namespace namespace = Namespace.of(metalakeName, catalogName);
 
     // test list schemas
-    NameIdentifier[] nameIdentifiers = schemas.listSchemas(namespace);
+    NameIdentifier[] nameIdentifiers = schemas.listSchemas();
     Set<String> schemaNames =
         Arrays.stream(nameIdentifiers).map(NameIdentifier::name).collect(Collectors.toSet());
     Assertions.assertTrue(schemaNames.contains(schemaName));
@@ -215,7 +215,7 @@ public class CatalogDorisIT extends AbstractIT {
     NameIdentifier schemaIdent = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
     schemas.createSchema(schemaIdent, schema_comment, Collections.emptyMap());
 
-    nameIdentifiers = schemas.listSchemas(Namespace.of(metalakeName, catalogName));
+    nameIdentifiers = schemas.listSchemas();
     Map<String, NameIdentifier> schemaMap =
         Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v -> v));
     Assertions.assertTrue(schemaMap.containsKey(testSchemaName));
@@ -234,7 +234,7 @@ public class CatalogDorisIT extends AbstractIT {
     Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(schemaIdent));
 
     // 2. check by list schema
-    nameIdentifiers = schemas.listSchemas(Namespace.of(metalakeName, catalogName));
+    nameIdentifiers = schemas.listSchemas();
     schemaMap =
         Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v -> v));
     Assertions.assertFalse(schemaMap.containsKey(testSchemaName));
