@@ -122,15 +122,13 @@ public class TestMultipleJDBCLoad extends AbstractIT {
     String schemaName = RandomNameUtils.genRandomName("it_schema");
     mysqlCatalog
         .asSchemas()
-        .createSchema(
-            NameIdentifier.of(metalakeName, mysqlCatalogName, schemaName),
+        .createSchema(schemaName,
             null,
             Collections.emptyMap());
 
     postgreSqlCatalog
         .asSchemas()
-        .createSchema(
-            NameIdentifier.of(metalakeName, postgreSqlCatalogName, schemaName),
+        .createSchema(schemaName,
             null,
             Collections.emptyMap());
 

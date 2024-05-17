@@ -72,7 +72,7 @@ public class CatalogConnectorMetadata {
   public List<String> listSchemaNames() {
     try {
       return Arrays.stream(
-              schemaCatalog.listSchemas(Namespace.ofSchema(metalake.name(), catalogName)))
+              schemaCatalog.listSchemas())
           .map(NameIdentifier::name)
           .toList();
     } catch (NoSuchCatalogException e) {
@@ -83,8 +83,7 @@ public class CatalogConnectorMetadata {
   public GravitinoSchema getSchema(String schemaName) {
     try {
       Schema schema =
-          schemaCatalog.loadSchema(
-              NameIdentifier.ofSchema(metalake.name(), catalogName, schemaName));
+          schemaCatalog.loadSchema(schemaName);
       return new GravitinoSchema(schema);
     } catch (NoSuchSchemaException e) {
       throw new TrinoException(GRAVITINO_SCHEMA_NOT_EXISTS, SCHEMA_DOES_NOT_EXIST_MSG, e);
@@ -139,8 +138,7 @@ public class CatalogConnectorMetadata {
 
   public void createSchema(GravitinoSchema schema) {
     try {
-      schemaCatalog.createSchema(
-          NameIdentifier.ofSchema(metalake.name(), catalogName, schema.getName()),
+      schemaCatalog.createSchema(schema.getName(),
           schema.getComment(),
           schema.getProperties());
     } catch (NoSuchSchemaException e) {
@@ -153,8 +151,7 @@ public class CatalogConnectorMetadata {
   public void dropSchema(String schemaName, boolean cascade) {
     try {
       boolean success =
-          schemaCatalog.dropSchema(
-              NameIdentifier.ofSchema(metalake.name(), catalogName, schemaName), cascade);
+          schemaCatalog.dropSchema(schemaName, cascade);
 
       if (!success) {
         throw new TrinoException(GRAVITINO_SCHEMA_NOT_EXISTS, "Drop schema failed");

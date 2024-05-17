@@ -135,7 +135,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     for (NameIdentifier nameIdentifier : nameIdentifiers) {
       catalog.asTableCatalog().dropTable(nameIdentifier);
     }
-    catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), false);
+    catalog.asSchemas().dropSchema(schemaName, false);
   }
 
   private void createMetalake() {
@@ -174,8 +174,8 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
 
     Schema createdSchema =
-        catalog.asSchemas().createSchema(ident, schema_comment, Collections.EMPTY_MAP);
-    Schema loadSchema = catalog.asSchemas().loadSchema(ident);
+        catalog.asSchemas().createSchema(ident.name(), schema_comment, Collections.EMPTY_MAP);
+    Schema loadSchema = catalog.asSchemas().loadSchema(ident.name());
     Assertions.assertEquals(createdSchema.name(), loadSchema.name());
     Assertions.assertEquals(createdSchema.comment(), loadSchema.comment());
   }
@@ -308,7 +308,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     // create schema check.
     String testSchemaName = GravitinoITUtils.genRandomName("test_schema_1");
     NameIdentifier schemaIdent = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
-    schemas.createSchema(schemaIdent, schema_comment, Collections.emptyMap());
+    schemas.createSchema(schemaIdent.name(), schema_comment, Collections.emptyMap());
     nameIdentifiers = schemas.listSchemas();
     Map<String, NameIdentifier> schemaMap =
         Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v -> v));
@@ -323,12 +323,12 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Assertions.assertThrows(
         SchemaAlreadyExistsException.class,
         () -> {
-          schemas.createSchema(schemaIdent, schema_comment, emptyMap);
+          schemas.createSchema(schemaIdent.name(), schema_comment, emptyMap);
         });
 
     // drop schema check.
-    schemas.dropSchema(schemaIdent, false);
-    Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(schemaIdent));
+    schemas.dropSchema(schemaIdent.name(), false);
+    Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(schemaIdent.name()));
     Assertions.assertThrows(
         NoSuchSchemaException.class, () -> postgreSqlService.loadSchema(schemaIdent));
 
@@ -337,7 +337,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v -> v));
     Assertions.assertFalse(schemaMap.containsKey(testSchemaName));
     Assertions.assertFalse(
-        schemas.dropSchema(NameIdentifier.of(metalakeName, catalogName, "no-exits"), false));
+        schemas.dropSchema("no-exits", false));
     TableCatalog tableCatalog = catalog.asTableCatalog();
 
     // create failed check.
@@ -355,8 +355,8 @@ public class CatalogPostgreSqlIT extends AbstractIT {
                 Distributions.NONE,
                 null));
     // drop schema failed check.
-    Assertions.assertFalse(schemas.dropSchema(schemaIdent, true));
-    Assertions.assertFalse(schemas.dropSchema(schemaIdent, false));
+    Assertions.assertFalse(schemas.dropSchema(schemaIdent.name(), true));
+    Assertions.assertFalse(schemas.dropSchema(schemaIdent.name(), false));
     Assertions.assertFalse(tableCatalog.dropTable(table));
     postgreSqlNamespaces = postgreSqlService.listSchemas(Namespace.empty());
     schemaNames =
@@ -529,24 +529,22 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   @Test
   void testCreateAndLoadSchema() {
     String testSchemaName = "test";
-    NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
 
-    Schema schema = catalog.asSchemas().createSchema(ident, "comment", null);
+    Schema schema = catalog.asSchemas().createSchema(testSchemaName, "comment", null);
     Assertions.assertEquals("anonymous", schema.auditInfo().creator());
     Assertions.assertEquals("comment", schema.comment());
-    schema = catalog.asSchemas().loadSchema(ident);
+    schema = catalog.asSchemas().loadSchema(testSchemaName);
     Assertions.assertEquals("anonymous", schema.auditInfo().creator());
     Assertions.assertEquals("comment", schema.comment());
 
     // test null comment
     testSchemaName = "test2";
-    ident = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
 
-    schema = catalog.asSchemas().createSchema(ident, null, null);
+    schema = catalog.asSchemas().createSchema(testSchemaName, null, null);
     Assertions.assertEquals("anonymous", schema.auditInfo().creator());
     // todo: Gravitino put id to comment, makes comment is empty string not null.
     Assertions.assertTrue(StringUtils.isEmpty(schema.comment()));
-    schema = catalog.asSchemas().loadSchema(ident);
+    schema = catalog.asSchemas().loadSchema(testSchemaName);
     Assertions.assertEquals("anonymous", schema.auditInfo().creator());
     Assertions.assertTrue(StringUtils.isEmpty(schema.comment()));
   }
@@ -1104,8 +1102,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     for (int i = 0; i < dbs.length; i++) {
       catalog
           .asSchemas()
-          .createSchema(
-              NameIdentifier.of(metalakeName, catalogName, dbs[i]), dbs[i], Maps.newHashMap());
+          .createSchema(dbs[i], dbs[i], Maps.newHashMap());
     }
 
     String tableName1 = "table1";
@@ -1157,8 +1154,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     for (int i = 0; i < dbs.length; i++) {
       catalog
           .asSchemas()
-          .createSchema(
-              NameIdentifier.of(metalakeName, catalogName, dbs[i]), dbs[i], Maps.newHashMap());
+          .createSchema(dbs[i], dbs[i], Maps.newHashMap());
     }
 
     String tableName1 = "table1";
@@ -1227,9 +1223,8 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     SupportsSchemas schemaSupport = catalog.asSchemas();
 
     for (String schema : schemas) {
-      NameIdentifier schemaIdentifier = NameIdentifier.of(metalakeName, catalogName, schema);
-      schemaSupport.createSchema(schemaIdentifier, null, Collections.emptyMap());
-      Assertions.assertNotNull(schemaSupport.loadSchema(schemaIdentifier));
+      schemaSupport.createSchema(schema, null, Collections.emptyMap());
+      Assertions.assertNotNull(schemaSupport.loadSchema(schema));
     }
 
     Set<String> schemaNames =

@@ -105,8 +105,7 @@ public class CatalogsPageDorisTest extends AbstractWebIT {
     Catalog catalog_doris = metalake.loadCatalog(catalogName);
     catalog_doris
         .asSchemas()
-        .createSchema(
-            NameIdentifier.of(metalakeName, catalogName, schemaName), "comment", properties);
+        .createSchema(schemaName, "comment", properties);
   }
 
   /**

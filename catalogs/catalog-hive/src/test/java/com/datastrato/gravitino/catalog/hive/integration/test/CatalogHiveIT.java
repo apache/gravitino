@@ -220,7 +220,7 @@ public class CatalogHiveIT extends AbstractIT {
 
   @AfterEach
   public void resetSchema() throws TException, InterruptedException {
-    catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), true);
+    catalog.asSchemas().dropSchema(schemaName, true);
     assertThrows(
         NoSuchObjectException.class,
         () -> hiveClientPool.run(client -> client.getDatabase(schemaName)));
@@ -262,8 +262,8 @@ public class CatalogHiveIT extends AbstractIT {
             schemaName.toLowerCase()));
     String comment = "comment";
 
-    catalog.asSchemas().createSchema(ident, comment, properties);
-    Schema loadSchema = catalog.asSchemas().loadSchema(ident);
+    catalog.asSchemas().createSchema(ident.name(), comment, properties);
+    Schema loadSchema = catalog.asSchemas().loadSchema(ident.name());
     Assertions.assertEquals(schemaName.toLowerCase(), loadSchema.name());
     Assertions.assertEquals(comment, loadSchema.comment());
     Assertions.assertEquals("val1", loadSchema.properties().get("key1"));
@@ -616,7 +616,7 @@ public class CatalogHiveIT extends AbstractIT {
             HiveContainer.HDFS_DEFAULTFS_PORT);
 
     properties.put(HiveSchemaPropertiesMetadata.LOCATION, expectedSchemaLocation);
-    catalog.asSchemas().createSchema(schemaIdent, "comment", properties);
+    catalog.asSchemas().createSchema(schemaIdent.name(), "comment", properties);
 
     Database actualSchema = hiveClientPool.run(client -> client.getDatabase(schemaIdent.name()));
     String actualSchemaLocation = actualSchema.getLocationUri();
@@ -1254,21 +1254,21 @@ public class CatalogHiveIT extends AbstractIT {
 
     GravitinoMetalake metalake = client.loadMetalake(metalakeName);
     Catalog catalog = metalake.loadCatalog(catalogName);
-    Schema schema = catalog.asSchemas().loadSchema(ident);
+    Schema schema = catalog.asSchemas().loadSchema(ident.name());
     Assertions.assertNull(schema.auditInfo().lastModifier());
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, schema.auditInfo().creator());
     schema =
         catalog
             .asSchemas()
             .alterSchema(
-                ident,
+                ident.name(),
                 SchemaChange.removeProperty("key1"),
                 SchemaChange.setProperty("key2", "val2-alter"));
 
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, schema.auditInfo().lastModifier());
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, schema.auditInfo().creator());
 
-    Map<String, String> properties2 = catalog.asSchemas().loadSchema(ident).properties();
+    Map<String, String> properties2 = catalog.asSchemas().loadSchema(ident.name()).properties();
     Assertions.assertFalse(properties2.containsKey("key1"));
     Assertions.assertEquals("val2-alter", properties2.get("key2"));
 
@@ -1311,11 +1311,11 @@ public class CatalogHiveIT extends AbstractIT {
       final int length = i;
       final NameIdentifier id =
           NameIdentifier.of(metalakeName, catalogName, schemaName.substring(0, length));
-      Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(id));
+      Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(id.name()));
     }
 
     NameIdentifier idC = NameIdentifier.of(metalakeName, catalogName, schemaName + "a");
-    Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(idC));
+    Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(idC.name()));
 
     TableCatalog tableCatalog = catalog.asTableCatalog();
 
@@ -1385,8 +1385,7 @@ public class CatalogHiveIT extends AbstractIT {
     final String schemaName = GravitinoITUtils.genRandomName("CatalogHiveIT_schema");
     catalog
         .asSchemas()
-        .createSchema(
-            NameIdentifier.of(metalakeName, catalogName, schemaName), "", ImmutableMap.of());
+        .createSchema(schemaName, "", ImmutableMap.of());
 
     final Catalog cata = catalog;
     // Now try to rename table

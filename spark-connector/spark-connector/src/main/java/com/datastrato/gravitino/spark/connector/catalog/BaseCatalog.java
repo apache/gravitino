@@ -284,7 +284,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
   @Override
   public String[][] listNamespaces() throws NoSuchNamespaceException {
     NameIdentifier[] schemas =
-        gravitinoCatalogClient.asSchemas().listSchemas(Namespace.of(metalakeName, catalogName));
+        gravitinoCatalogClient.asSchemas().listSchemas();
     return Arrays.stream(schemas)
         .map(schema -> new String[] {schema.name()})
         .toArray(String[][]::new);
@@ -306,7 +306,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
       Schema schema =
           gravitinoCatalogClient
               .asSchemas()
-              .loadSchema(NameIdentifier.of(metalakeName, catalogName, namespace[0]));
+              .loadSchema(namespace[0]);
       String comment = schema.comment();
       Map<String, String> properties = schema.properties();
       if (comment != null) {
@@ -330,8 +330,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
     try {
       gravitinoCatalogClient
           .asSchemas()
-          .createSchema(
-              NameIdentifier.of(metalakeName, catalogName, namespace[0]), comment, properties);
+          .createSchema(namespace[0], comment, properties);
     } catch (SchemaAlreadyExistsException e) {
       throw new NamespaceAlreadyExistsException(namespace);
     }
@@ -358,7 +357,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
     try {
       gravitinoCatalogClient
           .asSchemas()
-          .alterSchema(NameIdentifier.of(metalakeName, catalogName, namespace[0]), schemaChanges);
+          .alterSchema(namespace[0], schemaChanges);
     } catch (NoSuchSchemaException e) {
       throw new NoSuchNamespaceException(namespace);
     }
@@ -371,7 +370,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
     try {
       return gravitinoCatalogClient
           .asSchemas()
-          .dropSchema(NameIdentifier.of(metalakeName, catalogName, namespace[0]), cascade);
+          .dropSchema(namespace[0], cascade);
     } catch (NonEmptySchemaException e) {
       throw new NonEmptyNamespaceException(namespace);
     }

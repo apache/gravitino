@@ -41,8 +41,13 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
 
   /** The REST client to send the requests. */
   protected final RESTClient restClient;
+  /** The namespace of current catalog, which is the metalake name. */
+  protected final Namespace namespace;
+
+  protected final Namespace schemaNamespace;
 
   BaseSchemaCatalog(
+          Namespace namespace,
       String name,
       Type type,
       String provider,
@@ -52,6 +57,9 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
       RESTClient restClient) {
     super(name, type, provider, comment, properties, auditDTO);
     this.restClient = restClient;
+    Namespace.checkCatalog(namespace);
+    this.namespace = namespace;
+    this.schemaNamespace = Namespace.ofSchema(namespace.level(0), name);
   }
 
   @Override
@@ -70,7 +78,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
 
     EntityListResponse resp =
         restClient.get(
-            formatSchemaRequestPath(namespace),
+            formatSchemaRequestPath(schemaNamespace),
             EntityListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.schemaErrorHandler());
@@ -92,15 +100,14 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
   @Override
   public Schema createSchema(String schemaName, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    NameIdentifier.checkSchema(schemaName);
 
     SchemaCreateRequest req =
-        new SchemaCreateRequest(RESTUtils.encodeString(schemaName.name()), comment, properties);
+        new SchemaCreateRequest(RESTUtils.encodeString(schemaName), comment, properties);
     req.validate();
 
     SchemaResponse resp =
         restClient.post(
-            formatSchemaRequestPath(schemaName.namespace()),
+            formatSchemaRequestPath(schemaNamespace),
             req,
             SchemaResponse.class,
             Collections.emptyMap(),
@@ -119,11 +126,10 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
    */
   @Override
   public Schema loadSchema(String schemaName) throws NoSuchSchemaException {
-    NameIdentifier.checkSchema(schemaName);
 
     SchemaResponse resp =
         restClient.get(
-            formatSchemaRequestPath(schemaName.namespace()) + "/" + RESTUtils.encodeString(schemaName.name()),
+            formatSchemaRequestPath(schemaNamespace) + "/" + RESTUtils.encodeString(schemaName),
             SchemaResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.schemaErrorHandler());
@@ -143,7 +149,6 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
   @Override
   public Schema alterSchema(String schemaName, SchemaChange... changes)
       throws NoSuchSchemaException {
-    NameIdentifier.checkSchema(schemaName);
 
     List<SchemaUpdateRequest> reqs =
         Arrays.stream(changes)
@@ -154,7 +159,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
 
     SchemaResponse resp =
         restClient.put(
-            formatSchemaRequestPath(schemaName.namespace()) + "/" + RESTUtils.encodeString(schemaName.name()),
+            formatSchemaRequestPath(schemaNamespace) + "/" + RESTUtils.encodeString(schemaName),
             updatesRequest,
             SchemaResponse.class,
             Collections.emptyMap(),
@@ -174,14 +179,13 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
    */
   @Override
   public boolean dropSchema(String schemaName, boolean cascade) throws NonEmptySchemaException {
-    NameIdentifier.checkSchema(schemaName);
 
     try {
       DropResponse resp =
           restClient.delete(
-              formatSchemaRequestPath(schemaName.namespace())
+              formatSchemaRequestPath(schemaNamespace)
                   + "/"
-                  + RESTUtils.encodeString(schemaName.name()),
+                  + RESTUtils.encodeString(schemaName),
               Collections.singletonMap("cascade", String.valueOf(cascade)),
               DropResponse.class,
               Collections.emptyMap(),

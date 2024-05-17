@@ -184,7 +184,7 @@ public class CatalogKafkaIT extends AbstractIT {
     Schema loadSchema =
         catalog
             .asSchemas()
-            .loadSchema(NameIdentifier.ofSchema(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME));
+            .loadSchema(DEFAULT_SCHEMA_NAME);
     Assertions.assertEquals(
         "The default schema of Kafka catalog including all topics", loadSchema.comment());
 
@@ -195,8 +195,7 @@ public class CatalogKafkaIT extends AbstractIT {
             () ->
                 catalog
                     .asSchemas()
-                    .alterSchema(
-                        NameIdentifier.ofSchema(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME),
+                    .alterSchema(DEFAULT_SCHEMA_NAME,
                         SchemaChange.removeProperty("key1")));
     Assertions.assertTrue(exception.getMessage().contains("Cannot alter the default schema"));
 
@@ -204,8 +203,7 @@ public class CatalogKafkaIT extends AbstractIT {
     boolean dropped =
         catalog
             .asSchemas()
-            .dropSchema(
-                NameIdentifier.ofSchema(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME), true);
+            .dropSchema(DEFAULT_SCHEMA_NAME, true);
     Assertions.assertFalse(dropped);
   }
 
@@ -218,8 +216,7 @@ public class CatalogKafkaIT extends AbstractIT {
             () ->
                 catalog
                     .asSchemas()
-                    .createSchema(
-                        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaName),
+                    .createSchema(schemaName,
                         "comment",
                         Collections.emptyMap()));
     Assertions.assertTrue(

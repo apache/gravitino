@@ -127,7 +127,6 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     String anotherSchemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
 
     NameIdentifier ident = NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaName);
-    NameIdentifier anotherIdent = NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, anotherSchemaName);
 
     String comment = "comment";
     createSchema(schemaName, ident, comment);
@@ -149,7 +148,7 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     SupportsSchemas schemas = anotherCatalog.asSchemas();
     Exception e =
         Assertions.assertThrows(
-            RuntimeException.class, () -> schemas.createSchema(anotherIdent, comment, properties));
+            RuntimeException.class, () -> schemas.createSchema(anotherSchemaName, comment, properties));
     Assertions.assertTrue(e.getMessage().contains("AccessControlException Permission denied"));
   }
 
@@ -209,7 +208,7 @@ public class ProxyCatalogHiveIT extends AbstractIT {
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HDFS_DEFAULTFS_PORT,
             schemaName.toLowerCase()));
-    catalog.asSchemas().createSchema(ident, comment, properties);
+    catalog.asSchemas().createSchema(ident.name(), comment, properties);
   }
 
   @Test

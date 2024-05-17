@@ -145,8 +145,7 @@ public class TrinoConnectorIT extends AbstractIT {
             HiveContainer.HDFS_DEFAULTFS_PORT,
             databaseName);
     containerSuite.getTrinoContainer().executeUpdateSQL(sql1);
-    NameIdentifier idSchema = NameIdentifier.of(metalakeName, catalogName, databaseName);
-    Schema schema = catalog.asSchemas().loadSchema(idSchema);
+    Schema schema = catalog.asSchemas().loadSchema(databaseName);
     Assertions.assertEquals(schema.name(), databaseName);
 
     ArrayList<ArrayList<String>> r =
@@ -378,7 +377,7 @@ public class TrinoConnectorIT extends AbstractIT {
     containerSuite.getTrinoContainer().executeUpdateSQL(createSchemaSql);
 
     Schema schema =
-        catalog.asSchemas().loadSchema(NameIdentifier.of(metalakeName, catalogName, schemaName));
+        catalog.asSchemas().loadSchema(schemaName);
     Assertions.assertEquals(
         "hdfs://localhost:9000/user/hive/warehouse/hive_schema_1123123",
         schema.properties().get("location"));
@@ -459,8 +458,7 @@ public class TrinoConnectorIT extends AbstractIT {
 
     catalog
         .asSchemas()
-        .createSchema(
-            NameIdentifier.of(metalakeName, catalogName, schemaName),
+        .createSchema(schemaName,
             "Created by gravitino client",
             ImmutableMap.<String, String>builder()
                 .put("location", "hdfs://localhost:9000/user/hive/warehouse/hive_schema_1223445.db")
@@ -702,8 +700,7 @@ public class TrinoConnectorIT extends AbstractIT {
     Schema schema =
         catalog
             .asSchemas()
-            .createSchema(
-                NameIdentifier.of(metalakeName, catalogName, schemaName),
+            .createSchema(schemaName,
                 "Created by gravitino client",
                 ImmutableMap.<String, String>builder().build());
 
@@ -924,8 +921,7 @@ public class TrinoConnectorIT extends AbstractIT {
     Schema schema =
         catalog
             .asSchemas()
-            .createSchema(
-                NameIdentifier.of(metalakeName, catalogName, schemaName),
+            .createSchema(schemaName,
                 "Created by gravitino client",
                 ImmutableMap.<String, String>builder().build());
 
@@ -1059,8 +1055,7 @@ public class TrinoConnectorIT extends AbstractIT {
 
     catalog
         .asSchemas()
-        .createSchema(
-            NameIdentifier.of(metalakeName, catalogName, schemaName),
+        .createSchema(schemaName,
             "Created by gravitino client",
             ImmutableMap.<String, String>builder().build());
 
@@ -1086,7 +1081,7 @@ public class TrinoConnectorIT extends AbstractIT {
     success =
         catalog
             .asSchemas()
-            .dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), true);
+            .dropSchema(schemaName, true);
     Assertions.assertFalse(success);
     final String sql3 = String.format("show schemas in %s like '%s'", catalogName, schemaName);
     success = checkTrinoHasLoaded(sql3, 30);
@@ -1181,8 +1176,7 @@ public class TrinoConnectorIT extends AbstractIT {
     Schema schema =
         catalog
             .asSchemas()
-            .createSchema(
-                NameIdentifier.of(metalakeName, catalogName, schemaName),
+            .createSchema(schemaName,
                 null,
                 ImmutableMap.<String, String>builder().build());
 

@@ -72,7 +72,7 @@ public class TestRelationalTable extends TestRelationalCatalog {
     SchemaResponse resp = new SchemaResponse(mockedSchema);
     buildMockResource(Method.POST, schemaPath, req, resp, SC_OK);
 
-    catalog.asSchemas().createSchema(schemaId, "comment", Collections.emptyMap());
+    catalog.asSchemas().createSchema(schemaId.name(), "comment", Collections.emptyMap());
 
     // setup partitioned table
     NameIdentifier tableId =

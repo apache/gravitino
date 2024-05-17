@@ -127,8 +127,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     properties.put(PROPERTIES_KEY1, PROPERTIES_VALUE1);
     catalog
         .asSchemas()
-        .createSchema(
-            NameIdentifier.of(metalakeName, catalogName, schemaName), "comment", properties);
+        .createSchema(schemaName, "comment", properties);
   }
 
   /**

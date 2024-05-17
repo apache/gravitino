@@ -100,15 +100,14 @@ public class HadoopCatalogIT extends AbstractIT {
   }
 
   private static void createSchema() {
-    NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");
     properties.put("location", defaultBaseLocation());
     String comment = "comment";
 
-    catalog.asSchemas().createSchema(ident, comment, properties);
-    Schema loadSchema = catalog.asSchemas().loadSchema(ident);
+    catalog.asSchemas().createSchema(schemaName, comment, properties);
+    Schema loadSchema = catalog.asSchemas().loadSchema(schemaName);
     Assertions.assertEquals(schemaName, loadSchema.name());
     Assertions.assertEquals(comment, loadSchema.comment());
     Assertions.assertEquals("val1", loadSchema.properties().get("key1"));
@@ -117,9 +116,8 @@ public class HadoopCatalogIT extends AbstractIT {
   }
 
   private static void dropSchema() {
-    NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
-    catalog.asSchemas().dropSchema(ident, true);
-    Assertions.assertFalse(catalog.asSchemas().schemaExists(ident));
+    catalog.asSchemas().dropSchema(schemaName, true);
+    Assertions.assertFalse(catalog.asSchemas().schemaExists(schemaName));
   }
 
   @Test
@@ -550,19 +548,18 @@ public class HadoopCatalogIT extends AbstractIT {
         GravitinoITUtils.genRandomName("test_drop_catalog_with_empty_schema_schema");
     filesetCatalog
         .asSchemas()
-        .createSchema(
-            NameIdentifier.of(metalakeName, catalogName, schemaName), "comment", ImmutableMap.of());
+        .createSchema(schemaName, "comment", ImmutableMap.of());
 
     // Drop the empty schema.
     boolean dropped =
         filesetCatalog
             .asSchemas()
-            .dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), true);
+            .dropSchema(schemaName, true);
     Assertions.assertTrue(dropped, "schema should be dropped");
     Assertions.assertFalse(
         filesetCatalog
             .asSchemas()
-            .schemaExists(NameIdentifier.of(metalakeName, catalogName, schemaName)),
+            .schemaExists(schemaName),
         "schema should not be exists");
 
     // Drop the catalog.

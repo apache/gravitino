@@ -57,7 +57,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
     return doWithCatalog(
         getCatalogIdentifier(NameIdentifier.of(namespace.levels())),
-        c -> c.doWithSchemaOps(s -> s.listSchemas()),
+        c -> c.doWithSchemaOps(s -> s.listSchemas(namespace)),
         NoSuchCatalogException.class);
   }
 

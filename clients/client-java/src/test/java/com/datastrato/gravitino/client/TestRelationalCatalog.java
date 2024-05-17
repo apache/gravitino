@@ -186,7 +186,7 @@ public class TestRelationalCatalog extends TestBase {
     buildMockResource(Method.POST, schemaPath, req, resp, SC_OK);
 
     Schema createdSchema =
-        catalog.asSchemas().createSchema(schemaId, "comment", Collections.emptyMap());
+        catalog.asSchemas().createSchema(schemaId.name(), "comment", Collections.emptyMap());
     Assertions.assertEquals("schema1", createdSchema.name());
     Assertions.assertEquals("comment", createdSchema.comment());
     Assertions.assertEquals(Collections.emptyMap(), createdSchema.properties());
@@ -201,7 +201,7 @@ public class TestRelationalCatalog extends TestBase {
     Throwable ex =
         Assertions.assertThrows(
             NoSuchCatalogException.class,
-            () -> schemas.createSchema(schemaId, "comment", emptyMap));
+            () -> schemas.createSchema(schemaId.name(), "comment", emptyMap));
     Assertions.assertTrue(ex.getMessage().contains("catalog not found"));
 
     // Test throw SchemaAlreadyExistsException
@@ -213,7 +213,7 @@ public class TestRelationalCatalog extends TestBase {
     Throwable ex1 =
         Assertions.assertThrows(
             SchemaAlreadyExistsException.class,
-            () -> schemas.createSchema(schemaId, "comment", emptyMap));
+            () -> schemas.createSchema(schemaId.name(), "comment", emptyMap));
     Assertions.assertTrue(ex1.getMessage().contains("schema already exists"));
   }
 
@@ -230,7 +230,7 @@ public class TestRelationalCatalog extends TestBase {
     SchemaResponse resp = new SchemaResponse(schema);
     buildMockResource(Method.GET, schemaPath, null, resp, SC_OK);
 
-    Schema loadedSchema = catalog.asSchemas().loadSchema(schemaId);
+    Schema loadedSchema = catalog.asSchemas().loadSchema(schemaId.name());
     Assertions.assertEquals("schema1", loadedSchema.name());
     Assertions.assertEquals("comment", loadedSchema.comment());
     Assertions.assertEquals(Collections.emptyMap(), loadedSchema.properties());
@@ -242,7 +242,7 @@ public class TestRelationalCatalog extends TestBase {
 
     SupportsSchemas schemas = catalog.asSchemas();
     Throwable ex1 =
-        Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(schemaId));
+        Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(schemaId.name()));
     Assertions.assertTrue(ex1.getMessage().contains("schema not found"));
   }
 
@@ -275,14 +275,14 @@ public class TestRelationalCatalog extends TestBase {
     DropResponse resp = new DropResponse(true);
     buildMockResource(Method.DELETE, schemaPath, null, resp, SC_OK);
 
-    Assertions.assertTrue(catalog.asSchemas().dropSchema(ident, false));
+    Assertions.assertTrue(catalog.asSchemas().dropSchema(ident.name(), false));
 
     // Test with cascade to ture
     DropResponse resp1 = new DropResponse(true);
     buildMockResource(
         Method.DELETE, schemaPath, ImmutableMap.of("cascade", "true"), null, resp1, SC_OK);
 
-    Assertions.assertTrue(catalog.asSchemas().dropSchema(ident, true));
+    Assertions.assertTrue(catalog.asSchemas().dropSchema(ident.name(), true));
 
     // Test throw NonEmptySchemaException
     ErrorResponse errorResp =
@@ -293,7 +293,7 @@ public class TestRelationalCatalog extends TestBase {
     SupportsSchemas schemas = catalog.asSchemas();
     Throwable ex =
         Assertions.assertThrows(
-            NonEmptySchemaException.class, () -> schemas.dropSchema(ident, true));
+            NonEmptySchemaException.class, () -> schemas.dropSchema(ident.name(), true));
 
     Assertions.assertTrue(ex.getMessage().contains("schema is not empty"));
   }
@@ -1163,7 +1163,7 @@ public class TestRelationalCatalog extends TestBase {
     SchemaResponse resp = new SchemaResponse(updatedSchema);
     buildMockResource(Method.PUT, schemaPath, updatesReq, resp, SC_OK);
 
-    Schema alteredSchema = catalog.asSchemas().alterSchema(ident, req.schemaChange());
+    Schema alteredSchema = catalog.asSchemas().alterSchema(ident.name(), req.schemaChange());
     Assertions.assertEquals(updatedSchema.name(), alteredSchema.name());
     Assertions.assertEquals(updatedSchema.comment(), alteredSchema.comment());
     Assertions.assertEquals(updatedSchema.properties(), alteredSchema.properties());

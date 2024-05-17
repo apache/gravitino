@@ -38,6 +38,7 @@ import org.apache.commons.lang3.StringUtils;
 public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog {
 
   MessagingCatalog(
+      Namespace namespace,
       String name,
       Type type,
       String provider,
@@ -45,7 +46,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
       Map<String, String> properties,
       AuditDTO auditDTO,
       RESTClient restClient) {
-    super(name, type, provider, comment, properties, auditDTO, restClient);
+    super(namespace, name, type, provider, comment, properties, auditDTO, restClient);
   }
 
   /** @return A new builder for {@link MessagingCatalog}. */
@@ -205,7 +206,15 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
     /** The REST client to send the requests. */
     private RESTClient restClient;
 
+    /** The namespace of the catalog */
+    private Namespace namespace;
+
     private Builder() {}
+
+    Builder withNamespace(Namespace namespace) {
+      this.namespace = namespace;
+      return this;
+    }
 
     Builder withRestClient(RESTClient restClient) {
       this.restClient = restClient;
@@ -214,13 +223,15 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
 
     @Override
     public MessagingCatalog build() {
+      Namespace.checkCatalog(namespace);
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name must not be blank");
       Preconditions.checkArgument(type != null, "type must not be null");
       Preconditions.checkArgument(StringUtils.isNotBlank(provider), "provider must not be blank");
       Preconditions.checkArgument(audit != null, "audit must not be null");
       Preconditions.checkArgument(restClient != null, "restClient must be set");
 
-      return new MessagingCatalog(name, type, provider, comment, properties, audit, restClient);
+      return new MessagingCatalog(
+          namespace, name, type, provider, comment, properties, audit, restClient);
     }
   }
 }

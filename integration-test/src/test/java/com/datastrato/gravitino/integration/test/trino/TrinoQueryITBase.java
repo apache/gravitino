@@ -210,8 +210,7 @@ public class TrinoQueryITBase {
                           }
                         });
 
-                schemas.dropSchema(
-                    NameIdentifier.ofSchema(metalakeName, catalogName, schema.name()), false);
+                schemas.dropSchema(schema.name(), false);
               } catch (Exception e) {
                 LOG.error("Failed to drop schema {}", schema);
               }

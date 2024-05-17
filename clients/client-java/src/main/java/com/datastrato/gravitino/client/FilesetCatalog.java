@@ -38,6 +38,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
     implements com.datastrato.gravitino.file.FilesetCatalog {
 
   FilesetCatalog(
+      Namespace namespace,
       String name,
       Type type,
       String provider,
@@ -45,7 +46,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
       Map<String, String> properties,
       AuditDTO auditDTO,
       RESTClient restClient) {
-    super(name, type, provider, comment, properties, auditDTO, restClient);
+    super(namespace, name, type, provider, comment, properties, auditDTO, restClient);
   }
 
   @Override
@@ -228,8 +229,15 @@ public class FilesetCatalog extends BaseSchemaCatalog
   static class Builder extends CatalogDTO.Builder<Builder> {
     /** The REST client to send the requests. */
     private RESTClient restClient;
+    /** The namespace of the catalog */
+    private Namespace namespace;
 
     private Builder() {}
+
+    Builder withNamespace(Namespace namespace) {
+      this.namespace = namespace;
+      return this;
+    }
 
     Builder withRestClient(RESTClient restClient) {
       this.restClient = restClient;
@@ -238,13 +246,15 @@ public class FilesetCatalog extends BaseSchemaCatalog
 
     @Override
     public FilesetCatalog build() {
+      Namespace.checkCatalog(namespace);
       Preconditions.checkArgument(restClient != null, "restClient must be set");
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name must not be blank");
       Preconditions.checkArgument(type != null, "type must not be null");
       Preconditions.checkArgument(StringUtils.isNotBlank(provider), "provider must not be blank");
       Preconditions.checkArgument(audit != null, "audit must not be null");
 
-      return new FilesetCatalog(name, type, provider, comment, properties, audit, restClient);
+      return new FilesetCatalog(
+          namespace, name, type, provider, comment, properties, audit, restClient);
     }
   }
 }

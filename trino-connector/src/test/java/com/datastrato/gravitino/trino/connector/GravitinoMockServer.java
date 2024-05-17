@@ -222,7 +222,7 @@ public class GravitinoMockServer implements AutoCloseable {
 
   private SupportsSchemas createSchemas(GravitinoCatalog catalog) {
     SupportsSchemas schemas = mock(SupportsSchemas.class);
-    when(schemas.createSchema(any(NameIdentifier.class), anyString(), anyMap()))
+    when(schemas.createSchema(any(String.class), anyString(), anyMap()))
         .thenAnswer(
             new Answer<Schema>() {
               @Override
@@ -251,7 +251,7 @@ public class GravitinoMockServer implements AutoCloseable {
               }
             });
 
-    when(schemas.dropSchema(any(NameIdentifier.class), anyBoolean()))
+    when(schemas.dropSchema(any(String.class), anyBoolean()))
         .thenAnswer(
             new Answer<Boolean>() {
               @Override
@@ -272,7 +272,7 @@ public class GravitinoMockServer implements AutoCloseable {
               }
             });
 
-    when(schemas.listSchemas(any(Namespace.class)))
+    when(schemas.listSchemas())
         .thenAnswer(
             new Answer<NameIdentifier[]>() {
               @Override
@@ -294,7 +294,7 @@ public class GravitinoMockServer implements AutoCloseable {
               }
             });
 
-    when(schemas.loadSchema(any(NameIdentifier.class)))
+    when(schemas.loadSchema(any(String.class)))
         .thenAnswer(
             new Answer<Schema>() {
               @Override

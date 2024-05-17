@@ -163,7 +163,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     for (NameIdentifier nameIdentifier : nameIdentifiers) {
       catalog.asTableCatalog().dropTable(nameIdentifier);
     }
-    catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), false);
+    catalog.asSchemas().dropSchema(schemaName, false);
   }
 
   private void createMetalake() {
@@ -211,8 +211,8 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     prop.put("key1", "val1");
     prop.put("key2", "val2");
 
-    Schema createdSchema = catalog.asSchemas().createSchema(ident, schema_comment, prop);
-    Schema loadSchema = catalog.asSchemas().loadSchema(ident);
+    Schema createdSchema = catalog.asSchemas().createSchema(ident.name(), schema_comment, prop);
+    Schema loadSchema = catalog.asSchemas().loadSchema(ident.name());
     Assertions.assertEquals(createdSchema.name(), loadSchema.name());
     prop.forEach((key, value) -> Assertions.assertEquals(loadSchema.properties().get(key), value));
   }
@@ -246,7 +246,6 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
   @Test
   void testOperationIcebergSchema() {
     SupportsSchemas schemas = catalog.asSchemas();
-    Namespace namespace = Namespace.of(metalakeName, catalogName);
     // list schema check.
     NameIdentifier[] nameIdentifiers = schemas.listSchemas();
     Set<String> schemaNames =
@@ -262,7 +261,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     // create schema check.
     String testSchemaName = GravitinoITUtils.genRandomName("test_schema_1");
     NameIdentifier schemaIdent = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
-    schemas.createSchema(schemaIdent, schema_comment, Collections.emptyMap());
+    schemas.createSchema(schemaIdent.name(), schema_comment, Collections.emptyMap());
     nameIdentifiers = schemas.listSchemas();
     Map<String, NameIdentifier> schemaMap =
         Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v -> v));
@@ -275,8 +274,8 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     Assertions.assertTrue(schemaNames.contains(testSchemaName));
 
     // alert、load schema check.
-    schemas.alterSchema(schemaIdent, SchemaChange.setProperty("t1", "v1"));
-    Schema schema = schemas.loadSchema(schemaIdent);
+    schemas.alterSchema(schemaIdent.name(), SchemaChange.setProperty("t1", "v1"));
+    Schema schema = schemas.loadSchema(schemaIdent.name());
     String val = schema.properties().get("t1");
     Assertions.assertEquals("v1", val);
 
@@ -288,11 +287,11 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     Map<String, String> emptyMap = Collections.emptyMap();
     Assertions.assertThrows(
         SchemaAlreadyExistsException.class,
-        () -> schemas.createSchema(schemaIdent, schema_comment, emptyMap));
+        () -> schemas.createSchema(schemaIdent.name(), schema_comment, emptyMap));
 
     // drop schema check.
-    schemas.dropSchema(schemaIdent, false);
-    Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(schemaIdent));
+    schemas.dropSchema(schemaIdent.name(), false);
+    Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(schemaIdent.name()));
     org.apache.iceberg.catalog.Namespace icebergNamespace =
         IcebergTableOpsHelper.getIcebergNamespace(schemaIdent.name());
     Assertions.assertThrows(
@@ -306,7 +305,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
         Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v -> v));
     Assertions.assertFalse(schemaMap.containsKey(testSchemaName));
     Assertions.assertFalse(
-        schemas.dropSchema(NameIdentifier.of(metalakeName, catalogName, "no-exits"), false));
+        schemas.dropSchema("no-exits", false));
     TableCatalog tableCatalog = catalog.asTableCatalog();
 
     // create failed check.
@@ -324,8 +323,8 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
                 Distributions.NONE,
                 null));
     // drop schema failed check.
-    Assertions.assertFalse(schemas.dropSchema(schemaIdent, true));
-    Assertions.assertFalse(schemas.dropSchema(schemaIdent, false));
+    Assertions.assertFalse(schemas.dropSchema(schemaIdent.name(), true));
+    Assertions.assertFalse(schemas.dropSchema(schemaIdent.name(), false));
     Assertions.assertFalse(tableCatalog.dropTable(table));
     icebergNamespaces =
         icebergSupportsNamespaces.listNamespaces(IcebergTableOpsHelper.getIcebergNamespace());
@@ -894,12 +893,12 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     IllegalArgumentException illegalArgumentException =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> schemas.createSchema(ident, schema_comment, prop));
+            () -> schemas.createSchema(ident.name(), schema_comment, prop));
     Assertions.assertTrue(
         illegalArgumentException.getMessage().contains(IcebergSchemaPropertiesMetadata.COMMENT));
     prop.remove(IcebergSchemaPropertiesMetadata.COMMENT);
-    catalog.asSchemas().createSchema(ident, schema_comment, prop);
-    Schema loadSchema = catalog.asSchemas().loadSchema(ident);
+    catalog.asSchemas().createSchema(ident.name(), schema_comment, prop);
+    Schema loadSchema = catalog.asSchemas().loadSchema(ident.name());
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, loadSchema.auditInfo().creator());
     Assertions.assertNull(loadSchema.auditInfo().lastModifier());
     Assertions.assertFalse(
@@ -909,19 +908,19 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     // alter
     SchemaChange change = SchemaChange.setProperty("comment", "v1");
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> schemas.alterSchema(ident, change));
+        IllegalArgumentException.class, () -> schemas.alterSchema(ident.name(), change));
 
     Assertions.assertDoesNotThrow(
         () ->
-            catalog.asSchemas().alterSchema(ident, SchemaChange.setProperty("comment-test", "v1")));
-    Schema schema = catalog.asSchemas().loadSchema(ident);
+            catalog.asSchemas().alterSchema(ident.name(), SchemaChange.setProperty("comment-test", "v1")));
+    Schema schema = catalog.asSchemas().loadSchema(ident.name());
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, schema.auditInfo().creator());
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, schema.auditInfo().lastModifier());
     Assertions.assertEquals("v1", schema.properties().get("comment-test"));
 
     // drop
-    Assertions.assertTrue(catalog.asSchemas().dropSchema(ident, false));
-    Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(ident));
+    Assertions.assertTrue(catalog.asSchemas().dropSchema(ident.name(), false));
+    Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(ident.name()));
   }
 
   @Test
