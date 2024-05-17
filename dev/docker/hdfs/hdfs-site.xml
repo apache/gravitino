@@ -1,0 +1,66 @@
+<configuration>
+  <property>
+    <name>dfs.replication</name>
+    <value>1</value>
+  </property>
+
+  <property>
+    <name>dfs.webhdfs.enabled</name>
+    <value>true</value>
+  </property>
+
+  <property>
+    <name>dfs.datanode.address</name>
+    <value>0.0.0.0:50010</value>
+  </property>
+
+  <property>
+    <name>dfs.permissions.superusergroup</name>
+    <value>hdfs</value>
+  </property>
+
+  <!-- Added kerberos related configuration -->
+  <property>
+    <name>dfs.namenode.kerberos.principal</name>
+    <value>hdfs/localhost@EXAMPLE.COM</value>
+  </property>
+
+  <property>
+    <name>dfs.namenode.keytab.file</name>
+    <value>/tmp/server.keytab</value>
+  </property>
+
+  <property>
+    <name>dfs.datanode.kerberos.principal</name>
+    <value>hdfs/localhost@EXAMPLE.COM</value>
+  </property>
+
+  <property>
+    <name>dfs.datanode.keytab.file</name>
+    <value>/tmp/server.keytab</value>
+  </property>
+
+  <property>
+    <name>dfs.block.access.token.enable</name>
+    <value>true</value>
+  </property>
+
+  <property>
+    <name>ignore.secure.ports.for.testing</name>
+    <value>true</value>
+  </property>
+
+  <property>
+    <name>dfs.namenode.kerberos.internal.spnego.principal</name>
+    <value>HTTP/localhost@EXAMPLE.COM</value>
+  </property>
+  <property>
+    <name>dfs.web.authentication.kerberos.keytab</name>
+    <value>/tmp/http.keytab</value>
+  </property>
+  <property>
+    <name>dfs.web.authentication.kerberos.principal</name>
+    <value>HTTP/localhost@EXAMPLE.COM</value>
+  </property>
+
+</configuration>

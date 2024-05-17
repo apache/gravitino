@@ -1,0 +1,63 @@
+<configuration>
+  <property>
+    <name>fs.defaultFS</name>
+    <value>hdfs://0.0.0.0:9000</value>
+  </property>
+
+  <property>
+    <name>name</name>
+    <value>Development Cluster</value>
+  </property>
+
+  <property>
+    <name>hadoop.http.staticuser.user</name>
+    <value>hadoopuser</value>
+  </property>
+
+  <property>
+    <name>hadoop.proxyuser.hive.hosts</name>
+    <value>*</value>
+  </property>
+
+  <property>
+    <name>hadoop.proxyuser.hive.groups</name>
+    <value>*</value>
+  </property>
+
+  <property>
+    <name>hadoop.proxyuser.root.groups</name>
+    <value>*</value>
+  </property>
+
+  <property>
+    <name>hadoop.proxyuser.root.hosts</name>
+    <value>*</value>
+  </property>
+
+  <!-- Added kerberos related configuration -->
+  <property>
+    <name>hadoop.proxyuser.hdfs.hosts</name>
+    <value>*</value>
+  </property>
+
+  <property>
+    <name>hadoop.proxyuser.hdfs.groups</name>
+    <value>*</value>
+  </property>
+
+  <property>
+    <name>hadoop.proxyuser.hdfs.users</name>
+    <value>*</value>
+  </property>
+
+  <property>
+    <name>hadoop.security.authorization</name>
+    <value>true</value>
+  </property>
+
+  <property>
+    <name>hadoop.security.authentication</name>
+    <value>kerberos</value>
+  </property>
+
+</configuration>
