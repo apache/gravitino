@@ -15,7 +15,6 @@ import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
-import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Arrays;

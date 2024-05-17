@@ -5,11 +5,11 @@
 
 package com.datastrato.gravitino.listener;
 
-import com.datastrato.gravitino.catalog.Catalog;
 import com.datastrato.gravitino.CatalogBasic;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.catalog.Catalog;
 import com.datastrato.gravitino.catalog.CatalogDispatcher;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;

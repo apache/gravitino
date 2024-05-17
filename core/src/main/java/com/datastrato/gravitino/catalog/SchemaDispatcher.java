@@ -5,7 +5,7 @@
 
 package com.datastrato.gravitino.catalog;
 
-import com.datastrato.gravitino.rel.SupportsSchemas;
+import com.datastrato.gravitino.schema.SupportsSchemas;
 
 /**
  * {@code SchemaDispatcher} interface acts as a specialization of the {@link SupportsSchemas}
