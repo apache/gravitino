@@ -8,6 +8,7 @@ import com.datastrato.gravitino.integration.test.spark.SparkCommonIT;
 import com.datastrato.gravitino.integration.test.util.spark.SparkMetadataColumnInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo;
 import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfoChecker;
+import com.datastrato.gravitino.spark.connector.iceberg.SparkIcebergTable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
@@ -18,6 +19,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import lombok.Data;
 import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.Column;
@@ -31,6 +33,8 @@ import org.apache.spark.sql.catalyst.expressions.Literal;
 import org.apache.spark.sql.connector.catalog.CatalogPlugin;
 import org.apache.spark.sql.connector.catalog.FunctionCatalog;
 import org.apache.spark.sql.connector.catalog.Identifier;
+import org.apache.spark.sql.connector.catalog.Table;
+import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.connector.catalog.functions.UnboundFunction;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructField;
@@ -237,6 +241,15 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     testIcebergUpdateOperation(icebergTableWriteProperties);
     testIcebergMergeIntoDeleteOperation(icebergTableWriteProperties);
     testIcebergMergeIntoUpdateOperation(icebergTableWriteProperties);
+  }
+
+  @Test
+  void testIcebergCallOperations() throws NoSuchTableException {
+    testIcebergCallRollbackToSnapshot();
+    testIcebergCallSetCurrentSnapshot();
+    testIcebergCallRewriteDataFiles();
+    testIcebergCallRewriteManifests();
+    testIcebergCallRewritePositionDeleteFiles();
   }
 
   private void testMetadataColumns() {
@@ -487,6 +500,155 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     checkTableUpdateByMergeInto(tableName);
   }
 
+  private void testIcebergCallRollbackToSnapshot() throws NoSuchTableException {
+    String fullTableName =
+        String.format(
+            "%s.%s.test_iceberg_call_rollback_to_snapshot", getCatalogName(), getDefaultDatabase());
+    String tableName = "test_iceberg_call_rollback_to_snapshot";
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+
+    sql(String.format("INSERT INTO %s VALUES(1, '1', 1)", tableName));
+    List<String> tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
+    Assertions.assertEquals(1, tableData.size());
+    Assertions.assertEquals("1,1,1", tableData.get(0));
+
+    long snapshotId = getCurrentSnapshotId(tableName);
+
+    sql(String.format("INSERT INTO %s VALUES(2, '2', 2)", tableName));
+    tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
+    Assertions.assertEquals(2, tableData.size());
+    Assertions.assertEquals("1,1,1;2,2,2", String.join(";", tableData));
+
+    sql(
+        String.format(
+            "CALL %s.system.rollback_to_snapshot('%s', %d)",
+            getCatalogName(), fullTableName, snapshotId));
+    tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
+    Assertions.assertEquals(1, tableData.size());
+    Assertions.assertEquals("1,1,1", tableData.get(0));
+  }
+
+  private void testIcebergCallSetCurrentSnapshot() throws NoSuchTableException {
+    String fullTableName =
+        String.format(
+            "%s.%s.test_iceberg_call_set_current_snapshot", getCatalogName(), getDefaultDatabase());
+    String tableName = "test_iceberg_call_set_current_snapshot";
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+
+    sql(String.format("INSERT INTO %s VALUES(1, '1', 1)", tableName));
+    List<String> tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
+    Assertions.assertEquals(1, tableData.size());
+    Assertions.assertEquals("1,1,1", tableData.get(0));
+
+    long snapshotId = getCurrentSnapshotId(tableName);
+
+    sql(String.format("INSERT INTO %s VALUES(2, '2', 2)", tableName));
+    tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
+    Assertions.assertEquals(2, tableData.size());
+    Assertions.assertEquals("1,1,1;2,2,2", String.join(";", tableData));
+
+    sql(
+        String.format(
+            "CALL %s.system.set_current_snapshot('%s', %d)",
+            getCatalogName(), fullTableName, snapshotId));
+    tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
+    Assertions.assertEquals(1, tableData.size());
+    Assertions.assertEquals("1,1,1", tableData.get(0));
+  }
+
+  private void testIcebergCallRewriteDataFiles() {
+    String fullTableName =
+        String.format(
+            "%s.%s.test_iceberg_call_rewrite_data_files", getCatalogName(), getDefaultDatabase());
+    String tableName = "test_iceberg_call_rewrite_data_files";
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+
+    IntStream.rangeClosed(1, 5)
+        .forEach(
+            i -> sql(String.format("INSERT INTO %s VALUES(%d, '%d', %d)", tableName, i, i, i)));
+    List<String> tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
+    Assertions.assertEquals(5, tableData.size());
+    Assertions.assertEquals("1,1,1;2,2,2;3,3,3;4,4,4;5,5,5", String.join(";", tableData));
+
+    List<Row> callResult =
+        getSparkSession()
+            .sql(
+                String.format(
+                    "CALL %s.system.rewrite_data_files(table => '%s', strategy => 'sort', sort_order => 'id DESC NULLS LAST', where => 'id < 10')",
+                    getCatalogName(), fullTableName))
+            .collectAsList();
+    Assertions.assertEquals(1, callResult.size());
+    Assertions.assertEquals(5, callResult.get(0).getInt(0));
+    Assertions.assertEquals(1, callResult.get(0).getInt(1));
+  }
+
+  private void testIcebergCallRewriteManifests() {
+    String fullTableName =
+        String.format("%s.%s.rewrite_manifests", getCatalogName(), getDefaultDatabase());
+    String tableName = "rewrite_manifests";
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+
+    IntStream.rangeClosed(1, 5)
+        .forEach(
+            i -> sql(String.format("INSERT INTO %s VALUES(%d, '%d', %d)", tableName, i, i, i)));
+    List<String> tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
+    Assertions.assertEquals(5, tableData.size());
+    Assertions.assertEquals("1,1,1;2,2,2;3,3,3;4,4,4;5,5,5", String.join(";", tableData));
+
+    List<Row> callResult =
+        getSparkSession()
+            .sql(
+                String.format(
+                    "CALL %s.system.rewrite_manifests(table => '%s', use_caching => false)",
+                    getCatalogName(), fullTableName))
+            .collectAsList();
+    Assertions.assertEquals(1, callResult.size());
+    Assertions.assertEquals(5, callResult.get(0).getInt(0));
+    Assertions.assertEquals(1, callResult.get(0).getInt(1));
+  }
+
+  private void testIcebergCallRewritePositionDeleteFiles() {
+    String fullTableName =
+        String.format(
+            "%s.%s.rewrite_position_delete_files", getCatalogName(), getDefaultDatabase());
+    String tableName = "rewrite_position_delete_files";
+    dropTableIfExists(tableName);
+    createIcebergTableWithTableProperties(
+        tableName,
+        false,
+        ImmutableMap.of(ICEBERG_FORMAT_VERSION, "2", ICEBERG_DELETE_MODE, "merge-on-read"));
+
+    sql(
+        String.format(
+            "INSERT INTO %s VALUES(1, '1', 1), (2, '2', 2), (3, '3', 3), (4, '4', 4), (5, '5', 5)",
+            tableName));
+    List<String> tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
+    Assertions.assertEquals(5, tableData.size());
+    Assertions.assertEquals("1,1,1;2,2,2;3,3,3;4,4,4;5,5,5", String.join(";", tableData));
+
+    sql(String.format("DELETE FROM %s WHERE id = 1", tableName));
+    sql(String.format("DELETE FROM %s WHERE id = 2", tableName));
+
+    tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
+    Assertions.assertEquals(3, tableData.size());
+    Assertions.assertEquals("3,3,3;4,4,4;5,5,5", String.join(";", tableData));
+
+    List<Row> callResult =
+        getSparkSession()
+            .sql(
+                String.format(
+                    "CALL %s.system.rewrite_position_delete_files(table => '%s', options => map('rewrite-all','true'))",
+                    getCatalogName(), fullTableName))
+            .collectAsList();
+    Assertions.assertEquals(1, callResult.size());
+    Assertions.assertEquals(2, callResult.get(0).getInt(0));
+    Assertions.assertEquals(1, callResult.get(0).getInt(1));
+  }
+
   private List<SparkTableInfo.SparkColumnInfo> getIcebergSimpleTableColumn() {
     return Arrays.asList(
         SparkTableInfo.SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment"),
@@ -558,5 +720,15 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
         boolean isPartitionedTable, int formatVersion, String writeMode) {
       return new IcebergTableWriteProperties(isPartitionedTable, formatVersion, writeMode);
     }
+  }
+
+  private long getCurrentSnapshotId(String tableName) throws NoSuchTableException {
+    CatalogPlugin catalogPlugin =
+        getSparkSession().sessionState().catalogManager().catalog(getCatalogName());
+    Assertions.assertInstanceOf(TableCatalog.class, catalogPlugin);
+    TableCatalog catalog = (TableCatalog) catalogPlugin;
+    Table table = catalog.loadTable(Identifier.of(new String[] {getDefaultDatabase()}, tableName));
+    SparkIcebergTable sparkIcebergTable = (SparkIcebergTable) table;
+    return sparkIcebergTable.table().currentSnapshot().snapshotId();
   }
 }
