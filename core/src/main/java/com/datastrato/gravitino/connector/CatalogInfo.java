@@ -5,7 +5,7 @@
 package com.datastrato.gravitino.connector;
 
 import com.datastrato.gravitino.Audit;
-import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.catalog.Catalog;
 import com.datastrato.gravitino.CatalogBasic;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.annotation.Evolving;
