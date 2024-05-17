@@ -196,3 +196,13 @@ Changelog
   - Expose ports:
     - `8030` Doris FE HTTP port
     - `9030` Doris FE MySQL server port
+
+## Gravitino CI kerberosized HDFS image
+
+You can use this image to test kerberized HDFS.
+
+Changelog
+- gravitino-ci-kerberosized-hdfs:0.1.0
+  - Docker image `datastrato/gravitino-ci-kerberosized-hdfs:0.1.0`
+  - Start a kdc service in the contianer
+  - Start HDFS with kerberos enabled
