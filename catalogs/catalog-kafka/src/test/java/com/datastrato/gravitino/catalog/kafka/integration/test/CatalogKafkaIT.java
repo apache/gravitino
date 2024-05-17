@@ -179,7 +179,7 @@ public class CatalogKafkaIT extends AbstractIT {
     // Test BOOTSTRAP_SERVERS that cannot be linked
     Catalog kafka =
         metalake.createCatalog(
-            NameIdentifier.of(METALAKE_NAME, catalogName),
+            catalogName,
             Catalog.Type.MESSAGING,
             PROVIDER,
             "comment",
