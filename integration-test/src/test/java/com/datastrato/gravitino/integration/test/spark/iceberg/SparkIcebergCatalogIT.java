@@ -18,6 +18,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -579,8 +580,7 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     List<String> partitionFields =
         Arrays.asList("name", "truncate(1, name)", "bucket(16, id)", "days(ts)");
     String partitionExpression = "name=a/name_trunc_1=a/id_bucket_16=4/ts_day=2024-01-01";
-    String tableName = "test_iceberg_partition_field_operations";
-    dropTableIfExists(tableName);
+    String tableName = "test_iceberg_partition_field_operations_" + new Random().nextInt(100);
     sql(getCreateIcebergSimpleTableString(tableName));
 
     // add partition fields
@@ -738,7 +738,7 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
   }
 
   private void testIcebergIdentifierOperations() throws NoSuchTableException {
-    String tableName = "test_iceberg_identifier_operations";
+    String tableName = "test_iceberg_identifier_operations_" + new Random().nextInt(100);
     // The Identifier fields must be non-null, so a new schema with non-null fields is created here.
     List<SparkTableInfo.SparkColumnInfo> columnInfos =
         Arrays.asList(
@@ -777,7 +777,8 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
   }
 
   private void testIcebergDistributionAndOrderingOperations() throws NoSuchTableException {
-    String tableName = "test_iceberg_distribution_and_ordering_operations";
+    String tableName =
+        "test_iceberg_distribution_and_ordering_operations_" + new Random().nextInt(100);
     dropTableIfExists(tableName);
     createSimpleTable(tableName);
 
