@@ -42,6 +42,7 @@ public class ContainerSuite implements Closeable {
   private static volatile TrinoITContainers trinoITContainers;
   private static volatile KafkaContainer kafkaContainer;
   private static volatile DorisContainer dorisContainer;
+  private static volatile KerberosizedHDFSContainer hdfsContainer;
 
   private static volatile MySQLContainer mySQLContainer;
   private static volatile MySQLContainer mySQLVersion5Container;
@@ -63,6 +64,10 @@ public class ContainerSuite implements Closeable {
     } catch (Exception e) {
       throw new RuntimeException("Failed to initialize ContainerSuite", e);
     }
+  }
+
+  public KerberosizedHDFSContainer getHdfsContainer() {
+    return hdfsContainer;
   }
 
   public static ContainerSuite getInstance() {
@@ -96,6 +101,25 @@ public class ContainerSuite implements Closeable {
           HiveContainer container = closer.register(hiveBuilder.build());
           container.start();
           hiveContainer = container;
+        }
+      }
+    }
+  }
+
+  public void startHDFSContainer() {
+    if (hdfsContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (hdfsContainer == null) {
+          // Start HDFS container
+          KerberosizedHDFSContainer.Builder hiveBuilder =
+              KerberosizedHDFSContainer.builder()
+                  .withHostName(KerberosizedHDFSContainer.HOST_NAME)
+                  .withEnvVars(ImmutableMap.<String, String>builder().build())
+                  .withExposePorts(ImmutableSet.of())
+                  .withNetwork(network);
+          KerberosizedHDFSContainer container = closer.register(hiveBuilder.build());
+          container.start();
+          hdfsContainer = container;
         }
       }
     }
