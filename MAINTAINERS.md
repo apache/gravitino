@@ -42,6 +42,7 @@ Contributors may be added by existing maintainers (see [Governance document](GOV
 | WangXin Han    | hanwxx              | Xiaomi           |
 | Congling Xia   | xiacongling         | Xiaomi           |
 | Kainan Bao     | bknbkn              | Xiaomi           |
+| Han Zhang      | xiaozcy             | Xiaomi           |
 
 ## Review process
 
