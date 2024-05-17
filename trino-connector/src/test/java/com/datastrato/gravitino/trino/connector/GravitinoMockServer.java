@@ -227,7 +227,7 @@ public class GravitinoMockServer implements AutoCloseable {
             new Answer<Schema>() {
               @Override
               public Schema answer(InvocationOnMock invocation) throws Throwable {
-                NameIdentifier schemaName = invocation.getArgument(0);
+                String schemaName = invocation.getArgument(0);
                 Map<String, String> properties = invocation.getArgument(2);
 
                 // create schema
@@ -242,8 +242,8 @@ public class GravitinoMockServer implements AutoCloseable {
                 catalogConnectorManager
                     .getCatalogConnector(catalogConnectorManager.getTrinoCatalogName(catalog))
                     .getMetadataAdapter();
-                GravitinoSchema schema = new GravitinoSchema(schemaName.name(), properties, "");
-                metadata.createSchema(null, schemaName.name(), emptyMap(), null);
+                GravitinoSchema schema = new GravitinoSchema(schemaName, properties, "");
+                metadata.createSchema(null, schemaName, emptyMap(), null);
 
                 Schema mockSchema =
                     mockSchema(schema.getName(), schema.getComment(), schema.getProperties());
@@ -256,7 +256,7 @@ public class GravitinoMockServer implements AutoCloseable {
             new Answer<Boolean>() {
               @Override
               public Boolean answer(InvocationOnMock invocation) throws Throwable {
-                NameIdentifier nameIdentifier = invocation.getArgument(0);
+                String schemaName = invocation.getArgument(0);
                 boolean cascade = invocation.getArgument(1);
 
                 // drop schema,
@@ -267,7 +267,7 @@ public class GravitinoMockServer implements AutoCloseable {
                                 catalogConnectorManager.getTrinoCatalogName(catalog))
                             .getInternalConnector();
                 ConnectorMetadata metadata = memoryConnector.getMetadata(null, null);
-                metadata.dropSchema(null, nameIdentifier.name(), cascade);
+                metadata.dropSchema(null, schemaName, cascade);
                 return true;
               }
             });
@@ -277,7 +277,6 @@ public class GravitinoMockServer implements AutoCloseable {
             new Answer<NameIdentifier[]>() {
               @Override
               public NameIdentifier[] answer(InvocationOnMock invocation) throws Throwable {
-                Namespace namespace = invocation.getArgument(0);
                 MemoryConnector memoryConnector =
                     (MemoryConnector)
                         catalogConnectorManager
@@ -289,7 +288,7 @@ public class GravitinoMockServer implements AutoCloseable {
                     .map(
                         schemaName ->
                             NameIdentifier.ofSchema(
-                                namespace.level(0), namespace.level(1), schemaName))
+                                catalog.getMetalake(), catalog.getName(), schemaName))
                     .toArray(NameIdentifier[]::new);
               }
             });
@@ -299,7 +298,7 @@ public class GravitinoMockServer implements AutoCloseable {
             new Answer<Schema>() {
               @Override
               public Schema answer(InvocationOnMock invocation) throws Throwable {
-                NameIdentifier schemaName = invocation.getArgument(0);
+                String schemaName = invocation.getArgument(0);
                 MemoryConnector memoryConnector =
                     (MemoryConnector)
                         catalogConnectorManager
@@ -309,7 +308,7 @@ public class GravitinoMockServer implements AutoCloseable {
                 memoryConnector.getMetadata(null, null);
                 ConnectorMetadata metadata = memoryConnector.getMetadata(null, null);
                 Map<String, Object> schemaProperties =
-                    metadata.getSchemaProperties(null, schemaName.name());
+                    metadata.getSchemaProperties(null, schemaName);
 
                 CatalogConnectorMetadataAdapter metadataAdapter =
                     catalogConnectorManager
@@ -318,7 +317,7 @@ public class GravitinoMockServer implements AutoCloseable {
 
                 GravitinoSchema gravitinoSchema =
                     new GravitinoSchema(
-                        schemaName.name(),
+                        schemaName,
                         metadataAdapter.toGravitinoSchemaProperties(schemaProperties),
                         "");
 
