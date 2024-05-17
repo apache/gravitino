@@ -31,7 +31,7 @@ Contribitors may be added by existing maintainers (see [Governance document](GOV
 
 | **NAME**      | **GitHub Username** | **Organization** |
 |---------------|---------------------|------------------|
-|               |                     |                  |
+| Eric Chang    | unknowntpo          | Lawsnote         |
 
 ## Review process
 
