@@ -8,6 +8,7 @@ import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.NAM
 
 import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.CatalogBasic;
 import com.datastrato.gravitino.Metalake;
 import com.datastrato.gravitino.authorization.Group;
 import com.datastrato.gravitino.authorization.Role;
@@ -163,7 +164,7 @@ public class DTOConverters {
    * @param catalog The catalog.
    * @return The catalog DTO.
    */
-  public static CatalogDTO toDTO(Catalog catalog) {
+  public static CatalogDTO toDTO(CatalogBasic catalog) {
     return CatalogDTO.builder()
         .withName(catalog.name())
         .withType(catalog.type())
@@ -576,7 +577,7 @@ public class DTOConverters {
    * @param catalogs The catalogs to be converted.
    * @return The array of CatalogDTOs.
    */
-  public static CatalogDTO[] toDTOs(Catalog[] catalogs) {
+  public static CatalogDTO[] toDTOs(CatalogBasic[] catalogs) {
     if (ArrayUtils.isEmpty(catalogs)) {
       return new CatalogDTO[0];
     }

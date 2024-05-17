@@ -68,7 +68,7 @@ public class TestHiveSchema extends MiniHiveMetastoreService {
     properties.put("key1", "val1");
     properties.put("key2", "val2");
     String comment = "comment";
-    SupportsSchemas schemas = hiveCatalog.asSchemas();
+    com.datastrato.gravitino.schema.SupportsSchemas schemas = hiveCatalog.asSchemas();
 
     Schema schema = schemas.createSchema(ident, comment, properties);
     Assertions.assertEquals(ident.name(), schema.name());

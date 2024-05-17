@@ -5,7 +5,7 @@
 
 package com.datastrato.gravitino.listener;
 
-import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.catalog.Catalog;
 import com.datastrato.gravitino.CatalogBasic;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.NameIdentifier;

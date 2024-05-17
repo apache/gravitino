@@ -5,7 +5,6 @@
 package com.datastrato.gravitino.listener.api.info;
 
 import com.datastrato.gravitino.Audit;
-import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogBasic;
 import com.datastrato.gravitino.annotation.DeveloperApi;
 import com.google.common.collect.ImmutableMap;
@@ -27,7 +26,7 @@ public final class CatalogInfo {
    *
    * @param catalog The source catalog.
    */
-  public CatalogInfo(Catalog catalog) {
+  public CatalogInfo(CatalogBasic catalog) {
     this(
         catalog.name(),
         catalog.type(),

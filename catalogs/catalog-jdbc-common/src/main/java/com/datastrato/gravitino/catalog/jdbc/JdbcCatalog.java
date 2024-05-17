@@ -12,7 +12,7 @@ import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import com.datastrato.gravitino.connector.BaseCatalog;
 import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.PropertyEntry;
-import com.datastrato.gravitino.rel.SupportsSchemas;
+import com.datastrato.gravitino.schema.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
 import java.util.Collections;
 import java.util.Map;
