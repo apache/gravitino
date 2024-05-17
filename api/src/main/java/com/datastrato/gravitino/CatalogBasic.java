@@ -5,8 +5,6 @@
 package com.datastrato.gravitino;
 
 import com.datastrato.gravitino.annotation.Evolving;
-import com.datastrato.gravitino.rel.SupportsSchemas;
-
 import java.util.Map;
 
 /**
@@ -66,5 +64,4 @@ public interface CatalogBasic extends Auditable {
    * @return The properties of the catalog.
    */
   Map<String, String> properties();
-
 }

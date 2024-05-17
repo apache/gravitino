@@ -9,8 +9,8 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 
 import com.datastrato.gravitino.Audit;
-import com.datastrato.gravitino.CatalogBasic;
 import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.CatalogBasic;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Map;

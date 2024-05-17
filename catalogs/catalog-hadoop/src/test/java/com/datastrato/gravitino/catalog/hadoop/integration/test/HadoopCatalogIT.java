@@ -4,10 +4,10 @@
  */
 package com.datastrato.gravitino.catalog.hadoop.integration.test;
 
+import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.client.GravitinoMetalake;
-import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
 import com.datastrato.gravitino.file.Fileset;

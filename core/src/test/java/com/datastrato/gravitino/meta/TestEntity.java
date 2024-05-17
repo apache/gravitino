@@ -4,7 +4,6 @@
  */
 package com.datastrato.gravitino.meta;
 
-import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogBasic;
 import com.datastrato.gravitino.Field;
 import com.datastrato.gravitino.authorization.Privileges;
