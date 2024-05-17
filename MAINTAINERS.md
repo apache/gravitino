@@ -3,7 +3,7 @@
   This software is licensed under the Apache License version 2.
 -->
 
-This document lists the maintainers and contribitors of the Project.
+This document lists the maintainers and contributors of the Project.
 
 # Maintainers
 
@@ -25,13 +25,14 @@ Maintainers may be added once approved by the existing maintainers (see [Governa
 | Lisa Cao      | lisancao            | Datastrato       |
 | Qian Xia      | LauraXia123         | Datastrato       |
 
-# Contribitors
+# Contributors
 
-Contribitors may be added by existing maintainers (see [Governance document](GOVERNANCE.md)). By adding your name to this list you agree to follow the project's guidelines and governance including the [Code of Conduct](CODE-OF-CONDUCT.md) and that you have permission to contribute from your employer. All contributions are licensed under the Apache License version 2.
+Contributors may be added by existing maintainers (see [Governance document](GOVERNANCE.md)). By adding your name to this list you agree to follow the project's guidelines and governance including the [Code of Conduct](CODE-OF-CONDUCT.md) and that you have permission to contribute from your employer. All contributions are licensed under the Apache License version 2.
 
-| **NAME**      | **GitHub Username** | **Organization** |
-|---------------|---------------------|------------------|
-|               |                     |                  |
+| **NAME**       | **GitHub Username** | **Organization** |
+|----------------|---------------------|------------------|
+| Kuan-Po Tseng  | brandboat           | opensource4you   |
+| Nicholas Jiang | SteNicholas         | Bilibili         |
 
 ## Review process
 

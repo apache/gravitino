@@ -10,9 +10,8 @@ import com.datastrato.gravitino.Version;
 import com.datastrato.gravitino.dto.responses.MetalakeResponse;
 import com.datastrato.gravitino.dto.responses.VersionResponse;
 import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
+import com.datastrato.gravitino.exceptions.IllegalNameIdentifierException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
-import com.datastrato.gravitino.json.JsonUtils;
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 import com.google.errorprone.annotations.InlineMe;
@@ -53,8 +52,7 @@ public abstract class GravitinoClientBase implements Closeable {
       AuthDataProvider authDataProvider,
       boolean checkVersion,
       Map<String, String> headers) {
-    ObjectMapper mapper = JsonUtils.objectMapper();
-    mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+    ObjectMapper mapper = ObjectMapperProvider.objectMapper();
 
     if (checkVersion) {
       this.restClient =
@@ -105,22 +103,33 @@ public abstract class GravitinoClientBase implements Closeable {
   /**
    * Loads a specific Metalake from the Gravitino API.
    *
-   * @param ident The identifier of the Metalake to be loaded.
+   * @param metalakeName The name of the Metalake to be loaded.
    * @return A GravitinoMetalake instance representing the loaded Metalake.
    * @throws NoSuchMetalakeException If the specified Metalake does not exist.
    */
-  public GravitinoMetalake loadMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
-    NameIdentifier.checkMetalake(ident);
+  public GravitinoMetalake loadMetalake(String metalakeName) throws NoSuchMetalakeException {
+
+    checkMetalakeName(metalakeName);
 
     MetalakeResponse resp =
         restClient.get(
-            API_METALAKES_IDENTIFIER_PATH + ident.name(),
+            API_METALAKES_IDENTIFIER_PATH + metalakeName,
             MetalakeResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.metalakeErrorHandler());
     resp.validate();
 
     return DTOConverters.toMetaLake(resp.getMetalake(), restClient);
+  }
+
+  /**
+   * Checks the validity of the Metalake name.
+   *
+   * @param metalakeName the name of the Metalake to be checked.
+   * @throws IllegalNameIdentifierException If the Metalake name is invalid.
+   */
+  public void checkMetalakeName(String metalakeName) {
+    NameIdentifier.checkMetalake(NameIdentifier.parse(metalakeName));
   }
 
   /**

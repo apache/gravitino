@@ -67,7 +67,7 @@ public class HadoopCatalogIT extends AbstractIT {
 
   @AfterAll
   public static void stop() throws IOException {
-    client.dropMetalake(NameIdentifier.of(metalakeName));
+    client.dropMetalake(metalakeName);
 
     if (hdfs != null) {
       hdfs.close();
@@ -85,8 +85,8 @@ public class HadoopCatalogIT extends AbstractIT {
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
     GravitinoMetalake createdMetalake =
-        client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
-    GravitinoMetalake loadMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
     Assertions.assertEquals(createdMetalake, loadMetalake);
 
     metalake = loadMetalake;
@@ -94,13 +94,9 @@ public class HadoopCatalogIT extends AbstractIT {
 
   private static void createCatalog() {
     metalake.createCatalog(
-        NameIdentifier.of(metalakeName, catalogName),
-        Catalog.Type.FILESET,
-        provider,
-        "comment",
-        ImmutableMap.of());
+        catalogName, Catalog.Type.FILESET, provider, "comment", ImmutableMap.of());
 
-    catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    catalog = metalake.loadCatalog(catalogName);
   }
 
   private static void createSchema() {
@@ -547,11 +543,7 @@ public class HadoopCatalogIT extends AbstractIT {
     // Create a catalog without specifying location.
     Catalog filesetCatalog =
         metalake.createCatalog(
-            NameIdentifier.of(metalakeName, catalogName),
-            Catalog.Type.FILESET,
-            provider,
-            "comment",
-            ImmutableMap.of());
+            catalogName, Catalog.Type.FILESET, provider, "comment", ImmutableMap.of());
 
     // Create a schema without specifying location.
     String schemaName =
@@ -574,11 +566,9 @@ public class HadoopCatalogIT extends AbstractIT {
         "schema should not be exists");
 
     // Drop the catalog.
-    dropped = metalake.dropCatalog(NameIdentifier.of(metalakeName, catalogName));
+    dropped = metalake.dropCatalog(catalogName);
     Assertions.assertTrue(dropped, "catalog should be dropped");
-    Assertions.assertFalse(
-        metalake.catalogExists(NameIdentifier.of(metalakeName, catalogName)),
-        "catalog should not be exists");
+    Assertions.assertFalse(metalake.catalogExists(catalogName), "catalog should not be exists");
   }
 
   private Fileset createFileset(

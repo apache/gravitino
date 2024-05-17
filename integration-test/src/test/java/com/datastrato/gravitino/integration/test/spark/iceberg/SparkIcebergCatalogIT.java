@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import lombok.Data;
 import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.Column;
@@ -30,12 +31,10 @@ import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.catalyst.expressions.Literal;
-import org.apache.spark.sql.connector.catalog.CatalogPlugin;
-import org.apache.spark.sql.connector.catalog.FunctionCatalog;
-import org.apache.spark.sql.connector.catalog.Identifier;
+import org.apache.spark.sql.connector.catalog.*;
+import org.apache.spark.sql.connector.catalog.functions.UnboundFunction;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
-import org.apache.spark.sql.connector.catalog.functions.UnboundFunction;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructField;
 import org.junit.jupiter.api.Assertions;
@@ -244,74 +243,83 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
   }
 
   @Test
-  void testIcebergTimeTravelQuery() throws NoSuchTableException {
-    String tableName = "test_iceberg_as_of_query";
-    dropTableIfExists(tableName);
-    createSimpleTable(tableName);
-    checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
-
-    sql(String.format("INSERT INTO %s VALUES (1, '1', 1)", tableName));
-    List<String> tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
-    Assertions.assertEquals(1, tableData.size());
-    Assertions.assertEquals("1,1,1", tableData.get(0));
-
-    SparkIcebergTable sparkIcebergTable = getSparkIcebergTableInstance(tableName);
-    long snapshotId = getCurrentSnapshotId(tableName);
-    sparkIcebergTable.table().manageSnapshots().createBranch("test_branch", snapshotId).commit();
-    sparkIcebergTable.table().manageSnapshots().createTag("test_tag", snapshotId).commit();
-    long snapshotTimestamp = getCurrentSnapshotTimestamp(tableName);
-    long timestamp = waitUntilAfter(snapshotTimestamp + 1000);
-    long timestampInSeconds = TimeUnit.MILLISECONDS.toSeconds(timestamp);
-
-    // create a second snapshot
-    sql(String.format("INSERT INTO %s VALUES (2, '2', 2)", tableName));
-    tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
-    Assertions.assertEquals(2, tableData.size());
-    Assertions.assertEquals("1,1,1;2,2,2", String.join(";", tableData));
-
-    tableData =
-        getQueryData(
-            String.format("SELECT * FROM %s TIMESTAMP AS OF %s", tableName, timestampInSeconds));
-    Assertions.assertEquals(1, tableData.size());
-    Assertions.assertEquals("1,1,1", tableData.get(0));
-    tableData =
-        getQueryData(
-            String.format(
-                "SELECT * FROM %s FOR SYSTEM_TIME AS OF %s", tableName, timestampInSeconds));
-    Assertions.assertEquals(1, tableData.size());
-    Assertions.assertEquals("1,1,1", tableData.get(0));
-
-    tableData =
-        getQueryData(String.format("SELECT * FROM %s VERSION AS OF %d", tableName, snapshotId));
-    Assertions.assertEquals(1, tableData.size());
-    Assertions.assertEquals("1,1,1", tableData.get(0));
-    tableData =
-        getQueryData(
-            String.format("SELECT * FROM %s FOR SYSTEM_VERSION AS OF %d", tableName, snapshotId));
-    Assertions.assertEquals(1, tableData.size());
-    Assertions.assertEquals("1,1,1", tableData.get(0));
-
-    tableData =
-        getQueryData(String.format("SELECT * FROM %s VERSION AS OF 'test_branch'", tableName));
-    Assertions.assertEquals(1, tableData.size());
-    Assertions.assertEquals("1,1,1", tableData.get(0));
-    tableData =
-        getQueryData(
-            String.format("SELECT * FROM %s FOR SYSTEM_VERSION AS OF 'test_branch'", tableName));
-    Assertions.assertEquals(1, tableData.size());
-    Assertions.assertEquals("1,1,1", tableData.get(0));
-
-    tableData = getQueryData(String.format("SELECT * FROM %s VERSION AS OF 'test_tag'", tableName));
-    Assertions.assertEquals(1, tableData.size());
-    Assertions.assertEquals("1,1,1", tableData.get(0));
-    tableData =
-        getQueryData(
-            String.format("SELECT * FROM %s FOR SYSTEM_VERSION AS OF 'test_tag'", tableName));
-    Assertions.assertEquals(1, tableData.size());
-    Assertions.assertEquals("1,1,1", tableData.get(0));
+  void testIcebergCallOperations() throws NoSuchTableException {
+    testIcebergCallRollbackToSnapshot();
+    testIcebergCallSetCurrentSnapshot();
+    testIcebergCallRewriteDataFiles();
+    testIcebergCallRewriteManifests();
+    testIcebergCallRewritePositionDeleteFiles();
   }
 
-  private void testMetadataColumns() {
+    @Test
+    void testIcebergTimeTravelQuery() throws NoSuchTableException {
+        String tableName = "test_iceberg_as_of_query";
+        dropTableIfExists(tableName);
+        createSimpleTable(tableName);
+        checkTableColumns(tableName, getSimpleTableColumn(), getTableInfo(tableName));
+
+        sql(String.format("INSERT INTO %s VALUES (1, '1', 1)", tableName));
+        List<String> tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
+        Assertions.assertEquals(1, tableData.size());
+        Assertions.assertEquals("1,1,1", tableData.get(0));
+
+        SparkIcebergTable sparkIcebergTable = getSparkIcebergTableInstance(tableName);
+        long snapshotId = getCurrentSnapshotId(tableName);
+        sparkIcebergTable.table().manageSnapshots().createBranch("test_branch", snapshotId).commit();
+        sparkIcebergTable.table().manageSnapshots().createTag("test_tag", snapshotId).commit();
+        long snapshotTimestamp = getCurrentSnapshotTimestamp(tableName);
+        long timestamp = waitUntilAfter(snapshotTimestamp + 1000);
+        long timestampInSeconds = TimeUnit.MILLISECONDS.toSeconds(timestamp);
+
+        // create a second snapshot
+        sql(String.format("INSERT INTO %s VALUES (2, '2', 2)", tableName));
+        tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
+        Assertions.assertEquals(2, tableData.size());
+        Assertions.assertEquals("1,1,1;2,2,2", String.join(";", tableData));
+
+        tableData =
+                getQueryData(
+                        String.format("SELECT * FROM %s TIMESTAMP AS OF %s", tableName, timestampInSeconds));
+        Assertions.assertEquals(1, tableData.size());
+        Assertions.assertEquals("1,1,1", tableData.get(0));
+        tableData =
+                getQueryData(
+                        String.format(
+                                "SELECT * FROM %s FOR SYSTEM_TIME AS OF %s", tableName, timestampInSeconds));
+        Assertions.assertEquals(1, tableData.size());
+        Assertions.assertEquals("1,1,1", tableData.get(0));
+
+        tableData =
+                getQueryData(String.format("SELECT * FROM %s VERSION AS OF %d", tableName, snapshotId));
+        Assertions.assertEquals(1, tableData.size());
+        Assertions.assertEquals("1,1,1", tableData.get(0));
+        tableData =
+                getQueryData(
+                        String.format("SELECT * FROM %s FOR SYSTEM_VERSION AS OF %d", tableName, snapshotId));
+        Assertions.assertEquals(1, tableData.size());
+        Assertions.assertEquals("1,1,1", tableData.get(0));
+
+        tableData =
+                getQueryData(String.format("SELECT * FROM %s VERSION AS OF 'test_branch'", tableName));
+        Assertions.assertEquals(1, tableData.size());
+        Assertions.assertEquals("1,1,1", tableData.get(0));
+        tableData =
+                getQueryData(
+                        String.format("SELECT * FROM %s FOR SYSTEM_VERSION AS OF 'test_branch'", tableName));
+        Assertions.assertEquals(1, tableData.size());
+        Assertions.assertEquals("1,1,1", tableData.get(0));
+
+        tableData = getQueryData(String.format("SELECT * FROM %s VERSION AS OF 'test_tag'", tableName));
+        Assertions.assertEquals(1, tableData.size());
+        Assertions.assertEquals("1,1,1", tableData.get(0));
+        tableData =
+                getQueryData(
+                        String.format("SELECT * FROM %s FOR SYSTEM_VERSION AS OF 'test_tag'", tableName));
+        Assertions.assertEquals(1, tableData.size());
+        Assertions.assertEquals("1,1,1", tableData.get(0));
+    }
+
+    private void testMetadataColumns() {
     String tableName = "test_metadata_columns";
     dropTableIfExists(tableName);
     String createTableSQL = getCreateSimpleTableString(tableName);
@@ -559,6 +567,155 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     checkTableUpdateByMergeInto(tableName);
   }
 
+  private void testIcebergCallRollbackToSnapshot() throws NoSuchTableException {
+    String fullTableName =
+        String.format(
+            "%s.%s.test_iceberg_call_rollback_to_snapshot", getCatalogName(), getDefaultDatabase());
+    String tableName = "test_iceberg_call_rollback_to_snapshot";
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+
+    sql(String.format("INSERT INTO %s VALUES(1, '1', 1)", tableName));
+    List<String> tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
+    Assertions.assertEquals(1, tableData.size());
+    Assertions.assertEquals("1,1,1", tableData.get(0));
+
+    long snapshotId = getCurrentSnapshotId(tableName);
+
+    sql(String.format("INSERT INTO %s VALUES(2, '2', 2)", tableName));
+    tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
+    Assertions.assertEquals(2, tableData.size());
+    Assertions.assertEquals("1,1,1;2,2,2", String.join(";", tableData));
+
+    sql(
+        String.format(
+            "CALL %s.system.rollback_to_snapshot('%s', %d)",
+            getCatalogName(), fullTableName, snapshotId));
+    tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
+    Assertions.assertEquals(1, tableData.size());
+    Assertions.assertEquals("1,1,1", tableData.get(0));
+  }
+
+  private void testIcebergCallSetCurrentSnapshot() throws NoSuchTableException {
+    String fullTableName =
+        String.format(
+            "%s.%s.test_iceberg_call_set_current_snapshot", getCatalogName(), getDefaultDatabase());
+    String tableName = "test_iceberg_call_set_current_snapshot";
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+
+    sql(String.format("INSERT INTO %s VALUES(1, '1', 1)", tableName));
+    List<String> tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
+    Assertions.assertEquals(1, tableData.size());
+    Assertions.assertEquals("1,1,1", tableData.get(0));
+
+    long snapshotId = getCurrentSnapshotId(tableName);
+
+    sql(String.format("INSERT INTO %s VALUES(2, '2', 2)", tableName));
+    tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
+    Assertions.assertEquals(2, tableData.size());
+    Assertions.assertEquals("1,1,1;2,2,2", String.join(";", tableData));
+
+    sql(
+        String.format(
+            "CALL %s.system.set_current_snapshot('%s', %d)",
+            getCatalogName(), fullTableName, snapshotId));
+    tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
+    Assertions.assertEquals(1, tableData.size());
+    Assertions.assertEquals("1,1,1", tableData.get(0));
+  }
+
+  private void testIcebergCallRewriteDataFiles() {
+    String fullTableName =
+        String.format(
+            "%s.%s.test_iceberg_call_rewrite_data_files", getCatalogName(), getDefaultDatabase());
+    String tableName = "test_iceberg_call_rewrite_data_files";
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+
+    IntStream.rangeClosed(1, 5)
+        .forEach(
+            i -> sql(String.format("INSERT INTO %s VALUES(%d, '%d', %d)", tableName, i, i, i)));
+    List<String> tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
+    Assertions.assertEquals(5, tableData.size());
+    Assertions.assertEquals("1,1,1;2,2,2;3,3,3;4,4,4;5,5,5", String.join(";", tableData));
+
+    List<Row> callResult =
+        getSparkSession()
+            .sql(
+                String.format(
+                    "CALL %s.system.rewrite_data_files(table => '%s', strategy => 'sort', sort_order => 'id DESC NULLS LAST', where => 'id < 10')",
+                    getCatalogName(), fullTableName))
+            .collectAsList();
+    Assertions.assertEquals(1, callResult.size());
+    Assertions.assertEquals(5, callResult.get(0).getInt(0));
+    Assertions.assertEquals(1, callResult.get(0).getInt(1));
+  }
+
+  private void testIcebergCallRewriteManifests() {
+    String fullTableName =
+        String.format("%s.%s.rewrite_manifests", getCatalogName(), getDefaultDatabase());
+    String tableName = "rewrite_manifests";
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+
+    IntStream.rangeClosed(1, 5)
+        .forEach(
+            i -> sql(String.format("INSERT INTO %s VALUES(%d, '%d', %d)", tableName, i, i, i)));
+    List<String> tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
+    Assertions.assertEquals(5, tableData.size());
+    Assertions.assertEquals("1,1,1;2,2,2;3,3,3;4,4,4;5,5,5", String.join(";", tableData));
+
+    List<Row> callResult =
+        getSparkSession()
+            .sql(
+                String.format(
+                    "CALL %s.system.rewrite_manifests(table => '%s', use_caching => false)",
+                    getCatalogName(), fullTableName))
+            .collectAsList();
+    Assertions.assertEquals(1, callResult.size());
+    Assertions.assertEquals(5, callResult.get(0).getInt(0));
+    Assertions.assertEquals(1, callResult.get(0).getInt(1));
+  }
+
+  private void testIcebergCallRewritePositionDeleteFiles() {
+    String fullTableName =
+        String.format(
+            "%s.%s.rewrite_position_delete_files", getCatalogName(), getDefaultDatabase());
+    String tableName = "rewrite_position_delete_files";
+    dropTableIfExists(tableName);
+    createIcebergTableWithTableProperties(
+        tableName,
+        false,
+        ImmutableMap.of(ICEBERG_FORMAT_VERSION, "2", ICEBERG_DELETE_MODE, "merge-on-read"));
+
+    sql(
+        String.format(
+            "INSERT INTO %s VALUES(1, '1', 1), (2, '2', 2), (3, '3', 3), (4, '4', 4), (5, '5', 5)",
+            tableName));
+    List<String> tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
+    Assertions.assertEquals(5, tableData.size());
+    Assertions.assertEquals("1,1,1;2,2,2;3,3,3;4,4,4;5,5,5", String.join(";", tableData));
+
+    sql(String.format("DELETE FROM %s WHERE id = 1", tableName));
+    sql(String.format("DELETE FROM %s WHERE id = 2", tableName));
+
+    tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
+    Assertions.assertEquals(3, tableData.size());
+    Assertions.assertEquals("3,3,3;4,4,4;5,5,5", String.join(";", tableData));
+
+    List<Row> callResult =
+        getSparkSession()
+            .sql(
+                String.format(
+                    "CALL %s.system.rewrite_position_delete_files(table => '%s', options => map('rewrite-all','true'))",
+                    getCatalogName(), fullTableName))
+            .collectAsList();
+    Assertions.assertEquals(1, callResult.size());
+    Assertions.assertEquals(2, callResult.get(0).getInt(0));
+    Assertions.assertEquals(1, callResult.get(0).getInt(1));
+  }
+
   private List<SparkTableInfo.SparkColumnInfo> getIcebergSimpleTableColumn() {
     return Arrays.asList(
         SparkTableInfo.SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment"),
@@ -632,31 +789,31 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     }
   }
 
-  private SparkIcebergTable getSparkIcebergTableInstance(String tableName)
-      throws NoSuchTableException {
-    CatalogPlugin catalogPlugin =
-        getSparkSession().sessionState().catalogManager().catalog(getCatalogName());
-    Assertions.assertInstanceOf(TableCatalog.class, catalogPlugin);
-    TableCatalog catalog = (TableCatalog) catalogPlugin;
-    Table table = catalog.loadTable(Identifier.of(new String[] {getDefaultDatabase()}, tableName));
-    return (SparkIcebergTable) table;
-  }
-
-  private long getCurrentSnapshotTimestamp(String tableName) throws NoSuchTableException {
-    SparkIcebergTable sparkIcebergTable = getSparkIcebergTableInstance(tableName);
-    return sparkIcebergTable.table().currentSnapshot().timestampMillis();
-  }
-
-  private long getCurrentSnapshotId(String tableName) throws NoSuchTableException {
-    SparkIcebergTable sparkIcebergTable = getSparkIcebergTableInstance(tableName);
-    return sparkIcebergTable.table().currentSnapshot().snapshotId();
-  }
-
-  private long waitUntilAfter(Long timestampMillis) {
-    long current = System.currentTimeMillis();
-    while (current <= timestampMillis) {
-      current = System.currentTimeMillis();
+    private SparkIcebergTable getSparkIcebergTableInstance(String tableName)
+            throws NoSuchTableException {
+        CatalogPlugin catalogPlugin =
+                getSparkSession().sessionState().catalogManager().catalog(getCatalogName());
+        Assertions.assertInstanceOf(TableCatalog.class, catalogPlugin);
+        TableCatalog catalog = (TableCatalog) catalogPlugin;
+        Table table = catalog.loadTable(Identifier.of(new String[] {getDefaultDatabase()}, tableName));
+        return (SparkIcebergTable) table;
     }
-    return current;
-  }
+
+    private long getCurrentSnapshotTimestamp(String tableName) throws NoSuchTableException {
+        SparkIcebergTable sparkIcebergTable = getSparkIcebergTableInstance(tableName);
+        return sparkIcebergTable.table().currentSnapshot().timestampMillis();
+    }
+
+    private long getCurrentSnapshotId(String tableName) throws NoSuchTableException {
+        SparkIcebergTable sparkIcebergTable = getSparkIcebergTableInstance(tableName);
+        return sparkIcebergTable.table().currentSnapshot().snapshotId();
+    }
+
+    private long waitUntilAfter(Long timestampMillis) {
+        long current = System.currentTimeMillis();
+        while (current <= timestampMillis) {
+            current = System.currentTimeMillis();
+        }
+        return current;
+    }
 }

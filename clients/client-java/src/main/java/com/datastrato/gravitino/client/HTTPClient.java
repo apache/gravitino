@@ -22,7 +22,6 @@ package com.datastrato.gravitino.client;
 import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
 import com.datastrato.gravitino.exceptions.RESTException;
-import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.rest.RESTRequest;
 import com.datastrato.gravitino.rest.RESTResponse;
 import com.datastrato.gravitino.rest.RESTUtils;
@@ -695,7 +694,7 @@ public class HTTPClient implements RESTClient {
 
     private final Map<String, String> baseHeaders = Maps.newHashMap();
     private String uri;
-    private ObjectMapper mapper = JsonUtils.objectMapper();
+    private ObjectMapper mapper = ObjectMapperProvider.objectMapper();
     private AuthDataProvider authDataProvider;
     private Runnable beforeConnectHandler;
 

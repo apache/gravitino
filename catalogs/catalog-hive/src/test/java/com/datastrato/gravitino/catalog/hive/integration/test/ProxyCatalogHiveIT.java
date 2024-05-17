@@ -290,8 +290,8 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
     GravitinoMetalake createdMetalake =
-        client.createMetalake(NameIdentifier.of(METALAKE_NAME), "comment", Collections.emptyMap());
-    GravitinoMetalake loadMetalake = client.loadMetalake(NameIdentifier.of(METALAKE_NAME));
+        client.createMetalake(METALAKE_NAME, "comment", Collections.emptyMap());
+    GravitinoMetalake loadMetalake = client.loadMetalake(METALAKE_NAME);
     Assertions.assertEquals(createdMetalake, loadMetalake);
 
     metalake = loadMetalake;
@@ -309,19 +309,14 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     properties.put(METASTORE_URIS, HIVE_METASTORE_URIS);
     properties.put(IMPERSONATION_ENABLE, "true");
 
-    metalake.createCatalog(
-        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME),
-        Catalog.Type.RELATIONAL,
-        PROVIDER,
-        "comment",
-        properties);
+    metalake.createCatalog(CATALOG_NAME, Catalog.Type.RELATIONAL, PROVIDER, "comment", properties);
 
-    catalog = metalake.loadCatalog(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME));
+    catalog = metalake.loadCatalog(CATALOG_NAME);
   }
 
   private static void loadCatalogWithAnotherClient() {
-    GravitinoMetalake metaLake = anotherClient.loadMetalake(NameIdentifier.of(METALAKE_NAME));
-    anotherCatalog = metaLake.loadCatalog(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME));
+    GravitinoMetalake metaLake = anotherClient.loadMetalake(METALAKE_NAME);
+    anotherCatalog = metaLake.loadCatalog(CATALOG_NAME);
   }
 
   public static void setEnv(String key, String value) {
