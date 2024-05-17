@@ -1383,9 +1383,7 @@ public class CatalogHiveIT extends AbstractIT {
 
     // Schema does not have the rename operation.
     final String schemaName = GravitinoITUtils.genRandomName("CatalogHiveIT_schema");
-    catalog
-        .asSchemas()
-        .createSchema(schemaName, "", ImmutableMap.of());
+    catalog.asSchemas().createSchema(schemaName, "", ImmutableMap.of());
 
     final Catalog cata = catalog;
     // Now try to rename table

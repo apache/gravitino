@@ -103,9 +103,7 @@ public class CatalogsPageDorisTest extends AbstractWebIT {
     Map<String, String> properties = Maps.newHashMap();
     properties.put(PROPERTIES_KEY1, PROPERTIES_VALUE1);
     Catalog catalog_doris = metalake.loadCatalog(catalogName);
-    catalog_doris
-        .asSchemas()
-        .createSchema(schemaName, "comment", properties);
+    catalog_doris.asSchemas().createSchema(schemaName, "comment", properties);
   }
 
   /**

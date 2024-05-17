@@ -71,10 +71,7 @@ public class CatalogConnectorMetadata {
 
   public List<String> listSchemaNames() {
     try {
-      return Arrays.stream(
-              schemaCatalog.listSchemas())
-          .map(NameIdentifier::name)
-          .toList();
+      return Arrays.stream(schemaCatalog.listSchemas()).map(NameIdentifier::name).toList();
     } catch (NoSuchCatalogException e) {
       throw new TrinoException(GRAVITINO_CATALOG_NOT_EXISTS, CATALOG_DOES_NOT_EXIST_MSG, e);
     }
@@ -82,8 +79,7 @@ public class CatalogConnectorMetadata {
 
   public GravitinoSchema getSchema(String schemaName) {
     try {
-      Schema schema =
-          schemaCatalog.loadSchema(schemaName);
+      Schema schema = schemaCatalog.loadSchema(schemaName);
       return new GravitinoSchema(schema);
     } catch (NoSuchSchemaException e) {
       throw new TrinoException(GRAVITINO_SCHEMA_NOT_EXISTS, SCHEMA_DOES_NOT_EXIST_MSG, e);
@@ -138,9 +134,7 @@ public class CatalogConnectorMetadata {
 
   public void createSchema(GravitinoSchema schema) {
     try {
-      schemaCatalog.createSchema(schema.getName(),
-          schema.getComment(),
-          schema.getProperties());
+      schemaCatalog.createSchema(schema.getName(), schema.getComment(), schema.getProperties());
     } catch (NoSuchSchemaException e) {
       throw new TrinoException(GRAVITINO_CATALOG_NOT_EXISTS, CATALOG_DOES_NOT_EXIST_MSG, e);
     } catch (TableAlreadyExistsException e) {
@@ -150,8 +144,7 @@ public class CatalogConnectorMetadata {
 
   public void dropSchema(String schemaName, boolean cascade) {
     try {
-      boolean success =
-          schemaCatalog.dropSchema(schemaName, cascade);
+      boolean success = schemaCatalog.dropSchema(schemaName, cascade);
 
       if (!success) {
         throw new TrinoException(GRAVITINO_SCHEMA_NOT_EXISTS, "Drop schema failed");

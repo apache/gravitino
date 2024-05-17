@@ -176,15 +176,11 @@ public class CatalogKafkaIT extends AbstractIT {
 
   @Test
   public void testDefaultSchema() {
-    NameIdentifier[] schemas =
-        catalog.asSchemas().listSchemas();
+    NameIdentifier[] schemas = catalog.asSchemas().listSchemas();
     Assertions.assertEquals(1, schemas.length);
     Assertions.assertEquals(DEFAULT_SCHEMA_NAME, schemas[0].name());
 
-    Schema loadSchema =
-        catalog
-            .asSchemas()
-            .loadSchema(DEFAULT_SCHEMA_NAME);
+    Schema loadSchema = catalog.asSchemas().loadSchema(DEFAULT_SCHEMA_NAME);
     Assertions.assertEquals(
         "The default schema of Kafka catalog including all topics", loadSchema.comment());
 
@@ -195,15 +191,11 @@ public class CatalogKafkaIT extends AbstractIT {
             () ->
                 catalog
                     .asSchemas()
-                    .alterSchema(DEFAULT_SCHEMA_NAME,
-                        SchemaChange.removeProperty("key1")));
+                    .alterSchema(DEFAULT_SCHEMA_NAME, SchemaChange.removeProperty("key1")));
     Assertions.assertTrue(exception.getMessage().contains("Cannot alter the default schema"));
 
     // test drop default schema
-    boolean dropped =
-        catalog
-            .asSchemas()
-            .dropSchema(DEFAULT_SCHEMA_NAME, true);
+    boolean dropped = catalog.asSchemas().dropSchema(DEFAULT_SCHEMA_NAME, true);
     Assertions.assertFalse(dropped);
   }
 
@@ -213,20 +205,14 @@ public class CatalogKafkaIT extends AbstractIT {
     Exception ex =
         Assertions.assertThrows(
             UnsupportedOperationException.class,
-            () ->
-                catalog
-                    .asSchemas()
-                    .createSchema(schemaName,
-                        "comment",
-                        Collections.emptyMap()));
+            () -> catalog.asSchemas().createSchema(schemaName, "comment", Collections.emptyMap()));
     Assertions.assertTrue(
         ex.getMessage().contains("Kafka catalog does not support schema creation"));
   }
 
   @Test
   public void testListSchema() {
-    NameIdentifier[] schemas =
-        catalog.asSchemas().listSchemas();
+    NameIdentifier[] schemas = catalog.asSchemas().listSchemas();
     Assertions.assertEquals(1, schemas.length);
     Assertions.assertEquals(DEFAULT_SCHEMA_NAME, schemas[0].name());
   }

@@ -109,28 +109,16 @@ public class TestMultipleJDBCLoad extends AbstractIT {
         metalake.createCatalog(
             mysqlCatalogName, Catalog.Type.RELATIONAL, "jdbc-mysql", "comment", mysqlConf);
 
-    NameIdentifier[] nameIdentifiers =
-        mysqlCatalog.asSchemas().listSchemas();
+    NameIdentifier[] nameIdentifiers = mysqlCatalog.asSchemas().listSchemas();
     Assertions.assertNotEquals(0, nameIdentifiers.length);
-    nameIdentifiers =
-        postgreSqlCatalog
-            .asSchemas()
-            .listSchemas();
+    nameIdentifiers = postgreSqlCatalog.asSchemas().listSchemas();
     Assertions.assertEquals(1, nameIdentifiers.length);
     Assertions.assertEquals("public", nameIdentifiers[0].name());
 
     String schemaName = RandomNameUtils.genRandomName("it_schema");
-    mysqlCatalog
-        .asSchemas()
-        .createSchema(schemaName,
-            null,
-            Collections.emptyMap());
+    mysqlCatalog.asSchemas().createSchema(schemaName, null, Collections.emptyMap());
 
-    postgreSqlCatalog
-        .asSchemas()
-        .createSchema(schemaName,
-            null,
-            Collections.emptyMap());
+    postgreSqlCatalog.asSchemas().createSchema(schemaName, null, Collections.emptyMap());
 
     String tableName = RandomNameUtils.genRandomName("it_table");
 

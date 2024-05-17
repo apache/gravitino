@@ -47,7 +47,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
   protected final Namespace schemaNamespace;
 
   BaseSchemaCatalog(
-          Namespace namespace,
+      Namespace namespace,
       String name,
       Type type,
       String provider,
@@ -91,10 +91,10 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
    * Create a new schema with specified identifier, comment and metadata.
    *
    * @param schemaName The name identifier of the schema.
-   * @param comment    The comment of the schema.
+   * @param comment The comment of the schema.
    * @param properties The properties of the schema.
    * @return The created {@link Schema}.
-   * @throws NoSuchCatalogException       if the catalog with specified namespace does not exist.
+   * @throws NoSuchCatalogException if the catalog with specified namespace does not exist.
    * @throws SchemaAlreadyExistsException if the schema with specified identifier already exists.
    */
   @Override
@@ -142,7 +142,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
    * Alter the schema with specified identifier by applying the changes.
    *
    * @param schemaName The name identifier of the schema.
-   * @param changes    The metadata changes to apply.
+   * @param changes The metadata changes to apply.
    * @return The altered {@link Schema}.
    * @throws NoSuchSchemaException if the schema with specified identifier does not exist.
    */
@@ -173,7 +173,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
    * Drop the schema with specified identifier.
    *
    * @param schemaName The name identifier of the schema.
-   * @param cascade    Whether to drop all the tables under the schema.
+   * @param cascade Whether to drop all the tables under the schema.
    * @return true if the schema is dropped successfully, false otherwise.
    * @throws NonEmptySchemaException if the schema is not empty and cascade is false.
    */
@@ -183,9 +183,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
     try {
       DropResponse resp =
           restClient.delete(
-              formatSchemaRequestPath(schemaNamespace)
-                  + "/"
-                  + RESTUtils.encodeString(schemaName),
+              formatSchemaRequestPath(schemaNamespace) + "/" + RESTUtils.encodeString(schemaName),
               Collections.singletonMap("cascade", String.valueOf(cascade)),
               DropResponse.class,
               Collections.emptyMap(),

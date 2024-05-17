@@ -71,7 +71,7 @@ class DTOConverters {
     switch (catalog.type()) {
       case RELATIONAL:
         return RelationalCatalog.builder()
-                .withNamespace(namespace)
+            .withNamespace(namespace)
             .withName(catalog.name())
             .withType(catalog.type())
             .withProvider(catalog.provider())
@@ -83,7 +83,7 @@ class DTOConverters {
 
       case FILESET:
         return FilesetCatalog.builder()
-                .withNamespace(namespace)
+            .withNamespace(namespace)
             .withName(catalog.name())
             .withType(catalog.type())
             .withProvider(catalog.provider())
@@ -95,7 +95,7 @@ class DTOConverters {
 
       case MESSAGING:
         return MessagingCatalog.builder()
-                .withNamespace(namespace)
+            .withNamespace(namespace)
             .withName(catalog.name())
             .withType(catalog.type())
             .withProvider(catalog.provider())

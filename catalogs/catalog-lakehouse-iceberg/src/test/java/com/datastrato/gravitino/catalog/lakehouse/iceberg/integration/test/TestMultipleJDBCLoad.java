@@ -120,27 +120,15 @@ public class TestMultipleJDBCLoad extends AbstractIT {
             "comment",
             icebergMysqlConf);
 
-    NameIdentifier[] nameIdentifiers =
-        mysqlCatalog.asSchemas().listSchemas();
+    NameIdentifier[] nameIdentifiers = mysqlCatalog.asSchemas().listSchemas();
     Assertions.assertEquals(0, nameIdentifiers.length);
-    nameIdentifiers =
-        postgreSqlCatalog
-            .asSchemas()
-            .listSchemas();
+    nameIdentifiers = postgreSqlCatalog.asSchemas().listSchemas();
     Assertions.assertEquals(0, nameIdentifiers.length);
 
     String schemaName = RandomNameUtils.genRandomName("it_schema");
-    mysqlCatalog
-        .asSchemas()
-        .createSchema(schemaName,
-            null,
-            Collections.emptyMap());
+    mysqlCatalog.asSchemas().createSchema(schemaName, null, Collections.emptyMap());
 
-    postgreSqlCatalog
-        .asSchemas()
-        .createSchema(schemaName,
-            null,
-            Collections.emptyMap());
+    postgreSqlCatalog.asSchemas().createSchema(schemaName, null, Collections.emptyMap());
 
     String tableName = RandomNameUtils.genRandomName("it_table");
 

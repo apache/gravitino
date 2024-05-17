@@ -291,7 +291,8 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
 
     // drop schema check.
     schemas.dropSchema(schemaIdent.name(), false);
-    Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(schemaIdent.name()));
+    Assertions.assertThrows(
+        NoSuchSchemaException.class, () -> schemas.loadSchema(schemaIdent.name()));
     org.apache.iceberg.catalog.Namespace icebergNamespace =
         IcebergTableOpsHelper.getIcebergNamespace(schemaIdent.name());
     Assertions.assertThrows(
@@ -304,8 +305,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     schemaMap =
         Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v -> v));
     Assertions.assertFalse(schemaMap.containsKey(testSchemaName));
-    Assertions.assertFalse(
-        schemas.dropSchema("no-exits", false));
+    Assertions.assertFalse(schemas.dropSchema("no-exits", false));
     TableCatalog tableCatalog = catalog.asTableCatalog();
 
     // create failed check.
@@ -912,7 +912,9 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
 
     Assertions.assertDoesNotThrow(
         () ->
-            catalog.asSchemas().alterSchema(ident.name(), SchemaChange.setProperty("comment-test", "v1")));
+            catalog
+                .asSchemas()
+                .alterSchema(ident.name(), SchemaChange.setProperty("comment-test", "v1")));
     Schema schema = catalog.asSchemas().loadSchema(ident.name());
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, schema.auditInfo().creator());
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, schema.auditInfo().lastModifier());

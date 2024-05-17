@@ -125,9 +125,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   void createSchema(String metalakeName, String catalogName, String schemaName) {
     Map<String, String> properties = Maps.newHashMap();
     properties.put(PROPERTIES_KEY1, PROPERTIES_VALUE1);
-    catalog
-        .asSchemas()
-        .createSchema(schemaName, "comment", properties);
+    catalog.asSchemas().createSchema(schemaName, "comment", properties);
   }
 
   /**

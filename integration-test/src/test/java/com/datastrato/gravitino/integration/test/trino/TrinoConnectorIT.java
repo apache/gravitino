@@ -376,8 +376,7 @@ public class TrinoConnectorIT extends AbstractIT {
             catalogName, schemaName);
     containerSuite.getTrinoContainer().executeUpdateSQL(createSchemaSql);
 
-    Schema schema =
-        catalog.asSchemas().loadSchema(schemaName);
+    Schema schema = catalog.asSchemas().loadSchema(schemaName);
     Assertions.assertEquals(
         "hdfs://localhost:9000/user/hive/warehouse/hive_schema_1123123",
         schema.properties().get("location"));
@@ -458,7 +457,8 @@ public class TrinoConnectorIT extends AbstractIT {
 
     catalog
         .asSchemas()
-        .createSchema(schemaName,
+        .createSchema(
+            schemaName,
             "Created by gravitino client",
             ImmutableMap.<String, String>builder()
                 .put("location", "hdfs://localhost:9000/user/hive/warehouse/hive_schema_1223445.db")
@@ -700,7 +700,8 @@ public class TrinoConnectorIT extends AbstractIT {
     Schema schema =
         catalog
             .asSchemas()
-            .createSchema(schemaName,
+            .createSchema(
+                schemaName,
                 "Created by gravitino client",
                 ImmutableMap.<String, String>builder().build());
 
@@ -921,7 +922,8 @@ public class TrinoConnectorIT extends AbstractIT {
     Schema schema =
         catalog
             .asSchemas()
-            .createSchema(schemaName,
+            .createSchema(
+                schemaName,
                 "Created by gravitino client",
                 ImmutableMap.<String, String>builder().build());
 
@@ -1055,7 +1057,8 @@ public class TrinoConnectorIT extends AbstractIT {
 
     catalog
         .asSchemas()
-        .createSchema(schemaName,
+        .createSchema(
+            schemaName,
             "Created by gravitino client",
             ImmutableMap.<String, String>builder().build());
 
@@ -1078,10 +1081,7 @@ public class TrinoConnectorIT extends AbstractIT {
     }
 
     // Do not support the cascade drop
-    success =
-        catalog
-            .asSchemas()
-            .dropSchema(schemaName, true);
+    success = catalog.asSchemas().dropSchema(schemaName, true);
     Assertions.assertFalse(success);
     final String sql3 = String.format("show schemas in %s like '%s'", catalogName, schemaName);
     success = checkTrinoHasLoaded(sql3, 30);
@@ -1176,9 +1176,7 @@ public class TrinoConnectorIT extends AbstractIT {
     Schema schema =
         catalog
             .asSchemas()
-            .createSchema(schemaName,
-                null,
-                ImmutableMap.<String, String>builder().build());
+            .createSchema(schemaName, null, ImmutableMap.<String, String>builder().build());
 
     Assertions.assertNotNull(schema);
 

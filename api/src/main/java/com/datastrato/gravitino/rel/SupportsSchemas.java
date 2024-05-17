@@ -69,10 +69,10 @@ public interface SupportsSchemas {
    * Create a schema in the catalog.
    *
    * @param schemaName The name of the schema.
-   * @param comment    The comment of the schema.
+   * @param comment The comment of the schema.
    * @param properties The properties of the schema.
    * @return The created schema.
-   * @throws NoSuchCatalogException       If the catalog does not exist.
+   * @throws NoSuchCatalogException If the catalog does not exist.
    * @throws SchemaAlreadyExistsException If the schema already exists.
    */
   Schema createSchema(String schemaName, String comment, Map<String, String> properties)
@@ -91,7 +91,7 @@ public interface SupportsSchemas {
    * Apply the metadata change to a schema in the catalog.
    *
    * @param schemaName The name of the schema.
-   * @param changes    The metadata changes to apply.
+   * @param changes The metadata changes to apply.
    * @return The altered schema.
    * @throws NoSuchSchemaException If the schema does not exist.
    */
@@ -105,9 +105,9 @@ public interface SupportsSchemas {
    * UnsupportedOperationException}.
    *
    * @param schemaName The name of the schema.
-   * @param cascade    If true, recursively drop all objects within the schema.
+   * @param cascade If true, recursively drop all objects within the schema.
    * @return True if the schema exists and is dropped successfully, false if the schema doesn't
-   * exist.
+   *     exist.
    * @throws NonEmptySchemaException If the schema is not empty and cascade is false.
    */
   boolean dropSchema(String schemaName, boolean cascade) throws NonEmptySchemaException;

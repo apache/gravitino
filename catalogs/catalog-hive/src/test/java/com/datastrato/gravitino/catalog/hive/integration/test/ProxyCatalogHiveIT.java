@@ -148,7 +148,8 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     SupportsSchemas schemas = anotherCatalog.asSchemas();
     Exception e =
         Assertions.assertThrows(
-            RuntimeException.class, () -> schemas.createSchema(anotherSchemaName, comment, properties));
+            RuntimeException.class,
+            () -> schemas.createSchema(anotherSchemaName, comment, properties));
     Assertions.assertTrue(e.getMessage().contains("AccessControlException Permission denied"));
   }
 

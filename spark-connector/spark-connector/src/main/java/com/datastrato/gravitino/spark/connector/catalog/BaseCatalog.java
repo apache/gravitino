@@ -283,8 +283,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
 
   @Override
   public String[][] listNamespaces() throws NoSuchNamespaceException {
-    NameIdentifier[] schemas =
-        gravitinoCatalogClient.asSchemas().listSchemas();
+    NameIdentifier[] schemas = gravitinoCatalogClient.asSchemas().listSchemas();
     return Arrays.stream(schemas)
         .map(schema -> new String[] {schema.name()})
         .toArray(String[][]::new);
@@ -303,10 +302,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
       throws NoSuchNamespaceException {
     validateNamespace(namespace);
     try {
-      Schema schema =
-          gravitinoCatalogClient
-              .asSchemas()
-              .loadSchema(namespace[0]);
+      Schema schema = gravitinoCatalogClient.asSchemas().loadSchema(namespace[0]);
       String comment = schema.comment();
       Map<String, String> properties = schema.properties();
       if (comment != null) {
@@ -328,9 +324,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
     Map<String, String> properties = new HashMap<>(metadata);
     String comment = properties.remove(SupportsNamespaces.PROP_COMMENT);
     try {
-      gravitinoCatalogClient
-          .asSchemas()
-          .createSchema(namespace[0], comment, properties);
+      gravitinoCatalogClient.asSchemas().createSchema(namespace[0], comment, properties);
     } catch (SchemaAlreadyExistsException e) {
       throw new NamespaceAlreadyExistsException(namespace);
     }
@@ -355,9 +349,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
                 })
             .toArray(SchemaChange[]::new);
     try {
-      gravitinoCatalogClient
-          .asSchemas()
-          .alterSchema(namespace[0], schemaChanges);
+      gravitinoCatalogClient.asSchemas().alterSchema(namespace[0], schemaChanges);
     } catch (NoSuchSchemaException e) {
       throw new NoSuchNamespaceException(namespace);
     }
@@ -368,9 +360,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
       throws NoSuchNamespaceException, NonEmptyNamespaceException {
     validateNamespace(namespace);
     try {
-      return gravitinoCatalogClient
-          .asSchemas()
-          .dropSchema(namespace[0], cascade);
+      return gravitinoCatalogClient.asSchemas().dropSchema(namespace[0], cascade);
     } catch (NonEmptySchemaException e) {
       throw new NonEmptyNamespaceException(namespace);
     }

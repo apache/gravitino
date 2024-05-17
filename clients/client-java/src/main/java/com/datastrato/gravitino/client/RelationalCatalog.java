@@ -51,7 +51,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
   private static final Logger LOG = LoggerFactory.getLogger(RelationalCatalog.class);
 
   RelationalCatalog(
-          Namespace namespace,
+      Namespace namespace,
       String name,
       Type type,
       String provider,
@@ -284,9 +284,10 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
     protected Builder() {}
 
     Builder withNamespace(Namespace namespace) {
-            this.namespace = namespace;
-            return this;
-          }
+      this.namespace = namespace;
+      return this;
+    }
+
     Builder withRestClient(RESTClient restClient) {
       this.restClient = restClient;
       return this;
@@ -301,7 +302,8 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
       Preconditions.checkArgument(StringUtils.isNotBlank(provider), "provider must not be blank");
       Preconditions.checkArgument(audit != null, "audit must not be null");
 
-      return new RelationalCatalog(namespace, name, type, provider, comment, properties, audit, restClient);
+      return new RelationalCatalog(
+          namespace, name, type, provider, comment, properties, audit, restClient);
     }
   }
 }

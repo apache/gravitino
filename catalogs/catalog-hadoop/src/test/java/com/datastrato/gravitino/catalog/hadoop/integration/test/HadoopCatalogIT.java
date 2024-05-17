@@ -546,21 +546,13 @@ public class HadoopCatalogIT extends AbstractIT {
     // Create a schema without specifying location.
     String schemaName =
         GravitinoITUtils.genRandomName("test_drop_catalog_with_empty_schema_schema");
-    filesetCatalog
-        .asSchemas()
-        .createSchema(schemaName, "comment", ImmutableMap.of());
+    filesetCatalog.asSchemas().createSchema(schemaName, "comment", ImmutableMap.of());
 
     // Drop the empty schema.
-    boolean dropped =
-        filesetCatalog
-            .asSchemas()
-            .dropSchema(schemaName, true);
+    boolean dropped = filesetCatalog.asSchemas().dropSchema(schemaName, true);
     Assertions.assertTrue(dropped, "schema should be dropped");
     Assertions.assertFalse(
-        filesetCatalog
-            .asSchemas()
-            .schemaExists(schemaName),
-        "schema should not be exists");
+        filesetCatalog.asSchemas().schemaExists(schemaName), "schema should not be exists");
 
     // Drop the catalog.
     dropped = metalake.dropCatalog(catalogName);

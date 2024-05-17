@@ -115,9 +115,7 @@ public class AuditCatalogMysqlIT extends AbstractIT {
 
     Column col1 = Column.of("col_1", Types.IntegerType.get(), "col_1_comment");
 
-    catalog
-        .asSchemas()
-        .createSchema(schemaName, null, properties);
+    catalog.asSchemas().createSchema(schemaName, null, properties);
     Table table =
         catalog
             .asTableCatalog()

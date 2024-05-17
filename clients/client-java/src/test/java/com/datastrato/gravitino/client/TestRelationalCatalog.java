@@ -157,8 +157,7 @@ public class TestRelationalCatalog extends TestBase {
     buildMockResource(Method.GET, schemaPath, null, errorResp, SC_NOT_FOUND);
     SupportsSchemas supportSchemas = catalog.asSchemas();
     Throwable ex =
-        Assertions.assertThrows(
-            NoSuchCatalogException.class, () -> supportSchemas.listSchemas());
+        Assertions.assertThrows(NoSuchCatalogException.class, () -> supportSchemas.listSchemas());
     Assertions.assertTrue(ex.getMessage().contains("catalog not found"));
 
     // Test throw RuntimeException
@@ -242,7 +241,8 @@ public class TestRelationalCatalog extends TestBase {
 
     SupportsSchemas schemas = catalog.asSchemas();
     Throwable ex1 =
-        Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(schemaId.name()));
+        Assertions.assertThrows(
+            NoSuchSchemaException.class, () -> schemas.loadSchema(schemaId.name()));
     Assertions.assertTrue(ex1.getMessage().contains("schema not found"));
   }
 

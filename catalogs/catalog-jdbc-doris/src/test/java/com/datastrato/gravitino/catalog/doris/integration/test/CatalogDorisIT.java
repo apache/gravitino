@@ -230,7 +230,8 @@ public class CatalogDorisIT extends AbstractIT {
 
     // check schema is deleted
     // 1. check by load schema
-    Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(schemaIdent.name()));
+    Assertions.assertThrows(
+        NoSuchSchemaException.class, () -> schemas.loadSchema(schemaIdent.name()));
 
     // 2. check by list schema
     nameIdentifiers = schemas.listSchemas();
@@ -247,11 +248,7 @@ public class CatalogDorisIT extends AbstractIT {
   void testDropDorisSchema() {
     String schemaName = GravitinoITUtils.genRandomName("doris_it_schema_dropped").toLowerCase();
 
-    catalog
-        .asSchemas()
-        .createSchema(schemaName,
-            "test_comment",
-            ImmutableMap.of("key", "value"));
+    catalog.asSchemas().createSchema(schemaName, "test_comment", ImmutableMap.of("key", "value"));
 
     catalog
         .asTableCatalog()
@@ -265,19 +262,13 @@ public class CatalogDorisIT extends AbstractIT {
             null);
 
     // Try to drop a database, and cascade equals to false, it should not be allowed.
-    Assertions.assertFalse(
-        catalog
-            .asSchemas()
-            .dropSchema(schemaName, false));
+    Assertions.assertFalse(catalog.asSchemas().dropSchema(schemaName, false));
 
     // Check the database still exists
     catalog.asSchemas().loadSchema(schemaName);
 
     // Try to drop a database, and cascade equals to true, it should be allowed.
-    Assertions.assertTrue(
-        catalog
-            .asSchemas()
-            .dropSchema(schemaName, true));
+    Assertions.assertTrue(catalog.asSchemas().dropSchema(schemaName, true));
 
     // Check database has been dropped
     SupportsSchemas schemas = catalog.asSchemas();

@@ -328,7 +328,8 @@ public class CatalogPostgreSqlIT extends AbstractIT {
 
     // drop schema check.
     schemas.dropSchema(schemaIdent.name(), false);
-    Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(schemaIdent.name()));
+    Assertions.assertThrows(
+        NoSuchSchemaException.class, () -> schemas.loadSchema(schemaIdent.name()));
     Assertions.assertThrows(
         NoSuchSchemaException.class, () -> postgreSqlService.loadSchema(schemaIdent));
 
@@ -336,8 +337,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     schemaMap =
         Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v -> v));
     Assertions.assertFalse(schemaMap.containsKey(testSchemaName));
-    Assertions.assertFalse(
-        schemas.dropSchema("no-exits", false));
+    Assertions.assertFalse(schemas.dropSchema("no-exits", false));
     TableCatalog tableCatalog = catalog.asTableCatalog();
 
     // create failed check.
@@ -551,8 +551,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
 
   @Test
   void testListSchema() {
-    NameIdentifier[] nameIdentifiers =
-        catalog.asSchemas().listSchemas();
+    NameIdentifier[] nameIdentifiers = catalog.asSchemas().listSchemas();
     Set<String> schemaNames =
         Arrays.stream(nameIdentifiers).map(NameIdentifier::name).collect(Collectors.toSet());
     Assertions.assertTrue(schemaNames.contains("public"));
@@ -1100,9 +1099,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     String[] dbs = {schemaName1, schemaName2, schemaName3, schemaName4, schemaName5};
 
     for (int i = 0; i < dbs.length; i++) {
-      catalog
-          .asSchemas()
-          .createSchema(dbs[i], dbs[i], Maps.newHashMap());
+      catalog.asSchemas().createSchema(dbs[i], dbs[i], Maps.newHashMap());
     }
 
     String tableName1 = "table1";
@@ -1152,9 +1149,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
 
     String[] dbs = {schemaName1, schemaName2, schemaName3};
     for (int i = 0; i < dbs.length; i++) {
-      catalog
-          .asSchemas()
-          .createSchema(dbs[i], dbs[i], Maps.newHashMap());
+      catalog.asSchemas().createSchema(dbs[i], dbs[i], Maps.newHashMap());
     }
 
     String tableName1 = "table1";
