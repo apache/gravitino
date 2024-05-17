@@ -197,7 +197,7 @@ Changelog
     - `8030` Doris FE HTTP port
     - `9030` Doris FE MySQL server port
 
-## Gravitino CI kerberosized HDFS image
+## Gravitino CI kerberos HDFS image
 
 You can use this image to test kerberized HDFS.
 
