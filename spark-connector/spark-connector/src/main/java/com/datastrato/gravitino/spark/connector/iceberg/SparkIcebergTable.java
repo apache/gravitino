@@ -64,9 +64,8 @@ public class SparkIcebergTable extends SparkTable {
   }
 
   /**
-   * Although SparkIcebergTable extended SparkTable, it also needs to initialize its member variable
-   * , such as snapshotId or branch, before it reused newScanBuilder from the parent class. In
-   * contrast, overriding newScanBuilder to support time travel is simpler and more concise.
+   * If using SparkIcebergTable not SparkTable, we must extract snapshotId or branchName using the
+   * Iceberg specific logic. It's hard to maintenance.
    */
   @Override
   public ScanBuilder newScanBuilder(CaseInsensitiveStringMap options) {
