@@ -244,7 +244,7 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
   }
 
   @Test
-  void testIcebergAsOfQuery() throws NoSuchTableException {
+  void testIcebergTimeTravelQuery() throws NoSuchTableException {
     String tableName = "test_iceberg_as_of_query";
     dropTableIfExists(tableName);
     createSimpleTable(tableName);
@@ -261,7 +261,6 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     sparkIcebergTable.table().manageSnapshots().createTag("test_tag", snapshotId).commit();
     long snapshotTimestamp = getCurrentSnapshotTimestamp(tableName);
     long timestamp = waitUntilAfter(snapshotTimestamp + 1000);
-    waitUntilAfter(timestamp + 1000);
     long timestampInSeconds = TimeUnit.MILLISECONDS.toSeconds(timestamp);
 
     // create a second snapshot
