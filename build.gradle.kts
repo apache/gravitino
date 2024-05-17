@@ -486,7 +486,7 @@ tasks.rat {
     "clients/client-python/gravitino.egg-info/*",
     "clients/client-python/gravitino/utils/exceptions.py",
     "clients/client-python/gravitino/utils/http_client.py",
-    "dev/docker/hdfs/*"
+    "dev/docker/kerberos-hdfs/*"
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.
