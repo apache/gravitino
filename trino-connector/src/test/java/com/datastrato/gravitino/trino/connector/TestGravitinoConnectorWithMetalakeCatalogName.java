@@ -10,7 +10,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import io.trino.Session;
@@ -111,7 +110,7 @@ public class TestGravitinoConnectorWithMetalakeCatalogName extends AbstractTestQ
 
     // test metalake named test1. the connnector name is test1
     GravitinoAdminClient gravitinoClient = server.createGravitinoClient();
-    gravitinoClient.createMetalake(NameIdentifier.ofMetalake("test1"), "", Collections.emptyMap());
+    gravitinoClient.createMetalake("test1", "", Collections.emptyMap());
 
     assertUpdate("call test1.system.create_catalog('memory1', 'memory', Map())");
     assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).contains("test1.memory1");
