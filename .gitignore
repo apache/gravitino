@@ -35,7 +35,7 @@ out/**
 *.ipr
 
 distribution
-common/src/main/resources/project.properties
+common/src/main/resources/gravitino-build-info.properties
 
 dev/docker/*/packages
 docs/build
