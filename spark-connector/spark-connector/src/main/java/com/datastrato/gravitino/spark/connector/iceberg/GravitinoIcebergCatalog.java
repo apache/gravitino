@@ -113,8 +113,11 @@ public class GravitinoIcebergCatalog extends BaseCatalog
           return builder.withTableCatalog(this).build();
         }
       }
-    } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
-      throw new RuntimeException("Failed to load Iceberg Procedure.", e);
+    } catch (NoSuchMethodException
+        | IllegalAccessException
+        | InvocationTargetException
+        | ClassNotFoundException e) {
+      throw new RuntimeException("Failed to load Iceberg Procedure " + identifier, e);
     }
 
     throw new NoSuchProcedureException(identifier);
@@ -126,10 +129,11 @@ public class GravitinoIcebergCatalog extends BaseCatalog
   }
 
   private boolean isSystemNamespace(String[] namespace)
-      throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
-    Method isSystemNamespace =
-        ((SparkCatalog) sparkCatalog).getClass().getMethod("isSystemNamespace", String[].class);
+      throws NoSuchMethodException, InvocationTargetException, IllegalAccessException,
+          ClassNotFoundException {
+    Class<?> baseCatalog = Class.forName("org.apache.iceberg.spark.BaseCatalog");
+    Method isSystemNamespace = baseCatalog.getDeclaredMethod("isSystemNamespace", String[].class);
     isSystemNamespace.setAccessible(true);
-    return (Boolean) isSystemNamespace.invoke(sparkCatalog, (Object) namespace);
+    return (Boolean) isSystemNamespace.invoke(baseCatalog, (Object) namespace);
   }
 }
