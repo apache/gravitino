@@ -103,6 +103,8 @@ public abstract class JdbcTableOperations implements TableOperation {
       LOG.info("Deleted table {} from database {}", tableName, databaseName);
     } catch (NoSuchTableException e) {
       return false;
+    } catch (NoSuchSchemaException e) {
+      return false;
     }
     return true;
   }

@@ -75,9 +75,9 @@ public class AuditCatalogMysqlIT extends AbstractIT {
 
   @AfterAll
   public static void stopIntegrationTest() throws IOException, InterruptedException {
-    AbstractIT.stopIntegrationTest();
     client.dropMetalake(metalakeName);
     mysqlService.close();
+    AbstractIT.stopIntegrationTest();
   }
 
   @Test

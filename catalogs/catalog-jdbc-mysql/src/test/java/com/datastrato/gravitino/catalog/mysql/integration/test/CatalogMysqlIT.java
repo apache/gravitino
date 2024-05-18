@@ -138,6 +138,7 @@ public class CatalogMysqlIT extends AbstractIT {
   @AfterAll
   public void stop() {
     clearTableAndSchema();
+    metalake.dropCatalog(catalogName);
     client.dropMetalake(metalakeName);
     mysqlService.close();
   }
