@@ -15,6 +15,7 @@ on:
           - 'gravitino-ci-doris'
           - 'trino'
           - 'hive'
+          - 'kerberos-hdfs'
       tag:
         description: 'Docker tag to apply to this image'
         required: true
