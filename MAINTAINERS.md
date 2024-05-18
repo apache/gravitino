@@ -33,16 +33,8 @@ Contributors may be added by existing maintainers (see [Governance document](GOV
 |----------------|---------------------|------------------|
 | Kuan-Po Tseng  | brandboat           | opensource4you   |
 | Nicholas Jiang | SteNicholas         | Bilibili         |
-| Peidian Li     | coolderli           | Xiaomi           |
-| Jiebao Xiao    | xloya               | Xiaomi           |
-| Can Cai        | caican00            | Xiaomi           |
-| Kang Zhou      | zhoukangcn          | Xiaomi           |
+| Sophie Sun     | SophieTech88        | ExtraHop Network |
 | Xing Yong      | YxAc                | Xiaomi           |
-| Liwei Yang     | lw-yang             | Xiaomi           |
-| WangXin Han    | hanwxx              | Xiaomi           |
-| Congling Xia   | xiacongling         | Xiaomi           |
-| Kainan Bao     | bknbkn              | Xiaomi           |
-| Han Zhang      | xiaozcy             | Xiaomi           |
 
 ## Review process
 
