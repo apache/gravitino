@@ -34,6 +34,7 @@ Contributors may be added by existing maintainers (see [Governance document](GOV
 | Kuan-Po Tseng  | brandboat           | opensource4you   |
 | Nicholas Jiang | SteNicholas         | Bilibili         |
 | Sophie Sun     | SophieTech88        | ExtraHop Network |
+| Liwei Yang     | lw-yang             | Xiaomi           |
 
 ## Review process
 
