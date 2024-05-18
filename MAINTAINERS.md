@@ -35,6 +35,7 @@ Contributors may be added by existing maintainers (see [Governance document](GOV
 | Nicholas Jiang | SteNicholas         | Bilibili         |
 | Eric Chang     | unknowntpo          | Lawsnote         |
 | Sophie Sun     | SophieTech88        | ExtraHop Network |
+| Ziva Li        | zivali              | Yahoo            |
 
 ## Review process
 
