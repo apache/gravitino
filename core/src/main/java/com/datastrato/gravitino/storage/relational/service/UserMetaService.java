@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
 /** The service class for user metadata. It provides the basic database operations for user. */
@@ -209,15 +210,22 @@ public class UserMetaService {
   }
 
   public int deleteUserMetasByLegacyTimeLine(long legacyTimeLine, int limit) {
-    int userDeletedCount =
-        SessionUtils.doWithCommitAndFetchResult(
-            UserMetaMapper.class,
-            mapper -> mapper.deleteUserMetasByLegacyTimeLine(legacyTimeLine, limit));
+    AtomicInteger userDeletedCount = new AtomicInteger(0);
+    AtomicInteger userRoleRelDeletedCount = new AtomicInteger(0);
 
-    int userRoleRelDeletedCount =
-        SessionUtils.doWithCommitAndFetchResult(
-            UserRoleRelMapper.class,
-            mapper -> mapper.deleteUserRoleRelMetasByLegacyTimeLine(legacyTimeLine, limit));
-    return userDeletedCount + userRoleRelDeletedCount;
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            userDeletedCount.set(
+                SessionUtils.doWithoutCommitAndFetchResult(
+                    UserMetaMapper.class,
+                    mapper -> mapper.deleteUserMetasByLegacyTimeLine(legacyTimeLine, limit))),
+        () ->
+            userRoleRelDeletedCount.set(
+                SessionUtils.doWithoutCommitAndFetchResult(
+                    UserRoleRelMapper.class,
+                    mapper ->
+                        mapper.deleteUserRoleRelMetasByLegacyTimeLine(legacyTimeLine, limit))));
+
+    return userDeletedCount.get() + userRoleRelDeletedCount.get();
   }
 }

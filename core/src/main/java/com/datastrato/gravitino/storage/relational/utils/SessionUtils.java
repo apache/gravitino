@@ -64,6 +64,25 @@ public class SessionUtils {
   }
 
   /**
+   * This method is used to perform a database operation without a commit and fetch the result. If
+   * the operation fails, will throw the RuntimeException.
+   *
+   * @param mapperClazz mapper class to be used for the operation
+   * @param func the operation to be performed with the mapper
+   * @return the result of the operation
+   * @param <T> the type of the mapper
+   * @param <R> the type of the result
+   */
+  public static <T, R> R doWithoutCommitAndFetchResult(Class<T> mapperClazz, Function<T, R> func) {
+    try {
+      T mapper = SqlSessions.getMapper(mapperClazz);
+      return func.apply(mapper);
+    } catch (Throwable t) {
+      throw t;
+    }
+  }
+
+  /**
    * This method is used to perform a database operation without a commit. If the operation fails,
    * will throw the RuntimeException.
    *
