@@ -44,6 +44,9 @@ jobs:
           elif [ "${{ github.event.inputs.image }}" == "gravitino-ci-doris" ]; then
             echo "image_type=doris" >> $GITHUB_ENV
             echo "image_name=datastrato/gravitino-ci-doris" >> $GITHUB_ENV
+          elif [ "${{ github.event.inputs.image }}" == "kerberos-hdfs" ]; then
+            echo "image_type=kerberos-hdfs" >> $GITHUB_ENV
+            echo "image_name=datastrato/gravitino-ci-kerberos-hdfs" >> $GITHUB_ENV
           elif [ "${{ github.event.inputs.image }}" == "gravitino" ]; then
             echo "image_type=gravitino" >> $GITHUB_ENV
             echo "image_name=datastrato/gravitino" >> $GITHUB_ENV
