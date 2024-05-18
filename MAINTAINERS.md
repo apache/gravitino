@@ -33,6 +33,7 @@ Contributors may be added by existing maintainers (see [Governance document](GOV
 |----------------|---------------------|------------------|
 | Kuan-Po Tseng  | brandboat           | opensource4you   |
 | Nicholas Jiang | SteNicholas         | Bilibili         |
+| Eric Chang     | unknowntpo          | Lawsnote         |
 | Sophie Sun     | SophieTech88        | ExtraHop Network |
 
 ## Review process
