@@ -17,6 +17,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -58,6 +59,12 @@ public class HDFSKerberosIT {
 
     System.setProperty("java.security.krb5.conf", "/tmp/krb5.conf");
     System.setProperty("sun.security.krb5.debug", "true");
+  }
+
+  @AfterAll
+  public static void tearDown() {
+    // Reset the UGI
+    UserGroupInformation.reset();
   }
 
   @Test
