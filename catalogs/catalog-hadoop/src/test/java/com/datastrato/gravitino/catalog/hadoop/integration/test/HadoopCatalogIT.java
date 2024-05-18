@@ -69,8 +69,8 @@ public class HadoopCatalogIT extends AbstractIT {
   public static void stop() throws IOException {
     Catalog catalog = metalake.loadCatalog(catalogName);
     catalog
-            .asSchemas()
-            .dropSchema(NameIdentifier.ofSchema(metalakeName, catalogName, schemaName), true);
+        .asSchemas()
+        .dropSchema(NameIdentifier.ofSchema(metalakeName, catalogName, schemaName), true);
     metalake.dropCatalog(catalogName);
     client.dropMetalake(metalakeName);
     if (hdfs != null) {

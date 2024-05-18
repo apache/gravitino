@@ -42,8 +42,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Gravitino Client for the administrator to interact with the Gravitino API, allowing the client to
@@ -168,14 +166,14 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
   @Override
   public boolean dropMetalake(String name) {
     checkMetalakeName(name);
-      DropResponse resp =
-          restClient.delete(
-              API_METALAKES_IDENTIFIER_PATH + name,
-              DropResponse.class,
-              Collections.emptyMap(),
-              ErrorHandlers.metalakeErrorHandler());
-      resp.validate();
-      return resp.dropped();
+    DropResponse resp =
+        restClient.delete(
+            API_METALAKES_IDENTIFIER_PATH + name,
+            DropResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.metalakeErrorHandler());
+    resp.validate();
+    return resp.dropped();
   }
 
   /**
