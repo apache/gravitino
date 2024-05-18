@@ -25,8 +25,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-it")
-public class KerberosizedHDFSTest {
-  private static final Logger LOG = LoggerFactory.getLogger(KerberosizedHDFSTest.class);
+public class HDFSKerberosIT {
+  private static final Logger LOG = LoggerFactory.getLogger(HDFSKerberosIT.class);
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static final String CLIENT_PRINCIPAL = "client@EXAMPLE.COM";
