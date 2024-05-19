@@ -40,6 +40,7 @@ Contributors may be added by existing maintainers (see [Governance document](GOV
 | Kang Zhou      | zhoukangcn          | Xiaomi           |
 | Han Zhang      | xiaozcy             | Xiaomi           |
 | Yu-Hsin Lai    | laiyousin           | Virginia Tech    |
+| Charlie Cheng  | charliecheng630     | cacaFly          |
 
 
 ## Review process
