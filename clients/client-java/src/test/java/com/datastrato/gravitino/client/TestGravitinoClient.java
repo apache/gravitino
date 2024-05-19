@@ -233,7 +233,9 @@ public class TestGravitinoClient extends TestBase {
     ErrorResponse errorResp = ErrorResponse.internalError("mock error");
     buildMockResource(
         Method.DELETE, "/api/metalakes/mock", null, errorResp, HttpStatus.SC_INTERNAL_SERVER_ERROR);
-    Assertions.assertFalse(client.dropMetalake("mock"));
+    Throwable excep =
+        Assertions.assertThrows(RuntimeException.class, () -> client.dropMetalake("mock"));
+    Assertions.assertTrue(excep.getMessage().contains("mock error"));
 
     // Test illegal metalake name identifier
     String badName = "mock.mock";
