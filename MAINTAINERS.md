@@ -37,6 +37,7 @@ Contributors may be added by existing maintainers (see [Governance document](GOV
 | Sophie Sun     | SophieTech88        | ExtraHop Network |
 | Ziva Li        | zivali              | Yahoo            |
 | Kang Zhou      | zhoukangcn          | Xiaomi           |
+| Han Zhang      | xiaozcy             | Xiaomi           |
 
 ## Review process
 
