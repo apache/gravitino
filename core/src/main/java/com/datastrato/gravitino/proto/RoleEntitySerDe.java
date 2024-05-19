@@ -35,7 +35,7 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
                     .collect(Collectors.toList()))
             .addAllPrivilegeEffects(
                 roleEntity.securableObjects().get(0).privileges().stream()
-                    .map(privilege -> privilege.effect().toString())
+                    .map(privilege -> privilege.condition().toString())
                     .collect(Collectors.toList()))
             .setSecurableObjectFullName(roleEntity.securableObjects().get(0).fullName())
             .setSecurableObjectType(roleEntity.securableObjects().get(0).type().name());
@@ -55,24 +55,24 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
    */
   @Override
   public RoleEntity deserialize(Role role, Namespace namespace) {
-    SecurableObject securableObject =
-        SecurableObjects.parse(
-            role.getSecurableObjectFullName(),
-            SecurableObject.Type.valueOf(role.getSecurableObjectType()));
+    List<Privilege> privileges = Lists.newArrayList();
 
     if (!role.getPrivilegesList().isEmpty()) {
-      List<Privilege> privileges = Lists.newArrayList();
 
       for (int index = 0; index < role.getPrivilegeEffectsCount(); index++) {
-        if (Privilege.Effect.ALLOW.name().equals(role.getPrivilegeEffects(index))) {
-          privileges.add(Privileges.allowPrivilegeFromString(role.getPrivileges(index)));
+        if (Privilege.Condition.ALLOW.name().equals(role.getPrivilegeEffects(index))) {
+          privileges.add(Privileges.allow(role.getPrivileges(index)));
         } else {
-          privileges.add(Privileges.denyPrivilegeFromString(role.getPrivileges(index)));
+          privileges.add(Privileges.deny(role.getPrivileges(index)));
         }
       }
-
-      securableObject.bindPrivileges(privileges);
     }
+
+    SecurableObject securableObject =
+        SecurableObjects.of(
+            role.getSecurableObjectFullName(),
+            SecurableObject.Type.valueOf(role.getSecurableObjectType()),
+            privileges);
 
     RoleEntity.Builder builder =
         RoleEntity.builder()

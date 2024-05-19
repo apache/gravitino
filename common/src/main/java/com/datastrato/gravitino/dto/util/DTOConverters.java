@@ -439,7 +439,10 @@ public class DTOConverters {
       return (PrivilegeDTO) privilege;
     }
 
-    return PrivilegeDTO.builder().withName(privilege.name()).withEffect(privilege.effect()).build();
+    return PrivilegeDTO.builder()
+        .withName(privilege.name())
+        .withEffect(privilege.condition())
+        .build();
   }
 
   /**

@@ -6,6 +6,7 @@ package com.datastrato.gravitino.meta;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Field;
+import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.file.Fileset;
 import com.google.common.collect.ImmutableMap;
@@ -265,7 +266,9 @@ public class TestEntity {
             .withId(1L)
             .withName(roleName)
             .withAuditInfo(auditInfo)
-            .withSecurableObject(SecurableObjects.ofCatalog(catalogName))
+            .withSecurableObject(
+                SecurableObjects.ofCatalog(
+                    catalogName, Lists.newArrayList(Privileges.UseCatalog.allow())))
             .withProperties(map)
             .build();
 
@@ -275,14 +278,17 @@ public class TestEntity {
     Assertions.assertEquals(auditInfo, fields.get(RoleEntity.AUDIT_INFO));
     Assertions.assertEquals(map, fields.get(RoleEntity.PROPERTIES));
     Assertions.assertEquals(
-        SecurableObjects.ofCatalog(catalogName), fields.get(RoleEntity.SECURABLE_OBJECT));
+        SecurableObjects.ofCatalog(catalogName, Lists.newArrayList(Privileges.UseCatalog.allow())),
+        fields.get(RoleEntity.SECURABLE_OBJECT));
 
     RoleEntity roleWithoutFields =
         RoleEntity.builder()
             .withId(1L)
             .withName(roleName)
             .withAuditInfo(auditInfo)
-            .withSecurableObject(SecurableObjects.ofCatalog(catalogName))
+            .withSecurableObject(
+                SecurableObjects.ofCatalog(
+                    catalogName, Lists.newArrayList(Privileges.UseCatalog.allow())))
             .build();
     Assertions.assertNull(roleWithoutFields.properties());
   }

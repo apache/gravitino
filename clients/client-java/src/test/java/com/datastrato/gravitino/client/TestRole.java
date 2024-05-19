@@ -63,8 +63,8 @@ public class TestRole extends TestBase {
     RoleResponse roleResponse = new RoleResponse(mockRole);
     buildMockResource(Method.POST, rolePath, request, roleResponse, SC_OK);
 
-    SecurableObject securableObject = SecurableObjects.ofCatalog("catalog");
-    securableObject.bindPrivileges(Lists.newArrayList(Privileges.UseCatalog.allow()));
+    SecurableObject securableObject =
+        SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
 
     Role createdRole =
         client.createRole(
@@ -164,11 +164,8 @@ public class TestRole extends TestBase {
     Assertions.assertEquals("schema", testParentRole.securableObjects().get(0).name());
     Assertions.assertEquals(
         SecurableObject.Type.SCHEMA, testParentRole.securableObjects().get(0).type());
-    Assertions.assertEquals(
-        "catalog", testParentRole.securableObjects().get(0).parent().fullName());
-    Assertions.assertEquals("catalog", testParentRole.securableObjects().get(0).parent().name());
-    Assertions.assertEquals(
-        SecurableObject.Type.CATALOG, testParentRole.securableObjects().get(0).parent().type());
+    Assertions.assertEquals("catalog", testParentRole.securableObjects().get(0).parentFullName());
+    Assertions.assertEquals("catalog", testParentRole.securableObjects().get(0).parentFullName());
   }
 
   @Test
@@ -193,8 +190,8 @@ public class TestRole extends TestBase {
   }
 
   private RoleDTO mockRoleDTO(String name) {
-    SecurableObject securableObject = SecurableObjects.ofCatalog("catalog");
-    securableObject.bindPrivileges(Lists.newArrayList(Privileges.UseCatalog.allow()));
+    SecurableObject securableObject =
+        SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
 
     return RoleDTO.builder()
         .withName(name)
@@ -206,9 +203,9 @@ public class TestRole extends TestBase {
   }
 
   private RoleDTO mockHasParentRoleDTO(String name) {
-    SecurableObject catalog = SecurableObjects.ofCatalog("catalog");
-    SecurableObject schema = SecurableObjects.ofSchema(catalog, "schema");
-    schema.bindPrivileges(Lists.newArrayList(Privileges.UseSchema.allow()));
+    SecurableObject schema =
+        SecurableObjects.ofSchema(
+            "catalog", "schema", Lists.newArrayList(Privileges.UseSchema.allow()));
     return RoleDTO.builder()
         .withName(name)
         .withProperties(ImmutableMap.of("k1", "v1"))
@@ -229,7 +226,8 @@ public class TestRole extends TestBase {
       Assertions.assertEquals(
           expectObject.privileges().get(0).name(), actualObject.privileges().get(0).name());
       Assertions.assertEquals(
-          expectObject.privileges().get(0).effect(), actualObject.privileges().get(0).effect());
+          expectObject.privileges().get(0).condition(),
+          actualObject.privileges().get(0).condition());
     }
     Assertions.assertEquals(
         expected.securableObjects().get(0).fullName(), actual.securableObjects().get(0).fullName());

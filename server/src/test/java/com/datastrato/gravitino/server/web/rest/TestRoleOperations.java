@@ -99,8 +99,8 @@ public class TestRoleOperations extends JerseyTest {
 
   @Test
   public void testCreateRole() {
-    SecurableObject securableObject = SecurableObjects.ofCatalog("catalog");
-    securableObject.bindPrivileges(Lists.newArrayList(Privileges.UseCatalog.allow()));
+    SecurableObject securableObject =
+        SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
 
     RoleCreateRequest req =
         new RoleCreateRequest(
@@ -126,15 +126,16 @@ public class TestRoleOperations extends JerseyTest {
     RoleDTO roleDTO = roleResponse.getRole();
     Assertions.assertEquals("role1", roleDTO.name());
     Assertions.assertEquals(
-        SecurableObjects.ofCatalog("catalog").fullName(),
+        SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()))
+            .fullName(),
         roleDTO.securableObjects().get(0).fullName());
     Assertions.assertEquals(1, roleDTO.securableObjects().get(0).privileges().size());
     Assertions.assertEquals(
         Privileges.UseCatalog.allow().name(),
         roleDTO.securableObjects().get(0).privileges().get(0).name());
     Assertions.assertEquals(
-        Privileges.UseCatalog.allow().effect(),
-        roleDTO.securableObjects().get(0).privileges().get(0).effect());
+        Privileges.UseCatalog.allow().condition(),
+        roleDTO.securableObjects().get(0).privileges().get(0).condition());
 
     // Test to throw NoSuchMetalakeException
     doThrow(new NoSuchMetalakeException("mock error"))
@@ -208,15 +209,16 @@ public class TestRoleOperations extends JerseyTest {
     Assertions.assertEquals("role1", roleDTO.name());
     Assertions.assertTrue(role.properties().isEmpty());
     Assertions.assertEquals(
-        SecurableObjects.ofCatalog("catalog").fullName(),
+        SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()))
+            .fullName(),
         roleDTO.securableObjects().get(0).fullName());
     Assertions.assertEquals(1, roleDTO.securableObjects().get(0).privileges().size());
     Assertions.assertEquals(
         Privileges.UseCatalog.allow().name(),
         roleDTO.securableObjects().get(0).privileges().get(0).name());
     Assertions.assertEquals(
-        Privileges.UseCatalog.allow().effect(),
-        roleDTO.securableObjects().get(0).privileges().get(0).effect());
+        Privileges.UseCatalog.allow().condition(),
+        roleDTO.securableObjects().get(0).privileges().get(0).condition());
 
     // Test to throw NoSuchMetalakeException
     doThrow(new NoSuchMetalakeException("mock error")).when(manager).getRole(any(), any());
@@ -263,8 +265,8 @@ public class TestRoleOperations extends JerseyTest {
   }
 
   private Role buildRole(String role) {
-    SecurableObject catalog = SecurableObjects.ofCatalog("catalog");
-    catalog.bindPrivileges(Lists.newArrayList(Privileges.UseCatalog.allow()));
+    SecurableObject catalog =
+        SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
     return RoleEntity.builder()
         .withId(1L)
         .withName(role)

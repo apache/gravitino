@@ -22,7 +22,6 @@ import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.authorization.Privilege;
 import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.SecurableObjects;
@@ -765,8 +764,8 @@ public class TestJDBCBackend {
 
   public static RoleEntity createRoleEntity(
       Long id, Namespace namespace, String name, AuditInfo auditInfo) {
-    SecurableObject securableObject = SecurableObjects.ofCatalog("catalog");
-    securableObject.bindPrivileges(Lists.newArrayList(Privileges.UseCatalog.allow()));
+    SecurableObject securableObject =
+        SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
 
     return RoleEntity.builder()
         .withId(id)
@@ -813,9 +812,7 @@ public class TestJDBCBackend {
       String name,
       AuditInfo auditInfo,
       SecurableObject securableObject,
-      List<Privilege> privileges,
       Map<String, String> properties) {
-    securableObject.bindPrivileges(privileges);
 
     return RoleEntity.builder()
         .withId(id)

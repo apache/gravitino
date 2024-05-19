@@ -44,13 +44,13 @@ import javax.annotation.Nullable;
 public interface SecurableObject {
 
   /**
-   * The parent securable object. If the securable object doesn't have parent, this method will
-   * return null.
+   * The parent full name of securable object. If the securable object doesn't have parent, this
+   * method will return null.
    *
-   * @return The parent securable object.
+   * @return The parent full name of securable object.
    */
   @Nullable
-  SecurableObject parent();
+  String parentFullName();
 
   /**
    * The name of th securable object.
@@ -82,13 +82,6 @@ public interface SecurableObject {
    * @return The privileges of the role.
    */
   List<Privilege> privileges();
-
-  /**
-   * After creating the securable object, you can bind some privileges for this securable object.
-   *
-   * @param privileges The privileges will bind to the securable object.
-   */
-  void bindPrivileges(List<Privilege> privileges);
 
   /**
    * The type of securable object in the Gravitino system. Every type will map one kind of the

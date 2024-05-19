@@ -81,20 +81,20 @@ public class RoleOperations {
           httpRequest,
           () -> {
             SecurableObject securableObject =
-                SecurableObjects.parse(
+                SecurableObjects.of(
                     request.getSecurableObjects()[0].fullName(),
-                    request.getSecurableObjects()[0].type());
-            securableObject.bindPrivileges(
-                request.getSecurableObjects()[0].privileges().stream()
-                    .map(
-                        privilege -> {
-                          if (privilege.effect().equals(Privilege.Effect.ALLOW)) {
-                            return Privileges.allowPrivilegeFromName(privilege.name());
-                          } else {
-                            return Privileges.denyPrivilegeFromName(privilege.name());
-                          }
-                        })
-                    .collect(Collectors.toList()));
+                    request.getSecurableObjects()[0].type(),
+                    request.getSecurableObjects()[0].privileges().stream()
+                        .map(
+                            privilege -> {
+                              if (privilege.condition().equals(Privilege.Condition.ALLOW)) {
+                                return Privileges.allow(privilege.name());
+                              } else {
+                                return Privileges.deny(privilege.name());
+                              }
+                            })
+                        .collect(Collectors.toList()));
+
             return Utils.ok(
                 new RoleResponse(
                     DTOConverters.toDTO(

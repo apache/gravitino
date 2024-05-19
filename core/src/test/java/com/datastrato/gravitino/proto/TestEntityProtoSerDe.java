@@ -381,9 +381,10 @@ public class TestEntityProtoSerDe {
         Namespace.of("metalake", Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.ROLE_SCHEMA_NAME);
     Long roleId = 1L;
     String roleName = "testRole";
-    SecurableObject securableObject = SecurableObjects.ofCatalog(catalogName);
-    securableObject.bindPrivileges(
-        Lists.newArrayList(Privileges.UseCatalog.allow(), Privileges.DropCatalog.deny()));
+    SecurableObject securableObject =
+        SecurableObjects.ofCatalog(
+            catalogName,
+            Lists.newArrayList(Privileges.UseCatalog.allow(), Privileges.DropCatalog.deny()));
 
     RoleEntity roleEntity =
         RoleEntity.builder()

@@ -1262,8 +1262,8 @@ public class TestEntityStorage {
   }
 
   private static RoleEntity createRole(Long id, String metalake, String name, AuditInfo auditInfo) {
-    SecurableObject securableObject = SecurableObjects.ofCatalog("catalog");
-    securableObject.bindPrivileges(Lists.newArrayList(Privileges.UseCatalog.allow()));
+    SecurableObject securableObject =
+        SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
 
     return RoleEntity.builder()
         .withId(id)

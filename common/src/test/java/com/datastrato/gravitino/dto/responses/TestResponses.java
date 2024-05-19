@@ -267,8 +267,8 @@ public class TestResponses {
   void testRoleResponse() throws IllegalArgumentException {
     AuditDTO audit =
         AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
-    SecurableObject securableObject = SecurableObjects.ofCatalog("catalog");
-    securableObject.bindPrivileges(Lists.newArrayList(Privileges.UseCatalog.allow()));
+    SecurableObject securableObject =
+        SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
     RoleDTO role =
         RoleDTO.builder()
             .withName("role1")

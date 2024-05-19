@@ -795,7 +795,7 @@ public class POConverters {
               JsonUtils.anyFieldMapper()
                   .writeValueAsString(
                       roleEntity.securableObjects().get(0).privileges().stream()
-                          .map(privilege -> privilege.effect().toString())
+                          .map(privilege -> privilege.condition().toString())
                           .collect(Collectors.toList())))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(roleEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
@@ -888,10 +888,6 @@ public class POConverters {
 
   public static RoleEntity fromRolePO(RolePO rolePO, Namespace namespace) {
     try {
-      SecurableObject securableObject =
-          SecurableObjects.parse(
-              rolePO.getSecurableObjectFullName(),
-              SecurableObject.Type.valueOf(rolePO.getSecurableObjectType()));
 
       List<String> privilegeNames =
           JsonUtils.anyFieldMapper()
@@ -902,13 +898,18 @@ public class POConverters {
 
       List<Privilege> privileges = Lists.newArrayList();
       for (int index = 0; index < privilegeNames.size(); index++) {
-        if (Privilege.Effect.ALLOW.name().equals(privilegeEffects.get(index))) {
-          privileges.add(Privileges.allowPrivilegeFromString(privilegeNames.get(index)));
+        if (Privilege.Condition.ALLOW.name().equals(privilegeEffects.get(index))) {
+          privileges.add(Privileges.allow(privilegeNames.get(index)));
         } else {
-          privileges.add(Privileges.allowPrivilegeFromString(privilegeNames.get(index)));
+          privileges.add(Privileges.allow(privilegeNames.get(index)));
         }
       }
-      securableObject.bindPrivileges(privileges);
+
+      SecurableObject securableObject =
+          SecurableObjects.of(
+              rolePO.getSecurableObjectFullName(),
+              SecurableObject.Type.valueOf(rolePO.getSecurableObjectType()),
+              privileges);
 
       return RoleEntity.builder()
           .withId(rolePO.getRoleId())

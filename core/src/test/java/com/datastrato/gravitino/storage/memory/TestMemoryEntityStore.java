@@ -16,6 +16,7 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.TestCatalog;
 import com.datastrato.gravitino.authorization.AuthorizationUtils;
+import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.file.Fileset;
@@ -30,6 +31,7 @@ import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.utils.Executable;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
@@ -226,7 +228,9 @@ public class TestMemoryEntityStore {
             .withName("role")
             .withNamespace(AuthorizationUtils.ofRoleNamespace("metalake"))
             .withAuditInfo(auditInfo)
-            .withSecurableObject(SecurableObjects.ofCatalog("catalog"))
+            .withSecurableObject(
+                SecurableObjects.ofCatalog(
+                    "catalog", Lists.newArrayList(Privileges.UseCatalog.allow())))
             .build();
 
     InMemoryEntityStore store = new InMemoryEntityStore();

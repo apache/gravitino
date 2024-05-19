@@ -16,7 +16,7 @@ public class PrivilegeDTO implements Privilege {
   private Name name;
 
   @JsonProperty("effect")
-  private Effect effect;
+  private Condition condition;
 
   /** Default constructor for Jackson deserialization. */
   protected PrivilegeDTO() {}
@@ -25,11 +25,11 @@ public class PrivilegeDTO implements Privilege {
    * Creates a new instance of PrivilegeDTO.
    *
    * @param name The name of the Privilege DTO.
-   * @param effect The effect of the Privilege DTO.
+   * @param condition The effect of the Privilege DTO.
    */
-  protected PrivilegeDTO(Name name, Effect effect) {
+  protected PrivilegeDTO(Name name, Condition condition) {
     this.name = name;
-    this.effect = effect;
+    this.condition = condition;
   }
 
   @Override
@@ -39,16 +39,16 @@ public class PrivilegeDTO implements Privilege {
 
   @Override
   public String simpleString() {
-    if (Effect.ALLOW.equals(effect)) {
-      return Privileges.allowPrivilegeFromName(name).simpleString();
+    if (Condition.ALLOW.equals(condition)) {
+      return Privileges.allow(name).simpleString();
     } else {
-      return Privileges.denyPrivilegeFromName(name).simpleString();
+      return Privileges.deny(name).simpleString();
     }
   }
 
   @Override
-  public Effect effect() {
-    return effect;
+  public Condition condition() {
+    return condition;
   }
 
   /** @return the builder for creating a new instance of PrivilegeDTO. */
@@ -60,7 +60,7 @@ public class PrivilegeDTO implements Privilege {
   public static class Builder {
 
     private Name name;
-    private Effect effect;
+    private Condition condition;
 
     /**
      * Sets the name of the privilege.
@@ -76,11 +76,11 @@ public class PrivilegeDTO implements Privilege {
     /**
      * Sets the effect of the privilege.
      *
-     * @param effect The effect of the privilege.
+     * @param condition The effect of the privilege.
      * @return The builder instance.
      */
-    public Builder withEffect(Effect effect) {
-      this.effect = effect;
+    public Builder withEffect(Condition condition) {
+      this.condition = condition;
       return this;
     }
 
@@ -92,8 +92,8 @@ public class PrivilegeDTO implements Privilege {
      */
     public PrivilegeDTO build() {
       Preconditions.checkArgument(name != null, "name cannot be null");
-      Preconditions.checkArgument(effect != null, "effect cannot be null");
-      return new PrivilegeDTO(name, effect);
+      Preconditions.checkArgument(condition != null, "effect cannot be null");
+      return new PrivilegeDTO(name, condition);
     }
   }
 }

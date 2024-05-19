@@ -6,8 +6,6 @@ package com.datastrato.gravitino.dto.authorization;
 
 import com.datastrato.gravitino.authorization.Privilege;
 import com.datastrato.gravitino.authorization.SecurableObject;
-import com.datastrato.gravitino.authorization.SecurableObjects;
-import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
@@ -28,7 +26,7 @@ public class SecurableObjectDTO implements SecurableObject {
   @JsonProperty("privileges")
   private PrivilegeDTO[] privileges;
 
-  private SecurableObject parent;
+  private String parent;
   private String name;
 
   /** Default constructor for Jackson deserialization. */
@@ -37,20 +35,29 @@ public class SecurableObjectDTO implements SecurableObject {
   /**
    * Creates a new instance of SecurableObject DTO.
    *
+   * @param privileges The privileges of the ScecurableObject DTO.
    * @param fullName The name of the SecurableObject DTO.
    * @param type The type of the securable object.
    */
-  protected SecurableObjectDTO(String fullName, Type type) {
-    SecurableObject securableObject = SecurableObjects.parse(fullName, type);
+  protected SecurableObjectDTO(String fullName, Type type, PrivilegeDTO[] privileges) {
     this.type = type;
     this.fullName = fullName;
-    this.parent = securableObject.parent();
-    this.name = securableObject.name();
+    int index = fullName.lastIndexOf(".");
+
+    if (index == -1) {
+      this.parent = null;
+      this.name = fullName;
+    } else {
+      this.parent = fullName.substring(0, index);
+      this.name = fullName.substring(index + 1);
+    }
+
+    this.privileges = privileges;
   }
 
   @Nullable
   @Override
-  public SecurableObject parent() {
+  public String parentFullName() {
     return parent;
   }
 
@@ -76,11 +83,6 @@ public class SecurableObjectDTO implements SecurableObject {
     }
 
     return Collections.unmodifiableList(Arrays.asList(privileges));
-  }
-
-  @Override
-  public void bindPrivileges(List<Privilege> privileges) {
-    this.privileges = privileges.stream().map(DTOConverters::toDTO).toArray(PrivilegeDTO[]::new);
   }
 
   /** @return the builder for creating a new instance of SecurableObjectDTO. */
@@ -142,9 +144,8 @@ public class SecurableObjectDTO implements SecurableObject {
       Preconditions.checkArgument(
           privileges != null && privileges.length != 0, "privileges can't be null or empty");
 
-      SecurableObjectDTO object = new SecurableObjectDTO(fullName, type);
+      SecurableObjectDTO object = new SecurableObjectDTO(fullName, type, privileges);
 
-      object.bindPrivileges(Arrays.asList(privileges));
       return object;
     }
   }
