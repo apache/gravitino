@@ -50,7 +50,9 @@ Contributors may be added by existing maintainers (see [Governance document](GOV
 | Can Cai        | caican00            | Xiaomi           |
 | Peidian Li     | coolderli           | Xiaomi           |
 | Lewis Jackson  | xnge                | opensource4you   |
+| Li-Hsing Liu   | austin362667        | opensource4you   |
 | Li Tianhang    | TEOTEO520           | Bilibili         |
+
 
 ## Review process
 
