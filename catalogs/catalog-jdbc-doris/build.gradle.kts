@@ -46,6 +46,7 @@ tasks {
     into("build/libs")
   }
   val copyCatalogLibs by registering(Copy::class) {
+    delete("build/libs")
     dependsOn("jar", "runtimeJars")
     from("build/libs")
     into("$rootDir/distribution/package/catalogs/jdbc-doris/libs")

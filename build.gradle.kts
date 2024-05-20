@@ -520,7 +520,6 @@ tasks {
   val outputDir = projectDir.dir("distribution")
 
   val compileDistribution by registering {
-    dependsOn(project.getTasksByName("clean", true))
     dependsOn("copySubprojectDependencies", "copyCatalogLibAndConfigs", "copySubprojectLib")
 
     group = "gravitino distribution"
@@ -635,6 +634,7 @@ tasks {
         it.name != "integration-test" &&
         it.name != "bundled-catalog"
       ) {
+        delete("${it.name}/build/libs")
         dependsOn("${it.name}:build")
         from("${it.name}/build/libs")
         into("distribution/package/libs")
