@@ -15,7 +15,7 @@ on:
           - 'gravitino-ci-doris'
           - 'trino'
           - 'hive'
-          - 'kerberos-hive'
+          - 'gravitino-ci-kerberos-hive'
       tag:
         description: 'Docker tag to apply to this image'
         required: true
