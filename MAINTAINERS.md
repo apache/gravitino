@@ -12,15 +12,15 @@ Maintainers may be added once approved by the existing maintainers (see [Governa
 | **NAME**      | **GitHub Username** | **Organization** |
 |---------------|---------------------|------------------|
 | Justin Mclean | justinmclean        | Datastrato       |
-| Heng Qin      | qqqttt123           | Datastrato       |
-| McHades       | mchades             | Datastrato       |
+| He Qi         | qqqttt123           | Datastrato       |
+| Minghuang Li  | mchades             | Datastrato       |
 | Xun Liu       | xunliu              | Datastrato       |
 | Hui Yu        | diqiu50             | Datastrato       |
 | Xiaojing Fang | FANNG1              | Datastrato       |
 | Qi Yu         | yuqi1129            | Datastrato       |
 | Clearvive     | Clearvive           | Datastrato       |
-| Cheyne        | ch3yne              | Datastrato       |
-| Jerry Shao    | jerryshao           | Datastrato       |
+| Decheng Liu   | ch3yne              | Datastrato       |
+| Saisai Shao   | jerryshao           | Datastrato       |
 | Shaofeng Shi  | shaofengshi         | Datastrato       |
 | Lisa Cao      | lisancao            | Datastrato       |
 | Qian Xia      | LauraXia123         | Datastrato       |

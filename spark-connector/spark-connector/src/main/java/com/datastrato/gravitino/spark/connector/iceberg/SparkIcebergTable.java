@@ -15,7 +15,9 @@ import org.apache.iceberg.spark.SparkCatalog;
 import org.apache.iceberg.spark.source.SparkTable;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.expressions.Transform;
+import org.apache.spark.sql.connector.read.ScanBuilder;
 import org.apache.spark.sql.types.StructType;
+import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
 /**
  * For spark-connector in Iceberg, it explicitly uses SparkTable to identify whether it is an
@@ -24,6 +26,7 @@ import org.apache.spark.sql.types.StructType;
 public class SparkIcebergTable extends SparkTable {
 
   private GravitinoTableInfoHelper gravitinoTableInfoHelper;
+  private org.apache.spark.sql.connector.catalog.Table sparkTable;
 
   public SparkIcebergTable(
       Identifier identifier,
@@ -36,6 +39,7 @@ public class SparkIcebergTable extends SparkTable {
     this.gravitinoTableInfoHelper =
         new GravitinoTableInfoHelper(
             true, identifier, gravitinoTable, propertiesConverter, sparkTransformConverter);
+    this.sparkTable = sparkTable;
   }
 
   @Override
@@ -57,6 +61,15 @@ public class SparkIcebergTable extends SparkTable {
   @Override
   public Transform[] partitioning() {
     return gravitinoTableInfoHelper.partitioning();
+  }
+
+  /**
+   * If using SparkIcebergTable not SparkTable, we must extract snapshotId or branchName using the
+   * Iceberg specific logic. It's hard to maintenance.
+   */
+  @Override
+  public ScanBuilder newScanBuilder(CaseInsensitiveStringMap options) {
+    return ((SparkTable) sparkTable).newScanBuilder(options);
   }
 
   private static boolean isCacheEnabled(SparkCatalog sparkCatalog) {
