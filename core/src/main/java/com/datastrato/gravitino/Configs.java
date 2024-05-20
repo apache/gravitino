@@ -277,7 +277,7 @@ public class Configs {
           .longConf()
           .createWithDefault(60 * 60 * 1000L);
 
-  ConfigEntry<Integer> METRICS_TIME_SLIDING_WINDOW_SECONDS =
+  public static final ConfigEntry<Integer> METRICS_TIME_SLIDING_WINDOW_SECONDS =
       new ConfigBuilder("gravitino.metrics.timeSlidingWindowSecs")
           .doc("The seconds of Gravitino metrics time sliding window")
           .version(ConfigConstants.VERSION_0_5_1)
