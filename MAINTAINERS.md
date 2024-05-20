@@ -18,7 +18,6 @@ Maintainers may be added once approved by the existing maintainers (see [Governa
 | Hui Yu        | diqiu50             | Datastrato       |
 | Xiaojing Fang | FANNG1              | Datastrato       |
 | Qi Yu         | yuqi1129            | Datastrato       |
-| Clearvive     | Clearvive           | Datastrato       |
 | Decheng Liu   | ch3yne              | Datastrato       |
 | Saisai Shao   | jerryshao           | Datastrato       |
 | Shaofeng Shi  | shaofengshi         | Datastrato       |
