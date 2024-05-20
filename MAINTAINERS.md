@@ -35,6 +35,8 @@ Contributors may be added by existing maintainers (see [Governance document](GOV
 | Nicholas Jiang | SteNicholas         | Bilibili         |
 | Eric Chang     | unknowntpo          | Lawsnote         |
 | Sophie Sun     | SophieTech88        | ExtraHop Network |
+| Xing Yong      | YxAc                | Xiaomi           |
+| Liwei Yang     | lw-yang             | Xiaomi           |
 | Yu-Ting Wang   | noidname01          | opensource4you   |
 | Ziva Li        | zivali              | Yahoo            |
 | Kang Zhou      | zhoukangcn          | Xiaomi           |
@@ -42,6 +44,7 @@ Contributors may be added by existing maintainers (see [Governance document](GOV
 | Yu-Hsin Lai    | laiyousin           | Virginia Tech    |
 | Charlie Cheng  | charliecheng630     | cacaFly          |
 | PoAn Yang      | FrankYang0592       | SUSE             |
+| JieBao Xiao    | xloya               | Xiaomi           |
 | Can Cai        | caican00            | Xiaomi           |
 
 
