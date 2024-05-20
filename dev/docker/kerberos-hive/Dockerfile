@@ -70,6 +70,7 @@ ENV HADOOP_COMMON_HOME=${HADOOP_INSTALL}
 ENV HADOOP_HDFS_HOME=${HADOOP_INSTALL}
 ENV HADOOP_CONF_DIR=${HADOOP_HOME}/etc/hadoop
 ENV YARN_HOME=${HADOOP_INSTALL}
+ENV KRB5CCNAME=krb5cc_cli_0
 
 ENV PATH=${JAVA_HOME}/bin:${HADOOP_HOME}/bin:${HADOOP_INSTALL}/sbin:${HIVE_HOME}/bin:${PATH}
 ENV CLASSPATH=${HADOOP_HOME}/lib/*:HIVE_HOME/lib/*:.
@@ -163,7 +164,7 @@ RUN rm -rf /tmp/packages
 
 ################################################################################
 # expose port
-EXPOSE 3306 9000 9083 10000 10002 50070 50075 50010 88 8000
+EXPOSE 3306 9000 9083 10000 10002 50070 50075 50010 88
 
 ################################################################################
 # create startup script and set ENTRYPOINT

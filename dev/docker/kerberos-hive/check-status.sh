@@ -13,7 +13,7 @@ else
   exit 1
 fi
 
-hive_ready=$(hive -e "show databases;" 2>&1)
+hive_ready=$(hive -e "select 1;" 2>&1)
 if [[ ${hive_ready} == *"FAILED"* ]]; then
   echo "Hive is not ready"
   exit 1
