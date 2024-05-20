@@ -4,19 +4,26 @@
  */
 package com.datastrato.gravitino.server.web.rest;
 
+import static com.datastrato.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
+import static com.datastrato.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
+import static com.datastrato.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.catalog.CatalogDispatcher;
 import com.datastrato.gravitino.catalog.CatalogManager;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.requests.CatalogCreateRequest;
 import com.datastrato.gravitino.dto.requests.CatalogUpdateRequest;
 import com.datastrato.gravitino.dto.requests.CatalogUpdatesRequest;
+import com.datastrato.gravitino.dto.responses.CatalogListResponse;
 import com.datastrato.gravitino.dto.responses.CatalogResponse;
 import com.datastrato.gravitino.dto.responses.DropResponse;
 import com.datastrato.gravitino.dto.responses.EntityListResponse;
@@ -25,6 +32,7 @@ import com.datastrato.gravitino.dto.responses.ErrorResponse;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
+import com.datastrato.gravitino.lock.LockManager;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.rest.RESTUtils;
@@ -43,7 +51,9 @@ import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 public class TestCatalogOperations extends JerseyTest {
 
@@ -57,6 +67,15 @@ public class TestCatalogOperations extends JerseyTest {
   }
 
   private CatalogManager manager = mock(CatalogManager.class);
+
+  @BeforeAll
+  public static void setup() {
+    Config config = mock(Config.class);
+    Mockito.doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
+    Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
+    Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
+    GravitinoEnv.getInstance().setLockManager(new LockManager(config));
+  }
 
   @Override
   protected Application configure() {
@@ -73,7 +92,7 @@ public class TestCatalogOperations extends JerseyTest {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(manager).to(CatalogManager.class).ranked(2);
+            bind(manager).to(CatalogDispatcher.class).ranked(2);
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });
@@ -108,6 +127,57 @@ public class TestCatalogOperations extends JerseyTest {
     doThrow(new NoSuchMetalakeException("mock error")).when(manager).listCatalogs(any());
     Response resp1 =
         target("/metalakes/metalake1/catalogs")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp1.getMediaType());
+
+    ErrorResponse errorResponse = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
+    Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
+  }
+
+  @Test
+  public void testListCatalogsInfo() {
+    TestCatalog catalog1 = buildCatalog("metalake1", "catalog1");
+    TestCatalog catalog2 = buildCatalog("metalake1", "catalog2");
+
+    when(manager.listCatalogsInfo(any())).thenReturn(new Catalog[] {catalog1, catalog2});
+
+    Response resp =
+        target("/metalakes/metalake1/catalogs")
+            .queryParam("details", "true")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+
+    CatalogListResponse catalogResponse = resp.readEntity(CatalogListResponse.class);
+    Assertions.assertEquals(0, catalogResponse.getCode());
+
+    CatalogDTO[] catalogDTOs = catalogResponse.getCatalogs();
+    Assertions.assertEquals(2, catalogDTOs.length);
+
+    CatalogDTO catalogDTO1 = catalogDTOs[0];
+    Assertions.assertEquals("catalog1", catalogDTO1.name());
+    Assertions.assertEquals(Catalog.Type.RELATIONAL, catalogDTO1.type());
+    Assertions.assertEquals("comment", catalogDTO1.comment());
+    Assertions.assertEquals(ImmutableMap.of("key", "value"), catalogDTO1.properties());
+
+    CatalogDTO catalogDTO2 = catalogDTOs[1];
+    Assertions.assertEquals("catalog2", catalogDTO2.name());
+    Assertions.assertEquals(Catalog.Type.RELATIONAL, catalogDTO2.type());
+    Assertions.assertEquals("comment", catalogDTO2.comment());
+    Assertions.assertEquals(ImmutableMap.of("key", "value"), catalogDTO2.properties());
+
+    doThrow(new NoSuchMetalakeException("mock error")).when(manager).listCatalogsInfo(any());
+    Response resp1 =
+        target("/metalakes/metalake1/catalogs")
+            .queryParam("details", "true")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .get();

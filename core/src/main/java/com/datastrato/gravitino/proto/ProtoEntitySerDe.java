@@ -6,6 +6,7 @@ package com.datastrato.gravitino.proto;
 
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntitySerDe;
+import com.datastrato.gravitino.Namespace;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.protobuf.Any;
@@ -37,6 +38,18 @@ public class ProtoEntitySerDe implements EntitySerDe {
           .put(
               "com.datastrato.gravitino.meta.FilesetEntity",
               "com.datastrato.gravitino.proto.FilesetEntitySerDe")
+          .put(
+              "com.datastrato.gravitino.meta.TopicEntity",
+              "com.datastrato.gravitino.proto.TopicEntitySerDe")
+          .put(
+              "com.datastrato.gravitino.meta.UserEntity",
+              "com.datastrato.gravitino.proto.UserEntitySerDe")
+          .put(
+              "com.datastrato.gravitino.meta.GroupEntity",
+              "com.datastrato.gravitino.proto.GroupEntitySerDe")
+          .put(
+              "com.datastrato.gravitino.meta.RoleEntity",
+              "com.datastrato.gravitino.proto.RoleEntitySerDe")
           .build();
 
   private static final Map<String, String> ENTITY_TO_PROTO =
@@ -52,7 +65,15 @@ public class ProtoEntitySerDe implements EntitySerDe {
           "com.datastrato.gravitino.meta.TableEntity",
           "com.datastrato.gravitino.proto.Table",
           "com.datastrato.gravitino.meta.FilesetEntity",
-          "com.datastrato.gravitino.proto.Fileset");
+          "com.datastrato.gravitino.proto.Fileset",
+          "com.datastrato.gravitino.meta.TopicEntity",
+          "com.datastrato.gravitino.proto.Topic",
+          "com.datastrato.gravitino.meta.UserEntity",
+          "com.datastrato.gravitino.proto.User",
+          "com.datastrato.gravitino.meta.GroupEntity",
+          "com.datastrato.gravitino.proto.Group",
+          "com.datastrato.gravitino.meta.RoleEntity",
+          "com.datastrato.gravitino.proto.Role");
 
   private final Map<Class<? extends Entity>, ProtoSerDe<? extends Entity, ? extends Message>>
       entityToSerDe;
@@ -71,7 +92,8 @@ public class ProtoEntitySerDe implements EntitySerDe {
   }
 
   @Override
-  public <T extends Entity> T deserialize(byte[] bytes, Class<T> clazz, ClassLoader classLoader)
+  public <T extends Entity> T deserialize(
+      byte[] bytes, Class<T> clazz, ClassLoader classLoader, Namespace namespace)
       throws IOException {
     Any any = Any.parseFrom(bytes);
     Class<? extends Message> protoClass = getProtoClass(clazz, classLoader);
@@ -81,7 +103,7 @@ public class ProtoEntitySerDe implements EntitySerDe {
     }
 
     Message anyMessage = any.unpack(protoClass);
-    return fromProto(anyMessage, clazz, classLoader);
+    return fromProto(anyMessage, clazz, classLoader, namespace);
   }
 
   private <T extends Entity, M extends Message> ProtoSerDe<T, M> getProtoSerde(
@@ -131,9 +153,9 @@ public class ProtoEntitySerDe implements EntitySerDe {
   }
 
   private <T extends Entity, M extends Message> T fromProto(
-      M m, Class<T> entityClass, ClassLoader classLoader) throws IOException {
+      M m, Class<T> entityClass, ClassLoader classLoader, Namespace namespace) throws IOException {
     ProtoSerDe<T, Message> protoSerDe = getProtoSerde(entityClass, classLoader);
-    return protoSerDe.deserialize(m);
+    return protoSerDe.deserialize(m, namespace);
   }
 
   private Class<?> loadClass(String className, ClassLoader classLoader) throws IOException {

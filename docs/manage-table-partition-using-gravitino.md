@@ -19,13 +19,13 @@ Although many catalogs inherently manage partitions automatically, there are sce
 
 The following table shows the partition operations supported across various catalogs in Gravitino:
 
-| Operation             | Hive catalog                                                                  | Iceberg catalog                                                               | Jdbc-Mysql catalog | Jdbc-PostgreSQL catalog |
-|-----------------------|-------------------------------------------------------------------------------|-------------------------------------------------------------------------------|--------------------|-------------------------|
-| Add Partition         | &#10004;                                                                      | &#10008;                                                                      | &#10008;           | &#10008;                |
-| Get Partition by Name | &#10004;                                                                      | &#10008;                                                                      | &#10008;           | &#10008;                |
-| List Partition Names  | &#10004;                                                                      | &#10008;                                                                      | &#10008;           | &#10008;                |
-| List Partitions       | &#10004;                                                                      | &#10008;                                                                      | &#10008;           | &#10008;                |
-| Drop Partition        | &#128640;([Coming Soon](https://github.com/datastrato/gravitino/issues/1655)) | &#128640;([Coming Soon](https://github.com/datastrato/gravitino/issues/1655)) | &#10008;           | &#10008;                |
+| Operation             | Hive catalog | Iceberg catalog                                                               | Jdbc-Mysql catalog | Jdbc-PostgreSQL catalog |
+|-----------------------|--------------|-------------------------------------------------------------------------------|--------------------|-------------------------|
+| Add Partition         | &#10004;     | &#10008;                                                                      | &#10008;           | &#10008;                |
+| Get Partition by Name | &#10004;     | &#10008;                                                                      | &#10008;           | &#10008;                |
+| List Partition Names  | &#10004;     | &#10008;                                                                      | &#10008;           | &#10008;                |
+| List Partitions       | &#10004;     | &#10008;                                                                      | &#10008;           | &#10008;                |
+| Drop Partition        | &#10004;     | &#128640;([Coming Soon](https://github.com/datastrato/gravitino/issues/1655)) | &#10008;           | &#10008;                |
 
 :::tip[WELCOME FEEDBACK]
 If you need additional partition management support for a specific catalog, please feel free to [create an issue](https://github.com/datastrato/gravitino/issues/new/choose) on the [Gravitino repository](https://github.com/datastrato/gravitino).
@@ -249,12 +249,12 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 GravitinoClient gravitinoClient = GravitinoClient
     .builder("http://127.0.0.1:8090")
+    .withMetalake("metalake")
     .build();
 
 // Assume that you have a partitioned table named "metalake.catalog.schema.table".
 Partition addedPartition = 
     gravitinoClient
-        .loadMetalake(NameIdentifier.of("metalake"))
         .loadCatalog(NameIdentifier.of("metalake", "catalog"))
         .asTableCatalog()
         .loadTable(NameIdentifier.of("metalake", "catalog", "schema", "table"))
@@ -294,12 +294,12 @@ If the partition name contains special characters, you should use [URL encoding]
 ```java
 GravitinoClient gravitinoClient = GravitinoClient
     .builder("http://127.0.0.1:8090")
+    .withMetalake("metalake")
     .build();
 
 // Assume that you have a partitioned table named "metalake.catalog.schema.table".
 Partition Partition = 
     gravitinoClient
-        .loadMetalake(NameIdentifier.of("metalake"))
         .loadCatalog(NameIdentifier.of("metalake", "catalog"))
         .asTableCatalog()
         .loadTable(NameIdentifier.of("metalake", "catalog", "schema", "table"))
@@ -330,12 +330,12 @@ http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tab
 ```java
 GravitinoClient gravitinoClient = GravitinoClient
     .builder("http://127.0.0.1:8090")
+    .withMetalake("metalake")
     .build();
 
 // Assume that you have a partitioned table named "metalake.catalog.schema.table".
 String[] partitionNames = 
     gravitinoClient
-        .loadMetalake(NameIdentifier.of("metalake"))
         .loadCatalog(NameIdentifier.of("metalake", "catalog"))
         .asTableCatalog()
         .loadTable(NameIdentifier.of("metalake", "catalog", "schema", "table"))
@@ -367,12 +367,51 @@ http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tab
 // Assume that you have a partitioned table named "metalake.catalog.schema.table".
 Partition[] partitions =
         gravitinoClient
-            .loadMetalake(NameIdentifier.of("metalake"))
             .loadCatalog(NameIdentifier.of("metalake", "catalog"))
             .asTableCatalog()
             .loadTable(NameIdentifier.of("metalake", "catalog", "schema", "table"))
             .supportPartitions()
             .listPartitions();
+```
+
+</TabItem>
+</Tabs>
+
+### Drop a partition by name
+
+You can drop a partition by its name via sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{partitioned_table_name}/partitions/{partition_name}` endpoint or by using the Gravitino Java client.
+The following is an example of dropping a partition by its name:
+
+<Tabs>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" \
+http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables/table/partitions/p20200321
+```
+
+:::tip
+If the partition name contains special characters, you should use [URL encoding](https://en.wikipedia.org/wiki/Percent-encoding#Reserved_characters). For example, if the partition name is `dt=2008-08-08/country=us` you should use `dt%3D2008-08-08%2Fcountry%3Dus` in the URL.
+:::
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+GravitinoClient gravitinoClient = GravitinoClient
+    .builder("http://127.0.0.1:8090")
+    .withMetalake("metalake")
+    .build();
+
+// Assume that you have a partitioned table named "metalake.catalog.schema.table".
+Partition Partition = 
+    gravitinoClient
+        .loadCatalog(NameIdentifier.of("metalake", "catalog"))
+        .asTableCatalog()
+        .loadTable(NameIdentifier.of("metalake", "catalog", "schema", "table"))
+        .supportPartitions()
+        .dropPartition("partition_name");
 ```
 
 </TabItem>

@@ -4,7 +4,8 @@
  */
 package com.datastrato.gravitino.catalog.hive;
 
-import com.datastrato.gravitino.catalog.TableOperations;
+import com.datastrato.gravitino.Entity;
+import com.datastrato.gravitino.connector.TableOperations;
 import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
@@ -19,6 +20,7 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -27,11 +29,15 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
+import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.UnknownTableException;
 import org.apache.parquet.Strings;
 import org.apache.thrift.TException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class HiveTableOperations implements TableOperations, SupportsPartitions {
+  public static final Logger LOG = LoggerFactory.getLogger(HiveTableOperations.class);
 
   private static final String PARTITION_NAME_DELIMITER = "/";
   private static final String PARTITION_VALUE_DELIMITER = "=";
@@ -127,6 +133,10 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
 
   @Override
   public Partition addPartition(Partition partition) throws PartitionAlreadyExistsException {
+    if (Entity.SECURABLE_ENTITY_RESERVED_NAME.equals(partition.name())) {
+      throw new IllegalArgumentException("Can't create a catalog with with reserved partition `*`");
+    }
+
     Preconditions.checkArgument(
         partition instanceof IdentityPartition, "Hive only supports identity partition");
     IdentityPartition identityPartition = (IdentityPartition) partition;
@@ -216,7 +226,108 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
 
   @Override
   public boolean dropPartition(String partitionName) {
-    throw new UnsupportedOperationException();
+    try {
+      Table hiveTable = table.clientPool().run(c -> c.getTable(table.schemaName(), table.name()));
+      // Get partitions that need to drop
+      // If the partition has child partition, then drop all the child partitions
+      // If the partition has no subpartitions, then just drop the partition
+      List<org.apache.hadoop.hive.metastore.api.Partition> partitions =
+          table
+              .clientPool()
+              .run(
+                  c ->
+                      c.listPartitions(
+                          table.schemaName(),
+                          table.name(),
+                          getFilterPartitionValueList(hiveTable, partitionName),
+                          (short) -1));
+      if (partitions.isEmpty()) {
+        throw new NoSuchPartitionException(
+            "Hive partition %s does not exist in Hive Metastore", partitionName);
+      }
+      // Delete partitions iteratively
+      for (org.apache.hadoop.hive.metastore.api.Partition partition : partitions) {
+        table
+            .clientPool()
+            .run(
+                c ->
+                    c.dropPartition(
+                        partition.getDbName(),
+                        partition.getTableName(),
+                        partition.getValues(),
+                        false));
+      }
+    } catch (NoSuchPartitionException e) {
+      return false;
+
+    } catch (UnknownTableException e) {
+      throw new NoSuchTableException(
+          e, "Hive table %s does not exist in Hive Metastore", table.name());
+
+    } catch (TException | InterruptedException e) {
+      throw new RuntimeException(
+          "Failed to get partition "
+              + partitionName
+              + " of table "
+              + table.name()
+              + "from Hive Metastore",
+          e);
+    }
+    return true;
+  }
+
+  /**
+   * Retrieve and complete partition field values from the given table and partitionSpec. The absent
+   * partition values will be filled with empty string.
+   *
+   * <p>For example, if the table is partitioned by column "log_date", "log_hour", "log_minute", and
+   * the partitionSpec is:
+   *
+   * <p>1) "log_date=2022-01-01/log_hour=01/log_minute=01", the return value should be
+   * ["2022-01-01", "01", "01"].
+   *
+   * <p>2) "log_date=2022-01-01", the return value should be ["2022-01-01", "", ""].
+   *
+   * <p>3) "log_hour=01", the return value should be ["", "01", ""].
+   *
+   * @param dropTable the table to get partition fields from
+   * @param partitionSpec partition in String format
+   * @return the filter partition list
+   * @throws IllegalArgumentException if the partitionSpec is not valid
+   */
+  private List<String> getFilterPartitionValueList(Table dropTable, String partitionSpec)
+      throws NoSuchPartitionException, IllegalArgumentException {
+    // Get all partition key names of the table
+    List<String> partitionKeys =
+        dropTable.getPartitionKeys().stream()
+            .map(FieldSchema::getName)
+            .collect(Collectors.toList());
+
+    // Split and process the partition specification string
+    Map<String, String> partSpecMap =
+        Arrays.stream(partitionSpec.split(PARTITION_NAME_DELIMITER))
+            .map(
+                part -> {
+                  String[] keyValue = part.split(PARTITION_VALUE_DELIMITER, 2);
+                  if (keyValue.length != 2) {
+                    throw new IllegalArgumentException("Error partition format: " + partitionSpec);
+                  }
+                  if (!partitionKeys.contains(keyValue[0])) {
+                    throw new NoSuchPartitionException(
+                        "Hive partition %s does not exist in Hive Metastore", partitionSpec);
+                  }
+                  return keyValue;
+                })
+            .collect(Collectors.toMap(keyValue -> keyValue[0], keyValue -> keyValue[1]));
+
+    // Retrieve or populate partition values from partSpecMap based on the table's partition key
+    // order
+    List<String> partitionValues =
+        partitionKeys.stream()
+            .map(key -> partSpecMap.getOrDefault(key, ""))
+            .collect(Collectors.toList());
+
+    return partitionValues;
   }
 
   @Override

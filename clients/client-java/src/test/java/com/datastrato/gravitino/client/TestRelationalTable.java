@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.client;
 
+import static com.datastrato.gravitino.dto.util.DTOConverters.fromDTOs;
 import static com.datastrato.gravitino.dto.util.DTOConverters.toDTO;
 import static org.apache.hc.core5.http.HttpStatus.SC_OK;
 import static org.apache.http.HttpStatus.SC_CONFLICT;
@@ -26,6 +27,7 @@ import com.datastrato.gravitino.dto.rel.partitions.RangePartitionDTO;
 import com.datastrato.gravitino.dto.requests.AddPartitionsRequest;
 import com.datastrato.gravitino.dto.requests.SchemaCreateRequest;
 import com.datastrato.gravitino.dto.requests.TableCreateRequest;
+import com.datastrato.gravitino.dto.responses.DropResponse;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
 import com.datastrato.gravitino.dto.responses.PartitionListResponse;
 import com.datastrato.gravitino.dto.responses.PartitionNameListResponse;
@@ -34,7 +36,6 @@ import com.datastrato.gravitino.dto.responses.SchemaResponse;
 import com.datastrato.gravitino.dto.responses.TableResponse;
 import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
 import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
-import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SupportsPartitions;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
@@ -53,7 +54,6 @@ import org.junit.jupiter.api.Test;
 
 public class TestRelationalTable extends TestRelationalCatalog {
 
-  private static Schema schema;
   private static Table partitionedTable;
   private static final String schemaName = "testSchema";
   private static final String partitionedTableName = "testPartitionedTable";
@@ -72,7 +72,7 @@ public class TestRelationalTable extends TestRelationalCatalog {
     SchemaResponse resp = new SchemaResponse(mockedSchema);
     buildMockResource(Method.POST, schemaPath, req, resp, SC_OK);
 
-    schema = catalog.asSchemas().createSchema(schemaId, "comment", Collections.emptyMap());
+    catalog.asSchemas().createSchema(schemaId, "comment", Collections.emptyMap());
 
     // setup partitioned table
     NameIdentifier tableId =
@@ -115,7 +115,7 @@ public class TestRelationalTable extends TestRelationalCatalog {
             .asTableCatalog()
             .createTable(
                 tableId,
-                columns,
+                fromDTOs(columns),
                 "comment",
                 Collections.emptyMap(),
                 partitioning,
@@ -156,15 +156,9 @@ public class TestRelationalTable extends TestRelationalCatalog {
         RangePartitionDTO.builder()
             .withName(partitionName)
             .withLower(
-                new LiteralDTO.Builder()
-                    .withDataType(Types.IntegerType.get())
-                    .withValue("1")
-                    .build())
+                LiteralDTO.builder().withDataType(Types.IntegerType.get()).withValue("1").build())
             .withUpper(
-                new LiteralDTO.Builder()
-                    .withDataType(Types.IntegerType.get())
-                    .withValue("10")
-                    .build())
+                LiteralDTO.builder().withDataType(Types.IntegerType.get()).withValue("10").build())
             .build();
     String partitionPath =
         withSlash(((RelationalTable) partitionedTable).getPartitionRequestPath());
@@ -196,15 +190,9 @@ public class TestRelationalTable extends TestRelationalCatalog {
         RangePartitionDTO.builder()
             .withName(partitionName)
             .withLower(
-                new LiteralDTO.Builder()
-                    .withDataType(Types.IntegerType.get())
-                    .withValue("1")
-                    .build())
+                LiteralDTO.builder().withDataType(Types.IntegerType.get()).withValue("1").build())
             .withUpper(
-                new LiteralDTO.Builder()
-                    .withDataType(Types.IntegerType.get())
-                    .withValue("10")
-                    .build())
+                LiteralDTO.builder().withDataType(Types.IntegerType.get()).withValue("10").build())
             .build();
     RelationalTable table = (RelationalTable) partitionedTable;
     String partitionPath =
@@ -260,5 +248,24 @@ public class TestRelationalTable extends TestRelationalCatalog {
         Assertions.assertThrows(
             PartitionAlreadyExistsException.class, () -> partitions.addPartition(partition));
     Assertions.assertEquals("partition already exists", exception.getMessage());
+  }
+
+  @Test
+  public void testDropPartition() throws JsonProcessingException {
+    String partitionName = "p1";
+
+    RelationalTable table = (RelationalTable) partitionedTable;
+    String partitionPath =
+        withSlash(
+            RelationalTable.formatPartitionRequestPath(
+                table.getPartitionRequestPath(), partitionName));
+    DropResponse resp = new DropResponse(true);
+    buildMockResource(Method.DELETE, partitionPath, null, resp, SC_OK);
+    Assertions.assertTrue(table.supportPartitions().dropPartition(partitionName));
+
+    // test not exist exception
+    DropResponse notExistResp = new DropResponse(false);
+    buildMockResource(Method.DELETE, partitionPath, null, notExistResp, SC_OK);
+    Assertions.assertFalse(table.supportPartitions().dropPartition(partitionName));
   }
 }

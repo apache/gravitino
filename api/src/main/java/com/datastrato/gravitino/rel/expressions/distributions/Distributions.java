@@ -7,6 +7,7 @@ package com.datastrato.gravitino.rel.expressions.distributions;
 import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import java.util.Arrays;
+import java.util.Objects;
 
 /** Helper methods to create distributions to pass into Gravitino. */
 public class Distributions {
@@ -131,6 +132,39 @@ public class Distributions {
     @Override
     public Expression[] expressions() {
       return expressions;
+    }
+
+    @Override
+    public String toString() {
+      return "DistributionImpl{"
+          + "strategy="
+          + strategy
+          + ", number="
+          + number
+          + ", expressions="
+          + Arrays.toString(expressions)
+          + '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      DistributionImpl that = (DistributionImpl) o;
+      return number == that.number
+          && strategy == that.strategy
+          && Arrays.equals(expressions, that.expressions);
+    }
+
+    @Override
+    public int hashCode() {
+      int result = Objects.hash(strategy, number);
+      result = 31 * result + Arrays.hashCode(expressions);
+      return result;
     }
 
     /** Builder to create a distribution. */

@@ -4,8 +4,13 @@
  */
 package com.datastrato.gravitino.dto.requests;
 
+import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+
+import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.indexes.Index;
+import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Types;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableList;
@@ -24,6 +29,12 @@ public class TestTableUpdatesRequest {
             new TableUpdateRequest.RemoveTablePropertyRequest("key"),
             new TableUpdateRequest.RenameTableColumnRequest(
                 new String[] {"oldColumn"}, "newColumn"),
+            new TableUpdateRequest.UpdateTableColumnDefaultValueRequest(
+                new String[] {"column"},
+                LiteralDTO.builder()
+                    .withDataType(Types.DateType.get())
+                    .withValue("2023-04-01")
+                    .build()),
             new TableUpdateRequest.UpdateTableColumnTypeRequest(
                 new String[] {"column"}, Types.StringType.get()),
             new TableUpdateRequest.UpdateTableColumnCommentRequest(
@@ -62,6 +73,17 @@ public class TestTableUpdatesRequest {
             + "        \"oldColumn\"\n"
             + "      ],\n"
             + "      \"newFieldName\": \"newColumn\"\n"
+            + "    },\n"
+            + "    {\n"
+            + "      \"@type\": \"updateColumnDefaultValue\",\n"
+            + "      \"fieldName\": [\n"
+            + "        \"column\"\n"
+            + "      ],\n"
+            + "      \"newDefaultValue\": {\n"
+            + "        \"type\": \"literal\",\n"
+            + "        \"dataType\": \"date\",\n"
+            + "        \"value\": \"2023-04-01\"\n"
+            + "      }\n"
             + "    },\n"
             + "    {\n"
             + "      \"@type\": \"updateColumnType\",\n"
@@ -110,6 +132,24 @@ public class TestTableUpdatesRequest {
 
     setTablePropertyRequest = new TableUpdateRequest.SetTablePropertyRequest("key", "");
     Assertions.assertDoesNotThrow(setTablePropertyRequest::validate);
+
+    // test validate DEFAULT_VALUE_NOT_SET or null property value
+    TableUpdateRequest.UpdateTableColumnDefaultValueRequest updateTableColumnDefaultValueRequest =
+        new TableUpdateRequest.UpdateTableColumnDefaultValueRequest(
+            new String[] {"key"}, DEFAULT_VALUE_NOT_SET);
+    Throwable exception1 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, updateTableColumnDefaultValueRequest::validate);
+    Assertions.assertTrue(
+        exception1.getMessage().contains("field is required and cannot be empty"));
+
+    updateTableColumnDefaultValueRequest =
+        new TableUpdateRequest.UpdateTableColumnDefaultValueRequest(new String[] {"key"}, null);
+    Throwable exception2 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, updateTableColumnDefaultValueRequest::validate);
+    Assertions.assertTrue(
+        exception2.getMessage().contains("field is required and cannot be empty"));
   }
 
   @Test
@@ -120,7 +160,9 @@ public class TestTableUpdatesRequest {
             Types.StringType.get(),
             "comment",
             TableChange.ColumnPosition.after("afterColumn"),
-            false);
+            false,
+            false,
+            LiteralDTO.builder().withDataType(Types.StringType.get()).withValue("hello").build());
     String jsonString = JsonUtils.objectMapper().writeValueAsString(addTableColumnRequest);
     String expected =
         "{\n"
@@ -133,7 +175,13 @@ public class TestTableUpdatesRequest {
             + "  \"position\": {\n"
             + "    \"after\": \"afterColumn\"\n"
             + "  },\n"
-            + "  \"nullable\": false\n"
+            + "  \"nullable\": false,\n"
+            + "  \"autoIncrement\": false,\n"
+            + "  \"defaultValue\": {\n"
+            + "    \"type\": \"literal\",\n"
+            + "    \"dataType\": \"string\",\n"
+            + "    \"value\": \"hello\"\n"
+            + "  }\n"
             + "}";
     Assertions.assertEquals(
         JsonUtils.objectMapper().readTree(expected), JsonUtils.objectMapper().readTree(jsonString));
@@ -155,7 +203,8 @@ public class TestTableUpdatesRequest {
             + "  \"type\": \"string\",\n"
             + "  \"comment\": \"test default nullability\",\n"
             + "  \"position\": \"first\",\n"
-            + "  \"nullable\": true\n"
+            + "  \"nullable\": true,\n"
+            + "  \"autoIncrement\": false\n"
             + "}";
     Assertions.assertEquals(
         JsonUtils.objectMapper().readTree(expected), JsonUtils.objectMapper().readTree(jsonString));
@@ -181,7 +230,8 @@ public class TestTableUpdatesRequest {
             + "  \"type\": \"string\",\n"
             + "  \"comment\": \"test default position\",\n"
             + "  \"position\": \"default\",\n"
-            + "  \"nullable\": true\n"
+            + "  \"nullable\": true,\n"
+            + "  \"autoIncrement\": false\n"
             + "}";
     Assertions.assertEquals(
         JsonUtils.objectMapper().readTree(expected), JsonUtils.objectMapper().readTree(jsonString));
@@ -192,5 +242,37 @@ public class TestTableUpdatesRequest {
                     TableUpdateRequest.AddTableColumnRequest.class)
                 .getPosition()
             instanceof TableChange.Default);
+  }
+
+  @Test
+  public void testOperationTableIndexRequest() throws JsonProcessingException {
+    // check add index request
+    TableUpdateRequest tableUpdateRequest =
+        new TableUpdateRequest.AddTableIndexRequest(
+            Index.IndexType.PRIMARY_KEY,
+            Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME,
+            new String[][] {{"column1"}});
+    String jsonString = JsonUtils.objectMapper().writeValueAsString(tableUpdateRequest);
+    String expected =
+        "{\"@type\":\"addTableIndex\",\"index\":{\"indexType\":\"PRIMARY_KEY\",\"name\":\"PRIMARY\",\"fieldNames\":[[\"column1\"]]}}";
+    Assertions.assertEquals(
+        JsonUtils.objectMapper().readTree(expected), JsonUtils.objectMapper().readTree(jsonString));
+
+    tableUpdateRequest =
+        new TableUpdateRequest.AddTableIndexRequest(
+            Index.IndexType.UNIQUE_KEY, "uk_2", new String[][] {{"column2"}});
+    jsonString = JsonUtils.objectMapper().writeValueAsString(tableUpdateRequest);
+    expected =
+        "{\"@type\":\"addTableIndex\",\"index\":{\"indexType\":\"UNIQUE_KEY\",\"name\":\"uk_2\",\"fieldNames\":[[\"column2\"]]}}";
+    Assertions.assertEquals(
+        JsonUtils.objectMapper().readTree(expected), JsonUtils.objectMapper().readTree(jsonString));
+
+    // check delete index request
+    TableUpdateRequest.DeleteTableIndexRequest deleteTableIndexRequest =
+        new TableUpdateRequest.DeleteTableIndexRequest("uk_2", true);
+    jsonString = JsonUtils.objectMapper().writeValueAsString(deleteTableIndexRequest);
+    expected = "{\"@type\":\"deleteTableIndex\",\"name\":\"uk_2\",\"ifExists\":true}";
+    Assertions.assertEquals(
+        JsonUtils.objectMapper().readTree(expected), JsonUtils.objectMapper().readTree(jsonString));
   }
 }

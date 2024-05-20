@@ -218,6 +218,7 @@
    ./api/src/main/java/com/datastrato/gravitino/rel/expressions/transforms/Transform.java
    ./api/src/main/java/com/datastrato/gravitino/rel/expressions/Expression.java
    ./api/src/main/java/com/datastrato/gravitino/rel/expressions/NamedReference.java
+   ./integration-test/src/test/java/com/datastrato/gravitino/integration/test/util/spark/SparkUtilIT.java
 
    Apache Iceberg
    ./api/src/main/java/com/datastrato/gravitino/exceptions/RESTException.java
@@ -246,8 +247,8 @@
    ./catalogs/catalog-hive/src/test/resources/hive-schema-3.1.0.derby.sql
 
    Apache Zeppelin
-   ./integration-test/src/test/java/com/datastrato/gravitino/integration/test/util/CommandExecutor.java
-   ./integration-test/src/test/java/com/datastrato/gravitino/integration/test/util/ProcessData.java
+   ./integration-test-common/src/test/java/com/datastrato/gravitino/integration/test/util/CommandExecutor.java
+   ./integration-test-common/src/test/java/com/datastrato/gravitino/integration/test/util/ProcessData.java
    ./web/WEB-INF/web.xml
 
    Apache Hadoop
@@ -259,11 +260,27 @@
    ./server-common/src/main/java/com/datastrato/gravitino/server/auth/KerberosServerUtils.java
 
    Apache Kafka
+   ./catalogs/catalog-kafka/src/test/resources/run
    ./core/src/main/java/com/datastrato/gravitino/utils/Bytes.java
 
    Apache Submarine
    ./bin/common.sh
 
+   Confluent Kafka Streams Examples
+   ./catalogs/catalog-kafka/src/test/java/com/datastrato/gravitino/catalog/kafka/embedded/KafkaClusterEmbedded.java
+   ./catalogs/catalog-kafka/src/test/java/com/datastrato/gravitino/catalog/kafka/embedded/KafkaEmbedded.java
+   ./catalogs/catalog-kafka/src/test/java/com/datastrato/gravitino/catalog/kafka/embedded/ZooKeeperEmbedded.java
+
    Trino
-   ./integration-test/src/main/java/com/datastrato/gravitino/integration/test/util/CloseableGroup.java
+   ./integration-test-common/src/test/java/com/datastrato/gravitino/integration/test/util/CloseableGroup.java
    ./trino-connector/src/main/java/com/datastrato/gravitino/trino/connector/catalog/hive/SortingColumn.java
+
+   Apache Arrow
+   ./dev/ci/util_free_space.sh
+
+This product bundles a third-party component under the
+   MIT License.
+
+   Kyligence/kylinpy
+   ./clients/client-python/gravitino/utils/exceptions.py
+   ./clients/client-python/gravitino/utils/http_client.py

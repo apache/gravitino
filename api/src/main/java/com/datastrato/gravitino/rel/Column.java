@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.rel;
 
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.FunctionExpression;
 import com.datastrato.gravitino.rel.types.Type;
@@ -21,6 +22,7 @@ import java.util.Objects;
  * TableCatalog#createTable(NameIdentifier, Column[], String, Map)}, and report it in {@link
  * Table#columns()} a default value and a generation expression.
  */
+@Evolving
 public interface Column {
 
   /**
@@ -181,7 +183,7 @@ public interface Column {
       if (this == o) {
         return true;
       }
-      if (o == null || getClass() != o.getClass()) {
+      if (!(o instanceof ColumnImpl)) {
         return false;
       }
       ColumnImpl column = (ColumnImpl) o;

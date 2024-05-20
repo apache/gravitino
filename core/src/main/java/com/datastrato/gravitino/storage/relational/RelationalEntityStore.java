@@ -17,7 +17,6 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
-import com.datastrato.gravitino.storage.relational.mysql.MySQLBackend;
 import com.datastrato.gravitino.utils.Executable;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -35,12 +34,15 @@ public class RelationalEntityStore implements EntityStore {
   private static final Logger LOGGER = LoggerFactory.getLogger(RelationalEntityStore.class);
   public static final ImmutableMap<String, String> RELATIONAL_BACKENDS =
       ImmutableMap.of(
-          Configs.DEFAULT_ENTITY_RELATIONAL_STORE, MySQLBackend.class.getCanonicalName());
+          Configs.DEFAULT_ENTITY_RELATIONAL_STORE, JDBCBackend.class.getCanonicalName());
   private RelationalBackend backend;
+  private RelationalGarbageCollector garbageCollector;
 
   @Override
   public void initialize(Config config) throws RuntimeException {
     this.backend = createRelationalEntityBackend(config);
+    this.garbageCollector = new RelationalGarbageCollector(backend, config);
+    this.garbageCollector.start();
   }
 
   private static RelationalBackend createRelationalEntityBackend(Config config) {
@@ -94,17 +96,17 @@ public class RelationalEntityStore implements EntityStore {
   public <E extends Entity & HasIdentifier> E get(
       NameIdentifier ident, Entity.EntityType entityType, Class<E> e)
       throws NoSuchEntityException, IOException {
-    E entity = backend.get(ident, entityType);
-    if (entity == null) {
-      throw new NoSuchEntityException("No such entity:%s", ident.toString());
-    }
-    return entity;
+    return backend.get(ident, entityType);
   }
 
   @Override
   public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
       throws IOException {
-    return backend.delete(ident, entityType, cascade);
+    try {
+      return backend.delete(ident, entityType, cascade);
+    } catch (NoSuchEntityException nse) {
+      return false;
+    }
   }
 
   @Override
@@ -114,6 +116,7 @@ public class RelationalEntityStore implements EntityStore {
 
   @Override
   public void close() throws IOException {
+    garbageCollector.close();
     backend.close();
   }
 }

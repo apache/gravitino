@@ -8,7 +8,10 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper.IcebergTableChange;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.utils.IcebergCatalogUtil;
+import com.datastrato.gravitino.utils.IsolatedClassLoader;
 import com.google.common.base.Preconditions;
+import java.sql.Driver;
+import java.sql.DriverManager;
 import java.util.Collections;
 import java.util.Optional;
 import javax.ws.rs.NotSupportedException;
@@ -29,17 +32,22 @@ import org.apache.iceberg.rest.responses.ListNamespacesResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class IcebergTableOps implements AutoCloseable {
+  public static final Logger LOG = LoggerFactory.getLogger(IcebergTableOps.class);
 
   protected Catalog catalog;
   private SupportsNamespaces asNamespaceCatalog;
+  private final String catalogType;
+  private String catalogUri = null;
 
   public IcebergTableOps(IcebergConfig icebergConfig) {
-    String catalogType = icebergConfig.get(IcebergConfig.CATALOG_BACKEND);
+    this.catalogType = icebergConfig.get(IcebergConfig.CATALOG_BACKEND);
     if (!IcebergCatalogBackend.MEMORY.name().equalsIgnoreCase(catalogType)) {
       icebergConfig.get(IcebergConfig.CATALOG_WAREHOUSE);
-      icebergConfig.get(IcebergConfig.CATALOG_URI);
+      this.catalogUri = icebergConfig.get(IcebergConfig.CATALOG_URI);
     }
     catalog = IcebergCatalogUtil.loadCatalogBackend(catalogType, icebergConfig.getAllConfig());
     if (catalog instanceof SupportsNamespaces) {
@@ -141,5 +149,54 @@ public class IcebergTableOps implements AutoCloseable {
       // JdbcCatalog need close.
       ((AutoCloseable) catalog).close();
     }
+
+    // Because each catalog in Gravitino has its own classloader, after a catalog is no longer used
+    // for a long time or dropped, the instance of classloader needs to be released. In order to
+    // let JVM GC remove the classloader, we need to release the resources of the classloader. The
+    // resources include the driver of the catalog backend and the
+    // AbandonedConnectionCleanupThread of MySQL. For more information about
+    // AbandonedConnectionCleanupThread, please refer to the corresponding java doc of MySQL
+    // driver.
+    if (catalogUri != null && catalogUri.contains("mysql")) {
+      closeMySQLCatalogResource();
+    } else if (catalogUri != null && catalogUri.contains("postgresql")) {
+      closePostgreSQLCatalogResource();
+    } else if (catalogType.equalsIgnoreCase(IcebergCatalogBackend.HIVE.name())) {
+      // TODO(yuqi) add close for other catalog types such Hive catalog
+    }
+  }
+
+  private void closeMySQLCatalogResource() {
+    try {
+      // Close thread AbandonedConnectionCleanupThread if we are using `com.mysql.cj.jdbc.Driver`,
+      // for driver `com.mysql.jdbc.Driver` (deprecated), the daemon thead maybe not this one.
+      Class.forName("com.mysql.cj.jdbc.AbandonedConnectionCleanupThread")
+          .getMethod("uncheckedShutdown")
+          .invoke(null);
+      LOG.info("AbandonedConnectionCleanupThread has been shutdown...");
+
+      // Unload the MySQL driver, only Unload the driver if it is loaded by
+      // IsolatedClassLoader.
+      closeDriverLoadedByIsolatedClassLoader(catalogUri);
+    } catch (Exception e) {
+      LOG.warn("Failed to shutdown AbandonedConnectionCleanupThread or deregister MySQL driver", e);
+    }
+  }
+
+  private void closeDriverLoadedByIsolatedClassLoader(String uri) {
+    try {
+      Driver driver = DriverManager.getDriver(uri);
+      if (driver.getClass().getClassLoader().getClass()
+          == IsolatedClassLoader.CUSTOM_CLASS_LOADER_CLASS) {
+        DriverManager.deregisterDriver(driver);
+        LOG.info("Driver {} has been deregistered...", driver);
+      }
+    } catch (Exception e) {
+      LOG.warn("Failed to deregister driver", e);
+    }
+  }
+
+  private void closePostgreSQLCatalogResource() {
+    closeDriverLoadedByIsolatedClassLoader(catalogUri);
   }
 }

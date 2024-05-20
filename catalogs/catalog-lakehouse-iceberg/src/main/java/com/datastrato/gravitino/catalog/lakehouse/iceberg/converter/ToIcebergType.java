@@ -17,11 +17,9 @@ import org.apache.iceberg.types.Types;
 public class ToIcebergType extends ToIcebergTypeVisitor<Type> {
   private final com.datastrato.gravitino.rel.types.Types.StructType root;
   private int nextId = 0;
-  private boolean nullable;
 
-  public ToIcebergType(boolean nullable) {
+  public ToIcebergType() {
     this.root = null;
-    this.nullable = nullable;
   }
 
   public ToIcebergType(com.datastrato.gravitino.rel.types.Types.StructType root) {
@@ -34,10 +32,12 @@ public class ToIcebergType extends ToIcebergTypeVisitor<Type> {
     return nextId++;
   }
 
+  @SuppressWarnings("ReferenceEquality")
   @Override
   public Type struct(com.datastrato.gravitino.rel.types.Types.StructType struct, List<Type> types) {
     com.datastrato.gravitino.rel.types.Types.StructType.Field[] fields = struct.fields();
     List<Types.NestedField> newFields = Lists.newArrayListWithExpectedSize(fields.length);
+    // Comparing the root node by reference equality.
     boolean isRoot = root == struct;
     for (int i = 0; i < fields.length; i += 1) {
       com.datastrato.gravitino.rel.types.Types.StructType.Field field = fields[i];
@@ -70,7 +70,7 @@ public class ToIcebergType extends ToIcebergTypeVisitor<Type> {
 
   @Override
   public Type array(com.datastrato.gravitino.rel.types.Types.ListType array, Type elementType) {
-    if (nullable) {
+    if (array.elementNullable()) {
       return Types.ListType.ofOptional(getNextId(), elementType);
     } else {
       return Types.ListType.ofRequired(getNextId(), elementType);
@@ -80,7 +80,7 @@ public class ToIcebergType extends ToIcebergTypeVisitor<Type> {
   @Override
   public Type map(
       com.datastrato.gravitino.rel.types.Types.MapType map, Type keyType, Type valueType) {
-    if (nullable) {
+    if (map.valueNullable()) {
       return Types.MapType.ofOptional(getNextId(), getNextId(), keyType, valueType);
     } else {
       return Types.MapType.ofRequired(getNextId(), getNextId(), keyType, valueType);

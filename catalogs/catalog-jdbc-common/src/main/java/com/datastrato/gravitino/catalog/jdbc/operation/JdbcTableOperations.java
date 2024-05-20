@@ -18,6 +18,7 @@ import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.Expression;
+import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
@@ -46,6 +47,9 @@ public abstract class JdbcTableOperations implements TableOperation {
 
   public static final String COMMENT = "COMMENT";
   public static final String SPACE = " ";
+
+  public static final String MODIFY_COLUMN = "MODIFY COLUMN ";
+  public static final String AFTER = "AFTER ";
 
   protected static final Logger LOG = LoggerFactory.getLogger(JdbcTableOperations.class);
 
@@ -76,13 +80,15 @@ public abstract class JdbcTableOperations implements TableOperation {
       String comment,
       Map<String, String> properties,
       Transform[] partitioning,
+      Distribution distribution,
       Index[] indexes)
       throws TableAlreadyExistsException {
     LOG.info("Attempting to create table {} in database {}", tableName, databaseName);
     try (Connection connection = getConnection(databaseName)) {
       JdbcConnectorUtils.executeUpdate(
           connection,
-          generateCreateTableSql(tableName, columns, comment, properties, partitioning, indexes));
+          generateCreateTableSql(
+              tableName, columns, comment, properties, partitioning, distribution, indexes));
       LOG.info("Created table {} in database {}", tableName, databaseName);
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
@@ -118,32 +124,44 @@ public abstract class JdbcTableOperations implements TableOperation {
     }
   }
 
+  /**
+   * Get table information from the result set and attach it to the table builder, If the table is
+   * not found, it will throw a NoSuchTableException.
+   *
+   * @param tablesResult The result set of the table
+   * @return The builder of the table to be returned
+   */
+  protected JdbcTable.Builder getTableBuilder(
+      ResultSet tablesResult, String databaseName, String tableName) throws SQLException {
+    boolean found = false;
+    JdbcTable.Builder builder = null;
+    while (tablesResult.next() && !found) {
+      if (Objects.equals(tablesResult.getString("TABLE_NAME"), tableName)) {
+        builder = getBasicJdbcTableInfo(tablesResult);
+        found = true;
+      }
+    }
+
+    if (!found) {
+      throw new NoSuchTableException("Table %s does not exist in %s.", tableName, databaseName);
+    }
+
+    return builder;
+  }
+
   @Override
   public JdbcTable load(String databaseName, String tableName) throws NoSuchTableException {
-    // We should handle case sensitivity and wild card issue in some catalog tables, take a MySQL
-    // table for example.
+    // We should handle case sensitivity and wild card issue in some catalog tables, take MySQL
+    // tables, for example.
     // 1. MySQL will get table 'a_b' and 'A_B' when we query 'a_b' in a case-insensitive charset
     // like utf8mb4.
     // 2. MySQL treats 'a_b' as a wildcard, matching any table name that begins with 'a', followed
     // by any character, and ending with 'b'.
     try (Connection connection = getConnection(databaseName)) {
-      // 1.Get table information
-      ResultSet table = getTable(connection, databaseName, tableName);
-      // The result of tables may be more than one due to the reason above, so we need to check the
-      // result
-      JdbcTable.Builder jdbcTableBuilder = new JdbcTable.Builder();
-      boolean found = false;
-      // Handle case-sensitive issues.
-      while (table.next() && !found) {
-        if (Objects.equals(table.getString("TABLE_NAME"), tableName)) {
-          jdbcTableBuilder = getBasicJdbcTableInfo(table);
-          found = true;
-        }
-      }
-
-      if (!found) {
-        throw new NoSuchTableException("Table %s does not exist in %s.", tableName, databaseName);
-      }
+      // 1. Get table information, The result of tables may be more than one due to the reason
+      // above, so we need to check the result.
+      ResultSet tables = getTable(connection, databaseName, tableName);
+      JdbcTable.Builder jdbcTableBuilder = getTableBuilder(tables, databaseName, tableName);
 
       // 2.Get column information
       List<JdbcColumn> jdbcColumns = new ArrayList<>();
@@ -161,7 +179,7 @@ public abstract class JdbcTableOperations implements TableOperation {
       jdbcTableBuilder.withColumns(jdbcColumns.toArray(new JdbcColumn[0]));
 
       // 3.Get index information
-      List<Index> indexes = getIndexes(databaseName, tableName, connection.getMetaData());
+      List<Index> indexes = getIndexes(connection, databaseName, tableName);
       jdbcTableBuilder.withIndexes(indexes.toArray(new Index[0]));
 
       // 4.Get table properties
@@ -169,7 +187,7 @@ public abstract class JdbcTableOperations implements TableOperation {
       jdbcTableBuilder.withProperties(tableProperties);
 
       // 5.Leave the information to the bottom layer to append the table
-      correctJdbcTableFields(connection, tableName, jdbcTableBuilder);
+      correctJdbcTableFields(connection, databaseName, tableName, jdbcTableBuilder);
       return jdbcTableBuilder.build();
     } catch (SQLException e) {
       throw exceptionMapper.toGravitinoException(e);
@@ -243,8 +261,9 @@ public abstract class JdbcTableOperations implements TableOperation {
 
   protected ResultSet getTables(Connection connection) throws SQLException {
     final DatabaseMetaData metaData = connection.getMetaData();
-    String databaseName = connection.getSchema();
-    return metaData.getTables(databaseName, databaseName, null, JdbcConnectorUtils.getTableTypes());
+    String catalogName = connection.getCatalog();
+    String schemaName = connection.getSchema();
+    return metaData.getTables(catalogName, schemaName, null, JdbcConnectorUtils.getTableTypes());
   }
 
   protected ResultSet getTable(Connection connection, String databaseName, String tableName)
@@ -269,13 +288,17 @@ public abstract class JdbcTableOperations implements TableOperation {
    * @throws SQLException
    */
   protected void correctJdbcTableFields(
-      Connection connection, String tableName, JdbcTable.Builder jdbcTableBuilder)
+      Connection connection,
+      String databaseName,
+      String tableName,
+      JdbcTable.Builder jdbcTableBuilder)
       throws SQLException {
     // nothing to do
   }
 
-  protected List<Index> getIndexes(String databaseName, String tableName, DatabaseMetaData metaData)
+  protected List<Index> getIndexes(Connection connection, String databaseName, String tableName)
       throws SQLException {
+    DatabaseMetaData metaData = connection.getMetaData();
     List<Index> indexes = new ArrayList<>();
 
     // Get primary key information
@@ -354,6 +377,7 @@ public abstract class JdbcTableOperations implements TableOperation {
       String comment,
       Map<String, String> properties,
       Transform[] partitioning,
+      Distribution distribution,
       Index[] indexes);
 
   protected abstract String generateRenameTableSql(String oldTableName, String newTableName);
@@ -399,7 +423,7 @@ public abstract class JdbcTableOperations implements TableOperation {
   }
 
   protected JdbcTable.Builder getBasicJdbcTableInfo(ResultSet table) throws SQLException {
-    return new JdbcTable.Builder()
+    return JdbcTable.builder()
         .withName(table.getString("TABLE_NAME"))
         .withComment(table.getString("REMARKS"))
         .withAuditInfo(AuditInfo.EMPTY);
@@ -418,7 +442,7 @@ public abstract class JdbcTableOperations implements TableOperation {
     Expression defaultValue =
         columnDefaultValueConverter.toGravitino(typeBean, columnDef, isExpression, nullable);
 
-    return new JdbcColumn.Builder()
+    return JdbcColumn.builder()
         .withName(column.getString("COLUMN_NAME"))
         .withType(typeConverter.toGravitinoType(typeBean))
         .withComment(StringUtils.isEmpty(comment) ? null : comment)

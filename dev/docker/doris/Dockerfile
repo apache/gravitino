@@ -5,9 +5,8 @@
 FROM ubuntu:22.04
 LABEL maintainer="support@datastrato.com"
 
-ARG DORIS_PACKAGE_NAME
-ARG DORIS_FILE_NAME
-ARG TARGET_ARCH
+ARG DORIS_VERSION
+ARG TARGETARCH
 
 WORKDIR /
 
@@ -18,7 +17,7 @@ RUN apt-get update -y &&  DEBIAN_FRONTEND=noninteractive apt-get install -y --no
     curl wget less vim htop iproute2 numactl jq iotop sysstat tzdata xz-utils \
     tcpdump iputils-ping dnsutils strace lsof blktrace \
     bpfcc-tools linux-headers-realtime linux-tools-realtime silversearcher-ag \
-    net-tools openjdk-8-jdk && \
+    net-tools netcat openjdk-8-jdk && \
     rm -rf /var/lib/apt/lists/*
 
 ################################################################################
@@ -42,9 +41,8 @@ RUN ARCH=$(uname -m) && \
 
 #################################################################################
 ## add files
-
-ADD packages/${DORIS_FILE_NAME} /opt
-RUN ln -s /opt/${DORIS_PACKAGE_NAME} ${DORIS_HOME}
+ADD packages/doris-${TARGETARCH}.tar.xz /opt/
+RUN ln -s /opt/apache-doris-${DORIS_VERSION}-bin-* ${DORIS_HOME} 
 
 COPY start.sh ${DORIS_HOME}
 

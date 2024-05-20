@@ -10,6 +10,7 @@ This software is licensed under the Apache License version 2."
 + Linux or macOS operating system
 + Git
 + A Java Development Kit, version 8 to 17, installed in your environment to launch Gradle
++ Python 3.8, 3.9, 3.10, or 3.11 to build the Gravitino Python client
 + Optionally, Docker to run integration tests
 
 :::info Please read the following notes before trying to build Gravitino.
@@ -59,16 +60,53 @@ This software is licensed under the Apache License version 2."
     ./gradlew build -PjdkVersion=17
     ```
 
-:::note
-The first time you build the project, downloading the dependencies may take a while. You can add
-`-x test` to skip the tests, by using `./gradlew build -x test`.
+   The `./gradlew build` command builds all the Gravitino components, including Gravitino 
+   server, Java and Python client, Trino and Spark connectors, and more.
 
-The built Gravitino libraries are Java 8 compatible, and verified under Java 8, 11, and 17
-environments. You can use Java 8, 11, 17 runtimes to run the Gravitino server, no matter which
-JDK version you use to build the project.
-:::
+   For Python client, the `./gradlew build` command builds the Python client with Python 3.8
+   by default. If you want to use Python 3.9, 3.10 or 3.11 to build, please modify the property
+   `pythonVersion` to 3.9, 3.10 or 3.11 in the `gradle.properties` file, or specify the version
+   with `-P`, like:
 
-3. Get the Gravitino binary package.
+    ```shell
+    ./gradlew build -PpythonVersion=3.9
+    ```
+
+   Or:
+
+    ```shell
+    ./gradlew build -PpythonVersion=3.10
+    ```
+
+   Or:
+
+    ```shell
+    ./gradlew build -PpythonVersion=3.11
+    ```
+   
+   If you want to build some modules alone, like Spark connector, you can use Gradle build task 
+   with specific module name, like:
+
+    ```shell
+    ./gradlew spark-connector:spark-connector-runtime:build
+    ```
+
+   This creates `gravitino-spark-connector-runtime-{sparkVersion}_{scalaVersion}-{version}.jar`
+   under the `spark-connector/spark-connector-runtime/build/libs` directory.
+
+   :::note
+   The first time you build the project, downloading the dependencies may take a while. You can add
+   `-x test` to skip the tests, by using `./gradlew build -x test`.
+   
+   The built Gravitino libraries are Java 8 compatible, and verified under Java 8, 11, and 17
+   environments. You can use Java 8, 11, 17 runtimes to run the Gravitino server, no matter which
+   JDK version you use to build the project.
+
+   The built jars are under the `build/libs` directory of the modules. You can publish them to your
+   Maven repository to use them in your project.
+   :::
+
+3. Get the Gravitino server binary package.
 
     ```shell
     ./gradlew compileDistribution
@@ -78,11 +116,11 @@ JDK version you use to build the project.
 
    The directory structure of the `distribution` directory is as follows:
 
-:::note
-The `./gradlew clean` command deletes the `distribution` directory.
-:::
+   :::note
+   The `./gradlew clean` command deletes the `distribution` directory.
+   :::
 
-4. Assemble the Gravitino distribution package.
+4. Assemble the Gravitino server distribution package.
 
     ```shell
     ./gradlew assembleDistribution
@@ -92,11 +130,11 @@ The `./gradlew clean` command deletes the `distribution` directory.
 
    You can deploy them to your production environment.
 
-:::note
-The `gravitino-{version}-bin.tar.gz` file is the Gravitino server distribution package, and the
-`gravitino-{version}-bin.tar.gz.sha256` file is the sha256 checksum file for the Gravitino
-server distribution package.
-:::
+   :::note
+   The `gravitino-{version}-bin.tar.gz` file is the Gravitino **server** distribution package, and the
+   `gravitino-{version}-bin.tar.gz.sha256` file is the sha256 checksum file for the Gravitino
+   server distribution package.
+   :::
 
 5. Assemble the Gravitino Trino connector package
 
@@ -110,4 +148,6 @@ server distribution package.
     ./gradlew assembleDistribution
     ```
 
-   This creates `gravitino-trino-connector-{version}.tar.gz` and `gravitino-trino-connector-{version}.tar.gz.sha256` under the `distribution` directory.
+   This creates `gravitino-trino-connector-{version}.tar.gz` and
+   `gravitino-trino-connector-{version}.tar.gz.sha256` under the `distribution` directory. You 
+   can uncompress and deploy it to Trino to use the Gravitino Trino connector.

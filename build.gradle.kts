@@ -10,11 +10,13 @@ import com.github.jk1.license.render.InventoryHtmlReportRenderer
 import com.github.jk1.license.render.ReportRenderer
 import com.github.vlsi.gradle.dsl.configureEach
 import net.ltgt.gradle.errorprone.errorprone
+import org.gradle.api.tasks.testing.Test
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.internal.hash.ChecksumService
 import org.gradle.internal.os.OperatingSystem
 import org.gradle.kotlin.dsl.support.serviceOf
 import java.io.File
+import java.io.IOException
 import java.util.Locale
 
 plugins {
@@ -91,6 +93,9 @@ project.extra["extraJvmArgs"] = if (extra["jdkVersion"] in listOf("8", "11")) {
   )
 }
 
+val pythonVersion: String = project.properties["pythonVersion"] as? String ?: project.extra["pythonVersion"].toString()
+project.extra["pythonVersion"] = pythonVersion
+
 licenseReport {
   renderers = arrayOf<ReportRenderer>(InventoryHtmlReportRenderer("report.html", "Backend"))
   filters = arrayOf<DependencyFilter>(LicenseBundleNormalizer())
@@ -98,6 +103,11 @@ licenseReport {
 repositories { mavenCentral() }
 
 allprojects {
+  // Gravitino Python client project didn't need to apply the Spotless plugin
+  if (project.name == "client-python") {
+    return@allprojects
+  }
+
   apply(plugin = "com.diffplug.spotless")
   repositories {
     mavenCentral()
@@ -133,6 +143,58 @@ allprojects {
       }
     }
   }
+
+  val setIntegrationTestEnvironment: (Test) -> Unit = { param ->
+    param.doFirst {
+      param.jvmArgs(project.property("extraJvmArgs") as List<*>)
+
+      // Default use MiniGravitino to run integration tests
+      param.environment("GRAVITINO_ROOT_DIR", project.rootDir.path)
+      param.environment("IT_PROJECT_DIR", project.buildDir.path)
+      param.environment("HADOOP_USER_NAME", "datastrato")
+      param.environment("HADOOP_HOME", "/tmp")
+      param.environment("PROJECT_VERSION", project.version)
+
+      val dockerRunning = project.rootProject.extra["dockerRunning"] as? Boolean ?: false
+      val macDockerConnector = project.rootProject.extra["macDockerConnector"] as? Boolean ?: false
+      if (OperatingSystem.current().isMacOsX() &&
+        dockerRunning &&
+        macDockerConnector
+      ) {
+        param.environment("NEED_CREATE_DOCKER_NETWORK", "true")
+      }
+
+      // Change poll image pause time from 30s to 60s
+      param.environment("TESTCONTAINERS_PULL_PAUSE_TIMEOUT", "60")
+      if (project.hasProperty("jdbcBackend")) {
+        param.environment("jdbcBackend", "true")
+      }
+
+      val testMode = project.properties["testMode"] as? String ?: "embedded"
+      param.systemProperty("gravitino.log.path", project.buildDir.path + "/${project.name}-integration-test.log")
+      project.delete(project.buildDir.path + "/${project.name}-integration-test.log")
+      if (testMode == "deploy") {
+        param.environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package")
+        param.systemProperty("testMode", "deploy")
+      } else if (testMode == "embedded") {
+        param.environment("GRAVITINO_HOME", project.rootDir.path)
+        param.environment("GRAVITINO_TEST", "true")
+        param.environment("GRAVITINO_WAR", project.rootDir.path + "/web/dist/")
+        param.systemProperty("testMode", "embedded")
+      } else {
+        throw GradleException("Gravitino integration tests only support [-PtestMode=embedded] or [-PtestMode=deploy] mode!")
+      }
+
+      param.useJUnitPlatform {
+        val DOCKER_IT_TEST = project.rootProject.extra["docker_it_test"] as? Boolean ?: false
+        if (!DOCKER_IT_TEST) {
+          excludeTags("gravitino-docker-it")
+        }
+      }
+    }
+  }
+
+  extra["initIntegrationTest"] = setIntegrationTestEnvironment
 }
 
 nexusPublishing {
@@ -161,6 +223,11 @@ dependencies {
 }
 
 subprojects {
+  // Gravitino Python client project didn't need to apply the java plugin
+  if (project.name == "client-python") {
+    return@subprojects
+  }
+
   apply(plugin = "jacoco")
   apply(plugin = "maven-publish")
   apply(plugin = "java")
@@ -215,87 +282,41 @@ subprojects {
 
     tasks.withType<JavaCompile>().configureEach {
       options.errorprone.isEnabled.set(true)
-      options.errorprone.disableAllChecks.set(true)
-      options.errorprone.enable(
-        "AnnotateFormatMethod",
-        "FormatStringAnnotation",
-        "AlwaysThrows",
-        "ArrayEquals",
-        "ArrayToString",
-        "ArraysAsListPrimitiveArray",
-        "ArrayFillIncompatibleType",
-        "BoxedPrimitiveEquality",
-        "ChainingConstructorIgnoresParameter",
-        "CheckNotNullMultipleTimes",
-        "CollectionIncompatibleType",
-        "CollectionToArraySafeParameter",
-        "ComparingThisWithNull",
-        "ComparisonOutOfRange",
-        "CompatibleWithAnnotationMisuse",
-        "CompileTimeConstant",
-        "ConditionalExpressionNumericPromotion",
-        "DangerousLiteralNull",
-        "DeadException",
-        "DeadThread",
-        "DoNotCall",
-        "DoNotMock",
-        "DuplicateMapKeys",
-        "EqualsNaN",
-        "EqualsNull",
-        "EqualsReference",
-        "EqualsWrongThing",
-        "ForOverride",
-        "FormatString",
-        "GetClassOnAnnotation",
-        "GetClassOnClass",
-        "HashtableContains",
-        "IdentityBinaryExpression",
-        "IdentityHashMapBoxing",
-        "Immutable",
-        "Incomparable",
-        "IncompatibleArgumentType",
-        "IndexOfChar",
-        "InfiniteRecursion",
-        "InvalidJavaTimeConstant",
-        "InvalidPatternSyntax",
-        "IsInstanceIncompatibleType",
-        "JUnit4ClassAnnotationNonStatic",
-        "JUnit4SetUpNotRun",
-        "JUnit4TearDownNotRun",
-        "JUnit4TestNotRun",
-        "JUnitAssertSameCheck",
-        "LockOnBoxedPrimitive",
-        "LoopConditionChecker",
-        "LossyPrimitiveCompare",
-        "MathRoundIntLong",
-        "MissingSuperCall",
-        "ModifyingCollectionWithItself",
-        "NonCanonicalStaticImport",
-        "NonFinalCompileTimeConstant",
-        "NonRuntimeAnnotation",
-        "NullTernary",
-        "OptionalEquality",
-        "PackageInfo",
-        "ParametersButNotParameterized",
-        "RandomCast",
-        "RandomModInteger",
-        "SelfAssignment",
-        "SelfComparison",
-        "SelfEquals",
-        "SizeGreaterThanOrEqualsZero",
-        "StreamToString",
-        "StringBuilderInitWithChar",
-        "SubstringOfZero",
-        "ThrowNull",
-        "TruthSelfEquals",
-        "TryFailThrowable",
-        "TypeParameterQualifier",
-        "UnnecessaryCheckNotNull",
-        "UnnecessaryTypeArgument",
-        "UnusedAnonymousClass",
-        "UnusedCollectionModifiedInPlace",
-        "VarTypeName",
-        "XorPower"
+      options.errorprone.disableWarningsInGeneratedCode.set(true)
+      options.errorprone.disable(
+        "AlmostJavadoc",
+        "CanonicalDuration",
+        "CheckReturnValue",
+        "ComparableType",
+        "ConstantOverflow",
+        "DoubleBraceInitialization",
+        "EqualsUnsafeCast",
+        "EmptyBlockTag",
+        "FutureReturnValueIgnored",
+        "InconsistentCapitalization",
+        "InconsistentHashCode",
+        "JavaTimeDefaultTimeZone",
+        "JdkObsolete",
+        "LockNotBeforeTry",
+        "MissingSummary",
+        "MissingOverride",
+        "MutableConstantField",
+        "NonOverridingEquals",
+        "ObjectEqualsForPrimitives",
+        "OperatorPrecedence",
+        "ReturnValueIgnored",
+        "SameNameButDifferent",
+        "StaticAssignmentInConstructor",
+        "StringSplitter",
+        "ThreadPriorityCheck",
+        "ThrowIfUncheckedKnownChecked",
+        "TypeParameterUnusedInFormals",
+        "UnicodeEscape",
+        "UnnecessaryParentheses",
+        "UnsafeReflectiveConstructionCast",
+        "UnusedMethod",
+        "VariableNameSameAsType",
+        "WaitNotInLoop"
       )
     }
   }
@@ -305,7 +326,7 @@ subprojects {
     options.locale = "en_US"
 
     val projectName = project.name
-    if (projectName == "common" || projectName == "api" || projectName == "client-java") {
+    if (projectName == "common" || projectName == "api" || projectName == "client-java" || projectName == "filesystem-hadoop3") {
       options {
         (this as CoreJavadocOptions).addStringOption("Xwerror", "-quiet")
         isFailOnError = true
@@ -327,6 +348,7 @@ subprojects {
     plugins.apply(NodePlugin::class)
     configure<NodeExtension> {
       version.set("20.9.0")
+      pnpmVersion.set("9.x")
       nodeProjectDir.set(file("$rootDir/.node"))
       download.set(true)
     }
@@ -367,6 +389,11 @@ subprojects {
   }
 
   configure<SigningExtension> {
+    val taskNames = gradle.getStartParameter().getTaskNames()
+    taskNames.forEach() {
+      if (it.contains("publishToMavenLocal")) setRequired(false)
+    }
+
     val gpgId = System.getenv("GPG_ID")
     val gpgSecretKey = System.getenv("GPG_PRIVATE_KEY")
     val gpgKeyPassword = System.getenv("GPG_PASSPHRASE")
@@ -447,14 +474,20 @@ tasks.rat {
     "web/next-env.d.ts",
     "web/dist/**/*",
     "web/node_modules/**/*",
-    "web/lib/utils/axios/**/*",
-    "web/lib/enums/httpEnum.ts",
-    "web/types/axios.d.ts",
+    "web/src/lib/utils/axios/**/*",
+    "web/src/lib/enums/httpEnum.ts",
+    "web/src/types/axios.d.ts",
     "web/yarn.lock",
     "web/package-lock.json",
     "web/pnpm-lock.yaml",
+    "web/src/lib/icons/svg/**/*.svg",
     "**/LICENSE.*",
-    "**/NOTICE.*"
+    "**/NOTICE.*",
+    "ROADMAP.md",
+    "clients/client-python/.pytest_cache/*",
+    "clients/client-python/gravitino.egg-info/*",
+    "clients/client-python/gravitino/utils/exceptions.py",
+    "clients/client-python/gravitino/utils/http_client.py"
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.
@@ -498,6 +531,7 @@ tasks {
         from(projectDir.dir("conf")) { into("package/conf") }
         from(projectDir.dir("bin")) { into("package/bin") }
         from(projectDir.dir("web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web") }
+        from(projectDir.dir("scripts")) { into("package/scripts") }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".template", "")
@@ -583,7 +617,7 @@ tasks {
   register("copySubprojectDependencies", Copy::class) {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
-        !it.name.startsWith("client") && it.name != "trino-connector" &&
+        !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark-connector") && it.name != "trino-connector" &&
         it.name != "integration-test" && it.name != "bundled-catalog"
       ) {
         from(it.configurations.runtimeClasspath)
@@ -596,6 +630,8 @@ tasks {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
         !it.name.startsWith("client") &&
+        !it.name.startsWith("filesystem") &&
+        !it.name.startsWith("spark-connector") &&
         it.name != "trino-connector" &&
         it.name != "integration-test" &&
         it.name != "bundled-catalog"
@@ -613,9 +649,11 @@ tasks {
     dependsOn(
       ":catalogs:catalog-hive:copyLibAndConfig",
       ":catalogs:catalog-lakehouse-iceberg:copyLibAndConfig",
+      ":catalogs:catalog-jdbc-doris:copyLibAndConfig",
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig",
-      ":catalogs:catalog-hadoop:copyLibAndConfig"
+      ":catalogs:catalog-hadoop:copyLibAndConfig",
+      "catalogs:catalog-kafka:copyLibAndConfig"
     )
   }
 
@@ -625,3 +663,132 @@ tasks {
 }
 
 apply(plugin = "com.dorongold.task-tree")
+
+project.extra["docker_it_test"] = false
+project.extra["dockerRunning"] = false
+project.extra["macDockerConnector"] = false
+project.extra["isOrbStack"] = false
+
+// The following is to check the docker status and print the tip message
+fun printDockerCheckInfo() {
+  checkMacDockerConnector()
+  checkDockerStatus()
+  checkOrbStackStatus()
+
+  val testMode = project.properties["testMode"] as? String ?: "embedded"
+  if (testMode != "deploy" && testMode != "embedded") {
+    return
+  }
+  val dockerRunning = project.extra["dockerRunning"] as? Boolean ?: false
+  val macDockerConnector = project.extra["macDockerConnector"] as? Boolean ?: false
+  val isOrbStack = project.extra["isOrbStack"] as? Boolean ?: false
+
+  if (OperatingSystem.current().isMacOsX() &&
+    dockerRunning &&
+    (macDockerConnector || isOrbStack)
+  ) {
+    project.extra["docker_it_test"] = true
+  } else if (OperatingSystem.current().isLinux() && dockerRunning) {
+    project.extra["docker_it_test"] = true
+  }
+
+  println("------------------ Check Docker environment ---------------------")
+  println("Docker server status ............................................ [${if (dockerRunning) "running" else "stop"}]")
+  if (OperatingSystem.current().isMacOsX()) {
+    println("mac-docker-connector status ..................................... [${if (macDockerConnector) "running" else "stop"}]")
+    println("OrbStack status ................................................. [${if (isOrbStack) "yes" else "no"}]")
+  }
+
+  val docker_it_test = project.extra["docker_it_test"] as? Boolean ?: false
+  if (!docker_it_test) {
+    println("Run test cases without `gravitino-docker-it` tag ................ [$testMode test]")
+  } else {
+    println("Using Gravitino IT Docker container to run all integration tests. [$testMode test]")
+  }
+  println("-----------------------------------------------------------------")
+
+  // Print help message if Docker server or mac-docker-connector is not running
+  printDockerServerTip()
+  printMacDockerTip()
+}
+
+fun printDockerServerTip() {
+  val dockerRunning = project.extra["dockerRunning"] as? Boolean ?: false
+  if (!dockerRunning) {
+    val redColor = "\u001B[31m"
+    val resetColor = "\u001B[0m"
+    println("Tip: Please make sure to start the ${redColor}Docker server$resetColor before running the integration tests.")
+  }
+}
+
+fun printMacDockerTip() {
+  val macDockerConnector = project.extra["macDockerConnector"] as? Boolean ?: false
+  val isOrbStack = project.extra["isOrbStack"] as? Boolean ?: false
+  if (OperatingSystem.current().isMacOsX() && !macDockerConnector && !isOrbStack) {
+    val redColor = "\u001B[31m"
+    val resetColor = "\u001B[0m"
+    println(
+      "Tip: Please make sure to use ${redColor}OrbStack$resetColor or execute the " +
+        "$redColor`dev/docker/tools/mac-docker-connector.sh`$resetColor script before running" +
+        " the integration test on macOS."
+    )
+  }
+}
+
+fun checkMacDockerConnector() {
+  if (OperatingSystem.current().isLinux()) {
+    // Linux does not require the use of `docker-connector`
+    return
+  }
+
+  try {
+    val processName = "docker-connector"
+    val command = "pgrep -x -q $processName"
+
+    val execResult = project.exec {
+      commandLine("bash", "-c", command)
+    }
+    if (execResult.exitValue == 0) {
+      project.extra["macDockerConnector"] = true
+    }
+  } catch (e: Exception) {
+    println("checkContainerRunning command execution failed: ${e.message}")
+  }
+}
+
+fun checkDockerStatus() {
+  try {
+    val process = ProcessBuilder("docker", "info").start()
+    val exitCode = process.waitFor()
+
+    if (exitCode == 0) {
+      project.extra["dockerRunning"] = true
+    } else {
+      println("checkDockerStatus command execution failed with exit code $exitCode")
+    }
+  } catch (e: IOException) {
+    println("checkDockerStatus command execution failed: ${e.message}")
+  }
+}
+
+fun checkOrbStackStatus() {
+  if (OperatingSystem.current().isLinux()) {
+    return
+  }
+
+  try {
+    val process = ProcessBuilder("docker", "context", "show").start()
+    val exitCode = process.waitFor()
+    if (exitCode == 0) {
+      val currentContext = process.inputStream.bufferedReader().readText()
+      println("Current docker context is: $currentContext")
+      project.extra["isOrbStack"] = currentContext.lowercase(Locale.getDefault()).contains("orbstack")
+    } else {
+      println("checkOrbStackStatus Command execution failed with exit code $exitCode")
+    }
+  } catch (e: IOException) {
+    println("checkOrbStackStatus command execution failed: ${e.message}")
+  }
+}
+
+printDockerCheckInfo()

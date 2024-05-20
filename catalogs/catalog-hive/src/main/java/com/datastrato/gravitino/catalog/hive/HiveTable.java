@@ -18,11 +18,11 @@ import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType.MANAGED_TABLE;
 import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.identity;
 
-import com.datastrato.gravitino.catalog.TableOperations;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType;
 import com.datastrato.gravitino.catalog.hive.converter.FromHiveType;
 import com.datastrato.gravitino.catalog.hive.converter.ToHiveType;
-import com.datastrato.gravitino.catalog.rel.BaseTable;
+import com.datastrato.gravitino.connector.BaseTable;
+import com.datastrato.gravitino.connector.TableOperations;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.SupportsPartitions;
@@ -109,7 +109,7 @@ public class HiveTable extends BaseTable {
                 sd.getCols().stream()
                     .map(
                         f ->
-                            new HiveColumn.Builder()
+                            HiveColumn.builder()
                                 .withName(f.getName())
                                 .withType(FromHiveType.convert(f.getType()))
                                 .withComment(f.getComment())
@@ -117,14 +117,14 @@ public class HiveTable extends BaseTable {
                 table.getPartitionKeys().stream()
                     .map(
                         p ->
-                            new HiveColumn.Builder()
+                            HiveColumn.builder()
                                 .withName(p.getName())
                                 .withType(FromHiveType.convert(p.getType()))
                                 .withComment(p.getComment())
                                 .build()))
             .toArray(Column[]::new);
 
-    return new HiveTable.Builder()
+    return HiveTable.builder()
         .withName(table.getTableName())
         .withComment(table.getParameters().get(COMMENT))
         .withProperties(buildTableProperties(table))
@@ -207,10 +207,12 @@ public class HiveTable extends BaseTable {
   private Map<String, String> buildTableParameters() {
     Map<String, String> parameters = Maps.newHashMap(properties());
     Optional.ofNullable(comment).ifPresent(c -> parameters.put(COMMENT, c));
-    String ignore =
-        EXTERNAL_TABLE.name().equalsIgnoreCase(properties().get(TABLE_TYPE))
-            ? parameters.put(EXTERNAL, "TRUE")
-            : parameters.put(EXTERNAL, "FALSE");
+
+    if (EXTERNAL_TABLE.name().equalsIgnoreCase(properties().get(TABLE_TYPE))) {
+      parameters.put(EXTERNAL, "TRUE");
+    } else {
+      parameters.put(EXTERNAL, "FALSE");
+    }
 
     parameters.remove(LOCATION);
     parameters.remove(TABLE_TYPE);
@@ -359,6 +361,9 @@ public class HiveTable extends BaseTable {
       return this;
     }
 
+    /** Creates a new instance of {@link Builder}. */
+    private Builder() {}
+
     /**
      * Internal method to build a HiveTable instance using the provided values.
      *
@@ -387,5 +392,14 @@ public class HiveTable extends BaseTable {
 
       return hiveTable;
     }
+  }
+
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }

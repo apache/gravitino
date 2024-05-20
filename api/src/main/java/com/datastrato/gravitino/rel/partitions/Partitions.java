@@ -12,6 +12,9 @@ import java.util.Objects;
 /** The helper class for partition expressions. */
 public class Partitions {
 
+  /** An empty array of partitions. */
+  public static Partition[] EMPTY_PARTITIONS = new Partition[0];
+
   /**
    * Creates a range partition.
    *
@@ -108,7 +111,7 @@ public class Partitions {
       if (this == o) {
         return true;
       }
-      if (o == null || getClass() != o.getClass()) {
+      if (!(o instanceof RangePartitionImpl)) {
         return false;
       }
       RangePartitionImpl that = (RangePartitionImpl) o;
@@ -158,7 +161,7 @@ public class Partitions {
       if (this == o) {
         return true;
       }
-      if (o == null || getClass() != o.getClass()) {
+      if (!(o instanceof ListPartitionImpl)) {
         return false;
       }
       ListPartitionImpl that = (ListPartitionImpl) o;
@@ -217,7 +220,7 @@ public class Partitions {
       if (this == o) {
         return true;
       }
-      if (o == null || getClass() != o.getClass()) {
+      if (!(o instanceof IdentityPartitionImpl)) {
         return false;
       }
       IdentityPartitionImpl that = (IdentityPartitionImpl) o;

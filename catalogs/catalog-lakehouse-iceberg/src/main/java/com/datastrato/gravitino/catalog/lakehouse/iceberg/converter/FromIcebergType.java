@@ -80,9 +80,9 @@ public class FromIcebergType extends TypeUtil.SchemaVisitor<Type> {
       case TIMESTAMP:
         Types.TimestampType ts = (Types.TimestampType) primitive;
         if (ts.shouldAdjustToUTC()) {
-          return com.datastrato.gravitino.rel.types.Types.TimestampType.withoutTimeZone();
-        } else {
           return com.datastrato.gravitino.rel.types.Types.TimestampType.withTimeZone();
+        } else {
+          return com.datastrato.gravitino.rel.types.Types.TimestampType.withoutTimeZone();
         }
       case STRING:
         return com.datastrato.gravitino.rel.types.Types.StringType.get();
@@ -98,8 +98,7 @@ public class FromIcebergType extends TypeUtil.SchemaVisitor<Type> {
         return com.datastrato.gravitino.rel.types.Types.DecimalType.of(
             decimal.precision(), decimal.scale());
       default:
-        throw new UnsupportedOperationException(
-            "Cannot convert unknown type to Gravitino: " + primitive);
+        return com.datastrato.gravitino.rel.types.Types.UnparsedType.of(primitive.typeId().name());
     }
   }
 }

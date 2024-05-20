@@ -4,21 +4,28 @@
  */
 package com.datastrato.gravitino;
 
-import com.datastrato.gravitino.catalog.BasePropertiesMetadata;
-import com.datastrato.gravitino.catalog.CatalogOperations;
-import com.datastrato.gravitino.catalog.PropertiesMetadata;
-import com.datastrato.gravitino.catalog.PropertyEntry;
+import com.datastrato.gravitino.connector.BasePropertiesMetadata;
+import com.datastrato.gravitino.connector.CatalogInfo;
+import com.datastrato.gravitino.connector.CatalogOperations;
+import com.datastrato.gravitino.connector.PropertiesMetadata;
+import com.datastrato.gravitino.connector.PropertyEntry;
 import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
+import com.datastrato.gravitino.exceptions.NoSuchTopicException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
+import com.datastrato.gravitino.exceptions.TopicAlreadyExistsException;
 import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.file.FilesetCatalog;
 import com.datastrato.gravitino.file.FilesetChange;
+import com.datastrato.gravitino.messaging.DataLayout;
+import com.datastrato.gravitino.messaging.Topic;
+import com.datastrato.gravitino.messaging.TopicCatalog;
+import com.datastrato.gravitino.messaging.TopicChange;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
@@ -39,7 +46,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class TestCatalogOperations
-    implements CatalogOperations, TableCatalog, FilesetCatalog, SupportsSchemas {
+    implements CatalogOperations, TableCatalog, FilesetCatalog, TopicCatalog, SupportsSchemas {
 
   private final Map<NameIdentifier, TestTable> tables;
 
@@ -47,11 +54,15 @@ public class TestCatalogOperations
 
   private final Map<NameIdentifier, TestFileset> filesets;
 
+  private final Map<NameIdentifier, TestTopic> topics;
+
   private final BasePropertiesMetadata tablePropertiesMetadata;
 
   private final BasePropertiesMetadata schemaPropertiesMetadata;
 
   private final BasePropertiesMetadata filesetPropertiesMetadata;
+
+  private final BasePropertiesMetadata topicPropertiesMetadata;
 
   private Map<String, String> config;
 
@@ -61,14 +72,16 @@ public class TestCatalogOperations
     tables = Maps.newHashMap();
     schemas = Maps.newHashMap();
     filesets = Maps.newHashMap();
+    topics = Maps.newHashMap();
     tablePropertiesMetadata = new TestBasePropertiesMetadata();
     schemaPropertiesMetadata = new TestBasePropertiesMetadata();
     filesetPropertiesMetadata = new TestFilesetPropertiesMetadata();
+    topicPropertiesMetadata = new TestBasePropertiesMetadata();
     this.config = config;
   }
 
   @Override
-  public void initialize(Map<String, String> config) throws RuntimeException {}
+  public void initialize(Map<String, String> config, CatalogInfo info) throws RuntimeException {}
 
   @Override
   public void close() throws IOException {}
@@ -104,7 +117,7 @@ public class TestCatalogOperations
         AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
 
     TestTable table =
-        new TestTable.Builder()
+        TestTable.builder()
             .withName(ident.name())
             .withComment(comment)
             .withProperties(new HashMap<>(properties))
@@ -122,7 +135,7 @@ public class TestCatalogOperations
       tables.put(ident, table);
     }
 
-    return new TestTable.Builder()
+    return TestTable.builder()
         .withName(ident.name())
         .withComment(comment)
         .withProperties(new HashMap<>(properties))
@@ -154,6 +167,7 @@ public class TestCatalogOperations
     Map<String, String> newProps =
         table.properties() != null ? Maps.newHashMap(table.properties()) : Maps.newHashMap();
 
+    NameIdentifier newIdent = ident;
     for (TableChange change : changes) {
       if (change instanceof TableChange.SetProperty) {
         newProps.put(
@@ -161,30 +175,32 @@ public class TestCatalogOperations
             ((TableChange.SetProperty) change).getValue());
       } else if (change instanceof TableChange.RemoveProperty) {
         newProps.remove(((TableChange.RemoveProperty) change).getProperty());
+      } else if (change instanceof TableChange.RenameTable) {
+        String newName = ((TableChange.RenameTable) change).getNewName();
+        newIdent = NameIdentifier.of(ident.namespace(), newName);
+        if (tables.containsKey(newIdent)) {
+          throw new TableAlreadyExistsException("Table %s already exists", ident);
+        }
       } else {
         throw new IllegalArgumentException("Unsupported table change: " + change);
       }
     }
 
     TestTable updatedTable =
-        new TestTable.Builder()
-            .withName(ident.name())
+        TestTable.builder()
+            .withName(newIdent.name())
             .withComment(table.comment())
             .withProperties(new HashMap<>(newProps))
             .withAuditInfo(updatedAuditInfo)
             .withColumns(table.columns())
             .withPartitioning(table.partitioning())
+            .withDistribution(table.distribution())
+            .withSortOrders(table.sortOrder())
+            .withIndexes(table.index())
             .build();
 
     tables.put(ident, updatedTable);
-    return new TestTable.Builder()
-        .withName(ident.name())
-        .withComment(table.comment())
-        .withProperties(new HashMap<>(newProps))
-        .withAuditInfo(updatedAuditInfo)
-        .withColumns(table.columns())
-        .withPartitioning(table.partitioning())
-        .build();
+    return updatedTable;
   }
 
   @Override
@@ -211,7 +227,7 @@ public class TestCatalogOperations
         AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
 
     TestSchema schema =
-        new TestSchema.Builder()
+        TestSchema.builder()
             .withName(ident.name())
             .withComment(comment)
             .withProperties(properties)
@@ -268,7 +284,7 @@ public class TestCatalogOperations
     }
 
     TestSchema updatedSchema =
-        new TestSchema.Builder()
+        TestSchema.builder()
             .withName(ident.name())
             .withComment(schema.comment())
             .withProperties(newProps)
@@ -387,6 +403,11 @@ public class TestCatalogOperations
   }
 
   @Override
+  public PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException {
+    return topicPropertiesMetadata;
+  }
+
+  @Override
   public NameIdentifier[] listFilesets(Namespace namespace) throws NoSuchSchemaException {
     return filesets.keySet().stream()
         .filter(ident -> ident.namespace().equals(namespace))
@@ -413,7 +434,7 @@ public class TestCatalogOperations
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
     TestFileset fileset =
-        new TestFileset.Builder()
+        TestFileset.builder()
             .withName(ident.name())
             .withComment(comment)
             .withProperties(properties)
@@ -422,8 +443,11 @@ public class TestCatalogOperations
             .withStorageLocation(storageLocation)
             .build();
 
-    if (tables.containsKey(ident)) {
+    NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
+    if (filesets.containsKey(ident)) {
       throw new FilesetAlreadyExistsException("Fileset %s already exists", ident);
+    } else if (!schemas.containsKey(schemaIdent)) {
+      throw new NoSuchSchemaException("Schema %s does not exist", schemaIdent);
     } else {
       filesets.put(ident, fileset);
     }
@@ -449,6 +473,7 @@ public class TestCatalogOperations
     TestFileset fileset = filesets.get(ident);
     Map<String, String> newProps =
         fileset.properties() != null ? Maps.newHashMap(fileset.properties()) : Maps.newHashMap();
+    NameIdentifier newIdent = ident;
 
     for (FilesetChange change : changes) {
       if (change instanceof FilesetChange.SetProperty) {
@@ -457,21 +482,28 @@ public class TestCatalogOperations
             ((FilesetChange.SetProperty) change).getValue());
       } else if (change instanceof FilesetChange.RemoveProperty) {
         newProps.remove(((FilesetChange.RemoveProperty) change).getProperty());
+      } else if (change instanceof FilesetChange.RenameFileset) {
+        String newName = ((FilesetChange.RenameFileset) change).getNewName();
+        newIdent = NameIdentifier.of(ident.namespace(), newName);
+        if (filesets.containsKey(newIdent)) {
+          throw new FilesetAlreadyExistsException("Fileset %s already exists", ident);
+        }
+        filesets.remove(ident);
       } else {
         throw new IllegalArgumentException("Unsupported fileset change: " + change);
       }
     }
 
     TestFileset updatedFileset =
-        new TestFileset.Builder()
-            .withName(ident.name())
+        TestFileset.builder()
+            .withName(newIdent.name())
             .withComment(fileset.comment())
             .withProperties(newProps)
             .withAuditInfo(updatedAuditInfo)
             .withType(fileset.type())
             .withStorageLocation(fileset.storageLocation())
             .build();
-    filesets.put(ident, updatedFileset);
+    filesets.put(newIdent, updatedFileset);
     return updatedFileset;
   }
 
@@ -479,6 +511,101 @@ public class TestCatalogOperations
   public boolean dropFileset(NameIdentifier ident) {
     if (filesets.containsKey(ident)) {
       filesets.remove(ident);
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  @Override
+  public NameIdentifier[] listTopics(Namespace namespace) throws NoSuchSchemaException {
+    return topics.keySet().stream()
+        .filter(ident -> ident.namespace().equals(namespace))
+        .toArray(NameIdentifier[]::new);
+  }
+
+  @Override
+  public Topic loadTopic(NameIdentifier ident) throws NoSuchTopicException {
+    if (topics.containsKey(ident)) {
+      return topics.get(ident);
+    } else {
+      throw new NoSuchTopicException("Topic %s does not exist", ident);
+    }
+  }
+
+  @Override
+  public Topic createTopic(
+      NameIdentifier ident, String comment, DataLayout dataLayout, Map<String, String> properties)
+      throws NoSuchSchemaException, TopicAlreadyExistsException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    TestTopic topic =
+        TestTopic.builder()
+            .withName(ident.name())
+            .withComment(comment)
+            .withProperties(properties)
+            .withAuditInfo(auditInfo)
+            .build();
+
+    if (topics.containsKey(ident)) {
+      throw new TopicAlreadyExistsException("Topic %s already exists", ident);
+    } else {
+      topics.put(ident, topic);
+    }
+
+    return topic;
+  }
+
+  @Override
+  public Topic alterTopic(NameIdentifier ident, TopicChange... changes)
+      throws NoSuchTopicException, IllegalArgumentException {
+    if (!topics.containsKey(ident)) {
+      throw new NoSuchTopicException("Topic %s does not exist", ident);
+    }
+
+    AuditInfo updatedAuditInfo =
+        AuditInfo.builder()
+            .withCreator("test")
+            .withCreateTime(Instant.now())
+            .withLastModifier("test")
+            .withLastModifiedTime(Instant.now())
+            .build();
+
+    TestTopic topic = topics.get(ident);
+    Map<String, String> newProps =
+        topic.properties() != null ? Maps.newHashMap(topic.properties()) : Maps.newHashMap();
+    String newComment = topic.comment();
+
+    for (TopicChange change : changes) {
+      if (change instanceof TopicChange.SetProperty) {
+        newProps.put(
+            ((TopicChange.SetProperty) change).getProperty(),
+            ((TopicChange.SetProperty) change).getValue());
+      } else if (change instanceof TopicChange.RemoveProperty) {
+        newProps.remove(((TopicChange.RemoveProperty) change).getProperty());
+      } else if (change instanceof TopicChange.UpdateTopicComment) {
+        newComment = ((TopicChange.UpdateTopicComment) change).getNewComment();
+      } else {
+        throw new IllegalArgumentException("Unsupported topic change: " + change);
+      }
+    }
+
+    TestTopic updatedTopic =
+        TestTopic.builder()
+            .withName(ident.name())
+            .withComment(newComment)
+            .withProperties(newProps)
+            .withAuditInfo(updatedAuditInfo)
+            .build();
+
+    topics.put(ident, updatedTopic);
+    return updatedTopic;
+  }
+
+  @Override
+  public boolean dropTopic(NameIdentifier ident) throws NoSuchTopicException {
+    if (topics.containsKey(ident)) {
+      topics.remove(ident);
       return true;
     } else {
       return false;

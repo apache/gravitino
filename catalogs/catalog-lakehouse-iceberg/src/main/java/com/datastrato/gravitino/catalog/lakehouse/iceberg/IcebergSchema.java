@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
-import com.datastrato.gravitino.catalog.rel.BaseSchema;
+import com.datastrato.gravitino.connector.BaseSchema;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import lombok.ToString;
@@ -31,20 +31,34 @@ public class IcebergSchema extends BaseSchema {
 
   /** A builder class for constructing IcebergSchema instances. */
   public static class Builder extends BaseSchemaBuilder<Builder, IcebergSchema> {
+    /** Creates a new instance of {@link Builder}. */
+    private Builder() {}
 
     @Override
     protected IcebergSchema internalBuild() {
       IcebergSchema icebergSchema = new IcebergSchema();
       icebergSchema.name = name;
-      icebergSchema.comment =
-          null == comment
-              ? (null == properties
-                  ? null
-                  : properties.get(IcebergSchemaPropertiesMetadata.COMMENT))
-              : comment;
+      if (null == comment) {
+        if (null == properties) {
+          icebergSchema.comment = null;
+        } else {
+          icebergSchema.comment = properties.get(IcebergSchemaPropertiesMetadata.COMMENT);
+        }
+      } else {
+        icebergSchema.comment = comment;
+      }
       icebergSchema.properties = properties;
       icebergSchema.auditInfo = auditInfo;
       return icebergSchema;
     }
+  }
+
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }

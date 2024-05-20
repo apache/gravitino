@@ -4,12 +4,14 @@
  */
 package com.datastrato.gravitino.file;
 
+import com.datastrato.gravitino.annotation.Evolving;
 import java.util.Objects;
 
 /**
  * A fileset change is a change to a fileset. It can be used to rename a fileset, update the comment
  * of a fileset, set a property and value pair for a fileset, or remove a property from a fileset.
  */
+@Evolving
 public interface FilesetChange {
 
   /**

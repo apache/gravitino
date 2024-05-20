@@ -5,8 +5,8 @@
 
 package com.datastrato.gravitino.trino.connector.catalog.jdbc;
 
-import com.datastrato.catalog.property.PropertyConverter;
-import com.datastrato.gravitino.catalog.PropertyEntry;
+import com.datastrato.gravitino.catalog.property.PropertyConverter;
+import com.datastrato.gravitino.connector.PropertyEntry;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import java.util.Map;
@@ -28,42 +28,67 @@ public class JDBCCatalogPropertyConverter extends PropertyConverter {
               // Data source authentication
               .put(JDBC_CONNECTION_USER_KEY, "jdbc-user")
               .put(JDBC_CONNECTION_PASSWORD_KEY, "jdbc-password")
-              .put("credential-provider.type", "credential-provider.type")
-              .put("user-credential-name", "user-credential-name")
-              .put("password-credential-name", "password-credential-name")
-              .put("connection-credential-file", "connection-credential-file")
-              .put("keystore-file-path", "keystore-file-path")
-              .put("keystore-type", "keystore-type")
-              .put("keystore-password", "keystore-password")
-              .put("keystore-user-credential-name", "keystore-user-credential-name")
-              .put("keystore-user-credential-password", "keystore-user-credential-password")
-              .put("keystore-password-credential-name", "keystore-password-credential-name")
-              .put("keystore-password-credential-password", "keystore-password-credential-password")
+              .put("credential-provider.type", TRINO_PROPERTIES_PREFIX + "credential-provider.type")
+              .put("user-credential-name", TRINO_PROPERTIES_PREFIX + "user-credential-name")
+              .put("password-credential-name", TRINO_PROPERTIES_PREFIX + "password-credential-name")
+              .put(
+                  "connection-credential-file",
+                  TRINO_PROPERTIES_PREFIX + "connection-credential-file")
+              .put("keystore-file-path", TRINO_PROPERTIES_PREFIX + "keystore-file-path")
+              .put("keystore-type", TRINO_PROPERTIES_PREFIX + "keystore-type")
+              .put("keystore-password", TRINO_PROPERTIES_PREFIX + "keystore-password")
+              .put(
+                  "keystore-user-credential-name",
+                  TRINO_PROPERTIES_PREFIX + "keystore-user-credential-name")
+              .put(
+                  "keystore-user-credential-password",
+                  TRINO_PROPERTIES_PREFIX + "keystore-user-credential-password")
+              .put(
+                  "keystore-password-credential-name",
+                  TRINO_PROPERTIES_PREFIX + "keystore-password-credential-name")
+              .put(
+                  "keystore-password-credential-password",
+                  TRINO_PROPERTIES_PREFIX + "keystore-password-credential-password")
 
               // General configuration properties
-              .put("case-insensitive-name-matching", "ase-insensitive-name-matching")
+              .put(
+                  "case-insensitive-name-matching",
+                  TRINO_PROPERTIES_PREFIX + "ase-insensitive-name-matching")
               .put(
                   "case-insensitive-name-matching.cache-ttl",
-                  "case-insensitive-name-matching.cache-ttl")
+                  TRINO_PROPERTIES_PREFIX + "case-insensitive-name-matching.cache-ttl")
               .put(
                   "case-insensitive-name-matching.config-file",
-                  "case-insensitive-name-matching.config-file")
+                  TRINO_PROPERTIES_PREFIX + "case-insensitive-name-matching.config-file")
               .put(
                   "case-insensitive-name-matching.config-file.refresh-period",
-                  "case-insensitive-name-matching.config-file.refresh-period")
-              .put("metadata.cache-ttl", "metadata.cache-ttl")
-              .put("metadata.cache-missing", "metadata.cache-missing")
-              .put("metadata.schemas.cache-ttl", "metadata.schemas.cache-ttl")
-              .put("metadata.tables.cache-ttl", "metadata.tables.cache-ttl")
-              .put("metadata.statistics.cache-ttl", "metadata.statistics.cache-ttl")
-              .put("metadata.cache-maximum-size", "metadata.cache-maximum-size")
-              .put("write.batch-size", "write.batch-size")
-              .put("dynamic-filtering.enabled", "dynamic-filtering.enabled")
-              .put("dynamic-filtering.wait-timeout", "dynamic-filtering.wait-timeout")
+                  TRINO_PROPERTIES_PREFIX
+                      + "case-insensitive-name-matching.config-file.refresh-period")
+              .put("metadata.cache-ttl", TRINO_PROPERTIES_PREFIX + "metadata.cache-ttl")
+              .put("metadata.cache-missing", TRINO_PROPERTIES_PREFIX + "metadata.cache-missing")
+              .put(
+                  "metadata.schemas.cache-ttl",
+                  TRINO_PROPERTIES_PREFIX + "metadata.schemas.cache-ttl")
+              .put(
+                  "metadata.tables.cache-ttl",
+                  TRINO_PROPERTIES_PREFIX + "metadata.tables.cache-ttl")
+              .put(
+                  "metadata.statistics.cache-ttl",
+                  TRINO_PROPERTIES_PREFIX + "metadata.statistics.cache-ttl")
+              .put(
+                  "metadata.cache-maximum-size",
+                  TRINO_PROPERTIES_PREFIX + "metadata.cache-maximum-size")
+              .put("write.batch-size", TRINO_PROPERTIES_PREFIX + "write.batch-size")
+              .put(
+                  "dynamic-filtering.enabled",
+                  TRINO_PROPERTIES_PREFIX + "dynamic-filtering.enabled")
+              .put(
+                  "dynamic-filtering.wait-timeout",
+                  TRINO_PROPERTIES_PREFIX + "dynamic-filtering.wait-timeout")
 
               // Performance
-              .put("join-pushdown.enabled", "join-pushdown.enabled")
-              .put("join-pushdown.strategy", "join-pushdown.strategy")
+              .put("join-pushdown.enabled", TRINO_PROPERTIES_PREFIX + "join-pushdown.enabled")
+              .put("join-pushdown.strategy", TRINO_PROPERTIES_PREFIX + "join-pushdown.strategy")
               .build());
 
   public static final Set<String> REQUIRED_PROPERTIES =

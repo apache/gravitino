@@ -4,13 +4,15 @@
  */
 package com.datastrato.gravitino;
 
-import com.datastrato.gravitino.catalog.file.BaseFileset;
+import com.datastrato.gravitino.connector.BaseFileset;
 import lombok.EqualsAndHashCode;
 
 @EqualsAndHashCode(callSuper = true)
 public class TestFileset extends BaseFileset {
 
   public static class Builder extends BaseFilesetBuilder<Builder, TestFileset> {
+    /** Creates a new instance of {@link Builder}. */
+    private Builder() {}
 
     @Override
     protected TestFileset internalBuild() {
@@ -23,5 +25,14 @@ public class TestFileset extends BaseFileset {
       fileset.storageLocation = storageLocation;
       return fileset;
     }
+  }
+
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }

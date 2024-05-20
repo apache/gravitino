@@ -10,7 +10,7 @@ import com.datastrato.gravitino.client.GravitinoVersion;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.integration.test.util.OAuthMockDataProvider;
-import com.datastrato.gravitino.server.auth.OAuthConfig;
+import com.datastrato.gravitino.server.authentication.OAuthConfig;
 import com.google.common.collect.Maps;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -28,10 +28,12 @@ public class OAuth2OperationsIT extends AbstractIT {
 
   private static final KeyPair keyPair = Keys.keyPairFor(SignatureAlgorithm.RS256);
   private static final String publicKey =
-      new String(Base64.getEncoder().encode(keyPair.getPublic().getEncoded()));
+      new String(
+          Base64.getEncoder().encode(keyPair.getPublic().getEncoded()), StandardCharsets.UTF_8);
 
   private static String token;
 
+  @SuppressWarnings("JavaUtilDate")
   @BeforeAll
   public static void startIntegrationTest() throws Exception {
     Map<String, String> configs = Maps.newHashMap();
@@ -57,7 +59,7 @@ public class OAuth2OperationsIT extends AbstractIT {
 
   @Test
   public void testAuthenticationApi() throws Exception {
-    GravitinoVersion gravitinoVersion = client.getVersion();
+    GravitinoVersion gravitinoVersion = client.serverVersion();
     Assertions.assertEquals(System.getenv("PROJECT_VERSION"), gravitinoVersion.version());
     Assertions.assertFalse(gravitinoVersion.compileDate().isEmpty());
     if (testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {

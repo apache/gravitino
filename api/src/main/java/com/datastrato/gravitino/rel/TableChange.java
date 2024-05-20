@@ -20,6 +20,9 @@
 
 package com.datastrato.gravitino.rel;
 
+import com.datastrato.gravitino.annotation.Evolving;
+import com.datastrato.gravitino.rel.expressions.Expression;
+import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.types.Type;
 import java.util.Arrays;
 import java.util.Objects;
@@ -28,8 +31,8 @@ import java.util.Objects;
  * The TableChange interface defines the public API for managing tables in a schema. If the catalog
  * implementation supports tables, it must implement this interface.
  */
+@Evolving
 public interface TableChange {
-
   /**
    * Create a TableChange for renaming a table.
    *
@@ -87,7 +90,8 @@ public interface TableChange {
    * @return A TableChange for the addition.
    */
   static TableChange addColumn(String[] fieldName, Type dataType) {
-    return new AddColumn(fieldName, dataType, null, null, true);
+    return new AddColumn(
+        fieldName, dataType, null, null, true, false, Column.DEFAULT_VALUE_NOT_SET);
   }
 
   /**
@@ -103,7 +107,8 @@ public interface TableChange {
    * @return A TableChange for the addition.
    */
   static TableChange addColumn(String[] fieldName, Type dataType, String comment) {
-    return new AddColumn(fieldName, dataType, comment, null, true);
+    return new AddColumn(
+        fieldName, dataType, comment, null, true, false, Column.DEFAULT_VALUE_NOT_SET);
   }
 
   /**
@@ -119,7 +124,8 @@ public interface TableChange {
    * @return A TableChange for the addition.
    */
   static TableChange addColumn(String[] fieldName, Type dataType, ColumnPosition position) {
-    return new AddColumn(fieldName, dataType, null, position, true);
+    return new AddColumn(
+        fieldName, dataType, null, position, true, false, Column.DEFAULT_VALUE_NOT_SET);
   }
 
   /**
@@ -137,7 +143,8 @@ public interface TableChange {
    */
   static TableChange addColumn(
       String[] fieldName, Type dataType, String comment, ColumnPosition position) {
-    return new AddColumn(fieldName, dataType, comment, position, true);
+    return new AddColumn(
+        fieldName, dataType, comment, position, true, false, Column.DEFAULT_VALUE_NOT_SET);
   }
 
   /**
@@ -153,7 +160,8 @@ public interface TableChange {
    * @return A TableChange for the addition.
    */
   static TableChange addColumn(String[] fieldName, Type dataType, boolean nullable) {
-    return new AddColumn(fieldName, dataType, null, null, nullable);
+    return new AddColumn(
+        fieldName, dataType, null, null, nullable, false, Column.DEFAULT_VALUE_NOT_SET);
   }
 
   /**
@@ -167,7 +175,67 @@ public interface TableChange {
    */
   static TableChange addColumn(
       String[] fieldName, Type dataType, String comment, boolean nullable) {
-    return new AddColumn(fieldName, dataType, comment, null, nullable);
+    return new AddColumn(
+        fieldName, dataType, comment, null, nullable, false, Column.DEFAULT_VALUE_NOT_SET);
+  }
+
+  /**
+   * Create a TableChange for adding a column.
+   *
+   * @param fieldName Field name of the new column.
+   * @param dataType The new column's data type.
+   * @param defaultValue The new column's default value.
+   * @return A TableChange for the addition.
+   */
+  static TableChange addColumn(String[] fieldName, Type dataType, Expression defaultValue) {
+    return new AddColumn(fieldName, dataType, null, null, true, false, defaultValue);
+  }
+
+  /**
+   * Create a TableChange for adding a column.
+   *
+   * @param fieldName Field name of the new column.
+   * @param dataType The new column's data type.
+   * @param comment The new field's comment string.
+   * @param defaultValue The new column's default value.
+   * @return A TableChange for the addition.
+   */
+  static TableChange addColumn(
+      String[] fieldName, Type dataType, String comment, Expression defaultValue) {
+    return new AddColumn(fieldName, dataType, comment, null, true, false, defaultValue);
+  }
+
+  /**
+   * Create a TableChange for adding a column.
+   *
+   * @param fieldName Field name of the new column.
+   * @param dataType The new column's data type.
+   * @param position The new column's position.
+   * @param defaultValue The new column's default value.
+   * @return A TableChange for the addition.
+   */
+  static TableChange addColumn(
+      String[] fieldName, Type dataType, ColumnPosition position, Expression defaultValue) {
+    return new AddColumn(fieldName, dataType, null, position, true, false, defaultValue);
+  }
+
+  /**
+   * Create a TableChange for adding a column.
+   *
+   * @param fieldName Field name of the new column.
+   * @param dataType The new column's data type.
+   * @param comment The new field's comment string.
+   * @param position The new column's position.
+   * @param defaultValue The new column's default value.
+   * @return A TableChange for the addition.
+   */
+  static TableChange addColumn(
+      String[] fieldName,
+      Type dataType,
+      String comment,
+      ColumnPosition position,
+      Expression defaultValue) {
+    return new AddColumn(fieldName, dataType, comment, position, true, false, defaultValue);
   }
 
   /**
@@ -190,7 +258,68 @@ public interface TableChange {
       String comment,
       ColumnPosition position,
       boolean nullable) {
-    return new AddColumn(fieldName, dataType, comment, position, nullable);
+    return new AddColumn(
+        fieldName, dataType, comment, position, nullable, false, Column.DEFAULT_VALUE_NOT_SET);
+  }
+
+  /**
+   * Create a TableChange for adding a column.
+   *
+   * <p>If the field already exists, the change will result in an {@link IllegalArgumentException}.
+   * If the new field is nested and its parent does not exist or is not a struct, the change will
+   * result in an {@link IllegalArgumentException}.
+   *
+   * @param fieldName Field name of the new column.
+   * @param dataType The new column's data type.
+   * @param comment The new field's comment string.
+   * @param position The new column's position.
+   * @param nullable The new column's nullable.
+   * @param autoIncrement The new column's autoIncrement.
+   * @return A TableChange for the addition.
+   */
+  static TableChange addColumn(
+      String[] fieldName,
+      Type dataType,
+      String comment,
+      ColumnPosition position,
+      boolean nullable,
+      boolean autoIncrement) {
+    return new AddColumn(
+        fieldName,
+        dataType,
+        comment,
+        position,
+        nullable,
+        autoIncrement,
+        Column.DEFAULT_VALUE_NOT_SET);
+  }
+
+  /**
+   * Create a TableChange for adding a column.
+   *
+   * <p>If the field already exists, the change will result in an {@link IllegalArgumentException}.
+   * If the new field is nested and its parent does not exist or is not a struct, the change will
+   * result in an {@link IllegalArgumentException}.
+   *
+   * @param fieldName Field name of the new column.
+   * @param dataType The new column's data type.
+   * @param comment The new field's comment string.
+   * @param position The new column's position.
+   * @param nullable The new column's nullable.
+   * @param autoIncrement The new column's autoIncrement.
+   * @param defaultValue The new column's default value.
+   * @return A TableChange for the addition.
+   */
+  static TableChange addColumn(
+      String[] fieldName,
+      Type dataType,
+      String comment,
+      ColumnPosition position,
+      boolean nullable,
+      boolean autoIncrement,
+      Expression defaultValue) {
+    return new AddColumn(
+        fieldName, dataType, comment, position, nullable, autoIncrement, defaultValue);
   }
 
   /**
@@ -207,6 +336,21 @@ public interface TableChange {
    */
   static TableChange renameColumn(String[] fieldName, String newName) {
     return new RenameColumn(fieldName, newName);
+  }
+
+  /**
+   * Create a TableChange for updating the default value of a field.
+   *
+   * <p>The name is used to find the field to update.
+   *
+   * <p>If the field does not exist, the change will result in an {@link IllegalArgumentException}.
+   *
+   * @param fieldName The field name of the column to update.
+   * @param newDefaultValue The new default value.
+   * @return A TableChange for the update.
+   */
+  static TableChange updateColumnDefaultValue(String[] fieldName, Expression newDefaultValue) {
+    return new UpdateColumnDefaultValue(fieldName, newDefaultValue);
   }
 
   /**
@@ -282,6 +426,41 @@ public interface TableChange {
    */
   static TableChange updateColumnNullability(String[] fieldName, boolean nullable) {
     return new UpdateColumnNullability(fieldName, nullable);
+  }
+
+  /**
+   * Create a TableChange for adding an index.
+   *
+   * @param type The type of the index.
+   * @param name The name of the index.
+   * @param fieldNames The field names of the index.
+   * @return A TableChange for the add index.
+   */
+  static TableChange addIndex(Index.IndexType type, String name, String[][] fieldNames) {
+    return new AddIndex(type, name, fieldNames);
+  }
+
+  /**
+   * Create a TableChange for deleting an index.
+   *
+   * @param name The name of the index to be dropped.
+   * @param ifExists If true, silence the error if column does not exist during drop. Otherwise, an
+   *     {@link IllegalArgumentException} will be thrown.
+   * @return A TableChange for the delete index.
+   */
+  static TableChange deleteIndex(String name, Boolean ifExists) {
+    return new DeleteIndex(name, ifExists);
+  }
+
+  /**
+   * Create a TableChange for updating the autoIncrement of a field.
+   *
+   * @param fieldName The field name of the column to update.
+   * @param autoIncrement Whether the column is auto-incremented.
+   * @return A TableChange for the update.
+   */
+  static TableChange updateColumnAutoIncrement(String[] fieldName, boolean autoIncrement) {
+    return new UpdateColumnAutoIncrement(fieldName, autoIncrement);
   }
 
   /** A TableChange to rename a table. */
@@ -530,6 +709,103 @@ public interface TableChange {
   }
 
   /**
+   * A TableChange to add an index. Add an index key based on the type and field name passed in as
+   * well as the name.
+   */
+  final class AddIndex implements TableChange {
+
+    private final Index.IndexType type;
+    private final String name;
+
+    private final String[][] fieldNames;
+
+    /**
+     * @param type The type of the index.
+     * @param name The name of the index.
+     * @param fieldNames The field names of the index.
+     */
+    public AddIndex(Index.IndexType type, String name, String[][] fieldNames) {
+      this.type = type;
+      this.name = name;
+      this.fieldNames = fieldNames;
+    }
+
+    /** @return The type of the index. */
+    public Index.IndexType getType() {
+      return type;
+    }
+
+    /** @return The name of the index. */
+    public String getName() {
+      return name;
+    }
+
+    /** @return The field names of the index. */
+    public String[][] getFieldNames() {
+      return fieldNames;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      AddIndex addIndex = (AddIndex) o;
+      return type == addIndex.type
+          && Objects.equals(name, addIndex.name)
+          && Arrays.deepEquals(fieldNames, addIndex.fieldNames);
+    }
+
+    @Override
+    public int hashCode() {
+      int result = Objects.hash(type, name);
+      result = 31 * result + Arrays.hashCode(fieldNames);
+      return result;
+    }
+  }
+
+  /**
+   * A TableChange to delete an index.
+   *
+   * <p>If the index does not exist, the change must result in an {@link IllegalArgumentException}.
+   */
+  final class DeleteIndex implements TableChange {
+    private final String name;
+    private final boolean ifExists;
+
+    /**
+     * @param name name of the index.
+     * @param ifExists If true, silence the error if index does not exist during drop.
+     */
+    public DeleteIndex(String name, boolean ifExists) {
+      this.name = name;
+      this.ifExists = ifExists;
+    }
+
+    /** @return The name of the index to be deleted. */
+    public String getName() {
+      return name;
+    }
+
+    /** @return If true, silence the error if index does not exist during drop. */
+    public boolean isIfExists() {
+      return ifExists;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      DeleteIndex that = (DeleteIndex) o;
+      return Objects.equals(name, that.name) && Objects.equals(ifExists, that.ifExists);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(name, ifExists);
+    }
+  }
+
+  /**
    * The interface for all column positions. Column positions are used to specify the position of a
    * column when adding a new column to a table.
    */
@@ -581,7 +857,9 @@ public interface TableChange {
     private final String column;
 
     private After(String column) {
-      assert column != null;
+      if (null == column) {
+        throw new IllegalArgumentException("column can not be null.");
+      }
       this.column = column;
     }
 
@@ -668,18 +946,24 @@ public interface TableChange {
     private final String comment;
     private final ColumnPosition position;
     private final boolean nullable;
+    private final boolean autoIncrement;
+    private final Expression defaultValue;
 
     private AddColumn(
         String[] fieldName,
         Type dataType,
         String comment,
         ColumnPosition position,
-        boolean nullable) {
+        boolean nullable,
+        boolean autoIncrement,
+        Expression defaultValue) {
       this.fieldName = fieldName;
       this.dataType = dataType;
       this.comment = comment;
       this.position = position == null ? ColumnPosition.defaultPos() : position;
       this.nullable = nullable;
+      this.autoIncrement = autoIncrement;
+      this.defaultValue = defaultValue;
     }
 
     /**
@@ -728,6 +1012,24 @@ public interface TableChange {
     }
 
     /**
+     * Checks if the new column is autoIncrement.
+     *
+     * @return true if the column is autoIncrement; false otherwise.
+     */
+    public boolean isAutoIncrement() {
+      return autoIncrement;
+    }
+
+    /**
+     * Retrieves the default value of the new column.
+     *
+     * @return The default value of the column.
+     */
+    public Expression getDefaultValue() {
+      return defaultValue;
+    }
+
+    /**
      * Compares this AddColumn instance with another object for equality. The comparison is based on
      * the field name, data type, comment, position, and nullability.
      *
@@ -740,21 +1042,23 @@ public interface TableChange {
       if (o == null || getClass() != o.getClass()) return false;
       AddColumn addColumn = (AddColumn) o;
       return nullable == addColumn.nullable
+          && autoIncrement == addColumn.autoIncrement
           && Arrays.equals(fieldName, addColumn.fieldName)
           && Objects.equals(dataType, addColumn.dataType)
           && Objects.equals(comment, addColumn.comment)
-          && Objects.equals(position, addColumn.position);
+          && Objects.equals(position, addColumn.position)
+          && Objects.equals(defaultValue, addColumn.defaultValue);
     }
 
     /**
      * Generates a hash code for this AddColumn instance. This hash code is based on the field name,
-     * data type, comment, position, and nullability.
+     * data type, comment, position, nullability, and autoIncrement.
      *
      * @return A hash code value for this column addition operation.
      */
     @Override
     public int hashCode() {
-      int result = Objects.hash(dataType, comment, position, nullable);
+      int result = Objects.hash(dataType, comment, position, nullable, autoIncrement, defaultValue);
       result = 31 * result + Arrays.hashCode(fieldName);
       return result;
     }
@@ -831,6 +1135,71 @@ public interface TableChange {
     @Override
     public String[] fieldName() {
       return fieldName;
+    }
+  }
+
+  /**
+   * A TableChange to update the default of a field.
+   *
+   * <p>The field names are used to find the field to update.
+   *
+   * <p>If the field does not exist, the change must result in an {@link IllegalArgumentException}.
+   */
+  final class UpdateColumnDefaultValue implements ColumnChange {
+    private final String[] fieldName;
+    private final Expression newDefaultValue;
+
+    private UpdateColumnDefaultValue(String[] fieldName, Expression newDefaultValue) {
+      this.fieldName = fieldName;
+      this.newDefaultValue = newDefaultValue;
+    }
+
+    /**
+     * Retrieves the field name of the column whose default value is being updated.
+     *
+     * @return An array of strings representing the field name.
+     */
+    @Override
+    public String[] fieldName() {
+      return fieldName;
+    }
+
+    /**
+     * Retrieves the new default value for the column.
+     *
+     * @return The new default value of the column.
+     */
+    public Expression getNewDefaultValue() {
+      return newDefaultValue;
+    }
+
+    /**
+     * Compares this UpdateColumnDefaultValue instance with another object for equality. The
+     * comparison is based on the field name array and the new default value.
+     *
+     * @param o The object to compare with this instance.
+     * @return true if the given object represents the same default value update; false otherwise.
+     */
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      UpdateColumnDefaultValue that = (UpdateColumnDefaultValue) o;
+      return Arrays.equals(fieldName, that.fieldName)
+          && Objects.equals(newDefaultValue, that.newDefaultValue);
+    }
+
+    /**
+     * Generates a hash code for this UpdateColumnDefaultValue instance. The hash code is based on
+     * both the hierarchical field name and the new default value.
+     *
+     * @return A hash code value for this default value update operation.
+     */
+    @Override
+    public int hashCode() {
+      int result = Objects.hash(newDefaultValue);
+      result = 31 * result + Arrays.hashCode(fieldName);
+      return result;
     }
   }
 
@@ -1157,6 +1526,61 @@ public interface TableChange {
     @Override
     public int hashCode() {
       int result = Objects.hash(nullable);
+      result = 31 * result + Arrays.hashCode(fieldName);
+      return result;
+    }
+  }
+
+  /**
+   * A TableChange to update the autoIncrement of a field. True is to add autoIncrement, false is to
+   * delete autoIncrement.
+   */
+  final class UpdateColumnAutoIncrement implements ColumnChange {
+    private final String[] fieldName;
+
+    private final boolean autoIncrement;
+
+    /**
+     * Creates a new UpdateColumnAutoIncrement instance.
+     *
+     * @param fieldName The name of the field to be updated.
+     * @param autoIncrement The new autoIncrement flag of the field.
+     */
+    public UpdateColumnAutoIncrement(String[] fieldName, boolean autoIncrement) {
+      this.fieldName = fieldName;
+      this.autoIncrement = autoIncrement;
+    }
+
+    /**
+     * Retrieves the field name of the column whose autoIncrement is being updated.
+     *
+     * @return An array of strings representing the field name.
+     */
+    @Override
+    public String[] fieldName() {
+      return fieldName;
+    }
+
+    /**
+     * The autoIncrement flag of the column.
+     *
+     * @return true if the column is autoIncrement; false otherwise.
+     */
+    public boolean isAutoIncrement() {
+      return autoIncrement;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      UpdateColumnAutoIncrement that = (UpdateColumnAutoIncrement) o;
+      return autoIncrement == that.autoIncrement && Arrays.equals(fieldName, that.fieldName);
+    }
+
+    @Override
+    public int hashCode() {
+      int result = Objects.hash(autoIncrement);
       result = 31 * result + Arrays.hashCode(fieldName);
       return result;
     }

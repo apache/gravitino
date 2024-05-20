@@ -125,7 +125,6 @@ public class TestLockManager {
     ThreadLocalRandom threadLocalRandom = ThreadLocalRandom.current();
     ReentrantReadWriteLock reentrantReadWriteLock = new ReentrantReadWriteLock();
     for (int i = 0; i < 1000; i++) {
-      NameIdentifier identifier = randomNameIdentifier();
       int num = threadLocalRandom.nextInt(5);
       LockType lockType = num >= 4 ? LockType.WRITE : LockType.READ;
       //      LockType lockType = LockType.values()[threadLocalRandom.nextInt(2)];
@@ -577,7 +576,7 @@ public class TestLockManager {
         IllegalStateException.class,
         () -> {
           for (int i = 0; i < 1000; i++) {
-            TreeLock lock = manager.createTreeLock(completeRandomNameIdentifier());
+            manager.createTreeLock(completeRandomNameIdentifier());
           }
         });
   }
@@ -595,7 +594,7 @@ public class TestLockManager {
               lock.lock(j % 2 == 0 ? LockType.READ : LockType.WRITE);
               try {
                 // Deliberately throw an exception here.
-                @SuppressWarnings("divzero")
+                @SuppressWarnings({"divzero", "UnusedVariable"})
                 int a = 1 / 0;
               } catch (Exception e) {
                 // Ignore
@@ -648,5 +647,12 @@ public class TestLockManager {
     for (int i = 0; i < concurrentThreadCount; i++) {
       service.take().get();
     }
+  }
+
+  @Test
+  public void testMockRootTreeLock() {
+    LockManager lockManager = new LockManager(getConfig());
+    lockManager.createTreeLock(NameIdentifier.of("/"));
+    Assertions.assertEquals(2L, lockManager.totalNodeCount.get(), "Should have 2 nodes");
   }
 }

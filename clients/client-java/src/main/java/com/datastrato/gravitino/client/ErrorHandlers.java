@@ -10,20 +10,28 @@ import com.datastrato.gravitino.dto.responses.OAuth2ErrorResponse;
 import com.datastrato.gravitino.exceptions.BadRequestException;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
+import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
+import com.datastrato.gravitino.exceptions.NoSuchGroupException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
+import com.datastrato.gravitino.exceptions.NoSuchRoleException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
+import com.datastrato.gravitino.exceptions.NoSuchTopicException;
+import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.NotFoundException;
 import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.RESTException;
+import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
+import com.datastrato.gravitino.exceptions.TopicAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
+import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
 import java.util.List;
@@ -112,6 +120,50 @@ public class ErrorHandlers {
     return FilesetErrorHandler.INSTANCE;
   }
 
+  /**
+   * Creates an error handler specific to Topic operations.
+   *
+   * @return A Consumer representing the Topic error handler.
+   */
+  public static Consumer<ErrorResponse> topicErrorHandler() {
+    return TopicErrorHandler.INSTANCE;
+  }
+
+  /**
+   * Creates an error handler specific to User operations.
+   *
+   * @return A Consumer representing the User error handler.
+   */
+  public static Consumer<ErrorResponse> userErrorHandler() {
+    return UserErrorHandler.INSTANCE;
+  }
+
+  /**
+   * Creates an error handler specific to Group operations.
+   *
+   * @return A Consumer representing the Group error handler.
+   */
+  public static Consumer<ErrorResponse> groupErrorHandler() {
+    return GroupErrorHandler.INSTANCE;
+  }
+
+  /**
+   * Creates an error handler specific to Role operations.
+   *
+   * @return A Consumer representing the Role error handler.
+   */
+  public static Consumer<ErrorResponse> roleErrorHandler() {
+    return RoleErrorHandler.INSTANCE;
+  }
+  /**
+   * Creates an error handler specific to permission operations.
+   *
+   * @return A Consumer representing the permission error handler.
+   */
+  public static Consumer<ErrorResponse> permissionOperationErrorHandler() {
+    return PermissionOperationErrorHandler.INSTANCE;
+  }
+
   private ErrorHandlers() {}
 
   /**
@@ -141,7 +193,7 @@ public class ErrorHandlers {
     if (stack.isEmpty()) {
       return message;
     } else {
-      return String.format("%s\n%s", message, stack);
+      return String.format("%s%n%s", message, stack);
     }
   }
 
@@ -182,9 +234,10 @@ public class ErrorHandlers {
 
         case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
           throw new UnsupportedOperationException(errorMessage);
-      }
 
-      super.accept(errorResponse);
+        default:
+          super.accept(errorResponse);
+      }
     }
   }
 
@@ -217,9 +270,10 @@ public class ErrorHandlers {
           throw new RuntimeException(errorMessage);
         case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
           throw new UnsupportedOperationException(errorMessage);
-      }
 
-      super.accept(errorResponse);
+        default:
+          super.accept(errorResponse);
+      }
     }
   }
 
@@ -251,11 +305,15 @@ public class ErrorHandlers {
         case ErrorConstants.NON_EMPTY_CODE:
           throw new NonEmptySchemaException(errorMessage);
 
+        case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
+          throw new UnsupportedOperationException(errorMessage);
+
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
-      }
 
-      super.accept(errorResponse);
+        default:
+          super.accept(errorResponse);
+      }
     }
   }
 
@@ -286,9 +344,10 @@ public class ErrorHandlers {
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
-      }
 
-      super.accept(errorResponse);
+        default:
+          super.accept(errorResponse);
+      }
     }
   }
 
@@ -313,9 +372,10 @@ public class ErrorHandlers {
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
-      }
 
-      super.accept(errorResponse);
+        default:
+          super.accept(errorResponse);
+      }
     }
   }
 
@@ -362,6 +422,8 @@ public class ErrorHandlers {
           case OAuth2ClientUtil.INVALID_SCOPE_ERROR:
             throw new BadRequestException(
                 "Malformed request: %s: %s", errorResponse.getType(), errorResponse.getMessage());
+          default:
+            super.accept(errorResponse);
         }
       }
       super.accept(errorResponse);
@@ -396,9 +458,187 @@ public class ErrorHandlers {
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
-      }
 
-      super.accept(errorResponse);
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
+  /** Error handler specific to Topic operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class TopicErrorHandler extends RestErrorHandler {
+
+    private static final TopicErrorHandler INSTANCE = new TopicErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMessage);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchSchemaException.class.getSimpleName())) {
+            throw new NoSuchSchemaException(errorMessage);
+          } else if (errorResponse.getType().equals(NoSuchTopicException.class.getSimpleName())) {
+            throw new NoSuchTopicException(errorMessage);
+          } else {
+            throw new NotFoundException(errorMessage);
+          }
+
+        case ErrorConstants.ALREADY_EXISTS_CODE:
+          throw new TopicAlreadyExistsException(errorMessage);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMessage);
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
+  /** Error handler specific to User operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class UserErrorHandler extends RestErrorHandler {
+
+    private static final UserErrorHandler INSTANCE = new UserErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMessage);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchMetalakeException.class.getSimpleName())) {
+            throw new NoSuchMetalakeException(errorMessage);
+          } else if (errorResponse.getType().equals(NoSuchUserException.class.getSimpleName())) {
+            throw new NoSuchUserException(errorMessage);
+          } else {
+            throw new NotFoundException(errorMessage);
+          }
+
+        case ErrorConstants.ALREADY_EXISTS_CODE:
+          throw new UserAlreadyExistsException(errorMessage);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMessage);
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
+  /** Error handler specific to Group operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class GroupErrorHandler extends RestErrorHandler {
+
+    private static final GroupErrorHandler INSTANCE = new GroupErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMessage);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchMetalakeException.class.getSimpleName())) {
+            throw new NoSuchMetalakeException(errorMessage);
+          } else if (errorResponse.getType().equals(NoSuchGroupException.class.getSimpleName())) {
+            throw new NoSuchGroupException(errorMessage);
+          } else {
+            throw new NotFoundException(errorMessage);
+          }
+
+        case ErrorConstants.ALREADY_EXISTS_CODE:
+          throw new GroupAlreadyExistsException(errorMessage);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMessage);
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
+  /** Error handler specific to Role operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class RoleErrorHandler extends RestErrorHandler {
+
+    private static final RoleErrorHandler INSTANCE = new RoleErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMessage);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchMetalakeException.class.getSimpleName())) {
+            throw new NoSuchMetalakeException(errorMessage);
+          } else if (errorResponse.getType().equals(NoSuchRoleException.class.getSimpleName())) {
+            throw new NoSuchRoleException(errorMessage);
+          } else {
+            throw new NotFoundException(errorMessage);
+          }
+
+        case ErrorConstants.ALREADY_EXISTS_CODE:
+          throw new RoleAlreadyExistsException(errorMessage);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMessage);
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
+  /** Error handler specific to Permission operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class PermissionOperationErrorHandler extends RestErrorHandler {
+
+    private static final PermissionOperationErrorHandler INSTANCE =
+        new PermissionOperationErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMessage);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchMetalakeException.class.getSimpleName())) {
+            throw new NoSuchMetalakeException(errorMessage);
+          } else if (errorResponse.getType().equals(NoSuchUserException.class.getSimpleName())) {
+            throw new NoSuchUserException(errorMessage);
+          } else if (errorResponse.getType().equals(NoSuchGroupException.class.getSimpleName())) {
+            throw new NoSuchGroupException(errorMessage);
+          } else if (errorResponse.getType().equals(NoSuchRoleException.class.getSimpleName())) {
+            throw new NoSuchRoleException(errorMessage);
+          } else {
+            throw new NotFoundException(errorMessage);
+          }
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMessage);
+
+        default:
+          super.accept(errorResponse);
+      }
     }
   }
 

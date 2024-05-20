@@ -40,6 +40,12 @@ public class SchemaEntity implements Entity, Auditable, HasIdentifier {
 
   private Map<String, String> properties;
 
+  private SchemaEntity() {}
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
   /**
    * Returns an unmodifiable map of the fields and their corresponding values for this schema.
    *
@@ -133,12 +139,13 @@ public class SchemaEntity implements Entity, Auditable, HasIdentifier {
     if (this == o) {
       return true;
     }
-    if (o == null || getClass() != o.getClass()) {
+    if (!(o instanceof SchemaEntity)) {
       return false;
     }
     SchemaEntity schema = (SchemaEntity) o;
     return Objects.equal(id, schema.id)
         && Objects.equal(name, schema.name)
+        && Objects.equal(namespace, schema.namespace)
         && Objects.equal(comment, schema.comment)
         && Objects.equal(properties, schema.properties)
         && Objects.equal(auditInfo, schema.auditInfo);
@@ -154,7 +161,7 @@ public class SchemaEntity implements Entity, Auditable, HasIdentifier {
 
     private final SchemaEntity schema;
 
-    public Builder() {
+    private Builder() {
       this.schema = new SchemaEntity();
     }
 
@@ -232,6 +239,15 @@ public class SchemaEntity implements Entity, Auditable, HasIdentifier {
     public SchemaEntity build() {
       schema.validate();
       return schema;
+    }
+
+    /**
+     * Creates a new instance of {@link Builder}.
+     *
+     * @return The new instance.
+     */
+    public static Builder builder() {
+      return new Builder();
     }
   }
 }

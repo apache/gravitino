@@ -54,19 +54,19 @@ public class CachedClientPool implements ClientPool<IMetaStoreClient, TException
 
   private final Configuration conf;
   private final int clientPoolSize;
+  private final ScheduledThreadPoolExecutor scheduler;
 
   CachedClientPool(int clientPoolSize, Configuration conf, long evictionInterval) {
     this.conf = conf;
     this.clientPoolSize = clientPoolSize;
     // Since Caffeine does not ensure that removalListener will be involved after expiration
     // We use a scheduler with one thread to clean up expired clients.
+    scheduler = new ScheduledThreadPoolExecutor(1, newDaemonThreadFactory());
     this.clientPoolCache =
         Caffeine.newBuilder()
             .expireAfterAccess(evictionInterval, TimeUnit.MILLISECONDS)
             .removalListener((ignored, value, cause) -> ((HiveClientPool) value).close())
-            .scheduler(
-                Scheduler.forScheduledExecutorService(
-                    new ScheduledThreadPoolExecutor(1, newDaemonThreadFactory())))
+            .scheduler(Scheduler.forScheduledExecutorService(scheduler))
             .build();
   }
 
@@ -135,6 +135,14 @@ public class CachedClientPool implements ClientPool<IMetaStoreClient, TException
   }
 
   public void close() {
+    // Close all the HiveClientPool instances in the cache first and then shutdown the scheduler. As
+    // Removal listener in Cache will be invoked by the scheduler asynchronously, we need to close
+    // the HiveClientPool instances first and then shutdown the scheduler. Another reason is that
+    // Caller may call this `close` method and then close the class loader that is needed by the
+    // `close` method. We must ensure that all the HiveClientPool instances are closed before the
+    // class loader is closed.
+    clientPoolCache.asMap().forEach((key, value) -> value.close());
     clientPoolCache.invalidateAll();
+    scheduler.shutdownNow();
   }
 }

@@ -7,18 +7,18 @@ call gravitino.system.create_catalog(
     )
 );
 
-create schema "test.gt_iceberg2".gt_tpch2;
-use "test.gt_iceberg2".gt_tpch2;
+create schema gt_iceberg2.gt_tpch2;
+use gt_iceberg2.gt_tpch2;
 
 CREATE TABLE customer (
    custkey bigint,
-   name varchar(25),
-   address varchar(40),
+   name varchar,
+   address varchar,
    nationkey bigint,
-   phone varchar(15),
+   phone varchar,
    acctbal decimal(12, 2),
-   mktsegment varchar(10),
-   comment varchar(117)
+   mktsegment varchar,
+   comment varchar
 );
 
 CREATE TABLE lineitem (
@@ -30,45 +30,45 @@ CREATE TABLE lineitem (
    extendedprice decimal(12, 2),
    discount decimal(12, 2),
    tax decimal(12, 2),
-   returnflag varchar(1),
-   linestatus varchar(1),
+   returnflag varchar,
+   linestatus varchar,
    shipdate date,
    commitdate date,
    receiptdate date,
-   shipinstruct varchar(25),
-   shipmode varchar(10),
-   comment varchar(44)
+   shipinstruct varchar,
+   shipmode varchar,
+   comment varchar
 );
 
 CREATE TABLE nation (
    nationkey bigint,
-   name varchar(25),
+   name varchar,
    regionkey bigint,
-   comment varchar(152)
+   comment varchar
 );
 
 CREATE TABLE orders (
    orderkey bigint,
    custkey bigint,
-   orderstatus varchar(1),
+   orderstatus varchar,
    totalprice decimal(12, 2),
    orderdate date,
-   orderpriority varchar(15),
-   clerk varchar(15),
+   orderpriority varchar,
+   clerk varchar,
    shippriority integer,
-   comment varchar(79)
+   comment varchar
 );
 
 CREATE TABLE part (
    partkey bigint,
-   name varchar(55),
-   mfgr varchar(25),
-   brand varchar(10),
-   type varchar(25),
+   name varchar,
+   mfgr varchar,
+   brand varchar,
+   type varchar,
    size integer,
-   container varchar(10),
+   container varchar,
    retailprice decimal(12, 2),
-   comment varchar(23)
+   comment varchar
 );
 
 CREATE TABLE partsupp (
@@ -76,23 +76,23 @@ CREATE TABLE partsupp (
    suppkey bigint,
    availqty integer,
    supplycost decimal(12, 2),
-   comment varchar(199)
+   comment varchar
 );
 
 CREATE TABLE region (
    regionkey bigint,
-   name varchar(25),
-   comment varchar(152)
+   name varchar,
+   comment varchar
 );
 
 CREATE TABLE supplier (
    suppkey bigint,
-   name varchar(25),
-   address varchar(40),
+   name varchar,
+   address varchar,
    nationkey bigint,
-   phone varchar(15),
+   phone varchar,
    acctbal decimal(12, 2),
-   comment varchar(101)
+   comment varchar
 );
 
 insert into customer select * from tpch.tiny.customer;

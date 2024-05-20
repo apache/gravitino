@@ -52,7 +52,7 @@ You can see the connector directory `gravitino-trino-connector-<version>` after 
 Copy the connector directory to the Trino container's plugin directory.
 
 ```shell
-docker copy  /tmp/gravitino-trino-connector-<version> trino-gravitino:/lib/trino/plugin
+docker cp /tmp/gravitino-trino-connector-<version> trino-gravitino:/lib/trino/plugin
 ```
 
 Check the plugin directory in the container.
@@ -74,11 +74,13 @@ To configure Gravitino connector correctly, you need to put the following config
 connector.name=gravitino
 gravitino.uri=http://gravitino-server-host:8090
 gravitino.metalake=test
+gravitino.simplify-catalog-names=true
 ```
 
 - The `gravitino.name` defines which Gravitino connector is used. It must be `gravitino`.
 - The `gravitino.metalake` defines which metalake are used. It should exist in the Gravitino server.
 - The `gravitino.uri` defines the connection information about Gravitino server. Make sure your container can access the Gravitino server.
+- The `gravitino.simplify-catalog-names` setting omits the metalake prefix from catalog names when set to true. 
 
 Full configurations for Gravitino connector can be seen [here](configuration.md)
 
@@ -99,7 +101,7 @@ docker restart trino-gravitino
 Use the Trino CLI to connect to the Trino container and run a query.
 
 ```text
-docker exec -it trino trino
+docker exec -it trino-gravitino trino
 trino> SHOW CATALOGS;
 Catalog
 ------------------------
@@ -113,10 +115,10 @@ system
 
 You can see the `gravitino` catalog in the result set. This signifies the successful installation of the Gravitino connector.
 
-Assuming you have created a catalog named `test.jdbc-mysql` in the Gravitino server, or please refer to [Create a Catalog](../manage-metadata-using-gravitino.md#create-a-catalog). Then you can use the Trino CLI to connect to the Trino container and run a query like this.
+Assuming you have created a catalog named `test.jdbc-mysql` in the Gravitino server, or please refer to [Create a Catalog](../manage-relational-metadata-using-gravitino.md#create-a-catalog). Then you can use the Trino CLI to connect to the Trino container and run a query like this.
 
 ```text
-docker exec -it trino trino
+docker exec -it trino-gravitino trino
 trino> SHOW CATALOGS;
 Catalog
 ------------------------
@@ -126,7 +128,7 @@ memory
 tpcds
 tpch
 system
-test.jdbc-mysql
+jdbc-mysql
 ```
 
-The catalog named 'test.jdbc-mysql' is the catalog that you created by gravitino server, and you can use it to access the mysql database like other Trino catalogs.
+The catalog named 'jdbc-mysql' is the catalog that you created by gravitino server, and you can use it to access the mysql database like other Trino catalogs.

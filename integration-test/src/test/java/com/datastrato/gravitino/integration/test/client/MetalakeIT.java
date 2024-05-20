@@ -12,13 +12,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.auth.AuthConstants;
-import com.datastrato.gravitino.client.GravitinoMetaLake;
-import com.datastrato.gravitino.exceptions.IllegalNameIdentifierException;
-import com.datastrato.gravitino.exceptions.IllegalNamespaceException;
+import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
-import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
+import com.datastrato.gravitino.utils.RandomNameUtils;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Map;
@@ -31,8 +29,8 @@ import org.junit.jupiter.api.TestMethodOrder;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class MetalakeIT extends AbstractIT {
-  public static String metalakeNameA = GravitinoITUtils.genRandomName("metalakeA");
-  public static String metalakeNameB = GravitinoITUtils.genRandomName("metalakeB");
+  public static String metalakeNameA = RandomNameUtils.genRandomName("metalakeA");
+  public static String metalakeNameB = RandomNameUtils.genRandomName("metalakeB");
 
   @BeforeEach
   private void start() {
@@ -48,19 +46,17 @@ public class MetalakeIT extends AbstractIT {
   @Test
   public void testListMetalake() {
     // no metalakes to start with
-    GravitinoMetaLake[] metaLakes = client.listMetalakes();
+    GravitinoMetalake[] metaLakes = client.listMetalakes();
     assertEquals(0, metaLakes.length);
 
     // one metalakes
-    client.createMetalake(
-        NameIdentifier.parse(metalakeNameA), "metalake A comment", Collections.emptyMap());
+    client.createMetalake(metalakeNameA, "metalake A comment", Collections.emptyMap());
     metaLakes = client.listMetalakes();
     assertEquals(1, metaLakes.length);
     assertEquals(metaLakes[0].name(), metalakeNameA);
 
     // two metalakes
-    client.createMetalake(
-        NameIdentifier.parse(metalakeNameB), "metalake B comment", Collections.emptyMap());
+    client.createMetalake(metalakeNameB, "metalake B comment", Collections.emptyMap());
     metaLakes = client.listMetalakes();
     ArrayList<String> names = new ArrayList<>(2);
     assertEquals(2, metaLakes.length);
@@ -73,9 +69,8 @@ public class MetalakeIT extends AbstractIT {
   @Test
   public void testLoadMetalake() {
     // metalake exists
-    client.createMetalake(
-        NameIdentifier.parse(metalakeNameA), "metalake A comment", Collections.emptyMap());
-    GravitinoMetaLake metaLakeA = client.loadMetalake(NameIdentifier.of(metalakeNameA));
+    client.createMetalake(metalakeNameA, "metalake A comment", Collections.emptyMap());
+    GravitinoMetalake metaLakeA = client.loadMetalake(metalakeNameA);
     assertEquals(metaLakeA.name(), metalakeNameA);
 
     // metalake does not exist
@@ -83,50 +78,43 @@ public class MetalakeIT extends AbstractIT {
     assertThrows(
         NoSuchMetalakeException.class,
         () -> {
-          client.loadMetalake(noexist);
+          client.loadMetalake(noexist.name());
         });
 
     // metalake empty name - note it's NameIdentifier.of("") that fails not the load
-    assertThrows(
-        IllegalNameIdentifierException.class, () -> client.loadMetalake(NameIdentifier.of("")));
-
-    // metalake bad name
-    NameIdentifier abc = NameIdentifier.of("A", "B", "C");
-    assertThrows(IllegalNamespaceException.class, () -> client.loadMetalake(abc));
+    assertThrows(IllegalArgumentException.class, () -> client.loadMetalake(""));
   }
 
   @Test
   public void testAlterMetalake() {
-    String newName = GravitinoITUtils.genRandomName("newmetaname");
+    String newName = RandomNameUtils.genRandomName("newmetaname");
 
-    client.createMetalake(
-        NameIdentifier.parse(metalakeNameA), "metalake A comment", Collections.emptyMap());
+    client.createMetalake(metalakeNameA, "metalake A comment", Collections.emptyMap());
 
     MetalakeChange[] changes =
         new MetalakeChange[] {
           MetalakeChange.rename(newName), MetalakeChange.updateComment("new metalake comment")
         };
-    GravitinoMetaLake metaLake = client.alterMetalake(NameIdentifier.of(metalakeNameA), changes);
+    GravitinoMetalake metaLake = client.alterMetalake(metalakeNameA, changes);
     assertEquals(newName, metaLake.name());
     assertEquals("new metalake comment", metaLake.comment());
     assertEquals(AuthConstants.ANONYMOUS_USER, metaLake.auditInfo().creator());
 
     // Reload metadata via new name to check if the changes are applied
-    GravitinoMetaLake newMetalake = client.loadMetalake(NameIdentifier.of(newName));
+    GravitinoMetalake newMetalake = client.loadMetalake(newName);
     assertEquals(newName, newMetalake.name());
     assertEquals("new metalake comment", newMetalake.comment());
 
     // Old name does not exist
     NameIdentifier old = NameIdentifier.of(metalakeNameA);
-    assertThrows(NoSuchMetalakeException.class, () -> client.loadMetalake(old));
+    assertThrows(NoSuchMetalakeException.class, () -> client.loadMetalake(old.name()));
   }
 
   @Test
-  public void testAlterNonExistantMetalake() {
-    String newName = GravitinoITUtils.genRandomName("newmetaname");
+  public void testAlterNonExistentMetalake() {
+    String newName = RandomNameUtils.genRandomName("newmetaname");
 
-    client.createMetalake(
-        NameIdentifier.parse(metalakeNameA), "metalake A comment", Collections.emptyMap());
+    client.createMetalake(metalakeNameA, "metalake A comment", Collections.emptyMap());
 
     MetalakeChange[] changes =
         new MetalakeChange[] {
@@ -135,15 +123,14 @@ public class MetalakeIT extends AbstractIT {
 
     // rename non existent metalake
     NameIdentifier noexists = NameIdentifier.of(metalakeNameB);
-    assertThrows(NoSuchMetalakeException.class, () -> client.alterMetalake(noexists, changes));
+    assertThrows(
+        NoSuchMetalakeException.class, () -> client.alterMetalake(noexists.name(), changes));
   }
 
   @Test
   public void testCreateMetalake() {
-    GravitinoMetaLake metaLakeA =
-        client.createMetalake(
-            NameIdentifier.parse(metalakeNameA), "metalake A comment", Collections.emptyMap());
-    GravitinoMetaLake metalake = client.loadMetalake(NameIdentifier.of(metalakeNameA));
+    client.createMetalake(metalakeNameA, "metalake A comment", Collections.emptyMap());
+    GravitinoMetalake metalake = client.loadMetalake(metalakeNameA);
     assertEquals(metalakeNameA, metalake.name());
     assertEquals("metalake A comment", metalake.comment());
     assertEquals(AuthConstants.ANONYMOUS_USER, metalake.auditInfo().creator());
@@ -154,53 +141,62 @@ public class MetalakeIT extends AbstractIT {
     assertThrows(
         MetalakeAlreadyExistsException.class,
         () -> {
-          client.createMetalake(exists, "metalake A comment", emptyMap);
+          client.createMetalake(exists.name(), "metalake A comment", emptyMap);
+        });
+  }
+
+  @Test
+  public void testCreateMetalakeWithChinese() {
+    client.createMetalake(metalakeNameA, "这是中文comment", Collections.emptyMap());
+    GravitinoMetalake metalake = client.loadMetalake(metalakeNameA);
+    assertEquals(metalakeNameA, metalake.name());
+    assertEquals("这是中文comment", metalake.comment());
+    assertEquals(AuthConstants.ANONYMOUS_USER, metalake.auditInfo().creator());
+
+    // Test metalake name already exists
+    Map<String, String> emptyMap = Collections.emptyMap();
+    NameIdentifier exists = NameIdentifier.parse(metalakeNameA);
+    assertThrows(
+        MetalakeAlreadyExistsException.class,
+        () -> {
+          client.createMetalake(exists.name(), "metalake A comment", emptyMap);
         });
   }
 
   @Test
   public void testDropMetalakes() {
-    GravitinoMetaLake metalakeA =
-        client.createMetalake(
-            NameIdentifier.parse(metalakeNameA), "metalake A comment", Collections.emptyMap());
-    assertTrue(client.dropMetalake(NameIdentifier.of(metalakeA.name())));
+    GravitinoMetalake metalakeA =
+        client.createMetalake(metalakeNameA, "metalake A comment", Collections.emptyMap());
+    assertTrue(client.dropMetalake(metalakeA.name()));
     NameIdentifier id = NameIdentifier.of(metalakeNameA);
     assertThrows(
         NoSuchMetalakeException.class,
         () -> {
-          client.loadMetalake(id);
+          client.loadMetalake(id.name());
         });
 
     // Metalake does not exist, so we return false
-    assertFalse(client.dropMetalake(NameIdentifier.of(metalakeA.name())));
-
-    // Bad metalake name
-    NameIdentifier badname = NameIdentifier.of("A", "B");
-    assertThrows(
-        IllegalNamespaceException.class,
-        () -> {
-          client.dropMetalake(badname);
-        });
+    assertFalse(client.dropMetalake(metalakeA.name()));
   }
 
   public void dropMetalakes() {
-    GravitinoMetaLake[] metaLakes = client.listMetalakes();
-    for (GravitinoMetaLake metalake : metaLakes) {
-      assertTrue(client.dropMetalake(NameIdentifier.of(metalake.name())));
+    GravitinoMetalake[] metaLakes = client.listMetalakes();
+    for (GravitinoMetalake metalake : metaLakes) {
+      assertTrue(client.dropMetalake(metalake.name()));
     }
 
     // Reload metadata from backend to check if the drop operations are applied
-    for (GravitinoMetaLake metalake : metaLakes) {
+    for (GravitinoMetalake metalake : metaLakes) {
       NameIdentifier id = NameIdentifier.of(metalake.name());
       Assertions.assertThrows(
           NoSuchMetalakeException.class,
           () -> {
-            client.loadMetalake(id);
+            client.loadMetalake(id.name());
           });
     }
 
-    for (GravitinoMetaLake metalake : metaLakes) {
-      Assertions.assertFalse(client.dropMetalake(NameIdentifier.of(metalake.name())));
+    for (GravitinoMetalake metalake : metaLakes) {
+      Assertions.assertFalse(client.dropMetalake(metalake.name()));
     }
   }
 }

@@ -39,6 +39,8 @@ import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
@@ -54,6 +56,7 @@ import com.fasterxml.jackson.databind.cfg.EnumFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -78,6 +81,7 @@ public class JsonUtils {
   private static final String STRATEGY = "strategy";
   private static final String FIELD_NAME = "fieldName";
   private static final String FIELD_NAMES = "fieldNames";
+  private static final String ASSIGNMENTS_NAME = "assignments";
   private static final String NUM_BUCKETS = "numBuckets";
   private static final String WIDTH = "width";
   private static final String FUNCTION_NAME = "funcName";
@@ -99,6 +103,8 @@ public class JsonUtils {
   private static final String LIST = "list";
   private static final String MAP = "map";
   private static final String UNION = "union";
+  private static final String UNPARSED = "unparsed";
+  private static final String UNPARSED_TYPE = "unparsedType";
   private static final String FIELDS = "fields";
   private static final String UNION_TYPES = "types";
   private static final String STRUCT_FIELD_NAME = "name";
@@ -230,12 +236,48 @@ public class JsonUtils {
   }
 
   /**
-   * Get the shared ObjectMapper instance for JSON serialization/deserialization.
+   * Returns a shared {@link ObjectMapper} instance for JSON serialization/deserialization test.
+   *
+   * <p>Note: This instance is intended for testing purposes only. For production use, obtain an
+   * {@link ObjectMapper} from the following providers:
+   *
+   * <ul>
+   *   <li>Client side: {@code com.datastrato.gravitino.client.ObjectMapperProvider}
+   *   <li>Server side: {@code com.datastrato.gravitino.server.web.ObjectMapperProvider}
+   * </ul>
+   *
+   * @return the shared {@link ObjectMapper} instance for testing.
+   */
+  @VisibleForTesting
+  public static ObjectMapper objectMapper() {
+    return ObjectMapperHolder.INSTANCE;
+  }
+
+  /**
+   * AnyFieldMapperHolder is a static inner class that holds the instance of ObjectMapper which can
+   * access any field of the object. This class utilizes the Initialization-on-demand holder idiom,
+   * which is a lazy-loaded singleton. This idiom takes advantage of the fact that inner classes are
+   * not loaded until they are referenced. It's a thread-safe and efficient way to implement a
+   * singleton as the instance is created when it's needed at the first time.
+   */
+  private static class AnyFieldMapperHolder {
+    private static final ObjectMapper INSTANCE =
+        JsonMapper.builder()
+            .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
+            .configure(EnumFeature.WRITE_ENUMS_TO_LOWERCASE, true)
+            .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
+            .build()
+            .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY)
+            .registerModule(new JavaTimeModule());
+  }
+
+  /**
+   * Get the shared AnyFieldMapper instance for JSON serialization/deserialization.
    *
    * @return The ObjectMapper instance.
    */
-  public static ObjectMapper objectMapper() {
-    return ObjectMapperHolder.INSTANCE;
+  public static ObjectMapper anyFieldMapper() {
+    return AnyFieldMapperHolder.INSTANCE;
   }
 
   /**
@@ -331,7 +373,7 @@ public class JsonUtils {
             node);
         Type dataType = readDataType(node.get(DATA_TYPE));
         String value = getStringOrNull(LITERAL_VALUE, node);
-        return new LiteralDTO.Builder().withDataType(dataType).withValue(value).build();
+        return LiteralDTO.builder().withDataType(dataType).withValue(value).build();
       case FIELD:
         Preconditions.checkArgument(
             node.has(FIELD_NAME),
@@ -351,7 +393,7 @@ public class JsonUtils {
         String functionName = getString(FUNCTION_NAME, node);
         List<FunctionArg> args = Lists.newArrayList();
         node.get(FUNCTION_ARGS).forEach(arg -> args.add(readFunctionArg(arg)));
-        return new FuncExpressionDTO.Builder()
+        return FuncExpressionDTO.builder()
             .withFunctionName(functionName)
             .withFunctionArgs(args.toArray(FunctionArg.EMPTY_ARGS))
             .build();
@@ -396,6 +438,127 @@ public class JsonUtils {
         throw new IOException("Unknown function argument type: " + arg.argType());
     }
     gen.writeEndObject();
+  }
+
+  private static void writePartition(PartitionDTO value, JsonGenerator gen) throws IOException {
+    gen.writeStartObject();
+    gen.writeStringField(PARTITION_TYPE, value.type().name().toLowerCase());
+    gen.writeStringField(PARTITION_NAME, value.name());
+    switch (value.type()) {
+      case IDENTITY:
+        IdentityPartitionDTO identityPartitionDTO = (IdentityPartitionDTO) value;
+        gen.writeFieldName(FIELD_NAMES);
+        gen.writeObject(identityPartitionDTO.fieldNames());
+        gen.writeArrayFieldStart(IDENTITY_PARTITION_VALUES);
+        for (LiteralDTO literal : identityPartitionDTO.values()) {
+          writeFunctionArg(literal, gen);
+        }
+        gen.writeEndArray();
+        break;
+      case LIST:
+        ListPartitionDTO listPartitionDTO = (ListPartitionDTO) value;
+        gen.writeArrayFieldStart(LIST_PARTITION_LISTS);
+        for (LiteralDTO[] literals : listPartitionDTO.lists()) {
+          gen.writeStartArray();
+          for (LiteralDTO literal : literals) {
+            writeFunctionArg(literal, gen);
+          }
+          gen.writeEndArray();
+        }
+        gen.writeEndArray();
+        break;
+      case RANGE:
+        RangePartitionDTO rangePartitionDTO = (RangePartitionDTO) value;
+        gen.writeFieldName(RANGE_PARTITION_UPPER);
+        writeFunctionArg(rangePartitionDTO.upper(), gen);
+        gen.writeFieldName(RANGE_PARTITION_LOWER);
+        writeFunctionArg(rangePartitionDTO.lower(), gen);
+        break;
+      default:
+        throw new IOException("Unknown partition type: " + value.type());
+    }
+    gen.writeObjectField(PARTITION_PROPERTIES, value.properties());
+    gen.writeEndObject();
+  }
+
+  private static PartitionDTO readPartition(JsonNode node) {
+    Preconditions.checkArgument(
+        node != null && !node.isNull() && node.isObject(),
+        "Partition must be a valid JSON object, but found: %s",
+        node);
+    Preconditions.checkArgument(
+        node.has(PARTITION_TYPE), "Partition must have a type field, but found: %s", node);
+    String type = getString(PARTITION_TYPE, node);
+    switch (PartitionDTO.Type.valueOf(type.toUpperCase())) {
+      case IDENTITY:
+        Preconditions.checkArgument(
+            node.has(FIELD_NAMES) && node.get(FIELD_NAMES).isArray(),
+            "Identity partition must have array of fieldNames, but found: %s",
+            node);
+        Preconditions.checkArgument(
+            node.has(IDENTITY_PARTITION_VALUES) && node.get(IDENTITY_PARTITION_VALUES).isArray(),
+            "Identity partition must have array of values, but found: %s",
+            node);
+
+        List<String[]> fieldNames = Lists.newArrayList();
+        node.get(FIELD_NAMES).forEach(field -> fieldNames.add(getStringArray((ArrayNode) field)));
+        List<LiteralDTO> values = Lists.newArrayList();
+        node.get(IDENTITY_PARTITION_VALUES)
+            .forEach(value -> values.add((LiteralDTO) readFunctionArg(value)));
+        return IdentityPartitionDTO.builder()
+            .withName(getStringOrNull(PARTITION_NAME, node))
+            .withFieldNames(fieldNames.toArray(new String[0][0]))
+            .withValues(values.toArray(new LiteralDTO[0]))
+            .withProperties(getStringMapOrNull(PARTITION_PROPERTIES, node))
+            .build();
+
+      case LIST:
+        Preconditions.checkArgument(
+            node.has(PARTITION_NAME), "List partition must have name, but found: %s", node);
+        Preconditions.checkArgument(
+            node.has(LIST_PARTITION_LISTS) && node.get(LIST_PARTITION_LISTS).isArray(),
+            "List partition must have array of lists, but found: %s",
+            node);
+
+        List<LiteralDTO[]> lists = Lists.newArrayList();
+        node.get(LIST_PARTITION_LISTS)
+            .forEach(
+                list -> {
+                  List<LiteralDTO> literals = Lists.newArrayList();
+                  list.forEach(literal -> literals.add((LiteralDTO) readFunctionArg(literal)));
+                  lists.add(literals.toArray(new LiteralDTO[0]));
+                });
+
+        return ListPartitionDTO.builder()
+            .withName(getStringOrNull(PARTITION_NAME, node))
+            .withLists(lists.toArray(new LiteralDTO[0][0]))
+            .withProperties(getStringMapOrNull(PARTITION_PROPERTIES, node))
+            .build();
+
+      case RANGE:
+        Preconditions.checkArgument(
+            node.has(PARTITION_NAME), "Range partition must have name, but found: %s", node);
+        Preconditions.checkArgument(
+            node.has(RANGE_PARTITION_UPPER),
+            "Range partition must have upper, but found: %s",
+            node);
+        Preconditions.checkArgument(
+            node.has(RANGE_PARTITION_LOWER),
+            "Range partition must have lower, but found: %s",
+            node);
+
+        LiteralDTO upper = (LiteralDTO) readFunctionArg(node.get(RANGE_PARTITION_UPPER));
+        LiteralDTO lower = (LiteralDTO) readFunctionArg(node.get(RANGE_PARTITION_LOWER));
+        return RangePartitionDTO.builder()
+            .withName(getStringOrNull(PARTITION_NAME, node))
+            .withUpper(upper)
+            .withLower(lower)
+            .withProperties(getStringMapOrNull(PARTITION_PROPERTIES, node))
+            .build();
+
+      default:
+        throw new IllegalArgumentException("Unknown partition type: " + type);
+    }
   }
 
   /**
@@ -488,8 +651,11 @@ public class JsonUtils {
       case UNION:
         writeUnionType((Types.UnionType) dataType, gen);
         break;
+      case UNPARSED:
+        writeUnparsedType((Types.UnparsedType) dataType, gen);
+        break;
       default:
-        throw new IOException("Cannot serialize unknown type: " + dataType);
+        writeUnparsedType(dataType.simpleString(), gen);
     }
   }
 
@@ -510,9 +676,8 @@ public class JsonUtils {
           : fromPrimitiveTypeString(text);
     }
 
-    if (node.isObject() && node.get(TYPE) != null) {
-      JsonNode typeField = node.get(TYPE);
-      String type = typeField.asText();
+    if (node.isObject() && node.has(TYPE)) {
+      String type = node.get(TYPE).asText();
 
       if (STRUCT.equals(type)) {
         return readStructType(node);
@@ -528,6 +693,10 @@ public class JsonUtils {
 
       if (UNION.equals(type)) {
         return readUnionType(node);
+      }
+
+      if (UNPARSED.equals(type)) {
+        return readUnparsedType(node);
       }
     }
 
@@ -596,6 +765,18 @@ public class JsonUtils {
     if (field.comment() != null) {
       gen.writeStringField(STRUCT_FIELD_COMMENT, field.comment());
     }
+    gen.writeEndObject();
+  }
+
+  private static void writeUnparsedType(Types.UnparsedType unparsedType, JsonGenerator gen)
+      throws IOException {
+    writeUnparsedType(unparsedType.unparsedType(), gen);
+  }
+
+  private static void writeUnparsedType(String unparsedType, JsonGenerator gen) throws IOException {
+    gen.writeStartObject();
+    gen.writeStringField(TYPE, UNPARSED);
+    gen.writeStringField(UNPARSED_TYPE, unparsedType);
     gen.writeEndObject();
   }
 
@@ -699,6 +880,13 @@ public class JsonUtils {
         node.has(STRUCT_FIELD_NULLABLE) ? node.get(STRUCT_FIELD_NULLABLE).asBoolean() : true;
     String comment = node.has(STRUCT_FIELD_COMMENT) ? getString(STRUCT_FIELD_COMMENT, node) : null;
     return Types.StructType.Field.of(name, type, nullable, comment);
+  }
+
+  private static Types.UnparsedType readUnparsedType(JsonNode node) {
+    Preconditions.checkArgument(
+        node.has(UNPARSED_TYPE), "Cannot parse unparsed type from missing unparsed type: %s", node);
+
+    return Types.UnparsedType.of(node.get(UNPARSED_TYPE).asText());
   }
 
   // Nested classes for custom serialization and deserialization
@@ -840,11 +1028,21 @@ public class JsonUtils {
           ListPartitioningDTO listPartitioningDTO = (ListPartitioningDTO) value;
           gen.writeFieldName(FIELD_NAMES);
           gen.writeObject(listPartitioningDTO.fieldNames());
+          gen.writeArrayFieldStart(ASSIGNMENTS_NAME);
+          for (ListPartitionDTO listPartitionDTO : listPartitioningDTO.assignments()) {
+            writePartition(listPartitionDTO, gen);
+          }
+          gen.writeEndArray();
           break;
         case RANGE:
           RangePartitioningDTO rangePartitioningDTO = (RangePartitioningDTO) value;
           gen.writeFieldName(FIELD_NAME);
           gen.writeObject(rangePartitioningDTO.fieldName());
+          gen.writeArrayFieldStart(ASSIGNMENTS_NAME);
+          for (PartitionDTO rangePartitionDTO : rangePartitioningDTO.assignments()) {
+            writePartition(rangePartitionDTO, gen);
+          }
+          gen.writeEndArray();
           break;
         case FUNCTION:
           FunctionPartitioningDTO funcExpression = (FunctionPartitioningDTO) value;
@@ -877,29 +1075,80 @@ public class JsonUtils {
       switch (Partitioning.Strategy.getByName(strategy)) {
         case IDENTITY:
           return IdentityPartitioningDTO.of(getStringList(FIELD_NAME, node).toArray(new String[0]));
+
         case YEAR:
           return YearPartitioningDTO.of(getStringList(FIELD_NAME, node).toArray(new String[0]));
+
         case MONTH:
           return MonthPartitioningDTO.of(getStringList(FIELD_NAME, node).toArray(new String[0]));
+
         case DAY:
           return DayPartitioningDTO.of(getStringList(FIELD_NAME, node).toArray(new String[0]));
+
         case HOUR:
           return HourPartitioningDTO.of(getStringList(FIELD_NAME, node).toArray(new String[0]));
+
         case BUCKET:
           int numBuckets = getInt(NUM_BUCKETS, node);
           List<String[]> fieldNames = Lists.newArrayList();
           node.get(FIELD_NAMES).forEach(field -> fieldNames.add(getStringArray((ArrayNode) field)));
           return BucketPartitioningDTO.of(numBuckets, fieldNames.toArray(new String[0][0]));
+
         case TRUNCATE:
           int width = getInt(WIDTH, node);
           return TruncatePartitioningDTO.of(
               width, getStringList(FIELD_NAME, node).toArray(new String[0]));
+
         case LIST:
           List<String[]> listFields = Lists.newArrayList();
           node.get(FIELD_NAMES).forEach(field -> listFields.add(getStringArray((ArrayNode) field)));
-          return ListPartitioningDTO.of(listFields.toArray(new String[0][0]));
+
+          if (!node.hasNonNull(ASSIGNMENTS_NAME)) {
+            return ListPartitioningDTO.of(listFields.toArray(new String[0][0]));
+          }
+
+          Preconditions.checkArgument(
+              node.get(ASSIGNMENTS_NAME).isArray(),
+              "Cannot parse list partitioning from non-array assignments: %s",
+              node);
+          List<ListPartitionDTO> assignments = Lists.newArrayList();
+          node.get(ASSIGNMENTS_NAME)
+              .forEach(
+                  assignment -> {
+                    PartitionDTO partitionDTO = readPartition(assignment);
+                    Preconditions.checkArgument(
+                        partitionDTO instanceof ListPartitionDTO,
+                        "Cannot parse list partitioning from non-list assignment: %s",
+                        assignment);
+                    assignments.add((ListPartitionDTO) partitionDTO);
+                  });
+          return ListPartitioningDTO.of(
+              listFields.toArray(new String[0][0]), assignments.toArray(new ListPartitionDTO[0]));
+
         case RANGE:
-          return RangePartitioningDTO.of(getStringList(FIELD_NAME, node).toArray(new String[0]));
+          String[] fields = getStringList(FIELD_NAME, node).toArray(new String[0]);
+          if (!node.hasNonNull(ASSIGNMENTS_NAME)) {
+            return RangePartitioningDTO.of(fields);
+          }
+
+          Preconditions.checkArgument(
+              node.get(ASSIGNMENTS_NAME).isArray(),
+              "Cannot parse range partitioning from non-array assignments: %s",
+              node);
+          List<RangePartitionDTO> rangeAssignments = Lists.newArrayList();
+          node.get(ASSIGNMENTS_NAME)
+              .forEach(
+                  assignment -> {
+                    PartitionDTO partitionDTO = readPartition(assignment);
+                    Preconditions.checkArgument(
+                        partitionDTO instanceof RangePartitionDTO,
+                        "Cannot parse range partitioning from non-range assignment: %s",
+                        assignment);
+                    rangeAssignments.add((RangePartitionDTO) partitionDTO);
+                  });
+          return RangePartitioningDTO.of(
+              fields, rangeAssignments.toArray(new RangePartitionDTO[0]));
+
         case FUNCTION:
           String functionName = getString(FUNCTION_NAME, node);
           Preconditions.checkArgument(
@@ -909,6 +1158,7 @@ public class JsonUtils {
           List<FunctionArg> args = Lists.newArrayList();
           node.get(FUNCTION_ARGS).forEach(arg -> args.add(readFunctionArg(arg)));
           return FunctionPartitioningDTO.of(functionName, args.toArray(FunctionArg.EMPTY_ARGS));
+
         default:
           throw new IOException("Unknown partitioning strategy: " + strategy);
       }
@@ -942,7 +1192,7 @@ public class JsonUtils {
       Preconditions.checkArgument(
           node.has(SORT_TERM), "Cannot parse sort order from missing sort term: %s", node);
       FunctionArg sortTerm = readFunctionArg(node.get(SORT_TERM));
-      SortOrderDTO.Builder builder = new SortOrderDTO.Builder().withSortTerm(sortTerm);
+      SortOrderDTO.Builder builder = SortOrderDTO.builder().withSortTerm(sortTerm);
       if (node.has(DIRECTION)) {
         builder.withDirection(SortDirection.fromString(getString(DIRECTION, node)));
       }
@@ -980,7 +1230,7 @@ public class JsonUtils {
           node != null && !node.isNull() && node.isObject(),
           "Cannot parse distribution from invalid JSON: %s",
           node);
-      DistributionDTO.Builder builder = new DistributionDTO.Builder();
+      DistributionDTO.Builder builder = DistributionDTO.builder();
       if (node.has(STRATEGY)) {
         String strategy = getString(STRATEGY, node);
         builder.withStrategy(Strategy.getByName(strategy));
@@ -1026,44 +1276,7 @@ public class JsonUtils {
     @Override
     public void serialize(PartitionDTO value, JsonGenerator gen, SerializerProvider serializers)
         throws IOException {
-      gen.writeStartObject();
-      gen.writeStringField(PARTITION_TYPE, value.type().name().toLowerCase());
-      gen.writeStringField(PARTITION_NAME, value.name());
-      switch (value.type()) {
-        case IDENTITY:
-          IdentityPartitionDTO identityPartitionDTO = (IdentityPartitionDTO) value;
-          gen.writeFieldName(FIELD_NAMES);
-          gen.writeObject(identityPartitionDTO.fieldNames());
-          gen.writeArrayFieldStart(IDENTITY_PARTITION_VALUES);
-          for (LiteralDTO literal : identityPartitionDTO.values()) {
-            writeFunctionArg(literal, gen);
-          }
-          gen.writeEndArray();
-          break;
-        case LIST:
-          ListPartitionDTO listPartitionDTO = (ListPartitionDTO) value;
-          gen.writeArrayFieldStart(LIST_PARTITION_LISTS);
-          for (LiteralDTO[] literals : listPartitionDTO.lists()) {
-            gen.writeStartArray();
-            for (LiteralDTO literal : literals) {
-              writeFunctionArg(literal, gen);
-            }
-            gen.writeEndArray();
-          }
-          gen.writeEndArray();
-          break;
-        case RANGE:
-          RangePartitionDTO rangePartitionDTO = (RangePartitionDTO) value;
-          gen.writeFieldName(RANGE_PARTITION_UPPER);
-          writeFunctionArg(rangePartitionDTO.upper(), gen);
-          gen.writeFieldName(RANGE_PARTITION_LOWER);
-          writeFunctionArg(rangePartitionDTO.lower(), gen);
-          break;
-        default:
-          throw new IOException("Unknown partition type: " + value.type());
-      }
-      gen.writeObjectField(PARTITION_PROPERTIES, value.properties());
-      gen.writeEndObject();
+      writePartition(value, gen);
     }
   }
 
@@ -1072,83 +1285,7 @@ public class JsonUtils {
     @Override
     public PartitionDTO deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
       JsonNode node = p.getCodec().readTree(p);
-      Preconditions.checkArgument(
-          node != null && !node.isNull() && node.isObject(),
-          "Partition must be a valid JSON object, but found: %s",
-          node);
-      Preconditions.checkArgument(
-          node.has(PARTITION_TYPE), "Partition must have a type field, but found: %s", node);
-      String type = getString(PARTITION_TYPE, node);
-      switch (PartitionDTO.Type.valueOf(type.toUpperCase())) {
-        case IDENTITY:
-          Preconditions.checkArgument(
-              node.has(FIELD_NAMES) && node.get(FIELD_NAMES).isArray(),
-              "Identity partition must have array of fieldNames, but found: %s",
-              node);
-          Preconditions.checkArgument(
-              node.has(IDENTITY_PARTITION_VALUES) && node.get(IDENTITY_PARTITION_VALUES).isArray(),
-              "Identity partition must have array of values, but found: %s",
-              node);
-
-          List<String[]> fieldNames = Lists.newArrayList();
-          node.get(FIELD_NAMES).forEach(field -> fieldNames.add(getStringArray((ArrayNode) field)));
-          List<LiteralDTO> values = Lists.newArrayList();
-          node.get(IDENTITY_PARTITION_VALUES)
-              .forEach(value -> values.add((LiteralDTO) readFunctionArg(value)));
-          return IdentityPartitionDTO.builder()
-              .withName(getStringOrNull(PARTITION_NAME, node))
-              .withFieldNames(fieldNames.toArray(new String[0][0]))
-              .withValues(values.toArray(new LiteralDTO[0]))
-              .withProperties(getStringMapOrNull(PARTITION_PROPERTIES, node))
-              .build();
-
-        case LIST:
-          Preconditions.checkArgument(
-              node.has(PARTITION_NAME), "List partition must have name, but found: %s", node);
-          Preconditions.checkArgument(
-              node.has(LIST_PARTITION_LISTS) && node.get(LIST_PARTITION_LISTS).isArray(),
-              "List partition must have array of lists, but found: %s",
-              node);
-
-          List<LiteralDTO[]> lists = Lists.newArrayList();
-          node.get(LIST_PARTITION_LISTS)
-              .forEach(
-                  list -> {
-                    List<LiteralDTO> literals = Lists.newArrayList();
-                    list.forEach(literal -> literals.add((LiteralDTO) readFunctionArg(literal)));
-                    lists.add(literals.toArray(new LiteralDTO[0]));
-                  });
-
-          return ListPartitionDTO.builder()
-              .withName(getStringOrNull(PARTITION_NAME, node))
-              .withLists(lists.toArray(new LiteralDTO[0][0]))
-              .withProperties(getStringMapOrNull(PARTITION_PROPERTIES, node))
-              .build();
-
-        case RANGE:
-          Preconditions.checkArgument(
-              node.has(PARTITION_NAME), "Range partition must have name, but found: %s", node);
-          Preconditions.checkArgument(
-              node.has(RANGE_PARTITION_UPPER),
-              "Range partition must have upper, but found: %s",
-              node);
-          Preconditions.checkArgument(
-              node.has(RANGE_PARTITION_LOWER),
-              "Range partition must have lower, but found: %s",
-              node);
-
-          LiteralDTO upper = (LiteralDTO) readFunctionArg(node.get(RANGE_PARTITION_UPPER));
-          LiteralDTO lower = (LiteralDTO) readFunctionArg(node.get(RANGE_PARTITION_LOWER));
-          return RangePartitionDTO.builder()
-              .withName(getStringOrNull(PARTITION_NAME, node))
-              .withUpper(upper)
-              .withLower(lower)
-              .withProperties(getStringMapOrNull(PARTITION_PROPERTIES, node))
-              .build();
-
-        default:
-          throw new IOException("Unknown partition type: " + type);
-      }
+      return readPartition(node);
     }
   }
 
@@ -1178,7 +1315,7 @@ public class JsonUtils {
           "Index must be a valid JSON object, but found: %s",
           node);
 
-      IndexDTO.Builder builder = new IndexDTO.Builder();
+      IndexDTO.Builder builder = IndexDTO.builder();
       Preconditions.checkArgument(
           node.has(INDEX_TYPE), "Cannot parse index from missing type: %s", node);
       String indexType = getString(INDEX_TYPE, node);

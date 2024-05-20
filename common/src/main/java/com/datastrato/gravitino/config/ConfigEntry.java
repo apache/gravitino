@@ -171,8 +171,25 @@ public class ConfigEntry<T> {
   public ConfigEntry<List<T>> toSequence() {
     ConfigEntry<List<T>> conf =
         new ConfigEntry<>(key, version, doc, alternatives, isPublic, isDeprecated);
-    conf.setValueConverter((String str) -> strToSeq(str, valueConverter));
-    conf.setStringConverter((List<T> val) -> seqToStr(val, stringConverter));
+
+    Function<String, T> elementConverter;
+    if (validator == null) {
+      elementConverter = valueConverter;
+    } else {
+      elementConverter =
+          value -> {
+            if (value == null) {
+              validator.accept(null);
+            }
+            T convertedValue = valueConverter.apply(value);
+            validator.accept(convertedValue);
+            return convertedValue;
+          };
+    }
+
+    conf.setValueConverter((String str) -> strToSeq(str, elementConverter));
+    conf.setStringConverter((List<T> val) -> val == null ? null : seqToStr(val, stringConverter));
+
     return conf;
   }
 
@@ -233,7 +250,9 @@ public class ConfigEntry<T> {
   }
 
   /**
-   * Reads the configuration value.
+   * Reads the configuration value. If the configuration value is not found, it will try to find the
+   * value from the alternatives，which means that newer configurations have higher priority over
+   * deprecated ones.
    *
    * @param properties The map containing the configuration properties.
    * @return The value of the configuration entry.

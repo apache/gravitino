@@ -12,8 +12,8 @@ RENAME TABLE
 
 DROP COLUMN
 
-"CREATE TABLE ""test.gt_hive"".gt_db1.tb01 (
-   name varchar(65535),
+"CREATE TABLE gt_hive.gt_db1.tb01 (
+   name varchar,
    salary integer
 )
 COMMENT ''
@@ -30,8 +30,8 @@ WITH (
 
 RENAME COLUMN
 
-"CREATE TABLE ""test.gt_hive"".gt_db1.tb01 (
-   s varchar(65535),
+"CREATE TABLE gt_hive.gt_db1.tb01 (
+   s varchar,
    salary integer
 )
 COMMENT ''
@@ -48,7 +48,7 @@ WITH (
 
 SET COLUMN TYPE
 
-"CREATE TABLE ""test.gt_hive"".gt_db1.tb01 (
+"CREATE TABLE gt_hive.gt_db1.tb01 (
    s varchar(256),
    salary integer
 )
@@ -66,7 +66,7 @@ WITH (
 
 COMMENT
 
-"CREATE TABLE ""test.gt_hive"".gt_db1.tb01 (
+"CREATE TABLE gt_hive.gt_db1.tb01 (
    s varchar(256),
    salary integer
 )
@@ -84,7 +84,7 @@ WITH (
 
 COMMENT
 
-"CREATE TABLE ""test.gt_hive"".gt_db1.tb01 (
+"CREATE TABLE gt_hive.gt_db1.tb01 (
    s varchar(256) COMMENT 'test column comments',
    salary integer
 )
@@ -102,10 +102,10 @@ WITH (
 
 ADD COLUMN
 
-"CREATE TABLE ""test.gt_hive"".gt_db1.tb01 (
+"CREATE TABLE gt_hive.gt_db1.tb01 (
    s varchar(256) COMMENT 'test column comments',
    salary integer,
-   city varchar(65535) COMMENT 'aaa'
+   city varchar COMMENT 'aaa'
 )
 COMMENT 'test table comments'
 WITH (

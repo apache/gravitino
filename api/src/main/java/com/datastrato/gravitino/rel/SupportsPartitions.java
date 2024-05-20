@@ -4,11 +4,13 @@
  */
 package com.datastrato.gravitino.rel;
 
+import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
 import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
 import com.datastrato.gravitino.rel.partitions.Partition;
 
 /** Interface for tables that support partitions. */
+@Evolving
 public interface SupportsPartitions {
 
   /**
@@ -77,14 +79,15 @@ public interface SupportsPartitions {
   /**
    * Drop a partition with specified name.
    *
-   * @param partitionName The identifier of the partition.
-   * @return true if a partition was deleted, false if the partition did not exist.
+   * @param partitionName the name of the partition
+   * @return true if a partition was deleted.
    */
   boolean dropPartition(String partitionName);
 
   /**
    * If the table supports purging, drop a partition with specified name and completely remove
-   * partition data by skipping a trash.
+   * partition data by skipping a trash. If the table is an external table or does not support
+   * purging partitions, {@link UnsupportedOperationException} is thrown.
    *
    * @param partitionName The name of the partition.
    * @return true if a partition was deleted, false if the partition did not exist.

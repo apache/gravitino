@@ -101,7 +101,7 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
     if (this == o) {
       return true;
     }
-    if (o == null || getClass() != o.getClass()) {
+    if (!(o instanceof TableEntity)) {
       return false;
     }
 
@@ -109,6 +109,7 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
     TableEntity baseTable = (TableEntity) o;
     return Objects.equal(id, baseTable.id)
         && Objects.equal(name, baseTable.name)
+        && Objects.equal(namespace, baseTable.namespace)
         && Objects.equal(auditInfo, baseTable.auditInfo);
   }
 
@@ -121,7 +122,7 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
 
     private final TableEntity tableEntity;
 
-    public Builder() {
+    private Builder() {
       this.tableEntity = new TableEntity();
     }
 
@@ -149,5 +150,14 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
       tableEntity.validate();
       return tableEntity;
     }
+  }
+
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }

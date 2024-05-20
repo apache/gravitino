@@ -1,11 +1,10 @@
-CREATE SCHEMA "test.gt_iceberg".gt_db2;
+CREATE SCHEMA gt_iceberg.gt_db2;
 
-USE "test.gt_iceberg".gt_db2;
+USE gt_iceberg.gt_db2;
 
 -- Unsupported Type: TINYINT, SMALLINT
 CREATE TABLE tb01 (
-    f1 VARCHAR(200),
-    f2 CHAR(20),
+    f1 VARCHAR,
     f3 VARBINARY,
     f4 DECIMAL(10, 3),
     f5 REAL,
@@ -21,17 +20,16 @@ CREATE TABLE tb01 (
 
 SHOW CREATE TABLE tb01;
 
-INSERT INTO tb01 (f1, f2, f3, f4, f5, f6, f7, f10, f11, f12, f13, f14, f15)
-VALUES ('Sample text 1', 'Text1', x'65', 123.456, 7.89, 12.34, true, 1000, 1000, 100000, DATE '2024-01-01', TIME '08:00:00', TIMESTAMP '2024-01-01 08:00:00');
+INSERT INTO tb01 (f1, f3, f4, f5, f6, f7, f10, f11, f12, f13, f14, f15)
+VALUES ('Sample text 1', x'65', 123.456, 7.89, 12.34, true, 1000, 1000, 100000, DATE '2024-01-01', TIME '08:00:00', TIMESTAMP '2024-01-01 08:00:00');
 
-INSERT INTO tb01 (f1, f2, f3, f4, f5, f6, f7, f10, f11, f12, f13, f14, f15)
-VALUES (NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+INSERT INTO tb01 (f1, f3, f4, f5, f6, f7, f10, f11, f12, f13, f14, f15)
+VALUES (NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
 select * from tb01 order by f1;
 
 CREATE TABLE tb02 (
-    f1 VARCHAR(200) not null ,
-    f2 CHAR(20) not null ,
+    f1 VARCHAR not null ,
     f3 VARBINARY not null ,
     f4 DECIMAL(10, 3) not null ,
     f5 REAL not null ,
@@ -47,23 +45,23 @@ CREATE TABLE tb02 (
 
 show create table tb02;
 
-INSERT INTO tb02 (f1, f2, f3, f4, f5, f6, f7, f10, f11, f12, f13, f14, f15)
-VALUES ('Sample text 1', 'Text1', x'65', 123.456, 7.89, 12.34, true, 1000, 1000, 100000, DATE '2024-01-01', TIME '08:00:00', TIMESTAMP '2024-01-01 08:00:00');
+INSERT INTO tb02 (f1, f3, f4, f5, f6, f7, f10, f11, f12, f13, f14, f15)
+VALUES ('Sample text 1', x'65', 123.456, 7.89, 12.34, true, 1000, 1000, 100000, DATE '2024-01-01', TIME '08:00:00', TIMESTAMP '2024-01-01 08:00:00');
 
-INSERT INTO tb02 (f1, f2, f3, f4, f5, f6, f7, f10, f11, f12, f13, f14, f15)
-VALUES (NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+INSERT INTO tb02 (f1, f3, f4, f5, f6, f7, f10, f11, f12, f13, f14, f15)
+VALUES (NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
-INSERT INTO tb02 (f1, f2, f3, f4, f5, f6, f7, f10, f11, f12, f13, f14, f15)
-VALUES ('Sample text 1', NULL, x'65', 123.456, 7.89, 12.34, true, 1000, 1000, 100000, DATE '2024-01-01', TIME '08:00:00', TIMESTAMP '2024-01-01 08:00:00');
+INSERT INTO tb02 (f1, f3, f4, f5, f6, f10, f11, f12, f13, f14, f15)
+VALUES ('Sample text 1', x'65', 123.456, 7.89, 12.34, 1000, 1000, 100000, DATE '2024-01-01', TIME '08:00:00', TIMESTAMP '2024-01-01 08:00:00');
 
-INSERT INTO tb02 (f1, f2, f3, f4, f5, f6, f7, f10, f11, f12, f13, f14, f15)
-VALUES ('Sample text 1', 'same3', x'65', 123.456, 7.89, 12.34, true, 1000, 1000, NULl, DATE '2024-01-01', TIME '08:00:00', TIMESTAMP '2024-01-01 08:00:00');
+INSERT INTO tb02 (f1, f3, f4, f5, f6, f7, f10, f11, f12, f13, f14, f15)
+VALUES ('Sample text 1', x'65', 123.456, 7.89, 12.34, true, 1000, 1000, NULL, DATE '2024-01-01', TIME '08:00:00', TIMESTAMP '2024-01-01 08:00:00');
 
-INSERT INTO tb02 (f1, f2, f3, f4, f5, f6, f7, f10, f11, f12, f13, f14, f15)
-VALUES ('Sample text 1', 'same9', x'65', 123.456, 7.89, 12.34, true, 1000, 1000, 1992382342, DATE '2024-01-01', NULL, TIMESTAMP '2024-01-01 08:00:00');
+INSERT INTO tb02 (f1, f3, f4, f5, f6, f7, f10, f11, f12, f13, f14, f15)
+VALUES ('Sample text 1', x'65', 123.456, 7.89, 12.34, true, 1000, 1000, 1992382342, DATE '2024-01-01', NULL, TIMESTAMP '2024-01-01 08:00:00');
 
 drop table tb01;
 
 drop table tb02;
 
-drop schema "test.gt_iceberg".gt_db2;
+drop schema gt_iceberg.gt_db2;

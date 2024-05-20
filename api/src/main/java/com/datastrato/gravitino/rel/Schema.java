@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.rel;
 
 import com.datastrato.gravitino.Auditable;
+import com.datastrato.gravitino.annotation.Evolving;
 import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -17,6 +18,7 @@ import javax.annotation.Nullable;
  * <p>This defines the basic properties of a schema. A catalog implementation with {@link
  * SupportsSchemas} should implement this interface.
  */
+@Evolving
 public interface Schema extends Auditable {
 
   /** @return The name of the Schema. */

@@ -8,7 +8,7 @@ import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
+import com.datastrato.gravitino.catalog.SchemaDispatcher;
 import com.datastrato.gravitino.dto.requests.SchemaCreateRequest;
 import com.datastrato.gravitino.dto.requests.SchemaUpdateRequest;
 import com.datastrato.gravitino.dto.requests.SchemaUpdatesRequest;
@@ -47,12 +47,12 @@ public class SchemaOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(SchemaOperations.class);
 
-  private final CatalogOperationDispatcher dispatcher;
+  private final SchemaDispatcher dispatcher;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public SchemaOperations(CatalogOperationDispatcher dispatcher) {
+  public SchemaOperations(SchemaDispatcher dispatcher) {
     this.dispatcher = dispatcher;
   }
 
@@ -70,7 +70,7 @@ public class SchemaOperations {
             NameIdentifier[] idents =
                 TreeLockUtils.doWithTreeLock(
                     NameIdentifier.of(metalake, catalog),
-                    LockType.WRITE,
+                    LockType.READ,
                     () -> dispatcher.listSchemas(schemaNS));
             return Utils.ok(new EntityListResponse(idents));
           });
@@ -95,7 +95,7 @@ public class SchemaOperations {
             NameIdentifier ident = NameIdentifier.ofSchema(metalake, catalog, request.getName());
             Schema schema =
                 TreeLockUtils.doWithTreeLock(
-                    ident,
+                    NameIdentifier.ofCatalog(metalake, catalog),
                     LockType.WRITE,
                     () ->
                         dispatcher.createSchema(
@@ -156,7 +156,9 @@ public class SchemaOperations {
                     .toArray(SchemaChange[]::new);
             Schema s =
                 TreeLockUtils.doWithTreeLock(
-                    ident, LockType.WRITE, () -> dispatcher.alterSchema(ident, changes));
+                    NameIdentifier.ofCatalog(metalake, catalog),
+                    LockType.WRITE,
+                    () -> dispatcher.alterSchema(ident, changes));
             return Utils.ok(new SchemaResponse(DTOConverters.toDTO(s)));
           });
 
@@ -182,7 +184,9 @@ public class SchemaOperations {
             NameIdentifier ident = NameIdentifier.ofSchema(metalake, catalog, schema);
             boolean dropped =
                 TreeLockUtils.doWithTreeLock(
-                    ident, LockType.WRITE, () -> dispatcher.dropSchema(ident, cascade));
+                    NameIdentifier.ofCatalog(metalake, catalog),
+                    LockType.WRITE,
+                    () -> dispatcher.dropSchema(ident, cascade));
             if (!dropped) {
               LOG.warn("Fail to drop schema {} under namespace {}", schema, ident.namespace());
             }

@@ -17,6 +17,7 @@ airlift-units = "1.8"
 airlift-log = "231"
 hive2 = "2.3.9"
 hadoop2 = "2.10.2"
+hadoop3 = "3.1.0"
 hadoop-minikdc = "3.3.6"
 httpclient5 = "5.2.1"
 mockserver = "5.15.0"
@@ -30,6 +31,7 @@ iceberg = '1.3.1' # 1.4.0 causes test to fail
 trino = '426'
 spark = "3.4.1" # 3.5.0 causes tests to fail
 scala-collection-compat = "2.7.0"
+scala-java-compat = "1.0.2"
 sqlite-jdbc = "3.42.0.0"
 testng = "7.5.1"
 testcontainers = "1.19.0"
@@ -45,6 +47,13 @@ postgresql = "42.6.0"
 immutables-value = "2.10.0"
 selenium = "3.141.59"
 rauschig = "1.2.0"
+mybatis = "3.5.6"
+h2db = "1.4.200"
+kyuubi = "1.8.2"
+kafka = "3.4.0"
+curator = "2.12.0"
+awaitility = "4.2.1"
+servlet = "3.1.0"
 
 protobuf-plugin = "0.9.2"
 spotless-plugin = '6.11.0'
@@ -96,6 +105,10 @@ hive2-common = { group = "org.apache.hive", name = "hive-common", version.ref = 
 hadoop2-hdfs = { group = "org.apache.hadoop", name = "hadoop-hdfs", version.ref = "hadoop2" }
 hadoop2-common = { group = "org.apache.hadoop", name = "hadoop-common", version.ref = "hadoop2"}
 hadoop2-mapreduce-client-core = { group = "org.apache.hadoop", name = "hadoop-mapreduce-client-core", version.ref = "hadoop2"}
+hadoop3-hdfs = { group = "org.apache.hadoop", name = "hadoop-hdfs", version.ref = "hadoop3" }
+hadoop3-common = { group = "org.apache.hadoop", name = "hadoop-common", version.ref = "hadoop3"}
+hadoop3-client = { group = "org.apache.hadoop", name = "hadoop-client", version.ref = "hadoop3"}
+hadoop3-mapreduce-client-core = { group = "org.apache.hadoop", name = "hadoop-mapreduce-client-core", version.ref = "hadoop3"}
 airlift-units = { group = "io.airlift", name = "units", version.ref = "airlift-units"}
 airlift-log = { group = "io.airlift", name = "log", version.ref = "airlift-log"}
 httpclient5 = { group = "org.apache.httpcomponents.client5", name = "httpclient5", version.ref = "httpclient5" }
@@ -143,9 +156,16 @@ minikdc = { group = "org.apache.hadoop", name = "hadoop-minikdc", version.ref = 
 immutables-value = { module = "org.immutables:value", version.ref = "immutables-value" }
 commons-cli = { group = "commons-cli", name = "commons-cli", version.ref = "commons-cli" }
 sun-activation = { group = "com.sun.activation", name = "javax.activation", version.ref = "sun-activation-version" }
+kafka-clients = { group = "org.apache.kafka", name = "kafka-clients", version.ref = "kafka" }
+kafka = { group = "org.apache.kafka", name = "kafka_2.12", version.ref = "kafka" }
+curator-test = { group = "org.apache.curator", name = "curator-test", version.ref = "curator"}
 
 selenium = { group = "org.seleniumhq.selenium", name = "selenium-java", version.ref = "selenium" }
 rauschig = { group = "org.rauschig", name = "jarchivelib", version.ref = "rauschig" }
+mybatis = { group = "org.mybatis", name = "mybatis", version.ref = "mybatis"}
+h2db = { group = "com.h2database", name = "h2", version.ref = "h2db"}
+awaitility = { group = "org.awaitility", name = "awaitility", version.ref = "awaitility" }
+servlet = { group = "javax.servlet", name = "javax.servlet-api", version.ref = "servlet" }
 
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api"]

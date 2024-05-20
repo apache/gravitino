@@ -4,8 +4,9 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
-import com.datastrato.gravitino.catalog.BaseCatalog;
-import com.datastrato.gravitino.catalog.CatalogOperations;
+import com.datastrato.gravitino.connector.BaseCatalog;
+import com.datastrato.gravitino.connector.CatalogOperations;
+import com.datastrato.gravitino.connector.capability.Capability;
 import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
 import java.util.Map;
@@ -27,9 +28,13 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
    */
   @Override
   protected CatalogOperations newOps(Map<String, String> config) {
-    IcebergCatalogOperations ops = new IcebergCatalogOperations(entity());
-    ops.initialize(config);
+    IcebergCatalogOperations ops = new IcebergCatalogOperations();
     return ops;
+  }
+
+  @Override
+  public Capability newCapability() {
+    return new IcebergCatalogCapability();
   }
 
   /** @return The Iceberg catalog operations as {@link IcebergCatalogOperations}. */

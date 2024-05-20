@@ -10,7 +10,6 @@ import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
-import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import java.util.Map;
 import org.apache.iceberg.NullOrder;
@@ -95,10 +94,9 @@ public class FromIcebergSortOrder implements SortOrderVisitor<SortOrder> {
   /**
    * Convert Iceberg order to Gravitino.
    *
-   * @param sortOrder
+   * @param sortOrder Iceberg sort order
    * @return Gravitino sort order
    */
-  @VisibleForTesting
   public static SortOrder[] fromSortOrder(org.apache.iceberg.SortOrder sortOrder) {
     FromIcebergSortOrder visitor = new FromIcebergSortOrder(sortOrder.schema());
     List<SortOrder> ordering = SortOrderVisitor.visit(sortOrder, visitor);

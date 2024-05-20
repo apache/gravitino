@@ -149,9 +149,9 @@ public class IcebergTableOpsHelper {
         "Cannot update missing field: %s",
         fieldName);
 
-    boolean nullable = icebergTableSchema.findField(fieldName).isOptional();
+    icebergTableSchema.findField(fieldName).isOptional();
     org.apache.iceberg.types.Type type =
-        ConvertUtil.toIcebergType(nullable, updateColumnType.getNewDataType());
+        ConvertUtil.toIcebergType(updateColumnType.getNewDataType());
     Preconditions.checkArgument(
         type.isPrimitiveType(), "Cannot update %s, not a primitive type: %s", fieldName, type);
     icebergUpdateSchema.updateColumn(fieldName, (PrimitiveType) type);
@@ -191,11 +191,15 @@ public class IcebergTableOpsHelper {
       parentStruct = icebergTableSchema.asStruct();
     }
 
+    if (addColumn.isAutoIncrement()) {
+      throw new IllegalArgumentException("Iceberg doesn't support auto increment column");
+    }
+
     if (addColumn.isNullable()) {
       icebergUpdateSchema.addColumn(
           getParentName(addColumn.fieldName()),
           getLeafName(addColumn.fieldName()),
-          ConvertUtil.toIcebergType(addColumn.isNullable(), addColumn.getDataType()),
+          ConvertUtil.toIcebergType(addColumn.getDataType()),
           addColumn.getComment());
     } else {
       // TODO: figure out how to enable users to add required columns
@@ -203,7 +207,7 @@ public class IcebergTableOpsHelper {
       icebergUpdateSchema.addRequiredColumn(
           getParentName(addColumn.fieldName()),
           getLeafName(addColumn.fieldName()),
-          ConvertUtil.toIcebergType(addColumn.isNullable(), addColumn.getDataType()),
+          ConvertUtil.toIcebergType(addColumn.getDataType()),
           addColumn.getComment());
     }
 
@@ -248,6 +252,8 @@ public class IcebergTableOpsHelper {
       } else if (change instanceof TableChange.UpdateColumnNullability) {
         doUpdateColumnNullability(
             icebergUpdateSchema, (TableChange.UpdateColumnNullability) change);
+      } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
+        throw new IllegalArgumentException("Iceberg doesn't support auto increment column");
       } else {
         throw new NotSupportedException(
             "Iceberg doesn't support " + change.getClass().getSimpleName() + " for now");
@@ -326,8 +332,8 @@ public class IcebergTableOpsHelper {
    * Gravitino only supports tables managed with a single level hierarchy, such as
    * `{namespace}.{table}`, so we need to perform truncation here.
    *
-   * @param namespace
-   * @param name
+   * @param namespace The Gravitino name space
+   * @param name The table name
    * @return Iceberg TableIdentifier
    */
   public static TableIdentifier buildIcebergTableIdentifier(

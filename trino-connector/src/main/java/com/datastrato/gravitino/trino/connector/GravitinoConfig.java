@@ -24,6 +24,13 @@ public class GravitinoConfig {
   private static final ConfigEntry GRAVITINO_METALAKE =
       new ConfigEntry("gravitino.metalake", "The metalake name for used", "", true);
 
+  private static final ConfigEntry GRAVITINO_SIMPLIFY_CATALOG_NAMES =
+      new ConfigEntry(
+          "gravitino.simplify-catalog-names",
+          "Omit metalake prefix for catalog names",
+          "true",
+          false);
+
   public GravitinoConfig(Map<String, String> requiredConfig) {
     config = requiredConfig;
 
@@ -47,11 +54,17 @@ public class GravitinoConfig {
     return config.getOrDefault(GRAVITINO_METALAKE.key, GRAVITINO_METALAKE.defaultValue);
   }
 
+  public boolean simplifyCatalogNames() {
+    return Boolean.parseBoolean(
+        config.getOrDefault(
+            GRAVITINO_SIMPLIFY_CATALOG_NAMES.key, GRAVITINO_SIMPLIFY_CATALOG_NAMES.defaultValue));
+  }
+
   boolean isDynamicConnector() {
     // 'isDynamicConnector' indicates whether the connector is user-configured within Trino or
     // loaded from the Gravitino server.
     // When a connector is loaded via Trino configuration,
-    // it is static and will always create an instance of DummyGravitinoConnector.
+    // it is static and will always create an instance of GravitinoSystemConnector.
     // Otherwise, it is dynamically loaded from the Gravitino server,
     // in which case the connector's configuration is set to '__gravitino.dynamic.connector=true'.
     // It is dynamic and will create an instance of GravitinoConnector.

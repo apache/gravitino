@@ -6,8 +6,9 @@ package com.datastrato.gravitino;
 
 import static com.datastrato.gravitino.TestCatalogOperations.FAIL_CREATE;
 
-import com.datastrato.gravitino.catalog.BaseCatalog;
-import com.datastrato.gravitino.catalog.CatalogOperations;
+import com.datastrato.gravitino.connector.BaseCatalog;
+import com.datastrato.gravitino.connector.CatalogOperations;
+import com.datastrato.gravitino.connector.capability.Capability;
 import com.datastrato.gravitino.rel.TableCatalog;
 import java.util.Map;
 import java.util.Objects;
@@ -27,6 +28,11 @@ public class TestCatalog extends BaseCatalog<TestCatalog> {
       throw new RuntimeException("Failed to create Test catalog");
     }
     return new TestCatalogOperations(config);
+  }
+
+  @Override
+  protected Capability newCapability() {
+    return new TestCatalogCapabilities();
   }
 
   @Override

@@ -1,0 +1,17 @@
+/*
+ * Copyright 2023 Datastrato Pvt Ltd.
+ * This software is licensed under the Apache License version 2.
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  min-height: 100%;
+}
+
+a {
+  -webkit-user-drag: none;
+}

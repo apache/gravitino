@@ -2,6 +2,10 @@
  * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
+
+import java.text.SimpleDateFormat
+import java.util.Date
+
 plugins {
   `maven-publish`
   id("java")
@@ -30,4 +34,70 @@ dependencies {
   testImplementation(libs.junit.jupiter.params)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
+}
+
+fun getGitCommitId(): String {
+  var gitCommitId: String
+  try {
+    val gitFolder = rootDir.path + "/.git/"
+    val head = File(gitFolder + "HEAD").readText().split(":")
+    val isCommit = head.size == 1
+    gitCommitId = if (isCommit) {
+      head[0].trim()
+    } else {
+      val refHead = File(gitFolder + head[1].trim())
+      refHead.readText().trim()
+    }
+  } catch (e: Exception) {
+    println("WARN: Unable to get Git commit id : ${e.message}")
+    gitCommitId = ""
+  }
+  return gitCommitId
+}
+
+val propertiesFile = "src/main/resources/gravitino-build-info.properties"
+fun writeProjectPropertiesFile() {
+  val propertiesFile = file(propertiesFile)
+  if (propertiesFile.exists()) {
+    propertiesFile.delete()
+  }
+
+  val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
+
+  val compileDate = dateFormat.format(Date())
+  val projectVersion = project.version.toString()
+  val commitId = getGitCommitId()
+
+  propertiesFile.parentFile.mkdirs()
+  propertiesFile.createNewFile()
+  propertiesFile.writer().use { writer ->
+    writer.write(
+      "#\n" +
+        "# Copyright 2023 Datastrato Pvt Ltd.\n" +
+        "# This software is licensed under the Apache License version 2.\n" +
+        "#\n"
+    )
+    writer.write("project.version=$projectVersion\n")
+    writer.write("compile.date=$compileDate\n")
+    writer.write("git.commit.id=$commitId\n")
+  }
+}
+
+tasks {
+  jar {
+    doFirst() {
+      writeProjectPropertiesFile()
+      if (!file(propertiesFile).exists()) {
+        throw GradleException("$propertiesFile file not generated!")
+      }
+    }
+
+    from("src/main/resources") {
+      include("gravitino-build-info.properties").duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    }
+  }
+
+  clean {
+    delete("$propertiesFile")
+  }
 }

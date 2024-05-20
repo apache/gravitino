@@ -9,6 +9,7 @@ LABEL maintainer="support@datastrato.com"
 ARG HADOOP_PACKAGE_NAME
 ARG HIVE_PACKAGE_NAME
 ARG JDBC_DIVER_PACKAGE_NAME
+ARG DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /
 
@@ -148,8 +149,9 @@ RUN mkdir /home/datastrato
 RUN chown -R datastrato:hadoop /home/datastrato
 
 ################################################################################
-# removed install packages
+# removed install packages and cache
 RUN rm -rf /tmp/packages
+RUN rm -rf /var/lib/apt/lists/*
 
 ################################################################################
 # expose port

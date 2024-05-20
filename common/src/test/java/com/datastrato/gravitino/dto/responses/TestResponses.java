@@ -11,14 +11,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.authorization.Privileges;
+import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
+import com.datastrato.gravitino.dto.authorization.GroupDTO;
+import com.datastrato.gravitino.dto.authorization.RoleDTO;
+import com.datastrato.gravitino.dto.authorization.UserDTO;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.SchemaDTO;
 import com.datastrato.gravitino.dto.rel.TableDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
+import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.rel.types.Types;
+import com.google.common.collect.Lists;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 
@@ -74,8 +81,8 @@ public class TestResponses {
   @Test
   void testMetalakeResponse() throws IllegalArgumentException {
     AuditDTO audit =
-        new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
-    MetalakeDTO metalake = new MetalakeDTO.Builder().withName("Metalake").withAudit(audit).build();
+        AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    MetalakeDTO metalake = MetalakeDTO.builder().withName("Metalake").withAudit(audit).build();
     MetalakeResponse response = new MetalakeResponse(metalake);
     response.validate(); // No exception thrown
   }
@@ -89,8 +96,8 @@ public class TestResponses {
   @Test
   void testMetalakeListResponse() throws IllegalArgumentException {
     AuditDTO audit =
-        new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
-    MetalakeDTO metalake = new MetalakeDTO.Builder().withName("Metalake").withAudit(audit).build();
+        AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    MetalakeDTO metalake = MetalakeDTO.builder().withName("Metalake").withAudit(audit).build();
     MetalakeListResponse response = new MetalakeListResponse(new MetalakeDTO[] {metalake});
     response.validate(); // No exception thrown
   }
@@ -104,9 +111,9 @@ public class TestResponses {
   @Test
   void testCatalogResponse() throws IllegalArgumentException {
     AuditDTO audit =
-        new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+        AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     CatalogDTO catalog =
-        new CatalogDTO.Builder()
+        CatalogDTO.builder()
             .withName("CatalogA")
             .withComment("comment")
             .withType(Catalog.Type.RELATIONAL)
@@ -126,9 +133,9 @@ public class TestResponses {
   @Test
   void testSchemaResponse() throws IllegalArgumentException {
     AuditDTO audit =
-        new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+        AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     SchemaDTO schema =
-        new SchemaDTO.Builder().withName("SchemaA").withComment("comment").withAudit(audit).build();
+        SchemaDTO.builder().withName("SchemaA").withComment("comment").withAudit(audit).build();
     SchemaResponse schemaResponse = new SchemaResponse(schema);
     schemaResponse.validate(); // No exception thrown
   }
@@ -142,11 +149,11 @@ public class TestResponses {
   @Test
   void testTableResponse() throws IllegalArgumentException {
     AuditDTO audit =
-        new AuditDTO.Builder().withCreator("creator").withCreateTime(Instant.now()).build();
+        AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     ColumnDTO column =
-        new ColumnDTO.Builder().withName("ColumnA").withDataType(Types.ByteType.get()).build();
+        ColumnDTO.builder().withName("ColumnA").withDataType(Types.ByteType.get()).build();
     TableDTO table =
-        new TableDTO.Builder()
+        TableDTO.builder()
             .withName("TableA")
             .withComment("comment")
             .withColumns(new ColumnDTO[] {column})
@@ -222,5 +229,56 @@ public class TestResponses {
   void testOAuthErrorException() throws IllegalArgumentException {
     OAuth2ErrorResponse response = new OAuth2ErrorResponse();
     assertThrows(IllegalArgumentException.class, () -> response.validate());
+  }
+
+  @Test
+  void testUserResponse() throws IllegalArgumentException {
+    AuditDTO audit =
+        AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    UserDTO user = UserDTO.builder().withName("user1").withAudit(audit).build();
+    UserResponse response = new UserResponse(user);
+    response.validate(); // No exception thrown
+  }
+
+  @Test
+  void testUserResponseException() throws IllegalArgumentException {
+    UserResponse user = new UserResponse();
+    assertThrows(IllegalArgumentException.class, () -> user.validate());
+  }
+
+  @Test
+  void testGroupResponse() throws IllegalArgumentException {
+    AuditDTO audit =
+        AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    GroupDTO group = GroupDTO.builder().withName("group1").withAudit(audit).build();
+    GroupResponse response = new GroupResponse(group);
+    response.validate(); // No exception thrown
+  }
+
+  @Test
+  void testGroupResponseException() throws IllegalArgumentException {
+    GroupResponse group = new GroupResponse();
+    assertThrows(IllegalArgumentException.class, () -> group.validate());
+  }
+
+  @Test
+  void testRoleResponse() throws IllegalArgumentException {
+    AuditDTO audit =
+        AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    RoleDTO role =
+        RoleDTO.builder()
+            .withName("role1")
+            .withPrivileges(Lists.newArrayList(Privileges.UseCatalog.get()))
+            .withSecurableObject(DTOConverters.toDTO(SecurableObjects.ofCatalog("catalog")))
+            .withAudit(audit)
+            .build();
+    RoleResponse response = new RoleResponse(role);
+    response.validate(); // No exception thrown
+  }
+
+  @Test
+  void testRoleResponseException() throws IllegalArgumentException {
+    RoleResponse role = new RoleResponse();
+    assertThrows(IllegalArgumentException.class, () -> role.validate());
   }
 }

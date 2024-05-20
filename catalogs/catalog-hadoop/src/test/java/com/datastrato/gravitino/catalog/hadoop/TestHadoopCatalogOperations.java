@@ -8,9 +8,9 @@ import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_STORE;
 import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
-import static com.datastrato.gravitino.Configs.KV_DELETE_AFTER_TIME;
+import static com.datastrato.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static com.datastrato.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
-import static com.datastrato.gravitino.catalog.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
@@ -20,7 +20,6 @@ import com.datastrato.gravitino.EntityStoreFactory;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
-import com.datastrato.gravitino.catalog.BaseCatalogPropertiesMetadata;
 import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
@@ -34,6 +33,7 @@ import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
@@ -58,8 +58,10 @@ public class TestHadoopCatalogOperations {
   private static final String ROCKS_DB_STORE_PATH =
       "/tmp/gravitino_test_entityStore_" + UUID.randomUUID().toString().replace("-", "");
 
-  private static final String TEST_ROOT_PATH =
-      "file:/tmp/gravitino_test_catalog_" + UUID.randomUUID().toString().replace("-", "");
+  private static final String UNFORMALIZED_TEST_ROOT_PATH =
+      "/tmp/gravitino_test_catalog_" + UUID.randomUUID().toString().replace("-", "");
+
+  private static final String TEST_ROOT_PATH = "file:" + UNFORMALIZED_TEST_ROOT_PATH;
 
   private static EntityStore store;
 
@@ -75,7 +77,7 @@ public class TestHadoopCatalogOperations {
 
     Assertions.assertEquals(ROCKS_DB_STORE_PATH, config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH));
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
-    Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
+    Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
 
     store = EntityStoreFactory.createEntityStore(config);
     store.initialize(config);
@@ -95,14 +97,14 @@ public class TestHadoopCatalogOperations {
   @Test
   public void testHadoopCatalogConfiguration() {
     Map<String, String> emptyProps = Maps.newHashMap();
-    HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store);
-    ops.initialize(emptyProps);
+    HadoopCatalogOperations ops = new HadoopCatalogOperations(store);
+    ops.initialize(emptyProps, null);
     Configuration conf = ops.hadoopConf;
     String value = conf.get("fs.defaultFS");
     Assertions.assertEquals("file:///", value);
 
     emptyProps.put(CATALOG_BYPASS_PREFIX + "fs.defaultFS", "hdfs://localhost:9000");
-    ops.initialize(emptyProps);
+    ops.initialize(emptyProps, null);
     Configuration conf1 = ops.hadoopConf;
     String value1 = conf1.get("fs.defaultFS");
     Assertions.assertEquals("hdfs://localhost:9000", value1);
@@ -110,7 +112,7 @@ public class TestHadoopCatalogOperations {
     Assertions.assertFalse(ops.catalogStorageLocation.isPresent());
 
     emptyProps.put(HadoopCatalogPropertiesMetadata.LOCATION, "file:///tmp/catalog");
-    ops.initialize(emptyProps);
+    ops.initialize(emptyProps, null);
     Assertions.assertTrue(ops.catalogStorageLocation.isPresent());
     Path expectedPath = new Path("file:///tmp/catalog");
     Assertions.assertEquals(expectedPath, ops.catalogStorageLocation.get());
@@ -123,11 +125,6 @@ public class TestHadoopCatalogOperations {
     Schema schema = createSchema(name, comment, null, null);
     Assertions.assertEquals(name, schema.name());
     Assertions.assertEquals(comment, schema.comment());
-    Map<String, String> props = schema.properties();
-    Assertions.assertTrue(
-        props.containsKey(BaseCatalogPropertiesMetadata.GRAVITINO_MANAGED_ENTITY));
-    Assertions.assertEquals(
-        "true", props.get(BaseCatalogPropertiesMetadata.GRAVITINO_MANAGED_ENTITY));
 
     Throwable exception =
         Assertions.assertThrows(
@@ -146,7 +143,7 @@ public class TestHadoopCatalogOperations {
     Path schemaPath = new Path(catalogPath, name);
     FileSystem fs = schemaPath.getFileSystem(new Configuration());
     Assertions.assertTrue(fs.exists(schemaPath));
-    Assertions.assertTrue(fs.isDirectory(schemaPath));
+    Assertions.assertTrue(fs.getFileStatus(schemaPath).isDirectory());
     Assertions.assertTrue(fs.listStatus(schemaPath).length == 0);
   }
 
@@ -162,7 +159,7 @@ public class TestHadoopCatalogOperations {
     Path schemaPath1 = new Path(schemaPath);
     FileSystem fs = schemaPath1.getFileSystem(new Configuration());
     Assertions.assertTrue(fs.exists(schemaPath1));
-    Assertions.assertTrue(fs.isDirectory(schemaPath1));
+    Assertions.assertTrue(fs.getFileStatus(schemaPath1).isDirectory());
     Assertions.assertTrue(fs.listStatus(schemaPath1).length == 0);
   }
 
@@ -178,7 +175,7 @@ public class TestHadoopCatalogOperations {
     Path schemaPath1 = new Path(schemaPath);
     FileSystem fs = schemaPath1.getFileSystem(new Configuration());
     Assertions.assertTrue(fs.exists(schemaPath1));
-    Assertions.assertTrue(fs.isDirectory(schemaPath1));
+    Assertions.assertTrue(fs.getFileStatus(schemaPath1).isDirectory());
     Assertions.assertTrue(fs.listStatus(schemaPath1).length == 0);
 
     Assertions.assertFalse(fs.exists(new Path(catalogPath)));
@@ -195,17 +192,13 @@ public class TestHadoopCatalogOperations {
 
     Assertions.assertEquals(name, schema.name());
 
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
-      ops.initialize(Maps.newHashMap());
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
+      ops.initialize(Maps.newHashMap(), null);
       Schema schema1 = ops.loadSchema(NameIdentifier.ofSchema("m1", "c1", name));
       Assertions.assertEquals(name, schema1.name());
       Assertions.assertEquals(comment, schema1.comment());
 
       Map<String, String> props = schema1.properties();
-      Assertions.assertTrue(
-          props.containsKey(BaseCatalogPropertiesMetadata.GRAVITINO_MANAGED_ENTITY));
-      Assertions.assertEquals(
-          "true", props.get(BaseCatalogPropertiesMetadata.GRAVITINO_MANAGED_ENTITY));
       Assertions.assertTrue(props.containsKey(StringIdentifier.ID_KEY));
 
       Throwable exception =
@@ -223,8 +216,8 @@ public class TestHadoopCatalogOperations {
     createSchema(name, comment, null, null);
     createSchema(name1, comment1, null, null);
 
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
-      ops.initialize(Maps.newHashMap());
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
+      ops.initialize(Maps.newHashMap(), null);
       Set<NameIdentifier> idents =
           Arrays.stream(ops.listSchemas(Namespace.of("m1", "c1"))).collect(Collectors.toSet());
       Assertions.assertTrue(idents.size() >= 2);
@@ -241,17 +234,13 @@ public class TestHadoopCatalogOperations {
     Schema schema = createSchema(name, comment, catalogPath, null);
     Assertions.assertEquals(name, schema.name());
 
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
-      ops.initialize(Maps.newHashMap());
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
+      ops.initialize(Maps.newHashMap(), null);
       Schema schema1 = ops.loadSchema(NameIdentifier.ofSchema("m1", "c1", name));
       Assertions.assertEquals(name, schema1.name());
       Assertions.assertEquals(comment, schema1.comment());
 
       Map<String, String> props = schema1.properties();
-      Assertions.assertTrue(
-          props.containsKey(BaseCatalogPropertiesMetadata.GRAVITINO_MANAGED_ENTITY));
-      Assertions.assertEquals(
-          "true", props.get(BaseCatalogPropertiesMetadata.GRAVITINO_MANAGED_ENTITY));
       Assertions.assertTrue(props.containsKey(StringIdentifier.ID_KEY));
 
       String newKey = "k1";
@@ -291,17 +280,13 @@ public class TestHadoopCatalogOperations {
     Assertions.assertEquals(name, schema.name());
     NameIdentifier id = NameIdentifier.ofSchema("m1", "c1", name);
 
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
-      ops.initialize(ImmutableMap.of(HadoopCatalogPropertiesMetadata.LOCATION, catalogPath));
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
+      ops.initialize(ImmutableMap.of(HadoopCatalogPropertiesMetadata.LOCATION, catalogPath), null);
       Schema schema1 = ops.loadSchema(id);
       Assertions.assertEquals(name, schema1.name());
       Assertions.assertEquals(comment, schema1.comment());
 
       Map<String, String> props = schema1.properties();
-      Assertions.assertTrue(
-          props.containsKey(BaseCatalogPropertiesMetadata.GRAVITINO_MANAGED_ENTITY));
-      Assertions.assertEquals(
-          "true", props.get(BaseCatalogPropertiesMetadata.GRAVITINO_MANAGED_ENTITY));
       Assertions.assertTrue(props.containsKey(StringIdentifier.ID_KEY));
 
       ops.dropSchema(id, false);
@@ -324,6 +309,10 @@ public class TestHadoopCatalogOperations {
       // Test drop non-empty schema with cascade = true
       ops.dropSchema(id, true);
       Assertions.assertFalse(fs.exists(schemaPath));
+
+      // Test drop empty schema
+      Assertions.assertFalse(ops.dropSchema(id, true));
+      Assertions.assertFalse(ops.dropSchema(id, false));
     }
   }
 
@@ -345,8 +334,8 @@ public class TestHadoopCatalogOperations {
     }
 
     NameIdentifier schemaIdent = NameIdentifier.ofSchema("m1", "c1", schemaName);
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
-      ops.initialize(catalogProps);
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
+      ops.initialize(catalogProps, null);
       if (!ops.schemaExists(schemaIdent)) {
         createSchema(schemaName, comment, catalogPath, schemaPath);
       }
@@ -397,8 +386,8 @@ public class TestHadoopCatalogOperations {
             + " when it's catalog and schema "
             + "location are not set",
         exception.getMessage());
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
-      ops.initialize(Maps.newHashMap());
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
+      ops.initialize(Maps.newHashMap(), null);
       Throwable e =
           Assertions.assertThrows(
               NoSuchFilesetException.class, () -> ops.loadFileset(filesetIdent));
@@ -413,8 +402,8 @@ public class TestHadoopCatalogOperations {
     Assertions.assertEquals(
         "Storage location must be set for external fileset " + filesetIdent,
         exception1.getMessage());
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
-      ops.initialize(Maps.newHashMap());
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
+      ops.initialize(Maps.newHashMap(), null);
       Throwable e =
           Assertions.assertThrows(
               NoSuchFilesetException.class, () -> ops.loadFileset(filesetIdent));
@@ -433,8 +422,8 @@ public class TestHadoopCatalogOperations {
       createFileset(fileset, schemaName, comment, Fileset.Type.MANAGED, null, null);
     }
 
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
-      ops.initialize(Maps.newHashMap());
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
+      ops.initialize(Maps.newHashMap(), null);
       Set<NameIdentifier> idents =
           Arrays.stream(ops.listFilesets(Namespace.of("m1", "c1", schemaName)))
               .collect(Collectors.toSet());
@@ -464,8 +453,8 @@ public class TestHadoopCatalogOperations {
     }
 
     NameIdentifier schemaIdent = NameIdentifier.ofSchema("m1", "c1", schemaName);
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
-      ops.initialize(catalogProps);
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
+      ops.initialize(catalogProps, null);
       if (!ops.schemaExists(schemaIdent)) {
         createSchema(schemaName, comment, catalogPath, schemaPath);
       }
@@ -510,8 +499,8 @@ public class TestHadoopCatalogOperations {
     FilesetChange change1 = FilesetChange.setProperty("k1", "v1");
     FilesetChange change2 = FilesetChange.removeProperty("k1");
 
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
-      ops.initialize(Maps.newHashMap());
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
+      ops.initialize(Maps.newHashMap(), null);
       NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
 
       Fileset fileset1 = ops.alterFileset(filesetIdent, change1);
@@ -530,6 +519,60 @@ public class TestHadoopCatalogOperations {
       Assertions.assertEquals(fileset.storageLocation(), fileset2.storageLocation());
       Map<String, String> props2 = fileset2.properties();
       Assertions.assertFalse(props2.containsKey("k1"));
+    }
+  }
+
+  @Test
+  public void testFormalizePath() throws IOException {
+
+    String[] paths =
+        new String[] {
+          "tmp/catalog",
+          "/tmp/catalog",
+          "file:/tmp/catalog",
+          "file:///tmp/catalog",
+          "hdfs://localhost:9000/tmp/catalog",
+          "s3://bucket/tmp/catalog",
+          "gs://bucket/tmp/catalog"
+        };
+
+    String[] expected =
+        new String[] {
+          "file:" + Paths.get("").toAbsolutePath() + "/tmp/catalog",
+          "file:/tmp/catalog",
+          "file:/tmp/catalog",
+          "file:/tmp/catalog",
+          "hdfs://localhost:9000/tmp/catalog",
+          "s3://bucket/tmp/catalog",
+          "gs://bucket/tmp/catalog"
+        };
+
+    for (int i = 0; i < paths.length; i++) {
+      Path actual = HadoopCatalogOperations.formalizePath(new Path(paths[i]), new Configuration());
+      Assertions.assertEquals(expected[i], actual.toString());
+    }
+  }
+
+  @Test
+  public void testUpdateFilesetComment() throws IOException {
+    String schemaName = "schema26";
+    String comment = "comment26";
+    String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+    createSchema(schemaName, comment, null, schemaPath);
+
+    String name = "fileset26";
+    Fileset fileset = createFileset(name, schemaName, comment, Fileset.Type.MANAGED, null, null);
+
+    FilesetChange change1 = FilesetChange.updateComment("comment26_new");
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
+      ops.initialize(Maps.newHashMap(), null);
+      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
+
+      Fileset fileset1 = ops.alterFileset(filesetIdent, change1);
+      Assertions.assertEquals(name, fileset1.name());
+      Assertions.assertEquals(Fileset.Type.MANAGED, fileset1.type());
+      Assertions.assertEquals("comment26_new", fileset1.comment());
+      Assertions.assertEquals(fileset.storageLocation(), fileset1.storageLocation());
     }
   }
 
@@ -606,7 +649,79 @@ public class TestHadoopCatalogOperations {
             null,
             null,
             TEST_ROOT_PATH + "/fileset19",
-            TEST_ROOT_PATH + "/fileset19"));
+            TEST_ROOT_PATH + "/fileset19"),
+        // Honor the catalog location
+        Arguments.of(
+            "fileset101",
+            Fileset.Type.MANAGED,
+            UNFORMALIZED_TEST_ROOT_PATH + "/catalog201",
+            null,
+            null,
+            TEST_ROOT_PATH + "/catalog201/s1_fileset101/fileset101"),
+        Arguments.of(
+            // honor the schema location
+            "fileset102",
+            Fileset.Type.MANAGED,
+            null,
+            UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset102",
+            null,
+            TEST_ROOT_PATH + "/s1_fileset102/fileset102"),
+        Arguments.of(
+            // honor the schema location
+            "fileset103",
+            Fileset.Type.MANAGED,
+            UNFORMALIZED_TEST_ROOT_PATH + "/catalog202",
+            UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset103",
+            null,
+            TEST_ROOT_PATH + "/s1_fileset103/fileset103"),
+        Arguments.of(
+            // honor the storage location
+            "fileset104",
+            Fileset.Type.MANAGED,
+            UNFORMALIZED_TEST_ROOT_PATH + "/catalog203",
+            UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset104",
+            UNFORMALIZED_TEST_ROOT_PATH + "/fileset104",
+            TEST_ROOT_PATH + "/fileset104"),
+        Arguments.of(
+            // honor the storage location
+            "fileset105",
+            Fileset.Type.MANAGED,
+            null,
+            null,
+            UNFORMALIZED_TEST_ROOT_PATH + "/fileset105",
+            TEST_ROOT_PATH + "/fileset105"),
+        Arguments.of(
+            // honor the storage location
+            "fileset106",
+            Fileset.Type.MANAGED,
+            UNFORMALIZED_TEST_ROOT_PATH + "/catalog204",
+            null,
+            UNFORMALIZED_TEST_ROOT_PATH + "/fileset106",
+            TEST_ROOT_PATH + "/fileset106"),
+        Arguments.of(
+            // honor the storage location
+            "fileset107",
+            Fileset.Type.EXTERNAL,
+            UNFORMALIZED_TEST_ROOT_PATH + "/catalog205",
+            UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset107",
+            UNFORMALIZED_TEST_ROOT_PATH + "/fileset107",
+            TEST_ROOT_PATH + "/fileset107"),
+        Arguments.of(
+            // honor the storage location
+            "fileset108",
+            Fileset.Type.EXTERNAL,
+            null,
+            UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset108",
+            UNFORMALIZED_TEST_ROOT_PATH + "/fileset108",
+            TEST_ROOT_PATH + "/fileset108"),
+        Arguments.of(
+            // honor the storage location
+            "fileset109",
+            Fileset.Type.EXTERNAL,
+            null,
+            null,
+            UNFORMALIZED_TEST_ROOT_PATH + "/fileset109",
+            TEST_ROOT_PATH + "/fileset109"));
   }
 
   private static Stream<Arguments> testRenameArguments() {
@@ -701,8 +816,8 @@ public class TestHadoopCatalogOperations {
       props.put(HadoopCatalogPropertiesMetadata.LOCATION, catalogPath);
     }
 
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
-      ops.initialize(props);
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
+      ops.initialize(props, null);
 
       NameIdentifier schemaIdent = NameIdentifier.ofSchema("m1", "c1", name);
       Map<String, String> schemaProps = Maps.newHashMap();
@@ -730,8 +845,8 @@ public class TestHadoopCatalogOperations {
       props.put(HadoopCatalogPropertiesMetadata.LOCATION, catalogPath);
     }
 
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(null, store)) {
-      ops.initialize(props);
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
+      ops.initialize(props, null);
 
       NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
       Map<String, String> filesetProps = Maps.newHashMap();

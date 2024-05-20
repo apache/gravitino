@@ -1,6 +1,6 @@
-CREATE SCHEMA "test.gt_hive".gt_db1;
+CREATE SCHEMA gt_hive.gt_db1;
 
-CREATE TABLE "test.gt_hive".gt_db1.tb01 (
+CREATE TABLE gt_hive.gt_db1.tb01 (
     name varchar,
     salary int
 )
@@ -8,13 +8,13 @@ WITH (
   format = 'TEXTFILE'
 );
 
-insert into "test.gt_hive".gt_db1.tb01(name, salary) values ('sam', 11);
-insert into "test.gt_hive".gt_db1.tb01(name, salary) values ('jerry', 13);
-insert into "test.gt_hive".gt_db1.tb01(name, salary) values ('bob', 14), ('tom', 12);
+insert into gt_hive.gt_db1.tb01(name, salary) values ('sam', 11);
+insert into gt_hive.gt_db1.tb01(name, salary) values ('jerry', 13);
+insert into gt_hive.gt_db1.tb01(name, salary) values ('bob', 14), ('tom', 12);
 
-select * from "test.gt_hive".gt_db1.tb01 order by name;
+select * from gt_hive.gt_db1.tb01 order by name;
 
-CREATE TABLE "test.gt_hive".gt_db1.tb02 (
+CREATE TABLE gt_hive.gt_db1.tb02 (
     name varchar,
     salary int
 )
@@ -22,12 +22,12 @@ WITH (
     format = 'TEXTFILE'
 );
 
-insert into "test.gt_hive".gt_db1.tb02(name, salary) select distinct * from "test.gt_hive".gt_db1.tb01 order by name;
+insert into gt_hive.gt_db1.tb02(name, salary) select * from gt_hive.gt_db1.tb01 order by name;
 
-select * from "test.gt_hive".gt_db1.tb02 order by name;
+select * from gt_hive.gt_db1.tb02 order by name;
 
-drop table "test.gt_hive".gt_db1.tb02;
+drop table gt_hive.gt_db1.tb02;
 
-drop table "test.gt_hive".gt_db1.tb01;
+drop table gt_hive.gt_db1.tb01;
 
-drop schema "test.gt_hive".gt_db1;
+drop schema gt_hive.gt_db1;

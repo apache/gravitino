@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.proto;
 
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.meta.TableEntity;
 
 public class TableEntitySerDe implements ProtoSerDe<TableEntity, Table> {
@@ -17,11 +18,12 @@ public class TableEntitySerDe implements ProtoSerDe<TableEntity, Table> {
   }
 
   @Override
-  public TableEntity deserialize(Table p) {
-    return new TableEntity.Builder()
+  public TableEntity deserialize(Table p, Namespace namespace) {
+    return TableEntity.builder()
         .withId(p.getId())
         .withName(p.getName())
-        .withAuditInfo(new AuditInfoSerDe().deserialize(p.getAuditInfo()))
+        .withNamespace(namespace)
+        .withAuditInfo(new AuditInfoSerDe().deserialize(p.getAuditInfo(), namespace))
         .build();
   }
 }

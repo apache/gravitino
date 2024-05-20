@@ -9,8 +9,7 @@ import static com.datastrato.gravitino.trino.connector.catalog.hive.HiveProperty
 import static com.datastrato.gravitino.trino.connector.catalog.hive.HivePropertyMeta.HIVE_PARTITION_KEY;
 import static com.datastrato.gravitino.trino.connector.catalog.hive.HivePropertyMeta.HIVE_SORT_ORDER_KEY;
 
-import com.datastrato.catalog.property.PropertyConverter;
-import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
+import com.datastrato.gravitino.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
@@ -95,11 +94,11 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
     List<String> partitionColumns =
         propertyMap.containsKey(HIVE_PARTITION_KEY)
             ? (List<String>) propertyMap.get(HIVE_PARTITION_KEY)
-            : Collections.EMPTY_LIST;
+            : Collections.emptyList();
     List<String> bucketColumns =
         propertyMap.containsKey(HIVE_BUCKET_KEY)
             ? (List<String>) propertyMap.get(HIVE_BUCKET_KEY)
-            : Collections.EMPTY_LIST;
+            : Collections.emptyList();
     int bucketCount =
         propertyMap.containsKey(HIVE_BUCKET_COUNT_KEY)
             ? (int) propertyMap.get(HIVE_BUCKET_COUNT_KEY)
@@ -107,7 +106,7 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
     List<SortingColumn> sortColumns =
         propertyMap.containsKey(HIVE_SORT_ORDER_KEY)
             ? (List<SortingColumn>) propertyMap.get(HIVE_SORT_ORDER_KEY)
-            : Collections.EMPTY_LIST;
+            : Collections.emptyList();
 
     if (!sortColumns.isEmpty() && (bucketColumns.isEmpty() || bucketCount == 0)) {
       throw new TrinoException(
@@ -184,10 +183,10 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
               ? Arrays.stream(gravitinoTable.getPartitioning())
                   .map(
                       ts ->
-                          ((Partitioning.SingleFieldPartitioning) ts)
+                          ((Transform.SingleFieldTransform) ts)
                               .fieldName()[0].toLowerCase(Locale.ENGLISH))
                   .collect(Collectors.toList())
-              : Collections.EMPTY_LIST);
+              : Collections.emptyList());
     }
 
     if (gravitinoTable.getDistribution() != null

@@ -22,6 +22,7 @@ package com.datastrato.gravitino.rel;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
@@ -32,6 +33,7 @@ import java.util.Map;
  * The Catalog interface to support schema operations. If the implemented catalog has schema
  * semantics, it should implement this interface.
  */
+@Evolving
 public interface SupportsSchemas {
 
   /**
@@ -106,7 +108,8 @@ public interface SupportsSchemas {
    *
    * @param ident The name identifier of the schema.
    * @param cascade If true, recursively drop all objects within the schema.
-   * @return True if the schema exists and is dropped successfully, false otherwise.
+   * @return True if the schema exists and is dropped successfully, false if the schema doesn't
+   *     exist.
    * @throws NonEmptySchemaException If the schema is not empty and cascade is false.
    */
   boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException;

@@ -9,10 +9,19 @@ import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.NAM
 import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Metalake;
+import com.datastrato.gravitino.authorization.Group;
+import com.datastrato.gravitino.authorization.Role;
+import com.datastrato.gravitino.authorization.SecurableObject;
+import com.datastrato.gravitino.authorization.User;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
+import com.datastrato.gravitino.dto.authorization.GroupDTO;
+import com.datastrato.gravitino.dto.authorization.RoleDTO;
+import com.datastrato.gravitino.dto.authorization.SecurableObjectDTO;
+import com.datastrato.gravitino.dto.authorization.UserDTO;
 import com.datastrato.gravitino.dto.file.FilesetDTO;
+import com.datastrato.gravitino.dto.messaging.TopicDTO;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.DistributionDTO;
 import com.datastrato.gravitino.dto.rel.SchemaDTO;
@@ -40,6 +49,7 @@ import com.datastrato.gravitino.dto.rel.partitions.ListPartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.PartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.RangePartitionDTO;
 import com.datastrato.gravitino.file.Fileset;
+import com.datastrato.gravitino.messaging.Topic;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.Table;
@@ -64,6 +74,7 @@ import com.datastrato.gravitino.rel.partitions.Partitions;
 import com.datastrato.gravitino.rel.partitions.RangePartition;
 import com.datastrato.gravitino.rel.types.Types;
 import java.util.Arrays;
+import java.util.Map;
 import org.apache.commons.lang3.ArrayUtils;
 
 /** Utility class for converting between DTOs and domain objects. */
@@ -93,7 +104,7 @@ public class DTOConverters {
    * @return The metalake DTO.
    */
   public static MetalakeDTO toDTO(Metalake metalake) {
-    return new MetalakeDTO.Builder()
+    return MetalakeDTO.builder()
         .withName(metalake.name())
         .withComment(metalake.comment())
         .withProperties(metalake.properties())
@@ -153,7 +164,7 @@ public class DTOConverters {
    * @return The catalog DTO.
    */
   public static CatalogDTO toDTO(Catalog catalog) {
-    return new CatalogDTO.Builder()
+    return CatalogDTO.builder()
         .withName(catalog.name())
         .withType(catalog.type())
         .withProvider(catalog.provider())
@@ -170,7 +181,7 @@ public class DTOConverters {
    * @return The schema DTO.
    */
   public static SchemaDTO toDTO(Schema schema) {
-    return new SchemaDTO.Builder()
+    return SchemaDTO.builder()
         .withName(schema.name())
         .withComment(schema.comment())
         .withProperties(schema.properties())
@@ -185,7 +196,7 @@ public class DTOConverters {
    * @return The column DTO.
    */
   public static ColumnDTO toDTO(Column column) {
-    return new ColumnDTO.Builder()
+    return ColumnDTO.builder()
         .withName(column.name())
         .withDataType(column.dataType())
         .withComment(column.comment())
@@ -206,7 +217,7 @@ public class DTOConverters {
    * @return The table DTO.
    */
   public static TableDTO toDTO(Table table) {
-    return new TableDTO.Builder()
+    return TableDTO.builder()
         .withName(table.name())
         .withComment(table.comment())
         .withColumns(
@@ -235,7 +246,7 @@ public class DTOConverters {
       return (DistributionDTO) distribution;
     }
 
-    return new DistributionDTO.Builder()
+    return DistributionDTO.builder()
         .withStrategy(distribution.strategy())
         .withNumber(distribution.number())
         .withArgs(
@@ -255,7 +266,8 @@ public class DTOConverters {
     if (sortOrder instanceof SortOrderDTO) {
       return (SortOrderDTO) sortOrder;
     }
-    return new SortOrderDTO.Builder()
+
+    return SortOrderDTO.builder()
         .withSortTerm(toFunctionArg(sortOrder.expression()))
         .withDirection(sortOrder.direction())
         .withNullOrder(sortOrder.nullOrdering())
@@ -289,20 +301,30 @@ public class DTOConverters {
         default:
           throw new IllegalArgumentException("Unsupported transform: " + transform.name());
       }
+
     } else if (transform instanceof Transforms.BucketTransform) {
       return BucketPartitioningDTO.of(
           ((Transforms.BucketTransform) transform).numBuckets(),
           ((Transforms.BucketTransform) transform).fieldNames());
+
     } else if (transform instanceof Transforms.TruncateTransform) {
       return TruncatePartitioningDTO.of(
           ((Transforms.TruncateTransform) transform).width(),
           ((Transforms.TruncateTransform) transform).fieldName());
+
     } else if (transform instanceof Transforms.ListTransform) {
-      return ListPartitioningDTO.of(((Transforms.ListTransform) transform).fieldNames());
+      Transforms.ListTransform listTransform = (Transforms.ListTransform) transform;
+      return ListPartitioningDTO.of(
+          listTransform.fieldNames(), (ListPartitionDTO[]) toDTOs(listTransform.assignments()));
+
     } else if (transform instanceof Transforms.RangeTransform) {
-      return RangePartitioningDTO.of(((Transforms.RangeTransform) transform).fieldName());
+      Transforms.RangeTransform rangeTransform = (Transforms.RangeTransform) transform;
+      return RangePartitioningDTO.of(
+          rangeTransform.fieldName(), (RangePartitionDTO[]) toDTOs(rangeTransform.assignments()));
+
     } else if (transform instanceof Transforms.ApplyTransform) {
       return FunctionPartitioningDTO.of(transform.name(), toFunctionArg(transform.arguments()));
+
     } else {
       throw new IllegalArgumentException("Unsupported transform: " + transform.name());
     }
@@ -326,6 +348,79 @@ public class DTOConverters {
   }
 
   /**
+   * Converts a user implementation to a UserDTO.
+   *
+   * @param user The user implementation.
+   * @return The user DTO.
+   */
+  public static UserDTO toDTO(User user) {
+    if (user instanceof UserDTO) {
+      return (UserDTO) user;
+    }
+
+    return UserDTO.builder()
+        .withName(user.name())
+        .withRoles(user.roles())
+        .withAudit(toDTO(user.auditInfo()))
+        .build();
+  }
+
+  /**
+   * Converts a group implementation to a GroupDTO.
+   *
+   * @param group The group implementation.
+   * @return The group DTO.
+   */
+  public static GroupDTO toDTO(Group group) {
+    if (group instanceof GroupDTO) {
+      return (GroupDTO) group;
+    }
+
+    return GroupDTO.builder()
+        .withName(group.name())
+        .withRoles(group.roles())
+        .withAudit(toDTO(group.auditInfo()))
+        .build();
+  }
+
+  /**
+   * Converts a role implementation to a RoleDTO.
+   *
+   * @param role The role implementation.
+   * @return The role DTO.
+   */
+  public static RoleDTO toDTO(Role role) {
+    if (role instanceof RoleDTO) {
+      return (RoleDTO) role;
+    }
+
+    return RoleDTO.builder()
+        .withName(role.name())
+        .withSecurableObject(toDTO(role.securableObject()))
+        .withPrivileges(role.privileges())
+        .withProperties(role.properties())
+        .withAudit(toDTO(role.auditInfo()))
+        .build();
+  }
+
+  /**
+   * Converts a securable object implementation to a SecurableObjectDTO.
+   *
+   * @param securableObject The securable object implementation.
+   * @return The securable object DTO.
+   */
+  public static SecurableObjectDTO toDTO(SecurableObject securableObject) {
+    if (securableObject instanceof SecurableObjectDTO) {
+      return (SecurableObjectDTO) securableObject;
+    }
+
+    return SecurableObjectDTO.builder()
+        .withFullName(securableObject.fullName())
+        .withType(securableObject.type())
+        .build();
+  }
+
+  /**
    * Converts a Expression to an FunctionArg DTO.
    *
    * @param expression The expression to be converted.
@@ -340,16 +435,16 @@ public class DTOConverters {
       if (Literals.NULL.equals(expression)) {
         return LiteralDTO.NULL;
       }
-      return new LiteralDTO.Builder()
+      return LiteralDTO.builder()
           .withValue((((Literal) expression).value().toString()))
           .withDataType(((Literal) expression).dataType())
           .build();
     } else if (expression instanceof NamedReference.FieldReference) {
-      return new FieldReferenceDTO.Builder()
+      return FieldReferenceDTO.builder()
           .withFieldName(((NamedReference.FieldReference) expression).fieldName())
           .build();
     } else if (expression instanceof FunctionExpression) {
-      return new FuncExpressionDTO.Builder()
+      return FuncExpressionDTO.builder()
           .withFunctionName(((FunctionExpression) expression).functionName())
           .withFunctionArgs(
               Arrays.stream(((FunctionExpression) expression).arguments())
@@ -392,6 +487,21 @@ public class DTOConverters {
         .storageLocation(fileset.storageLocation())
         .properties(fileset.properties())
         .audit(toDTO(fileset.auditInfo()))
+        .build();
+  }
+
+  /**
+   * Converts a Topic to a TopicDTO.
+   *
+   * @param topic The topic to be converted.
+   * @return The topic DTO.
+   */
+  public static TopicDTO toDTO(Topic topic) {
+    return TopicDTO.builder()
+        .withName(topic.name())
+        .withComment(topic.comment())
+        .withProperties(topic.properties())
+        .withAudit(toDTO(topic.auditInfo()))
         .build();
   }
 
@@ -461,6 +571,19 @@ public class DTOConverters {
   }
 
   /**
+   * Converts an array of Catalogs to an array of CatalogDTOs.
+   *
+   * @param catalogs The catalogs to be converted.
+   * @return The array of CatalogDTOs.
+   */
+  public static CatalogDTO[] toDTOs(Catalog[] catalogs) {
+    if (ArrayUtils.isEmpty(catalogs)) {
+      return new CatalogDTO[0];
+    }
+    return Arrays.stream(catalogs).map(DTOConverters::toDTO).toArray(CatalogDTO[]::new);
+  }
+
+  /**
    * Converts a DistributionDTO to a Distribution.
    *
    * @param distributionDTO The distribution DTO.
@@ -510,6 +633,8 @@ public class DTOConverters {
         return FunctionExpression.of(
             ((FuncExpressionDTO) arg).functionName(),
             fromFunctionArgs(((FuncExpressionDTO) arg).args()));
+      case UNPARSED:
+        return UnparsedExpression.of(((UnparsedExpressionDTO) arg).unparsedExpression());
       default:
         throw new IllegalArgumentException("Unsupported expression type: " + arg.getClass());
     }
@@ -558,8 +683,8 @@ public class DTOConverters {
         RangePartitionDTO rangePartitionDTO = (RangePartitionDTO) partitionDTO;
         return Partitions.range(
             rangePartitionDTO.name(),
-            rangePartitionDTO.lower(),
             rangePartitionDTO.upper(),
+            rangePartitionDTO.lower(),
             rangePartitionDTO.properties());
       case LIST:
         ListPartitionDTO listPartitionDTO = (ListPartitionDTO) partitionDTO;
@@ -643,6 +768,61 @@ public class DTOConverters {
   }
 
   /**
+   * Converts a TableDTO to a Table.
+   *
+   * @param tableDTO The table DTO to be converted.
+   * @return The table.
+   */
+  public static Table fromDTO(TableDTO tableDTO) {
+    return new Table() {
+      @Override
+      public String name() {
+        return tableDTO.name();
+      }
+
+      @Override
+      public Column[] columns() {
+        return fromDTOs((ColumnDTO[]) tableDTO.columns());
+      }
+
+      @Override
+      public Transform[] partitioning() {
+        return fromDTOs((Partitioning[]) tableDTO.partitioning());
+      }
+
+      @Override
+      public SortOrder[] sortOrder() {
+        return fromDTOs((SortOrderDTO[]) tableDTO.sortOrder());
+      }
+
+      @Override
+      public Distribution distribution() {
+        return fromDTO((DistributionDTO) tableDTO.distribution());
+      }
+
+      @Override
+      public Index[] index() {
+        return fromDTOs((IndexDTO[]) tableDTO.index());
+      }
+
+      @Override
+      public String comment() {
+        return tableDTO.comment();
+      }
+
+      @Override
+      public Map<String, String> properties() {
+        return tableDTO.properties();
+      }
+
+      @Override
+      public Audit auditInfo() {
+        return tableDTO.auditInfo();
+      }
+    };
+  }
+
+  /**
    * Converts a partitioning DTO to a Transform.
    *
    * @param partitioning The partitioning DTO to be converted.
@@ -670,9 +850,19 @@ public class DTOConverters {
             ((TruncatePartitioningDTO) partitioning).width(),
             ((TruncatePartitioningDTO) partitioning).fieldName());
       case LIST:
-        return Transforms.list(((ListPartitioningDTO) partitioning).fieldNames());
+        ListPartitioningDTO listPartitioningDTO = (ListPartitioningDTO) partitioning;
+        ListPartition[] listPartitions =
+            Arrays.stream(listPartitioningDTO.assignments())
+                .map(p -> (ListPartition) fromDTO(p))
+                .toArray(ListPartition[]::new);
+        return Transforms.list(listPartitioningDTO.fieldNames(), listPartitions);
       case RANGE:
-        return Transforms.range(((RangePartitioningDTO) partitioning).fieldName());
+        RangePartitioningDTO rangePartitioningDTO = (RangePartitioningDTO) partitioning;
+        RangePartition[] rangePartitions =
+            Arrays.stream(rangePartitioningDTO.assignments())
+                .map(p -> (RangePartition) fromDTO(p))
+                .toArray(RangePartition[]::new);
+        return Transforms.range(rangePartitioningDTO.fieldName(), rangePartitions);
       case FUNCTION:
         return Transforms.apply(
             ((FunctionPartitioningDTO) partitioning).functionName(),

@@ -14,5 +14,3 @@ To install and deploy the Gravitino connector, The following environmental setup
 - Ensure that all nodes running Trino can access the real catalogs resources, such as Hive, Iceberg, MySQL, PostgreSQL, etc.
 - Ensure that you have installed the following connectors in Trino: Hive, Iceberg, MySQL, PostgreSQL.
 - Ensure that you have set the `catalog.management` to `static` in the Trino configuration.
-- Ensure that you have set the `allow_pushdown_into_connectors` to `false` in the Trino session configuration.
-

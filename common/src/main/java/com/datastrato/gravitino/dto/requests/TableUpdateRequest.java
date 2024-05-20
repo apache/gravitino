@@ -4,11 +4,18 @@
  */
 package com.datastrato.gravitino.dto.requests;
 
+import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+
 import com.datastrato.gravitino.json.JsonUtils;
+import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.Expression;
+import com.datastrato.gravitino.rel.indexes.Index;
+import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rest.RESTRequest;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
@@ -41,6 +48,9 @@ import org.apache.commons.lang3.StringUtils;
       value = TableUpdateRequest.RenameTableColumnRequest.class,
       name = "renameColumn"),
   @JsonSubTypes.Type(
+      value = TableUpdateRequest.UpdateTableColumnDefaultValueRequest.class,
+      name = "updateColumnDefaultValue"),
+  @JsonSubTypes.Type(
       value = TableUpdateRequest.UpdateTableColumnTypeRequest.class,
       name = "updateColumnType"),
   @JsonSubTypes.Type(
@@ -54,7 +64,14 @@ import org.apache.commons.lang3.StringUtils;
       name = "updateColumnNullability"),
   @JsonSubTypes.Type(
       value = TableUpdateRequest.DeleteTableColumnRequest.class,
-      name = "deleteColumn")
+      name = "deleteColumn"),
+  @JsonSubTypes.Type(value = TableUpdateRequest.AddTableIndexRequest.class, name = "addTableIndex"),
+  @JsonSubTypes.Type(
+      value = TableUpdateRequest.DeleteTableIndexRequest.class,
+      name = "deleteTableIndex"),
+  @JsonSubTypes.Type(
+      value = TableUpdateRequest.UpdateColumnAutoIncrementRequest.class,
+      name = "updateColumnAutoIncrement")
 })
 public interface TableUpdateRequest extends RESTRequest {
 
@@ -280,9 +297,20 @@ public interface TableUpdateRequest extends RESTRequest {
     @JsonProperty(value = "nullable", defaultValue = "true")
     private final boolean nullable;
 
+    @Getter
+    @JsonProperty(value = "autoIncrement", defaultValue = "false")
+    private final boolean autoIncrement;
+
+    @Getter
+    @JsonProperty("defaultValue")
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    @JsonSerialize(using = JsonUtils.ColumnDefaultValueSerializer.class)
+    @JsonDeserialize(using = JsonUtils.ColumnDefaultValueDeserializer.class)
+    private final Expression defaultValue;
+
     /** Default constructor for Jackson deserialization. */
     public AddTableColumnRequest() {
-      this(null, null, null, null, true);
+      this(null, null, null, null, true, false, null);
     }
 
     /**
@@ -293,18 +321,24 @@ public interface TableUpdateRequest extends RESTRequest {
      * @param comment the comment of the field to add
      * @param position the position of the field to add, null for default position
      * @param nullable whether the field to add is nullable
+     * @param autoIncrement whether the field to add is auto increment
+     * @param defaultValue whether the field has default value
      */
     public AddTableColumnRequest(
         String[] fieldName,
         Type dataType,
         String comment,
         TableChange.ColumnPosition position,
-        boolean nullable) {
+        boolean nullable,
+        boolean autoIncrement,
+        Expression defaultValue) {
       this.fieldName = fieldName;
       this.dataType = dataType;
       this.comment = comment;
       this.position = position == null ? TableChange.ColumnPosition.defaultPos() : position;
       this.nullable = nullable;
+      this.autoIncrement = autoIncrement;
+      this.defaultValue = defaultValue == null ? Column.DEFAULT_VALUE_NOT_SET : defaultValue;
     }
 
     /**
@@ -317,7 +351,7 @@ public interface TableUpdateRequest extends RESTRequest {
      */
     public AddTableColumnRequest(
         String[] fieldName, Type dataType, String comment, TableChange.ColumnPosition position) {
-      this(fieldName, dataType, comment, position, true);
+      this(fieldName, dataType, comment, position, true, false, null);
     }
 
     /**
@@ -350,7 +384,8 @@ public interface TableUpdateRequest extends RESTRequest {
     /** @return An instance of TableChange. */
     @Override
     public TableChange tableChange() {
-      return TableChange.addColumn(fieldName, dataType, comment, position, nullable);
+      return TableChange.addColumn(
+          fieldName, dataType, comment, position, nullable, autoIncrement, defaultValue);
     }
   }
 
@@ -404,6 +439,61 @@ public interface TableUpdateRequest extends RESTRequest {
     @Override
     public TableChange tableChange() {
       return TableChange.renameColumn(oldFieldName, newFieldName);
+    }
+  }
+
+  /** Represents a request to update the default value of a column of a table. */
+  @EqualsAndHashCode
+  @ToString
+  class UpdateTableColumnDefaultValueRequest implements TableUpdateRequest {
+
+    @Getter
+    @JsonProperty("fieldName")
+    private final String[] fieldName;
+
+    @Getter
+    @JsonProperty("newDefaultValue")
+    @JsonSerialize(using = JsonUtils.ColumnDefaultValueSerializer.class)
+    @JsonDeserialize(using = JsonUtils.ColumnDefaultValueDeserializer.class)
+    private final Expression newDefaultValue;
+
+    /**
+     * Constructor for UpdateTableColumnDefaultValueRequest.
+     *
+     * @param fieldName the field name to update
+     * @param newDefaultValue the new default value of the field
+     */
+    public UpdateTableColumnDefaultValueRequest(String[] fieldName, Expression newDefaultValue) {
+      this.fieldName = fieldName;
+      this.newDefaultValue = newDefaultValue;
+    }
+
+    /** Default constructor for Jackson deserialization. */
+    public UpdateTableColumnDefaultValueRequest() {
+      this(null, null);
+    }
+
+    /**
+     * Validates the request.
+     *
+     * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+     */
+    @Override
+    public void validate() throws IllegalArgumentException {
+      Preconditions.checkArgument(
+          fieldName != null
+              && fieldName.length > 0
+              && Arrays.stream(fieldName).allMatch(StringUtils::isNotBlank),
+          "\"fieldName\" field is required and cannot be empty");
+      Preconditions.checkArgument(
+          (newDefaultValue != null && newDefaultValue != DEFAULT_VALUE_NOT_SET),
+          "\"newDefaultValue\" field is required and cannot be empty");
+    }
+
+    /** @return An instance of TableChange. */
+    @Override
+    public TableChange tableChange() {
+      return TableChange.updateColumnDefaultValue(fieldName, newDefaultValue);
     }
   }
 
@@ -670,6 +760,143 @@ public interface TableUpdateRequest extends RESTRequest {
     @Override
     public TableChange tableChange() {
       return TableChange.deleteColumn(fieldName, ifExists);
+    }
+  }
+
+  /** Represents a request to add an index to a table. */
+  @EqualsAndHashCode
+  @ToString
+  class AddTableIndexRequest implements TableUpdateRequest {
+
+    @JsonProperty("index")
+    @JsonSerialize(using = JsonUtils.IndexSerializer.class)
+    @JsonDeserialize(using = JsonUtils.IndexDeserializer.class)
+    private Index index;
+
+    /** Default constructor for Jackson deserialization. */
+    public AddTableIndexRequest() {}
+
+    /**
+     * The constructor of the add table index request.
+     *
+     * @param type The type of the index
+     * @param name The name of the index
+     * @param fieldNames The field names under the table contained in the index.
+     */
+    public AddTableIndexRequest(Index.IndexType type, String name, String[][] fieldNames) {
+      this.index = Indexes.of(type, name, fieldNames);
+    }
+
+    /**
+     * Validates the request.
+     *
+     * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+     */
+    @Override
+    public void validate() throws IllegalArgumentException {
+      Preconditions.checkNotNull(index, "Index cannot be null");
+      Preconditions.checkArgument(index.type() != null, "Index type cannot be null");
+      Preconditions.checkArgument(
+          index.fieldNames() != null && index.fieldNames().length > 0,
+          "The index must be set with corresponding column names");
+    }
+
+    /** @return An instance of TableChange. */
+    @Override
+    public TableChange tableChange() {
+      return TableChange.addIndex(index.type(), index.name(), index.fieldNames());
+    }
+  }
+
+  /** Represents a request to delete an index from a table. */
+  @EqualsAndHashCode
+  @ToString
+  class DeleteTableIndexRequest implements TableUpdateRequest {
+
+    @JsonProperty("name")
+    private String name;
+
+    @JsonProperty("ifExists")
+    private Boolean ifExists;
+
+    /** Default constructor for Jackson deserialization. */
+    public DeleteTableIndexRequest() {}
+
+    /**
+     * The constructor of the delete table index request.
+     *
+     * @param name The name of the index
+     * @param ifExists Whether to delete the index if it exists
+     */
+    public DeleteTableIndexRequest(String name, Boolean ifExists) {
+      this.name = name;
+      this.ifExists = ifExists;
+    }
+
+    /**
+     * Validates the request.
+     *
+     * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+     */
+    @Override
+    public void validate() throws IllegalArgumentException {
+      Preconditions.checkNotNull(name, "Index name cannot be null");
+    }
+
+    /** @return An instance of TableChange. */
+    @Override
+    public TableChange tableChange() {
+      return TableChange.deleteIndex(name, ifExists);
+    }
+  }
+
+  /** Represents a request to update a column autoIncrement from a table. */
+  @EqualsAndHashCode
+  @ToString
+  class UpdateColumnAutoIncrementRequest implements TableUpdateRequest {
+
+    @Getter
+    @JsonProperty("fieldName")
+    private final String[] fieldName;
+
+    @Getter
+    @JsonProperty("autoIncrement")
+    private final boolean autoIncrement;
+
+    /**
+     * Constructor for UpdateColumnAutoIncrementRequest.
+     *
+     * @param fieldName the field name to update.
+     * @param autoIncrement Whether the column is auto-incremented.
+     */
+    public UpdateColumnAutoIncrementRequest(String[] fieldName, boolean autoIncrement) {
+      this.fieldName = fieldName;
+      this.autoIncrement = autoIncrement;
+    }
+
+    /** Default constructor for Jackson deserialization. */
+    public UpdateColumnAutoIncrementRequest() {
+      this(null, false);
+    }
+
+    /**
+     * Validates the request.
+     *
+     * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+     */
+    @Override
+    public void validate() throws IllegalArgumentException {
+      Preconditions.checkArgument(
+          fieldName != null
+              && fieldName.length > 0
+              && Arrays.stream(fieldName).allMatch(StringUtils::isNotBlank),
+          "\"fieldName\" field is required and cannot be empty");
+    }
+
+    /** @return An instance of TableChange. */
+    @Override
+    public TableChange tableChange() {
+      return TableChange.updateColumnAutoIncrement(fieldName, autoIncrement);
     }
   }
 }

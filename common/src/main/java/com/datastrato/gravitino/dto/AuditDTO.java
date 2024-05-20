@@ -90,7 +90,7 @@ public class AuditDTO implements Audit {
     protected Instant lastModifiedTime;
 
     /** * Default constructor for the builder. */
-    public Builder() {}
+    private Builder() {}
 
     /**
      * Sets the creator for the audit.

@@ -166,6 +166,7 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
     FilesetEntity that = (FilesetEntity) o;
     return Objects.equals(id, that.id)
         && Objects.equals(name, that.name)
+        && Objects.equals(namespace, that.namespace)
         && Objects.equals(comment, that.comment)
         && Objects.equals(type, that.type)
         && Objects.equals(storageLocation, that.storageLocation)
@@ -182,7 +183,7 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
 
     private final FilesetEntity fileset;
 
-    public Builder() {
+    private Builder() {
       fileset = new FilesetEntity();
     }
 
@@ -285,5 +286,14 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
       fileset.validate();
       return fileset;
     }
+  }
+
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 }

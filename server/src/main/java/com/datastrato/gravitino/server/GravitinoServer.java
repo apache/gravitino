@@ -4,19 +4,25 @@
  */
 package com.datastrato.gravitino.server;
 
+import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.GravitinoEnv;
-import com.datastrato.gravitino.catalog.CatalogManager;
-import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
-import com.datastrato.gravitino.meta.MetalakeManager;
+import com.datastrato.gravitino.catalog.CatalogDispatcher;
+import com.datastrato.gravitino.catalog.FilesetDispatcher;
+import com.datastrato.gravitino.catalog.PartitionDispatcher;
+import com.datastrato.gravitino.catalog.SchemaDispatcher;
+import com.datastrato.gravitino.catalog.TableDispatcher;
+import com.datastrato.gravitino.catalog.TopicDispatcher;
+import com.datastrato.gravitino.metalake.MetalakeDispatcher;
 import com.datastrato.gravitino.metrics.MetricsSystem;
 import com.datastrato.gravitino.metrics.source.MetricsSource;
-import com.datastrato.gravitino.server.auth.ServerAuthenticator;
+import com.datastrato.gravitino.server.authentication.ServerAuthenticator;
 import com.datastrato.gravitino.server.web.ConfigServlet;
 import com.datastrato.gravitino.server.web.HttpServerMetricsSource;
 import com.datastrato.gravitino.server.web.JettyServer;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.datastrato.gravitino.server.web.ObjectMapperProvider;
 import com.datastrato.gravitino.server.web.VersioningFilter;
+import com.datastrato.gravitino.server.web.filter.AccessControlNotAllowedFilter;
 import com.datastrato.gravitino.server.web.ui.WebUIFilter;
 import java.io.File;
 import java.util.Properties;
@@ -31,6 +37,8 @@ import org.slf4j.LoggerFactory;
 public class GravitinoServer extends ResourceConfig {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoServer.class);
+
+  private static final String API_ANY_PATH = "/api/*";
 
   public static final String CONF_FILE = "gravitino.conf";
 
@@ -65,18 +73,26 @@ public class GravitinoServer extends ResourceConfig {
 
   private void initializeRestApi() {
     packages("com.datastrato.gravitino.server.web.rest");
+    boolean enableAuthorization = serverConfig.get(Configs.ENABLE_AUTHORIZATION);
     register(
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(gravitinoEnv.metalakesManager()).to(MetalakeManager.class).ranked(1);
-            bind(gravitinoEnv.catalogManager()).to(CatalogManager.class).ranked(1);
-            bind(gravitinoEnv.catalogOperationDispatcher())
-                .to(CatalogOperationDispatcher.class)
-                .ranked(1);
+            bind(gravitinoEnv.metalakeDispatcher()).to(MetalakeDispatcher.class).ranked(1);
+            bind(gravitinoEnv.catalogDispatcher()).to(CatalogDispatcher.class).ranked(1);
+
+            bind(gravitinoEnv.schemaDispatcher()).to(SchemaDispatcher.class).ranked(1);
+            bind(gravitinoEnv.tableDispatcher()).to(TableDispatcher.class).ranked(1);
+            bind(gravitinoEnv.partitionDispatcher()).to(PartitionDispatcher.class).ranked(1);
+            bind(gravitinoEnv.filesetDispatcher()).to(FilesetDispatcher.class).ranked(1);
+            bind(gravitinoEnv.topicDispatcher()).to(TopicDispatcher.class).ranked(1);
           }
         });
     register(ObjectMapperProvider.class).register(JacksonFeature.class);
+
+    if (!enableAuthorization) {
+      register(AccessControlNotAllowedFilter.class);
+    }
 
     HttpServerMetricsSource httpServerMetricsSource =
         new HttpServerMetricsSource(MetricsSource.GRAVITINO_SERVER_METRIC_NAME, this, server);
@@ -84,12 +100,13 @@ public class GravitinoServer extends ResourceConfig {
     metricsSystem.register(httpServerMetricsSource);
 
     Servlet servlet = new ServletContainer(this);
-    server.addServlet(servlet, "/api/*");
+    server.addServlet(servlet, API_ANY_PATH);
     Servlet configServlet = new ConfigServlet(serverConfig);
     server.addServlet(configServlet, "/configs");
-    server.addCustomFilters("/api/*");
-    server.addFilter(new VersioningFilter(), "/api/*");
-    server.addSystemFilters("/api/*");
+    server.addCustomFilters(API_ANY_PATH);
+    server.addFilter(new VersioningFilter(), API_ANY_PATH);
+    server.addSystemFilters(API_ANY_PATH);
+
     server.addFilter(new WebUIFilter(), "/"); // Redirect to the /ui/index html page.
     server.addFilter(new WebUIFilter(), "/ui/*"); // Redirect to the static html file.
   }

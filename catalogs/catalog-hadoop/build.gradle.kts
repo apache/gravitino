@@ -16,26 +16,44 @@ dependencies {
   implementation(project(":common"))
 
   implementation(libs.guava)
-  implementation(libs.hadoop2.common)
-  implementation(libs.hadoop2.hdfs)
+  implementation(libs.hadoop3.common) {
+    exclude("com.sun.jersey")
+    exclude("javax.servlet", "servlet-api")
+  }
+
+  implementation(libs.hadoop3.hdfs) {
+    exclude("com.sun.jersey")
+    exclude("javax.servlet", "servlet-api")
+  }
+  implementation(libs.hadoop3.client)
+
   implementation(libs.slf4j.api)
 
+  testImplementation(project(":clients:client-java"))
+  testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":server"))
+  testImplementation(project(":server-common"))
+
+  testImplementation(libs.bundles.log4j)
+  testImplementation(libs.mockito.core)
+  testImplementation(libs.mysql.driver)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
-  testImplementation(libs.mockito.core)
+  testImplementation(libs.testcontainers)
+  testImplementation(libs.testcontainers.mysql)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks {
-  val copyDepends by registering(Copy::class) {
+  val runtimeJars by registering(Copy::class) {
     from(configurations.runtimeClasspath)
-    into("build/libs_all")
+    into("build/libs")
   }
 
   val copyCatalogLibs by registering(Copy::class) {
-    dependsOn(copyDepends, "build")
-    from("build/libs_all", "build/libs")
+    dependsOn("jar", "runtimeJars")
+    from("build/libs")
     into("$rootDir/distribution/package/catalogs/hadoop/libs")
   }
 
@@ -63,4 +81,31 @@ tasks {
   register("copyLibAndConfig", Copy::class) {
     dependsOn(copyCatalogConfig, copyCatalogLibs)
   }
+}
+
+tasks.test {
+  val skipUTs = project.hasProperty("skipTests")
+  if (skipUTs) {
+    // Only run integration tests
+    include("**/integration/**")
+  }
+
+  val skipITs = project.hasProperty("skipITs")
+  if (skipITs) {
+    // Exclude integration tests
+    exclude("**/integration/**")
+  } else {
+    dependsOn(tasks.jar)
+
+    doFirst {
+      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.10")
+    }
+
+    val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
+    init(this)
+  }
+}
+
+tasks.getByName("generateMetadataFileForMavenJavaPublication") {
+  dependsOn("runtimeJars")
 }

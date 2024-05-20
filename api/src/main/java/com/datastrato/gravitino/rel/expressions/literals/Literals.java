@@ -14,6 +14,7 @@ import java.util.Objects;
 
 /** The helper class to create literals to pass into Gravitino. */
 public class Literals {
+
   /** Used to represent a null literal. */
   public static final Literal<Types.NullType> NULL = new LiteralImpl<>(null, Types.NullType.get());
 
@@ -22,8 +23,8 @@ public class Literals {
    *
    * @param value the literal value
    * @param dataType the data type of the literal
-   * @return a new {@link com.datastrato.gravitino.rel.expressions.Literal} instance
    * @param <T> the JVM type of value held by the literal
+   * @return a new {@link com.datastrato.gravitino.rel.expressions.Literal} instance
    */
   public static <T> LiteralImpl<T> of(T value, Type dataType) {
     return new LiteralImpl<>(value, dataType);
@@ -203,13 +204,23 @@ public class Literals {
       if (o == null || getClass() != o.getClass()) {
         return false;
       }
-      LiteralImpl<?> literal = (LiteralImpl) o;
-      return Objects.equals(value, literal.value) && Objects.equals(dataType, literal.dataType);
+
+      LiteralImpl<?> literal = (LiteralImpl<?>) o;
+      if (!Objects.equals(dataType, literal.dataType)) {
+        return false;
+      }
+      // Check both values for null before comparing to avoid NullPointerException
+      if (value == null || literal.value == null) {
+        return Objects.equals(value, literal.value);
+      }
+      // Now, it's safe to compare using toString() since neither value is null
+      return Objects.equals(value, literal.value)
+          || value.toString().equals(literal.value.toString());
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(value, dataType);
+      return Objects.hash(dataType, value != null ? value.toString() : null);
     }
 
     @Override

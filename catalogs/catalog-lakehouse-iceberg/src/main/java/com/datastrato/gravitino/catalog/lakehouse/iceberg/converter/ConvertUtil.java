@@ -31,13 +31,11 @@ public class ConvertUtil {
   /**
    * Convert the Gravitino type to the Iceberg type.
    *
-   * @param nullable Whether the field is nullable.
    * @param gravitinoType Gravitino type.
    * @return Iceberg type.
    */
-  public static Type toIcebergType(
-      boolean nullable, com.datastrato.gravitino.rel.types.Type gravitinoType) {
-    return ToIcebergTypeVisitor.visit(gravitinoType, new ToIcebergType(nullable));
+  public static Type toIcebergType(com.datastrato.gravitino.rel.types.Type gravitinoType) {
+    return ToIcebergTypeVisitor.visit(gravitinoType, new ToIcebergType());
   }
 
   /**
@@ -57,8 +55,7 @@ public class ConvertUtil {
    * @return Gravitino iceberg column
    */
   public static IcebergColumn fromNestedField(Types.NestedField nestedField) {
-    return new IcebergColumn.Builder()
-        .withId(nestedField.fieldId())
+    return IcebergColumn.builder()
         .withName(nestedField.name())
         .withNullable(nestedField.isOptional())
         .withComment(nestedField.doc())

@@ -51,7 +51,7 @@ public class DataSourceUtils {
     basicDataSource.setMinIdle(jdbcConfig.getPoolMinSize());
     // Set each time a connection is taken out from the connection pool, a test statement will be
     // executed to confirm whether the connection is valid.
-    basicDataSource.setTestOnBorrow(true);
+    basicDataSource.setTestOnBorrow(jdbcConfig.getTestOnBorrow());
     basicDataSource.setValidationQuery(POOL_TEST_QUERY);
     return basicDataSource;
   }
@@ -65,8 +65,12 @@ public class DataSourceUtils {
   public static void closeDataSource(DataSource dataSource) {
     if (null != dataSource) {
       try {
-        assert dataSource instanceof BasicDataSource;
-        ((BasicDataSource) dataSource).close();
+        if (dataSource instanceof BasicDataSource) {
+          ((BasicDataSource) dataSource).close();
+        } else {
+          throw new UnsupportedOperationException(
+              "close operation can only be called in BasicDataSource.");
+        }
       } catch (SQLException ignore) {
         // no op
       }

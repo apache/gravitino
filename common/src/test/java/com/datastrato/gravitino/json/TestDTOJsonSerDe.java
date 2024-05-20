@@ -25,6 +25,8 @@ import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
 import com.datastrato.gravitino.dto.rel.partitioning.RangePartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.TruncatePartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.YearPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitions.ListPartitionDTO;
+import com.datastrato.gravitino.dto.rel.partitions.RangePartitionDTO;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
@@ -47,8 +49,28 @@ public class TestDTOJsonSerDe {
   private final String columnJson =
       "{\"name\":%s,\"type\":%s,\"comment\":%s,\"nullable\":%s,\"autoIncrement\":%s}";
 
-  private final String tableJson =
-      "{\"name\":%s,\"comment\":%s,\"columns\":[%s],\"properties\":%s,\"audit\":%s,\"distribution\":%s,\"sortOrders\":%s,\"partitioning\":%s,\"indexes\":%s}";
+  private String getExpectedTableJson(
+      String tableName,
+      String tableComment,
+      String columns,
+      String properties,
+      String audit,
+      String distribution,
+      String sortOrders,
+      String partitioning,
+      String indexes) {
+    return String.format(
+        "{\"name\":%s,\"comment\":%s,\"columns\":[%s],\"properties\":%s,\"audit\":%s,\"distribution\":%s,\"sortOrders\":%s,\"partitioning\":%s,\"indexes\":%s}",
+        withQuotes(tableName),
+        withQuotes(tableComment),
+        columns,
+        properties,
+        audit,
+        distribution,
+        sortOrders,
+        partitioning,
+        indexes);
+  }
 
   private String withQuotes(String str) {
     return "\"" + str + "\"";
@@ -103,7 +125,7 @@ public class TestDTOJsonSerDe {
 
     // Test with required fields
     MetalakeDTO metalake =
-        new MetalakeDTO.Builder()
+        MetalakeDTO.builder()
             .withName(name)
             .withComment(comment)
             .withProperties(properties)
@@ -123,7 +145,7 @@ public class TestDTOJsonSerDe {
     Assertions.assertEquals(metalake, desermetalake);
 
     // Test with optional fields
-    MetalakeDTO metalake1 = new MetalakeDTO.Builder().withName(name).withAudit(audit).build();
+    MetalakeDTO metalake1 = MetalakeDTO.builder().withName(name).withAudit(audit).build();
 
     String serJson1 = JsonUtils.objectMapper().writeValueAsString(metalake1);
     String expectedJson1 =
@@ -143,7 +165,7 @@ public class TestDTOJsonSerDe {
     AuditDTO audit =
         AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     CatalogDTO catalog =
-        new CatalogDTO.Builder()
+        CatalogDTO.builder()
             .withName("catalog")
             .withType(Catalog.Type.RELATIONAL)
             .withProvider("test")
@@ -158,7 +180,7 @@ public class TestDTOJsonSerDe {
 
     // test with optional fields
     CatalogDTO catalog1 =
-        new CatalogDTO.Builder()
+        CatalogDTO.builder()
             .withName("catalog")
             .withType(Catalog.Type.RELATIONAL)
             .withProvider("test")
@@ -205,7 +227,7 @@ public class TestDTOJsonSerDe {
             .withDataType(Types.DateType.get())
             .withComment(comment)
             .withDefaultValue(
-                new LiteralDTO.Builder()
+                LiteralDTO.builder()
                     .withDataType(Types.DateType.get())
                     .withValue("2023-04-01")
                     .build())
@@ -259,10 +281,9 @@ public class TestDTOJsonSerDe {
 
     String serJson = JsonUtils.objectMapper().writeValueAsString(table);
     String expectedJson =
-        String.format(
-            tableJson,
-            withQuotes(tableName),
-            withQuotes(tableComment),
+        getExpectedTableJson(
+            tableName,
+            tableComment,
             String.format(
                 columnJson,
                 withQuotes(name),
@@ -293,37 +314,76 @@ public class TestDTOJsonSerDe {
     Partitioning yearPart = YearPartitioningDTO.of(field1);
 
     // construct list partition
-    // TODO: support assign partition value
-    // String[][] p1Value = {{"2023-04-01", "San Francisco"}, {"2023-04-01", "San Francisco"}};
-    // String[][] p2Value = {{"2023-04-01", "Houston"}, {"2023-04-01", "Dallas"}};
-    Partitioning listPart =
-        new ListPartitioningDTO.Builder()
-            .withFieldNames(new String[][] {field1, field2})
-            // .withAssignment("p202304_California", p1Value)
-            // .withAssignment("p202304_Texas", p2Value)
+    LiteralDTO[][] pCaliforniaValue = {
+      {
+        LiteralDTO.builder().withValue("2023-04-01").withDataType(Types.DateType.get()).build(),
+        LiteralDTO.builder().withValue("San Francisco").withDataType(Types.StringType.get()).build()
+      },
+      {
+        LiteralDTO.builder().withValue("2023-04-01").withDataType(Types.DateType.get()).build(),
+        LiteralDTO.builder().withValue("San Diego").withDataType(Types.StringType.get()).build()
+      }
+    };
+    ListPartitionDTO pCalifornia =
+        ListPartitionDTO.builder()
+            .withName("p202304_California")
+            .withLists(pCaliforniaValue)
             .build();
 
+    LiteralDTO[][] pTexasValue = {
+      {
+        LiteralDTO.builder().withValue("2023-04-01").withDataType(Types.DateType.get()).build(),
+        LiteralDTO.builder().withValue("Houston").withDataType(Types.StringType.get()).build()
+      },
+      {
+        LiteralDTO.builder().withValue("2023-04-01").withDataType(Types.DateType.get()).build(),
+        LiteralDTO.builder().withValue("Dallas").withDataType(Types.StringType.get()).build()
+      }
+    };
+    ListPartitionDTO pTexas =
+        ListPartitionDTO.builder().withName("p202304_Texas").withLists(pTexasValue).build();
+
+    Partitioning listPart =
+        ListPartitioningDTO.of(
+            new String[][] {field1, field2}, new ListPartitionDTO[] {pCalifornia, pTexas});
+
     // construct range partition
-    // TODO: support assign partition value
-    Partitioning rangePart =
-        new RangePartitioningDTO.Builder()
-            .withFieldName(field1)
-            // .withRange("p20230101", "2023-01-01T00:00:00", "2023-01-02T00:00:00")
-            // .withRange("p20230102", "2023-01-01T00:00:00", null)
+    RangePartitionDTO p20230101 =
+        RangePartitionDTO.builder()
+            .withName("p20230101")
+            .withUpper(
+                LiteralDTO.builder()
+                    .withValue("2023-01-01")
+                    .withDataType(Types.DateType.get())
+                    .build())
+            .withLower(
+                LiteralDTO.builder()
+                    .withValue("2023-01-01")
+                    .withDataType(Types.DateType.get())
+                    .build())
             .build();
+    RangePartitionDTO p20230102 =
+        RangePartitionDTO.builder()
+            .withName("p20230102")
+            .withUpper(
+                LiteralDTO.builder()
+                    .withValue("2023-01-02")
+                    .withDataType(Types.DateType.get())
+                    .build())
+            .withLower(LiteralDTO.NULL)
+            .build();
+    Partitioning rangePart =
+        RangePartitioningDTO.of(field1, new RangePartitionDTO[] {p20230101, p20230102});
 
     // construct function partitioning, toYYYYMM(toDate(ts, ‘Asia/Shanghai’))
     FunctionArg arg1 = FieldReferenceDTO.of(field1);
     FunctionArg arg2 =
-        new LiteralDTO.Builder()
+        LiteralDTO.builder()
             .withDataType(Types.StringType.get())
             .withValue("Asia/Shanghai")
             .build();
     FunctionArg toDateFunc =
-        new FuncExpressionDTO.Builder()
-            .withFunctionName("toDate")
-            .withFunctionArgs(arg1, arg2)
-            .build();
+        FuncExpressionDTO.builder().withFunctionName("toDate").withFunctionArgs(arg1, arg2).build();
     Partitioning expressionPart = FunctionPartitioningDTO.of("toYYYYMM", toDateFunc);
     Partitioning bucketPart = BucketPartitioningDTO.of(10, field1);
     Partitioning truncatePart = TruncatePartitioningDTO.of(20, field2);
@@ -352,7 +412,7 @@ public class TestDTOJsonSerDe {
   }
 
   @Test
-  public void testPartitioningDTOSerDeFail() throws Exception {
+  public void testPartitioningDTOSerDeFail() {
     // test `strategy` value null
     String wrongJson1 = "{\"strategy\": null,\"fieldName\":[\"dt\"]}";
     ObjectMapper map = JsonUtils.objectMapper();
@@ -377,5 +437,64 @@ public class TestDTOJsonSerDe {
         Assertions.assertThrows(
             IllegalArgumentException.class, () -> map.readValue(wrongJson6, Partitioning.class));
     Assertions.assertTrue(exception.getMessage().contains("Invalid partitioning strategy"));
+
+    // test invalid arguments for partitioning
+    String wrongJson3 =
+        "{\n"
+            + "    \"strategy\": \"list\",\n"
+            + "    \"fieldNames\": [\n"
+            + "        [\n"
+            + "            \"dt\"\n"
+            + "        ],\n"
+            + "        [\n"
+            + "            \"city\"\n"
+            + "        ]\n"
+            + "    ],\n"
+            + "    \"assignments\": \"partitions\"\n"
+            + "}";
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> map.readValue(wrongJson3, Partitioning.class));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("Cannot parse list partitioning from non-array assignments"),
+        exception.getMessage());
+
+    String wrong4 =
+        "{\n"
+            + "    \"strategy\": \"list\",\n"
+            + "    \"fieldNames\": [\n"
+            + "        [\n"
+            + "            \"dt\"\n"
+            + "        ],\n"
+            + "        [\n"
+            + "            \"city\"\n"
+            + "        ]\n"
+            + "    ],\n"
+            + "    \"assignments\": [\n"
+            + "        {\n"
+            + "            \"type\": \"range\",\n"
+            + "            \"name\": \"p20230101\",\n"
+            + "            \"upper\": {\n"
+            + "                \"type\": \"literal\",\n"
+            + "                \"dataType\": \"date\",\n"
+            + "                \"value\": \"2023-01-01\"\n"
+            + "            },\n"
+            + "            \"lower\": {\n"
+            + "                \"type\": \"literal\",\n"
+            + "                \"dataType\": \"date\",\n"
+            + "                \"value\": \"2023-01-01\"\n"
+            + "            },\n"
+            + "            \"properties\": null\n"
+            + "        }\n"
+            + "    ]\n"
+            + "}";
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> map.readValue(wrong4, Partitioning.class));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Cannot parse list partitioning from non-list assignment"),
+        exception.getMessage());
   }
 }

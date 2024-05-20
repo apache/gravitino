@@ -10,9 +10,10 @@ import static com.datastrato.gravitino.dto.util.DTOConverters.toDTOs;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.catalog.CatalogOperationDispatcher;
+import com.datastrato.gravitino.catalog.PartitionDispatcher;
 import com.datastrato.gravitino.dto.rel.partitions.PartitionDTO;
 import com.datastrato.gravitino.dto.requests.AddPartitionsRequest;
+import com.datastrato.gravitino.dto.responses.DropResponse;
 import com.datastrato.gravitino.dto.responses.PartitionListResponse;
 import com.datastrato.gravitino.dto.responses.PartitionNameListResponse;
 import com.datastrato.gravitino.dto.responses.PartitionResponse;
@@ -20,12 +21,12 @@ import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.lock.LockType;
 import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.metrics.MetricNames;
-import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.partitions.Partition;
 import com.datastrato.gravitino.server.web.Utils;
 import com.google.common.base.Preconditions;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -35,15 +36,18 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Path("/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables/{table}/partitions")
 public class PartitionOperations {
+  private static final Logger LOG = LoggerFactory.getLogger(PartitionOperations.class);
 
-  private final CatalogOperationDispatcher dispatcher;
+  private final PartitionDispatcher dispatcher;
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public PartitionOperations(CatalogOperationDispatcher dispatcher) {
+  public PartitionOperations(PartitionDispatcher dispatcher) {
     this.dispatcher = dispatcher;
   }
 
@@ -66,12 +70,11 @@ public class PartitionOperations {
                 tableIdent,
                 LockType.READ,
                 () -> {
-                  Table loadTable = dispatcher.loadTable(tableIdent);
                   if (verbose) {
-                    Partition[] partitions = loadTable.supportPartitions().listPartitions();
+                    Partition[] partitions = dispatcher.listPartitions(tableIdent);
                     return Utils.ok(new PartitionListResponse(toDTOs(partitions)));
                   } else {
-                    String[] partitionNames = loadTable.supportPartitions().listPartitionNames();
+                    String[] partitionNames = dispatcher.listPartitionNames(tableIdent);
                     return Utils.ok(new PartitionNameListResponse((partitionNames)));
                   }
                 });
@@ -101,8 +104,7 @@ public class PartitionOperations {
                 tableIdent,
                 LockType.READ,
                 () -> {
-                  Table loadTable = dispatcher.loadTable(tableIdent);
-                  Partition p = loadTable.supportPartitions().getPartition(partition);
+                  Partition p = dispatcher.getPartition(tableIdent, partition);
                   return Utils.ok(new PartitionResponse(DTOConverters.toDTO(p)));
                 });
           });
@@ -133,17 +135,54 @@ public class PartitionOperations {
                 tableIdent,
                 LockType.WRITE,
                 () -> {
-                  Table loadTable = dispatcher.loadTable(tableIdent);
                   Partition p =
-                      loadTable
-                          .supportPartitions()
-                          .addPartition(fromDTO(request.getPartitions()[0]));
+                      dispatcher.addPartition(tableIdent, fromDTO(request.getPartitions()[0]));
                   return Utils.ok(
                       new PartitionListResponse(new PartitionDTO[] {DTOConverters.toDTO(p)}));
                 });
           });
     } catch (Exception e) {
       return ExceptionHandlers.handlePartitionException(OperationType.CREATE, "", table, e);
+    }
+  }
+
+  @DELETE
+  @Path("{partition}")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "drop-partition." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "drop-partition", absolute = true)
+  public Response dropPartition(
+      @PathParam("metalake") String metalake,
+      @PathParam("catalog") String catalog,
+      @PathParam("schema") String schema,
+      @PathParam("table") String table,
+      @PathParam("partition") String partition,
+      @QueryParam("purge") @DefaultValue("false") boolean purge) {
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            NameIdentifier tableIdent = NameIdentifier.of(metalake, catalog, schema, table);
+            return TreeLockUtils.doWithTreeLock(
+                tableIdent,
+                LockType.WRITE,
+                () -> {
+                  boolean dropped =
+                      purge
+                          ? dispatcher.purgePartition(tableIdent, partition)
+                          : dispatcher.dropPartition(tableIdent, partition);
+                  if (!dropped) {
+                    LOG.warn(
+                        "Failed to drop partition {} under table {} under schema {}",
+                        partition,
+                        table,
+                        schema);
+                  }
+                  return Utils.ok(new DropResponse(dropped));
+                });
+          });
+    } catch (Exception e) {
+      return ExceptionHandlers.handlePartitionException(OperationType.DROP, "", table, e);
     }
   }
 }
