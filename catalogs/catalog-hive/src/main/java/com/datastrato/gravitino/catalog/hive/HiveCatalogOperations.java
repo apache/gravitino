@@ -547,9 +547,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
-  private void validatePartitionForCreate(Column[] columns, Transform[] partitioning) {
-    int partitionStartIndex = columns.length - partitioning.length;
-
+  private void validatePartitionForCreate(Transform[] partitioning) {
     for (int i = 0; i < partitioning.length; i++) {
       Preconditions.checkArgument(
           partitioning[i] instanceof Transforms.IdentityTransform,
@@ -558,13 +556,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       Transforms.IdentityTransform identity = (Transforms.IdentityTransform) partitioning[i];
       Preconditions.checkArgument(
           identity.fieldName().length == 1, "Hive partition does not support nested field");
-
-      // The partition field must be placed at the end of the columns in order.
-      // For example, if the table has columns [a, b, c, d], then the partition field must be
-      // [b, c, d] or [c, d] or [d].
-      Preconditions.checkArgument(
-          columns[partitionStartIndex + i].name().equals(identity.fieldName()[0]),
-          "The partition field must be placed at the end of the columns in order");
     }
   }
 
@@ -669,7 +660,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         "Hive-catalog does not support indexes, since indexing was removed since 3.0");
     NameIdentifier schemaIdent = NameIdentifier.of(tableIdent.namespace().levels());
 
-    validatePartitionForCreate(columns, partitioning);
+    validatePartitionForCreate(partitioning);
     validateDistributionAndSort(distribution, sortOrders);
 
     TableType tableType = (TableType) tablePropertiesMetadata.getOrDefault(properties, TABLE_TYPE);

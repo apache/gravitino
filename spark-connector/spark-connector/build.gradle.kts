@@ -26,8 +26,9 @@ dependencies {
   implementation(libs.guava)
   implementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
   implementation("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
+    implementation(project(mapOf("path" to ":api")))
 
-  compileOnly("org.apache.spark:spark-catalyst_$scalaVersion:$sparkVersion")
+    compileOnly("org.apache.spark:spark-catalyst_$scalaVersion:$sparkVersion")
   compileOnly("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion")
   compileOnly("org.scala-lang.modules:scala-java8-compat_$scalaVersion:$scalaJava8CompatVersion")
   annotationProcessor(libs.lombok)

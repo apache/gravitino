@@ -25,6 +25,12 @@ import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.RowFactory;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.StructType;
+import org.apache.spark.sql.types.StructField;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -35,6 +41,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public abstract class SparkCommonIT extends SparkEnvIT {
+
   private static final Logger LOG = LoggerFactory.getLogger(SparkCommonIT.class);
 
   // To generate test data for write&read table.
@@ -750,6 +757,43 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     List<String> queryResult2 = getTableData(tableName);
     Assertions.assertEquals(1, queryResult2.size());
     Assertions.assertEquals("5,5,5", queryResult2.get(0));
+  }
+
+  @Test
+  void testCreateTableFromDataFrame() {
+    String tableName = "create_from_data_frame_table";
+    dropTableIfExists(tableName);
+
+    StructType schema = DataTypes.createStructType(new StructField[]{
+        DataTypes.createStructField("name", DataTypes.StringType, false),
+        DataTypes.createStructField("favorite_color", DataTypes.StringType, true),
+        DataTypes.createStructField("favorite_numbers",
+            DataTypes.StringType, false)
+    });
+
+    List<Row> data = new ArrayList<>();
+    data.add(RowFactory.create("Alyssa", "blue", "1"));
+    data.add(RowFactory.create("Ben", "red", "2"));
+
+    Dataset<Row> usersDF = getSparkSession().createDataFrame(data, schema);
+
+    usersDF.write()
+        .partitionBy("favorite_color")
+        .saveAsTable(tableName);
+
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create()
+            .withName(tableName)
+            .withColumns(Arrays.asList(
+                SparkColumnInfo.of("name", DataTypes.StringType, null),
+                SparkColumnInfo.of("favorite_color", DataTypes.StringType, null),
+                SparkColumnInfo.of("favorite_numbers", DataTypes.StringType, null)
+                ))
+            .withIdentifyPartition(Arrays.asList("favorite_color"))
+            .withComment(null);
+    checker.check(tableInfo);
   }
 
   protected void checkTableReadWrite(SparkTableInfo table) {
