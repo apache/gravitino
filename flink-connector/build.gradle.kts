@@ -123,5 +123,5 @@ tasks.test {
     init(this)
   }
 
-//  dependsOn(":integration-test:test")
+  dependsOn(":integration-test:test")
 }
