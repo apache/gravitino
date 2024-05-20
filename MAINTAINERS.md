@@ -24,7 +24,6 @@ Maintainers may be added once approved by the existing maintainers (see [Governa
 | Lisa Cao      | lisancao            | Datastrato       |
 | Qian Xia      | LauraXia123         | Datastrato       |
 | Danhua Wang   | danhuawang          | Datastrato       |
-| Hiren Sharma  | hiirrxnn            | Datastrato       |
 
 # Contributors
 
@@ -53,6 +52,7 @@ Contributors may be added by existing maintainers (see [Governance document](GOV
 | Lewis Jackson  | xnge                | opensource4you   |
 | Li-Hsing Liu   | austin362667        | opensource4you   |
 | Li Tianhang    | TEOTEO520           | Bilibili         |
+| Hiren Sharma   | hiirrxnn            | opensource4you   |
 
 ## Review process
 
