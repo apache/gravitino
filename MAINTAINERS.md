@@ -43,6 +43,7 @@ Contributors may be added by existing maintainers (see [Governance document](GOV
 | Yu-Hsin Lai    | laiyousin           | Virginia Tech    |
 | Charlie Cheng  | charliecheng630     | cacaFly          |
 | PoAn Yang      | FrankYang0592       | SUSE             |
+| JieBao Xiao    | xloya               | Xiaomi           |
 
 
 ## Review process
