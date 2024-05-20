@@ -8,12 +8,15 @@ package com.datastrato.gravitino.metrics.source;
 import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Snapshot;
 import com.codahale.metrics.Timer;
+import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.metrics.MetricsSystem;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.mockito.Mockito;
 
 @TestInstance(Lifecycle.PER_CLASS)
 public class TestMetricsSource extends MetricsSource {
@@ -28,7 +31,9 @@ public class TestMetricsSource extends MetricsSource {
 
   @BeforeAll
   void init() {
-    metricsSystem = new MetricsSystem(60);
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.METRICS_TIME_SLIDING_WINDOW_SECONDS)).thenReturn(60);
+    this.metricsSystem = new MetricsSystem(config);
     metricsSystem.register(this);
   }
 

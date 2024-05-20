@@ -9,6 +9,8 @@ import com.codahale.metrics.MetricFilter;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Reporter;
 import com.codahale.metrics.jmx.JmxReporter;
+import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.metrics.source.MetricsSource;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
@@ -31,6 +33,7 @@ import org.slf4j.LoggerFactory;
  * report metrics from MetricsSources registered to MetricsSystem.
  */
 public class MetricsSystem implements Closeable {
+
   private static final Logger LOG = LoggerFactory.getLogger(MetricsSystem.class);
   private final String name;
   private final MetricRegistry metricRegistry;
@@ -39,13 +42,14 @@ public class MetricsSystem implements Closeable {
   private CollectorRegistry prometheusRegistry;
   private int timeSlidingWindowSeconds;
 
-  public MetricsSystem(int timeSlidingWindowSeconds) {
-    this("", timeSlidingWindowSeconds);
+  public MetricsSystem(Config config) {
+    this("", config);
   }
 
-  public MetricsSystem(String name, int timeSlidingWindowSeconds) {
+  public MetricsSystem(String name, Config config) {
     this.name = name;
-    this.timeSlidingWindowSeconds = timeSlidingWindowSeconds;
+    this.timeSlidingWindowSeconds =
+        config.get(Configs.METRICS_TIME_SLIDING_WINDOW_SECONDS).intValue();
     this.metricRegistry = new MetricRegistry();
     this.prometheusRegistry = new CollectorRegistry();
   }
