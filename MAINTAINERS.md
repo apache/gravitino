@@ -45,6 +45,7 @@ Contributors may be added by existing maintainers (see [Governance document](GOV
 | Charlie Cheng  | charliecheng630     | cacaFly          |
 | PoAn Yang      | FrankYang0592       | SUSE             |
 | JieBao Xiao    | xloya               | Xiaomi           |
+| Can Cai        | caican00            | Xiaomi           |
 
 
 ## Review process
