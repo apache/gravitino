@@ -27,7 +27,6 @@ Maintainers may be added once approved by the existing maintainers (see [Governa
 | Danhua Wang   | danhuawang          | Datastrato       |
 | Hiren Sharma  | hiirrxnn            | Datastrato       |
 
-
 # Contributors
 
 Contributors may be added by existing maintainers (see [Governance document](GOVERNANCE.md)). By adding your name to this list you agree to follow the project's guidelines and governance including the [Code of Conduct](CODE-OF-CONDUCT.md) and that you have permission to contribute from your employer. All contributions are licensed under the Apache License version 2.
