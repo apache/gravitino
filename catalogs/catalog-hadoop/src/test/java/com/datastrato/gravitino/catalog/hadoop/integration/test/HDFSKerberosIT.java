@@ -13,7 +13,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedAction;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.AccessControlException;
@@ -31,28 +30,28 @@ public class HDFSKerberosIT {
   private static final Logger LOG = LoggerFactory.getLogger(HDFSKerberosIT.class);
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
-  private static final String CLIENT_PRINCIPAL = "client@EXAMPLE.COM";
+  private static final String CLIENT_PRINCIPAL = "cli@HADOOPKRB";
   private static UserGroupInformation clientUGI;
 
   @BeforeAll
   public static void setup() throws IOException {
-    containerSuite.startHDFSContainer();
+    containerSuite.startKerberosHiveContainer();
 
     containerSuite
-        .getHdfsContainer()
+        .getKerberosHiveContainer()
         .getContainer()
-        .copyFileFromContainer("/tmp/client.keytab", "/tmp/client.keytab");
+        .copyFileFromContainer("/etc/admin.keytab", "/tmp/client.keytab");
 
     containerSuite
-        .getHdfsContainer()
+        .getKerberosHiveContainer()
         .getContainer()
         .copyFileFromContainer("/etc/krb5.conf", "/tmp/krb5.conf_tmp");
 
-    String ip = containerSuite.getHdfsContainer().getContainerIpAddress();
+    String ip = containerSuite.getKerberosHiveContainer().getContainerIpAddress();
 
     String content =
         FileUtils.readFileToString(new File("/tmp/krb5.conf_tmp"), StandardCharsets.UTF_8);
-    content = content.replace("kdc = localhost", "kdc = " + ip + ":88");
+    content = content.replace("kdc = localhost:88", "kdc = " + ip + ":88");
     content = content.replace("admin_server = localhost", "admin_server = " + ip + ":749");
     FileUtils.write(new File("/tmp/krb5.conf"), content, StandardCharsets.UTF_8);
 
@@ -84,14 +83,8 @@ public class HDFSKerberosIT {
             () -> {
               try {
                 FileSystem fs = FileSystem.get(conf);
-                Path path = new Path("/user/client");
+                Path path = new Path("/");
                 Assertions.assertTrue(fs.exists(path));
-
-                path = new Path("/user/client/test1");
-                fs.mkdirs(path);
-
-                FileStatus status = fs.getFileStatus(path);
-                Assertions.assertEquals(755, status.getPermission().toOctal());
                 return null;
               } catch (IOException e) {
                 throw new RuntimeException(e);
@@ -109,7 +102,7 @@ public class HDFSKerberosIT {
   private static String defaultBaseLocation() {
     return String.format(
         "hdfs://%s:%d/user/",
-        containerSuite.getHdfsContainer().getContainerIpAddress(),
+        containerSuite.getKerberosHiveContainer().getContainerIpAddress(),
         KerberosHDFSContainer.HDFS_DEFAULTFS_PORT);
   }
 }

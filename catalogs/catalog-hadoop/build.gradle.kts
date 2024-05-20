@@ -99,7 +99,7 @@ tasks.test {
 
     doFirst {
       environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.10")
-      environment("GRAVITINO_CI_KERBEROS_HDFS_DOCKER_IMAGE", "datastrato/gravitino-ci-kerberos-hdfs:0.1.0")
+      environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-kerberos-hive:0.1.0")
     }
 
     val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
