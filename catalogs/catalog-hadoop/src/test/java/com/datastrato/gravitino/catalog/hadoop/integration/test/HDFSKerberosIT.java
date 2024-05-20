@@ -6,7 +6,7 @@
 package com.datastrato.gravitino.catalog.hadoop.integration.test;
 
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
-import com.datastrato.gravitino.integration.test.container.KerberosizedHDFSContainer;
+import com.datastrato.gravitino.integration.test.container.KerberosHDFSContainer;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -110,6 +110,6 @@ public class HDFSKerberosIT {
     return String.format(
         "hdfs://%s:%d/user/",
         containerSuite.getHdfsContainer().getContainerIpAddress(),
-        KerberosizedHDFSContainer.HDFS_DEFAULTFS_PORT);
+        KerberosHDFSContainer.HDFS_DEFAULTFS_PORT);
   }
 }

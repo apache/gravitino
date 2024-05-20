@@ -20,11 +20,11 @@ import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Container;
 import org.testcontainers.containers.Network;
 
-public class KerberosizedHDFSContainer extends BaseContainer {
-  public static final Logger LOG = LoggerFactory.getLogger(KerberosizedHDFSContainer.class);
+public class KerberosHDFSContainer extends BaseContainer {
+  public static final Logger LOG = LoggerFactory.getLogger(KerberosHDFSContainer.class);
 
   public static final String DEFAULT_IMAGE =
-      System.getenv("GRAVITINO_CI_KERBEROSIZED_HDFS_DOCKER_IMAGE");
+      System.getenv("GRAVITINO_CI_KERBEROS_HDFS_DOCKER_IMAGE");
   public static final String HOST_NAME = "hdfs_host";
 
   private static final String HDFS_LOG_PATH = "/usr/local/hadoop/logs";
@@ -32,11 +32,11 @@ public class KerberosizedHDFSContainer extends BaseContainer {
   public static final int KDC_PORT = 88;
   public static final int KDC_ADMIN_PORT = 749;
 
-  public static KerberosizedHDFSContainer.Builder builder() {
-    return new KerberosizedHDFSContainer.Builder();
+  public static KerberosHDFSContainer.Builder builder() {
+    return new KerberosHDFSContainer.Builder();
   }
 
-  protected KerberosizedHDFSContainer(
+  protected KerberosHDFSContainer(
       String image,
       String hostName,
       Set<Integer> ports,
@@ -115,7 +115,7 @@ public class KerberosizedHDFSContainer extends BaseContainer {
   }
 
   public static class Builder
-      extends BaseContainer.Builder<KerberosizedHDFSContainer.Builder, KerberosizedHDFSContainer> {
+      extends BaseContainer.Builder<KerberosHDFSContainer.Builder, KerberosHDFSContainer> {
     private Builder() {
       this.image = DEFAULT_IMAGE;
       this.hostName = HOST_NAME;
@@ -123,8 +123,8 @@ public class KerberosizedHDFSContainer extends BaseContainer {
     }
 
     @Override
-    public KerberosizedHDFSContainer build() {
-      return new KerberosizedHDFSContainer(
+    public KerberosHDFSContainer build() {
+      return new KerberosHDFSContainer(
           image, hostName, exposePorts, extraHosts, filesToMount, envVars, network);
     }
   }

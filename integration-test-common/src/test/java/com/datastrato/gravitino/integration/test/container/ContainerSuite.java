@@ -42,7 +42,7 @@ public class ContainerSuite implements Closeable {
   private static volatile TrinoITContainers trinoITContainers;
   private static volatile KafkaContainer kafkaContainer;
   private static volatile DorisContainer dorisContainer;
-  private static volatile KerberosizedHDFSContainer hdfsContainer;
+  private static volatile KerberosHDFSContainer hdfsContainer;
 
   private static volatile MySQLContainer mySQLContainer;
   private static volatile MySQLContainer mySQLVersion5Container;
@@ -66,7 +66,7 @@ public class ContainerSuite implements Closeable {
     }
   }
 
-  public KerberosizedHDFSContainer getHdfsContainer() {
+  public KerberosHDFSContainer getHdfsContainer() {
     return hdfsContainer;
   }
 
@@ -111,13 +111,13 @@ public class ContainerSuite implements Closeable {
       synchronized (ContainerSuite.class) {
         if (hdfsContainer == null) {
           // Start HDFS container
-          KerberosizedHDFSContainer.Builder hiveBuilder =
-              KerberosizedHDFSContainer.builder()
-                  .withHostName(KerberosizedHDFSContainer.HOST_NAME)
+          KerberosHDFSContainer.Builder hdfsBuilder =
+              KerberosHDFSContainer.builder()
+                  .withHostName(KerberosHDFSContainer.HOST_NAME)
                   .withEnvVars(ImmutableMap.<String, String>builder().build())
                   .withExposePorts(ImmutableSet.of())
                   .withNetwork(network);
-          KerberosizedHDFSContainer container = closer.register(hiveBuilder.build());
+          KerberosHDFSContainer container = closer.register(hdfsBuilder.build());
           container.start();
           hdfsContainer = container;
         }
