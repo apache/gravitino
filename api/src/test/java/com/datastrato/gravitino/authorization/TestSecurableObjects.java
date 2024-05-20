@@ -24,6 +24,14 @@ public class TestSecurableObjects {
     Assertions.assertEquals("*", allMetalakes.fullName());
     Assertions.assertEquals(METALAKE, allMetalakes.type());
 
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            SecurableObjects.of(
+                METALAKE,
+                Lists.newArrayList("*"),
+                Lists.newArrayList(Privileges.UseMetalake.allow())));
+
     SecurableObject metalake =
         SecurableObjects.ofMetalake("metalake", Lists.newArrayList(Privileges.UseMetalake.allow()));
     Assertions.assertEquals("metalake", metalake.fullName());

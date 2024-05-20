@@ -296,6 +296,10 @@ public class SecurableObjects {
           "If the length of names is 3, it must be FILESET, TABLE or TOPIC");
     }
 
+    for (String name : names) {
+      checkName(name);
+    }
+
     return new SecurableObjectImpl(getParentFullName(names), getLastName(names), type, privileges);
   }
 
