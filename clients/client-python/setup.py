@@ -24,7 +24,7 @@ setup(
     python_requires=">=3.8",
     packages=find_packages(exclude=["tests*"]),
     classifiers=[
-        'Development Status :: 5 - Production/Stable',
+        'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: Apache Software License',
         'Programming Language :: Python :: 3.8',
