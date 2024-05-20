@@ -43,7 +43,7 @@ import static com.datastrato.gravitino.authorization.Privilege.Name.WRITE_TOPIC;
 public class Privileges {
 
   /**
-   * Returns the Privilege with allow effect from the string representation.
+   * Returns the Privilege with allow condition from the string representation.
    *
    * @param privilege The string representation of the privilege.
    * @return The Privilege.
@@ -54,7 +54,7 @@ public class Privileges {
   }
 
   /**
-   * Returns the Privilege with allow effect from the `Privilege.Name`.
+   * Returns the Privilege with allow condition from the `Privilege.Name`.
    *
    * @param name The `Privilege.Name` of the privilege.
    * @return The Privilege.
@@ -153,7 +153,7 @@ public class Privileges {
   }
 
   /**
-   * Returns the Privilege with deny effect from the string representation.
+   * Returns the Privilege with deny condition from the string representation.
    *
    * @param privilege The string representation of the privilege.
    * @return The Privilege.
@@ -164,7 +164,7 @@ public class Privileges {
   }
 
   /**
-   * Returns the Privilege with deny effect from the `Privilege.Name`.
+   * Returns the Privilege with deny condition from the `Privilege.Name`.
    *
    * @param name The `Privilege.Name` of the privilege.
    * @return The Privilege.
@@ -283,12 +283,12 @@ public class Privileges {
 
     private CreateCatalog() {}
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static CreateCatalog allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static CreateCatalog deny() {
       return DENY_INSTANCE;
     }
@@ -327,12 +327,12 @@ public class Privileges {
 
     private AlterCatalog() {}
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static AlterCatalog allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static AlterCatalog deny() {
       return DENY_INSTANCE;
     }
@@ -371,12 +371,12 @@ public class Privileges {
 
     private DropCatalog() {}
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static DropCatalog allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static DropCatalog deny() {
       return DENY_INSTANCE;
     }
@@ -414,12 +414,12 @@ public class Privileges {
 
     private UseCatalog() {}
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static UseCatalog allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static UseCatalog deny() {
       return DENY_INSTANCE;
     }
@@ -458,12 +458,12 @@ public class Privileges {
 
     private UseSchema() {}
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static UseSchema allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static UseSchema deny() {
       return DENY_INSTANCE;
     }
@@ -502,12 +502,12 @@ public class Privileges {
 
     private CreateSchema() {}
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static CreateSchema allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static CreateSchema deny() {
       return DENY_INSTANCE;
     }
@@ -546,12 +546,12 @@ public class Privileges {
 
     private AlterSchema() {}
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static AlterSchema allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static AlterSchema deny() {
       return DENY_INSTANCE;
     }
@@ -590,12 +590,12 @@ public class Privileges {
 
     private DropSchema() {}
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static DropSchema allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static DropSchema deny() {
       return DENY_INSTANCE;
     }
@@ -634,12 +634,12 @@ public class Privileges {
 
     private CreateTable() {}
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static CreateTable allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static CreateTable deny() {
       return DENY_INSTANCE;
     }
@@ -676,12 +676,12 @@ public class Privileges {
           }
         };
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static DropTable allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static DropTable deny() {
       return DENY_INSTANCE;
     }
@@ -718,12 +718,12 @@ public class Privileges {
           }
         };
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static ReadTable allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static ReadTable deny() {
       return DENY_INSTANCE;
     }
@@ -760,12 +760,12 @@ public class Privileges {
           }
         };
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static WriteTable allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static WriteTable deny() {
       return DENY_INSTANCE;
     }
@@ -802,12 +802,12 @@ public class Privileges {
           }
         };
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static CreateFileset allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static CreateFileset deny() {
       return DENY_INSTANCE;
     }
@@ -844,12 +844,12 @@ public class Privileges {
           }
         };
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static DropFileset allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static DropFileset deny() {
       return DENY_INSTANCE;
     }
@@ -886,12 +886,12 @@ public class Privileges {
           }
         };
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static ReadFileset allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static ReadFileset deny() {
       return DENY_INSTANCE;
     }
@@ -928,12 +928,12 @@ public class Privileges {
           }
         };
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static WriteFileset allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static WriteFileset deny() {
       return DENY_INSTANCE;
     }
@@ -972,12 +972,12 @@ public class Privileges {
 
     private CreateTopic() {}
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static CreateTopic allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static CreateTopic deny() {
       return DENY_INSTANCE;
     }
@@ -1014,12 +1014,12 @@ public class Privileges {
           }
         };
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static DropTopic allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static DropTopic deny() {
       return DENY_INSTANCE;
     }
@@ -1056,12 +1056,12 @@ public class Privileges {
           }
         };
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static ReadTopic allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static ReadTopic deny() {
       return DENY_INSTANCE;
     }
@@ -1098,12 +1098,12 @@ public class Privileges {
           }
         };
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static WriteTopic allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static WriteTopic deny() {
       return DENY_INSTANCE;
     }
@@ -1140,12 +1140,12 @@ public class Privileges {
           }
         };
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static ManageMetalake allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static ManageMetalake deny() {
       return DENY_INSTANCE;
     }
@@ -1182,12 +1182,12 @@ public class Privileges {
           }
         };
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static CreateMetalake allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static CreateMetalake deny() {
       return DENY_INSTANCE;
     }
@@ -1226,12 +1226,12 @@ public class Privileges {
 
     private UseMetalake() {}
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static UseMetalake allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static UseMetalake deny() {
       return DENY_INSTANCE;
     }
@@ -1268,12 +1268,12 @@ public class Privileges {
           }
         };
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static GetUser allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static GetUser deny() {
       return DENY_INSTANCE;
     }
@@ -1312,12 +1312,12 @@ public class Privileges {
 
     private AddUser() {}
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static AddUser allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static AddUser deny() {
       return DENY_INSTANCE;
     }
@@ -1354,12 +1354,12 @@ public class Privileges {
           }
         };
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static RemoveUser allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static RemoveUser deny() {
       return DENY_INSTANCE;
     }
@@ -1398,12 +1398,12 @@ public class Privileges {
 
     private AddGroup() {}
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static AddGroup allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static AddGroup deny() {
       return DENY_INSTANCE;
     }
@@ -1442,12 +1442,12 @@ public class Privileges {
 
     private RemoveGroup() {}
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static RemoveGroup allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static RemoveGroup deny() {
       return DENY_INSTANCE;
     }
@@ -1486,12 +1486,12 @@ public class Privileges {
 
     private GetGroup() {}
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static GetGroup allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static GetGroup deny() {
       return DENY_INSTANCE;
     }
@@ -1528,12 +1528,12 @@ public class Privileges {
           }
         };
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static CreateRole allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static CreateRole deny() {
       return DENY_INSTANCE;
     }
@@ -1572,12 +1572,12 @@ public class Privileges {
 
     private GetRole() {}
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static GetRole allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static GetRole deny() {
       return DENY_INSTANCE;
     }
@@ -1616,12 +1616,12 @@ public class Privileges {
 
     private DeleteRole() {}
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static DeleteRole allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static DeleteRole deny() {
       return DENY_INSTANCE;
     }
@@ -1660,12 +1660,12 @@ public class Privileges {
 
     private GrantRole() {}
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static GrantRole allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static GrantRole deny() {
       return DENY_INSTANCE;
     }
@@ -1704,12 +1704,12 @@ public class Privileges {
 
     private RevokeRole() {}
 
-    /** @return The instance with allow effect of the privilege. */
+    /** @return The instance with allow condition of the privilege. */
     public static RevokeRole allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny effect of the privilege. */
+    /** @return The instance with deny condition of the privilege. */
     public static RevokeRole deny() {
       return DENY_INSTANCE;
     }
