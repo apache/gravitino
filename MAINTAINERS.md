@@ -49,6 +49,7 @@ Contributors may be added by existing maintainers (see [Governance document](GOV
 | JieBao Xiao    | xloya               | Xiaomi           |
 | Can Cai        | caican00            | Xiaomi           |
 | Peidian Li     | coolderli           | Xiaomi           |
+| Brandon Lu     | Lanznx              | LINE             |
 | Lewis Jackson  | xnge                | opensource4you   |
 | Li-Hsing Liu   | austin362667        | opensource4you   |
 | Li Tianhang    | TEOTEO520           | Bilibili         |
