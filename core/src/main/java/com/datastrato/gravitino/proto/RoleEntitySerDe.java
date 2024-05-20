@@ -33,7 +33,7 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
                 roleEntity.securableObjects().get(0).privileges().stream()
                     .map(privilege -> privilege.name().toString())
                     .collect(Collectors.toList()))
-            .addAllPrivilegeEffects(
+            .addAllPrivilegeConditions(
                 roleEntity.securableObjects().get(0).privileges().stream()
                     .map(privilege -> privilege.condition().toString())
                     .collect(Collectors.toList()))
@@ -59,8 +59,8 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
 
     if (!role.getPrivilegesList().isEmpty()) {
 
-      for (int index = 0; index < role.getPrivilegeEffectsCount(); index++) {
-        if (Privilege.Condition.ALLOW.name().equals(role.getPrivilegeEffects(index))) {
+      for (int index = 0; index < role.getPrivilegeConditionsCount(); index++) {
+        if (Privilege.Condition.ALLOW.name().equals(role.getPrivilegeConditions(index))) {
           privileges.add(Privileges.allow(role.getPrivileges(index)));
         } else {
           privileges.add(Privileges.deny(role.getPrivileges(index)));

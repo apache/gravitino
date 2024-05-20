@@ -122,7 +122,7 @@ message Role {
   uint64 id = 1;
   string name = 2;
   repeated string privileges = 3;
-  repeated string privilege_effects = 4;
+  repeated string privilege_conditions = 4;
   string securable_object_full_name = 5;
   string securable_object_type = 6;
   map<string, string> properties = 7;
