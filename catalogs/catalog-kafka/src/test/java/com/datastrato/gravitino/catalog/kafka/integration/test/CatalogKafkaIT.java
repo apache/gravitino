@@ -7,6 +7,7 @@ package com.datastrato.gravitino.catalog.kafka.integration.test;
 import static com.datastrato.gravitino.catalog.kafka.KafkaCatalogPropertiesMetadata.BOOTSTRAP_SERVERS;
 import static com.datastrato.gravitino.catalog.kafka.KafkaTopicPropertiesMetadata.PARTITION_COUNT;
 import static com.datastrato.gravitino.catalog.kafka.KafkaTopicPropertiesMetadata.REPLICATION_FACTOR;
+import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static com.datastrato.gravitino.integration.test.container.KafkaContainer.DEFAULT_BROKER_PORT;
 
 import com.datastrato.gravitino.Catalog;
@@ -31,6 +32,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.Config;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.TopicDescription;
@@ -119,7 +121,8 @@ public class CatalogKafkaIT extends AbstractIT {
     Catalog createdCatalog = createCatalog(catalogName, comment, properties);
     Assertions.assertEquals(catalogName, createdCatalog.name());
     Assertions.assertEquals(comment, createdCatalog.comment());
-    Assertions.assertEquals(properties, createdCatalog.properties());
+    Assertions.assertEquals(
+        kafkaBootstrapServers, createdCatalog.properties().get(BOOTSTRAP_SERVERS));
 
     // test load catalog
     Catalog loadedCatalog = metalake.loadCatalog(catalogName);
@@ -172,6 +175,34 @@ public class CatalogKafkaIT extends AbstractIT {
                     ImmutableMap.of("abc", "2")));
     Assertions.assertTrue(
         exception.getMessage().contains("Missing configuration: bootstrap.servers"));
+
+    // Test BOOTSTRAP_SERVERS that cannot be linked
+    Catalog kafka =
+        metalake.createCatalog(
+            catalogName,
+            Catalog.Type.MESSAGING,
+            PROVIDER,
+            "comment",
+            ImmutableMap.of(
+                BOOTSTRAP_SERVERS,
+                "192.0.2.1:9999",
+                CATALOG_BYPASS_PREFIX + AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG,
+                "3000",
+                CATALOG_BYPASS_PREFIX + AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG,
+                "3000"));
+    exception =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                kafka
+                    .asTopicCatalog()
+                    .listTopics(
+                        Namespace.ofTopic(METALAKE_NAME, catalogName, DEFAULT_SCHEMA_NAME)));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("Timed out waiting for a node assignment. Call: listTopics"),
+        exception.getMessage());
   }
 
   @Test
