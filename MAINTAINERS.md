@@ -53,7 +53,6 @@ Contributors may be added by existing maintainers (see [Governance document](GOV
 | Li-Hsing Liu   | austin362667        | opensource4you   |
 | Li Tianhang    | TEOTEO520           | Bilibili         |
 
-
 ## Review process
 
 All contributions to the project must be reviewed by **AT LEAST** one maintainer before merging.
