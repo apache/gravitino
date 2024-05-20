@@ -6,7 +6,6 @@ package com.datastrato.gravitino.flink.connector.integration.test.hive;
 
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.flink.connector.PropertiesConverter;
 import com.datastrato.gravitino.flink.connector.hive.GravitinoHiveCatalog;
 import com.datastrato.gravitino.flink.connector.hive.GravitinoHiveCatalogFactory;
@@ -42,12 +41,10 @@ public class HiveCatalogStoreIT extends FlinkEnvIT {
     configuration.set(HiveCatalogFactoryOptions.HIVE_CONF_DIR, "src/test/resources/flink-tests");
     CatalogDescriptor catalogDescriptor = CatalogDescriptor.of(catalogName, configuration);
     tableEnv.createCatalog(catalogName, catalogDescriptor);
-    Assertions.assertTrue(
-        metalake.catalogExists(NameIdentifier.ofCatalog(FlinkEnvIT.metalakeName, catalogName)));
+    Assertions.assertTrue(metalake.catalogExists(catalogName));
 
     // Check the catalog properties.
-    com.datastrato.gravitino.Catalog gravitinoCatalog =
-        metalake.loadCatalog(NameIdentifier.ofCatalog(FlinkEnvIT.metalakeName, catalogName));
+    com.datastrato.gravitino.Catalog gravitinoCatalog = metalake.loadCatalog(catalogName);
     Map<String, String> properties = gravitinoCatalog.properties();
     Assertions.assertEquals("thrift://127.0.0.1:9083", properties.get(METASTORE_URIS));
     Map<String, String> flinkProperties =
@@ -88,8 +85,7 @@ public class HiveCatalogStoreIT extends FlinkEnvIT {
     // Drop the catalog. Only support drop catalog by SQL.
     tableEnv.useCatalog(DEFAULT_CATALOG);
     tableEnv.executeSql("drop catalog " + catalogName);
-    Assertions.assertFalse(
-        metalake.catalogExists(NameIdentifier.ofCatalog(FlinkEnvIT.metalakeName, catalogName)));
+    Assertions.assertFalse(metalake.catalogExists(catalogName));
 
     Optional<Catalog> droppedCatalog = tableEnv.getCatalog(catalogName);
     Assertions.assertFalse(droppedCatalog.isPresent(), "Catalog should be dropped");
@@ -108,12 +104,10 @@ public class HiveCatalogStoreIT extends FlinkEnvIT {
                 + "'hive-conf-dir'='src/test/resources/flink-tests'"
                 + ")",
             catalogName));
-    Assertions.assertTrue(
-        metalake.catalogExists(NameIdentifier.ofCatalog(metalakeName, catalogName)));
+    Assertions.assertTrue(metalake.catalogExists(catalogName));
 
     // Check the properties of the created catalog.
-    com.datastrato.gravitino.Catalog gravitinoCatalog =
-        metalake.loadCatalog(NameIdentifier.ofCatalog(FlinkEnvIT.metalakeName, catalogName));
+    com.datastrato.gravitino.Catalog gravitinoCatalog = metalake.loadCatalog(catalogName);
     Map<String, String> properties = gravitinoCatalog.properties();
     Assertions.assertEquals("thrift://127.0.0.1:9083", properties.get(METASTORE_URIS));
     Map<String, String> flinkProperties =
@@ -159,8 +153,7 @@ public class HiveCatalogStoreIT extends FlinkEnvIT {
     // Drop the catalog. Only support using SQL to drop catalog.
     tableEnv.useCatalog(DEFAULT_CATALOG);
     tableEnv.executeSql("drop catalog " + catalogName);
-    Assertions.assertFalse(
-        metalake.catalogExists(NameIdentifier.ofCatalog(FlinkEnvIT.metalakeName, catalogName)));
+    Assertions.assertFalse(metalake.catalogExists(catalogName));
 
     Optional<Catalog> droppedCatalog = tableEnv.getCatalog(catalogName);
     Assertions.assertFalse(droppedCatalog.isPresent(), "Catalog should be dropped");
@@ -176,7 +169,7 @@ public class HiveCatalogStoreIT extends FlinkEnvIT {
     String catalogName = "hive_catalog_in_gravitino";
     com.datastrato.gravitino.Catalog gravitinoCatalog =
         metalake.createCatalog(
-            NameIdentifier.ofCatalog(metalakeName, catalogName),
+            catalogName,
             com.datastrato.gravitino.Catalog.Type.RELATIONAL,
             "hive",
             null,
@@ -189,8 +182,7 @@ public class HiveCatalogStoreIT extends FlinkEnvIT {
                 "thrift://127.0.0.1:9083"));
     Assertions.assertNotNull(gravitinoCatalog);
     Assertions.assertEquals(catalogName, gravitinoCatalog.name());
-    Assertions.assertTrue(
-        metalake.catalogExists(NameIdentifier.ofCatalog(metalakeName, catalogName)));
+    Assertions.assertTrue(metalake.catalogExists(catalogName));
     Assertions.assertEquals(2, tableEnv.listCatalogs().length, "Should create a new catalog");
 
     // get the catalog from gravitino.
@@ -205,8 +197,7 @@ public class HiveCatalogStoreIT extends FlinkEnvIT {
     // drop the catalog.
     tableEnv.useCatalog(DEFAULT_CATALOG);
     tableEnv.executeSql("drop catalog " + catalogName);
-    Assertions.assertFalse(
-        metalake.catalogExists(NameIdentifier.ofCatalog(FlinkEnvIT.metalakeName, catalogName)));
+    Assertions.assertFalse(metalake.catalogExists(catalogName));
     Assertions.assertEquals(
         1, tableEnv.listCatalogs().length, "The created catalog should be dropped.");
   }

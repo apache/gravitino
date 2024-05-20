@@ -6,7 +6,6 @@ package com.datastrato.gravitino.flink.connector.catalog;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.google.common.base.Preconditions;
@@ -36,7 +35,7 @@ public class GravitinoCatalogManager {
     this.gravitinoClient = GravitinoAdminClient.builder(gravitinoUri).build();
     // Will not evict catalog by default
     this.gravitinoCatalogs = CacheBuilder.newBuilder().build();
-    this.metalake = gravitinoClient.loadMetalake(NameIdentifier.ofMetalake(metalakeName));
+    this.metalake = gravitinoClient.loadMetalake(metalakeName);
   }
 
   /**
@@ -117,13 +116,7 @@ public class GravitinoCatalogManager {
       String comment,
       String provider,
       Map<String, String> properties) {
-    Catalog catalog =
-        metalake.createCatalog(
-            NameIdentifier.ofCatalog(metalakeName, catalogName),
-            type,
-            provider,
-            comment,
-            properties);
+    Catalog catalog = metalake.createCatalog(catalogName, type, provider, comment, properties);
     gravitinoCatalogs.put(catalogName, catalog);
     return catalog;
   }
@@ -136,7 +129,7 @@ public class GravitinoCatalogManager {
    */
   public boolean dropCatalog(String catalogName) {
     gravitinoCatalogs.invalidate(catalogName);
-    return metalake.dropCatalog(NameIdentifier.ofCatalog(metalakeName, catalogName));
+    return metalake.dropCatalog(catalogName);
   }
 
   /**
@@ -145,7 +138,7 @@ public class GravitinoCatalogManager {
    * @return Set of catalog names
    */
   public Set<String> listCatalogs() {
-    NameIdentifier[] catalogNames = metalake.listCatalogs(Namespace.ofCatalog(metalake.name()));
+    NameIdentifier[] catalogNames = metalake.listCatalogs();
     LOG.info(
         "Load metalake {}'s catalogs. catalogs: {}.",
         metalake.name(),
@@ -160,11 +153,11 @@ public class GravitinoCatalogManager {
    * @return boolean
    */
   public boolean contains(String catalogName) {
-    return metalake.catalogExists(NameIdentifier.ofCatalog(metalakeName, catalogName));
+    return metalake.catalogExists(catalogName);
   }
 
   private Catalog loadCatalog(String catalogName) {
-    Catalog catalog = metalake.loadCatalog(NameIdentifier.ofCatalog(metalakeName, catalogName));
+    Catalog catalog = metalake.loadCatalog(catalogName);
     Preconditions.checkArgument(
         Catalog.Type.RELATIONAL.equals(catalog.type()), "Only support relational catalog");
     LOG.info("Load catalog {} from Gravitino successfully.", catalogName);

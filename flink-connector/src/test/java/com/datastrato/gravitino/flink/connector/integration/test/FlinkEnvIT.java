@@ -4,7 +4,6 @@
  */
 package com.datastrato.gravitino.flink.connector.integration.test;
 
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.flink.connector.PropertiesConverter;
 import com.datastrato.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions;
@@ -49,7 +48,7 @@ public abstract class FlinkEnvIT extends AbstractIT {
   }
 
   private static void initMetalake() {
-    metalake = client.createMetalake(NameIdentifier.of(metalakeName), "", Collections.emptyMap());
+    metalake = client.createMetalake(metalakeName, "", Collections.emptyMap());
   }
 
   private static void initFlinkEnv() {
