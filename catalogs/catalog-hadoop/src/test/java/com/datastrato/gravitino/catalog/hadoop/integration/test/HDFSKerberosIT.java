@@ -103,7 +103,7 @@ public class HDFSKerberosIT {
     // Clear UGI, It will throw exception
     UserGroupInformation.reset();
     Exception e = Assertions.assertThrows(Exception.class, action::run);
-    Assertions.assertTrue(e.getCause() instanceof AccessControlException);
+    Assertions.assertInstanceOf(AccessControlException.class, e.getCause());
   }
 
   private static String defaultBaseLocation() {
