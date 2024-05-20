@@ -36,10 +36,13 @@ public class RelationalEntityStore implements EntityStore {
       ImmutableMap.of(
           Configs.DEFAULT_ENTITY_RELATIONAL_STORE, JDBCBackend.class.getCanonicalName());
   private RelationalBackend backend;
+  private RelationalGarbageCollector garbageCollector;
 
   @Override
   public void initialize(Config config) throws RuntimeException {
     this.backend = createRelationalEntityBackend(config);
+    this.garbageCollector = new RelationalGarbageCollector(backend, config);
+    this.garbageCollector.start();
   }
 
   private static RelationalBackend createRelationalEntityBackend(Config config) {
@@ -99,7 +102,11 @@ public class RelationalEntityStore implements EntityStore {
   @Override
   public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
       throws IOException {
-    return backend.delete(ident, entityType, cascade);
+    try {
+      return backend.delete(ident, entityType, cascade);
+    } catch (NoSuchEntityException nse) {
+      return false;
+    }
   }
 
   @Override
@@ -109,6 +116,7 @@ public class RelationalEntityStore implements EntityStore {
 
   @Override
   public void close() throws IOException {
+    garbageCollector.close();
     backend.close();
   }
 }

@@ -11,6 +11,7 @@ import com.datastrato.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -20,6 +21,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import javax.sql.DataSource;
 import org.apache.commons.collections4.MapUtils;
@@ -50,25 +52,27 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
   @Override
   public JdbcSchema load(String schema) throws NoSuchSchemaException {
     try (Connection connection = getConnection()) {
-      String sql =
-          "SELECT schema_name FROM information_schema.schemata WHERE schema_name = ? AND catalog_name = ?";
-      try (PreparedStatement statement = connection.prepareStatement(sql)) {
-        statement.setString(1, schema);
-        statement.setString(2, database);
-        try (ResultSet resultSet = statement.executeQuery()) {
-          if (!resultSet.next()) {
-            throw new NoSuchSchemaException("No such schema: %s", schema);
-          }
-          String schemaName = resultSet.getString(1);
-          String comment = getSchemaComment(schema, connection);
-          return JdbcSchema.builder()
-              .withName(schemaName)
-              .withComment(comment)
-              .withAuditInfo(AuditInfo.EMPTY)
-              .withProperties(Collections.emptyMap())
-              .build();
+      ResultSet resultSet = getSchema(connection, schema);
+
+      boolean found = false;
+      while (resultSet.next()) {
+        if (Objects.equals(resultSet.getString(1), schema)) {
+          found = true;
+          break;
         }
       }
+
+      if (!found) {
+        throw new NoSuchSchemaException("No such schema: %s", schema);
+      }
+
+      String comment = getSchemaComment(schema, connection);
+      return JdbcSchema.builder()
+          .withName(schema)
+          .withComment(comment)
+          .withAuditInfo(AuditInfo.EMPTY)
+          .withProperties(Collections.emptyMap())
+          .build();
     } catch (SQLException e) {
       throw exceptionMapper.toGravitinoException(e);
     }
@@ -78,16 +82,11 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
   public List<String> listDatabases() {
     List<String> result = new ArrayList<>();
     try (Connection connection = getConnection()) {
-      try (PreparedStatement statement =
-          connection.prepareStatement(
-              "SELECT schema_name FROM information_schema.schemata WHERE catalog_name = ?")) {
-        statement.setString(1, database);
-        ResultSet resultSet = statement.executeQuery();
-        while (resultSet.next()) {
-          String databaseName = resultSet.getString(1);
-          if (!isSystemDatabase(databaseName)) {
-            result.add(databaseName);
-          }
+      ResultSet resultSet = getSchema(connection, null);
+      while (resultSet.next()) {
+        String schemaName = resultSet.getString(1);
+        if (!isSystemDatabase(schemaName)) {
+          result.add(resultSet.getString(1));
         }
       }
     } catch (final SQLException se) {
@@ -114,6 +113,22 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
           .append("'");
     }
     return sqlBuilder.toString();
+  }
+
+  /**
+   * Get the schema with the given name.
+   *
+   * <p>Note: This method will return a result set that may contain multiple rows as the schemaName
+   * in `getSchemas` is a pattern. The result set will contain all schemas that match the pattern.
+   *
+   * <p>Database in PG corresponds to Catalog in JDBC. Schema in PG corresponds to Schema in JDBC.
+   *
+   * @param connection the connection to the database
+   * @param schemaName the name of the schema
+   */
+  private ResultSet getSchema(Connection connection, String schemaName) throws SQLException {
+    final DatabaseMetaData metaData = connection.getMetaData();
+    return metaData.getSchemas(database, schemaName);
   }
 
   @Override

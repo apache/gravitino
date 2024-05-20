@@ -17,6 +17,7 @@ import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.catalog.SchemaDispatcher;
 import com.datastrato.gravitino.catalog.SchemaOperationDispatcher;
 import com.datastrato.gravitino.dto.rel.SchemaDTO;
 import com.datastrato.gravitino.dto.requests.SchemaCreateRequest;
@@ -93,7 +94,7 @@ public class TestSchemaOperations extends JerseyTest {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(dispatcher).to(SchemaOperationDispatcher.class).ranked(2);
+            bind(dispatcher).to(SchemaDispatcher.class).ranked(2);
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });

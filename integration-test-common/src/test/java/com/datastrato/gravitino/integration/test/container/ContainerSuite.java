@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.integration.test.container;
 
 import com.datastrato.gravitino.integration.test.util.CloseableGroup;
+import com.datastrato.gravitino.integration.test.util.TestDatabaseName;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.RemoveNetworkCmd;
 import com.github.dockerjava.api.model.Info;
@@ -15,7 +16,10 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.DockerClientFactory;
@@ -25,18 +29,24 @@ public class ContainerSuite implements Closeable {
   public static final Logger LOG = LoggerFactory.getLogger(ContainerSuite.class);
   private static volatile ContainerSuite instance = null;
 
-  // The subnet must match the configuration in `dev/docker/tools/mac-docker-connector.conf`
+  // The subnet must match the configuration in
+  // `dev/docker/tools/mac-docker-connector.conf`
   public static final String CONTAINER_NETWORK_SUBNET = "10.20.30.0/28";
   private static final String CONTAINER_NETWORK_GATEWAY = "10.20.30.1";
   private static final String CONTAINER_NETWORK_IPRANGE = "10.20.30.0/28";
   private static final String NETWORK_NAME = "gravitino-ci-network";
 
   private static Network network = null;
-  private static HiveContainer hiveContainer;
-  private static TrinoContainer trinoContainer;
-  private static TrinoITContainers trinoITContainers;
+  private static volatile HiveContainer hiveContainer;
+  private static volatile TrinoContainer trinoContainer;
+  private static volatile TrinoITContainers trinoITContainers;
+  private static volatile KafkaContainer kafkaContainer;
+  private static volatile DorisContainer dorisContainer;
 
-  private static DorisContainer dorisContainer;
+  private static volatile MySQLContainer mySQLContainer;
+  private static volatile MySQLContainer mySQLVersion5Container;
+  private static volatile Map<PGImageName, PostgreSQLContainer> pgContainerMap =
+      new EnumMap<>(PGImageName.class);
 
   protected static final CloseableGroup closer = CloseableGroup.create();
 
@@ -71,20 +81,24 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startHiveContainer() {
-    if (hiveContainer != null) {
-      return;
+    if (hiveContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (hiveContainer == null) {
+          // Start Hive container
+          HiveContainer.Builder hiveBuilder =
+              HiveContainer.builder()
+                  .withHostName("gravitino-ci-hive")
+                  .withEnvVars(
+                      ImmutableMap.<String, String>builder()
+                          .put("HADOOP_USER_NAME", "datastrato")
+                          .build())
+                  .withNetwork(network);
+          HiveContainer container = closer.register(hiveBuilder.build());
+          container.start();
+          hiveContainer = container;
+        }
+      }
     }
-    // Start Hive container
-    HiveContainer.Builder hiveBuilder =
-        HiveContainer.builder()
-            .withHostName("gravitino-ci-hive")
-            .withEnvVars(
-                ImmutableMap.<String, String>builder()
-                    .put("HADOOP_USER_NAME", "datastrato")
-                    .build())
-            .withNetwork(network);
-    hiveContainer = closer.register(hiveBuilder.build());
-    hiveContainer.start();
   }
 
   public void startTrinoContainer(
@@ -92,48 +106,166 @@ public class ContainerSuite implements Closeable {
       String trinoConnectorLibDir,
       int gravitinoServerPort,
       String metalakeName) {
-    if (trinoContainer != null) {
-      return;
+    if (trinoContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (trinoContainer == null) {
+          // Start Trino container
+          String hiveContainerIp = hiveContainer.getContainerIpAddress();
+          TrinoContainer.Builder trinoBuilder =
+              TrinoContainer.builder()
+                  .withEnvVars(
+                      ImmutableMap.<String, String>builder()
+                          .put("HADOOP_USER_NAME", "datastrato")
+                          .put("GRAVITINO_HOST_IP", "host.docker.internal")
+                          .put("GRAVITINO_HOST_PORT", String.valueOf(gravitinoServerPort))
+                          .put("GRAVITINO_METALAKE_NAME", metalakeName)
+                          .build())
+                  .withNetwork(getNetwork())
+                  .withExtraHosts(
+                      ImmutableMap.<String, String>builder()
+                          .put("host.docker.internal", "host-gateway")
+                          .put(HiveContainer.HOST_NAME, hiveContainerIp)
+                          .build())
+                  .withFilesToMount(
+                      ImmutableMap.<String, String>builder()
+                          .put(
+                              TrinoContainer.TRINO_CONTAINER_PLUGIN_GRAVITINO_DIR,
+                              trinoConnectorLibDir)
+                          .build())
+                  .withExposePorts(ImmutableSet.of(TrinoContainer.TRINO_PORT))
+                  .withTrinoConfDir(trinoConfDir)
+                  .withMetalakeName(metalakeName)
+                  .withHiveContainerIP(hiveContainerIp);
+
+          TrinoContainer container = closer.register(trinoBuilder.build());
+          container.start();
+          trinoContainer = container;
+        }
+      }
     }
-
-    // Start Trino container
-    String hiveContainerIp = hiveContainer.getContainerIpAddress();
-    TrinoContainer.Builder trinoBuilder =
-        TrinoContainer.builder()
-            .withEnvVars(
-                ImmutableMap.<String, String>builder()
-                    .put("HADOOP_USER_NAME", "root")
-                    .put("GRAVITINO_HOST_IP", "host.docker.internal")
-                    .put("GRAVITINO_HOST_PORT", String.valueOf(gravitinoServerPort))
-                    .put("GRAVITINO_METALAKE_NAME", metalakeName)
-                    .build())
-            .withNetwork(getNetwork())
-            .withExtraHosts(
-                ImmutableMap.<String, String>builder()
-                    .put("host.docker.internal", "host-gateway")
-                    .build())
-            .withFilesToMount(
-                ImmutableMap.<String, String>builder()
-                    .put(TrinoContainer.TRINO_CONTAINER_PLUGIN_GRAVITINO_DIR, trinoConnectorLibDir)
-                    .build())
-            .withExposePorts(ImmutableSet.of(TrinoContainer.TRINO_PORT))
-            .withTrinoConfDir(trinoConfDir)
-            .withMetalakeName(metalakeName)
-            .withHiveContainerIP(hiveContainerIp);
-
-    trinoContainer = closer.register(trinoBuilder.build());
-    trinoContainer.start();
   }
 
   public void startDorisContainer() {
-    if (dorisContainer != null) {
-      return;
+    if (dorisContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (dorisContainer == null) {
+          // Start Doris container
+          DorisContainer.Builder dorisBuilder =
+              DorisContainer.builder().withHostName("gravitino-ci-doris").withNetwork(network);
+          DorisContainer container = closer.register(dorisBuilder.build());
+          container.start();
+          dorisContainer = container;
+        }
+      }
     }
-    // Start Doris container
-    DorisContainer.Builder dorisBuilder =
-        DorisContainer.builder().withHostName("gravitino-ci-doris").withNetwork(network);
-    dorisContainer = closer.register(dorisBuilder.build());
-    dorisContainer.start();
+  }
+
+  public void startMySQLContainer(TestDatabaseName testDatabaseName) {
+    if (mySQLContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (mySQLContainer == null) {
+          // Start MySQL container
+          MySQLContainer.Builder mysqlBuilder =
+              MySQLContainer.builder()
+                  .withHostName("gravitino-ci-mysql")
+                  .withEnvVars(
+                      ImmutableMap.<String, String>builder()
+                          .put("MYSQL_ROOT_PASSWORD", "root")
+                          .build())
+                  .withExposePorts(ImmutableSet.of(MySQLContainer.MYSQL_PORT))
+                  .withNetwork(network);
+
+          MySQLContainer container = closer.register(mysqlBuilder.build());
+          container.start();
+          mySQLContainer = container;
+        }
+      }
+    }
+    synchronized (MySQLContainer.class) {
+      mySQLContainer.createDatabase(testDatabaseName);
+    }
+  }
+
+  public void startMySQLVersion5Container(TestDatabaseName testDatabaseName) {
+    if (mySQLVersion5Container == null) {
+      synchronized (ContainerSuite.class) {
+        if (mySQLVersion5Container == null) {
+          // Start MySQL container
+          MySQLContainer.Builder mysqlBuilder =
+              MySQLContainer.builder()
+                  .withImage("mysql:5.7")
+                  .withHostName("gravitino-ci-mysql-v5")
+                  .withEnvVars(
+                      ImmutableMap.<String, String>builder()
+                          .put("MYSQL_ROOT_PASSWORD", "root")
+                          .build())
+                  .withExposePorts(ImmutableSet.of(MySQLContainer.MYSQL_PORT))
+                  .withNetwork(network);
+
+          MySQLContainer container = closer.register(mysqlBuilder.build());
+          container.start();
+          mySQLVersion5Container = container;
+        }
+      }
+    }
+    synchronized (MySQLContainer.class) {
+      mySQLVersion5Container.createDatabase(testDatabaseName);
+    }
+  }
+
+  public void startPostgreSQLContainer(TestDatabaseName testDatabaseName, PGImageName pgImageName) {
+    if (!pgContainerMap.containsKey(pgImageName)) {
+      synchronized (ContainerSuite.class) {
+        if (!pgContainerMap.containsKey(pgImageName)) {
+          // Start PostgreSQL container
+          PostgreSQLContainer.Builder pgBuilder =
+              PostgreSQLContainer.builder()
+                  .withImage(pgImageName.toString())
+                  .withHostName(PostgreSQLContainer.HOST_NAME)
+                  .withEnvVars(
+                      ImmutableMap.<String, String>builder()
+                          .put("POSTGRES_USER", PostgreSQLContainer.USER_NAME)
+                          .put("POSTGRES_PASSWORD", PostgreSQLContainer.PASSWORD)
+                          .build())
+                  .withExposePorts(ImmutableSet.of(PostgreSQLContainer.PG_PORT))
+                  .withNetwork(network);
+
+          PostgreSQLContainer container = closer.register(pgBuilder.build());
+          container.start();
+          pgContainerMap.put(pgImageName, container);
+        }
+      }
+    }
+    synchronized (PostgreSQLContainer.class) {
+      pgContainerMap.get(pgImageName).createDatabase(testDatabaseName);
+    }
+  }
+
+  public void startPostgreSQLContainer(TestDatabaseName testDatabaseName) {
+    // Apply default image
+    startPostgreSQLContainer(testDatabaseName, PGImageName.VERSION_13);
+  }
+
+  public void startKafkaContainer() {
+    if (kafkaContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (kafkaContainer == null) {
+          KafkaContainer.Builder builder = KafkaContainer.builder().withNetwork(network);
+          KafkaContainer container = closer.register(builder.build());
+          try {
+            container.start();
+          } catch (Exception e) {
+            LOG.error("Failed to start Kafka container", e);
+            throw new RuntimeException("Failed to start Kafka container", e);
+          }
+          kafkaContainer = container;
+        }
+      }
+    }
+  }
+
+  public KafkaContainer getKafkaContainer() {
+    return kafkaContainer;
   }
 
   public TrinoContainer getTrinoContainer() {
@@ -156,7 +288,31 @@ public class ContainerSuite implements Closeable {
     return dorisContainer;
   }
 
-  // Let containers assign addresses in a fixed subnet to avoid `mac-docker-connector` needing to
+  public MySQLContainer getMySQLContainer() {
+    return mySQLContainer;
+  }
+
+  public MySQLContainer getMySQLVersion5Container() {
+    return mySQLVersion5Container;
+  }
+
+  public PostgreSQLContainer getPostgreSQLContainer() throws NoSuchElementException {
+    return getPostgreSQLContainer(PGImageName.VERSION_13);
+  }
+
+  public PostgreSQLContainer getPostgreSQLContainer(PGImageName pgImageName)
+      throws NoSuchElementException {
+    if (!pgContainerMap.containsKey(pgImageName)) {
+      throw new NoSuchElementException(
+          String.format(
+              "PostgreSQL container %s not found, please create it by calling startPostgreSQLContainer() first",
+              pgImageName));
+    }
+    return pgContainerMap.get(pgImageName);
+  }
+
+  // Let containers assign addresses in a fixed subnet to avoid
+  // `mac-docker-connector` needing to
   // refresh the configuration
   private static Network createDockerNetwork() {
     DockerClient dockerClient = DockerClientFactory.instance().client();

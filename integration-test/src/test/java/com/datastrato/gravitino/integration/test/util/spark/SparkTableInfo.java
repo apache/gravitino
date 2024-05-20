@@ -6,7 +6,8 @@
 package com.datastrato.gravitino.integration.test.util.spark;
 
 import com.datastrato.gravitino.spark.connector.ConnectorConstants;
-import com.datastrato.gravitino.spark.connector.table.SparkBaseTable;
+import com.datastrato.gravitino.spark.connector.hive.SparkHiveTable;
+import com.datastrato.gravitino.spark.connector.iceberg.SparkIcebergTable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -17,12 +18,20 @@ import java.util.stream.Collectors;
 import javax.ws.rs.NotSupportedException;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.spark.sql.connector.catalog.SupportsMetadataColumns;
+import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
+import org.apache.spark.sql.connector.expressions.ApplyTransform;
 import org.apache.spark.sql.connector.expressions.BucketTransform;
+import org.apache.spark.sql.connector.expressions.DaysTransform;
+import org.apache.spark.sql.connector.expressions.HoursTransform;
 import org.apache.spark.sql.connector.expressions.IdentityTransform;
+import org.apache.spark.sql.connector.expressions.MonthsTransform;
 import org.apache.spark.sql.connector.expressions.SortedBucketTransform;
 import org.apache.spark.sql.connector.expressions.Transform;
+import org.apache.spark.sql.connector.expressions.YearsTransform;
 import org.apache.spark.sql.types.DataType;
+import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.Assertions;
 
 /** SparkTableInfo is used to check the result in test. */
@@ -37,6 +46,7 @@ public class SparkTableInfo {
   private Transform bucket;
   private List<Transform> partitions = new ArrayList<>();
   private Set<String> partitionColumnNames = new HashSet<>();
+  private SparkMetadataColumnInfo[] metadataColumns;
 
   public SparkTableInfo() {}
 
@@ -69,13 +79,20 @@ public class SparkTableInfo {
   void addPartition(Transform partition) {
     if (partition instanceof IdentityTransform) {
       partitionColumnNames.add(((IdentityTransform) partition).reference().fieldNames()[0]);
+      this.partitions.add(partition);
+    } else if (partition instanceof BucketTransform
+        || partition instanceof HoursTransform
+        || partition instanceof DaysTransform
+        || partition instanceof MonthsTransform
+        || partition instanceof YearsTransform
+        || (partition instanceof ApplyTransform && "truncate".equalsIgnoreCase(partition.name()))) {
+      this.partitions.add(partition);
     } else {
       throw new NotSupportedException("Doesn't support " + partition.name());
     }
-    this.partitions.add(partition);
   }
 
-  static SparkTableInfo create(SparkBaseTable baseTable) {
+  static SparkTableInfo create(Table baseTable) {
     SparkTableInfo sparkTableInfo = new SparkTableInfo();
     String identifier = baseTable.name();
     String[] items = identifier.split("\\.");
@@ -84,7 +101,9 @@ public class SparkTableInfo {
     sparkTableInfo.tableName = items[1];
     sparkTableInfo.database = items[0];
     sparkTableInfo.columns =
-        Arrays.stream(baseTable.schema().fields())
+        // using `baseTable.schema()` directly will failed because the method named `schema` is
+        // Deprecated in Spark Table interface
+        Arrays.stream(getSchema(baseTable).fields())
             .map(
                 sparkField ->
                     new SparkColumnInfo(
@@ -100,14 +119,36 @@ public class SparkTableInfo {
             transform -> {
               if (transform instanceof BucketTransform
                   || transform instanceof SortedBucketTransform) {
-                sparkTableInfo.setBucket(transform);
-              } else if (transform instanceof IdentityTransform) {
+                if (isBucketPartition(baseTable, transform)) {
+                  sparkTableInfo.addPartition(transform);
+                } else {
+                  sparkTableInfo.setBucket(transform);
+                }
+              } else if (transform instanceof IdentityTransform
+                  || transform instanceof HoursTransform
+                  || transform instanceof DaysTransform
+                  || transform instanceof MonthsTransform
+                  || transform instanceof YearsTransform
+                  || (transform instanceof ApplyTransform
+                      && "truncate".equalsIgnoreCase(transform.name()))) {
                 sparkTableInfo.addPartition(transform);
               } else {
                 throw new NotSupportedException(
                     "Doesn't support Spark transform: " + transform.name());
               }
             });
+    if (baseTable instanceof SupportsMetadataColumns) {
+      SupportsMetadataColumns supportsMetadataColumns = (SupportsMetadataColumns) baseTable;
+      sparkTableInfo.metadataColumns =
+          Arrays.stream(supportsMetadataColumns.metadataColumns())
+              .map(
+                  metadataColumn ->
+                      new SparkMetadataColumnInfo(
+                          metadataColumn.name(),
+                          metadataColumn.dataType(),
+                          metadataColumn.isNullable()))
+              .toArray(SparkMetadataColumnInfo[]::new);
+    }
     return sparkTableInfo;
   }
 
@@ -121,6 +162,21 @@ public class SparkTableInfo {
     return columns.stream()
         .filter(column -> partitionColumnNames.contains(column.name))
         .collect(Collectors.toList());
+  }
+
+  private static boolean isBucketPartition(Table baseTable, Transform transform) {
+    return baseTable instanceof SparkIcebergTable && !(transform instanceof SortedBucketTransform);
+  }
+
+  private static StructType getSchema(Table baseTable) {
+    if (baseTable instanceof SparkHiveTable) {
+      return ((SparkHiveTable) baseTable).schema();
+    } else if (baseTable instanceof SparkIcebergTable) {
+      return ((SparkIcebergTable) baseTable).schema();
+    } else {
+      throw new IllegalArgumentException(
+          "Doesn't support Spark table: " + baseTable.getClass().getName());
+    }
   }
 
   @Data

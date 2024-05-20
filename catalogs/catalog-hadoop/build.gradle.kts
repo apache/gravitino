@@ -36,9 +36,11 @@ dependencies {
 
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.mockito.core)
+  testImplementation(libs.mysql.driver)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.testcontainers)
+  testImplementation(libs.testcontainers.mysql)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
@@ -96,10 +98,14 @@ tasks.test {
     dependsOn(tasks.jar)
 
     doFirst {
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.9")
+      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.10")
     }
 
     val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
     init(this)
   }
+}
+
+tasks.getByName("generateMetadataFileForMavenJavaPublication") {
+  dependsOn("runtimeJars")
 }

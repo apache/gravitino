@@ -9,7 +9,7 @@ import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_STORE;
 import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
-import static com.datastrato.gravitino.Configs.KV_DELETE_AFTER_TIME;
+import static com.datastrato.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static com.datastrato.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
 
 import com.datastrato.gravitino.Config;
@@ -60,16 +60,20 @@ public class TestKvEntityStorage extends TestEntityStorage {
     }
   }
 
-  @Test
-  void testCreateKvEntityStore() throws IOException {
+  public Config getConfig() throws IOException {
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
     Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn("/tmp/gravitino");
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
-    Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
+    Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
+    return config;
+  }
 
+  @Test
+  void testCreateKvEntityStore() throws IOException {
+    Config config = getConfig();
     FileUtils.deleteDirectory(FileUtils.getFile("/tmp/gravitino"));
 
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
@@ -173,16 +177,11 @@ public class TestKvEntityStorage extends TestEntityStorage {
   @Test
   @Disabled("KvEntityStore is not thread safe after issue #780")
   void testConcurrentIssues() throws IOException, ExecutionException, InterruptedException {
-    Config config = Mockito.mock(Config.class);
+    Config config = getConfig();
     File baseDir = new File(System.getProperty("java.io.tmpdir"));
     File file = Files.createTempDirectory(baseDir.toPath(), "test").toFile();
     file.deleteOnExit();
-    Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
-    Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
-    Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(file.getAbsolutePath());
-    Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
-    Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
 
     ThreadPoolExecutor threadPoolExecutor =
         new ThreadPoolExecutor(

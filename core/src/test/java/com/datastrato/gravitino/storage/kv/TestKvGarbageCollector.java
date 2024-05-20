@@ -9,13 +9,15 @@ import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_STORE;
 import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
-import static com.datastrato.gravitino.Configs.KV_DELETE_AFTER_TIME;
+import static com.datastrato.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static com.datastrato.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
 import static com.datastrato.gravitino.storage.kv.TestKvEntityStorage.createBaseMakeLake;
 import static com.datastrato.gravitino.storage.kv.TestKvEntityStorage.createCatalog;
 import static com.datastrato.gravitino.storage.kv.TestKvEntityStorage.createFilesetEntity;
 import static com.datastrato.gravitino.storage.kv.TestKvEntityStorage.createSchemaEntity;
 import static com.datastrato.gravitino.storage.kv.TestKvEntityStorage.createTableEntity;
+import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.getBinaryTransactionId;
+import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.getTransactionId;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
@@ -29,8 +31,10 @@ import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.FilesetEntity;
+import com.datastrato.gravitino.meta.GroupEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.TableEntity;
+import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.TransactionIdGenerator;
 import com.datastrato.gravitino.storage.kv.KvGarbageCollector.LogHelper;
 import java.io.File;
@@ -56,7 +60,7 @@ class TestKvGarbageCollector {
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
     Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(file.getAbsolutePath());
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(3L);
-    Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
+    Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
     return config;
   }
 
@@ -69,16 +73,17 @@ class TestKvGarbageCollector {
   @Test
   void testScheduler() throws IOException {
     Config config = getConfig();
-    Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L); // 20 minutes
-    long dateTimeLineMinute = config.get(KV_DELETE_AFTER_TIME) / 1000 / 60;
+    Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L); // 20 minutes
+    long dateTimeLineMinute = config.get(STORE_DELETE_AFTER_TIME) / 1000 / 60;
     Assertions.assertEquals(10, Math.max(dateTimeLineMinute / 10, 10));
 
-    Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(2 * 60 * 60 * 1000L); // 2 hours
-    dateTimeLineMinute = config.get(KV_DELETE_AFTER_TIME) / 1000 / 60;
+    Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(2 * 60 * 60 * 1000L); // 2 hours
+    dateTimeLineMinute = config.get(STORE_DELETE_AFTER_TIME) / 1000 / 60;
     Assertions.assertEquals(12, Math.max(dateTimeLineMinute / 10, 10));
 
-    Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(2 * 60 * 60 * 24 * 1000L); // 2 days
-    dateTimeLineMinute = config.get(KV_DELETE_AFTER_TIME) / 1000 / 60;
+    Mockito.when(config.get(STORE_DELETE_AFTER_TIME))
+        .thenReturn(2 * 60 * 60 * 24 * 1000L); // 2 days
+    dateTimeLineMinute = config.get(STORE_DELETE_AFTER_TIME) / 1000 / 60;
     Assertions.assertEquals(288, Math.max(dateTimeLineMinute / 10, 10));
   }
 
@@ -127,8 +132,9 @@ class TestKvGarbageCollector {
       // 0x1E, last_timestamp can be seen as they have not been stored to the backend.
       Assertions.assertEquals(7, allData.size());
 
+      // Set the TTL to 2 seconds before the kvGarbageCollector is created
+      Mockito.doReturn(2000L).when(config).get(STORE_DELETE_AFTER_TIME);
       KvGarbageCollector kvGarbageCollector = new KvGarbageCollector(kvBackend, config, null);
-      Mockito.doReturn(2000L).when(config).get(KV_DELETE_AFTER_TIME);
 
       // Wait TTL time to make sure the data is expired, please see ENTITY_KV_TTL
       Thread.sleep(3000);
@@ -153,16 +159,8 @@ class TestKvGarbageCollector {
 
   @Test
   void testRemoveWithGCCollector1() throws IOException, InterruptedException {
-    Config config = Mockito.mock(Config.class);
-    File baseDir = new File(System.getProperty("java.io.tmpdir"));
-    File file = Files.createTempDirectory(baseDir.toPath(), "test").toFile();
-    file.deleteOnExit();
-    Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
-    Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
-    Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
-    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(file.getAbsolutePath());
+    Config config = getConfig();
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
-    Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
 
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
@@ -190,6 +188,20 @@ class TestKvGarbageCollector {
       kvEntityStore.put(schemaEntity);
       kvEntityStore.put(tableEntity);
       kvEntityStore.put(filesetEntity);
+      kvEntityStore.put(
+          UserEntity.builder()
+              .withId(1L)
+              .withAuditInfo(auditInfo)
+              .withName("the same")
+              .withNamespace(Namespace.of("metalake1", "catalog1", "schema1"))
+              .build());
+      kvEntityStore.put(
+          GroupEntity.builder()
+              .withId(2L)
+              .withAuditInfo(auditInfo)
+              .withName("the same")
+              .withNamespace(Namespace.of("metalake1", "catalog1", "schema1"))
+              .build());
 
       // now try to scan raw data from kv store
       KvBackend kvBackend = kvEntityStore.backend;
@@ -202,7 +214,7 @@ class TestKvGarbageCollector {
                   .endInclusive(false)
                   .build());
 
-      Assertions.assertEquals(5, data.size());
+      Assertions.assertEquals(7, data.size());
 
       KvGarbageCollector kvGarbageCollector = kvEntityStore.kvGarbageCollector;
       for (Pair<byte[], byte[]> pair : data) {
@@ -230,6 +242,17 @@ class TestKvGarbageCollector {
                 NameIdentifier.of("metalake1", "catalog1", "schema1", "fileset1"),
                 helper.identifier);
             break;
+          case USER:
+            Assertions.assertEquals(
+                NameIdentifier.of("metalake1", "catalog1", "schema1", "the same"),
+                helper.identifier);
+            break;
+
+          case GROUP:
+            Assertions.assertEquals(
+                NameIdentifier.of("metalake1", "catalog1", "schema1", "the same"),
+                helper.identifier);
+            break;
           default:
             Assertions.fail();
         }
@@ -239,16 +262,8 @@ class TestKvGarbageCollector {
 
   @Test
   void testRemoveWithGCCollector2() throws IOException, InterruptedException {
-    Config config = Mockito.mock(Config.class);
-    File baseDir = new File(System.getProperty("java.io.tmpdir"));
-    File file = Files.createTempDirectory(baseDir.toPath(), "test").toFile();
-    file.deleteOnExit();
-    Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
-    Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
-    Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
-    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(file.getAbsolutePath());
+    Config config = getConfig();
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
-    Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
 
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
@@ -278,7 +293,7 @@ class TestKvGarbageCollector {
       store.put(metalake2);
       store.put(metalake3);
 
-      Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(1000L);
+      Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(1000L);
       Thread.sleep(1500);
 
       kvEntityStore.kvGarbageCollector.collectAndClean();
@@ -309,7 +324,7 @@ class TestKvGarbageCollector {
       store.put(catalog1);
       store.put(catalog2);
 
-      Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(1000L);
+      Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(1000L);
       Thread.sleep(1500);
 
       kvEntityStore.kvGarbageCollector.collectAndClean();
@@ -342,7 +357,7 @@ class TestKvGarbageCollector {
       store.put(schema1);
       store.put(schema2);
 
-      Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(1000L);
+      Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(1000L);
       Thread.sleep(1500);
       kvEntityStore.kvGarbageCollector.collectAndClean();
 
@@ -378,7 +393,7 @@ class TestKvGarbageCollector {
       store.put(table1);
       store.put(table2);
 
-      Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(1000L);
+      Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(1000L);
       Thread.sleep(1500);
       kvEntityStore.kvGarbageCollector.collectAndClean();
 
@@ -394,6 +409,98 @@ class TestKvGarbageCollector {
                   NameIdentifier.of("metalake1", "catalog2", "schema2", "table2"),
                   Entity.EntityType.TABLE,
                   TableEntity.class));
+    }
+  }
+
+  @Test
+  void testIncrementalGC() throws Exception {
+    Config config = getConfig();
+    Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      store.initialize(config);
+
+      if (!(store instanceof KvEntityStore)) {
+        return;
+      }
+      KvEntityStore kvEntityStore = (KvEntityStore) store;
+
+      store.setSerDe(EntitySerDeFactory.createEntitySerDe(config.get(Configs.ENTITY_SERDE)));
+      AuditInfo auditInfo =
+          AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+      BaseMetalake metalake1 = createBaseMakeLake(1L, "metalake1", auditInfo);
+      BaseMetalake metalake2 = createBaseMakeLake(2L, "metalake2", auditInfo);
+      BaseMetalake metalake3 = createBaseMakeLake(3L, "metalake3", auditInfo);
+
+      for (int i = 0; i < 10; i++) {
+        store.put(metalake1);
+        store.put(metalake2);
+        store.put(metalake3);
+
+        store.delete(NameIdentifier.of("metalake1"), Entity.EntityType.METALAKE);
+        store.delete(NameIdentifier.of("metalake2"), Entity.EntityType.METALAKE);
+        store.delete(NameIdentifier.of("metalake3"), Entity.EntityType.METALAKE);
+
+        Thread.sleep(10);
+      }
+
+      store.put(metalake1);
+      store.put(metalake2);
+      store.put(metalake3);
+
+      Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(1000L);
+      Thread.sleep(1500);
+
+      // Scan raw key-value data from storage to confirm the data is deleted
+      kvEntityStore.kvGarbageCollector.collectAndClean();
+      List<Pair<byte[], byte[]>> allData =
+          kvEntityStore.backend.scan(
+              new KvRange.KvRangeBuilder()
+                  .start("_".getBytes())
+                  .end("z".getBytes())
+                  .startInclusive(false)
+                  .endInclusive(false)
+                  .build());
+
+      Assertions.assertEquals(3, allData.size());
+
+      long transactionId =
+          getTransactionId(
+              getBinaryTransactionId(kvEntityStore.kvGarbageCollector.commitIdHasBeenCollected));
+      Assertions.assertNotEquals(1, transactionId);
+
+      for (int i = 0; i < 10; i++) {
+        store.delete(NameIdentifier.of("metalake1"), Entity.EntityType.METALAKE);
+        store.delete(NameIdentifier.of("metalake2"), Entity.EntityType.METALAKE);
+        store.delete(NameIdentifier.of("metalake3"), Entity.EntityType.METALAKE);
+        store.put(metalake1);
+        store.put(metalake2);
+        store.put(metalake3);
+        Thread.sleep(10);
+      }
+      store.delete(NameIdentifier.of("metalake1"), Entity.EntityType.METALAKE);
+      store.delete(NameIdentifier.of("metalake2"), Entity.EntityType.METALAKE);
+      store.delete(NameIdentifier.of("metalake3"), Entity.EntityType.METALAKE);
+
+      Thread.sleep(1500);
+      kvEntityStore.kvGarbageCollector.collectAndClean();
+
+      allData =
+          kvEntityStore.backend.scan(
+              new KvRange.KvRangeBuilder()
+                  .start("_".getBytes())
+                  .end("z".getBytes())
+                  .startInclusive(false)
+                  .endInclusive(false)
+                  .build());
+
+      Assertions.assertTrue(allData.isEmpty());
+
+      long transactionIdV2 =
+          getTransactionId(
+              getBinaryTransactionId(kvEntityStore.kvGarbageCollector.commitIdHasBeenCollected));
+      Assertions.assertTrue(transactionIdV2 > transactionId);
     }
   }
 }

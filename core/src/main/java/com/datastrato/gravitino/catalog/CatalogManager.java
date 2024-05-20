@@ -15,23 +15,31 @@ import com.datastrato.gravitino.CatalogChange.SetProperty;
 import com.datastrato.gravitino.CatalogProvider;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
+import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Entity.EntityType;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
-import com.datastrato.gravitino.SupportsCatalogs;
 import com.datastrato.gravitino.connector.BaseCatalog;
+import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;
+import com.datastrato.gravitino.connector.PropertiesMetadata;
+import com.datastrato.gravitino.connector.PropertyEntry;
+import com.datastrato.gravitino.connector.capability.Capability;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.file.FilesetCatalog;
+import com.datastrato.gravitino.messaging.TopicCatalog;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
+import com.datastrato.gravitino.meta.SchemaEntity;
+import com.datastrato.gravitino.rel.SupportsPartitions;
 import com.datastrato.gravitino.rel.SupportsSchemas;
+import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.IsolatedClassLoader;
@@ -45,6 +53,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Multimaps;
 import com.google.common.collect.Streams;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
@@ -60,6 +69,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.ServiceLoader;
+import java.util.Set;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -69,7 +79,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Manages the catalog instances and operations. */
-public class CatalogManager implements SupportsCatalogs, Closeable {
+public class CatalogManager implements CatalogDispatcher, Closeable {
 
   private static final String CATALOG_DOES_NOT_EXIST_MSG = "Catalog %s does not exist";
   private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";
@@ -117,9 +127,36 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
           });
     }
 
+    public <R> R doWithTopicOps(ThrowableFunction<TopicCatalog, R> fn) throws Exception {
+      return classLoader.withClassLoader(
+          cl -> {
+            if (asTopics() == null) {
+              throw new UnsupportedOperationException("Catalog does not support topic operations");
+            }
+            return fn.apply(asTopics());
+          });
+    }
+
+    public <R> R doWithPartitionOps(
+        NameIdentifier tableIdent, ThrowableFunction<SupportsPartitions, R> fn) throws Exception {
+      return classLoader.withClassLoader(
+          cl -> {
+            Preconditions.checkArgument(
+                asTables() != null, "Catalog does not support table operations");
+            Table table = asTables().loadTable(tableIdent);
+            Preconditions.checkArgument(
+                table.supportPartitions() != null, "Table does not support partition operations");
+            return fn.apply(table.supportPartitions());
+          });
+    }
+
     public <R> R doWithPropertiesMeta(ThrowableFunction<HasPropertyMetadata, R> fn)
         throws Exception {
       return classLoader.withClassLoader(cl -> fn.apply(catalog.ops()));
+    }
+
+    public Capability capabilities() throws Exception {
+      return classLoader.withClassLoader(cl -> catalog.capability());
     }
 
     public void close() {
@@ -149,6 +186,10 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
 
     private FilesetCatalog asFilesets() {
       return catalog.ops() instanceof FilesetCatalog ? (FilesetCatalog) catalog.ops() : null;
+    }
+
+    private TopicCatalog asTopics() {
+      return catalog.ops() instanceof TopicCatalog ? (TopicCatalog) catalog.ops() : null;
     }
   }
 
@@ -230,8 +271,17 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     checkMetalakeExists(metalakeIdent);
 
     try {
-      return store.list(namespace, CatalogEntity.class, EntityType.CATALOG).stream()
-          .map(CatalogEntity::toCatalogInfo)
+      List<CatalogEntity> catalogEntities =
+          store.list(namespace, CatalogEntity.class, EntityType.CATALOG);
+
+      // Using provider as key to avoid loading the same type catalog instance multiple times
+      Map<String, Set<String>> hiddenProps = new HashMap<>();
+      Multimaps.index(catalogEntities, CatalogEntity::getProvider)
+          .asMap()
+          .forEach((p, e) -> hiddenProps.put(p, getHiddenPropertyNames(e.iterator().next())));
+
+      return catalogEntities.stream()
+          .map(e -> e.toCatalogInfoWithoutHiddenProps(hiddenProps.get(e.getProvider())))
           .toArray(Catalog[]::new);
     } catch (IOException ioe) {
       LOG.error("Failed to list catalogs in metalake {}", metalakeIdent, ioe);
@@ -272,13 +322,18 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
 
-    if (CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME.equals(ident.name())) {
+    if (Entity.SYSTEM_CATALOG_RESERVED_NAME.equals(ident.name())) {
       throw new IllegalArgumentException("Can't create a catalog with with reserved name `system`");
     }
 
+    if (Entity.SECURABLE_ENTITY_RESERVED_NAME.equals(ident.name())) {
+      throw new IllegalArgumentException("Can't create a catalog with with reserved name `*`");
+    }
+
     // load catalog-related configuration from catalog-specific configuration file
-    Map<String, String> catalogSpecificConfig = loadCatalogSpecificConfig(properties, provider);
-    Map<String, String> mergedConfig = mergeConf(properties, catalogSpecificConfig);
+    Map<String, String> newProperties = Optional.ofNullable(properties).orElse(Maps.newHashMap());
+    Map<String, String> catalogSpecificConfig = loadCatalogSpecificConfig(newProperties, provider);
+    Map<String, String> mergedConfig = mergeConf(newProperties, catalogSpecificConfig);
 
     long uid = idGenerator.nextId();
     StringIdentifier stringId = StringIdentifier.fromId(uid);
@@ -302,6 +357,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
                     .build())
             .build();
 
+    boolean createSuccess = false;
     try {
       NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
       if (!store.exists(metalakeIdent, EntityType.METALAKE)) {
@@ -309,9 +365,9 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
         throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalakeIdent);
       }
 
-      // TODO: should avoid a race condition here
-      CatalogWrapper wrapper = catalogCache.get(ident, id -> createCatalogWrapper(e));
       store.put(e, false /* overwrite */);
+      CatalogWrapper wrapper = catalogCache.get(ident, id -> createCatalogWrapper(e));
+      createSuccess = true;
       return wrapper.catalog;
     } catch (EntityAlreadyExistsException e1) {
       LOG.warn("Catalog {} already exists", ident, e1);
@@ -321,7 +377,18 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     } catch (Exception e3) {
       catalogCache.invalidate(ident);
       LOG.error("Failed to create catalog {}", ident, e3);
+      if (e3 instanceof RuntimeException) {
+        throw (RuntimeException) e3;
+      }
       throw new RuntimeException(e3);
+    } finally {
+      if (!createSuccess) {
+        try {
+          store.delete(ident, EntityType.CATALOG, true);
+        } catch (IOException e4) {
+          LOG.error("Failed to clean up catalog {}", ident, e4);
+        }
+      }
     }
   }
 
@@ -445,7 +512,23 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     catalogCache.invalidate(ident);
 
     try {
+      CatalogEntity catalogEntity = store.get(ident, EntityType.CATALOG, CatalogEntity.class);
+      if (catalogEntity.getProvider().equals("kafka")) {
+        // Kafka catalog needs to cascade drop the default schema
+        List<SchemaEntity> schemas =
+            store.list(
+                Namespace.ofSchema(ident.namespace().level(0), ident.name()),
+                SchemaEntity.class,
+                EntityType.SCHEMA);
+        // If there is only one schema, it must be the default schema, because we don't allow to
+        // drop the default schema.
+        if (schemas.size() == 1) {
+          return store.delete(ident, EntityType.CATALOG, true);
+        }
+      }
       return store.delete(ident, EntityType.CATALOG);
+    } catch (NoSuchEntityException e) {
+      return false;
     } catch (IOException ioe) {
       LOG.error("Failed to drop catalog {}", ident, ioe);
       throw new RuntimeException(ioe);
@@ -494,21 +577,8 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
     Map<String, String> conf = entity.getProperties();
     String provider = entity.getProvider();
 
-    IsolatedClassLoader classLoader;
-    if (config.get(Configs.CATALOG_LOAD_ISOLATED)) {
-      String pkgPath = buildPkgPath(conf, provider);
-      String confPath = buildConfPath(conf, provider);
-      classLoader = IsolatedClassLoader.buildClassLoader(Lists.newArrayList(pkgPath, confPath));
-    } else {
-      // This will use the current class loader, it is mainly used for test.
-      classLoader =
-          new IsolatedClassLoader(
-              Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
-    }
-
-    // Load Catalog class instance
-    BaseCatalog<?> catalog = createCatalogInstance(classLoader, provider);
-    catalog.withCatalogConf(conf).withCatalogEntity(entity);
+    IsolatedClassLoader classLoader = createClassLoader(provider, conf);
+    BaseCatalog<?> catalog = createBaseCatalog(classLoader, entity);
 
     CatalogWrapper wrapper = new CatalogWrapper(catalog, classLoader);
     // Validate catalog properties and initialize the config
@@ -524,11 +594,54 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
           // so. For simply, We will preload the value of properties and thus AppClassLoader can get
           // the value of properties.
           wrapper.catalog.properties();
+          wrapper.catalog.capability();
           return null;
         },
         IllegalArgumentException.class);
 
     return wrapper;
+  }
+
+  private Set<String> getHiddenPropertyNames(CatalogEntity entity) {
+    Map<String, String> conf = entity.getProperties();
+    String provider = entity.getProvider();
+
+    try (IsolatedClassLoader classLoader = createClassLoader(provider, conf)) {
+      BaseCatalog<?> catalog = createBaseCatalog(classLoader, entity);
+      return classLoader.withClassLoader(
+          cl -> {
+            try (CatalogOperations ops = catalog.ops()) {
+              PropertiesMetadata catalogPropertiesMetadata = ops.catalogPropertiesMetadata();
+              return catalogPropertiesMetadata.propertyEntries().values().stream()
+                  .filter(PropertyEntry::isHidden)
+                  .map(PropertyEntry::getName)
+                  .collect(Collectors.toSet());
+            } catch (Exception e) {
+              LOG.error("Failed to get hidden property names", e);
+              throw e;
+            }
+          },
+          RuntimeException.class);
+    }
+  }
+
+  private BaseCatalog<?> createBaseCatalog(IsolatedClassLoader classLoader, CatalogEntity entity) {
+    // Load Catalog class instance
+    BaseCatalog<?> catalog = createCatalogInstance(classLoader, entity.getProvider());
+    catalog.withCatalogConf(entity.getProperties()).withCatalogEntity(entity);
+    return catalog;
+  }
+
+  private IsolatedClassLoader createClassLoader(String provider, Map<String, String> conf) {
+    if (config.get(Configs.CATALOG_LOAD_ISOLATED)) {
+      String pkgPath = buildPkgPath(conf, provider);
+      String confPath = buildConfPath(conf, provider);
+      return IsolatedClassLoader.buildClassLoader(Lists.newArrayList(pkgPath, confPath));
+    } else {
+      // This will use the current class loader, it is mainly used for test.
+      return new IsolatedClassLoader(
+          Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+    }
   }
 
   private BaseCatalog<?> createCatalogInstance(IsolatedClassLoader classLoader, String provider) {
@@ -663,7 +776,7 @@ public class CatalogManager implements SupportsCatalogs, Closeable {
       if (change instanceof CatalogChange.RenameCatalog) {
         CatalogChange.RenameCatalog rename = (CatalogChange.RenameCatalog) change;
 
-        if (CatalogEntity.SYSTEM_CATALOG_RESERVED_NAME.equals(
+        if (Entity.SYSTEM_CATALOG_RESERVED_NAME.equals(
             ((CatalogChange.RenameCatalog) change).getNewName())) {
           throw new IllegalArgumentException(
               "Can't rename a catalog with with reserved name `system`");

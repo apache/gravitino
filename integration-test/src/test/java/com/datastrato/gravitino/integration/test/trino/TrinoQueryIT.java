@@ -4,7 +4,8 @@
  */
 package com.datastrato.gravitino.integration.test.trino;
 
-import com.datastrato.gravitino.Namespace;
+import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
+
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -22,6 +23,7 @@ import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -76,20 +78,19 @@ public class TrinoQueryIT extends TrinoQueryITBase {
 
   private static void cleanupTestEnv() throws Exception {
     try {
-      Arrays.stream(TrinoQueryITBase.metalake.listCatalogs(Namespace.of(metalakeName)))
+      Arrays.stream(TrinoQueryITBase.metalake.listCatalogs())
           .filter(catalog -> catalog.name().startsWith("gt_"))
           .forEach(catalog -> TrinoQueryITBase.dropCatalog(catalog.name()));
 
-      int tries = 30;
-      while (tries-- >= 0) {
-        String[] catalogs = trinoQueryRunner.runQuery("show catalogs").split("\n");
-        LOG.info("Catalogs: {}", Arrays.toString(catalogs));
-        if (Arrays.stream(catalogs).filter(s -> s.startsWith("\"test.gt_")).count() == 0) {
-          break;
-        }
-        Thread.sleep(1000);
-        LOG.info("Waiting for test catalogs to be dropped");
-      }
+      await()
+          .atMost(30, TimeUnit.SECONDS)
+          .pollInterval(1, TimeUnit.SECONDS)
+          .until(
+              () -> {
+                String[] catalogs = trinoQueryRunner.runQuery("show catalogs").split("\n");
+                LOG.info("Catalogs: {}", Arrays.toString(catalogs));
+                return Arrays.stream(catalogs).noneMatch(s -> s.startsWith("\"gt_"));
+              });
     } catch (Exception e) {
       throw new Exception("Failed to clean up test env: " + e.getMessage(), e);
     }
@@ -172,10 +173,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
   }
 
   private static boolean isQueryFailed(String result) {
-    if (Pattern.compile("^Query \\w+ failed:").matcher(result).find()) {
-      return true;
-    }
-    return false;
+    return Pattern.compile("^Query \\w+ failed:").matcher(result).find();
   }
 
   void executeSqlFileWithCheckResult(
@@ -267,13 +265,11 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     // expectResult:
     // <QUERY_FAILED> Schema must be specified when session schema is not set
     if (expectResult.startsWith("<QUERY_FAILED>")) {
-      boolean match =
-          Pattern.compile(
-                  "^Query \\w+ failed.*: "
-                      + Pattern.quote(expectResult.replace("<QUERY_FAILED>", "").trim()))
-              .matcher(result)
-              .find();
-      return match;
+      return Pattern.compile(
+              "^Query \\w+ failed.*: "
+                  + Pattern.quote(expectResult.replace("<QUERY_FAILED>", "").trim()))
+          .matcher(result)
+          .find();
     }
 
     // match text
@@ -325,11 +321,10 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     ExecutorService executor = Executors.newFixedThreadPool(testParallelism);
     CompletionService completionService = new ExecutorCompletionService<>(executor);
 
-    List<Future<Integer>> allFutures = new ArrayList<>();
     totalCount.addAndGet(getTesterCount(testSetDirName, catalogFileName, testerPrefix));
     List<Future<Integer>> futures =
         runOneTestset(completionService, testSetDirName, catalogFileName, testerPrefix);
-    allFutures.addAll(futures);
+    List<Future<Integer>> allFutures = new ArrayList<>(futures);
 
     waitForCompleted(executor, completionService, allFutures);
   }

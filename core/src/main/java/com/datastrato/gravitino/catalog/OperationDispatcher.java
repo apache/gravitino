@@ -11,22 +11,22 @@ import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
-import com.datastrato.gravitino.connector.BasePropertiesMetadata;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;
 import com.datastrato.gravitino.connector.PropertiesMetadata;
+import com.datastrato.gravitino.connector.capability.Capability;
 import com.datastrato.gravitino.exceptions.IllegalNameIdentifierException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.file.FilesetChange;
+import com.datastrato.gravitino.messaging.TopicChange;
 import com.datastrato.gravitino.rel.SchemaChange;
+import com.datastrato.gravitino.rel.SupportsPartitions;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.ThrowableFunction;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -60,6 +60,24 @@ public abstract class OperationDispatcher {
     this.idGenerator = idGenerator;
   }
 
+  <R, E extends Throwable> R doWithTable(
+      NameIdentifier tableIdent, ThrowableFunction<SupportsPartitions, R> fn, Class<E> ex)
+      throws E {
+    try {
+      NameIdentifier catalogIdent = getCatalogIdentifier(tableIdent);
+      CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(catalogIdent);
+      return c.doWithPartitionOps(tableIdent, fn);
+    } catch (Throwable throwable) {
+      if (ex.isInstance(throwable)) {
+        throw ex.cast(throwable);
+      }
+      if (RuntimeException.class.isAssignableFrom(throwable.getClass())) {
+        throw (RuntimeException) throwable;
+      }
+      throw new RuntimeException(throwable);
+    }
+  }
+
   <R, E extends Throwable> R doWithCatalog(
       NameIdentifier ident, ThrowableFunction<CatalogManager.CatalogWrapper, R> fn, Class<E> ex)
       throws E {
@@ -69,6 +87,9 @@ public abstract class OperationDispatcher {
     } catch (Throwable throwable) {
       if (ex.isInstance(throwable)) {
         throw ex.cast(throwable);
+      }
+      if (RuntimeException.class.isAssignableFrom(throwable.getClass())) {
+        throw (RuntimeException) throwable;
       }
       throw new RuntimeException(throwable);
     }
@@ -95,6 +116,20 @@ public abstract class OperationDispatcher {
 
       throw new RuntimeException(throwable);
     }
+  }
+
+  Capability getCatalogCapability(NameIdentifier ident) {
+    return doWithCatalog(
+        getCatalogIdentifier(ident),
+        CatalogManager.CatalogWrapper::capabilities,
+        IllegalArgumentException.class);
+  }
+
+  Capability getCatalogCapability(Namespace namespace) {
+    return doWithCatalog(
+        getCatalogIdentifier(NameIdentifier.of(namespace.levels())),
+        CatalogManager.CatalogWrapper::capabilities,
+        IllegalArgumentException.class);
   }
 
   Set<String> getHiddenPropertyNames(
@@ -143,6 +178,9 @@ public abstract class OperationDispatcher {
       } else if (item instanceof FilesetChange.SetProperty) {
         FilesetChange.SetProperty setProperty = (FilesetChange.SetProperty) item;
         properties.put(setProperty.getProperty(), setProperty.getValue());
+      } else if (item instanceof TopicChange.SetProperty) {
+        TopicChange.SetProperty setProperty = (TopicChange.SetProperty) item;
+        properties.put(setProperty.getProperty(), setProperty.getValue());
       }
     }
 
@@ -160,6 +198,9 @@ public abstract class OperationDispatcher {
         properties.put(removeProperty.getProperty(), removeProperty.getProperty());
       } else if (item instanceof FilesetChange.RemoveProperty) {
         FilesetChange.RemoveProperty removeProperty = (FilesetChange.RemoveProperty) item;
+        properties.put(removeProperty.getProperty(), removeProperty.getProperty());
+      } else if (item instanceof TopicChange.RemoveProperty) {
+        TopicChange.RemoveProperty removeProperty = (TopicChange.RemoveProperty) item;
         properties.put(removeProperty.getProperty(), removeProperty.getProperty());
       }
     }
@@ -204,7 +245,6 @@ public abstract class OperationDispatcher {
     return ret;
   }
 
-  @VisibleForTesting
   // TODO(xun): Remove this method when we implement a better way to get the catalog identifier
   //  [#257] Add an explicit get catalog functions in NameIdentifier
   NameIdentifier getCatalogIdentifier(NameIdentifier ident) {
@@ -225,14 +265,11 @@ public abstract class OperationDispatcher {
     return NameIdentifier.of(allElems.get(0), allElems.get(1));
   }
 
-  boolean isManagedEntity(Map<String, String> properties) {
-    return Optional.ofNullable(properties)
-        .map(
-            p ->
-                p.getOrDefault(
-                        BasePropertiesMetadata.GRAVITINO_MANAGED_ENTITY, Boolean.FALSE.toString())
-                    .equals(Boolean.TRUE.toString()))
-        .orElse(false);
+  boolean isManagedEntity(NameIdentifier catalogIdent, Capability.Scope scope) {
+    return doWithCatalog(
+        catalogIdent,
+        c -> c.capabilities().managedStorage(scope).supported(),
+        IllegalArgumentException.class);
   }
 
   static final class FormattedErrorMessages {

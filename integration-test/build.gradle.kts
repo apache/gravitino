@@ -13,6 +13,8 @@ plugins {
 
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark.get()
+val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
+val kyuubiVersion: String = libs.versions.kyuubi.get()
 val icebergVersion: String = libs.versions.iceberg.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
@@ -29,8 +31,7 @@ dependencies {
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
-  testImplementation(project(":spark-connector")) {
-    exclude("org.apache.iceberg")
+  testImplementation(project(":spark-connector:spark-connector")) {
     exclude("org.apache.hadoop", "hadoop-client-api")
     exclude("org.apache.hadoop", "hadoop-client-runtime")
   }
@@ -100,6 +101,7 @@ dependencies {
     exclude("org.apache.directory.api", "api-ldap-schema-data")
   }
   testImplementation(libs.mockito.core)
+  testImplementation(libs.mybatis)
   testImplementation(libs.mysql.driver)
 
   testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion") {
@@ -114,6 +116,10 @@ dependencies {
     exclude("io.dropwizard.metrics")
     exclude("org.rocksdb")
   }
+  testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
+  testImplementation("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
+  testImplementation("org.apache.iceberg:iceberg-core:$icebergVersion")
+  testImplementation("org.apache.iceberg:iceberg-hive-metastore:$icebergVersion")
 
   testImplementation(libs.okhttp3.loginterceptor)
   testImplementation(libs.postgresql.driver)
@@ -136,10 +142,10 @@ dependencies {
 
 tasks.test {
   val skipITs = project.hasProperty("skipITs")
-  val skipWebITs = project.hasProperty("skipWebITs")
   if (skipITs) {
     exclude("**/integration/test/**")
   } else {
+    val skipWebITs = project.hasProperty("skipWebITs")
     if (skipWebITs) {
       exclude("**/integration/test/web/ui/**")
     }
@@ -154,8 +160,10 @@ tasks.test {
 
     doFirst {
       // Gravitino CI Docker image
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.9")
+      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.10")
       environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "datastrato/gravitino-ci-trino:0.1.5")
+      environment("GRAVITINO_CI_KAFKA_DOCKER_IMAGE", "apache/kafka:3.7.0")
+      environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "datastrato/gravitino-ci-doris:0.1.3")
 
       copy {
         from("${project.rootDir}/dev/docker/trino/conf")

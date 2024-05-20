@@ -93,6 +93,9 @@ project.extra["extraJvmArgs"] = if (extra["jdkVersion"] in listOf("8", "11")) {
   )
 }
 
+val pythonVersion: String = project.properties["pythonVersion"] as? String ?: project.extra["pythonVersion"].toString()
+project.extra["pythonVersion"] = pythonVersion
+
 licenseReport {
   renderers = arrayOf<ReportRenderer>(InventoryHtmlReportRenderer("report.html", "Backend"))
   filters = arrayOf<DependencyFilter>(LicenseBundleNormalizer())
@@ -100,6 +103,11 @@ licenseReport {
 repositories { mavenCentral() }
 
 allprojects {
+  // Gravitino Python client project didn't need to apply the Spotless plugin
+  if (project.name == "client-python") {
+    return@allprojects
+  }
+
   apply(plugin = "com.diffplug.spotless")
   repositories {
     mavenCentral()
@@ -158,6 +166,9 @@ allprojects {
 
       // Change poll image pause time from 30s to 60s
       param.environment("TESTCONTAINERS_PULL_PAUSE_TIMEOUT", "60")
+      if (project.hasProperty("jdbcBackend")) {
+        param.environment("jdbcBackend", "true")
+      }
 
       val testMode = project.properties["testMode"] as? String ?: "embedded"
       param.systemProperty("gravitino.log.path", project.buildDir.path + "/${project.name}-integration-test.log")
@@ -212,6 +223,11 @@ dependencies {
 }
 
 subprojects {
+  // Gravitino Python client project didn't need to apply the java plugin
+  if (project.name == "client-python") {
+    return@subprojects
+  }
+
   apply(plugin = "jacoco")
   apply(plugin = "maven-publish")
   apply(plugin = "java")
@@ -266,99 +282,41 @@ subprojects {
 
     tasks.withType<JavaCompile>().configureEach {
       options.errorprone.isEnabled.set(true)
-      options.errorprone.disableAllChecks.set(true)
       options.errorprone.disableWarningsInGeneratedCode.set(true)
-      options.errorprone.enable(
-        "AnnotateFormatMethod",
-        "AlwaysThrows",
-        "ArrayEquals",
-        "ArrayToString",
-        "ArraysAsListPrimitiveArray",
-        "ArrayFillIncompatibleType",
-        "BoxedPrimitiveEquality",
-        "ChainingConstructorIgnoresParameter",
-        "CheckNotNullMultipleTimes",
-        "ClassCanBeStatic",
-        "CollectionIncompatibleType",
-        "CollectionToArraySafeParameter",
-        "ComparingThisWithNull",
-        "ComparisonOutOfRange",
-        "CompatibleWithAnnotationMisuse",
-        "CompileTimeConstant",
-        "ConditionalExpressionNumericPromotion",
-        "DangerousLiteralNull",
-        "DeadException",
-        "DeadThread",
-        "DefaultCharset",
-        "DoNotCall",
-        "DoNotMock",
-        "DuplicateMapKeys",
-        "EqualsGetClass",
-        "EqualsNaN",
-        "EqualsNull",
-        "EqualsReference",
-        "EqualsWrongThing",
-        "ForOverride",
-        "FormatString",
-        "FormatStringAnnotation",
-        "GetClassOnAnnotation",
-        "GetClassOnClass",
-        "HashtableContains",
-        "IdentityBinaryExpression",
-        "IdentityHashMapBoxing",
-        "Immutable",
-        "ImmutableEnumChecker",
-        "Incomparable",
-        "IncompatibleArgumentType",
-        "IndexOfChar",
-        "InfiniteRecursion",
-        "InlineFormatString",
-        "InvalidJavaTimeConstant",
-        "InvalidPatternSyntax",
-        "IsInstanceIncompatibleType",
-        "JavaUtilDate",
-        "JUnit4ClassAnnotationNonStatic",
-        "JUnit4SetUpNotRun",
-        "JUnit4TearDownNotRun",
-        "JUnit4TestNotRun",
-        "JUnitAssertSameCheck",
-        "LockOnBoxedPrimitive",
-        "LoopConditionChecker",
-        "LossyPrimitiveCompare",
-        "MathRoundIntLong",
-        "MissingSuperCall",
-        "ModifyingCollectionWithItself",
-        "MutablePublicArray",
-        "NonCanonicalStaticImport",
-        "NonFinalCompileTimeConstant",
-        "NonRuntimeAnnotation",
-        "NullTernary",
-        "OptionalEquality",
-        "PackageInfo",
-        "ParametersButNotParameterized",
-        "RandomCast",
-        "RandomModInteger",
-        "ReferenceEquality",
-        "SelfAssignment",
-        "SelfComparison",
-        "SelfEquals",
-        "SizeGreaterThanOrEqualsZero",
-        "StaticGuardedByInstance",
-        "StreamToString",
-        "StringBuilderInitWithChar",
-        "SubstringOfZero",
-        "ThrowNull",
-        "TruthSelfEquals",
-        "TryFailThrowable",
-        "TypeParameterQualifier",
-        "UnnecessaryCheckNotNull",
-        "UnnecessaryTypeArgument",
-        "UnusedAnonymousClass",
-        "UnusedCollectionModifiedInPlace",
-        "UnusedVariable",
-        "UseCorrectAssertInTests",
-        "VarTypeName",
-        "XorPower"
+      options.errorprone.disable(
+        "AlmostJavadoc",
+        "CanonicalDuration",
+        "CheckReturnValue",
+        "ComparableType",
+        "ConstantOverflow",
+        "DoubleBraceInitialization",
+        "EqualsUnsafeCast",
+        "EmptyBlockTag",
+        "FutureReturnValueIgnored",
+        "InconsistentCapitalization",
+        "InconsistentHashCode",
+        "JavaTimeDefaultTimeZone",
+        "JdkObsolete",
+        "LockNotBeforeTry",
+        "MissingSummary",
+        "MissingOverride",
+        "MutableConstantField",
+        "NonOverridingEquals",
+        "ObjectEqualsForPrimitives",
+        "OperatorPrecedence",
+        "ReturnValueIgnored",
+        "SameNameButDifferent",
+        "StaticAssignmentInConstructor",
+        "StringSplitter",
+        "ThreadPriorityCheck",
+        "ThrowIfUncheckedKnownChecked",
+        "TypeParameterUnusedInFormals",
+        "UnicodeEscape",
+        "UnnecessaryParentheses",
+        "UnsafeReflectiveConstructionCast",
+        "UnusedMethod",
+        "VariableNameSameAsType",
+        "WaitNotInLoop"
       )
     }
   }
@@ -390,6 +348,7 @@ subprojects {
     plugins.apply(NodePlugin::class)
     configure<NodeExtension> {
       version.set("20.9.0")
+      pnpmVersion.set("9.x")
       nodeProjectDir.set(file("$rootDir/.node"))
       download.set(true)
     }
@@ -519,9 +478,14 @@ tasks.rat {
     "web/yarn.lock",
     "web/package-lock.json",
     "web/pnpm-lock.yaml",
+    "web/src/lib/icons/svg/**/*.svg",
     "**/LICENSE.*",
     "**/NOTICE.*",
-    "clients/client-python/.pytest_cache/*"
+    "ROADMAP.md",
+    "clients/client-python/.pytest_cache/*",
+    "clients/client-python/gravitino.egg-info/*",
+    "clients/client-python/gravitino/utils/exceptions.py",
+    "clients/client-python/gravitino/utils/http_client.py"
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.
@@ -565,6 +529,7 @@ tasks {
         from(projectDir.dir("conf")) { into("package/conf") }
         from(projectDir.dir("bin")) { into("package/bin") }
         from(projectDir.dir("web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web") }
+        from(projectDir.dir("scripts")) { into("package/scripts") }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".template", "")
@@ -650,8 +615,8 @@ tasks {
   register("copySubprojectDependencies", Copy::class) {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
-        !it.name.startsWith("client") && !it.name.startsWith("filesystem") && it.name != "trino-connector" &&
-        it.name != "integration-test" && it.name != "bundled-catalog" && it.name != "spark-connector"
+        !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark-connector") && it.name != "trino-connector" &&
+        it.name != "integration-test" && it.name != "bundled-catalog"
       ) {
         from(it.configurations.runtimeClasspath)
         into("distribution/package/libs")
@@ -664,8 +629,8 @@ tasks {
       if (!it.name.startsWith("catalog") &&
         !it.name.startsWith("client") &&
         !it.name.startsWith("filesystem") &&
+        !it.name.startsWith("spark-connector") &&
         it.name != "trino-connector" &&
-        it.name != "spark-connector" &&
         it.name != "integration-test" &&
         it.name != "bundled-catalog"
       ) {
@@ -686,7 +651,7 @@ tasks {
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig",
       ":catalogs:catalog-hadoop:copyLibAndConfig",
-      "catalogs:catalog-messaging-kafka:copyLibAndConfig"
+      "catalogs:catalog-kafka:copyLibAndConfig"
     )
   }
 

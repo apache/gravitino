@@ -15,6 +15,8 @@ import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import com.datastrato.gravitino.exceptions.NoSuchColumnException;
+import com.datastrato.gravitino.exceptions.NoSuchTableException;
+import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
@@ -31,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import javax.sql.DataSource;
 import org.apache.commons.collections4.MapUtils;
@@ -70,6 +73,28 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
   }
 
   @Override
+  protected JdbcTable.Builder getTableBuilder(
+      ResultSet tablesResult, String databaseName, String tableName) throws SQLException {
+    boolean found = false;
+    JdbcTable.Builder builder = null;
+    while (tablesResult.next() && !found) {
+      String tableNameInResult = tablesResult.getString("TABLE_NAME");
+      String tableSchemaInResultLowerCase = tablesResult.getString("TABLE_SCHEM");
+      if (Objects.equals(tableNameInResult, tableName)
+          && Objects.equals(tableSchemaInResultLowerCase, databaseName)) {
+        builder = getBasicJdbcTableInfo(tablesResult);
+        found = true;
+      }
+    }
+
+    if (!found) {
+      throw new NoSuchTableException("Table %s does not exist in %s.", tableName, databaseName);
+    }
+
+    return builder;
+  }
+
+  @Override
   protected String generateCreateTableSql(
       String tableName,
       JdbcColumn[] columns,
@@ -83,7 +108,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
           "Currently we do not support Partitioning in PostgreSQL");
     }
     Preconditions.checkArgument(
-        distribution == Distributions.NONE, "PostgreSQL does not support distribution");
+        Distributions.NONE.equals(distribution), "PostgreSQL does not support distribution");
 
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder
@@ -254,6 +279,12 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       } else if (change instanceof TableChange.RenameColumn) {
         TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) change;
         alterSql.add(renameColumnFieldDefinition(renameColumn, tableName));
+      } else if (change instanceof TableChange.UpdateColumnDefaultValue) {
+        lazyLoadTable = getOrCreateTable(schemaName, tableName, lazyLoadTable);
+        TableChange.UpdateColumnDefaultValue updateColumnDefaultValue =
+            (TableChange.UpdateColumnDefaultValue) change;
+        alterSql.add(
+            updateColumnDefaultValueFieldDefinition(updateColumnDefaultValue, lazyLoadTable));
       } else if (change instanceof TableChange.UpdateColumnType) {
         lazyLoadTable = getOrCreateTable(schemaName, tableName, lazyLoadTable);
         TableChange.UpdateColumnType updateColumnType = (TableChange.UpdateColumnType) change;
@@ -448,6 +479,36 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
         + ";";
   }
 
+  private String updateColumnDefaultValueFieldDefinition(
+      TableChange.UpdateColumnDefaultValue updateColumnDefaultValue, JdbcTable jdbcTable) {
+    if (updateColumnDefaultValue.fieldName().length > 1) {
+      throw new UnsupportedOperationException(POSTGRESQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
+    }
+    String col = updateColumnDefaultValue.fieldName()[0];
+    JdbcColumn column =
+        (JdbcColumn)
+            Arrays.stream(jdbcTable.columns())
+                .filter(c -> c.name().equals(col))
+                .findFirst()
+                .orElse(null);
+    if (null == column) {
+      throw new NoSuchColumnException("Column %s does not exist.", col);
+    }
+
+    StringBuilder sqlBuilder = new StringBuilder(ALTER_TABLE + jdbcTable.name());
+    sqlBuilder
+        .append("\n")
+        .append(ALTER_COLUMN)
+        .append(PG_QUOTE)
+        .append(col)
+        .append(PG_QUOTE)
+        .append(" SET DEFAULT ")
+        .append(
+            columnDefaultValueConverter.fromGravitino(
+                updateColumnDefaultValue.getNewDefaultValue()));
+    return sqlBuilder.append(";").toString();
+  }
+
   private String updateColumnTypeFieldDefinition(
       TableChange.UpdateColumnType updateColumnType, JdbcTable jdbcTable) {
     if (updateColumnType.fieldName().length > 1) {
@@ -547,6 +608,14 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     // Add NOT NULL if the column is marked as such
     if (!addColumn.isNullable()) {
       columnDefinition.append("NOT NULL ");
+    }
+
+    // Append default value if available
+    if (!Column.DEFAULT_VALUE_NOT_SET.equals(addColumn.getDefaultValue())) {
+      columnDefinition
+          .append("DEFAULT ")
+          .append(columnDefaultValueConverter.fromGravitino(addColumn.getDefaultValue()))
+          .append(SPACE);
     }
 
     // Append position if available

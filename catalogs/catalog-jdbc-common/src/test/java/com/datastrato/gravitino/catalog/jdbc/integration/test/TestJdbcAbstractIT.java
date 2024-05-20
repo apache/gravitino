@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.sql.DataSource;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -46,7 +47,7 @@ public abstract class TestJdbcAbstractIT {
 
   protected static final String TEST_DB_NAME = RandomNameUtils.genRandomName("test_db_");
 
-  public static void startup() {
+  public static void startup() throws Exception {
     CONTAINER.start();
     HashMap<String, String> properties = Maps.newHashMap();
     properties.put(JdbcConfig.JDBC_DRIVER.getKey(), CONTAINER.getDriverClassName());
@@ -68,6 +69,15 @@ public abstract class TestJdbcAbstractIT {
 
     Assertions.assertEquals(databaseName, load.name());
     Assertions.assertEquals(comment, load.comment());
+
+    if (MapUtils.isNotEmpty(properties)) {
+      Map<String, String> loadProperties = load.properties();
+      properties.forEach(
+          (key, value) -> {
+            Assertions.assertTrue(loadProperties.containsKey(key));
+            Assertions.assertEquals(loadProperties.get(key), value);
+          });
+    }
   }
 
   protected static void testDropDatabase(String databaseName) {
@@ -125,7 +135,12 @@ public abstract class TestJdbcAbstractIT {
     }
 
     Assertions.assertEquals(expected.name(), actual.name());
-    Assertions.assertEquals(expected.dataType(), actual.dataType());
+    Assertions.assertEquals(
+        expected.dataType(),
+        actual.dataType(),
+        String.format(
+            "expected: %s, actual: %s",
+            expected.dataType().simpleString(), actual.dataType().simpleString()));
     Assertions.assertEquals(expected.nullable(), actual.nullable());
     Assertions.assertEquals(expected.comment(), actual.comment());
     Assertions.assertEquals(expected.autoIncrement(), actual.autoIncrement());

@@ -199,7 +199,7 @@ public class CatalogHiveIT extends AbstractIT {
 
   @AfterAll
   public static void stop() throws IOException {
-    client.dropMetalake(NameIdentifier.of(metalakeName));
+    client.dropMetalake(metalakeName);
     if (hiveClientPool != null) {
       hiveClientPool.close();
     }
@@ -232,8 +232,8 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
     GravitinoMetalake createdMetalake =
-        client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
-    GravitinoMetalake loadMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
     Assertions.assertEquals(createdMetalake, loadMetalake);
 
     metalake = loadMetalake;
@@ -243,14 +243,9 @@ public class CatalogHiveIT extends AbstractIT {
     Map<String, String> properties = Maps.newHashMap();
     properties.put(METASTORE_URIS, HIVE_METASTORE_URIS);
 
-    metalake.createCatalog(
-        NameIdentifier.of(metalakeName, catalogName),
-        Catalog.Type.RELATIONAL,
-        provider,
-        "comment",
-        properties);
+    metalake.createCatalog(catalogName, Catalog.Type.RELATIONAL, provider, "comment", properties);
 
-    catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    catalog = metalake.loadCatalog(catalogName);
   }
 
   private static void createSchema() throws TException, InterruptedException {
@@ -485,6 +480,52 @@ public class CatalogHiveIT extends AbstractIT {
                 Assertions.assertEquals(properties.get(key), hiveTable1.getParameters().get(key)));
     assertTableEquals(createdTable1, hiveTable1);
     checkTableReadWrite(hiveTable1);
+
+    // test column not null
+    Column illegalColumn =
+        Column.of("not_null_column", Types.StringType.get(), "not null column", false, false, null);
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(
+                        nameIdentifier,
+                        new Column[] {illegalColumn},
+                        TABLE_COMMENT,
+                        properties,
+                        Transforms.EMPTY_TRANSFORM));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The NOT NULL constraint for column is only supported since Hive 3.0, "
+                    + "but the current Gravitino Hive catalog only supports Hive 2.x"));
+
+    // test column default value
+    Column withDefault =
+        Column.of(
+            "default_column", Types.StringType.get(), "default column", true, false, Literals.NULL);
+    exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(
+                        nameIdentifier,
+                        new Column[] {withDefault},
+                        TABLE_COMMENT,
+                        properties,
+                        Transforms.EMPTY_TRANSFORM));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The DEFAULT constraint for column is only supported since Hive 3.0, "
+                    + "but the current Gravitino Hive catalog only supports Hive 2.x"),
+        "The exception message is: " + exception.getMessage());
   }
 
   @Test
@@ -538,7 +579,7 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertEquals(TEXT_INPUT_FORMAT_CLASS, actualTable2.getSd().getInputFormat());
     Assertions.assertEquals(IGNORE_KEY_OUTPUT_FORMAT_CLASS, actualTable2.getSd().getOutputFormat());
     Assertions.assertEquals(EXTERNAL_TABLE.name(), actualTable2.getTableType());
-    Assertions.assertEquals(table2, actualTable2.getSd().getSerdeInfo().getName());
+    Assertions.assertEquals(table2.toLowerCase(), actualTable2.getSd().getSerdeInfo().getName());
     Assertions.assertEquals(TABLE_COMMENT, actualTable2.getParameters().get(COMMENT));
     Assertions.assertEquals(
         ((Boolean) tablePropertiesMetadata.getDefaultValue(EXTERNAL)).toString().toUpperCase(),
@@ -809,6 +850,118 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertEquals(2, count);
   }
 
+  @Test
+  public void testDropPartition() throws TException, InterruptedException, IOException {
+    Table createdTable = preparePartitionedTable();
+
+    // add partition "hive_col_name2=2023-01-02/hive_col_name3=gravitino_it_test2"
+    String[] field1 = new String[] {"hive_col_name2"};
+    String[] field2 = new String[] {"hive_col_name3"};
+    Literal<?> literal1 = Literals.dateLiteral(LocalDate.parse("2023-01-02"));
+    Literal<?> literal2 = Literals.stringLiteral("gravitino_it_test2");
+    Partition identity =
+        Partitions.identity(new String[][] {field1, field2}, new Literal<?>[] {literal1, literal2});
+    IdentityPartition partitionAdded =
+        (IdentityPartition) createdTable.supportPartitions().addPartition(identity);
+    // Directly get partition from hive metastore to check if the partition is created successfully.
+    org.apache.hadoop.hive.metastore.api.Partition partitionGot =
+        hiveClientPool.run(
+            client -> client.getPartition(schemaName, createdTable.name(), partitionAdded.name()));
+    Assertions.assertEquals(
+        partitionAdded.values()[0].value().toString(), partitionGot.getValues().get(0));
+    Assertions.assertEquals(
+        partitionAdded.values()[1].value().toString(), partitionGot.getValues().get(1));
+    Assertions.assertEquals(partitionAdded.properties(), partitionGot.getParameters());
+
+    // test drop partition "hive_col_name2=2023-01-02/hive_col_name3=gravitino_it_test2"
+    boolean dropRes1 = createdTable.supportPartitions().dropPartition(partitionAdded.name());
+    Assertions.assertTrue(dropRes1);
+    Assertions.assertThrows(
+        NoSuchObjectException.class,
+        () ->
+            hiveClientPool.run(
+                client ->
+                    client.getPartition(schemaName, createdTable.name(), partitionAdded.name())));
+    org.apache.hadoop.hive.metastore.api.Table hiveTab =
+        hiveClientPool.run(client -> client.getTable(schemaName, createdTable.name()));
+    Path partitionDirectory = new Path(hiveTab.getSd().getLocation() + identity.name());
+    Assertions.assertFalse(
+        hdfs.exists(partitionDirectory), "The partition directory should not exist");
+
+    // add partition "hive_col_name2=2024-01-02/hive_col_name3=gravitino_it_test2"
+    String[] field3 = new String[] {"hive_col_name2"};
+    String[] field4 = new String[] {"hive_col_name3"};
+    Literal<?> literal3 = Literals.dateLiteral(LocalDate.parse("2024-01-02"));
+    Literal<?> literal4 = Literals.stringLiteral("gravitino_it_test2");
+    Partition identity1 =
+        Partitions.identity(new String[][] {field3, field4}, new Literal<?>[] {literal3, literal4});
+    IdentityPartition partitionAdded1 =
+        (IdentityPartition) createdTable.supportPartitions().addPartition(identity1);
+
+    // Directly get partition from hive metastore to check if the partition is created successfully.
+    org.apache.hadoop.hive.metastore.api.Partition partitionGot1 =
+        hiveClientPool.run(
+            client -> client.getPartition(schemaName, createdTable.name(), partitionAdded1.name()));
+    Assertions.assertEquals(
+        partitionAdded1.values()[0].value().toString(), partitionGot1.getValues().get(0));
+    Assertions.assertEquals(
+        partitionAdded1.values()[1].value().toString(), partitionGot1.getValues().get(1));
+    Assertions.assertEquals(partitionAdded1.properties(), partitionGot1.getParameters());
+
+    // add partition "hive_col_name2=2024-01-02/hive_col_name3=gravitino_it_test3"
+    String[] field5 = new String[] {"hive_col_name2"};
+    String[] field6 = new String[] {"hive_col_name3"};
+    Literal<?> literal5 = Literals.dateLiteral(LocalDate.parse("2024-01-02"));
+    Literal<?> literal6 = Literals.stringLiteral("gravitino_it_test3");
+    Partition identity2 =
+        Partitions.identity(new String[][] {field5, field6}, new Literal<?>[] {literal5, literal6});
+    IdentityPartition partitionAdded2 =
+        (IdentityPartition) createdTable.supportPartitions().addPartition(identity2);
+    // Directly get partition from hive metastore to check if the partition is created successfully.
+    org.apache.hadoop.hive.metastore.api.Partition partitionGot2 =
+        hiveClientPool.run(
+            client -> client.getPartition(schemaName, createdTable.name(), partitionAdded2.name()));
+    Assertions.assertEquals(
+        partitionAdded2.values()[0].value().toString(), partitionGot2.getValues().get(0));
+    Assertions.assertEquals(
+        partitionAdded2.values()[1].value().toString(), partitionGot2.getValues().get(1));
+    Assertions.assertEquals(partitionAdded2.properties(), partitionGot2.getParameters());
+
+    // test drop partition "hive_col_name2=2024-01-02"
+    boolean dropRes2 = createdTable.supportPartitions().dropPartition("hive_col_name2=2024-01-02");
+    Assertions.assertTrue(dropRes2);
+    Assertions.assertThrows(
+        NoSuchObjectException.class,
+        () ->
+            hiveClientPool.run(
+                client ->
+                    client.getPartition(schemaName, createdTable.name(), partitionAdded1.name())));
+    Path partitionDirectory1 = new Path(hiveTab.getSd().getLocation() + identity1.name());
+    Assertions.assertFalse(
+        hdfs.exists(partitionDirectory1), "The partition directory should not exist");
+    Assertions.assertThrows(
+        NoSuchObjectException.class,
+        () ->
+            hiveClientPool.run(
+                client ->
+                    client.getPartition(schemaName, createdTable.name(), partitionAdded2.name())));
+    Path partitionDirectory2 = new Path(hiveTab.getSd().getLocation() + identity2.name());
+    Assertions.assertFalse(
+        hdfs.exists(partitionDirectory2), "The partition directory should not exist");
+
+    // test no-exist partition with ifExist=false
+    Assertions.assertFalse(createdTable.supportPartitions().dropPartition(partitionAdded.name()));
+  }
+
+  @Test
+  public void testPurgePartition()
+      throws InterruptedException, UnsupportedOperationException, TException {
+    Table createdTable = preparePartitionedTable();
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> createdTable.supportPartitions().purgePartition("testPartition"));
+  }
+
   private Table preparePartitionedTable() throws TException, InterruptedException {
     Column[] columns = createColumns();
 
@@ -971,6 +1124,49 @@ public class CatalogHiveIT extends AbstractIT {
             });
     Assertions.assertTrue(exception.getMessage().contains("Cannot alter partition column"));
 
+    // test add column with default value exception
+    TableChange withDefaultValue =
+        TableChange.addColumn(
+            new String[] {"col_3"}, Types.ByteType.get(), "comment", Literals.NULL);
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> tableCatalog.alterTable(id, withDefaultValue));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The DEFAULT constraint for column is only supported since Hive 3.0, "
+                    + "but the current Gravitino Hive catalog only supports Hive 2.x"),
+        "The exception message is: " + exception.getMessage());
+
+    // test alter column nullability exception
+    TableChange alterColumnNullability =
+        TableChange.updateColumnNullability(new String[] {HIVE_COL_NAME1}, false);
+    exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> tableCatalog.alterTable(id, alterColumnNullability));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The NOT NULL constraint for column is only supported since Hive 3.0,"
+                    + " but the current Gravitino Hive catalog only supports Hive 2.x. Illegal column: hive_col_name1"));
+
+    // test update column default value exception
+    TableChange updateDefaultValue =
+        TableChange.updateColumnDefaultValue(new String[] {HIVE_COL_NAME1}, Literals.NULL);
+    exception =
+        assertThrows(
+            IllegalArgumentException.class, () -> tableCatalog.alterTable(id, updateDefaultValue));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The DEFAULT constraint for column is only supported since Hive 3.0, "
+                    + "but the current Gravitino Hive catalog only supports Hive 2.x"),
+        "The exception message is: " + exception.getMessage());
+
     // test updateColumnPosition exception
     Column col1 = Column.of("name", Types.StringType.get(), "comment");
     Column col2 = Column.of("address", Types.StringType.get(), "comment");
@@ -1023,7 +1219,7 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertEquals(
         ((TableType) tablePropertiesMetadata.getDefaultValue(TABLE_TYPE)).name(),
         actualTable.getTableType());
-    Assertions.assertEquals(tableName, actualTable.getSd().getSerdeInfo().getName());
+    Assertions.assertEquals(tableName.toLowerCase(), actualTable.getSd().getSerdeInfo().getName());
     Assertions.assertEquals(
         ((Boolean) tablePropertiesMetadata.getDefaultValue(EXTERNAL)).toString().toUpperCase(),
         actualTable.getParameters().get(EXTERNAL));
@@ -1056,8 +1252,8 @@ public class CatalogHiveIT extends AbstractIT {
   public void testAlterSchema() throws TException, InterruptedException {
     NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
 
-    GravitinoMetalake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
-    Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    GravitinoMetalake metalake = client.loadMetalake(metalakeName);
+    Catalog catalog = metalake.loadCatalog(catalogName);
     Schema schema = catalog.asSchemas().loadSchema(ident);
     Assertions.assertNull(schema.auditInfo().lastModifier());
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, schema.auditInfo().creator());
@@ -1084,29 +1280,29 @@ public class CatalogHiveIT extends AbstractIT {
 
   @Test
   void testLoadEntityWithSamePrefix() {
-    GravitinoMetalake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
-    Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    GravitinoMetalake metalake = client.loadMetalake(metalakeName);
+    Catalog catalog = metalake.loadCatalog(catalogName);
     Assertions.assertNotNull(catalog);
 
     for (int i = 1; i < metalakeName.length(); i++) {
       // We can't get the metalake by prefix
       final int length = i;
       final NameIdentifier id = NameIdentifier.of(metalakeName.substring(0, length));
-      Assertions.assertThrows(NoSuchMetalakeException.class, () -> client.loadMetalake(id));
+      Assertions.assertThrows(NoSuchMetalakeException.class, () -> client.loadMetalake(id.name()));
     }
     final NameIdentifier idA = NameIdentifier.of(metalakeName + "a");
-    Assertions.assertThrows(NoSuchMetalakeException.class, () -> client.loadMetalake(idA));
+    Assertions.assertThrows(NoSuchMetalakeException.class, () -> client.loadMetalake(idA.name()));
 
     for (int i = 1; i < catalogName.length(); i++) {
       // We can't get the catalog by prefix
       final int length = i;
       final NameIdentifier id = NameIdentifier.of(metalakeName, catalogName.substring(0, length));
-      Assertions.assertThrows(NoSuchCatalogException.class, () -> metalake.loadCatalog(id));
+      Assertions.assertThrows(NoSuchCatalogException.class, () -> metalake.loadCatalog(id.name()));
     }
 
     // We can't load the catalog.
     final NameIdentifier idB = NameIdentifier.of(metalakeName, catalogName + "a");
-    Assertions.assertThrows(NoSuchCatalogException.class, () -> metalake.loadCatalog(idB));
+    Assertions.assertThrows(NoSuchCatalogException.class, () -> metalake.loadCatalog(idB.name()));
 
     SupportsSchemas schemas = catalog.asSchemas();
 
@@ -1138,48 +1334,51 @@ public class CatalogHiveIT extends AbstractIT {
   @Test
   void testAlterEntityName() {
     String metalakeName = GravitinoITUtils.genRandomName("CatalogHiveIT_metalake");
-    client.createMetalake(NameIdentifier.of(metalakeName), "", ImmutableMap.of());
-    final GravitinoMetalake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    client.createMetalake(metalakeName, "", ImmutableMap.of());
+    final GravitinoMetalake metalake = client.loadMetalake(metalakeName);
     String newMetalakeName = GravitinoITUtils.genRandomName("CatalogHiveIT_metalake_new");
 
     // Test rename metalake
     NameIdentifier id = NameIdentifier.of(metalakeName);
     NameIdentifier newId = NameIdentifier.of(newMetalakeName);
     for (int i = 0; i < 2; i++) {
-      Assertions.assertThrows(NoSuchMetalakeException.class, () -> client.loadMetalake(newId));
-      client.alterMetalake(id, MetalakeChange.rename(newMetalakeName));
-      client.loadMetalake(newId);
-      Assertions.assertThrows(NoSuchMetalakeException.class, () -> client.loadMetalake(id));
+      Assertions.assertThrows(
+          NoSuchMetalakeException.class, () -> client.loadMetalake(newId.name()));
+      client.alterMetalake(id.name(), MetalakeChange.rename(newMetalakeName));
+      client.loadMetalake(newId.name());
+      Assertions.assertThrows(NoSuchMetalakeException.class, () -> client.loadMetalake(id.name()));
 
-      client.alterMetalake(newId, MetalakeChange.rename(metalakeName));
-      client.loadMetalake(id);
-      Assertions.assertThrows(NoSuchMetalakeException.class, () -> client.loadMetalake(newId));
+      client.alterMetalake(newId.name(), MetalakeChange.rename(metalakeName));
+      client.loadMetalake(id.name());
+      Assertions.assertThrows(
+          NoSuchMetalakeException.class, () -> client.loadMetalake(newId.name()));
     }
 
     String catalogName = GravitinoITUtils.genRandomName("CatalogHiveIT_catalog");
     metalake.createCatalog(
-        NameIdentifier.of(metalakeName, catalogName),
+        catalogName,
         Catalog.Type.RELATIONAL,
         provider,
         "comment",
         ImmutableMap.of(METASTORE_URIS, HIVE_METASTORE_URIS));
 
-    Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Catalog catalog = metalake.loadCatalog(catalogName);
     // Test rename catalog
     String newCatalogName = GravitinoITUtils.genRandomName("CatalogHiveIT_catalog_new");
     NameIdentifier newId2 = NameIdentifier.of(metalakeName, newMetalakeName);
     NameIdentifier oldId = NameIdentifier.of(metalakeName, catalogName);
     for (int i = 0; i < 2; i++) {
-      Assertions.assertThrows(NoSuchCatalogException.class, () -> metalake.loadCatalog(newId2));
-      metalake.alterCatalog(
-          NameIdentifier.of(metalakeName, catalogName), CatalogChange.rename(newCatalogName));
-      metalake.loadCatalog(NameIdentifier.of(metalakeName, newCatalogName));
-      Assertions.assertThrows(NoSuchCatalogException.class, () -> metalake.loadCatalog(oldId));
+      Assertions.assertThrows(
+          NoSuchCatalogException.class, () -> metalake.loadCatalog(newId2.name()));
+      metalake.alterCatalog(catalogName, CatalogChange.rename(newCatalogName));
+      metalake.loadCatalog(newCatalogName);
+      Assertions.assertThrows(
+          NoSuchCatalogException.class, () -> metalake.loadCatalog(oldId.name()));
 
-      metalake.alterCatalog(
-          NameIdentifier.of(metalakeName, newCatalogName), CatalogChange.rename(catalogName));
-      catalog = metalake.loadCatalog(oldId);
-      Assertions.assertThrows(NoSuchCatalogException.class, () -> metalake.loadCatalog(newId2));
+      metalake.alterCatalog(newCatalogName, CatalogChange.rename(catalogName));
+      catalog = metalake.loadCatalog(oldId.name());
+      Assertions.assertThrows(
+          NoSuchCatalogException.class, () -> metalake.loadCatalog(newId2.name()));
     }
 
     // Schema does not have the rename operation.
@@ -1231,23 +1430,22 @@ public class CatalogHiveIT extends AbstractIT {
     String metalakeName1 = GravitinoITUtils.genRandomName("CatalogHiveIT_metalake1");
     String metalakeName2 = GravitinoITUtils.genRandomName("CatalogHiveIT_metalake2");
 
-    client.createMetalake(NameIdentifier.of(metalakeName1), "comment", Collections.emptyMap());
-    client.createMetalake(NameIdentifier.of(metalakeName2), "comment", Collections.emptyMap());
+    client.createMetalake(metalakeName1, "comment", Collections.emptyMap());
+    client.createMetalake(metalakeName2, "comment", Collections.emptyMap());
 
-    client.dropMetalake(NameIdentifier.of(metalakeName1));
-    client.dropMetalake(NameIdentifier.of(metalakeName2));
+    client.dropMetalake(metalakeName1);
+    client.dropMetalake(metalakeName2);
 
-    client.createMetalake(NameIdentifier.of(metalakeName1), "comment", Collections.emptyMap());
+    client.createMetalake(metalakeName1, "comment", Collections.emptyMap());
 
-    client.alterMetalake(NameIdentifier.of(metalakeName1), MetalakeChange.rename(metalakeName2));
+    client.alterMetalake(metalakeName1, MetalakeChange.rename(metalakeName2));
 
-    client.loadMetalake(NameIdentifier.of(metalakeName2));
+    client.loadMetalake(metalakeName2);
 
-    NameIdentifier of = NameIdentifier.of(metalakeName1);
     Assertions.assertThrows(
         NoSuchMetalakeException.class,
         () -> {
-          client.loadMetalake(of);
+          client.loadMetalake(metalakeName1);
         });
   }
 
@@ -1363,6 +1561,72 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @Test
+  public void testRemoveNonExistTable() throws TException, InterruptedException {
+    Column[] columns = createColumns();
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            columns,
+            TABLE_COMMENT,
+            ImmutableMap.of(TABLE_TYPE, EXTERNAL_TABLE.name().toLowerCase(Locale.ROOT)),
+            new Transform[] {Transforms.identity(columns[2].name())});
+
+    // Directly drop table from hive metastore.
+    hiveClientPool.run(
+        client -> {
+          client.dropTable(schemaName, tableName, true, false, false);
+          return null;
+        });
+
+    // Drop table from catalog, drop non-exist table should return false;
+    Assertions.assertFalse(
+        catalog
+            .asTableCatalog()
+            .dropTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName)),
+        "The table should not be found in the catalog");
+
+    Assertions.assertFalse(
+        catalog
+            .asTableCatalog()
+            .tableExists(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName)),
+        "The table should not be found in the catalog");
+  }
+
+  @Test
+  public void testPurgeNonExistTable() throws TException, InterruptedException {
+    Column[] columns = createColumns();
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            columns,
+            TABLE_COMMENT,
+            ImmutableMap.of(TABLE_TYPE, EXTERNAL_TABLE.name().toLowerCase(Locale.ROOT)),
+            new Transform[] {Transforms.identity(columns[2].name())});
+
+    // Directly drop table from hive metastore.
+    hiveClientPool.run(
+        client -> {
+          client.dropTable(schemaName, tableName, true, false, true);
+          return null;
+        });
+
+    // Drop table from catalog, drop non-exist table should return false;
+    Assertions.assertFalse(
+        catalog
+            .asTableCatalog()
+            .purgeTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName)),
+        "The table should not be found in the catalog");
+
+    Assertions.assertFalse(
+        catalog
+            .asTableCatalog()
+            .tableExists(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName)),
+        "The table should not be found in the catalog");
+  }
+
+  @Test
   void testCustomCatalogOperations() {
     String catalogName = "custom_catalog";
     Assertions.assertDoesNotThrow(
@@ -1379,11 +1643,6 @@ public class CatalogHiveIT extends AbstractIT {
     properties.put(METASTORE_URIS, HIVE_METASTORE_URIS);
     properties.put(BaseCatalog.CATALOG_OPERATION_IMPL, customImpl);
 
-    metalake.createCatalog(
-        NameIdentifier.of(metalakeName, catalogName),
-        Catalog.Type.RELATIONAL,
-        provider,
-        "comment",
-        properties);
+    metalake.createCatalog(catalogName, Catalog.Type.RELATIONAL, provider, "comment", properties);
   }
 }

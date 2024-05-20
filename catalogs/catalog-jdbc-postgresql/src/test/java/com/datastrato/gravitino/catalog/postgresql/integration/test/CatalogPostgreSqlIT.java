@@ -16,10 +16,14 @@ import com.datastrato.gravitino.catalog.postgresql.integration.test.service.Post
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
+import com.datastrato.gravitino.integration.test.container.ContainerSuite;
+import com.datastrato.gravitino.integration.test.container.PGImageName;
+import com.datastrato.gravitino.integration.test.container.PostgreSQLContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.integration.test.util.JdbcDriverDownloader;
+import com.datastrato.gravitino.integration.test.util.TestDatabaseName;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SupportsSchemas;
@@ -38,13 +42,14 @@ import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Decimal;
 import com.datastrato.gravitino.rel.types.Types;
+import com.datastrato.gravitino.rel.types.Types.IntegerType;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
@@ -61,12 +66,12 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
-import org.testcontainers.containers.PostgreSQLContainer;
 
 @Tag("gravitino-docker-it")
 @TestInstance(Lifecycle.PER_CLASS)
 public class CatalogPostgreSqlIT extends AbstractIT {
-  public static final String DEFAULT_POSTGRES_IMAGE = "postgres:13";
+  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  public static final PGImageName DEFAULT_POSTGRES_IMAGE = PGImageName.VERSION_13;
   public static final String DOWNLOAD_JDBC_DRIVER_URL =
       "https://jdbc.postgresql.org/download/postgresql-42.7.0.jar";
 
@@ -88,28 +93,24 @@ public class CatalogPostgreSqlIT extends AbstractIT {
 
   private PostgreSqlService postgreSqlService;
 
-  private PostgreSQLContainer<?> POSTGRESQL_CONTAINER;
+  private PostgreSQLContainer POSTGRESQL_CONTAINER;
 
-  protected final String TEST_DB_NAME = GravitinoITUtils.genRandomName("test_db");
+  protected final TestDatabaseName TEST_DB_NAME = TestDatabaseName.PG_CATALOG_POSTGRESQL_IT;
 
-  protected String postgreImageName = DEFAULT_POSTGRES_IMAGE;
+  protected PGImageName postgreImageName = DEFAULT_POSTGRES_IMAGE;
 
   @BeforeAll
-  public void startup() throws IOException {
+  public void startup() throws IOException, SQLException {
 
     if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
       String gravitinoHome = System.getenv("GRAVITINO_HOME");
       Path tmpPath = Paths.get(gravitinoHome, "/catalogs/jdbc-postgresql/libs");
       JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_JDBC_DRIVER_URL, tmpPath.toString());
     }
+    containerSuite.startPostgreSQLContainer(TEST_DB_NAME, postgreImageName);
+    POSTGRESQL_CONTAINER = containerSuite.getPostgreSQLContainer(postgreImageName);
 
-    POSTGRESQL_CONTAINER =
-        new PostgreSQLContainer<>(postgreImageName)
-            .withDatabaseName(TEST_DB_NAME)
-            .withUsername("root")
-            .withPassword("root");
-    POSTGRESQL_CONTAINER.start();
-    postgreSqlService = new PostgreSqlService(POSTGRESQL_CONTAINER);
+    postgreSqlService = new PostgreSqlService(POSTGRESQL_CONTAINER, TEST_DB_NAME);
     createMetalake();
     createCatalog();
     createSchema();
@@ -118,13 +119,12 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   @AfterAll
   public void stop() {
     clearTableAndSchema();
-    client.dropMetalake(NameIdentifier.of(metalakeName));
+    client.dropMetalake(metalakeName);
     postgreSqlService.close();
-    POSTGRESQL_CONTAINER.stop();
   }
 
   @AfterEach
-  private void resetSchema() {
+  public void resetSchema() {
     clearTableAndSchema();
     createSchema();
   }
@@ -143,37 +143,28 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
     GravitinoMetalake createdMetalake =
-        client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
-    GravitinoMetalake loadMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
     Assertions.assertEquals(createdMetalake, loadMetalake);
 
     metalake = loadMetalake;
   }
 
-  private void createCatalog() {
+  private void createCatalog() throws SQLException {
     Map<String, String> catalogProperties = Maps.newHashMap();
 
-    try {
-      String jdbcUrl = POSTGRESQL_CONTAINER.getJdbcUrl();
-      String database = new URI(jdbcUrl.substring(jdbcUrl.lastIndexOf("/") + 1)).getPath();
-      catalogProperties.put(
-          JdbcConfig.JDBC_DRIVER.getKey(), POSTGRESQL_CONTAINER.getDriverClassName());
-      catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
-      catalogProperties.put(JdbcConfig.JDBC_DATABASE.getKey(), database);
-      catalogProperties.put(JdbcConfig.USERNAME.getKey(), POSTGRESQL_CONTAINER.getUsername());
-      catalogProperties.put(JdbcConfig.PASSWORD.getKey(), POSTGRESQL_CONTAINER.getPassword());
-    } catch (URISyntaxException e) {
-      throw new RuntimeException(e);
-    }
+    String jdbcUrl = POSTGRESQL_CONTAINER.getJdbcUrl(TEST_DB_NAME);
+    catalogProperties.put(
+        JdbcConfig.JDBC_DRIVER.getKey(), POSTGRESQL_CONTAINER.getDriverClassName(TEST_DB_NAME));
+    catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
+    catalogProperties.put(JdbcConfig.JDBC_DATABASE.getKey(), TEST_DB_NAME.toString());
+    catalogProperties.put(JdbcConfig.USERNAME.getKey(), POSTGRESQL_CONTAINER.getUsername());
+    catalogProperties.put(JdbcConfig.PASSWORD.getKey(), POSTGRESQL_CONTAINER.getPassword());
 
     Catalog createdCatalog =
         metalake.createCatalog(
-            NameIdentifier.of(metalakeName, catalogName),
-            Catalog.Type.RELATIONAL,
-            provider,
-            "comment",
-            catalogProperties);
-    Catalog loadCatalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+            catalogName, Catalog.Type.RELATIONAL, provider, "comment", catalogProperties);
+    Catalog loadCatalog = metalake.loadCatalog(catalogName);
     Assertions.assertEquals(createdCatalog, loadCatalog);
 
     catalog = loadCatalog;
@@ -208,6 +199,61 @@ public class CatalogPostgreSqlIT extends AbstractIT {
       Column.of("time", Types.TimeType.get(), "time"),
       Column.of("binary", Types.TimestampType.withoutTimeZone(), "binary")
     };
+  }
+
+  private Column[] columnsWithDefaultValue() {
+    return new Column[] {
+      Column.of(
+          "col_1",
+          Types.FloatType.get(),
+          "col_1_comment",
+          false,
+          false,
+          FunctionExpression.of("random")),
+      Column.of("col_2", Types.VarCharType.of(255), "col_2_comment", true, false, Literals.NULL),
+      Column.of("col_3", Types.StringType.get(), "col_3_comment", false, false, null),
+      Column.of(
+          "col_4",
+          Types.IntegerType.get(),
+          "col_4_comment",
+          true,
+          false,
+          Literals.integerLiteral(1000)),
+      Column.of(
+          "col_5",
+          Types.TimestampType.withoutTimeZone(),
+          "col_5_comment",
+          true,
+          false,
+          Literals.NULL)
+    };
+  }
+
+  @Test
+  void testCreateTableWithArrayType() {
+    String tableName = GravitinoITUtils.genRandomName("postgresql_it_array_table");
+    Column col = Column.of("array", Types.ListType.of(IntegerType.get(), false), "col_4_comment");
+    Column[] columns = new Column[] {col};
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table createdTable =
+        tableCatalog.createTable(tableIdentifier, columns, null, ImmutableMap.of());
+
+    Assertions.assertEquals(tableName, createdTable.name());
+    Assertions.assertEquals(columns.length, createdTable.columns().length);
+    for (int i = 0; i < columns.length; i++) {
+      ITUtils.assertColumn(columns[i], createdTable.columns()[i]);
+    }
+
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(tableName, loadTable.name());
+    Assertions.assertEquals(columns.length, loadTable.columns().length);
+    for (int i = 0; i < columns.length; i++) {
+      ITUtils.assertColumn(columns[i], loadTable.columns()[i]);
+    }
   }
 
   @Test
@@ -350,7 +396,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Assertions.assertEquals(createdTable.columns().length, columns.length);
 
     for (int i = 0; i < columns.length; i++) {
-      assertColumn(columns[i], createdTable.columns()[i]);
+      ITUtils.assertColumn(columns[i], createdTable.columns()[i]);
     }
 
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
@@ -363,7 +409,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     }
     Assertions.assertEquals(loadTable.columns().length, columns.length);
     for (int i = 0; i < columns.length; i++) {
-      assertColumn(columns[i], loadTable.columns()[i]);
+      ITUtils.assertColumn(columns[i], loadTable.columns()[i]);
     }
   }
 
@@ -591,10 +637,10 @@ public class CatalogPostgreSqlIT extends AbstractIT {
             Distributions.NONE,
             new SortOrder[0],
             indexes);
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), properties, indexes, createdTable);
     Table table = tableCatalog.loadTable(tableIdentifier);
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), properties, indexes, table);
 
     // Test create index complex fields fail.
@@ -748,10 +794,55 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   }
 
   @Test
+  void testUpdateColumnDefaultValue() {
+    Column[] columns = columnsWithDefaultValue();
+    Table table =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+                columns,
+                table_comment,
+                createProperties());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, table.auditInfo().creator());
+    Assertions.assertNull(table.auditInfo().lastModifier());
+    catalog
+        .asTableCatalog()
+        .alterTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            TableChange.updateColumnDefaultValue(
+                new String[] {columns[0].name()}, Literals.of("1.234", Types.FloatType.get())),
+            TableChange.updateColumnDefaultValue(
+                new String[] {columns[1].name()}, Literals.of("hello", Types.VarCharType.of(255))),
+            TableChange.updateColumnDefaultValue(
+                new String[] {columns[2].name()}, Literals.of("world", Types.StringType.get())),
+            TableChange.updateColumnDefaultValue(
+                new String[] {columns[3].name()}, Literals.of(2000, Types.IntegerType.get())),
+            TableChange.updateColumnDefaultValue(
+                new String[] {columns[4].name()}, FunctionExpression.of("current_timestamp")));
+
+    table =
+        catalog
+            .asTableCatalog()
+            .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+
+    Assertions.assertEquals(
+        Literals.of("1.234", Types.FloatType.get()), table.columns()[0].defaultValue());
+    Assertions.assertEquals(
+        Literals.of("hello", Types.VarCharType.of(255)), table.columns()[1].defaultValue());
+    Assertions.assertEquals(
+        Literals.of("world", Types.StringType.get()), table.columns()[2].defaultValue());
+    Assertions.assertEquals(
+        Literals.of(2000, Types.IntegerType.get()), table.columns()[3].defaultValue());
+    Assertions.assertEquals(
+        FunctionExpression.of("current_timestamp"), table.columns()[4].defaultValue());
+  }
+
+  @Test
   void testColumnDefaultValueConverter() {
     // test convert from MySQL to Gravitino
     String tableName = GravitinoITUtils.genRandomName("test_default_value");
-    String fullTableName = TEST_DB_NAME + "." + schemaName + "." + tableName;
+    String fullTableName = String.format("%s.%s.%s", TEST_DB_NAME, schemaName, tableName);
     String sql =
         "CREATE TABLE "
             + fullTableName
@@ -918,22 +1009,26 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Table t1 =
         tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, t1_name));
     Arrays.stream(t1.columns()).anyMatch(c -> Objects.equals(c.name(), "t112"));
-    assertionsTableInfo(t1_name, table_comment, Arrays.asList(t1_col), properties, t1_indexes, t1);
+    ITUtils.assertionsTableInfo(
+        t1_name, table_comment, Arrays.asList(t1_col), properties, t1_indexes, t1);
 
     Table t2 =
         tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, t2_name));
     Arrays.stream(t2.columns()).anyMatch(c -> Objects.equals(c.name(), "t212"));
-    assertionsTableInfo(t2_name, table_comment, Arrays.asList(t2_col), properties, t2_indexes, t2);
+    ITUtils.assertionsTableInfo(
+        t2_name, table_comment, Arrays.asList(t2_col), properties, t2_indexes, t2);
 
     Table t3 =
         tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, t3_name));
     Arrays.stream(t3.columns()).anyMatch(c -> Objects.equals(c.name(), "t_12"));
-    assertionsTableInfo(t3_name, table_comment, Arrays.asList(t3_col), properties, t3_indexes, t3);
+    ITUtils.assertionsTableInfo(
+        t3_name, table_comment, Arrays.asList(t3_col), properties, t3_indexes, t3);
 
     Table t4 =
         tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, t4_name));
     Arrays.stream(t4.columns()).anyMatch(c -> Objects.equals(c.name(), "_1__"));
-    assertionsTableInfo(t4_name, table_comment, Arrays.asList(t4_col), properties, t4_indexes, t4);
+    ITUtils.assertionsTableInfo(
+        t4_name, table_comment, Arrays.asList(t4_col), properties, t4_indexes, t4);
   }
 
   @Test
@@ -960,7 +1055,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
             Distributions.NONE,
             new SortOrder[0],
             indexes);
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         "tablename",
         "low case table name",
         Arrays.asList(newColumns),
@@ -968,7 +1063,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         indexes,
         createdTable);
     Table table = tableCatalog.loadTable(tableIdentifier);
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         "tablename", "low case table name", Arrays.asList(newColumns), properties, indexes, table);
 
     // Test create table with same name but different case
@@ -1048,6 +1143,74 @@ public class CatalogPostgreSqlIT extends AbstractIT {
           catalog.asTableCatalog().listTables(Namespace.of(metalakeName, catalogName, dbs[i]));
       Assertions.assertEquals(1, tableNames.length);
       Assertions.assertEquals(tables[i], tableNames[0].name());
+    }
+  }
+
+  @Test
+  void testCreateSameTableInDifferentSchema() {
+    String schemaPrefix = GravitinoITUtils.genRandomName("postgresql_it_schema");
+    String schemaName1 = schemaPrefix + "1a";
+    String schemaName2 = schemaPrefix + "_a";
+    String schemaName3 = schemaPrefix + "__";
+
+    String[] dbs = {schemaName1, schemaName2, schemaName3};
+    for (int i = 0; i < dbs.length; i++) {
+      catalog
+          .asSchemas()
+          .createSchema(
+              NameIdentifier.of(metalakeName, catalogName, dbs[i]), dbs[i], Maps.newHashMap());
+    }
+
+    String tableName1 = "table1";
+    String tableName2 = "table2";
+    String tableName3 = "table3";
+    Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, false, null);
+    Column col2 = Column.of("col_2", Types.IntegerType.get(), "yes", false, false, null);
+    Column col3 = Column.of("col_3", Types.DateType.get(), "comment", false, false, null);
+    Column col4 = Column.of("col_4", Types.VarCharType.of(255), "code", false, false, null);
+    Column col5 = Column.of("col_5", Types.VarCharType.of(255), "config", false, false, null);
+    Column[] newColumns = new Column[] {col1, col2, col3, col4, col5};
+
+    String[] tables = {tableName1, tableName2, tableName3};
+
+    for (int i = 0; i < dbs.length; i++) {
+      for (int j = 0; j < tables.length; j++) {
+        catalog
+            .asTableCatalog()
+            .createTable(
+                NameIdentifier.of(metalakeName, catalogName, dbs[i], tables[j]),
+                newColumns,
+                dbs[i] + "." + tables[j],
+                Maps.newHashMap(),
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                new SortOrder[0],
+                new Index[0]);
+      }
+    }
+
+    // list table in schema
+    for (int i = 0; i < dbs.length; i++) {
+      NameIdentifier[] tableNames =
+          catalog.asTableCatalog().listTables(Namespace.of(metalakeName, catalogName, dbs[i]));
+      Assertions.assertEquals(3, tableNames.length);
+      String[] realNames =
+          Arrays.stream(tableNames).map(NameIdentifier::name).toArray(String[]::new);
+      Assertions.assertArrayEquals(tables, realNames);
+
+      final int idx = i;
+      for (String n : realNames) {
+        Table t =
+            Assertions.assertDoesNotThrow(
+                () ->
+                    catalog
+                        .asTableCatalog()
+                        .loadTable(NameIdentifier.of(metalakeName, catalogName, dbs[idx], n)));
+        Assertions.assertEquals(n, t.name());
+
+        // Test the table1 is the `1a`.`table1` not `_a`.`table1` or `__`.`table1`
+        Assertions.assertEquals(dbs[idx] + "." + n, t.comment());
+      }
     }
   }
 
@@ -1159,7 +1322,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
           Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}),
           Indexes.primary("pk1_key", new String[][] {{"col_1"}})
         };
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), createProperties(), indexes, table);
 
     // delete index and add new column and index.
@@ -1181,7 +1344,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
     Column col4 = Column.of("col_4", Types.VarCharType.of(255), null, true, false, null);
     newColumns = new Column[] {col1, col2, col3, col4};
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), createProperties(), indexes, table);
 
     // Add a previously existing index
@@ -1201,7 +1364,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         };
     table =
         tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), createProperties(), indexes, table);
   }
 
@@ -1241,7 +1404,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
 
     Column col5 = Column.of("col_5", Types.LongType.get(), "id", false, true, null);
     newColumns = new Column[] {col1, col2, col3, col4, col5};
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName,
         table_comment,
         Arrays.asList(newColumns),
@@ -1255,7 +1418,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     table = tableCatalog.loadTable(tableIdentifier);
     col5 = Column.of("col_5", Types.LongType.get(), "id", false, false, null);
     newColumns = new Column[] {col1, col2, col3, col4, col5};
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName,
         table_comment,
         Arrays.asList(newColumns),
@@ -1269,12 +1432,69 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     table = tableCatalog.loadTable(tableIdentifier);
     col5 = Column.of("col_5", Types.LongType.get(), "id", false, true, null);
     newColumns = new Column[] {col1, col2, col3, col4, col5};
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName,
         table_comment,
         Arrays.asList(newColumns),
         properties,
         Indexes.EMPTY_INDEXES,
         table);
+  }
+
+  @Test
+  void testAddColumnDefaultValue() {
+    Column col1 = Column.of("col_1", Types.LongType.get(), "uid", true, false, null);
+    Column col2 = Column.of("col_2", Types.DateType.get(), "comment", true, false, null);
+    Column[] newColumns = new Column[] {col1, col2};
+    String tableName = "default_value_table";
+
+    Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, newColumns[0].defaultValue());
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        newColumns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0],
+        Indexes.EMPTY_INDEXES);
+
+    Column col3 =
+        Column.of("col_3", Types.LongType.get(), "id", false, false, Literals.longLiteral(1000L));
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addColumn(
+            new String[] {col3.name()},
+            col3.dataType(),
+            col3.comment(),
+            TableChange.ColumnPosition.defaultPos(),
+            col3.nullable(),
+            col3.autoIncrement(),
+            col3.defaultValue()));
+
+    Table table = tableCatalog.loadTable(tableIdentifier);
+
+    newColumns = new Column[] {col1, col2, col3};
+    ITUtils.assertionsTableInfo(
+        tableName,
+        table_comment,
+        Arrays.asList(newColumns),
+        properties,
+        Indexes.EMPTY_INDEXES,
+        table);
+  }
+
+  @Test
+  void testGetPGDriver() {
+    Assertions.assertDoesNotThrow(
+        () -> DriverManager.getDriver("jdbc:postgresql://dummy_address:12345/"));
+    Assertions.assertThrows(
+        Exception.class,
+        () -> DriverManager.getDriver("jdbc:postgresql://dummy_address:dummy_port/"));
   }
 }

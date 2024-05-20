@@ -5,9 +5,13 @@
 
 package com.datastrato.gravitino.storage.relational.mapper;
 
+import com.datastrato.gravitino.storage.relational.po.FilesetMaxVersionPO;
 import com.datastrato.gravitino.storage.relational.po.FilesetVersionPO;
+import java.util.List;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 /**
@@ -97,4 +101,31 @@ public interface FilesetVersionMapper {
           + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
           + " WHERE fileset_id = #{filesetId} AND deleted_at = 0")
   Integer softDeleteFilesetVersionsByFilesetId(@Param("filesetId") Long filesetId);
+
+  @Delete(
+      "DELETE FROM "
+          + VERSION_TABLE_NAME
+          + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeLine} LIMIT #{limit}")
+  Integer deleteFilesetVersionsByLegacyTimeLine(
+      @Param("legacyTimeLine") Long legacyTimeLine, @Param("limit") int limit);
+
+  @Select(
+      "SELECT fileset_id as filesetId,"
+          + " Max(version) as version"
+          + " FROM "
+          + VERSION_TABLE_NAME
+          + " WHERE version > #{versionRetentionCount} AND deleted_at = 0"
+          + " GROUP BY fileset_id")
+  List<FilesetMaxVersionPO> selectFilesetVersionsByRetentionCount(
+      @Param("versionRetentionCount") Long versionRetentionCount);
+
+  @Update(
+      "UPDATE "
+          + VERSION_TABLE_NAME
+          + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
+          + " WHERE fileset_id = #{filesetId} AND version <= #{versionRetentionLine} AND deleted_at = 0 LIMIT #{limit}")
+  Integer softDeleteFilesetVersionsByRetentionLine(
+      @Param("filesetId") Long filesetId,
+      @Param("versionRetentionLine") long versionRetentionLine,
+      @Param("limit") int limit);
 }

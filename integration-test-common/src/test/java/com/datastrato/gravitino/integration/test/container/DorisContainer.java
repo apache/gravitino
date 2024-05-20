@@ -5,8 +5,10 @@
 package com.datastrato.gravitino.integration.test.container;
 
 import static java.lang.String.format;
+import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
 import com.google.common.collect.ImmutableSet;
+import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -15,6 +17,7 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.rnorth.ducttape.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,6 +32,9 @@ public class DorisContainer extends BaseContainer {
   public static final String PASSWORD = "root";
   public static final int FE_HTTP_PORT = 8030;
   public static final int FE_MYSQL_PORT = 9030;
+
+  private static final String DORIS_FE_PATH = "/opt/apache-doris/fe/log";
+  private static final String DORIS_BE_PATH = "/opt/apache-doris/be/log";
 
   public static Builder builder() {
     return new Builder();
@@ -60,36 +66,68 @@ public class DorisContainer extends BaseContainer {
   }
 
   @Override
-  protected boolean checkContainerStatus(int retryLimit) {
-    int nRetry = 0;
+  public void close() {
+    copyDorisLog();
+    super.close();
+  }
 
+  private void copyDorisLog() {
+    try {
+      // stop Doris container
+      String destPath = System.getenv("IT_PROJECT_DIR");
+      LOG.info("Copy doris log file to {}", destPath);
+
+      String feTarPath = "/doris-be.tar";
+      String beTarPath = "/doris-fe.tar";
+
+      // Pack the jar files
+      container.execInContainer("tar", "cf", feTarPath, DORIS_BE_PATH);
+      container.execInContainer("tar", "cf", beTarPath, DORIS_FE_PATH);
+
+      container.copyFileFromContainer(feTarPath, destPath + File.separator + "doris-be.tar");
+      container.copyFileFromContainer(beTarPath, destPath + File.separator + "doris-fe.tar");
+    } catch (Exception e) {
+      LOG.error("Failed to copy container log to local", e);
+    }
+  }
+
+  @Override
+  protected boolean checkContainerStatus(int retryLimit) {
     String dorisJdbcUrl = format("jdbc:mysql://%s:%d/", getContainerIpAddress(), FE_MYSQL_PORT);
     LOG.info("Doris url is " + dorisJdbcUrl);
 
-    while (nRetry++ < retryLimit) {
-      try (Connection connection = DriverManager.getConnection(dorisJdbcUrl, USER_NAME, "");
-          Statement statement = connection.createStatement()) {
+    await()
+        .atMost(30, TimeUnit.SECONDS)
+        .pollInterval(30 / retryLimit, TimeUnit.SECONDS)
+        .until(
+            () -> {
+              try (Connection connection =
+                      DriverManager.getConnection(dorisJdbcUrl, USER_NAME, "");
+                  Statement statement = connection.createStatement()) {
 
-        // execute `SHOW PROC '/backends';` to check if backends is ready
-        String query = "SHOW PROC '/backends';";
-        try (ResultSet resultSet = statement.executeQuery(query)) {
-          while (resultSet.next()) {
-            String alive = resultSet.getString("Alive");
-            if (alive.equalsIgnoreCase("true")) {
-              LOG.info("Doris container startup success!");
-              return true;
-            }
-          }
-        }
+                // execute `SHOW PROC '/backends';` to check if backends is ready
+                String query = "SHOW PROC '/backends';";
+                try (ResultSet resultSet = statement.executeQuery(query)) {
+                  while (resultSet.next()) {
+                    String alive = resultSet.getString("Alive");
+                    String totalCapacity = resultSet.getString("TotalCapacity");
+                    float totalCapacityFloat = Float.parseFloat(totalCapacity.split(" ")[0]);
 
-        LOG.info("Doris container is not ready yet!");
-        Thread.sleep(5000);
-      } catch (Exception e) {
-        LOG.error(e.getMessage(), e);
-      }
-    }
+                    // alive should be true and totalCapacity should not be 0.000
+                    if (alive.equalsIgnoreCase("true") && totalCapacityFloat > 0.0f) {
+                      LOG.info("Doris container startup success!");
+                      return true;
+                    }
+                  }
+                }
+                LOG.info("Doris container is not ready yet!");
+              } catch (Exception e) {
+                LOG.error(e.getMessage(), e);
+              }
+              return false;
+            });
 
-    return false;
+    return true;
   }
 
   private boolean changePassword() {

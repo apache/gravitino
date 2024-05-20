@@ -25,13 +25,11 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
-import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
-import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.Maps;
 import java.time.Instant;
@@ -201,61 +199,6 @@ public class TestHiveTable extends MiniHiveMetastoreService {
                     distribution,
                     sortOrders));
     Assertions.assertTrue(exception.getMessage().contains("Table already exists"));
-
-    HiveColumn illegalColumn =
-        HiveColumn.builder()
-            .withName("col_3")
-            .withType(Types.ByteType.get())
-            .withComment(HIVE_COMMENT)
-            .withNullable(false)
-            .build();
-
-    exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                tableCatalog.createTable(
-                    tableIdentifier,
-                    new Column[] {illegalColumn},
-                    HIVE_COMMENT,
-                    properties,
-                    new Transform[0],
-                    distribution,
-                    sortOrders));
-    Assertions.assertTrue(
-        exception
-            .getMessage()
-            .contains(
-                "The NOT NULL constraint for column is only supported since Hive 3.0, "
-                    + "but the current Gravitino Hive catalog only supports Hive 2.x"));
-
-    HiveColumn withDefault =
-        HiveColumn.builder()
-            .withName("col_3")
-            .withType(Types.ByteType.get())
-            .withComment(HIVE_COMMENT)
-            .withNullable(true)
-            .withDefaultValue(Literals.NULL)
-            .build();
-    exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                tableCatalog.createTable(
-                    tableIdentifier,
-                    new Column[] {withDefault},
-                    HIVE_COMMENT,
-                    properties,
-                    Transforms.EMPTY_TRANSFORM,
-                    distribution,
-                    sortOrders));
-    Assertions.assertTrue(
-        exception
-            .getMessage()
-            .contains(
-                "The DEFAULT constraint for column is only supported since Hive 3.0, "
-                    + "but the current Gravitino Hive catalog only supports Hive 2.x"),
-        "The exception message is: " + exception.getMessage());
   }
 
   @Test
@@ -455,21 +398,6 @@ public class TestHiveTable extends MiniHiveMetastoreService {
             () -> tableCatalog.alterTable(tableIdentifier, tableChange3));
     Assertions.assertTrue(exception.getMessage().contains("Column position cannot be null"));
 
-    TableChange.ColumnPosition first = TableChange.ColumnPosition.first();
-    TableChange tableChange4 =
-        TableChange.addColumn(new String[] {"col_3"}, Types.ByteType.get(), null, first, false);
-
-    exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> tableCatalog.alterTable(tableIdentifier, tableChange4));
-    Assertions.assertTrue(
-        exception
-            .getMessage()
-            .contains(
-                "The NOT NULL constraint for column is only supported since Hive 3.0, "
-                    + "but the current Gravitino Hive catalog only supports Hive 2.x"));
-
     TableChange.ColumnPosition pos = TableChange.ColumnPosition.after(col2.name());
     TableChange tableChange5 =
         TableChange.addColumn(new String[] {"col_3"}, Types.ByteType.get(), pos);
@@ -488,14 +416,6 @@ public class TestHiveTable extends MiniHiveMetastoreService {
             IllegalArgumentException.class,
             () -> tableCatalog.alterTable(tableIdentifier, tableChange6));
     Assertions.assertTrue(exception.getMessage().contains("Cannot add column with duplicate name"));
-
-    TableChange tableChange7 = TableChange.updateColumnNullability(new String[] {"col_1"}, false);
-    exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> tableCatalog.alterTable(tableIdentifier, tableChange7));
-    Assertions.assertEquals(
-        "Hive does not support altering column nullability", exception.getMessage());
 
     // test alter
     tableCatalog.alterTable(

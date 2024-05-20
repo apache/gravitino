@@ -332,8 +332,8 @@ public class IcebergTableOpsHelper {
    * Gravitino only supports tables managed with a single level hierarchy, such as
    * `{namespace}.{table}`, so we need to perform truncation here.
    *
-   * @param namespace
-   * @param name
+   * @param namespace The Gravitino name space
+   * @param name The table name
    * @return Iceberg TableIdentifier
    */
   public static TableIdentifier buildIcebergTableIdentifier(

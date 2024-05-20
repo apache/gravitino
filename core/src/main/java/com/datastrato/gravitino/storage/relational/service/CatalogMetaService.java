@@ -17,6 +17,7 @@ import com.datastrato.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import com.datastrato.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.TableMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.TopicMetaMapper;
 import com.datastrato.gravitino.storage.relational.po.CatalogPO;
 import com.datastrato.gravitino.storage.relational.utils.ExceptionUtils;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
@@ -111,7 +112,7 @@ public class CatalogMetaService {
             }
           });
     } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLConstraintException(
+      ExceptionUtils.checkSQLException(
           re, Entity.EntityType.CATALOG, catalogEntity.nameIdentifier().toString());
       throw re;
     }
@@ -146,7 +147,7 @@ public class CatalogMetaService {
                       POConverters.updateCatalogPOWithVersion(oldCatalogPO, newEntity, metalakeId),
                       oldCatalogPO));
     } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLConstraintException(
+      ExceptionUtils.checkSQLException(
           re, Entity.EntityType.CATALOG, newEntity.nameIdentifier().toString());
       throw re;
     }
@@ -188,7 +189,11 @@ public class CatalogMetaService {
           () ->
               SessionUtils.doWithoutCommit(
                   FilesetVersionMapper.class,
-                  mapper -> mapper.softDeleteFilesetVersionsByCatalogId(catalogId)));
+                  mapper -> mapper.softDeleteFilesetVersionsByCatalogId(catalogId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  TopicMetaMapper.class,
+                  mapper -> mapper.softDeleteTopicMetasByCatalogId(catalogId)));
     } else {
       List<SchemaEntity> schemaEntities =
           SchemaMetaService.getInstance()
@@ -203,5 +208,13 @@ public class CatalogMetaService {
     }
 
     return true;
+  }
+
+  public int deleteCatalogMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
+    return SessionUtils.doWithCommitAndFetchResult(
+        CatalogMetaMapper.class,
+        mapper -> {
+          return mapper.deleteCatalogMetasByLegacyTimeLine(legacyTimeLine, limit);
+        });
   }
 }

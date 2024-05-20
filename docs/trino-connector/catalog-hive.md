@@ -44,7 +44,7 @@ per catalog:
 Users can create a schema with properties through Gravitino Trino connector as follows:
 
 ```SQL
-CREATE SCHEMA "metalake.catalog".schema_name 
+CREATE SCHEMA catalog.schema_name 
 ```
 
 ## Table operations
@@ -57,7 +57,7 @@ allowing null values, and adding comments. The Gravitino connector does not supp
 The following example shows how to create a table in the Hive catalog:
 
 ```shell
-CREATE TABLE "metalake.catalog".schema_name.table_name
+CREATE TABLE catalog.schema_name.table_name
 (
   name varchar,
   salary int
@@ -112,7 +112,7 @@ Reserved properties: A reserved property is one can't be set by users but can be
 Users can use the following example to create a table with properties: 
 
 ```sql
-CREATE TABLE "metalake.catalog".dbname.tabname
+CREATE TABLE catalog.dbname.tabname
 (
   name varchar,
   salary int
@@ -190,7 +190,7 @@ The results are similar to:
  gravitino
  jmx
  system
- test.hive_test
+ hive_test
 (4 rows)
 
 Query 20231017_082503_00018_6nt3n, FINISHED, 1 node
@@ -202,24 +202,24 @@ Other catalogs are regular user-configured Trino catalogs.
 
 ### Creating tables and schemas
 
-Create a new schema named `database_01` in `test.hive_test` catalog.
+Create a new schema named `database_01` in `hive_test` catalog.
 
 ```sql
-CREATE SCHEMA "test.hive_test".database_01;
+CREATE SCHEMA hive_test.database_01;
 ```
 
 Create a new schema using HDFS location:
 
 ```sql
-CREATE SCHEMA "test.hive_test".database_01 WITH (
+CREATE SCHEMA hive_test.database_01 WITH (
   location = 'hdfs://hdfs-host:9000/user/hive/warehouse/database_01'
 );
 ```
 
-Create a new table named `table_01` in schema `"test.hive_test".database_01` and stored in a TEXTFILE format, partitioning by `salary`, bucket by `name` and sorted by `salary`.
+Create a new table named `table_01` in schema `hive_test.database_01` and stored in a TEXTFILE format, partitioning by `salary`, bucket by `name` and sorted by `salary`.
 
 ```sql
-CREATE TABLE  "test.hive_test".database_01.table_01
+CREATE TABLE  hive_test.database_01.table_01
 (
 name varchar,
 salary int
@@ -238,13 +238,13 @@ WITH (
 Insert data into the table `table_01`:
 
 ```sql
-INSERT INTO "test.hive_test".database_01.table_01 (name, salary) VALUES ('ice', 12);
+INSERT INTO hive_test.database_01.table_01 (name, salary) VALUES ('ice', 12);
 ```
 
 Insert data into the table `table_01` from select:
 
 ```sql
-INSERT INTO "test.hive_test".database_01.table_01 (name, salary) SELECT * FROM "test.hive_test".database_01.table_01;
+INSERT INTO hive_test.database_01.table_01 (name, salary) SELECT * FROM hive_test.database_01.table_01;
 ```
 
 ### Querying data
@@ -252,7 +252,7 @@ INSERT INTO "test.hive_test".database_01.table_01 (name, salary) SELECT * FROM "
 Query the `table_01` table:
 
 ```sql
-SELECT * FROM "test.hive_test".database_01.table_01;
+SELECT * FROM hive_test.database_01.table_01;
 ```
 
 ### Modify a table
@@ -260,19 +260,19 @@ SELECT * FROM "test.hive_test".database_01.table_01;
 Add a new column `age` to the `table_01` table:
 
 ```sql
-ALTER TABLE "test.hive_test".database_01.table_01 ADD COLUMN age int;
+ALTER TABLE hive_test.database_01.table_01 ADD COLUMN age int;
 ```
 
 Drop a column `age` from the `table_01` table:
 
 ```sql
-ALTER TABLE "test.hive_test".database_01.table_01 DROP COLUMN age;
+ALTER TABLE hive_test.database_01.table_01 DROP COLUMN age;
 ```
 
 Rename the `table_01` table to `table_02`:
 
 ```sql
-ALTER TABLE "test.hive_test".database_01.table_01 RENAME TO "test.hive_test".database_01.table_02;
+ALTER TABLE hive_test.database_01.table_01 RENAME TO hive_test.database_01.table_02;
 ```
 
 ### DROP
@@ -280,13 +280,13 @@ ALTER TABLE "test.hive_test".database_01.table_01 RENAME TO "test.hive_test".dat
 Drop a schema:
 
 ```sql
-DROP SCHEMA "test.hive_test".database_01;
+DROP SCHEMA hive_test.database_01;
 ```
 
 Drop a table:
 
 ```sql
-DROP TABLE "test.hive_test".database_01.table_01;
+DROP TABLE hive_test.database_01.table_01;
 ```
 
 ## HDFS config and permissions

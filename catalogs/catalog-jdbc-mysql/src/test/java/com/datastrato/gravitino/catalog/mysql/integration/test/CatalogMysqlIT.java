@@ -11,16 +11,20 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.catalog.mysql.integration.test.service.MysqlService;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NotFoundException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
+import com.datastrato.gravitino.integration.test.container.ContainerSuite;
+import com.datastrato.gravitino.integration.test.container.MySQLContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.integration.test.util.JdbcDriverDownloader;
+import com.datastrato.gravitino.integration.test.util.TestDatabaseName;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Column.ColumnImpl;
 import com.datastrato.gravitino.rel.Schema;
@@ -45,6 +49,7 @@ import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
@@ -61,12 +66,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.junit.jupiter.api.condition.EnabledIf;
-import org.testcontainers.containers.MySQLContainer;
-import org.testcontainers.shaded.org.apache.commons.lang3.RandomUtils;
 
 @Tag("gravitino-docker-it")
 @TestInstance(Lifecycle.PER_CLASS)
 public class CatalogMysqlIT extends AbstractIT {
+  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static final String provider = "jdbc-mysql";
   public static final String DOWNLOAD_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar";
@@ -92,34 +96,40 @@ public class CatalogMysqlIT extends AbstractIT {
 
   private MysqlService mysqlService;
 
-  private MySQLContainer<?> MYSQL_CONTAINER;
+  private MySQLContainer MYSQL_CONTAINER;
 
-  protected final String TEST_DB_NAME = RandomUtils.nextInt(0, 10000) + "_test_db";
+  private TestDatabaseName TEST_DB_NAME;
 
   public static final String defaultMysqlImageName = "mysql:8.0";
 
   protected String mysqlImageName = defaultMysqlImageName;
+
+  protected String mysqlDriverDownloadUrl = DOWNLOAD_JDBC_DRIVER_URL;
 
   boolean SupportColumnDefaultValueExpression() {
     return true;
   }
 
   @BeforeAll
-  public void startup() throws IOException {
+  public void startup() throws IOException, SQLException {
 
     if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
       String gravitinoHome = System.getenv("GRAVITINO_HOME");
       Path tmpPath = Paths.get(gravitinoHome, "/catalogs/jdbc-mysql/libs");
-      JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_JDBC_DRIVER_URL, tmpPath.toString());
+      JdbcDriverDownloader.downloadJdbcDriver(mysqlDriverDownloadUrl, tmpPath.toString());
     }
 
-    MYSQL_CONTAINER =
-        new MySQLContainer<>(mysqlImageName)
-            .withDatabaseName(TEST_DB_NAME)
-            .withUsername("root")
-            .withPassword("root");
-    MYSQL_CONTAINER.start();
-    mysqlService = new MysqlService(MYSQL_CONTAINER);
+    TEST_DB_NAME = TestDatabaseName.MYSQL_CATALOG_MYSQL_IT;
+
+    if (mysqlImageName.equals("mysql:5.7")) {
+      containerSuite.startMySQLVersion5Container(TestDatabaseName.MYSQL_CATALOG_MYSQL_IT);
+      MYSQL_CONTAINER = containerSuite.getMySQLVersion5Container();
+    } else {
+      containerSuite.startMySQLContainer(TEST_DB_NAME);
+      MYSQL_CONTAINER = containerSuite.getMySQLContainer();
+    }
+
+    mysqlService = new MysqlService(MYSQL_CONTAINER, TEST_DB_NAME);
     createMetalake();
     createCatalog();
     createSchema();
@@ -128,13 +138,12 @@ public class CatalogMysqlIT extends AbstractIT {
   @AfterAll
   public void stop() {
     clearTableAndSchema();
-    client.dropMetalake(NameIdentifier.of(metalakeName));
+    client.dropMetalake(metalakeName);
     mysqlService.close();
-    MYSQL_CONTAINER.stop();
   }
 
   @AfterEach
-  private void resetSchema() {
+  public void resetSchema() {
     clearTableAndSchema();
     createSchema();
   }
@@ -153,32 +162,31 @@ public class CatalogMysqlIT extends AbstractIT {
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
     GravitinoMetalake createdMetalake =
-        client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
-    GravitinoMetalake loadMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
     Assertions.assertEquals(createdMetalake, loadMetalake);
 
     metalake = loadMetalake;
   }
 
-  private void createCatalog() {
+  private void createCatalog() throws SQLException {
     Map<String, String> catalogProperties = Maps.newHashMap();
 
     catalogProperties.put(
         JdbcConfig.JDBC_URL.getKey(),
         StringUtils.substring(
-            MYSQL_CONTAINER.getJdbcUrl(), 0, MYSQL_CONTAINER.getJdbcUrl().lastIndexOf("/")));
-    catalogProperties.put(JdbcConfig.JDBC_DRIVER.getKey(), MYSQL_CONTAINER.getDriverClassName());
+            MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME),
+            0,
+            MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME).lastIndexOf("/")));
+    catalogProperties.put(
+        JdbcConfig.JDBC_DRIVER.getKey(), MYSQL_CONTAINER.getDriverClassName(TEST_DB_NAME));
     catalogProperties.put(JdbcConfig.USERNAME.getKey(), MYSQL_CONTAINER.getUsername());
     catalogProperties.put(JdbcConfig.PASSWORD.getKey(), MYSQL_CONTAINER.getPassword());
 
     Catalog createdCatalog =
         metalake.createCatalog(
-            NameIdentifier.of(metalakeName, catalogName),
-            Catalog.Type.RELATIONAL,
-            provider,
-            "comment",
-            catalogProperties);
-    Catalog loadCatalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+            catalogName, Catalog.Type.RELATIONAL, provider, "comment", catalogProperties);
+    Catalog loadCatalog = metalake.loadCatalog(catalogName);
     Assertions.assertEquals(createdCatalog, loadCatalog);
 
     catalog = loadCatalog;
@@ -200,6 +208,41 @@ public class CatalogMysqlIT extends AbstractIT {
     Column col3 = Column.of(MYSQL_COL_NAME3, Types.StringType.get(), "col_3_comment");
 
     return new Column[] {col1, col2, col3};
+  }
+
+  private Column[] createColumnsWithDefaultValue() {
+    return new Column[] {
+      Column.of(
+          MYSQL_COL_NAME1,
+          Types.FloatType.get(),
+          "col_1_comment",
+          false,
+          false,
+          Literals.of("1.23", Types.FloatType.get())),
+      Column.of(
+          MYSQL_COL_NAME2,
+          Types.TimestampType.withoutTimeZone(),
+          "col_2_comment",
+          false,
+          false,
+          FunctionExpression.of("current_timestamp")),
+      Column.of(
+          MYSQL_COL_NAME3, Types.VarCharType.of(255), "col_3_comment", true, false, Literals.NULL),
+      Column.of(
+          MYSQL_COL_NAME4,
+          Types.IntegerType.get(),
+          "col_4_comment",
+          false,
+          false,
+          Literals.of("1000", Types.IntegerType.get())),
+      Column.of(
+          MYSQL_COL_NAME5,
+          Types.DecimalType.of(3, 2),
+          "col_5_comment",
+          true,
+          false,
+          Literals.of("1.23", Types.DecimalType.of(3, 2)))
+    };
   }
 
   private Map<String, String> createProperties() {
@@ -315,7 +358,7 @@ public class CatalogMysqlIT extends AbstractIT {
     Assertions.assertEquals(createdTable.columns().length, columns.length);
 
     for (int i = 0; i < columns.length; i++) {
-      assertColumn(columns[i], createdTable.columns()[i]);
+      ITUtils.assertColumn(columns[i], createdTable.columns()[i]);
     }
 
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
@@ -328,7 +371,7 @@ public class CatalogMysqlIT extends AbstractIT {
     }
     Assertions.assertEquals(loadTable.columns().length, columns.length);
     for (int i = 0; i < columns.length; i++) {
-      assertColumn(columns[i], loadTable.columns()[i]);
+      ITUtils.assertColumn(columns[i], loadTable.columns()[i]);
     }
   }
 
@@ -464,6 +507,7 @@ public class CatalogMysqlIT extends AbstractIT {
             + "  date_col_2 date,\n"
             + "  date_col_3 date DEFAULT (CURRENT_DATE + INTERVAL 1 YEAR),\n"
             + "  date_col_4 date DEFAULT (CURRENT_DATE),\n"
+            + "  date_col_5 date DEFAULT '2024-04-01',\n"
             + "  timestamp_col_1 timestamp default '2012-12-31 11:30:45',\n"
             + "  timestamp_col_2 timestamp default 19830905,\n"
             + "  decimal_6_2_col_1 decimal(6, 2) default 1.2\n"
@@ -517,6 +561,10 @@ public class CatalogMysqlIT extends AbstractIT {
           break;
         case "date_col_4":
           Assertions.assertEquals(UnparsedExpression.of("curdate()"), column.defaultValue());
+          break;
+        case "date_col_5":
+          Assertions.assertEquals(
+              Literals.of("2024-04-01", Types.DateType.get()), column.defaultValue());
           break;
         case "timestamp_col_1":
           Assertions.assertEquals(
@@ -663,6 +711,52 @@ public class CatalogMysqlIT extends AbstractIT {
   }
 
   @Test
+  void testUpdateColumnDefaultValue() {
+    Column[] columns = createColumnsWithDefaultValue();
+    Table table =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+                columns,
+                null,
+                ImmutableMap.of());
+
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, table.auditInfo().creator());
+    Assertions.assertNull(table.auditInfo().lastModifier());
+    catalog
+        .asTableCatalog()
+        .alterTable(
+            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            TableChange.updateColumnDefaultValue(
+                new String[] {columns[0].name()}, Literals.of("1.2345", Types.FloatType.get())),
+            TableChange.updateColumnDefaultValue(
+                new String[] {columns[1].name()}, FunctionExpression.of("current_timestamp")),
+            TableChange.updateColumnDefaultValue(
+                new String[] {columns[2].name()}, Literals.of("hello", Types.VarCharType.of(255))),
+            TableChange.updateColumnDefaultValue(
+                new String[] {columns[3].name()}, Literals.of("2000", Types.IntegerType.get())),
+            TableChange.updateColumnDefaultValue(
+                new String[] {columns[4].name()}, Literals.of("2.34", Types.DecimalType.of(3, 2))));
+
+    table =
+        catalog
+            .asTableCatalog()
+            .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+
+    Assertions.assertEquals(
+        Literals.of("1.2345", Types.FloatType.get()), table.columns()[0].defaultValue());
+    Assertions.assertEquals(
+        FunctionExpression.of("current_timestamp"), table.columns()[1].defaultValue());
+    Assertions.assertEquals(
+        Literals.of("hello", Types.VarCharType.of(255)), table.columns()[2].defaultValue());
+    Assertions.assertEquals(
+        Literals.of("2000", Types.IntegerType.get()), table.columns()[3].defaultValue());
+    Assertions.assertEquals(
+        Literals.of("2.34", Types.DecimalType.of(3, 2)), table.columns()[4].defaultValue());
+  }
+
+  @Test
   void testDropMySQLDatabase() {
     String schemaName = GravitinoITUtils.genRandomName("mysql_schema").toLowerCase();
     String tableName = GravitinoITUtils.genRandomName("mysql_table").toLowerCase();
@@ -682,7 +776,8 @@ public class CatalogMysqlIT extends AbstractIT {
             "Created by gravitino client",
             ImmutableMap.<String, String>builder().build());
 
-    // Try to drop a database, and cascade equals to false, it should not be allowed.
+    // Try to drop a database, and cascade equals to false, it should not be
+    // allowed.
     catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), false);
     // Check the database still exists
     catalog.asSchemas().loadSchema(NameIdentifier.of(metalakeName, catalogName, schemaName));
@@ -734,10 +829,10 @@ public class CatalogMysqlIT extends AbstractIT {
             Distributions.NONE,
             new SortOrder[0],
             indexes);
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), properties, indexes, createdTable);
     Table table = tableCatalog.loadTable(tableIdentifier);
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), properties, indexes, table);
 
     NameIdentifier id = NameIdentifier.of(metalakeName, catalogName, schemaName, "test_failed");
@@ -835,10 +930,10 @@ public class CatalogMysqlIT extends AbstractIT {
             new SortOrder[0],
             indexes);
     // Test create auto increment key success.
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), properties, indexes, createdTable);
     Table table = tableCatalog.loadTable(tableIdentifier);
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), properties, indexes, table);
 
     // Test alter table. auto increment exist.
@@ -855,7 +950,7 @@ public class CatalogMysqlIT extends AbstractIT {
           col4,
           col5
         };
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(alterColumns), properties, indexes, table);
 
     // UpdateColumnComment
@@ -870,7 +965,7 @@ public class CatalogMysqlIT extends AbstractIT {
           col4,
           col5
         };
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(alterColumns), properties, indexes, table);
 
     // RenameColumn
@@ -890,7 +985,7 @@ public class CatalogMysqlIT extends AbstractIT {
           Indexes.createMysqlPrimaryKey(new String[][] {{"col_1_1"}, {"col_2"}}),
           Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}})
         };
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(alterColumns), properties, indexes, table);
 
     tableCatalog.dropTable(tableIdentifier);
@@ -945,7 +1040,7 @@ public class CatalogMysqlIT extends AbstractIT {
     NameIdentifier identer = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
     RuntimeException exception =
         Assertions.assertThrowsExactly(
-            RuntimeException.class,
+            UnsupportedOperationException.class,
             () -> catalog.asSchemas().createSchema(identer, "comment", null));
     Assertions.assertTrue(
         exception.getMessage().contains("MySQL doesn't support set schema comment: comment"));
@@ -957,6 +1052,7 @@ public class CatalogMysqlIT extends AbstractIT {
     Assertions.assertTrue(StringUtils.isEmpty(schema.comment()));
     schema = catalog.asSchemas().loadSchema(ident);
     Assertions.assertTrue(StringUtils.isEmpty(schema.comment()));
+    catalog.asSchemas().dropSchema(ident, true);
   }
 
   @Test
@@ -1071,22 +1167,26 @@ public class CatalogMysqlIT extends AbstractIT {
     Table t1 =
         tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, t1_name));
     Arrays.stream(t1.columns()).anyMatch(c -> Objects.equals(c.name(), "t112"));
-    assertionsTableInfo(t1_name, table_comment, Arrays.asList(t1_col), properties, t1_indexes, t1);
+    ITUtils.assertionsTableInfo(
+        t1_name, table_comment, Arrays.asList(t1_col), properties, t1_indexes, t1);
 
     Table t2 =
         tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, t2_name));
     Arrays.stream(t2.columns()).anyMatch(c -> Objects.equals(c.name(), "t212"));
-    assertionsTableInfo(t2_name, table_comment, Arrays.asList(t2_col), properties, t2_indexes, t2);
+    ITUtils.assertionsTableInfo(
+        t2_name, table_comment, Arrays.asList(t2_col), properties, t2_indexes, t2);
 
     Table t3 =
         tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, t3_name));
     Arrays.stream(t3.columns()).anyMatch(c -> Objects.equals(c.name(), "t_12"));
-    assertionsTableInfo(t3_name, table_comment, Arrays.asList(t3_col), properties, t3_indexes, t3);
+    ITUtils.assertionsTableInfo(
+        t3_name, table_comment, Arrays.asList(t3_col), properties, t3_indexes, t3);
 
     Table t4 =
         tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, t4_name));
     Arrays.stream(t4.columns()).anyMatch(c -> Objects.equals(c.name(), "_1__"));
-    assertionsTableInfo(t4_name, table_comment, Arrays.asList(t4_col), properties, t4_indexes, t4);
+    ITUtils.assertionsTableInfo(
+        t4_name, table_comment, Arrays.asList(t4_col), properties, t4_indexes, t4);
   }
 
   @Test
@@ -1118,10 +1218,10 @@ public class CatalogMysqlIT extends AbstractIT {
             Distributions.NONE,
             new SortOrder[0],
             indexes);
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         "tableName", table_comment, Arrays.asList(newColumns), properties, indexes, createdTable);
     Table table = tableCatalog.loadTable(tableIdentifier);
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         "tableName", table_comment, Arrays.asList(newColumns), properties, indexes, table);
 
     // Test create table with same name but different case
@@ -1143,8 +1243,50 @@ public class CatalogMysqlIT extends AbstractIT {
     Assertions.assertEquals("TABLENAME", tableAgain.name());
 
     table = tableCatalog.loadTable(tableIdentifier2);
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         "TABLENAME", table_comment, Arrays.asList(newColumns), properties, indexes, table);
+  }
+
+  @Test
+  void testNameSpec() {
+    // test operate illegal schema name from MySQL
+    String testSchemaName = "//";
+    String sql = String.format("CREATE DATABASE `%s`", testSchemaName);
+    mysqlService.executeQuery(sql);
+
+    NameIdentifier schemaIdent = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
+    Schema schema = catalog.asSchemas().loadSchema(schemaIdent);
+    Assertions.assertEquals(testSchemaName, schema.name());
+
+    NameIdentifier[] schemaIdents =
+        catalog.asSchemas().listSchemas(Namespace.of(metalakeName, catalogName));
+    Assertions.assertTrue(
+        Arrays.stream(schemaIdents).anyMatch(s -> s.name().equals(testSchemaName)));
+
+    Assertions.assertTrue(catalog.asSchemas().dropSchema(schemaIdent, false));
+    Assertions.assertFalse(catalog.asSchemas().schemaExists(schemaIdent));
+
+    // test operate illegal table name from MySQL
+    mysqlService.executeQuery(sql);
+    String testTableName = "//";
+    sql = String.format("CREATE TABLE `%s`.`%s` (id int)", testSchemaName, testTableName);
+    mysqlService.executeQuery(sql);
+    NameIdentifier tableIdent =
+        NameIdentifier.of(metalakeName, catalogName, testSchemaName, testTableName);
+
+    Table table = catalog.asTableCatalog().loadTable(tableIdent);
+    Assertions.assertEquals(testTableName, table.name());
+
+    NameIdentifier[] tableIdents =
+        catalog
+            .asTableCatalog()
+            .listTables(Namespace.of(metalakeName, catalogName, testSchemaName));
+    Assertions.assertTrue(Arrays.stream(tableIdents).anyMatch(t -> t.name().equals(testTableName)));
+
+    Assertions.assertTrue(catalog.asTableCatalog().dropTable(tableIdent));
+    Assertions.assertFalse(catalog.asTableCatalog().tableExists(tableIdent));
+    Assertions.assertFalse(catalog.asTableCatalog().purgeTable(tableIdent));
+    catalog.asSchemas().dropSchema(schemaIdent, true);
   }
 
   @Test
@@ -1209,6 +1351,11 @@ public class CatalogMysqlIT extends AbstractIT {
               .stream()
               .anyMatch(n -> n.equals(tableName)));
     }
+
+    for (String schema : schemas) {
+      NameIdentifier schemaIdentifier = NameIdentifier.of(metalakeName, catalogName, schema);
+      schemaSupport.dropSchema(schemaIdentifier, true);
+    }
   }
 
   @Test
@@ -1258,7 +1405,7 @@ public class CatalogMysqlIT extends AbstractIT {
           Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}),
           Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}})
         };
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), createProperties(), indexes, table);
 
     // delete index and add new column and index.
@@ -1280,7 +1427,7 @@ public class CatalogMysqlIT extends AbstractIT {
         tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
     Column col4 = Column.of("col_4", Types.VarCharType.of(255), null, true, false, null);
     newColumns = new Column[] {col1, col2, col3, col4};
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), createProperties(), indexes, table);
 
     // Add a previously existing index
@@ -1300,7 +1447,7 @@ public class CatalogMysqlIT extends AbstractIT {
         };
     table =
         tableCatalog.loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), createProperties(), indexes, table);
   }
 
@@ -1367,7 +1514,7 @@ public class CatalogMysqlIT extends AbstractIT {
     Column col6 = Column.of("col_6", Types.LongType.get(), "id", false, true, null);
     Index[] indices = new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_6"}})};
     newColumns = new Column[] {col1, col2, col3, col4, col5, col6};
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), properties, indices, table);
 
     // Test the auto-increment property of modified fields
@@ -1377,7 +1524,7 @@ public class CatalogMysqlIT extends AbstractIT {
     col6 = Column.of("col_6", Types.LongType.get(), "id", false, false, null);
     indices = new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_6"}})};
     newColumns = new Column[] {col1, col2, col3, col4, col5, col6};
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), properties, indices, table);
 
     // Add the auto-increment attribute to the field
@@ -1387,7 +1534,54 @@ public class CatalogMysqlIT extends AbstractIT {
     col6 = Column.of("col_6", Types.LongType.get(), "id", false, true, null);
     indices = new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_6"}})};
     newColumns = new Column[] {col1, col2, col3, col4, col5, col6};
-    assertionsTableInfo(
+    ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), properties, indices, table);
+  }
+
+  @Test
+  void testAddColumnDefaultValue() {
+    Column col1 = Column.of("col_1", Types.LongType.get(), "uid", true, false, null);
+    Column col2 = Column.of("col_2", Types.ByteType.get(), "yes", true, false, null);
+    Column col3 = Column.of("col_3", Types.VarCharType.of(255), "comment", true, false, null);
+    String tableName = "default_value_table";
+    Column[] newColumns = new Column[] {col1, col2, col3};
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        newColumns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0],
+        Indexes.EMPTY_INDEXES);
+
+    Column col4 =
+        Column.of("col_4", Types.LongType.get(), "col4", false, false, Literals.longLiteral(1000L));
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addColumn(
+            new String[] {col4.name()},
+            col4.dataType(),
+            col4.comment(),
+            TableChange.ColumnPosition.defaultPos(),
+            col4.nullable(),
+            col4.autoIncrement(),
+            col4.defaultValue()));
+
+    Table table = tableCatalog.loadTable(tableIdentifier);
+    newColumns = new Column[] {col1, col2, col3, col4};
+
+    ITUtils.assertionsTableInfo(
+        tableName,
+        table_comment,
+        Arrays.asList(newColumns),
+        properties,
+        Indexes.EMPTY_INDEXES,
+        table);
   }
 }

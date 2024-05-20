@@ -211,7 +211,10 @@
    MIT license.
 
    Vben
-   ./web/lib/utils/axios
-   ./web/types/axios.d.ts
-   ./web/lib/enums/httpEnum.ts
-   ./web/lib/utils/index.js (parts of)
+   ./src/lib/utils/axios
+   ./src/types/axios.d.ts
+   ./src/lib/enums/httpEnum.ts
+   ./src/lib/utils/index.js (parts of)
+
+   Third party SIL Open Font License v1.1 (OFL-1.1)
+   (SIL OPEN FONT LICENSE Version 1.1) The Alata font family (https://github.com/SorkinType/Alata)

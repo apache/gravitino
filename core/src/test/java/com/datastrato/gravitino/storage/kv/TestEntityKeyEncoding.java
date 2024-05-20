@@ -9,7 +9,7 @@ import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_STORE;
 import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
-import static com.datastrato.gravitino.Configs.KV_DELETE_AFTER_TIME;
+import static com.datastrato.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static com.datastrato.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
 import static com.datastrato.gravitino.storage.kv.BinaryEntityKeyEncoder.BYTABLE_NAMESPACE_SEPARATOR;
 import static com.datastrato.gravitino.storage.kv.BinaryEntityKeyEncoder.WILD_CARD;
@@ -52,7 +52,7 @@ public class TestEntityKeyEncoding {
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(3000L);
     Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
     Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
-    Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
+    Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
     return config;
   }
 
@@ -74,6 +74,65 @@ public class TestEntityKeyEncoding {
     IdGenerator spyIdGenerator = Mockito.spy(idGenerator);
     field.set(nameMappingService, spyIdGenerator);
     return spyIdGenerator;
+  }
+
+  @Test
+  void testFilesetAndTableWithSameName()
+      throws IOException, NoSuchFieldException, IllegalAccessException {
+    Config config = getConfig();
+    try (KvEntityStore kvEntityStore = getKvEntityStore(config)) {
+      BinaryEntityKeyEncoder encoder = (BinaryEntityKeyEncoder) kvEntityStore.entityKeyEncoder;
+      IdGenerator mockIdGenerator = getIdGeneratorAndSpy(encoder);
+      Mockito.doReturn(0L).when(mockIdGenerator).nextId();
+      NameIdentifier mateLakeIdentifier1 = NameIdentifier.of("metalake");
+      encoder.encode(mateLakeIdentifier1, EntityType.METALAKE);
+
+      Mockito.doReturn(1L).when(mockIdGenerator).nextId();
+      NameIdentifier catalogIdentifier = NameIdentifier.of("metalake", "catalogs");
+      encoder.encode(catalogIdentifier, EntityType.CATALOG);
+
+      Mockito.doReturn(2L).when(mockIdGenerator).nextId();
+      NameIdentifier schemaIdentifier = NameIdentifier.of("metalake", "catalogs", "schema");
+      encoder.encode(schemaIdentifier, EntityType.SCHEMA);
+
+      Mockito.doReturn(3L).when(mockIdGenerator).nextId();
+      NameIdentifier tableIdentifier =
+          NameIdentifier.of("metalake", "catalogs", "schema", "theSame");
+      byte[] tableKey = encoder.encode(tableIdentifier, EntityType.TABLE);
+      byte[] expectKey =
+          Bytes.concat(
+              EntityType.TABLE.getShortName().getBytes(StandardCharsets.UTF_8),
+              BYTABLE_NAMESPACE_SEPARATOR,
+              ByteUtils.longToByte(0L),
+              BYTABLE_NAMESPACE_SEPARATOR,
+              ByteUtils.longToByte(1L),
+              BYTABLE_NAMESPACE_SEPARATOR,
+              ByteUtils.longToByte(2L),
+              BYTABLE_NAMESPACE_SEPARATOR,
+              ByteUtils.longToByte(3L));
+
+      Assertions.assertArrayEquals(expectKey, tableKey);
+
+      Mockito.doReturn(4L).when(mockIdGenerator).nextId();
+      NameIdentifier filesetIdentifier =
+          NameIdentifier.of("metalake", "catalogs", "schema", "theSame");
+      byte[] filesetKey = encoder.encode(filesetIdentifier, EntityType.FILESET);
+
+      // Check the id of table is NOT the same as the id of fileset
+      Assertions.assertNotEquals(tableKey, filesetKey);
+      expectKey =
+          Bytes.concat(
+              EntityType.FILESET.getShortName().getBytes(StandardCharsets.UTF_8),
+              BYTABLE_NAMESPACE_SEPARATOR,
+              ByteUtils.longToByte(0L),
+              BYTABLE_NAMESPACE_SEPARATOR,
+              ByteUtils.longToByte(1L),
+              BYTABLE_NAMESPACE_SEPARATOR,
+              ByteUtils.longToByte(2L),
+              BYTABLE_NAMESPACE_SEPARATOR,
+              ByteUtils.longToByte(4L));
+      Assertions.assertArrayEquals(expectKey, filesetKey);
+    }
   }
 
   @Test

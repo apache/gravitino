@@ -1,6 +1,6 @@
-CREATE SCHEMA "test.gt_postgresql".gt_db1;
+CREATE SCHEMA gt_postgresql.gt_db1;
 
-USE "test.gt_postgresql".gt_db1;
+USE gt_postgresql.gt_db1;
 
 -- Unsupported Type: TINYINT
 CREATE TABLE tb01 (
@@ -69,4 +69,4 @@ drop table tb01;
 
 drop table tb02;
 
-drop schema "test.gt_postgresql".gt_db1 cascade;
+drop schema gt_postgresql.gt_db1 cascade;

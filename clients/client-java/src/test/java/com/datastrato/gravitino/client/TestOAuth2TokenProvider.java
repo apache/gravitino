@@ -9,12 +9,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockserver.integration.ClientAndServer.startClientAndServer;
 
 import com.datastrato.gravitino.auth.AuthConstants;
-import com.datastrato.gravitino.client.DefaultOAuth2TokenProvider.Builder;
 import com.datastrato.gravitino.dto.responses.OAuth2ErrorResponse;
 import com.datastrato.gravitino.dto.responses.OAuth2TokenResponse;
 import com.datastrato.gravitino.exceptions.BadRequestException;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
-import com.datastrato.gravitino.json.JsonUtils;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
@@ -49,10 +48,11 @@ public class TestOAuth2TokenProvider {
 
   @Test
   public void testProviderInitException() throws Exception {
-    Builder tokenProvider1 = DefaultOAuth2TokenProvider.builder().withUri("test");
-    Builder tokenProvider2 =
+    DefaultOAuth2TokenProvider.Builder tokenProvider1 =
+        DefaultOAuth2TokenProvider.builder().withUri("test");
+    DefaultOAuth2TokenProvider.Builder tokenProvider2 =
         DefaultOAuth2TokenProvider.builder().withUri("test").withCredential("xx");
-    Builder tokenProvider3 =
+    DefaultOAuth2TokenProvider.Builder tokenProvider3 =
         DefaultOAuth2TokenProvider.builder().withUri("test").withCredential("xx").withScope("test");
 
     Assertions.assertThrows(IllegalArgumentException.class, () -> tokenProvider1.build());
@@ -67,7 +67,7 @@ public class TestOAuth2TokenProvider {
         HttpResponse.response().withStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR);
     OAuth2ErrorResponse respBody =
         new OAuth2ErrorResponse(OAuth2ClientUtil.INVALID_CLIENT_ERROR, "invalid");
-    String respJson = JsonUtils.objectMapper().writeValueAsString(respBody);
+    String respJson = ObjectMapperProvider.objectMapper().writeValueAsString(respBody);
     mockResponse = mockResponse.withBody(respJson);
     mockServer.when(any(), Times.exactly(1)).respond(mockResponse);
     OAuth2TokenProvider.Builder builder =
@@ -79,7 +79,7 @@ public class TestOAuth2TokenProvider {
     Assertions.assertThrows(UnauthorizedException.class, builder::build);
 
     respBody = new OAuth2ErrorResponse(OAuth2ClientUtil.INVALID_GRANT_ERROR, "invalid");
-    respJson = JsonUtils.objectMapper().writeValueAsString(respBody);
+    respJson = ObjectMapperProvider.objectMapper().writeValueAsString(respBody);
     mockResponse = mockResponse.withBody(respJson);
     mockServer.when(any(), Times.exactly(1)).respond(mockResponse);
     Assertions.assertThrows(BadRequestException.class, builder::build);
@@ -94,14 +94,15 @@ public class TestOAuth2TokenProvider {
             .withPath("oauth/token")
             .withScope("test");
 
+    ObjectMapper objectMapper = ObjectMapperProvider.objectMapper();
     HttpResponse mockResponse = HttpResponse.response().withStatusCode(HttpStatus.SC_OK);
     OAuth2TokenResponse response = new OAuth2TokenResponse("1", "2", "3", 1, "test", null);
-    String respJson = JsonUtils.objectMapper().writeValueAsString(response);
+    String respJson = objectMapper.writeValueAsString(response);
     mockResponse = mockResponse.withBody(respJson);
     mockServer.when(any(), Times.exactly(1)).respond(mockResponse);
     Assertions.assertThrows(IllegalArgumentException.class, builder::build);
     response = new OAuth2TokenResponse("1", "2", "bearer", 1, "test", null);
-    respJson = JsonUtils.objectMapper().writeValueAsString(response);
+    respJson = objectMapper.writeValueAsString(response);
     mockResponse = mockResponse.withBody(respJson);
     mockServer.when(any(), Times.exactly(1)).respond(mockResponse);
     OAuth2TokenProvider provider = builder.build();
@@ -117,7 +118,7 @@ public class TestOAuth2TokenProvider {
             .compact();
 
     response = new OAuth2TokenResponse(oldAccessToken, "2", "bearer", 1, "test", null);
-    respJson = JsonUtils.objectMapper().writeValueAsString(response);
+    respJson = objectMapper.writeValueAsString(response);
     mockResponse = mockResponse.withBody(respJson);
     mockServer.when(any(), Times.exactly(1)).respond(mockResponse);
     provider = builder.build();
@@ -130,7 +131,7 @@ public class TestOAuth2TokenProvider {
             .compact();
 
     response = new OAuth2TokenResponse(accessToken, "2", "bearer", 1, "test", null);
-    respJson = JsonUtils.objectMapper().writeValueAsString(response);
+    respJson = ObjectMapperProvider.objectMapper().writeValueAsString(response);
     mockResponse = mockResponse.withBody(respJson);
     mockServer.when(any(), Times.exactly(1)).respond(mockResponse);
     Assertions.assertNotEquals(accessToken, oldAccessToken);

@@ -128,7 +128,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
           icebergTableOps.listNamespace(IcebergTableOpsHelper.getIcebergNamespace()).namespaces();
 
       return namespaces.stream()
-          .map(icebergNamespace -> NameIdentifier.of(icebergNamespace.levels()))
+          .map(icebergNamespace -> NameIdentifier.of(namespace, icebergNamespace.toString()))
           .toArray(NameIdentifier[]::new);
     } catch (NoSuchNamespaceException e) {
       throw new NoSuchSchemaException(
@@ -314,6 +314,11 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
    */
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
+    NameIdentifier schemaIdent = NameIdentifier.of(namespace.levels());
+    if (!schemaExists(schemaIdent)) {
+      throw new NoSuchSchemaException("Schema (database) does not exist %s", namespace);
+    }
+
     try {
       ListTablesResponse listTablesResponse =
           icebergTableOps.listTable(IcebergTableOpsHelper.getIcebergNamespace(namespace));
@@ -476,20 +481,13 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       IcebergColumn[] icebergColumns =
           Arrays.stream(columns)
               .map(
-                  column -> {
-                    // Iceberg column default value is WIP, see
-                    // https://github.com/apache/iceberg/pull/4525
-                    Preconditions.checkArgument(
-                        column.defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET),
-                        "Iceberg does not support column default value. Illegal column: "
-                            + column.name());
-                    return IcebergColumn.builder()
-                        .withName(column.name())
-                        .withType(column.dataType())
-                        .withComment(column.comment())
-                        .withNullable(column.nullable())
-                        .build();
-                  })
+                  column ->
+                      IcebergColumn.builder()
+                          .withName(column.name())
+                          .withType(column.dataType())
+                          .withComment(column.comment())
+                          .withNullable(column.nullable())
+                          .build())
               .toArray(IcebergColumn[]::new);
 
       IcebergTable createdTable =

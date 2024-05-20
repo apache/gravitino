@@ -22,7 +22,6 @@ package com.datastrato.gravitino.client;
 import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
 import com.datastrato.gravitino.exceptions.RESTException;
-import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.rest.RESTRequest;
 import com.datastrato.gravitino.rest.RESTResponse;
 import com.datastrato.gravitino.rest.RESTUtils;
@@ -79,6 +78,21 @@ public class HTTPClient implements RESTClient {
   private final ObjectMapper mapper;
   private final AuthDataProvider authDataProvider;
 
+  // Handler to be executed before connecting to the server.
+  private final Runnable beforeConnectHandler;
+  // Handler status
+  enum HandlerStatus {
+    // The handler has not been executed yet.
+    Start,
+    // The handler has been executed successfully.
+    Finished,
+    // The handler is currently running.
+    Running,
+  }
+
+  // The status of the handler.
+  private volatile HandlerStatus handlerStatus = HandlerStatus.Start;
+
   /**
    * Constructs an instance of HTTPClient with the provided information.
    *
@@ -86,12 +100,14 @@ public class HTTPClient implements RESTClient {
    * @param baseHeaders A map of base headers to be included in all HTTP requests.
    * @param objectMapper The ObjectMapper used for JSON serialization and deserialization.
    * @param authDataProvider The provider of authentication data.
+   * @param beforeConnectHandler The function to be executed before connecting to the server.
    */
   private HTTPClient(
       String uri,
       Map<String, String> baseHeaders,
       ObjectMapper objectMapper,
-      AuthDataProvider authDataProvider) {
+      AuthDataProvider authDataProvider,
+      Runnable beforeConnectHandler) {
     this.uri = uri;
     this.mapper = objectMapper;
 
@@ -106,6 +122,11 @@ public class HTTPClient implements RESTClient {
 
     this.httpClient = clientBuilder.build();
     this.authDataProvider = authDataProvider;
+
+    if (beforeConnectHandler == null) {
+      handlerStatus = HandlerStatus.Finished;
+    }
+    this.beforeConnectHandler = beforeConnectHandler;
   }
 
   /**
@@ -314,6 +335,11 @@ public class HTTPClient implements RESTClient {
       Map<String, String> headers,
       Consumer<ErrorResponse> errorHandler,
       Consumer<Map<String, String>> responseHeaders) {
+
+    if (handlerStatus != HandlerStatus.Finished) {
+      performPreConnectHandler();
+    }
+
     if (path.startsWith("/")) {
       throw new RESTException(
           "Received a malformed path for a REST request: %s. Paths should not start with /", path);
@@ -380,6 +406,21 @@ public class HTTPClient implements RESTClient {
       }
     } catch (IOException e) {
       throw new RESTException(e, "Error occurred while processing %s request", method);
+    }
+  }
+
+  private synchronized void performPreConnectHandler() {
+    // beforeConnectHandler is a pre-connection handler that needs to be executed before the first
+    // HTTP request. if the handler execute fails, we set the status to Start to retry the handler.
+    if (handlerStatus == HandlerStatus.Start) {
+      handlerStatus = HandlerStatus.Running;
+      try {
+        beforeConnectHandler.run();
+        handlerStatus = HandlerStatus.Finished;
+      } catch (Exception e) {
+        handlerStatus = HandlerStatus.Start;
+        throw e;
+      }
     }
   }
 
@@ -653,8 +694,9 @@ public class HTTPClient implements RESTClient {
 
     private final Map<String, String> baseHeaders = Maps.newHashMap();
     private String uri;
-    private ObjectMapper mapper = JsonUtils.objectMapper();
+    private ObjectMapper mapper = ObjectMapperProvider.objectMapper();
     private AuthDataProvider authDataProvider;
+    private Runnable beforeConnectHandler;
 
     private Builder(Map<String, String> properties) {
       this.properties = properties;
@@ -708,6 +750,17 @@ public class HTTPClient implements RESTClient {
     }
 
     /**
+     * Sets the preConnect handle for the HTTP client.
+     *
+     * @param beforeConnectHandler The handle run before connect to the server .
+     * @return This Builder instance for method chaining.
+     */
+    public Builder withPreConnectHandler(Runnable beforeConnectHandler) {
+      this.beforeConnectHandler = beforeConnectHandler;
+      return this;
+    }
+
+    /**
      * Sets the AuthDataProvider for the HTTP client.
      *
      * @param authDataProvider The authDataProvider providing the data used to authenticate.
@@ -725,13 +778,13 @@ public class HTTPClient implements RESTClient {
      */
     public HTTPClient build() {
 
-      return new HTTPClient(uri, baseHeaders, mapper, authDataProvider);
+      return new HTTPClient(uri, baseHeaders, mapper, authDataProvider, beforeConnectHandler);
     }
   }
 
   private StringEntity toJson(Object requestBody) {
     try {
-      return new StringEntity(mapper.writeValueAsString(requestBody));
+      return new StringEntity(mapper.writeValueAsString(requestBody), StandardCharsets.UTF_8);
     } catch (JsonProcessingException e) {
       throw new RESTException(e, "Failed to write request body: %s", requestBody);
     }

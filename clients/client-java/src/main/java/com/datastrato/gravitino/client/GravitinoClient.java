@@ -8,11 +8,10 @@ package com.datastrato.gravitino.client;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.SupportsCatalogs;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
+import com.datastrato.gravitino.rel.SupportsCatalogs;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 
@@ -33,11 +32,19 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
    * @param uri The base URI for the Gravitino API.
    * @param metalakeName The specified metalake name.
    * @param authDataProvider The provider of the data which is used for authentication.
+   * @param checkVersion Whether to check the version of the Gravitino server. Gravitino does not
+   *     support the case that the client-side version is higher than the server-side version.
+   * @param headers The base header for Gravitino API.
    * @throws NoSuchMetalakeException if the metalake with specified name does not exist.
    */
-  private GravitinoClient(String uri, String metalakeName, AuthDataProvider authDataProvider) {
-    super(uri, authDataProvider);
-    this.metalake = loadMetalake(NameIdentifier.of(metalakeName));
+  private GravitinoClient(
+      String uri,
+      String metalakeName,
+      AuthDataProvider authDataProvider,
+      boolean checkVersion,
+      Map<String, String> headers) {
+    super(uri, authDataProvider, checkVersion, headers);
+    this.metalake = loadMetalake(metalakeName);
   }
 
   /**
@@ -51,40 +58,40 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
   }
 
   @Override
-  public NameIdentifier[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException {
-    return getMetalake().listCatalogs(namespace);
+  public NameIdentifier[] listCatalogs() throws NoSuchMetalakeException {
+    return getMetalake().listCatalogs();
   }
 
   @Override
-  public Catalog[] listCatalogsInfo(Namespace namespace) throws NoSuchMetalakeException {
-    return getMetalake().listCatalogsInfo(namespace);
+  public Catalog[] listCatalogsInfo() throws NoSuchMetalakeException {
+    return getMetalake().listCatalogsInfo();
   }
 
   @Override
-  public Catalog loadCatalog(NameIdentifier ident) throws NoSuchCatalogException {
-    return getMetalake().loadCatalog(ident);
+  public Catalog loadCatalog(String catalogName) throws NoSuchCatalogException {
+    return getMetalake().loadCatalog(catalogName);
   }
 
   @Override
   public Catalog createCatalog(
-      NameIdentifier ident,
+      String catalogName,
       Catalog.Type type,
       String provider,
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
-    return getMetalake().createCatalog(ident, type, provider, comment, properties);
+    return getMetalake().createCatalog(catalogName, type, provider, comment, properties);
   }
 
   @Override
-  public Catalog alterCatalog(NameIdentifier ident, CatalogChange... changes)
+  public Catalog alterCatalog(String catalogName, CatalogChange... changes)
       throws NoSuchCatalogException, IllegalArgumentException {
-    return getMetalake().alterCatalog(ident, changes);
+    return getMetalake().alterCatalog(catalogName, changes);
   }
 
   @Override
-  public boolean dropCatalog(NameIdentifier ident) {
-    return getMetalake().dropCatalog(ident);
+  public boolean dropCatalog(String catalogName) {
+    return getMetalake().dropCatalog(catalogName);
   }
 
   /**
@@ -138,7 +145,7 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
           metalakeName != null && !metalakeName.isEmpty(),
           "The argument 'metalakeName' must be a valid name");
 
-      return new GravitinoClient(uri, metalakeName, authDataProvider);
+      return new GravitinoClient(uri, metalakeName, authDataProvider, checkVersion, headers);
     }
   }
 }

@@ -5,6 +5,8 @@
 
 package com.datastrato.gravitino.storage.relational;
 
+import static com.datastrato.gravitino.Configs.GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT;
+
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.Entity;
@@ -18,13 +20,22 @@ import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.FilesetEntity;
+import com.datastrato.gravitino.meta.GroupEntity;
+import com.datastrato.gravitino.meta.RoleEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.TableEntity;
+import com.datastrato.gravitino.meta.TopicEntity;
+import com.datastrato.gravitino.meta.UserEntity;
+import com.datastrato.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 import com.datastrato.gravitino.storage.relational.service.CatalogMetaService;
 import com.datastrato.gravitino.storage.relational.service.FilesetMetaService;
+import com.datastrato.gravitino.storage.relational.service.GroupMetaService;
 import com.datastrato.gravitino.storage.relational.service.MetalakeMetaService;
+import com.datastrato.gravitino.storage.relational.service.RoleMetaService;
 import com.datastrato.gravitino.storage.relational.service.SchemaMetaService;
 import com.datastrato.gravitino.storage.relational.service.TableMetaService;
+import com.datastrato.gravitino.storage.relational.service.TopicMetaService;
+import com.datastrato.gravitino.storage.relational.service.UserMetaService;
 import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import java.io.IOException;
 import java.util.List;
@@ -42,6 +53,7 @@ public class JDBCBackend implements RelationalBackend {
   @Override
   public void initialize(Config config) {
     SqlSessionFactoryHelper.getInstance().init(config);
+    SQLExceptionConverterFactory.initConverter(config);
   }
 
   @Override
@@ -58,6 +70,8 @@ public class JDBCBackend implements RelationalBackend {
         return (List<E>) TableMetaService.getInstance().listTablesByNamespace(namespace);
       case FILESET:
         return (List<E>) FilesetMetaService.getInstance().listFilesetsByNamespace(namespace);
+      case TOPIC:
+        return (List<E>) TopicMetaService.getInstance().listTopicsByNamespace(namespace);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for list operation", entityType);
@@ -87,6 +101,14 @@ public class JDBCBackend implements RelationalBackend {
       TableMetaService.getInstance().insertTable((TableEntity) e, overwritten);
     } else if (e instanceof FilesetEntity) {
       FilesetMetaService.getInstance().insertFileset((FilesetEntity) e, overwritten);
+    } else if (e instanceof TopicEntity) {
+      TopicMetaService.getInstance().insertTopic((TopicEntity) e, overwritten);
+    } else if (e instanceof UserEntity) {
+      UserMetaService.getInstance().insertUser((UserEntity) e, overwritten);
+    } else if (e instanceof RoleEntity) {
+      RoleMetaService.getInstance().insertRole((RoleEntity) e, overwritten);
+    } else if (e instanceof GroupEntity) {
+      GroupMetaService.getInstance().insertGroup((GroupEntity) e, overwritten);
     } else {
       throw new UnsupportedEntityTypeException(
           "Unsupported entity type: %s for insert operation", e.getClass());
@@ -108,6 +130,12 @@ public class JDBCBackend implements RelationalBackend {
         return (E) TableMetaService.getInstance().updateTable(ident, updater);
       case FILESET:
         return (E) FilesetMetaService.getInstance().updateFileset(ident, updater);
+      case TOPIC:
+        return (E) TopicMetaService.getInstance().updateTopic(ident, updater);
+      case USER:
+        return (E) UserMetaService.getInstance().updateUser(ident, updater);
+      case GROUP:
+        return (E) GroupMetaService.getInstance().updateGroup(ident, updater);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for update operation", entityType);
@@ -128,6 +156,14 @@ public class JDBCBackend implements RelationalBackend {
         return (E) TableMetaService.getInstance().getTableByIdentifier(ident);
       case FILESET:
         return (E) FilesetMetaService.getInstance().getFilesetByIdentifier(ident);
+      case TOPIC:
+        return (E) TopicMetaService.getInstance().getTopicByIdentifier(ident);
+      case USER:
+        return (E) UserMetaService.getInstance().getUserByIdentifier(ident);
+      case GROUP:
+        return (E) GroupMetaService.getInstance().getGroupByIdentifier(ident);
+      case ROLE:
+        return (E) RoleMetaService.getInstance().getRoleByIdentifier(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for get operation", entityType);
@@ -147,9 +183,86 @@ public class JDBCBackend implements RelationalBackend {
         return TableMetaService.getInstance().deleteTable(ident);
       case FILESET:
         return FilesetMetaService.getInstance().deleteFileset(ident);
+      case TOPIC:
+        return TopicMetaService.getInstance().deleteTopic(ident);
+      case USER:
+        return UserMetaService.getInstance().deleteUser(ident);
+      case GROUP:
+        return GroupMetaService.getInstance().deleteGroup(ident);
+      case ROLE:
+        return RoleMetaService.getInstance().deleteRole(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for delete operation", entityType);
+    }
+  }
+
+  @Override
+  public int hardDeleteLegacyData(Entity.EntityType entityType, long legacyTimeLine) {
+    switch (entityType) {
+      case METALAKE:
+        return MetalakeMetaService.getInstance()
+            .deleteMetalakeMetasByLegacyTimeLine(
+                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case CATALOG:
+        return CatalogMetaService.getInstance()
+            .deleteCatalogMetasByLegacyTimeLine(
+                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case SCHEMA:
+        return SchemaMetaService.getInstance()
+            .deleteSchemaMetasByLegacyTimeLine(
+                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case TABLE:
+        return TableMetaService.getInstance()
+            .deleteTableMetasByLegacyTimeLine(
+                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case FILESET:
+        return FilesetMetaService.getInstance()
+            .deleteFilesetAndVersionMetasByLegacyTimeLine(
+                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case TOPIC:
+        return TopicMetaService.getInstance()
+            .deleteTopicMetasByLegacyTimeLine(
+                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+
+      case COLUMN:
+      case USER:
+      case GROUP:
+      case AUDIT:
+      case ROLE:
+        return 0;
+        // TODO: Implement hard delete logic for these entity types.
+
+      default:
+        throw new IllegalArgumentException(
+            "Unsupported entity type when collectAndRemoveLegacyData: " + entityType);
+    }
+  }
+
+  @Override
+  public int deleteOldVersionData(Entity.EntityType entityType, long versionRetentionCount) {
+    switch (entityType) {
+      case METALAKE:
+      case CATALOG:
+      case SCHEMA:
+      case TABLE:
+      case COLUMN:
+      case TOPIC:
+      case USER:
+      case GROUP:
+      case AUDIT:
+      case ROLE:
+        // These entity types have not implemented multi-versions, so we can skip.
+        return 0;
+
+      case FILESET:
+        return FilesetMetaService.getInstance()
+            .deleteFilesetVersionsByRetentionCount(
+                versionRetentionCount, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+
+      default:
+        throw new IllegalArgumentException(
+            "Unsupported entity type when collectAndRemoveOldVersionData: " + entityType);
     }
   }
 

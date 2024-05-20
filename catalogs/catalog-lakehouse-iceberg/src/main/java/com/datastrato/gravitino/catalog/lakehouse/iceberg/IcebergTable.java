@@ -5,6 +5,8 @@
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata.DISTRIBUTION_MODE;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata.LOCATION;
+import static org.apache.iceberg.TableProperties.DEFAULT_FILE_FORMAT;
 
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.ConvertUtil;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.FromIcebergPartitionSpec;
@@ -21,6 +23,7 @@ import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import java.util.HashMap;
 import java.util.Map;
 import lombok.Getter;
 import lombok.ToString;
@@ -47,11 +50,32 @@ public class IcebergTable extends BaseTable {
   /** The default provider of the table. */
   public static final String DEFAULT_ICEBERG_PROVIDER = "iceberg";
 
+  /** The supported parquet file format for Iceberg tables. */
+  public static final String ICEBERG_PARQUET_FILE_FORMAT = "parquet";
+  /** The supported orc file format for Iceberg tables. */
+  public static final String ICEBERG_ORC_FILE_FORMAT = "orc";
+  /** The supported avro file format for Iceberg tables. */
+  public static final String ICEBERG_AVRO_FILE_FORMAT = "avro";
+
   public static final String ICEBERG_COMMENT_FIELD_NAME = "comment";
 
   private String location;
 
   private IcebergTable() {}
+
+  public static Map<String, String> rebuildCreateProperties(Map<String, String> createProperties) {
+    String provider = createProperties.get(PROP_PROVIDER);
+    if (ICEBERG_PARQUET_FILE_FORMAT.equalsIgnoreCase(provider)) {
+      createProperties.put(DEFAULT_FILE_FORMAT, ICEBERG_PARQUET_FILE_FORMAT);
+    } else if (ICEBERG_AVRO_FILE_FORMAT.equalsIgnoreCase(provider)) {
+      createProperties.put(DEFAULT_FILE_FORMAT, ICEBERG_AVRO_FILE_FORMAT);
+    } else if (ICEBERG_ORC_FILE_FORMAT.equalsIgnoreCase(provider)) {
+      createProperties.put(DEFAULT_FILE_FORMAT, ICEBERG_ORC_FILE_FORMAT);
+    } else if (provider != null && !DEFAULT_ICEBERG_PROVIDER.equalsIgnoreCase(provider)) {
+      throw new IllegalArgumentException("Unsupported format in USING: " + provider);
+    }
+    return createProperties;
+  }
 
   public CreateTableRequest toCreateTableRequest() {
     Schema schema = ConvertUtil.toIcebergSchema(this);
@@ -62,7 +86,7 @@ public class IcebergTable extends BaseTable {
             .withName(name)
             .withLocation(location)
             .withSchema(schema)
-            .setProperties(properties)
+            .setProperties(rebuildCreateProperties(properties))
             .withPartitionSpec(ToIcebergPartitionSpec.toPartitionSpec(schema, partitioning))
             .withWriteOrder(ToIcebergSortOrder.toSortOrder(schema, sortOrders));
     return builder.build();
@@ -109,7 +133,8 @@ public class IcebergTable extends BaseTable {
    * @return A new IcebergTable instance.
    */
   public static IcebergTable fromIcebergTable(TableMetadata table, String tableName) {
-    Map<String, String> properties = table.properties();
+    Map<String, String> properties = new HashMap<>(table.properties());
+    properties.put(LOCATION, table.location());
     Schema schema = table.schema();
     Transform[] partitionSpec = FromIcebergPartitionSpec.fromPartitionSpec(table.spec(), schema);
     SortOrder[] sortOrder = FromIcebergSortOrder.fromSortOrder(table.sortOrder());
@@ -185,10 +210,6 @@ public class IcebergTable extends BaseTable {
       icebergTable.sortOrders = sortOrders;
       if (null != comment) {
         icebergTable.properties.putIfAbsent(ICEBERG_COMMENT_FIELD_NAME, comment);
-      }
-      String provider = icebergTable.properties.get(PROP_PROVIDER);
-      if (provider != null && !DEFAULT_ICEBERG_PROVIDER.equalsIgnoreCase(provider)) {
-        throw new IllegalArgumentException("Unsupported format in USING: " + provider);
       }
       return icebergTable;
     }

@@ -6,14 +6,19 @@ package com.datastrato.gravitino.client;
 
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Version;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
+import com.datastrato.gravitino.dto.VersionDTO;
 import com.datastrato.gravitino.dto.requests.MetalakeCreateRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeUpdatesRequest;
 import com.datastrato.gravitino.dto.responses.DropResponse;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
 import com.datastrato.gravitino.dto.responses.MetalakeListResponse;
 import com.datastrato.gravitino.dto.responses.MetalakeResponse;
+import com.datastrato.gravitino.dto.responses.VersionResponse;
+import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
+import com.datastrato.gravitino.exceptions.IllegalNamespaceException;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.exceptions.RESTException;
@@ -27,6 +32,9 @@ import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockserver.matchers.Times;
+import org.mockserver.model.HttpRequest;
+import org.mockserver.model.HttpResponse;
 
 public class TestGravitinoClient extends TestBase {
 
@@ -93,7 +101,7 @@ public class TestGravitinoClient extends TestBase {
     MetalakeResponse resp = new MetalakeResponse(mockMetalake);
     buildMockResource(Method.GET, "/api/metalakes/mock", null, resp, HttpStatus.SC_OK);
     NameIdentifier id = NameIdentifier.of("mock");
-    GravitinoMetalake metaLake = client.loadMetalake(id);
+    GravitinoMetalake metaLake = client.loadMetalake(id.name());
     Assertions.assertEquals("mock", metaLake.name());
     Assertions.assertEquals("comment", metaLake.comment());
     Assertions.assertEquals("creator", metaLake.auditInfo().creator());
@@ -103,20 +111,23 @@ public class TestGravitinoClient extends TestBase {
         ErrorResponse.notFound(NoSuchMetalakeException.class.getSimpleName(), "mock error");
     buildMockResource(Method.GET, "/api/metalakes/mock", null, errorResp, HttpStatus.SC_NOT_FOUND);
     Throwable excep =
-        Assertions.assertThrows(NoSuchMetalakeException.class, () -> client.loadMetalake(id));
+        Assertions.assertThrows(
+            NoSuchMetalakeException.class, () -> client.loadMetalake(id.name()));
     Assertions.assertTrue(excep.getMessage().contains("mock error"));
 
     // Test illegal metalake name identifier
-    NameIdentifier badName = NameIdentifier.parse("mock.mock");
+    String badName = "mock.mock";
 
     Throwable excep1 =
-        Assertions.assertThrows(IllegalArgumentException.class, () -> client.loadMetalake(badName));
+        Assertions.assertThrows(
+            IllegalNamespaceException.class, () -> client.loadMetalake(badName));
     Assertions.assertTrue(
         excep1.getMessage().contains("Metalake namespace must be non-null and empty"));
 
     // Test return unparsed system error
     buildMockResource(Method.GET, "/api/metalakes/mock", null, null, HttpStatus.SC_CONFLICT);
-    Throwable excep2 = Assertions.assertThrows(RESTException.class, () -> client.loadMetalake(id));
+    Throwable excep2 =
+        Assertions.assertThrows(RESTException.class, () -> client.loadMetalake(id.name()));
     Assertions.assertTrue(excep2.getMessage().contains("Error code: " + HttpStatus.SC_CONFLICT));
   }
 
@@ -135,7 +146,8 @@ public class TestGravitinoClient extends TestBase {
     MetalakeResponse resp = new MetalakeResponse(mockMetalake);
     buildMockResource(Method.POST, "/api/metalakes", req, resp, HttpStatus.SC_OK);
     NameIdentifier id = NameIdentifier.parse("mock");
-    GravitinoMetalake metaLake = client.createMetalake(id, "comment", Collections.emptyMap());
+    GravitinoMetalake metaLake =
+        client.createMetalake(id.name(), "comment", Collections.emptyMap());
     Map<String, String> emptyMap = Collections.emptyMap();
 
     Assertions.assertEquals("mock", metaLake.name());
@@ -150,14 +162,14 @@ public class TestGravitinoClient extends TestBase {
     Throwable excep =
         Assertions.assertThrows(
             MetalakeAlreadyExistsException.class,
-            () -> client.createMetalake(id, "comment", emptyMap));
+            () -> client.createMetalake(id.name(), "comment", emptyMap));
     Assertions.assertTrue(excep.getMessage().contains("mock error"));
 
     // Test return unparsed system error
     buildMockResource(Method.POST, "/api/metalakes", req, null, HttpStatus.SC_CONFLICT);
     Throwable excep1 =
         Assertions.assertThrows(
-            RESTException.class, () -> client.createMetalake(id, "comment", emptyMap));
+            RESTException.class, () -> client.createMetalake(id.name(), "comment", emptyMap));
     Assertions.assertTrue(excep1.getMessage().contains("Error code: " + HttpStatus.SC_CONFLICT));
   }
 
@@ -184,7 +196,7 @@ public class TestGravitinoClient extends TestBase {
 
     buildMockResource(Method.PUT, "/api/metalakes/mock", req, resp, HttpStatus.SC_OK);
     NameIdentifier id = NameIdentifier.of("mock");
-    GravitinoMetalake metaLake = client.alterMetalake(id, changes);
+    GravitinoMetalake metaLake = client.alterMetalake(id.name(), changes);
     Assertions.assertEquals("newName", metaLake.name());
     Assertions.assertEquals("newComment", metaLake.comment());
     Assertions.assertEquals("creator", metaLake.auditInfo().creator());
@@ -195,11 +207,11 @@ public class TestGravitinoClient extends TestBase {
     buildMockResource(Method.PUT, "/api/metalakes/mock", req, errorResp, HttpStatus.SC_NOT_FOUND);
     Throwable excep =
         Assertions.assertThrows(
-            NoSuchMetalakeException.class, () -> client.alterMetalake(id, changes));
+            NoSuchMetalakeException.class, () -> client.alterMetalake(id.name(), changes));
     Assertions.assertTrue(excep.getMessage().contains("mock error"));
 
     // Test illegal argument
-    NameIdentifier id2 = NameIdentifier.parse("mock.mock");
+    String id2 = "mock.mock";
     Throwable excep1 =
         Assertions.assertThrows(
             IllegalArgumentException.class, () -> client.alterMetalake(id2, changes));
@@ -211,23 +223,103 @@ public class TestGravitinoClient extends TestBase {
   public void testDropMetalake() throws JsonProcessingException {
     DropResponse resp = new DropResponse(true);
     buildMockResource(Method.DELETE, "/api/metalakes/mock", null, resp, HttpStatus.SC_OK);
-    Assertions.assertTrue(client.dropMetalake(NameIdentifier.of("mock")));
+    Assertions.assertTrue(client.dropMetalake("mock"));
 
     DropResponse resp1 = new DropResponse(false);
     buildMockResource(Method.DELETE, "/api/metalakes/mock", null, resp1, HttpStatus.SC_OK);
-    Assertions.assertFalse(client.dropMetalake(NameIdentifier.of("mock")));
+    Assertions.assertFalse(client.dropMetalake("mock"));
 
     // Test return internal error
     ErrorResponse errorResp = ErrorResponse.internalError("mock error");
     buildMockResource(
         Method.DELETE, "/api/metalakes/mock", null, errorResp, HttpStatus.SC_INTERNAL_SERVER_ERROR);
-    Assertions.assertFalse(client.dropMetalake(NameIdentifier.of("mock")));
+    Assertions.assertFalse(client.dropMetalake("mock"));
 
     // Test illegal metalake name identifier
-    NameIdentifier id = NameIdentifier.parse("mock.mock");
+    String badName = "mock.mock";
     Throwable excep1 =
-        Assertions.assertThrows(IllegalArgumentException.class, () -> client.dropMetalake(id));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> client.dropMetalake(badName));
     Assertions.assertTrue(
         excep1.getMessage().contains("Metalake namespace must be non-null and empty"));
+  }
+
+  @Test
+  public void testGetServerVersion() throws JsonProcessingException {
+    String version = "0.1.3";
+    String date = "2024-01-03 12:28:33";
+    String commitId = "6ef1f9d";
+
+    VersionResponse resp = new VersionResponse(new VersionDTO(version, date, commitId));
+    buildMockResource(Method.GET, "/api/version", null, resp, HttpStatus.SC_OK);
+    GravitinoVersion gravitinoVersion = client.serverVersion();
+
+    Assertions.assertEquals(version, gravitinoVersion.version());
+    Assertions.assertEquals(date, gravitinoVersion.compileDate());
+    Assertions.assertEquals(commitId, gravitinoVersion.gitCommit());
+  }
+
+  @Test
+  public void testGetClientVersion() {
+    GravitinoVersion version = client.clientVersion();
+    Version.VersionInfo currentVersion = Version.getCurrentVersion();
+
+    Assertions.assertEquals(currentVersion.version, version.version());
+    Assertions.assertEquals(currentVersion.compileDate, version.compileDate());
+    Assertions.assertEquals(currentVersion.gitCommit, version.gitCommit());
+  }
+
+  @Test
+  public void testCheckVersionFailed() throws JsonProcessingException {
+    String version = "0.1.1";
+    String date = "2024-01-03 12:28:33";
+    String commitId = "6ef1f9d";
+
+    VersionResponse resp = new VersionResponse(new VersionDTO(version, date, commitId));
+    buildMockResource(Method.GET, "/api/version", null, resp, HttpStatus.SC_OK);
+
+    // check the client version is greater than server version
+    Assertions.assertThrows(GravitinoRuntimeException.class, () -> client.checkVersion());
+  }
+
+  @Test
+  public void testCheckVersionSuccess() throws JsonProcessingException {
+    VersionResponse resp = new VersionResponse(Version.getCurrentVersionDTO());
+    buildMockResource(Method.GET, "/api/version", null, resp, HttpStatus.SC_OK);
+
+    // check the client version is equal to server version
+    Assertions.assertDoesNotThrow(() -> client.checkVersion());
+
+    String version = "100.1.1-SNAPSHOT";
+    String date = "2024-01-03 12:28:33";
+    String commitId = "6ef1f9d";
+
+    resp = new VersionResponse(new VersionDTO(version, date, commitId));
+    buildMockResource(Method.GET, "/api/version", null, resp, HttpStatus.SC_OK);
+
+    // check the client version is less than server version
+    Assertions.assertDoesNotThrow(() -> client.checkVersion());
+  }
+
+  @Test
+  public void testUnusedDTOAttribute() throws JsonProcessingException {
+    VersionResponse resp = new VersionResponse(Version.getCurrentVersionDTO());
+
+    HttpRequest mockRequest = HttpRequest.request("/api/version").withMethod(Method.GET.name());
+    HttpResponse mockResponse = HttpResponse.response().withStatusCode(HttpStatus.SC_OK);
+    String respJson = MAPPER.writeValueAsString(resp);
+
+    // add unused attribute for version DTO
+    respJson = respJson.replace("\"gitCommit\"", "\"unused_key\":\"unused_value\", \"gitCommit\"");
+    mockResponse = mockResponse.withBody(respJson);
+    mockServer.when(mockRequest, Times.exactly(1)).respond(mockResponse);
+
+    Assertions.assertDoesNotThrow(
+        () -> {
+          GravitinoVersion version = client.serverVersion();
+          Version.VersionInfo currentVersion = Version.getCurrentVersion();
+          Assertions.assertEquals(currentVersion.version, version.version());
+          Assertions.assertEquals(currentVersion.compileDate, version.compileDate());
+          Assertions.assertEquals(currentVersion.gitCommit, version.gitCommit());
+        });
   }
 }

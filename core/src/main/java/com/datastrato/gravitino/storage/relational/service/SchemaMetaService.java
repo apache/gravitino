@@ -17,6 +17,7 @@ import com.datastrato.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import com.datastrato.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.TableMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.TopicMetaMapper;
 import com.datastrato.gravitino.storage.relational.po.SchemaPO;
 import com.datastrato.gravitino.storage.relational.utils.ExceptionUtils;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
@@ -108,7 +109,7 @@ public class SchemaMetaService {
             }
           });
     } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLConstraintException(
+      ExceptionUtils.checkSQLException(
           re, Entity.EntityType.SCHEMA, schemaEntity.nameIdentifier().toString());
       throw re;
     }
@@ -141,7 +142,7 @@ public class SchemaMetaService {
                   mapper.updateSchemaMeta(
                       POConverters.updateSchemaPOWithVersion(oldSchemaPO, newEntity), oldSchemaPO));
     } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLConstraintException(
+      ExceptionUtils.checkSQLException(
           re, Entity.EntityType.SCHEMA, newEntity.nameIdentifier().toString());
       throw re;
     }
@@ -179,7 +180,11 @@ public class SchemaMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     FilesetVersionMapper.class,
-                    mapper -> mapper.softDeleteFilesetVersionsBySchemaId(schemaId)));
+                    mapper -> mapper.softDeleteFilesetVersionsBySchemaId(schemaId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    TopicMetaMapper.class,
+                    mapper -> mapper.softDeleteTopicMetasBySchemaId(schemaId)));
       } else {
         List<TableEntity> tableEntities =
             TableMetaService.getInstance()
@@ -208,6 +213,14 @@ public class SchemaMetaService {
       }
     }
     return true;
+  }
+
+  public int deleteSchemaMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
+    return SessionUtils.doWithCommitAndFetchResult(
+        SchemaMetaMapper.class,
+        mapper -> {
+          return mapper.deleteSchemaMetasByLegacyTimeLine(legacyTimeLine, limit);
+        });
   }
 
   private void fillSchemaPOBuilderParentEntityId(SchemaPO.Builder builder, Namespace namespace) {

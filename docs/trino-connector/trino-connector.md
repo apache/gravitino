@@ -15,17 +15,14 @@ Once metadata such as catalogs, schemas, or tables are changed in Gravitino, Tri
 about 3~10 seconds. 
 :::
 
-The loading of Gravitino's catalogs into Trino follows the naming convention:
+By default, the loading of Gravitino's catalogs into Trino follows the naming convention:
 
 ```text
-{metalake}.{catalog}
+{catalog}
 ```
-
-Regarding `metalake` and `catalog`, 
-you can refer to [Create a Metalake](../manage-metadata-using-gravitino.md#create-a-metalake), [Create a Catalog](../manage-metadata-using-gravitino.md#create-a-catalog).
 
 Usage in queries is as follows:
 
 ```text
-SELECT * from "metalake.catalog".dbname.tabname
+SELECT * from catalog.dbname.tabname
 ```

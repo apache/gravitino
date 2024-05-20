@@ -43,23 +43,35 @@ You can also specify filter parameters by setting configuration entries of the f
 
 ### Storage configuration
 
-| Configuration item                                | Description                                                                                                                                                                                                                                                | Default value                    | Required                         | Since version |
-|---------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------|----------------------------------|---------------|
-| `gravitino.entity.store`                          | Which storage implementation to use. Key-value pair storage and relational storage are currently supported, the default value is `kv`, and the optional value is `relational`.                                                                             | `kv`                             | No                               | 0.1.0         |
-| `gravitino.entity.store.kv`                       | Detailed implementation of KV storage. `RocksDB` storage is currently supported, and the implementation is `RocksDBKvBackend`.                                                                                                                             | `RocksDBKvBackend`               | No                               | 0.1.0         |
-| `gravitino.entity.store.kv.rocksdbPath`           | The storage path for RocksDB storage implementation. It supports both absolute and relative path, if the value is a relative path, the final path is `${GRAVITINO_HOME}/${PATH_YOU_HAVA_SET}`, default value is `${GRAVITINO_HOME}/data/rocksdb`           | `${GRAVITINO_HOME}/data/rocksdb` | No                               | 0.1.0         |
-| `graivitino.entity.serde`                         | The serialization/deserialization class used to support entity storage. `proto' is currently supported.                                                                                                                                                    | `proto`                          | No                               | 0.1.0         |
-| `gravitino.entity.store.maxTransactionSkewTimeMs` | The maximum skew time of transactions in milliseconds.                                                                                                                                                                                                     | `2000`                           | No                               | 0.3.0         |
-| `gravitino.entity.store.kv.deleteAfterTimeMs`     | The maximum time in milliseconds that deleted and old-version data is kept. Set to at least 10 minutes and no longer than 30 days.                                                                                                                         | `604800000`(7 days)              | No                               | 0.3.0         |
-| `gravitino.entity.store.relational`               | Detailed implementation of Relational storage. `MySQL` is currently supported, and the implementation is `JDBCBackend`.                                                                                                                                    | `JDBCBackend`                    | No                               | 0.5.0         |
-| `gravitino.entity.store.relational.jdbcUrl`       | The database url that the `JDBCBackend` needs to connect to. If you use `MySQL`, you should firstly initialize the database tables yourself by executing the file named `mysql_init.sql` in the `src/main/resources/mysql` directory of the `core` module. | (none)                           | Yes if you use `JdbcBackend`     | 0.5.0         |
-| `gravitino.entity.store.relational.jdbcDriver`    | The jdbc driver name that the `JDBCBackend` needs to use. You should place the driver Jar package in the `${GRAVITINO_HOME}/libs/` directory.                                                                                                              | (none)                           | Yes if you use `JdbcBackend`     | 0.5.0         |
-| `gravitino.entity.store.relational.jdbcUser`      | The username that the `JDBCBackend` needs to use when connecting the database. It is required for `MySQL`.                                                                                                                                                 | (none)                           | Yes if you use `JdbcBackend`     | 0.5.0         |
-| `gravitino.entity.store.relational.jdbcPassword`  | The password that the `JDBCBackend` needs to use when connecting the database. It is required for `MySQL`.                                                                                                                                                 | (none)                           | Yes if you use `JdbcBackend`     | 0.5.0         |
+| Configuration item                                | Description                                                                                                                                                                                                                                      | Default value                    | Required                     | Since version |
+|---------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------|------------------------------|---------------|
+| `gravitino.entity.store`                          | Which storage implementation to use. Key-value pair storage and relational storage are currently supported, the default value is `kv`, and the optional value is `relational`.                                                                   | `kv`                             | No                           | 0.1.0         |
+| `gravitino.entity.store.kv`                       | Detailed implementation of KV storage. `RocksDB` storage is currently supported, and the implementation is `RocksDBKvBackend`.                                                                                                                   | `RocksDBKvBackend`               | No                           | 0.1.0         |
+| `gravitino.entity.store.kv.rocksdbPath`           | The storage path for RocksDB storage implementation. It supports both absolute and relative path, if the value is a relative path, the final path is `${GRAVITINO_HOME}/${PATH_YOU_HAVA_SET}`, default value is `${GRAVITINO_HOME}/data/rocksdb` | `${GRAVITINO_HOME}/data/rocksdb` | No                           | 0.1.0         |
+| `graivitino.entity.serde`                         | The serialization/deserialization class used to support entity storage. `proto' is currently supported.                                                                                                                                          | `proto`                          | No                           | 0.1.0         |
+| `gravitino.entity.store.maxTransactionSkewTimeMs` | The maximum skew time of transactions in milliseconds.                                                                                                                                                                                           | `2000`                           | No                           | 0.3.0         |
+| `gravitino.entity.store.kv.deleteAfterTimeMs`     | It is deprecated since Gravitino 0.5.0. Please use `gravitino.entity.store.deleteAfterTimeMs` instead.                                                                                                                                           | `604800000`(7 days)              | No                           | 0.3.0         |
+| `gravitino.entity.store.deleteAfterTimeMs`        | The maximum time in milliseconds that deleted and old-version data is kept. Set to at least 10 minutes and no longer than 30 days.                                                                                                               | `604800000`(7 days)              | No                           | 0.5.0         |
+| `gravitino.entity.store.versionRetentionCount`    | The Count of versions allowed to be retained, including the current version, used to delete old versions data. Set to at least 1 and no greater than 10.                                                                                         | `1`                              | No                           | 0.5.0         |
+| `gravitino.entity.store.relational`               | Detailed implementation of Relational storage. `MySQL` is currently supported, and the implementation is `JDBCBackend`.                                                                                                                          | `JDBCBackend`                    | No                           | 0.5.0         |
+| `gravitino.entity.store.relational.jdbcUrl`       | The database url that the `JDBCBackend` needs to connect to. If you use `MySQL`, you should firstly initialize the database tables yourself by executing the ddl scripts in the `${GRAVITINO_HOME}/scripts/mysql/` directory.                    | (none)                           | Yes if you use `JDBCBackend` | 0.5.0         |
+| `gravitino.entity.store.relational.jdbcDriver`    | The jdbc driver name that the `JDBCBackend` needs to use. You should place the driver Jar package in the `${GRAVITINO_HOME}/libs/` directory.                                                                                                    | (none)                           | Yes if you use `JDBCBackend` | 0.5.0         |
+| `gravitino.entity.store.relational.jdbcUser`      | The username that the `JDBCBackend` needs to use when connecting the database. It is required for `MySQL`.                                                                                                                                       | (none)                           | Yes if you use `JDBCBackend` | 0.5.0         |
+| `gravitino.entity.store.relational.jdbcPassword`  | The password that the `JDBCBackend` needs to use when connecting the database. It is required for `MySQL`.                                                                                                                                       | (none)                           | Yes if you use `JDBCBackend` | 0.5.0         |
 
 :::caution
 We strongly recommend that you change the default value of `gravitino.entity.store.kv.rocksdbPath`, as it's under the deployment directory and future version upgrades may remove it.
 :::
+
+### Tree lock configuration
+
+Gravitino server uses tree lock to ensure the consistency of the data. The tree lock is a memory lock (Currently, Gravitino only supports in memory lock) that can be used to ensure the consistency of the data in Gravitino server. The configuration items are as follows:
+
+| Configuration item                   | Description                                                   | Default value | Required | Since Version |
+|--------------------------------------|---------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.lock.maxNodes`            | The maximum number of tree lock nodes to keep in memory       | 100000        | No       | 0.5.0         |
+| `gravitino.lock.minNodes`            | The minimum number of tree lock nodes to keep in memory       | 1000          | No       | 0.5.0         |
+| `gravitino.lock.cleanIntervalInSecs` | The interval in seconds to clean up the stale tree lock nodes | 60            | No       | 0.5.0         |
 
 ### Catalog configuration
 
@@ -75,6 +87,45 @@ We strongly recommend that you change the default value of `gravitino.entity.sto
 | `gravitino.auxService.names ` | The auxiliary service name of the Gravitino Iceberg REST server. Use **`iceberg-rest`** for the Gravitino Iceberg REST server. | (none)        | 0.2.0         |
 
 Refer to [Iceberg REST catalog service](iceberg-rest-service.md) for configuration details.
+
+### Event listener configuration
+
+Gravitino provides event listener mechanism to allow users to capture the events which are provided by Gravitino server to integrate some custom operations.
+
+To leverage the event listener, you must implement the `EventListenerPlugin` interface and place the JAR file in the classpath of the Gravitino server. Then, add configurations to gravitino.conf to enable the event listener.
+
+| Property name                              | Description                                                                                            | Default value | Required | Since Version |
+|--------------------------------------------|--------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.eventListener.names`            | The name of the event listener, For multiple listeners, separate names with a comma, like "audit,sync" | (none)        | Yes      | 0.5.0         |
+| `gravitino.eventListener.{name}.className` | The class name of the event listener, replace `{name}` with the actual listener name.                  | (none)        | Yes      | 0.5.0         | 
+| `gravitino.eventListener.{name}.{key}`     | Custom properties that will be passed to the event listener plugin.                                    | (none)        | Yes      | 0.5.0         | 
+
+#### Event
+
+Gravitino triggers a specific event upon the completion of the operation, with varying events being generated for different operations.
+
+| operation type     | event                                                                                                                                                                                                                                                                           | 
+|--------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| table operation    | `CreateTableEvent`, `AlterTableEvent`, `DropTableEvent`, `LoadTableEvent`, `ListTableEvent`, `PurgeTableFailureEvent`, `CreateTableFailureEvent`, `AlterTableFailureEvent`, `DropTableFailureEvent`, `LoadTableFailureEvent`, `ListTableFailureEvent`, `PurgeTableFailureEvent` |
+| fileset operation  | `CreateFileSetEvent`, `AlterFileSetEvent`, `DropFileSetEvent`, `LoadFileSetEvent`, `ListFileSetEvent`, `CreateFileSetFailureEvent`, `AlterFileSetFailureEvent`, `DropFileSetFailureEvent`, `LoadFileSetFailureEvent`, `ListFileSetFailureEvent`                                 |
+| topic operation    | `CreateTopicEvent`, `AlterTopicEvent`, `DropTopicEvent`, `LoadTopicEvent`, `ListTopicEvent`, `CreateTopicFailureEvent`, `AlterTopicFailureEvent`, `DropTopicFailureEvent`, `LoadTopicFailureEvent`, `ListTopicFailureEvent`                                                     |
+| schema operation   | `CreateSchemaEvent`, `AlterSchemaEvent`, `DropSchemaEvent`, `LoadSchemaEvent`, `ListSchemaEvent`, `CreateSchemaFailureEvent`, `AlterSchemaFailureEvent`, `DropSchemaFailureEvent`, `LoadSchemaFailureEvent`, `ListSchemaFailureEvent`                                           |
+| catalog operation  | `CreateCatalogEvent`, `AlterCatalogEvent`, `DropCatalogEvent`, `LoadCatalogEvent`, `ListCatalogEvent`, `CreateCatalogFailureEvent`, `AlterCatalogFailureEvent`, `DropCatalogFailureEvent`, `LoadCatalogFailureEvent`, `ListCatalogFailureEvent`                                 |
+| metalake operation | `CreateMetalakeEvent`, `AlterMetalakeEvent`, `DropMetalakeEvent`, `LoadMetalakeEvent`, `ListMetalakeEvent`, `CreateMetalakeFailureEvent`, `AlterMetalakeFailureEvent`, `DropMetalakeFailureEvent`, `LoadMetalakeFailureEvent`, `ListMetalakeFailureEvent`                       |
+
+#### Event listener plugin
+
+The `EventListenerPlugin` defines an interface for event listeners that manage the lifecycle and state of a plugin. This includes handling its initialization, startup, and shutdown processes, as well as handing events triggered by various operations.
+
+The plugin provides several operational modes for how to process event, supporting both synchronous and asynchronous processing approaches.
+
+- **SYNC**: Events are processed synchronously, immediately following the associated operation. This mode ensures events are processed before the operation's result is returned to the client, but it may delay the main process if event processing takes too long.
+
+- **ASYNC_SHARED**: This mode employs a shared queue and dispatcher for asynchronous event processing. It prevents the main process from being blocked, though there's a risk events might be dropped if not promptly consumed. Sharing a dispatcher can lead to poor isolation in case of slow listeners.
+ 
+- **ASYNC_ISOLATED**: Events are processed asynchronously, with each listener having its own dedicated queue and dispatcher thread. This approach offers better isolation but at the expense of multiple queues and dispatchers.
+
+For more details, please refer to the definition of the plugin.
 
 ### Security configuration
 
@@ -116,6 +167,7 @@ The following table lists the catalog specific properties and their default path
 | `lakehouse-iceberg` | [Lakehouse Iceberg catalog properties](lakehouse-iceberg-catalog.md#catalog-properties) | `catalogs/lakehouse-iceberg/conf/lakehouse-iceberg.conf` |
 | `jdbc-mysql`        | [MySQL catalog properties](jdbc-mysql-catalog.md#catalog-properties)                    | `catalogs/jdbc-mysql/conf/jdbc-mysql.conf`               |
 | `jdbc-postgresql`   | [PostgreSQL catalog properties](jdbc-postgresql-catalog.md#catalog-properties)          | `catalogs/jdbc-postgresql/conf/jdbc-postgresql.conf`     |
+| `jdbc-doris`        | [Doris catalog properties](jdbc-doris-catalog.md#catalog-properties)                    | `catalogs/jdbc-doris/conf/jdbc-doris.conf`               |
 
 :::info
 The Gravitino server automatically adds the catalog properties configuration directory to classpath.

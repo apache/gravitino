@@ -24,7 +24,10 @@ dependencies {
   implementation(libs.slf4j.api)
 
   testImplementation(project(":catalogs:catalog-jdbc-common", "testArtifacts"))
+  testImplementation(project(":clients:client-java"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":server"))
+  testImplementation(project(":server-common"))
 
   testImplementation(libs.commons.lang3)
   testImplementation(libs.guava)
@@ -79,10 +82,14 @@ tasks.test {
     dependsOn(tasks.jar)
 
     doFirst {
-      environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "datastrato/gravitino-ci-doris:0.1.1")
+      environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "datastrato/gravitino-ci-doris:0.1.3")
     }
 
     val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
     init(this)
   }
+}
+
+tasks.getByName("generateMetadataFileForMavenJavaPublication") {
+  dependsOn("runtimeJars")
 }

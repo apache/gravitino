@@ -7,8 +7,8 @@ call gravitino.system.create_catalog(
     )
 );
 
-create schema "test.gt_iceberg2".gt_tpch2;
-use "test.gt_iceberg2".gt_tpch2;
+create schema gt_iceberg2.gt_tpch2;
+use gt_iceberg2.gt_tpch2;
 
 CREATE TABLE customer (
    custkey bigint,

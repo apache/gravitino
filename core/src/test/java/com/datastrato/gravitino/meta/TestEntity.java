@@ -6,6 +6,8 @@ package com.datastrato.gravitino.meta;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Field;
+import com.datastrato.gravitino.authorization.Privileges;
+import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.file.Fileset;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -51,6 +53,14 @@ public class TestEntity {
   // User test data
   private final Long userId = 1L;
   private final String userName = "testUser";
+
+  // Group test data
+  private final Long groupId = 1L;
+  private final String groupName = "testGroup";
+
+  // Role test data
+  private final Long roleId = 1L;
+  private final String roleName = "testRole";
 
   @Test
   public void testMetalake() {
@@ -213,18 +223,72 @@ public class TestEntity {
             .withId(userId)
             .withName(userName)
             .withAuditInfo(auditInfo)
-            .withRoles(Lists.newArrayList("role"))
+            .withRoleNames(Lists.newArrayList("role"))
             .build();
 
     Map<Field, Object> fields = testUserEntity.fields();
     Assertions.assertEquals(userId, fields.get(UserEntity.ID));
     Assertions.assertEquals(userName, fields.get(UserEntity.NAME));
     Assertions.assertEquals(auditInfo, fields.get(UserEntity.AUDIT_INFO));
-    Assertions.assertEquals(Lists.newArrayList("role"), fields.get(UserEntity.ROLES));
+    Assertions.assertEquals(Lists.newArrayList("role"), fields.get(UserEntity.ROLE_NAMES));
 
     UserEntity testUserEntityWithoutFields =
         UserEntity.builder().withId(userId).withName(userName).withAuditInfo(auditInfo).build();
 
     Assertions.assertNull(testUserEntityWithoutFields.roles());
+  }
+
+  @Test
+  public void testGroup() {
+    GroupEntity group =
+        GroupEntity.builder()
+            .withId(groupId)
+            .withName(groupName)
+            .withAuditInfo(auditInfo)
+            .withRoleNames(Lists.newArrayList("role"))
+            .build();
+    Map<Field, Object> fields = group.fields();
+    Assertions.assertEquals(groupId, fields.get(GroupEntity.ID));
+    Assertions.assertEquals(groupName, fields.get(GroupEntity.NAME));
+    Assertions.assertEquals(auditInfo, fields.get(GroupEntity.AUDIT_INFO));
+    Assertions.assertEquals(Lists.newArrayList("role"), fields.get(GroupEntity.ROLE_NAMES));
+
+    GroupEntity groupWithoutFields =
+        GroupEntity.builder().withId(userId).withName(userName).withAuditInfo(auditInfo).build();
+
+    Assertions.assertNull(groupWithoutFields.roles());
+  }
+
+  @Test
+  public void testRole() {
+    RoleEntity role =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName(roleName)
+            .withAuditInfo(auditInfo)
+            .withSecurableObject(SecurableObjects.ofCatalog(catalogName))
+            .withPrivileges(Lists.newArrayList(Privileges.UseCatalog.get()))
+            .withProperties(map)
+            .build();
+
+    Map<Field, Object> fields = role.fields();
+    Assertions.assertEquals(roleId, fields.get(RoleEntity.ID));
+    Assertions.assertEquals(roleName, fields.get(RoleEntity.NAME));
+    Assertions.assertEquals(auditInfo, fields.get(RoleEntity.AUDIT_INFO));
+    Assertions.assertEquals(map, fields.get(RoleEntity.PROPERTIES));
+    Assertions.assertEquals(
+        Lists.newArrayList(Privileges.UseCatalog.get()), fields.get(RoleEntity.PRIVILEGES));
+    Assertions.assertEquals(
+        SecurableObjects.ofCatalog(catalogName), fields.get(RoleEntity.SECURABLE_OBJECT));
+
+    RoleEntity roleWithoutFields =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName(roleName)
+            .withAuditInfo(auditInfo)
+            .withSecurableObject(SecurableObjects.ofCatalog(catalogName))
+            .withPrivileges(Lists.newArrayList(Privileges.UseCatalog.get()))
+            .build();
+    Assertions.assertNull(roleWithoutFields.properties());
   }
 }

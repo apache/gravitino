@@ -1,4 +1,6 @@
 # Copyright 2024 Datastrato Pvt Ltd.
 # This software is licensed under the Apache License version 2.
-pytest~=8.0.1
-requests~=2.31.0
+
+# the tools to publish the python client to Pypi
+requests
+dataclasses-json

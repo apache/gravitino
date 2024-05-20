@@ -6,11 +6,14 @@
 import { defHttp } from '@/lib/utils/axios'
 
 const Apis = {
-  GET: ({ metalake }) => `/api/metalakes/${metalake}/catalogs`,
-  GET_DETAIL: ({ metalake, catalog }) => `/api/metalakes/${metalake}/catalogs/${catalog}`,
-  CREATE: ({ metalake }) => `/api/metalakes/${metalake}/catalogs`,
-  UPDATE: ({ metalake, catalog }) => `/api/metalakes/${metalake}/catalogs/${catalog}`,
-  DELETE: ({ metalake, catalog }) => `/api/metalakes/${metalake}/catalogs/${catalog}`
+  GET: ({ metalake }) => `/api/metalakes/${encodeURIComponent(metalake)}/catalogs?details=true`,
+  GET_DETAIL: ({ metalake, catalog }) =>
+    `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(catalog)}`,
+  CREATE: ({ metalake }) => `/api/metalakes/${encodeURIComponent(metalake)}/catalogs`,
+  UPDATE: ({ metalake, catalog }) =>
+    `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(catalog)}`,
+  DELETE: ({ metalake, catalog }) =>
+    `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(catalog)}`
 }
 
 export const getCatalogsApi = params => {

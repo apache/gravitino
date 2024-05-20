@@ -8,7 +8,7 @@ import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_STORE;
 import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
-import static com.datastrato.gravitino.Configs.KV_DELETE_AFTER_TIME;
+import static com.datastrato.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static com.datastrato.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
 import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
@@ -20,7 +20,6 @@ import com.datastrato.gravitino.EntityStoreFactory;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
-import com.datastrato.gravitino.connector.BaseCatalogPropertiesMetadata;
 import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
@@ -78,7 +77,7 @@ public class TestHadoopCatalogOperations {
 
     Assertions.assertEquals(ROCKS_DB_STORE_PATH, config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH));
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
-    Mockito.when(config.get(KV_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
+    Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
 
     store = EntityStoreFactory.createEntityStore(config);
     store.initialize(config);
@@ -126,11 +125,6 @@ public class TestHadoopCatalogOperations {
     Schema schema = createSchema(name, comment, null, null);
     Assertions.assertEquals(name, schema.name());
     Assertions.assertEquals(comment, schema.comment());
-    Map<String, String> props = schema.properties();
-    Assertions.assertTrue(
-        props.containsKey(BaseCatalogPropertiesMetadata.GRAVITINO_MANAGED_ENTITY));
-    Assertions.assertEquals(
-        "true", props.get(BaseCatalogPropertiesMetadata.GRAVITINO_MANAGED_ENTITY));
 
     Throwable exception =
         Assertions.assertThrows(
@@ -205,10 +199,6 @@ public class TestHadoopCatalogOperations {
       Assertions.assertEquals(comment, schema1.comment());
 
       Map<String, String> props = schema1.properties();
-      Assertions.assertTrue(
-          props.containsKey(BaseCatalogPropertiesMetadata.GRAVITINO_MANAGED_ENTITY));
-      Assertions.assertEquals(
-          "true", props.get(BaseCatalogPropertiesMetadata.GRAVITINO_MANAGED_ENTITY));
       Assertions.assertTrue(props.containsKey(StringIdentifier.ID_KEY));
 
       Throwable exception =
@@ -251,10 +241,6 @@ public class TestHadoopCatalogOperations {
       Assertions.assertEquals(comment, schema1.comment());
 
       Map<String, String> props = schema1.properties();
-      Assertions.assertTrue(
-          props.containsKey(BaseCatalogPropertiesMetadata.GRAVITINO_MANAGED_ENTITY));
-      Assertions.assertEquals(
-          "true", props.get(BaseCatalogPropertiesMetadata.GRAVITINO_MANAGED_ENTITY));
       Assertions.assertTrue(props.containsKey(StringIdentifier.ID_KEY));
 
       String newKey = "k1";
@@ -301,10 +287,6 @@ public class TestHadoopCatalogOperations {
       Assertions.assertEquals(comment, schema1.comment());
 
       Map<String, String> props = schema1.properties();
-      Assertions.assertTrue(
-          props.containsKey(BaseCatalogPropertiesMetadata.GRAVITINO_MANAGED_ENTITY));
-      Assertions.assertEquals(
-          "true", props.get(BaseCatalogPropertiesMetadata.GRAVITINO_MANAGED_ENTITY));
       Assertions.assertTrue(props.containsKey(StringIdentifier.ID_KEY));
 
       ops.dropSchema(id, false);
@@ -327,6 +309,10 @@ public class TestHadoopCatalogOperations {
       // Test drop non-empty schema with cascade = true
       ops.dropSchema(id, true);
       Assertions.assertFalse(fs.exists(schemaPath));
+
+      // Test drop empty schema
+      Assertions.assertFalse(ops.dropSchema(id, true));
+      Assertions.assertFalse(ops.dropSchema(id, false));
     }
   }
 

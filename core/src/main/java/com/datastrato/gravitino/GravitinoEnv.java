@@ -6,11 +6,33 @@ package com.datastrato.gravitino;
 
 import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
+import com.datastrato.gravitino.catalog.CatalogDispatcher;
 import com.datastrato.gravitino.catalog.CatalogManager;
+import com.datastrato.gravitino.catalog.FilesetDispatcher;
+import com.datastrato.gravitino.catalog.FilesetNormalizeDispatcher;
 import com.datastrato.gravitino.catalog.FilesetOperationDispatcher;
+import com.datastrato.gravitino.catalog.PartitionDispatcher;
+import com.datastrato.gravitino.catalog.PartitionNormalizeDispatcher;
+import com.datastrato.gravitino.catalog.PartitionOperationDispatcher;
+import com.datastrato.gravitino.catalog.SchemaDispatcher;
+import com.datastrato.gravitino.catalog.SchemaNormalizeDispatcher;
 import com.datastrato.gravitino.catalog.SchemaOperationDispatcher;
+import com.datastrato.gravitino.catalog.TableDispatcher;
+import com.datastrato.gravitino.catalog.TableNormalizeDispatcher;
 import com.datastrato.gravitino.catalog.TableOperationDispatcher;
+import com.datastrato.gravitino.catalog.TopicDispatcher;
+import com.datastrato.gravitino.catalog.TopicNormalizeDispatcher;
+import com.datastrato.gravitino.catalog.TopicOperationDispatcher;
+import com.datastrato.gravitino.listener.CatalogEventDispatcher;
+import com.datastrato.gravitino.listener.EventBus;
+import com.datastrato.gravitino.listener.EventListenerManager;
+import com.datastrato.gravitino.listener.FilesetEventDispatcher;
+import com.datastrato.gravitino.listener.MetalakeEventDispatcher;
+import com.datastrato.gravitino.listener.SchemaEventDispatcher;
+import com.datastrato.gravitino.listener.TableEventDispatcher;
+import com.datastrato.gravitino.listener.TopicEventDispatcher;
 import com.datastrato.gravitino.lock.LockManager;
+import com.datastrato.gravitino.metalake.MetalakeDispatcher;
 import com.datastrato.gravitino.metalake.MetalakeManager;
 import com.datastrato.gravitino.metrics.MetricsSystem;
 import com.datastrato.gravitino.metrics.source.JVMMetricsSource;
@@ -32,15 +54,21 @@ public class GravitinoEnv {
 
   private EntityStore entityStore;
 
+  private CatalogDispatcher catalogDispatcher;
+
   private CatalogManager catalogManager;
 
-  private SchemaOperationDispatcher schemaOperationDispatcher;
+  private SchemaDispatcher schemaDispatcher;
 
-  private TableOperationDispatcher tableOperationDispatcher;
+  private TableDispatcher tableDispatcher;
 
-  private FilesetOperationDispatcher filesetOperationDispatcher;
+  private PartitionDispatcher partitionDispatcher;
 
-  private MetalakeManager metalakeManager;
+  private FilesetDispatcher filesetDispatcher;
+
+  private TopicDispatcher topicDispatcher;
+
+  private MetalakeDispatcher metalakeDispatcher;
 
   private AccessControlManager accessControlManager;
 
@@ -51,6 +79,7 @@ public class GravitinoEnv {
   private MetricsSystem metricsSystem;
 
   private LockManager lockManager;
+  private EventListenerManager eventListenerManager;
 
   private GravitinoEnv() {}
 
@@ -80,6 +109,28 @@ public class GravitinoEnv {
   }
 
   /**
+   * This method is used for testing purposes only to set the access manager for test in package
+   * `com.datastrato.gravitino.server.web.rest` and `com.datastrato.gravitino.authorization`.
+   *
+   * @param accessControlManager The access control manager to be set.
+   */
+  @VisibleForTesting
+  public void setAccessControlManager(AccessControlManager accessControlManager) {
+    this.accessControlManager = accessControlManager;
+  }
+
+  /**
+   * This method is used for testing purposes only to set the entity store for test in package
+   * `com.datastrato.gravitino.authorization`.
+   *
+   * @param entityStore The entity store to be set.
+   */
+  @VisibleForTesting
+  public void setEntityStore(EntityStore entityStore) {
+    this.entityStore = entityStore;
+  }
+
+  /**
    * Initialize the Gravitino environment.
    *
    * @param config The configuration object to initialize the environment.
@@ -98,20 +149,55 @@ public class GravitinoEnv {
     // create and initialize a random id generator
     this.idGenerator = new RandomIdGenerator();
 
+    this.eventListenerManager = new EventListenerManager();
+    eventListenerManager.init(
+        config.getConfigsWithPrefix(EventListenerManager.GRAVITINO_EVENT_LISTENER_PREFIX));
+    EventBus eventBus = eventListenerManager.createEventBus();
+
     // Create and initialize metalake related modules
-    this.metalakeManager = new MetalakeManager(entityStore, idGenerator);
+    MetalakeManager metalakeManager = new MetalakeManager(entityStore, idGenerator);
+    this.metalakeDispatcher = new MetalakeEventDispatcher(eventBus, metalakeManager);
 
     // Create and initialize Catalog related modules
     this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
-    this.schemaOperationDispatcher =
+    this.catalogDispatcher = new CatalogEventDispatcher(eventBus, catalogManager);
+
+    SchemaOperationDispatcher schemaOperationDispatcher =
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
-    this.tableOperationDispatcher =
+    SchemaNormalizeDispatcher schemaNormalizeDispatcher =
+        new SchemaNormalizeDispatcher(schemaOperationDispatcher);
+    this.schemaDispatcher = new SchemaEventDispatcher(eventBus, schemaNormalizeDispatcher);
+
+    TableOperationDispatcher tableOperationDispatcher =
         new TableOperationDispatcher(catalogManager, entityStore, idGenerator);
-    this.filesetOperationDispatcher =
+    TableNormalizeDispatcher tableNormalizeDispatcher =
+        new TableNormalizeDispatcher(tableOperationDispatcher);
+    this.tableDispatcher = new TableEventDispatcher(eventBus, tableNormalizeDispatcher);
+
+    PartitionOperationDispatcher partitionOperationDispatcher =
+        new PartitionOperationDispatcher(catalogManager, entityStore, idGenerator);
+    // todo: support PartitionEventDispatcher
+    this.partitionDispatcher = new PartitionNormalizeDispatcher(partitionOperationDispatcher);
+
+    FilesetOperationDispatcher filesetOperationDispatcher =
         new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator);
+    FilesetNormalizeDispatcher filesetNormalizeDispatcher =
+        new FilesetNormalizeDispatcher(filesetOperationDispatcher);
+    this.filesetDispatcher = new FilesetEventDispatcher(eventBus, filesetNormalizeDispatcher);
+
+    TopicOperationDispatcher topicOperationDispatcher =
+        new TopicOperationDispatcher(catalogManager, entityStore, idGenerator);
+    TopicNormalizeDispatcher topicNormalizeDispatcher =
+        new TopicNormalizeDispatcher(topicOperationDispatcher);
+    this.topicDispatcher = new TopicEventDispatcher(eventBus, topicNormalizeDispatcher);
 
     // Create and initialize access control related modules
-    this.accessControlManager = new AccessControlManager(entityStore, idGenerator);
+    boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);
+    if (enableAuthorization) {
+      this.accessControlManager = new AccessControlManager(entityStore, idGenerator, config);
+    } else {
+      this.accessControlManager = null;
+    }
 
     this.auxServiceManager = new AuxiliaryServiceManager();
     this.auxServiceManager.serviceInit(
@@ -142,48 +228,61 @@ public class GravitinoEnv {
   }
 
   /**
-   * Get the CatalogManager associated with the Gravitino environment.
+   * Get the CatalogDispatcher associated with the Gravitino environment.
    *
-   * @return The CatalogManager instance.
+   * @return The CatalogDispatcher instance.
    */
-  public CatalogManager catalogManager() {
-    return catalogManager;
+  public CatalogDispatcher catalogDispatcher() {
+    return catalogDispatcher;
   }
 
   /**
-   * Get the SchemaOperationDispatcher associated with the Gravitino environment.
+   * Get the SchemaDispatcher associated with the Gravitino environment.
    *
-   * @return The SchemaOperationDispatcher instance.
+   * @return The SchemaDispatcher instance.
    */
-  public SchemaOperationDispatcher schemaOperationDispatcher() {
-    return schemaOperationDispatcher;
+  public SchemaDispatcher schemaDispatcher() {
+    return schemaDispatcher;
   }
 
   /**
-   * Get the TableOperationDispatcher associated with the Gravitino environment.
+   * Get the TableDispatcher associated with the Gravitino environment.
    *
-   * @return The TableOperationDispatcher instance.
+   * @return The TableDispatcher instance.
    */
-  public TableOperationDispatcher tableOperationDispatcher() {
-    return tableOperationDispatcher;
+  public TableDispatcher tableDispatcher() {
+    return tableDispatcher;
+  }
+
+  public PartitionDispatcher partitionDispatcher() {
+    return partitionDispatcher;
   }
 
   /**
-   * Get the FilesetOperationDispatcher associated with the Gravitino environment.
+   * Get the FilesetDispatcher associated with the Gravitino environment.
    *
-   * @return The FilesetOperationDispatcher instance.
+   * @return The FilesetDispatcher instance.
    */
-  public FilesetOperationDispatcher filesetOperationDispatcher() {
-    return filesetOperationDispatcher;
+  public FilesetDispatcher filesetDispatcher() {
+    return filesetDispatcher;
   }
 
   /**
-   * Get the MetalakeManager associated with the Gravitino environment.
+   * Get the TopicDispatcher associated with the Gravitino environment.
    *
-   * @return The MetalakeManager instance.
+   * @return The TopicDispatcher instance.
    */
-  public MetalakeManager metalakesManager() {
-    return metalakeManager;
+  public TopicDispatcher topicDispatcher() {
+    return topicDispatcher;
+  }
+
+  /**
+   * Get the MetalakeDispatcher associated with the Gravitino environment.
+   *
+   * @return The MetalakeDispatcher instance.
+   */
+  public MetalakeDispatcher metalakeDispatcher() {
+    return metalakeDispatcher;
   }
 
   /**
@@ -220,6 +319,7 @@ public class GravitinoEnv {
   public void start() {
     auxServiceManager.serviceStart();
     metricsSystem.start();
+    eventListenerManager.start();
   }
 
   /** Shutdown the Gravitino environment. */
@@ -248,6 +348,10 @@ public class GravitinoEnv {
 
     if (metricsSystem != null) {
       metricsSystem.close();
+    }
+
+    if (eventListenerManager != null) {
+      eventListenerManager.stop();
     }
 
     LOG.info("Gravitino Environment is shut down.");
