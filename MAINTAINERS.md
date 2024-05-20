@@ -24,6 +24,7 @@ Maintainers may be added once approved by the existing maintainers (see [Governa
 | Shaofeng Shi  | shaofengshi         | Datastrato       |
 | Lisa Cao      | lisancao            | Datastrato       |
 | Qian Xia      | LauraXia123         | Datastrato       |
+| Danhua Wang   | danhuawang          | Datastrato       |
 
 # Contributors
 
