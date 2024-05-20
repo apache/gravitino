@@ -15,7 +15,7 @@ except FileNotFoundError:
 setup(
     name="gravitino",
     description="Python lib/client for Gravitino",
-    version="0.5.0.dev12",
+    version="0.5.0.dev21",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/datastrato/gravitino",
@@ -37,4 +37,5 @@ setup(
     extras_require={
         "dev": open("requirements-dev.txt").read(),
     },
+    include_package_data=True,
 )
