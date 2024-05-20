@@ -548,6 +548,39 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
+  void testAlterTableReplaceColumns() {
+    String tableName = "test_replace_columns_table";
+    dropTableIfExists(tableName);
+
+    createSimpleTable(tableName);
+    List<SparkColumnInfo> simpleTableColumns = getSimpleTableColumn();
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+    checkTableColumns(tableName, simpleTableColumns, tableInfo);
+    checkTableReadWrite(tableInfo);
+    String firstLine = getExpectedTableData(tableInfo);
+
+    sql(
+        String.format(
+            "ALTER TABLE %S REPLACE COLUMNS (id int COMMENT 'new comment', name2 string, age long);",
+            tableName));
+    ArrayList<SparkColumnInfo> updateColumns = new ArrayList<>();
+    // change comment for id
+    updateColumns.add(SparkColumnInfo.of("id", DataTypes.IntegerType, "new comment"));
+    // change column name
+    updateColumns.add(SparkColumnInfo.of("name2", DataTypes.StringType, null));
+    // change column type
+    updateColumns.add(SparkColumnInfo.of("age", DataTypes.LongType, null));
+
+    tableInfo = getTableInfo(tableName);
+    checkTableColumns(tableName, updateColumns, tableInfo);
+    sql(String.format("INSERT INTO %S VALUES(1, 'name2', 10)", tableName));
+    List<String> data = getTableData(tableName);
+    Assertions.assertEquals(2, data.size());
+    Assertions.assertEquals(firstLine, data.get(0));
+    Assertions.assertEquals("1,name2,10", data.get(1));
+  }
+
+  @Test
   void testComplexType() {
     String tableName = "complex_type_table";
     dropTableIfExists(tableName);
