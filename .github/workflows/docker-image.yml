@@ -38,7 +38,7 @@ jobs:
           if [ "${{ github.event.inputs.image }}" == "gravitino-ci-hive" ]; then
             echo "image_type=hive" >> $GITHUB_ENV
             echo "image_name=datastrato/gravitino-ci-hive" >> $GITHUB_ENV
-          if [ "${{ github.event.inputs.image }}" == "gravitino-ci-kerberos-hive" ]; then
+          elif [ "${{ github.event.inputs.image }}" == "gravitino-ci-kerberos-hive" ]; then
             echo "image_type=kerberos-hive" >> $GITHUB_ENV
             echo "image_name=datastrato/gravitino-ci-kerberos-hive" >> $GITHUB_ENV
           elif [ "${{ github.event.inputs.image }}" == "gravitino-ci-trino" ]; then
