@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
 /** The service class for group metadata. It provides the basic database operations for group. */
@@ -213,22 +212,22 @@ public class GroupMetaService {
   }
 
   public int deleteGroupMetasByLegacyTimeLine(long legacyTimeLine, int limit) {
-    AtomicInteger groupDeletedCount = new AtomicInteger(0);
-    AtomicInteger groupRoleRelDeletedCount = new AtomicInteger(0);
+    int[] groupDeletedCount = new int[] {0};
+    int[] groupRoleRelDeletedCount = new int[] {0};
 
     SessionUtils.doMultipleWithCommit(
         () ->
-            groupDeletedCount.set(
+            groupDeletedCount[0] =
                 SessionUtils.doWithoutCommitAndFetchResult(
                     GroupMetaMapper.class,
-                    mapper -> mapper.deleteGroupMetasByLegacyTimeLine(legacyTimeLine, limit))),
+                    mapper -> mapper.deleteGroupMetasByLegacyTimeLine(legacyTimeLine, limit)),
         () ->
-            groupRoleRelDeletedCount.set(
+            groupRoleRelDeletedCount[0] =
                 SessionUtils.doWithoutCommitAndFetchResult(
                     GroupRoleRelMapper.class,
                     mapper ->
-                        mapper.deleteGroupRoleRelMetasByLegacyTimeLine(legacyTimeLine, limit))));
+                        mapper.deleteGroupRoleRelMetasByLegacyTimeLine(legacyTimeLine, limit)));
 
-    return groupDeletedCount.get() + groupRoleRelDeletedCount.get();
+    return groupDeletedCount[0] + groupRoleRelDeletedCount[0];
   }
 }

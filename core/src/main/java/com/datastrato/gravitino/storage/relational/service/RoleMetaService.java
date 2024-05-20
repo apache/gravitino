@@ -17,7 +17,6 @@ import com.datastrato.gravitino.storage.relational.utils.ExceptionUtils;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /** The service class for role metadata. It provides the basic database operations for role. */
 public class RoleMetaService {
@@ -126,29 +125,28 @@ public class RoleMetaService {
   }
 
   public int deleteRoleMetasByLegacyTimeLine(long legacyTimeLine, int limit) {
-    AtomicInteger roleDeletedCount = new AtomicInteger(0);
-    AtomicInteger userRoleRelDeletedCount = new AtomicInteger(0);
-    AtomicInteger groupRoleRelDeletedCount = new AtomicInteger(0);
+    int[] roleDeletedCount = new int[] {0};
+    int[] userRoleRelDeletedCount = new int[] {0};
+    int[] groupRoleRelDeletedCount = new int[] {0};
 
     SessionUtils.doMultipleWithCommit(
         () ->
-            roleDeletedCount.set(
+            roleDeletedCount[0] =
                 SessionUtils.doWithoutCommitAndFetchResult(
                     RoleMetaMapper.class,
-                    mapper -> mapper.deleteRoleMetasByLegacyTimeLine(legacyTimeLine, limit))),
+                    mapper -> mapper.deleteRoleMetasByLegacyTimeLine(legacyTimeLine, limit)),
         () ->
-            userRoleRelDeletedCount.set(
+            userRoleRelDeletedCount[0] =
                 SessionUtils.doWithoutCommitAndFetchResult(
                     UserRoleRelMapper.class,
-                    mapper ->
-                        mapper.deleteUserRoleRelMetasByLegacyTimeLine(legacyTimeLine, limit))),
+                    mapper -> mapper.deleteUserRoleRelMetasByLegacyTimeLine(legacyTimeLine, limit)),
         () ->
-            groupRoleRelDeletedCount.set(
+            groupRoleRelDeletedCount[0] =
                 SessionUtils.doWithoutCommitAndFetchResult(
                     GroupRoleRelMapper.class,
                     mapper ->
-                        mapper.deleteGroupRoleRelMetasByLegacyTimeLine(legacyTimeLine, limit))));
+                        mapper.deleteGroupRoleRelMetasByLegacyTimeLine(legacyTimeLine, limit)));
 
-    return roleDeletedCount.get() + userRoleRelDeletedCount.get() + groupRoleRelDeletedCount.get();
+    return roleDeletedCount[0] + userRoleRelDeletedCount[0] + groupRoleRelDeletedCount[0];
   }
 }
