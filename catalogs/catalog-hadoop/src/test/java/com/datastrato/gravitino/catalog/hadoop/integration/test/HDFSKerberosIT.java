@@ -16,6 +16,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -68,7 +69,7 @@ public class HDFSKerberosIT {
   }
 
   @Test
-  public void testKerberoizeHDFS() throws IOException {
+  public void testKerberosHDFS() throws IOException {
     Configuration conf = new Configuration();
     conf.set("fs.defaultFS", defaultBaseLocation());
     conf.setBoolean("fs.hdfs.impl.disable.cache", true);
@@ -78,7 +79,7 @@ public class HDFSKerberosIT {
     clientUGI =
         UserGroupInformation.loginUserFromKeytabAndReturnUGI(
             CLIENT_PRINCIPAL, "/tmp/client.keytab");
-    clientUGI.doAs(
+    PrivilegedAction<?> action =
         (PrivilegedAction)
             () -> {
               try {
@@ -95,7 +96,14 @@ public class HDFSKerberosIT {
               } catch (IOException e) {
                 throw new RuntimeException(e);
               }
-            });
+            };
+
+    clientUGI.doAs(action);
+
+    // Clear UGI, It will throw exception
+    UserGroupInformation.reset();
+    Exception e = Assertions.assertThrows(Exception.class, action::run);
+    Assertions.assertTrue(e.getCause() instanceof AccessControlException);
   }
 
   private static String defaultBaseLocation() {
