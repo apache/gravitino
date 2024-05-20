@@ -520,6 +520,7 @@ tasks {
   val outputDir = projectDir.dir("distribution")
 
   val compileDistribution by registering {
+    dependsOn(project.getTasksByName("clean", true))
     dependsOn("copySubprojectDependencies", "copyCatalogLibAndConfigs", "copySubprojectLib")
 
     group = "gravitino distribution"
