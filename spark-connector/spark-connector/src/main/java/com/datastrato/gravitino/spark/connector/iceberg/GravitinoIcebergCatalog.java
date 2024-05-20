@@ -5,7 +5,6 @@
 
 package com.datastrato.gravitino.spark.connector.iceberg;
 
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
@@ -165,18 +164,6 @@ public class GravitinoIcebergCatalog extends BaseCatalog
     Method isSystemNamespace = baseCatalog.getDeclaredMethod("isSystemNamespace", String[].class);
     isSystemNamespace.setAccessible(true);
     return (Boolean) isSystemNamespace.invoke(baseCatalog, (Object) namespace);
-  }
-
-  private com.datastrato.gravitino.rel.Table loadGravitinoTable(Identifier ident)
-      throws NoSuchTableException {
-    try {
-      String database = getDatabase(ident);
-      return gravitinoCatalogClient
-          .asTableCatalog()
-          .loadTable(NameIdentifier.of(metalakeName, catalogName, database, ident.name()));
-    } catch (com.datastrato.gravitino.exceptions.NoSuchTableException e) {
-      throw new NoSuchTableException(ident);
-    }
   }
 
   private org.apache.spark.sql.connector.catalog.Table loadSparkTable(
