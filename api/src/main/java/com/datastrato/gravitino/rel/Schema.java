@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.rel;
 
 import com.datastrato.gravitino.Auditable;
+import com.datastrato.gravitino.SupportsSchemas;
 import com.datastrato.gravitino.annotation.Evolving;
 import java.util.Collections;
 import java.util.Map;

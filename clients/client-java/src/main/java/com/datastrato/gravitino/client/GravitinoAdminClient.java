@@ -6,6 +6,7 @@
 package com.datastrato.gravitino.client;
 
 import com.datastrato.gravitino.MetalakeChange;
+import com.datastrato.gravitino.SupportsMetalakes;
 import com.datastrato.gravitino.authorization.Group;
 import com.datastrato.gravitino.authorization.Privilege;
 import com.datastrato.gravitino.authorization.Role;
@@ -35,7 +36,6 @@ import com.datastrato.gravitino.exceptions.NoSuchRoleException;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
-import com.datastrato.gravitino.rel.SupportsMetalakes;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Collections;

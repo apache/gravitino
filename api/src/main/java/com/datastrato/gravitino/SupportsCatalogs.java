@@ -2,13 +2,8 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.rel;
+package com.datastrato.gravitino;
 
-import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.CatalogBasicInfo;
-import com.datastrato.gravitino.CatalogChange;
-import com.datastrato.gravitino.CatalogProvider;
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
@@ -66,8 +61,8 @@ public interface SupportsCatalogs {
    * Create a catalog with specified identifier.
    *
    * <p>The parameter "provider" is a short name of the catalog, used to tell Gravitino which
-   * catalog should be created. The short name should be the same as the {@link CatalogProvider}
-   * interface provided.
+   * catalog should be created. The short name should be the same as the {@link
+   * com.datastrato.gravitino.CatalogProvider} interface provided.
    *
    * @param catalogName the name of the catalog.
    * @param type the type of the catalog.
