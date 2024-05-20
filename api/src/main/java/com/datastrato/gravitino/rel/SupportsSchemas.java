@@ -29,8 +29,8 @@ import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import java.util.Map;
 
 /**
- * The Catalog interface to support schema operations. If the implemented catalog has schema
- * semantics, it should implement this interface.
+ * The client interface to support schema operations. The server side should use the other one with
+ * the same name in the core module.
  */
 @Evolving
 public interface SupportsSchemas {

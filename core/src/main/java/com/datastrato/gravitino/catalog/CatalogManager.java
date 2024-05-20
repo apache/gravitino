@@ -8,7 +8,7 @@ import static com.datastrato.gravitino.StringIdentifier.ID_KEY;
 import static com.datastrato.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForAlter;
 import static com.datastrato.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 
-import com.datastrato.gravitino.CatalogBasic;
+import com.datastrato.gravitino.CatalogBasicInfo;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.CatalogChange.RemoveProperty;
 import com.datastrato.gravitino.CatalogChange.SetProperty;
@@ -316,7 +316,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   @Override
   public Catalog createCatalog(
       NameIdentifier ident,
-      CatalogBasic.Type type,
+      CatalogBasicInfo.Type type,
       String provider,
       String comment,
       Map<String, String> properties)

@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.meta;
 
-import com.datastrato.gravitino.CatalogBasic;
+import com.datastrato.gravitino.CatalogBasicInfo;
 import com.datastrato.gravitino.Field;
 import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.SecurableObjects;
@@ -31,7 +31,7 @@ public class TestEntity {
   // Catalog test data
   private final Long catalogId = 1L;
   private final String catalogName = "testCatalog";
-  private final CatalogBasic.Type type = CatalogBasic.Type.RELATIONAL;
+  private final CatalogBasicInfo.Type type = CatalogBasicInfo.Type.RELATIONAL;
   private final String provider = "test";
 
   // Schema test data

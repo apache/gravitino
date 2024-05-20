@@ -5,7 +5,7 @@
 package com.datastrato.gravitino.rel;
 
 import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.CatalogBasic;
+import com.datastrato.gravitino.CatalogBasicInfo;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.CatalogProvider;
 import com.datastrato.gravitino.NameIdentifier;
@@ -80,7 +80,7 @@ public interface SupportsCatalogs {
    */
   Catalog createCatalog(
       String catalogName,
-      CatalogBasic.Type type,
+      CatalogBasicInfo.Type type,
       String provider,
       String comment,
       Map<String, String> properties)

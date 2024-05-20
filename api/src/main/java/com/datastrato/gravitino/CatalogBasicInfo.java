@@ -7,12 +7,9 @@ package com.datastrato.gravitino;
 import com.datastrato.gravitino.annotation.Evolving;
 import java.util.Map;
 
-/**
- * The interface of a catalog. The catalog is the second level entity in the gravitino system,
- * containing a set of tables.
- */
+/** The base interface of a catalog, defining the basic attributes and catalog types. */
 @Evolving
-public interface CatalogBasic extends Auditable {
+public interface CatalogBasicInfo extends Auditable {
 
   /** The type of the catalog. */
   enum Type {

@@ -11,11 +11,12 @@ import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
 
 /**
- * The interface of a catalog. The catalog is the second level entity in the gravitino system,
- * containing a set of tables.
+ * The client interface of a catalog. The catalog is the second level entity in the gravitino
+ * system, containing a set of tables. The server side should use the other one with the same name
+ * in the core module.
  */
 @Evolving
-public interface Catalog extends CatalogBasic {
+public interface Catalog extends CatalogBasicInfo {
 
   /**
    * Return the {@link SupportsSchemas} if the catalog supports schema operations.

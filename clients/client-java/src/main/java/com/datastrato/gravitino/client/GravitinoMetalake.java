@@ -5,7 +5,7 @@
 package com.datastrato.gravitino.client;
 
 import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.CatalogBasic;
+import com.datastrato.gravitino.CatalogBasicInfo;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.dto.AuditDTO;
@@ -135,7 +135,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
   @Override
   public Catalog createCatalog(
       String catalogName,
-      CatalogBasic.Type type,
+      CatalogBasicInfo.Type type,
       String provider,
       String comment,
       Map<String, String> properties)

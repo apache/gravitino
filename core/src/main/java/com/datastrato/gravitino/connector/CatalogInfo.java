@@ -5,7 +5,7 @@
 package com.datastrato.gravitino.connector;
 
 import com.datastrato.gravitino.Audit;
-import com.datastrato.gravitino.CatalogBasic;
+import com.datastrato.gravitino.CatalogBasicInfo;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.catalog.Catalog;
@@ -25,7 +25,7 @@ public final class CatalogInfo implements Catalog {
 
   private final String name;
 
-  private final CatalogBasic.Type type;
+  private final CatalogBasicInfo.Type type;
 
   private final String provider;
 
@@ -40,7 +40,7 @@ public final class CatalogInfo implements Catalog {
   public CatalogInfo(
       Long id,
       String name,
-      CatalogBasic.Type type,
+      CatalogBasicInfo.Type type,
       String provider,
       String comment,
       Map<String, String> properties,
@@ -69,7 +69,7 @@ public final class CatalogInfo implements Catalog {
 
   /** @return The type of the catalog. */
   @Override
-  public CatalogBasic.Type type() {
+  public CatalogBasicInfo.Type type() {
     return type;
   }
 

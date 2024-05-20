@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.catalog;
 
-import com.datastrato.gravitino.CatalogBasic;
+import com.datastrato.gravitino.CatalogBasicInfo;
 import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.file.FilesetCatalog;
 import com.datastrato.gravitino.messaging.TopicCatalog;
@@ -12,11 +12,11 @@ import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.schema.SupportsSchemas;
 
 /**
- * The interface of a catalog. The catalog is the second level entity in the gravitino system,
- * containing a set of tables.
+ * The server-side interface of a catalog. The catalog is the second level entity in the gravitino
+ * system, containing a set of tables.
  */
 @Evolving
-public interface Catalog extends CatalogBasic {
+public interface Catalog extends CatalogBasicInfo {
 
   /**
    * Return the {@link SupportsSchemas} if the catalog supports schema operations.
