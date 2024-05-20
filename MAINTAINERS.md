@@ -31,7 +31,7 @@ Contributors may be added by existing maintainers (see [Governance document](GOV
 
 | **NAME**       | **GitHub Username** | **Organization** |
 |----------------|---------------------|------------------|
-| Kuan-Po Tseng  | brandboat           | opensource4you   |
+| Kuan-Po Tseng  | brandboat           | SUSE             |
 | Nicholas Jiang | SteNicholas         | Bilibili         |
 | Eric Chang     | unknowntpo          | Lawsnote         |
 | Sophie Sun     | SophieTech88        | ExtraHop Network |
