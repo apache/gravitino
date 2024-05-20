@@ -25,6 +25,7 @@ Maintainers may be added once approved by the existing maintainers (see [Governa
 | Lisa Cao      | lisancao            | Datastrato       |
 | Qian Xia      | LauraXia123         | Datastrato       |
 | Danhua Wang   | danhuawang          | Datastrato       |
+| Hiren Sharma  | hiirrxnn            | Datastrato       |
 
 # Contributors
 
@@ -48,6 +49,7 @@ Contributors may be added by existing maintainers (see [Governance document](GOV
 | Congling Xia   | xiacongling         | Xiaomi           |
 | JieBao Xiao    | xloya               | Xiaomi           |
 | Can Cai        | caican00            | Xiaomi           |
+| Peidian Li     | coolderli           | Xiaomi           |
 
 ## Review process
 
