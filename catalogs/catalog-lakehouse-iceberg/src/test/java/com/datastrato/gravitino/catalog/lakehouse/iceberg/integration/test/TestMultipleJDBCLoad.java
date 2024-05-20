@@ -82,7 +82,7 @@ public class TestMultipleJDBCLoad extends AbstractIT {
     String metalakeName = RandomNameUtils.genRandomName("it_metalake");
     String postgreSqlCatalogName = RandomNameUtils.genRandomName("it_iceberg_postgresql");
     GravitinoMetalake metalake =
-        client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
+        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
 
     Map<String, String> icebergPgConf = Maps.newHashMap();
     String jdbcUrl = postgreSQLContainer.getJdbcUrl(TEST_DB_NAME);
@@ -96,7 +96,7 @@ public class TestMultipleJDBCLoad extends AbstractIT {
 
     Catalog postgreSqlCatalog =
         metalake.createCatalog(
-            NameIdentifier.of(metalakeName, postgreSqlCatalogName),
+            postgreSqlCatalogName,
             Catalog.Type.RELATIONAL,
             "lakehouse-iceberg",
             "comment",
@@ -115,7 +115,7 @@ public class TestMultipleJDBCLoad extends AbstractIT {
     String mysqlCatalogName = RandomNameUtils.genRandomName("it_iceberg_mysql");
     Catalog mysqlCatalog =
         metalake.createCatalog(
-            NameIdentifier.of(metalakeName, mysqlCatalogName),
+            mysqlCatalogName,
             Catalog.Type.RELATIONAL,
             "lakehouse-iceberg",
             "comment",

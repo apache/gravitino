@@ -212,8 +212,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     Map<String, String> properties = Maps.newHashMap();
     properties.put(PROPERTIES_KEY1, PROPERTIES_VALUE1);
     String storageLocation = storageLocation(schemaName, filesetName);
-    Catalog catalog_fileset =
-        metalake.loadCatalog(NameIdentifier.ofCatalog(metalakeName, catalogName));
+    Catalog catalog_fileset = metalake.loadCatalog(catalogName);
     catalog_fileset
         .asFilesetCatalog()
         .createFileset(
@@ -245,7 +244,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     metalakePage.setMetalakeNameField(METALAKE_SELECT_NAME);
     clickAndWait(metalakePage.submitHandleMetalakeBtn);
     // load metalake
-    metalake = gravitinoClient.loadMetalake(NameIdentifier.of(METALAKE_NAME));
+    metalake = gravitinoClient.loadMetalake(METALAKE_NAME);
     metalakePage.clickMetalakeLink(METALAKE_NAME);
     // create catalog
     clickAndWait(catalogsPage.createCatalogBtn);
@@ -272,7 +271,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     catalogsPage.setCatalogPropsAt(2, "key2", "value2");
     clickAndWait(catalogsPage.handleSubmitCatalogBtn);
     // load catalog
-    catalog = metalake.loadCatalog(NameIdentifier.of(METALAKE_NAME, HIVE_CATALOG_NAME));
+    catalog = metalake.loadCatalog(HIVE_CATALOG_NAME);
 
     Assertions.assertTrue(catalogsPage.verifyGetCatalog(HIVE_CATALOG_NAME));
   }

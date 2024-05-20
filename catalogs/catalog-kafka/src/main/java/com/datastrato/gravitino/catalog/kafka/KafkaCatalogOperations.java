@@ -157,7 +157,13 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
       return topicNames.stream()
           .map(name -> NameIdentifier.of(namespace, name))
           .toArray(NameIdentifier[]::new);
-    } catch (InterruptedException | ExecutionException e) {
+    } catch (ExecutionException e) {
+      throw new RuntimeException(
+          String.format(
+              "Failed to list topics under the schema %s: %s",
+              namespace, e.getCause().getMessage()),
+          e);
+    } catch (InterruptedException e) {
       throw new RuntimeException("Failed to list topics under the schema " + namespace, e);
     }
   }

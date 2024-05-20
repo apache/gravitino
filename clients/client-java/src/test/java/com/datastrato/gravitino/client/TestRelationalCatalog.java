@@ -123,7 +123,7 @@ public class TestRelationalCatalog extends TestBase {
 
     catalog =
         metalake.createCatalog(
-            NameIdentifier.of(metalakeName, catalogName),
+            catalogName,
             CatalogDTO.Type.RELATIONAL,
             provider,
             "comment",
