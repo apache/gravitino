@@ -12,7 +12,6 @@ import com.datastrato.gravitino.spark.connector.catalog.BaseCatalog;
 import java.util.Map;
 import org.apache.kyuubi.spark.connector.hive.HiveTable;
 import org.apache.kyuubi.spark.connector.hive.HiveTableCatalog;
-import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
@@ -34,19 +33,10 @@ public class GravitinoHiveCatalog extends BaseCatalog {
   protected org.apache.spark.sql.connector.catalog.Table createSparkTable(
       Identifier identifier,
       Table gravitinoTable,
+      org.apache.spark.sql.connector.catalog.Table sparkTable,
       TableCatalog sparkHiveCatalog,
       PropertiesConverter propertiesConverter,
       SparkTransformConverter sparkTransformConverter) {
-    org.apache.spark.sql.connector.catalog.Table sparkTable;
-    try {
-      sparkTable = sparkHiveCatalog.loadTable(identifier);
-    } catch (NoSuchTableException e) {
-      throw new RuntimeException(
-          String.format(
-              "Failed to load the real sparkTable: %s",
-              String.join(".", getDatabase(identifier), identifier.name())),
-          e);
-    }
     return new SparkHiveTable(
         identifier,
         gravitinoTable,
