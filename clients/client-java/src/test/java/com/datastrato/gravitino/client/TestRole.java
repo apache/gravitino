@@ -205,7 +205,10 @@ public class TestRole extends TestBase {
   private RoleDTO mockHasParentRoleDTO(String name) {
     SecurableObject schema =
         SecurableObjects.ofSchema(
-            "catalog", "schema", Lists.newArrayList(Privileges.UseSchema.allow()));
+            SecurableObjects.ofCatalog(
+                "catalog", Lists.newArrayList(Privileges.UseCatalog.allow())),
+            "schema",
+            Lists.newArrayList(Privileges.UseSchema.allow()));
     return RoleDTO.builder()
         .withName(name)
         .withProperties(ImmutableMap.of("k1", "v1"))

@@ -64,8 +64,9 @@ public class SecurableObjects {
    */
   public static SecurableObject ofTable(
       SecurableObject schema, String table, List<Privilege> privileges) {
-
-    return of(SecurableObject.Type.TABLE, Lists.newArrayList(schema.fullName(), table), privileges);
+    List<String> names = Lists.newArrayList(DOT.splitToList(schema.fullName()));
+    names.add(table);
+    return of(SecurableObject.Type.TABLE, names, privileges);
   }
 
   /**
@@ -78,7 +79,9 @@ public class SecurableObjects {
    */
   public static SecurableObject ofTopic(
       SecurableObject schema, String topic, List<Privilege> privileges) {
-    return of(SecurableObject.Type.TOPIC, Lists.newArrayList(schema.fullName(), topic), privileges);
+    List<String> names = Lists.newArrayList(DOT.splitToList(schema.fullName()));
+    names.add(topic);
+    return of(SecurableObject.Type.TOPIC, names, privileges);
   }
 
   /**
@@ -92,8 +95,9 @@ public class SecurableObjects {
    */
   public static SecurableObject ofFileset(
       SecurableObject schema, String fileset, List<Privilege> privileges) {
-    return of(
-        SecurableObject.Type.FILESET, Lists.newArrayList(schema.fullName(), fileset), privileges);
+    List<String> names = Lists.newArrayList(DOT.splitToList(schema.fullName()));
+    names.add(fileset);
+    return of(SecurableObject.Type.FILESET, names, privileges);
   }
 
   /**
@@ -106,8 +110,6 @@ public class SecurableObjects {
    * @return The created {@link SecurableObject}
    */
   public static SecurableObject ofAllMetalakes(List<Privilege> privileges) {
-    checkPrivileges(privileges);
-
     return new SecurableObjectImpl(null, "*", SecurableObject.Type.METALAKE, privileges);
   }
 
@@ -250,8 +252,6 @@ public class SecurableObjects {
           "If the length of names is 3, it must be FILESET, TABLE or TOPIC");
     }
 
-    checkPrivileges(privileges);
-
     for (String name : names) {
       checkName(name);
     }
@@ -278,12 +278,6 @@ public class SecurableObjects {
 
     if ("*".equals(name)) {
       throw new IllegalArgumentException("Cannot create a securable object with `*` name.");
-    }
-  }
-
-  private static void checkPrivileges(List<Privilege> privileges) {
-    if (privileges == null || privileges.isEmpty()) {
-      throw new IllegalArgumentException("Securable object should bind some privileges");
     }
   }
 }
