@@ -108,7 +108,8 @@ public class MiniGravitino {
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, GravitinoServer.WEBSERVER_CONF_PREFIX);
     this.host = jettyServerConfig.getHost();
-    this.port = jettyServerConfig.getHttpPort();
+    this.port = ITUtils.getAvailablePort();
+    serverConfig.set(JettyServerConfig.WEBSERVER_HTTP_PORT, port);
     String URI = String.format("http://%s:%d", host, port);
     if (AuthenticatorType.OAUTH
         .name()
