@@ -115,9 +115,23 @@ public class HiveContainer extends BaseContainer {
               return false;
             });
 
-    // Kerberized Hive can't execute '', so we remove the related check.
-
-    String sql =
+    final String showDatabaseSQL = "show databases";
+    await()
+        .atMost(30, TimeUnit.SECONDS)
+        .pollInterval(30 / retryLimit, TimeUnit.SECONDS)
+        .until(
+            () -> {
+              try {
+                Container.ExecResult result = executeInContainer("hive", "-e", showDatabaseSQL);
+                if (result.getStdout().contains("default")) {
+                  return true;
+                }
+              } catch (Exception e) {
+                LOG.error("Failed to execute sql: {}", showDatabaseSQL, e);
+              }
+              return false;
+            });
+    final String createTableSQL =
         "CREATE TABLE IF NOT EXISTS default.employee ( eid int, name String, "
             + "salary String, destination String) ";
     await()
@@ -126,12 +140,12 @@ public class HiveContainer extends BaseContainer {
         .until(
             () -> {
               try {
-                Container.ExecResult result = executeInContainer("hive", "-e", sql);
+                Container.ExecResult result = executeInContainer("hive", "-e", createTableSQL);
                 if (result.getExitCode() == 0) {
                   return true;
                 }
               } catch (Exception e) {
-                LOG.error("Failed to execute sql: {}", sql, e);
+                LOG.error("Failed to execute sql: {}", createTableSQL, e);
               }
               return false;
             });
