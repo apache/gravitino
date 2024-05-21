@@ -69,7 +69,7 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
     }
 
     SecurableObject securableObject =
-        SecurableObjects.of(
+        SecurableObjects.parse(
             role.getSecurableObjectFullName(),
             SecurableObject.Type.valueOf(role.getSecurableObjectType()),
             privileges);

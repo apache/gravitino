@@ -6,6 +6,7 @@ package com.datastrato.gravitino.authorization;
 
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
@@ -23,10 +24,7 @@ public class SecurableObjects {
    * @return The created metalake {@link SecurableObject}
    */
   public static SecurableObject ofMetalake(String metalake, List<Privilege> privileges) {
-    checkName(metalake);
-    checkPrivileges(privileges);
-
-    return new SecurableObjectImpl(null, metalake, SecurableObject.Type.METALAKE, privileges);
+    return of(SecurableObject.Type.METALAKE, Lists.newArrayList(metalake), privileges);
   }
 
   /**
@@ -37,82 +35,65 @@ public class SecurableObjects {
    * @return The created catalog {@link SecurableObject}
    */
   public static SecurableObject ofCatalog(String catalog, List<Privilege> privileges) {
-    checkName(catalog);
-    checkPrivileges(privileges);
-
-    return new SecurableObjectImpl(null, catalog, SecurableObject.Type.CATALOG, privileges);
+    return of(SecurableObject.Type.CATALOG, Lists.newArrayList(catalog), privileges);
   }
 
   /**
    * Create the schema {@link SecurableObject} with the given securable catalog object and schema
    * name.
    *
-   * @param catalogFullName The catalog full name
+   * @param catalog The catalog securable object.
    * @param schema The schema name
    * @param privileges The privileges of the schema
    * @return The created schema {@link SecurableObject}
    */
   public static SecurableObject ofSchema(
-      String catalogFullName, String schema, List<Privilege> privileges) {
-    checkCatalog(catalogFullName);
-    checkName(schema);
-    checkPrivileges(privileges);
+      SecurableObject catalog, String schema, List<Privilege> privileges) {
 
-    return new SecurableObjectImpl(
-        catalogFullName, schema, SecurableObject.Type.SCHEMA, privileges);
+    return of(
+        SecurableObject.Type.SCHEMA, Lists.newArrayList(catalog.fullName(), schema), privileges);
   }
 
   /**
    * Create the table {@link SecurableObject} with the given securable schema object and table name.
    *
-   * @param schemaFullName The schema full name
+   * @param schema The schema securable object
    * @param table The table name
    * @param privileges The privileges of the table
    * @return The created table {@link SecurableObject}
    */
   public static SecurableObject ofTable(
-      String schemaFullName, String table, List<Privilege> privileges) {
-    checkSchema(schemaFullName);
-    checkName(table);
-    checkPrivileges(privileges);
+      SecurableObject schema, String table, List<Privilege> privileges) {
 
-    return new SecurableObjectImpl(schemaFullName, table, SecurableObject.Type.TABLE, privileges);
+    return of(SecurableObject.Type.TABLE, Lists.newArrayList(schema.fullName(), table), privileges);
   }
 
   /**
    * Create the topic {@link SecurableObject} with the given securable schema object and topic name.
    *
-   * @param schemaFullName The schema full name
+   * @param schema The schema securable object
    * @param topic The topic name
    * @param privileges The privileges of the topic
    * @return The created topic {@link SecurableObject}
    */
   public static SecurableObject ofTopic(
-      String schemaFullName, String topic, List<Privilege> privileges) {
-    checkSchema(schemaFullName);
-    checkName(topic);
-    checkPrivileges(privileges);
-
-    return new SecurableObjectImpl(schemaFullName, topic, SecurableObject.Type.TOPIC, privileges);
+      SecurableObject schema, String topic, List<Privilege> privileges) {
+    return of(SecurableObject.Type.TOPIC, Lists.newArrayList(schema.fullName(), topic), privileges);
   }
 
   /**
    * Create the table {@link SecurableObject} with the given securable schema object and fileset
    * name.
    *
-   * @param schemaFullName The schema full name
+   * @param schema The schema securable object
    * @param fileset The fileset name
    * @param privileges The privileges of the fileset
    * @return The created fileset {@link SecurableObject}
    */
   public static SecurableObject ofFileset(
-      String schemaFullName, String fileset, List<Privilege> privileges) {
-    checkSchema(schemaFullName);
-    checkName(fileset);
-    checkPrivileges(privileges);
-
-    return new SecurableObjectImpl(
-        schemaFullName, fileset, SecurableObject.Type.FILESET, privileges);
+      SecurableObject schema, String fileset, List<Privilege> privileges) {
+    return of(
+        SecurableObject.Type.FILESET, Lists.newArrayList(schema.fullName(), fileset), privileges);
   }
 
   /**
@@ -130,38 +111,12 @@ public class SecurableObjects {
     return new SecurableObjectImpl(null, "*", SecurableObject.Type.METALAKE, privileges);
   }
 
-  private static void checkSchema(String schemaFullName) {
-    if (StringUtils.isBlank(schemaFullName)) {
-      throw new IllegalArgumentException("Schema full name can't be blank");
-    }
-
-    if (DOT.splitToList(schemaFullName).size() != 2) {
-      throw new IllegalArgumentException("Schema full name has a wrong format");
-    }
-  }
-
-  private static void checkCatalog(String catalogFullName) {
-    if (StringUtils.isBlank(catalogFullName)) {
-      throw new IllegalArgumentException("Catalog full name can't be blank");
-    }
-
-    if (DOT.splitToList(catalogFullName).size() != 1) {
-      throw new IllegalArgumentException("Catalog full name has a wrong format");
-    }
-  }
-
   private static class SecurableObjectImpl implements SecurableObject {
 
     private final String parentFullName;
     private final String name;
     private final Type type;
     private List<Privilege> privileges;
-
-    SecurableObjectImpl(String parentFullName, String name, Type type) {
-      this.parentFullName = parentFullName;
-      this.name = name;
-      this.type = type;
-    }
 
     SecurableObjectImpl(String parentFullName, String name, Type type, List<Privilege> privileges) {
       this.parentFullName = parentFullName;
@@ -231,7 +186,7 @@ public class SecurableObjects {
    * @param privileges The secureable object privileges.
    * @return The created {@link SecurableObject}
    */
-  public static SecurableObject of(
+  public static SecurableObject parse(
       String fullName, SecurableObject.Type type, List<Privilege> privileges) {
     if ("*".equals(fullName)) {
       if (type != SecurableObject.Type.METALAKE) {
@@ -259,7 +214,6 @@ public class SecurableObjects {
    */
   static SecurableObject of(
       SecurableObject.Type type, List<String> names, List<Privilege> privileges) {
-
     if (names == null) {
       throw new IllegalArgumentException("Cannot create a securable object with null names");
     }
@@ -295,6 +249,8 @@ public class SecurableObjects {
       throw new IllegalArgumentException(
           "If the length of names is 3, it must be FILESET, TABLE or TOPIC");
     }
+
+    checkPrivileges(privileges);
 
     for (String name : names) {
       checkName(name);

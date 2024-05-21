@@ -906,7 +906,7 @@ public class POConverters {
       }
 
       SecurableObject securableObject =
-          SecurableObjects.of(
+          SecurableObjects.parse(
               rolePO.getSecurableObjectFullName(),
               SecurableObject.Type.valueOf(rolePO.getSecurableObjectType()),
               privileges);

@@ -81,7 +81,7 @@ public class RoleOperations {
           httpRequest,
           () -> {
             SecurableObject securableObject =
-                SecurableObjects.of(
+                SecurableObjects.parse(
                     request.getSecurableObjects()[0].fullName(),
                     request.getSecurableObjects()[0].type(),
                     request.getSecurableObjects()[0].privileges().stream()

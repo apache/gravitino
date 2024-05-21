@@ -441,7 +441,7 @@ public class DTOConverters {
 
     return PrivilegeDTO.builder()
         .withName(privilege.name())
-        .withEffect(privilege.condition())
+        .withCondition(privilege.condition())
         .build();
   }
 

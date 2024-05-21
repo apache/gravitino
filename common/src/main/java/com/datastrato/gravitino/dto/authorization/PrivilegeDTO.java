@@ -15,7 +15,7 @@ public class PrivilegeDTO implements Privilege {
   @JsonProperty("name")
   private Name name;
 
-  @JsonProperty("effect")
+  @JsonProperty("condition")
   private Condition condition;
 
   /** Default constructor for Jackson deserialization. */
@@ -74,12 +74,12 @@ public class PrivilegeDTO implements Privilege {
     }
 
     /**
-     * Sets the effect of the privilege.
+     * Sets the condition of the privilege.
      *
-     * @param condition The effect of the privilege.
+     * @param condition The condition of the privilege.
      * @return The builder instance.
      */
-    public Builder withEffect(Condition condition) {
+    public Builder withCondition(Condition condition) {
       this.condition = condition;
       return this;
     }

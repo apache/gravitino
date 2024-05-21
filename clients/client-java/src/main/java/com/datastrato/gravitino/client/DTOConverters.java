@@ -284,7 +284,7 @@ class DTOConverters {
                 .map(
                     privilege -> {
                       return PrivilegeDTO.builder()
-                          .withEffect(privilege.condition())
+                          .withCondition(privilege.condition())
                           .withName(privilege.name())
                           .build();
                     })

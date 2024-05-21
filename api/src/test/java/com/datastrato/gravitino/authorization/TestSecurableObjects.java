@@ -56,7 +56,7 @@ public class TestSecurableObjects {
 
     SecurableObject schema =
         SecurableObjects.ofSchema(
-            catalog.fullName(), "schema", Lists.newArrayList(Privileges.UseSchema.allow()));
+            catalog, "schema", Lists.newArrayList(Privileges.UseSchema.allow()));
     Assertions.assertEquals("catalog.schema", schema.fullName());
     Assertions.assertEquals(SCHEMA, schema.type());
     SecurableObject anotherSchema =
@@ -67,8 +67,7 @@ public class TestSecurableObjects {
     Assertions.assertEquals(schema, anotherSchema);
 
     SecurableObject table =
-        SecurableObjects.ofTable(
-            schema.fullName(), "table", Lists.newArrayList(Privileges.ReadTable.allow()));
+        SecurableObjects.ofTable(schema, "table", Lists.newArrayList(Privileges.ReadTable.allow()));
     Assertions.assertEquals("catalog.schema.table", table.fullName());
     Assertions.assertEquals(TABLE, table.type());
     SecurableObject anotherTable =
@@ -80,7 +79,7 @@ public class TestSecurableObjects {
 
     SecurableObject fileset =
         SecurableObjects.ofFileset(
-            schema.fullName(), "fileset", Lists.newArrayList(Privileges.UseSchema.allow()));
+            schema, "fileset", Lists.newArrayList(Privileges.UseSchema.allow()));
     Assertions.assertEquals("catalog.schema.fileset", fileset.fullName());
     Assertions.assertEquals(FILESET, fileset.type());
     SecurableObject anotherFileset =
@@ -91,8 +90,7 @@ public class TestSecurableObjects {
     Assertions.assertEquals(fileset, anotherFileset);
 
     SecurableObject topic =
-        SecurableObjects.ofTopic(
-            schema.fullName(), "topic", Lists.newArrayList(Privileges.ReadTopic.allow()));
+        SecurableObjects.ofTopic(schema, "topic", Lists.newArrayList(Privileges.ReadTopic.allow()));
     Assertions.assertEquals("catalog.schema.topic", topic.fullName());
     Assertions.assertEquals(TOPIC, topic.type());
 

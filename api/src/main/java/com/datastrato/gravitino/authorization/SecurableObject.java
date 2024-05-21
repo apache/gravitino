@@ -77,7 +77,7 @@ public interface SecurableObject {
   /**
    * The privileges of the securable object. For example: If the securable object is a table, the
    * privileges could be `READ TABLE`, `WRITE TABLE`, etc. If a schema has the privilege of `LOAD
-   * TABLE`. It means the role can all tables of the schema.
+   * TABLE`. It means the role can load all tables of the schema.
    *
    * @return The privileges of the role.
    */
