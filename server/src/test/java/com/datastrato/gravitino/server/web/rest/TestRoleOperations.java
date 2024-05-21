@@ -271,7 +271,7 @@ public class TestRoleOperations extends JerseyTest {
         .withId(1L)
         .withName(role)
         .withProperties(Collections.emptyMap())
-        .withSecurableObject(catalog)
+        .withSecurableObjects(Lists.newArrayList(catalog))
         .withAuditInfo(
             AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .build();

@@ -249,17 +249,20 @@ public class AccessControlManager {
    * @param metalake The Metalake of the Role.
    * @param role The name of the Role.
    * @param properties The properties of the Role.
-   * @param securableObject The securable object of the Role.
+   * @param securableObjects The securable objects of the Role.
    * @return The created Role instance.
    * @throws RoleAlreadyExistsException If a Role with the same name already exists.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If creating the Role encounters storage issues.
    */
   public Role createRole(
-      String metalake, String role, Map<String, String> properties, SecurableObject securableObject)
+      String metalake,
+      String role,
+      Map<String, String> properties,
+      List<SecurableObject> securableObjects)
       throws RoleAlreadyExistsException, NoSuchMetalakeException {
     return doWithNonAdminLock(
-        () -> roleManager.createRole(metalake, role, properties, securableObject));
+        () -> roleManager.createRole(metalake, role, properties, securableObjects));
   }
 
   /**

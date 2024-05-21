@@ -773,7 +773,7 @@ public class TestJDBCBackend {
         .withNamespace(namespace)
         .withProperties(null)
         .withAuditInfo(auditInfo)
-        .withSecurableObject(securableObject)
+        .withSecurableObjects(Lists.newArrayList(securableObject))
         .build();
   }
 
@@ -820,7 +820,7 @@ public class TestJDBCBackend {
         .withProperties(properties)
         .withNamespace(namespace)
         .withAuditInfo(auditInfo)
-        .withSecurableObject(securableObject)
+        .withSecurableObjects(Lists.newArrayList(securableObject))
         .build();
   }
 }

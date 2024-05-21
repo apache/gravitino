@@ -19,6 +19,8 @@ import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.server.web.Utils;
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
@@ -80,20 +82,26 @@ public class RoleOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            SecurableObject securableObject =
-                SecurableObjects.parse(
-                    request.getSecurableObjects()[0].fullName(),
-                    request.getSecurableObjects()[0].type(),
-                    request.getSecurableObjects()[0].privileges().stream()
-                        .map(
-                            privilege -> {
-                              if (privilege.condition().equals(Privilege.Condition.ALLOW)) {
-                                return Privileges.allow(privilege.name());
-                              } else {
-                                return Privileges.deny(privilege.name());
-                              }
-                            })
-                        .collect(Collectors.toList()));
+            List<SecurableObject> securableObjects =
+                Arrays.stream(request.getSecurableObjects())
+                    .map(
+                        securableObjectDTO ->
+                            SecurableObjects.parse(
+                                securableObjectDTO.fullName(),
+                                securableObjectDTO.type(),
+                                securableObjectDTO.privileges().stream()
+                                    .map(
+                                        privilege -> {
+                                          if (privilege
+                                              .condition()
+                                              .equals(Privilege.Condition.ALLOW)) {
+                                            return Privileges.allow(privilege.name());
+                                          } else {
+                                            return Privileges.deny(privilege.name());
+                                          }
+                                        })
+                                    .collect(Collectors.toList())))
+                    .collect(Collectors.toList());
 
             return Utils.ok(
                 new RoleResponse(
@@ -102,7 +110,7 @@ public class RoleOperations {
                             metalake,
                             request.getName(),
                             request.getProperties(),
-                            securableObject))));
+                            securableObjects))));
           });
 
     } catch (Exception e) {
