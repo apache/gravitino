@@ -51,7 +51,7 @@ Contributors may be added by existing maintainers (see [Governance document](GOV
 | Brandon Lu     | Lanznx              | LINE             |
 | Lewis Jackson  | xnge                | opensource4you   |
 | Li-Hsing Liu   | austin362667        | opensource4you   |
-| Li Tianhang    | TEOTEO520           | Bilibili         |
+| Tianhang Li    | TEOTEO520           | Bilibili         |
 | Hiren Sharma   | hiirrxnn            | opensource4you   |
 
 ## Review process
