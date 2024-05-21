@@ -7,6 +7,7 @@ package com.datastrato.gravitino.spark.connector.integration.test;
 import com.datastrato.gravitino.spark.connector.integration.test.util.SparkTableInfo;
 import com.datastrato.gravitino.spark.connector.integration.test.util.SparkTableInfo.SparkColumnInfo;
 import com.datastrato.gravitino.spark.connector.integration.test.util.SparkTableInfoChecker;
+import com.datastrato.gravitino.spark.connector.ConnectorConstants;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
@@ -385,6 +386,23 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     Map<String, String> newProperties = getTableInfo(tableName).getTableProperties();
     Assertions.assertFalse(newProperties.containsKey("key1"));
     Assertions.assertTrue(newProperties.containsKey("key2"));
+  }
+
+  @Test
+  void testAlterTableUpdateComment() {
+    String tableName = "test_comment";
+    String comment = "comment1";
+    dropTableIfExists(tableName);
+
+    createSimpleTable(tableName);
+    sql(
+        String.format(
+            "ALTER TABLE %s SET TBLPROPERTIES('%s'='%s')",
+            tableName, ConnectorConstants.COMMENT, comment));
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+    SparkTableInfoChecker checker =
+        SparkTableInfoChecker.create().withName(tableName).withComment(comment);
+    checker.check(tableInfo);
   }
 
   @Test
