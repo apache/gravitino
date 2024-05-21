@@ -25,11 +25,8 @@ import java.util.Properties;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.junit.jupiter.api.Assertions;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class ITUtils {
-  private static final Logger LOG = LoggerFactory.getLogger(ITUtils.class);
   public static final String TEST_MODE = "testMode";
   public static final String EMBEDDED_TEST_MODE = "embedded";
 
