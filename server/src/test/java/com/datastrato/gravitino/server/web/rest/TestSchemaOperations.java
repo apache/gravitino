@@ -20,7 +20,7 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.catalog.SchemaDispatcher;
 import com.datastrato.gravitino.catalog.SchemaOperationDispatcher;
-import com.datastrato.gravitino.dto.rel.SchemaDTO;
+import com.datastrato.gravitino.dto.SchemaDTO;
 import com.datastrato.gravitino.dto.requests.SchemaCreateRequest;
 import com.datastrato.gravitino.dto.requests.SchemaUpdateRequest;
 import com.datastrato.gravitino.dto.requests.SchemaUpdatesRequest;
