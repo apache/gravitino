@@ -10,7 +10,6 @@ import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Reporter;
 import com.codahale.metrics.jmx.JmxReporter;
 import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.metrics.source.MetricsSource;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
@@ -40,7 +39,7 @@ public class MetricsSystem implements Closeable {
   private HashMap<String, MetricsSource> metricSources = new HashMap<>();
   private List<Reporter> metricsReporters = new ArrayList<>();
   private CollectorRegistry prometheusRegistry;
-  private int timeSlidingWindowSeconds;
+  private Config serverConfig;
 
   public MetricsSystem(Config config) {
     this("", config);
@@ -48,8 +47,7 @@ public class MetricsSystem implements Closeable {
 
   public MetricsSystem(String name, Config config) {
     this.name = name;
-    this.timeSlidingWindowSeconds =
-        config.get(Configs.METRICS_TIME_SLIDING_WINDOW_SECONDS).intValue();
+    this.serverConfig = config;
     this.metricRegistry = new MetricRegistry();
     this.prometheusRegistry = new CollectorRegistry();
   }
@@ -183,7 +181,7 @@ public class MetricsSystem implements Closeable {
     return new MetricsServlet(prometheusRegistry);
   }
 
-  public int getTimeSlidingWindowSeconds() {
-    return timeSlidingWindowSeconds;
+  public Config getServerConfig() {
+    return serverConfig;
   }
 }

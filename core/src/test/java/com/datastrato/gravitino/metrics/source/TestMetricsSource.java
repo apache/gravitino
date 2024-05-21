@@ -24,15 +24,19 @@ public class TestMetricsSource extends MetricsSource {
   private static String TEST_METRICS_SOURCE = "test";
   private static int gaugeValue = 0;
   private MetricsSystem metricsSystem;
+  private static final Config config;
+
+  static {
+    config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.METRICS_TIME_SLIDING_WINDOW_SECONDS)).thenReturn(60);
+  }
 
   public TestMetricsSource() {
-    super(TEST_METRICS_SOURCE);
+    super(TEST_METRICS_SOURCE, config);
   }
 
   @BeforeAll
   void init() {
-    Config config = Mockito.mock(Config.class);
-    Mockito.when(config.get(Configs.METRICS_TIME_SLIDING_WINDOW_SECONDS)).thenReturn(60);
     this.metricsSystem = new MetricsSystem(config);
     metricsSystem.register(this);
   }

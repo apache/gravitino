@@ -94,9 +94,13 @@ public class GravitinoServer extends ResourceConfig {
       register(AccessControlNotAllowedFilter.class);
     }
 
-    HttpServerMetricsSource httpServerMetricsSource =
-        new HttpServerMetricsSource(MetricsSource.GRAVITINO_SERVER_METRIC_NAME, this, server);
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
+    HttpServerMetricsSource httpServerMetricsSource =
+        new HttpServerMetricsSource(
+            MetricsSource.GRAVITINO_SERVER_METRIC_NAME,
+            this,
+            server,
+            metricsSystem.getServerConfig());
     metricsSystem.register(httpServerMetricsSource);
 
     Servlet servlet = new ServletContainer(this);

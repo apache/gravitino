@@ -11,8 +11,8 @@ import com.codahale.metrics.Histogram;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.SlidingTimeWindowArrayReservoir;
 import com.codahale.metrics.Timer;
-import com.datastrato.gravitino.GravitinoEnv;
-import com.datastrato.gravitino.metrics.MetricsSystem;
+import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.Configs;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -28,9 +28,12 @@ public abstract class MetricsSource {
   public static final String JVM_METRIC_NAME = "jvm";
   private final MetricRegistry metricRegistry;
   private final String metricsSourceName;
+  private final int timeSlidingWindowSeconds;
 
-  protected MetricsSource(String name) {
+  protected MetricsSource(String name, Config config) {
     this.metricsSourceName = name;
+    this.timeSlidingWindowSeconds =
+        config.get(Configs.METRICS_TIME_SLIDING_WINDOW_SECONDS).intValue();
     metricRegistry = new MetricRegistry();
   }
 
@@ -103,12 +106,6 @@ public abstract class MetricsSource {
   }
 
   protected int getTimeSlidingWindowSeconds() {
-    MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
-    // in test case
-    if (metricsSystem == null) {
-      return 60;
-    } else {
-      return metricsSystem.getTimeSlidingWindowSeconds();
-    }
+    return timeSlidingWindowSeconds;
   }
 }
