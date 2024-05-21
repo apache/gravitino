@@ -9,12 +9,12 @@ import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREF
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.Schema;
+import com.datastrato.gravitino.SchemaChange;
 import com.datastrato.gravitino.catalog.hive.miniHMS.MiniHiveMetastoreService;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
-import com.datastrato.gravitino.rel.Schema;
-import com.datastrato.gravitino.rel.SchemaChange;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Arrays;

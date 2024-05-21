@@ -16,6 +16,7 @@ import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.SchemaChange;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType;
 import com.datastrato.gravitino.catalog.hive.converter.ToHiveType;
 import com.datastrato.gravitino.connector.CatalogInfo;
@@ -30,7 +31,6 @@ import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;

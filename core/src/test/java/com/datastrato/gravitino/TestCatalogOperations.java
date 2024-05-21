@@ -28,8 +28,6 @@ import com.datastrato.gravitino.messaging.TopicCatalog;
 import com.datastrato.gravitino.messaging.TopicChange;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Schema;
-import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;

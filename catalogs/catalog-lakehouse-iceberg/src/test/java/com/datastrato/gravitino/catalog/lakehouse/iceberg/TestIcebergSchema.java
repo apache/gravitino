@@ -6,13 +6,13 @@ package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.Schema;
+import com.datastrato.gravitino.SchemaChange;
 import com.datastrato.gravitino.catalog.PropertiesMetadataHelpers;
 import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
-import com.datastrato.gravitino.rel.Schema;
-import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.schema.SupportsSchemas;
 import com.google.common.collect.Maps;
 import java.time.Instant;

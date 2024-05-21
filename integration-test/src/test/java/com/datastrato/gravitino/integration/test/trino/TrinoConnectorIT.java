@@ -8,6 +8,7 @@ import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
@@ -17,7 +18,6 @@ import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.integration.test.util.JdbcDriverDownloader;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;

@@ -4,8 +4,8 @@
  */
 package com.datastrato.gravitino.dto.rel;
 
+import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.dto.AuditDTO;
-import com.datastrato.gravitino.rel.Schema;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;

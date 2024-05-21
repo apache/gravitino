@@ -10,6 +10,7 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.SchemaChange;
 import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
@@ -24,7 +25,6 @@ import com.datastrato.gravitino.dto.requests.TopicUpdateRequest;
 import com.datastrato.gravitino.file.FilesetChange;
 import com.datastrato.gravitino.messaging.TopicChange;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.Expression;
 
