@@ -12,18 +12,18 @@ Maintainers may be added once approved by the existing maintainers (see [Governa
 | **NAME**      | **GitHub Username** | **Organization** |
 |---------------|---------------------|------------------|
 | Justin Mclean | justinmclean        | Datastrato       |
-| Heng Qin      | qqqttt123           | Datastrato       |
-| McHades       | mchades             | Datastrato       |
+| He Qi         | qqqttt123           | Datastrato       |
+| Minghuang Li  | mchades             | Datastrato       |
 | Xun Liu       | xunliu              | Datastrato       |
 | Hui Yu        | diqiu50             | Datastrato       |
 | Xiaojing Fang | FANNG1              | Datastrato       |
 | Qi Yu         | yuqi1129            | Datastrato       |
-| Clearvive     | Clearvive           | Datastrato       |
-| Cheyne        | ch3yne              | Datastrato       |
-| Jerry Shao    | jerryshao           | Datastrato       |
+| Decheng Liu   | ch3yne              | Datastrato       |
+| Saisai Shao   | jerryshao           | Datastrato       |
 | Shaofeng Shi  | shaofengshi         | Datastrato       |
 | Lisa Cao      | lisancao            | Datastrato       |
 | Qian Xia      | LauraXia123         | Datastrato       |
+| Danhua Wang   | danhuawang          | Datastrato       |
 
 # Contributors
 
@@ -44,8 +44,15 @@ Contributors may be added by existing maintainers (see [Governance document](GOV
 | Yu-Hsin Lai    | laiyousin           | Virginia Tech    |
 | Charlie Cheng  | charliecheng630     | cacaFly          |
 | PoAn Yang      | FrankYang0592       | SUSE             |
+| Congling Xia   | xiacongling         | Xiaomi           |
 | JieBao Xiao    | xloya               | Xiaomi           |
-
+| Can Cai        | caican00            | Xiaomi           |
+| Peidian Li     | coolderli           | Xiaomi           |
+| Brandon Lu     | Lanznx              | LINE             |
+| Lewis Jackson  | xnge                | opensource4you   |
+| Li-Hsing Liu   | austin362667        | opensource4you   |
+| Tianhang Li    | TEOTEO520           | Bilibili         |
+| Hiren Sharma   | hiirrxnn            | opensource4you   |
 
 ## Review process
 

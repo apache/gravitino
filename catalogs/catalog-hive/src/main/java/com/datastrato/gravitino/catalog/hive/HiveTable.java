@@ -100,7 +100,7 @@ public class HiveTable extends BaseTable {
                   f ->
                       SortOrders.of(
                           NamedReference.field(f.getCol()),
-                          f.getOrder() == 0 ? SortDirection.ASCENDING : SortDirection.DESCENDING))
+                          f.getOrder() == 1 ? SortDirection.ASCENDING : SortDirection.DESCENDING))
               .toArray(SortOrder[]::new);
     }
 
@@ -276,7 +276,7 @@ public class HiveTable extends BaseTable {
       for (SortOrder sortOrder : sortOrders) {
         String columnName = ((NamedReference.FieldReference) sortOrder.expression()).fieldName()[0];
         sd.addToSortCols(
-            new Order(columnName, sortOrder.direction() == SortDirection.ASCENDING ? 0 : 1));
+            new Order(columnName, sortOrder.direction() == SortDirection.ASCENDING ? 1 : 0));
       }
     }
 
