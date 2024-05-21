@@ -96,17 +96,13 @@ RUN tar -xz -C ${HADOOP_HOME} --strip-components 1 -f /tmp/packages/${HADOOP_PAC
 # replace configuration templates
 RUN rm -f ${HADOOP_CONF_DIR}/core-site.xml
 RUN rm -f ${HADOOP_CONF_DIR}/hadoop-env.sh
-RUN rm -f ${HADOOP_CONF_DIR}/yarn-env.sh
 RUN rm -f ${HADOOP_CONF_DIR}/hdfs-site.xml
 RUN rm -f ${HADOOP_CONF_DIR}/mapred-site.xml
-RUN rm -f ${HADOOP_CONF_DIR}/yarn-site.xml
 
 ADD core-site.xml ${HADOOP_CONF_DIR}/core-site.xml
 ADD hadoop-env.sh ${HADOOP_CONF_DIR}/hadoop-env.sh
-ADD yarn-env.sh ${HADOOP_CONF_DIR}/yarn-env.sh
 ADD hdfs-site.xml ${HADOOP_CONF_DIR}/hdfs-site.xml
 ADD mapred-site.xml ${HADOOP_CONF_DIR}/mapred-site.xml
-ADD yarn-site.xml ${HADOOP_CONF_DIR}/yarn-site.xml
 ADD check-status.sh /tmp/check-status.sh
 
 # format HFS
