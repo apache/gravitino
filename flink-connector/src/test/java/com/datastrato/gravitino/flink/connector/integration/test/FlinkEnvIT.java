@@ -8,7 +8,12 @@ import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.flink.connector.PropertiesConverter;
 import com.datastrato.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
+import com.datastrato.gravitino.integration.test.util.ITUtils;
+import com.datastrato.gravitino.server.web.JettyServerConfig;
+import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
 import java.util.Collections;
+import java.util.Map;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.TableEnvironment;
 import org.junit.jupiter.api.AfterAll;
@@ -27,6 +32,12 @@ public abstract class FlinkEnvIT extends AbstractIT {
 
   @BeforeAll
   static void startUp() throws Exception {
+    Map<String, String> customConfigs =
+        ImmutableMap.of(
+            JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
+            Integer.toString(ITUtils.getAvailablePort()));
+    AbstractIT.registerCustomConfigs(customConfigs);
+    AbstractIT.startIntegrationTest();
     // Start Gravitino server
     initGravitinoEnv();
     initMetalake();
@@ -35,7 +46,9 @@ public abstract class FlinkEnvIT extends AbstractIT {
   }
 
   @AfterAll
-  static void stop() {}
+  static void stop() throws IOException, InterruptedException {
+    AbstractIT.stopIntegrationTest();
+  }
 
   protected String flinkByPass(String key) {
     return PropertiesConverter.FLINK_PROPERTY_PREFIX + key;
