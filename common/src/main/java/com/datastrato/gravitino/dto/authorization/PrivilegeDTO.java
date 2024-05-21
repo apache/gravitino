@@ -25,7 +25,7 @@ public class PrivilegeDTO implements Privilege {
    * Creates a new instance of PrivilegeDTO.
    *
    * @param name The name of the Privilege DTO.
-   * @param condition The effect of the Privilege DTO.
+   * @param condition The condition of the Privilege DTO.
    */
   protected PrivilegeDTO(Name name, Condition condition) {
     this.name = name;
@@ -88,11 +88,11 @@ public class PrivilegeDTO implements Privilege {
      * Builds an instance of PrivilegeDTO using the builder's properties.
      *
      * @return An instance of PrivilegeDTO.
-     * @throws IllegalArgumentException If the name or effect are not set.
+     * @throws IllegalArgumentException If the name or condition are not set.
      */
     public PrivilegeDTO build() {
       Preconditions.checkArgument(name != null, "name cannot be null");
-      Preconditions.checkArgument(condition != null, "effect cannot be null");
+      Preconditions.checkArgument(condition != null, "condition cannot be null");
       return new PrivilegeDTO(name, condition);
     }
   }

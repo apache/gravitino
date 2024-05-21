@@ -892,13 +892,13 @@ public class POConverters {
       List<String> privilegeNames =
           JsonUtils.anyFieldMapper()
               .readValue(rolePO.getPrivileges(), new TypeReference<List<String>>() {});
-      List<String> privilegeEffects =
+      List<String> privilegeConditions =
           JsonUtils.anyFieldMapper()
               .readValue(rolePO.getPrivilegeConditions(), new TypeReference<List<String>>() {});
 
       List<Privilege> privileges = Lists.newArrayList();
       for (int index = 0; index < privilegeNames.size(); index++) {
-        if (Privilege.Condition.ALLOW.name().equals(privilegeEffects.get(index))) {
+        if (Privilege.Condition.ALLOW.name().equals(privilegeConditions.get(index))) {
           privileges.add(Privileges.allow(privilegeNames.get(index)));
         } else {
           privileges.add(Privileges.allow(privilegeNames.get(index)));

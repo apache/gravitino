@@ -184,9 +184,9 @@ public class RolePO {
           rolePO.securableObjectFullName != null, "Securable object full name is required");
       Preconditions.checkArgument(
           rolePO.securableObjectType != null, "Securable object type is required");
-      Preconditions.checkArgument(rolePO.privileges != null, "Privileges is required");
+      Preconditions.checkArgument(rolePO.privileges != null, "Privileges are required");
       Preconditions.checkArgument(
-          rolePO.privilegeConditions != null, "PrivilegeEffects is required");
+          rolePO.privilegeConditions != null, "Privilege conditions are required");
       Preconditions.checkArgument(rolePO.auditInfo != null, "Audit info is required");
       Preconditions.checkArgument(rolePO.currentVersion != null, "Current version is required");
       Preconditions.checkArgument(rolePO.lastVersion != null, "Last version is required");
