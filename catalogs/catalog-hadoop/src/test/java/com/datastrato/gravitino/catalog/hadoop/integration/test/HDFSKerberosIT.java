@@ -37,6 +37,7 @@ public class HDFSKerberosIT {
   public static void setup() throws IOException {
     containerSuite.startKerberosHiveContainer();
 
+    // Copy the keytab and krb5.conf from the container
     containerSuite
         .getKerberosHiveContainer()
         .getContainer()
@@ -49,6 +50,7 @@ public class HDFSKerberosIT {
 
     String ip = containerSuite.getKerberosHiveContainer().getContainerIpAddress();
 
+    // Modify the krb5.conf and change the kdc and admin_server to the container IP
     String content =
         FileUtils.readFileToString(new File("/tmp/krb5.conf_tmp"), StandardCharsets.UTF_8);
     content = content.replace("kdc = localhost:88", "kdc = " + ip + ":88");
