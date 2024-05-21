@@ -117,6 +117,7 @@ ADD hadoop-env.sh ${HADOOP_CONF_DIR}/hadoop-env.sh
 ADD yarn-env.sh ${HADOOP_CONF_DIR}/yarn-env.sh
 ADD hdfs-site.xml ${HADOOP_CONF_DIR}/hdfs-site.xml
 ADD mapred-site.xml ${HADOOP_CONF_DIR}/mapred-site.xml
+ADD yarn-site.xml ${HADOOP_CONF_DIR}/yarn-site.xml
 ADD check-status.sh /tmp/check-status.sh
 
 
