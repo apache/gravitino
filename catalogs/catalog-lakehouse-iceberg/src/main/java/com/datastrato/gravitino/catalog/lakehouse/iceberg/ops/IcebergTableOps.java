@@ -15,7 +15,7 @@ import java.sql.DriverManager;
 import java.util.Collections;
 import java.util.Optional;
 import javax.ws.rs.NotSupportedException;
-import org.apache.iceberg.BaseMetadataTable;
+import org.apache.iceberg.MetadataTableType;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.Transaction;
@@ -124,8 +124,8 @@ public class IcebergTableOps implements AutoCloseable {
     try {
       return CatalogHandlers.loadTable(catalog, tableIdentifier);
     } catch (NoSuchTableException e) {
-      Table table = catalog.loadTable(tableIdentifier);
-      if (table instanceof BaseMetadataTable) {
+      if (MetadataTableType.from(tableIdentifier.name()) != null) {
+        Table table = catalog.loadTable(tableIdentifier);
         TableMetadata tableMetadata =
             TableMetadata.newTableMetadata(
                 table.schema(),
