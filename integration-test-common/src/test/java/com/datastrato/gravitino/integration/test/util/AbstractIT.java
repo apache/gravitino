@@ -6,7 +6,6 @@ package com.datastrato.gravitino.integration.test.util;
 
 import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 import static com.datastrato.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
-import static com.datastrato.gravitino.server.web.JettyServerConfig.WEBSERVER_HTTP_PORT;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
