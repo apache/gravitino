@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.catalog.hadoop;
 
 import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION;
 
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
@@ -12,9 +13,11 @@ import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
+import com.datastrato.gravitino.catalog.hadoop.kerberos.KerberosClient;
 import com.datastrato.gravitino.connector.CatalogInfo;
 import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.PropertiesMetadata;
+import com.datastrato.gravitino.connector.ProxyPlugin;
 import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
@@ -36,6 +39,7 @@ import com.datastrato.gravitino.utils.PrincipalUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
@@ -47,6 +51,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.security.SecurityUtil;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,7 +78,15 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   @VisibleForTesting Optional<Path> catalogStorageLocation;
 
-  // For testing only.
+  private Map<String, String> conf;
+
+  @SuppressWarnings("unused")
+  private ProxyPlugin proxyPlugin;
+
+  private String kerberosRealm;
+
+  private CatalogInfo catalogInfo;
+
   HadoopCatalogOperations(EntityStore store) {
     this.store = store;
   }
@@ -81,10 +95,16 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     this(GravitinoEnv.getInstance().entityStore());
   }
 
+  public String getKerberosRealm() {
+    return kerberosRealm;
+  }
+
   @Override
   public void initialize(Map<String, String> config, CatalogInfo info) throws RuntimeException {
     // Initialize Hadoop Configuration.
+    this.conf = config;
     this.hadoopConf = new Configuration();
+    this.catalogInfo = info;
     Map<String, String> bypassConfigs =
         config.entrySet().stream()
             .filter(e -> e.getKey().startsWith(CATALOG_BYPASS_PREFIX))
@@ -98,7 +118,27 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
         (String)
             CATALOG_PROPERTIES_METADATA.getOrDefault(
                 config, HadoopCatalogPropertiesMetadata.LOCATION);
+    conf.forEach(hadoopConf::set);
+    initKerberosAuthentication(conf, hadoopConf);
+
     this.catalogStorageLocation = Optional.ofNullable(catalogLocation).map(Path::new);
+  }
+
+  private void initKerberosAuthentication(Map<String, String> conf, Configuration hadoopConf) {
+    String enableAuth = conf.get(HADOOP_SECURITY_AUTHORIZATION);
+
+    if (UserGroupInformation.AuthenticationMethod.KERBEROS
+            == SecurityUtil.getAuthenticationMethod(hadoopConf)
+        && StringUtils.equalsIgnoreCase(enableAuth, "true")) {
+      UserGroupInformation.setConfiguration(hadoopConf);
+      try {
+        KerberosClient kerberosClient = new KerberosClient(conf, hadoopConf);
+        File keytabFile = kerberosClient.saveKeyTabFileFromUri(catalogInfo.id());
+        this.kerberosRealm = kerberosClient.login(keytabFile.getAbsolutePath());
+      } catch (IOException e) {
+        throw new RuntimeException("Failed to login with kerberos", e);
+      }
+    }
   }
 
   @Override
@@ -608,5 +648,9 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   static Path formalizePath(Path path, Configuration configuration) throws IOException {
     FileSystem defaultFs = FileSystem.get(configuration);
     return path.makeQualified(defaultFs.getUri(), defaultFs.getWorkingDirectory());
+  }
+
+  void setProxyPlugin(HadoopProxyPlugin hiveProxyPlugin) {
+    this.proxyPlugin = hiveProxyPlugin;
   }
 }

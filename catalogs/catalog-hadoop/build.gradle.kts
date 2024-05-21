@@ -34,6 +34,9 @@ dependencies {
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
 
+  testImplementation(libs.minikdc)
+  testImplementation(libs.hadoop3.minicluster)
+
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mysql.driver)
