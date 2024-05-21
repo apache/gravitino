@@ -49,8 +49,11 @@ sed -i "s/mockhost/${HOSTNAME}/g" ${HIVE_HOME}/conf/hive-site.xml
 # format HFS
 ${HADOOP_HOME}/bin/hdfs namenode -format -nonInteractive
 
-# start hdfs
-${HADOOP_HOME}/sbin/start-dfs.sh
+echo "Starting HDFS..."
+echo "Starting NameNode..."
+${HADOOP_HOME}/sbin/hadoop-daemon.sh start namenode
+
+echo "Starting DataNode..."
 ${HADOOP_HOME}/sbin/start-secure-dns.sh
 
 # start mysql and create databases/users for hive

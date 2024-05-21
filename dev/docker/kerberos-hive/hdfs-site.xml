@@ -41,31 +41,6 @@
   </property>
 
   <property>
-    <name>dfs.secondary.namenode.address</name>
-    <value>0.0.0.0:50088</value>
-  </property>
-  <property>
-    <name>dfs.secondary.namenode.kerberos.principal</name>
-    <value>hdfs/mockhost@HADOOPKRB</value>
-  </property>
-  <property>
-    <name>dfs.secondary.namenode.keytab.file</name>
-    <value>/hdfs.keytab</value>
-  </property>
-  <property>
-    <name>dfs.secondary.namenode.kerberos.internal.spnego.principal</name>
-    <value>HTTP/mockhost@HADOOPKRB</value>
-  </property>
-  <property>
-    <name>dfs.secondary.web.authentication.kerberos.keytab</name>
-    <value>/hdfs.keytab</value>
-  </property>
-  <property>
-    <name>dfs.secondary.web.authentication.kerberos.principal</name>
-    <value>HTTP/mockhost@HADOOPKRB</value>
-  </property>
-
-  <property>
     <name>dfs.datanode.kerberos.principal</name>
     <value>hdfs/mockhost@HADOOPKRB</value>
   </property>
