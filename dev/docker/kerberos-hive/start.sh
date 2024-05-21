@@ -46,7 +46,7 @@ sed -i "s/mockhost/${HOSTNAME}/g" ${HADOOP_CONF_DIR}/hdfs-site.xml
 sed -i "s/mockhost/${HOSTNAME}/g" ${HADOOP_CONF_DIR}/core-site.xml
 sed -i "s/mockhost/${HOSTNAME}/g" ${HIVE_HOME}/conf/hive-site.xml
 
-# format HFS
+# format HDFS
 ${HADOOP_HOME}/bin/hdfs namenode -format -nonInteractive
 
 echo "Starting HDFS..."
