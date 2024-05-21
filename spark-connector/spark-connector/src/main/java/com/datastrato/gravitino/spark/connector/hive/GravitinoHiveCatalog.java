@@ -9,9 +9,11 @@ import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
 import com.datastrato.gravitino.spark.connector.catalog.BaseCatalog;
+import java.util.Arrays;
 import java.util.Map;
 import org.apache.kyuubi.spark.connector.hive.HiveTable;
 import org.apache.kyuubi.spark.connector.hive.HiveTableCatalog;
+import org.apache.spark.sql.connector.catalog.Column;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
@@ -54,5 +56,10 @@ public class GravitinoHiveCatalog extends BaseCatalog {
   @Override
   protected SparkTransformConverter getSparkTransformConverter() {
     return new SparkTransformConverter(false);
+  }
+
+  @Override
+  protected boolean partitionColumnsAtEnd() {
+    return true;
   }
 }

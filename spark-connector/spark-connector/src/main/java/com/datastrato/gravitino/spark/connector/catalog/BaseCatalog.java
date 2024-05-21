@@ -14,6 +14,7 @@ import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.expressions.literals.Literals;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform.SingleFieldTransform;
 import com.datastrato.gravitino.spark.connector.ConnectorConstants;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
@@ -25,6 +26,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.ws.rs.NotSupportedException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.spark.sql.catalyst.analysis.NamespaceAlreadyExistsException;
@@ -57,6 +61,7 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap;
  * initialization.
  */
 public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
+
   // The specific Spark catalog to do IO operations, different catalogs have different spark catalog
   // implementations, like HiveTableCatalog for Hive, JDBCTableCatalog for JDBC, SparkCatalog for
   // Iceberg.
@@ -78,8 +83,8 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
   /**
    * Create a specific Spark catalog, mainly used to create Spark table.
    *
-   * @param name catalog name
-   * @param options catalog options from configuration
+   * @param name       catalog name
+   * @param options    catalog options from configuration
    * @param properties catalog properties from Gravitino
    * @return a specific Spark catalog
    */
@@ -90,13 +95,13 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
    * Create a specific Spark table, combined with gravitinoTable to do DML operations and
    * sparkCatalog to do IO operations.
    *
-   * @param identifier Spark's table identifier
-   * @param gravitinoTable Gravitino table to do DDL operations
-   * @param sparkTable Spark internal table to do IO operations
-   * @param sparkCatalog specific Spark catalog to do IO operations
-   * @param propertiesConverter transform properties between Gravitino and Spark
+   * @param identifier              Spark's table identifier
+   * @param gravitinoTable          Gravitino table to do DDL operations
+   * @param sparkTable              Spark internal table to do IO operations
+   * @param sparkCatalog            specific Spark catalog to do IO operations
+   * @param propertiesConverter     transform properties between Gravitino and Spark
    * @param sparkTransformConverter sparkTransformConverter convert transforms between Gravitino and
-   *     Spark
+   *                                Spark
    * @return a specific Spark table
    */
   protected abstract Table createSparkTable(
@@ -156,7 +161,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
       return Arrays.stream(identifiers)
           .map(
               identifier ->
-                  Identifier.of(new String[] {getDatabase(identifier)}, identifier.name()))
+                  Identifier.of(new String[]{getDatabase(identifier)}, identifier.name()))
           .toArray(Identifier[]::new);
     } catch (NoSuchSchemaException e) {
       throw new NoSuchNamespaceException(namespace);
@@ -169,10 +174,6 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
       throws TableAlreadyExistsException, NoSuchNamespaceException {
     NameIdentifier gravitinoIdentifier =
         NameIdentifier.of(metalakeName, catalogName, getDatabase(ident), ident.name());
-    com.datastrato.gravitino.rel.Column[] gravitinoColumns =
-        Arrays.stream(columns)
-            .map(column -> createGravitinoColumn(column))
-            .toArray(com.datastrato.gravitino.rel.Column[]::new);
 
     Map<String, String> gravitinoProperties =
         propertiesConverter.toGravitinoTableProperties(properties);
@@ -183,6 +184,8 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
         sparkTransformConverter.toGravitinoDistributionAndSortOrders(transforms);
     com.datastrato.gravitino.rel.expressions.transforms.Transform[] partitionings =
         sparkTransformConverter.toGravitinoPartitionings(transforms);
+    com.datastrato.gravitino.rel.Column[] gravitinoColumns = toGravitinoColumn(columns,
+        partitionings);
 
     try {
       com.datastrato.gravitino.rel.Table gravitinoTable =
@@ -302,7 +305,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
     NameIdentifier[] schemas =
         gravitinoCatalogClient.asSchemas().listSchemas(Namespace.of(metalakeName, catalogName));
     return Arrays.stream(schemas)
-        .map(schema -> new String[] {schema.name()})
+        .map(schema -> new String[]{schema.name()})
         .toArray(String[][]::new);
   }
 
@@ -410,6 +413,41 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
       return sparkIdentifier.namespace()[0];
     }
     return getCatalogDefaultNamespace();
+  }
+
+  // Partition columns must behind the non partition columns
+  protected boolean partitionColumnsAtEnd() {
+    return false;
+  }
+
+  private Column[] reorderColumns(Column[] columns, Set<String> partitionColumnSet) {
+    Stream<Column> notPartitionColumns = Arrays.stream(columns).filter(
+        column -> !partitionColumnSet.contains(column.name())
+    );
+    Stream<Column> partitionColumns = Arrays.stream(columns).filter(
+        column -> partitionColumnSet.contains(column.name())
+    );
+    return Stream.concat(notPartitionColumns, partitionColumns).toArray(Column[]::new);
+  }
+
+  private com.datastrato.gravitino.rel.Column[] toGravitinoColumn(Column[] columns,
+      com.datastrato.gravitino.rel.expressions.transforms.Transform[] gravitinoPartitions) {
+    if (partitionColumnsAtEnd()) {
+      Set<String> partitionColumnNames = Arrays.stream(gravitinoPartitions).map(
+          partition -> {
+            Preconditions.checkArgument(partition instanceof SingleFieldTransform,
+                "Only support SingleFieldTransform for partition, but got " + partition.getClass()
+                    .getSimpleName());
+            SingleFieldTransform transform = (SingleFieldTransform) partition;
+            return String.join(ConnectorConstants.DOT, transform.fieldName());
+          }
+      ).collect(Collectors.toSet());
+      columns = reorderColumns(columns, partitionColumnNames);
+    }
+
+    return Arrays.stream(columns)
+        .map(column -> createGravitinoColumn(column))
+        .toArray(com.datastrato.gravitino.rel.Column[]::new);
   }
 
   private void validateNamespace(String[] namespace) {

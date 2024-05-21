@@ -28,7 +28,6 @@ import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.RowFactory;
-import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.types.StructField;
 import org.junit.jupiter.api.AfterAll;
@@ -766,9 +765,8 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
     StructType schema = DataTypes.createStructType(new StructField[]{
         DataTypes.createStructField("name", DataTypes.StringType, false),
-        DataTypes.createStructField("favorite_color", DataTypes.StringType, true),
-        DataTypes.createStructField("favorite_numbers",
-            DataTypes.StringType, false)
+        DataTypes.createStructField("favorite_color", DataTypes.StringType, false),
+        DataTypes.createStructField("favorite_numbers", DataTypes.StringType, false)
     });
 
     List<Row> data = new ArrayList<>();
@@ -790,9 +788,8 @@ public abstract class SparkCommonIT extends SparkEnvIT {
                 SparkColumnInfo.of("name", DataTypes.StringType, null),
                 SparkColumnInfo.of("favorite_color", DataTypes.StringType, null),
                 SparkColumnInfo.of("favorite_numbers", DataTypes.StringType, null)
-                ))
-            .withIdentifyPartition(Arrays.asList("favorite_color"))
-            .withComment(null);
+            ))
+            .withIdentifyPartition(Arrays.asList("favorite_color"));
     checker.check(tableInfo);
   }
 
