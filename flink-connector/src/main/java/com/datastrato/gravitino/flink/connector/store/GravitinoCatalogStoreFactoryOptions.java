@@ -14,13 +14,13 @@ public class GravitinoCatalogStoreFactoryOptions {
 
   public static final String GRAVITINO = "gravitino";
 
-  public static final ConfigOption<String> METALAKE_URI =
-      ConfigOptions.key("metalake.uri")
+  public static final ConfigOption<String> GRAVITINO_URI =
+      ConfigOptions.key("gravitino.uri")
           .stringType()
           .noDefaultValue()
-          .withDescription("The uri of gravitino metalake");
-  public static final ConfigOption<String> METALAKE_NAME =
-      ConfigOptions.key("metalake.name")
+          .withDescription("The uri of gravitino uri");
+  public static final ConfigOption<String> GRAVITINO_METALAKE =
+      ConfigOptions.key("gravitino.metalake")
           .stringType()
           .noDefaultValue()
           .withDescription("The name of gravitino metalake");

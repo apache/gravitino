@@ -15,7 +15,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -23,12 +22,14 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Random;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.junit.jupiter.api.Assertions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ITUtils {
+  private static final Logger LOG = LoggerFactory.getLogger(ITUtils.class);
   public static final String TEST_MODE = "testMode";
   public static final String EMBEDDED_TEST_MODE = "embedded";
 
@@ -121,26 +122,6 @@ public class ITUtils {
       Assertions.assertEquals(LiteralDTO.NULL, actual.defaultValue());
     } else {
       Assertions.assertEquals(expected.defaultValue(), actual.defaultValue());
-    }
-  }
-
-  public static int getAvailablePort() {
-    int max = 65535;
-    int min = 2000;
-    Random random = new Random();
-    int port = random.nextInt(max) % (max - min + 1) + min;
-    if (isLocalPortUsing(port)) {
-      return getAvailablePort();
-    } else {
-      return port;
-    }
-  }
-
-  private static boolean isLocalPortUsing(int port) {
-    try (Socket socket = new Socket("127.0.0.1", port)) {
-      return true;
-    } catch (IOException e) {
-      return false;
     }
   }
 

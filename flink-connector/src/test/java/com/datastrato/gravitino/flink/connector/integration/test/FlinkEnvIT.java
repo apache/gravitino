@@ -8,12 +8,8 @@ import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.flink.connector.PropertiesConverter;
 import com.datastrato.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
-import com.datastrato.gravitino.integration.test.util.ITUtils;
-import com.datastrato.gravitino.server.web.JettyServerConfig;
-import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Collections;
-import java.util.Map;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.TableEnvironment;
 import org.junit.jupiter.api.AfterAll;
@@ -23,26 +19,20 @@ import org.slf4j.LoggerFactory;
 
 public abstract class FlinkEnvIT extends AbstractIT {
   private static final Logger LOG = LoggerFactory.getLogger(FlinkEnvIT.class);
-  protected static final String metalakeName = "flink";
+  protected static final String gravitinoMetalake = "flink";
 
   protected static GravitinoMetalake metalake;
   protected static TableEnvironment tableEnv;
 
-  private static String metalakeUri = "http://127.0.0.1:8090";
+  private static String gravitinoUri = "http://127.0.0.1:8090";
 
   @BeforeAll
   static void startUp() throws Exception {
-    Map<String, String> customConfigs =
-        ImmutableMap.of(
-            JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
-            Integer.toString(ITUtils.getAvailablePort()));
-    AbstractIT.registerCustomConfigs(customConfigs);
-    AbstractIT.startIntegrationTest();
     // Start Gravitino server
     initGravitinoEnv();
     initMetalake();
     initFlinkEnv();
-    LOG.info("Startup Flink env successfully, metalake uri: {}.", metalakeUri);
+    LOG.info("Startup Flink env successfully, gravitino uri: {}.", gravitinoUri);
   }
 
   @AfterAll
@@ -57,19 +47,19 @@ public abstract class FlinkEnvIT extends AbstractIT {
   private static void initGravitinoEnv() {
     // Gravitino server is already started by AbstractIT, just construct gravitinoUrl
     int gravitinoPort = getGravitinoServerPort();
-    metalakeUri = String.format("http://127.0.0.1:%d", gravitinoPort);
+    gravitinoUri = String.format("http://127.0.0.1:%d", gravitinoPort);
   }
 
   private static void initMetalake() {
-    metalake = client.createMetalake(metalakeName, "", Collections.emptyMap());
+    metalake = client.createMetalake(gravitinoMetalake, "", Collections.emptyMap());
   }
 
   private static void initFlinkEnv() {
     final Configuration configuration = new Configuration();
     configuration.setString(
         "table.catalog-store.kind", GravitinoCatalogStoreFactoryOptions.GRAVITINO);
-    configuration.setString("table.catalog-store.gravitino.metalake.name", metalakeName);
-    configuration.setString("table.catalog-store.gravitino.metalake.uri", metalakeUri);
+    configuration.setString("table.catalog-store.gravitino.gravitino.name", gravitinoMetalake);
+    configuration.setString("table.catalog-store.gravitino.gravitino.uri", gravitinoUri);
     tableEnv = TableEnvironment.create(configuration);
   }
 }

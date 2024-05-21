@@ -6,8 +6,8 @@
 package com.datastrato.gravitino.flink.connector.store;
 
 import static com.datastrato.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO;
-import static com.datastrato.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.METALAKE_NAME;
-import static com.datastrato.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.METALAKE_URI;
+import static com.datastrato.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO_METALAKE;
+import static com.datastrato.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO_URI;
 import static org.apache.flink.table.factories.FactoryUtil.createCatalogStoreFactoryHelper;
 
 import com.datastrato.gravitino.flink.connector.catalog.GravitinoCatalogManager;
@@ -38,11 +38,12 @@ public class GravitinoCatalogStoreFactory implements CatalogStoreFactory {
     factoryHelper.validate();
 
     ReadableConfig options = factoryHelper.getOptions();
-    String metalakeUri =
-        Preconditions.checkNotNull(options.get(METALAKE_URI), "The metalake.uri must be set.");
-    String metalakeName =
-        Preconditions.checkNotNull(options.get(METALAKE_NAME), "The metalake.name must be set.");
-    this.catalogManager = GravitinoCatalogManager.create(metalakeUri, metalakeName);
+    String gravitinoUri =
+        Preconditions.checkNotNull(options.get(GRAVITINO_URI), "The metalake.uri must be set.");
+    String gravitinoName =
+        Preconditions.checkNotNull(
+            options.get(GRAVITINO_METALAKE), "The metalake.name must be set.");
+    this.catalogManager = GravitinoCatalogManager.create(gravitinoUri, gravitinoName);
   }
 
   @Override
@@ -59,7 +60,7 @@ public class GravitinoCatalogStoreFactory implements CatalogStoreFactory {
 
   @Override
   public Set<ConfigOption<?>> requiredOptions() {
-    return ImmutableSet.of(METALAKE_NAME, METALAKE_URI);
+    return ImmutableSet.of(GRAVITINO_METALAKE, GRAVITINO_URI);
   }
 
   @Override

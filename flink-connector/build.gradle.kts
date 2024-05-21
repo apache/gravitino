@@ -122,6 +122,4 @@ tasks.test {
     val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
     init(this)
   }
-
-  dependsOn(":integration-test:test")
 }
