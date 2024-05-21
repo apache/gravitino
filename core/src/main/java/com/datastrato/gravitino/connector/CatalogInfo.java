@@ -8,7 +8,6 @@ import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.CatalogBasicInfo;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.annotation.Evolving;
-import com.datastrato.gravitino.catalog.Catalog;
 import java.util.Map;
 
 /**

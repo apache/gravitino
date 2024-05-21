@@ -10,6 +10,7 @@ import com.datastrato.gravitino.CatalogProvider;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.annotation.Evolving;
+import com.datastrato.gravitino.connector.Catalog;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;

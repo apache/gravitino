@@ -7,7 +7,6 @@ package com.datastrato.gravitino.connector;
 import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.CatalogProvider;
 import com.datastrato.gravitino.annotation.Evolving;
-import com.datastrato.gravitino.catalog.Catalog;
 import com.datastrato.gravitino.connector.capability.Capability;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.google.common.annotations.VisibleForTesting;
