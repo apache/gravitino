@@ -55,11 +55,17 @@ public interface Tag extends Auditable {
 
     /** The supported entities that a tag can be attached to. */
     enum SupportedEntityType {
+      /** Catalog type entity. */
       CATALOG,
+      /** Schema type entity. */
       SCHEMA,
+      /** Table type entity. */
       TABLE,
+      /** Fileset type entity. */
       FILESET,
+      /** Topic type entity. */
       TOPIC,
+      /** Column type entity. */
       COLUMN
     }
 
@@ -73,14 +79,23 @@ public interface Tag extends Auditable {
         this.identifier = identifier;
       }
 
+      /** @return The type of the entity. */
       public SupportedEntityType type() {
         return type;
       }
 
+      /** @return The String identifier of the entity. */
       public String identifier() {
         return identifier;
       }
 
+      /**
+       * Create a new instance of the used entity.
+       *
+       * @param type The type of the entity.
+       * @param identifier The String identifier of the entity.
+       * @return The used entity.
+       */
       public static UsedEntity of(SupportedEntityType type, String identifier) {
         return new UsedEntity(type, identifier);
       }
