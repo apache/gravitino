@@ -8,7 +8,6 @@ import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.flink.connector.PropertiesConverter;
 import com.datastrato.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
-import java.io.IOException;
 import java.util.Collections;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.TableEnvironment;
@@ -27,7 +26,7 @@ public abstract class FlinkEnvIT extends AbstractIT {
   private static String gravitinoUri = "http://127.0.0.1:8090";
 
   @BeforeAll
-  static void startUp() throws Exception {
+  static void startUp() {
     // Start Gravitino server
     initGravitinoEnv();
     initMetalake();
@@ -36,9 +35,7 @@ public abstract class FlinkEnvIT extends AbstractIT {
   }
 
   @AfterAll
-  static void stop() throws IOException, InterruptedException {
-    AbstractIT.stopIntegrationTest();
-  }
+  static void stop() {}
 
   protected String flinkByPass(String key) {
     return PropertiesConverter.FLINK_PROPERTY_PREFIX + key;
@@ -58,7 +55,7 @@ public abstract class FlinkEnvIT extends AbstractIT {
     final Configuration configuration = new Configuration();
     configuration.setString(
         "table.catalog-store.kind", GravitinoCatalogStoreFactoryOptions.GRAVITINO);
-    configuration.setString("table.catalog-store.gravitino.gravitino.name", gravitinoMetalake);
+    configuration.setString("table.catalog-store.gravitino.gravitino.metalake", gravitinoMetalake);
     configuration.setString("table.catalog-store.gravitino.gravitino.uri", gravitinoUri);
     tableEnv = TableEnvironment.create(configuration);
   }
