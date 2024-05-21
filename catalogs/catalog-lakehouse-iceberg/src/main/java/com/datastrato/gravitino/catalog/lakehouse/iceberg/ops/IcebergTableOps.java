@@ -15,11 +15,15 @@ import java.sql.DriverManager;
 import java.util.Collections;
 import java.util.Optional;
 import javax.ws.rs.NotSupportedException;
+import org.apache.iceberg.BaseMetadataTable;
+import org.apache.iceberg.Table;
+import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
@@ -117,7 +121,23 @@ public class IcebergTableOps implements AutoCloseable {
   }
 
   public LoadTableResponse loadTable(TableIdentifier tableIdentifier) {
-    return CatalogHandlers.loadTable(catalog, tableIdentifier);
+    try {
+      return CatalogHandlers.loadTable(catalog, tableIdentifier);
+    } catch (NoSuchTableException e) {
+      Table table = catalog.loadTable(tableIdentifier);
+      if (table instanceof BaseMetadataTable) {
+        TableMetadata tableMetadata =
+            TableMetadata.newTableMetadata(
+                table.schema(),
+                table.spec(),
+                table.sortOrder(),
+                table.location(),
+                table.properties());
+        return LoadTableResponse.builder().withTableMetadata(tableMetadata).build();
+      } else {
+        throw new NoSuchTableException("Table does not exist: %s", tableIdentifier.toString());
+      }
+    }
   }
 
   public boolean tableExists(TableIdentifier tableIdentifier) {

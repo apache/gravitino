@@ -412,18 +412,18 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
     return getCatalogDefaultNamespace();
   }
 
-  private void validateNamespace(String[] namespace) {
-    Preconditions.checkArgument(
-        namespace.length == 1,
-        "Doesn't support multi level namespaces: " + String.join(".", namespace));
-  }
-
-  private String getCatalogDefaultNamespace() {
+  protected String getCatalogDefaultNamespace() {
     String[] catalogDefaultNamespace = sparkCatalog.defaultNamespace();
     Preconditions.checkArgument(
         catalogDefaultNamespace != null && catalogDefaultNamespace.length == 1,
         "Catalog default namespace is not valid");
     return catalogDefaultNamespace[0];
+  }
+
+  private void validateNamespace(String[] namespace) {
+    Preconditions.checkArgument(
+        namespace.length == 1,
+        "Doesn't support multi level namespaces: " + String.join(".", namespace));
   }
 
   private com.datastrato.gravitino.rel.Column createGravitinoColumn(Column sparkColumn) {

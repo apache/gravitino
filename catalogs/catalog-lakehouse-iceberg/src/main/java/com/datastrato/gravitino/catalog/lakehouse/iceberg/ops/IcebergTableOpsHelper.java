@@ -351,7 +351,8 @@ public class IcebergTableOpsHelper {
    */
   public static TableIdentifier buildIcebergTableIdentifier(NameIdentifier nameIdentifier) {
     String[] levels = nameIdentifier.namespace().levels();
-    return TableIdentifier.of(levels[levels.length - 1], nameIdentifier.name());
+    String[] namespace = levels[levels.length - 1].split("\\.");
+    return TableIdentifier.of(Namespace.of(namespace), nameIdentifier.name());
   }
 
   @VisibleForTesting

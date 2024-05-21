@@ -5,6 +5,8 @@
 
 package com.datastrato.gravitino.spark.connector.iceberg;
 
+import static com.datastrato.gravitino.spark.connector.ConnectorConstants.DOT;
+
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
@@ -154,6 +156,22 @@ public class GravitinoIcebergCatalog extends BaseCatalog
           sparkTransformConverter);
     } catch (com.datastrato.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(ident);
+    }
+  }
+
+  @Override
+  protected String getDatabase(Identifier sparkIdentifier) {
+    if (sparkIdentifier.namespace() == null || sparkIdentifier.namespace().length == 0) {
+      return getCatalogDefaultNamespace();
+    } else if (sparkIdentifier.namespace().length == 1) {
+      return sparkIdentifier.namespace()[0];
+    } else if (sparkIdentifier.namespace().length == 2) {
+      return String.join(DOT, sparkIdentifier.namespace());
+    } else {
+      throw new IllegalArgumentException(
+          String.format(
+              "The namespace of the Iceberg Identifier should be 0 or 1 or 2 levels, but got %d levels. Actually Iceberg Identifier is: %s",
+              sparkIdentifier.namespace().length, sparkIdentifier));
     }
   }
 
