@@ -151,7 +151,7 @@ public class RolePO {
       return this;
     }
 
-    public Builder withPrivilegeEffects(String privilegeConditions) {
+    public Builder withPrivilegeConditions(String privilegeConditions) {
       rolePO.privilegeConditions = privilegeConditions;
       return this;
     }

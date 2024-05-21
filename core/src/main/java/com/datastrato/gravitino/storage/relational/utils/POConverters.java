@@ -791,7 +791,7 @@ public class POConverters {
                       roleEntity.securableObjects().get(0).privileges().stream()
                           .map(privilege -> privilege.name().toString())
                           .collect(Collectors.toList())))
-          .withPrivilegeEffects(
+          .withPrivilegeConditions(
               JsonUtils.anyFieldMapper()
                   .writeValueAsString(
                       roleEntity.securableObjects().get(0).privileges().stream()
