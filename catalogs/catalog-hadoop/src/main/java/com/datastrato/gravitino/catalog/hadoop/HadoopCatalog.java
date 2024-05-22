@@ -6,6 +6,7 @@ package com.datastrato.gravitino.catalog.hadoop;
 
 import com.datastrato.gravitino.connector.BaseCatalog;
 import com.datastrato.gravitino.connector.CatalogOperations;
+import com.datastrato.gravitino.connector.capability.Capability;
 import java.util.Map;
 
 /**
@@ -24,5 +25,10 @@ public class HadoopCatalog extends BaseCatalog<HadoopCatalog> {
   protected CatalogOperations newOps(Map<String, String> config) {
     HadoopCatalogOperations ops = new HadoopCatalogOperations();
     return ops;
+  }
+
+  @Override
+  protected Capability newCapability() {
+    return new HadoopCatalogCapability();
   }
 }
