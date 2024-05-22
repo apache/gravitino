@@ -12,7 +12,6 @@ import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
@@ -102,45 +101,10 @@ public class TestFromIcebergSortOrder extends TestBaseConvert {
               ? NullOrdering.NULLS_FIRST
               : NullOrdering.NULLS_LAST,
           sortOrder.nullOrdering());
-      String icebergNullOrder =
-          sortField.nullOrder() == NullOrder.NULLS_FIRST ? "nulls_first" : "nulls_last";
-      String icebergSortOrderString =
-          convertIcebergTransform(sortField)
-              + idToName.get(sortField.sourceId())
-              + ") "
-              + sortField.direction().toString().toLowerCase(Locale.ROOT)
-              + " "
-              + icebergNullOrder;
+      String icebergSortOrderString = getIcebergTransfromString(sortField, schema);
       String gravitinoSortOrderString =
-          sortOrder.expression() instanceof NamedReference.FieldReference
-              ? "identity("
-                  + sortOrder.expression().toString()
-                  + ") "
-                  + sortOrder.direction()
-                  + " "
-                  + sortOrder.nullOrdering()
-              : sortOrder.expression().toString()
-                  + " "
-                  + sortOrder.direction()
-                  + " "
-                  + sortOrder.nullOrdering();
+          getGravitinoSortOrderExpressionString(sortOrder.expression());
       Assertions.assertEquals(icebergSortOrderString, gravitinoSortOrderString);
-    }
-  }
-
-  private static String convertIcebergTransform(SortField sortField) {
-    String transform = sortField.transform().toString();
-    if (transform.startsWith("year")
-        || transform.startsWith("month")
-        || transform.startsWith("day")
-        || transform.startsWith("hour")) {
-      return transform + "(";
-    } else if (transform.startsWith("truncate") || transform.startsWith("bucket")) {
-      return transform.replace("[", "(").replace("]", ", ");
-    } else if (transform.startsWith("identity")) {
-      return "identity(";
-    } else {
-      throw new RuntimeException("Unsupported Iceberg transform type");
     }
   }
 }

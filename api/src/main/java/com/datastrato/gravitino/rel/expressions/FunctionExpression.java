@@ -5,7 +5,6 @@
 package com.datastrato.gravitino.rel.expressions;
 
 import com.datastrato.gravitino.annotation.Evolving;
-import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import java.util.Arrays;
 import java.util.Objects;
 
@@ -74,17 +73,7 @@ public interface FunctionExpression extends Expression {
       if (arguments.length == 0) {
         return functionName + "()";
       }
-      String[] functionArguments =
-          Arrays.stream(this.arguments)
-              .map(
-                  expression -> {
-                    if (expression instanceof Literals.LiteralImpl) {
-                      return ((Literals.LiteralImpl<?>) expression).value().toString();
-                    }
-                    return expression.toString();
-                  })
-              .toArray(String[]::new);
-      return functionName + "(" + String.join(", ", functionArguments) + ")";
+      return functionName + "(" + String.join(", ", Arrays.toString(arguments)) + ")";
     }
 
     @Override

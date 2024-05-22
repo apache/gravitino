@@ -1183,12 +1183,6 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
               SortDirection.ASCENDING,
               NullOrdering.NULLS_LAST),
         };
-    final String[] sortOrderString =
-        new String[] {
-          "iceberg_col_name2 desc nulls_first",
-          "bucket(10, iceberg_col_name1) asc nulls_last",
-          "truncate(2, iceberg_col_name3) asc nulls_last"
-        };
 
     Transform[] partitioning = new Transform[] {Transforms.day(columns[1].name())};
 
@@ -1216,18 +1210,6 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
         sortOrders,
         partitioning,
         loadTable);
-
-    SortOrder[] loadedSortOrders = loadTable.sortOrder();
-    Assertions.assertEquals(sortOrders.length, loadedSortOrders.length);
-    for (int i = 0; i < sortOrders.length; i++) {
-      Assertions.assertEquals(sortOrders[i].direction(), loadedSortOrders[i].direction());
-      Assertions.assertEquals(sortOrders[i].nullOrdering(), loadedSortOrders[i].nullOrdering());
-      Assertions.assertEquals(
-          sortOrderString[i],
-          String.format(
-              "%s %s %s",
-              sortOrders[i].expression(), sortOrders[i].direction(), sortOrders[i].nullOrdering()));
-    }
 
     Assertions.assertDoesNotThrow(() -> tableCatalog.dropTable(tableIdentifier));
   }
