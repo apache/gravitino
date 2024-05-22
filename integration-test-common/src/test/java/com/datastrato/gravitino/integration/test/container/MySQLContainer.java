@@ -8,9 +8,7 @@ import static java.lang.String.format;
 import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
 import com.datastrato.gravitino.integration.test.util.TestDatabaseName;
-import com.datastrato.gravitino.rest.RESTUtils;
 import com.google.common.collect.ImmutableSet;
-import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -31,15 +29,7 @@ public class MySQLContainer extends BaseContainer {
 
   public static final String DEFAULT_IMAGE = "mysql:8.0";
   public static final String HOST_NAME = "gravitino-ci-mysql";
-  public static final int MYSQL_PORT;
-
-  static {
-    try {
-      MYSQL_PORT = RESTUtils.findAvailablePort(3000, 4000);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-  }
+  public static final int MYSQL_PORT = 3306;
 
   public static final String USER_NAME = "root";
   public static final String PASSWORD = "root";
