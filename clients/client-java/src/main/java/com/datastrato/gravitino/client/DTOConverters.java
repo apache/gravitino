@@ -13,6 +13,7 @@ import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
+import com.datastrato.gravitino.dto.authorization.PrivilegeDTO;
 import com.datastrato.gravitino.dto.authorization.SecurableObjectDTO;
 import com.datastrato.gravitino.dto.requests.CatalogUpdateRequest;
 import com.datastrato.gravitino.dto.requests.FilesetUpdateRequest;
@@ -278,6 +279,16 @@ class DTOConverters {
     return SecurableObjectDTO.builder()
         .withFullName(securableObject.fullName())
         .withType(securableObject.type())
+        .withPrivileges(
+            securableObject.privileges().stream()
+                .map(
+                    privilege -> {
+                      return PrivilegeDTO.builder()
+                          .withCondition(privilege.condition())
+                          .withName(privilege.name())
+                          .build();
+                    })
+                .toArray(PrivilegeDTO[]::new))
         .build();
   }
 }
