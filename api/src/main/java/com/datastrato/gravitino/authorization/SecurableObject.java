@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.authorization;
 
 import com.datastrato.gravitino.annotation.Unstable;
+import java.util.List;
 import javax.annotation.Nullable;
 
 /**
@@ -43,13 +44,13 @@ import javax.annotation.Nullable;
 public interface SecurableObject {
 
   /**
-   * The parent securable object. If the securable object doesn't have parent, this method will
-   * return null.
+   * The parent full name of securable object. If the securable object doesn't have parent, this
+   * method will return null.
    *
-   * @return The parent securable object.
+   * @return The parent full name of securable object.
    */
   @Nullable
-  SecurableObject parent();
+  String parent();
 
   /**
    * The name of th securable object.
@@ -72,6 +73,15 @@ public interface SecurableObject {
    * @return The type of securable object.
    */
   Type type();
+
+  /**
+   * The privileges of the securable object. For example: If the securable object is a table, the
+   * privileges could be `READ TABLE`, `WRITE TABLE`, etc. If a schema has the privilege of `LOAD
+   * TABLE`. It means the role can load all tables of the schema.
+   *
+   * @return The privileges of the role.
+   */
+  List<Privilege> privileges();
 
   /**
    * The type of securable object in the Gravitino system. Every type will map one kind of the

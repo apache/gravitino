@@ -63,8 +63,8 @@ class TestRoleMetaService extends TestJDBCBackend {
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role1",
             auditInfo,
-            SecurableObjects.ofCatalog("catalog"),
-            Lists.newArrayList(Privileges.UseCatalog.get()),
+            SecurableObjects.ofCatalog(
+                "catalog", Lists.newArrayList(Privileges.UseCatalog.allow())),
             ImmutableMap.of("k1", "v1"));
 
     roleMetaService.insertRole(role1, false);
@@ -88,8 +88,8 @@ class TestRoleMetaService extends TestJDBCBackend {
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role1",
             auditInfo,
-            SecurableObjects.ofCatalog("catalog"),
-            Lists.newArrayList(Privileges.UseCatalog.get()),
+            SecurableObjects.ofCatalog(
+                "catalog", Lists.newArrayList(Privileges.UseCatalog.allow())),
             ImmutableMap.of("k1", "v1"));
     Assertions.assertThrows(
         NoSuchEntityException.class,
@@ -104,8 +104,8 @@ class TestRoleMetaService extends TestJDBCBackend {
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role1",
             auditInfo,
-            SecurableObjects.ofCatalog("catalog"),
-            Lists.newArrayList(Privileges.UseCatalog.get()),
+            SecurableObjects.ofCatalog(
+                "catalog", Lists.newArrayList(Privileges.UseCatalog.allow())),
             ImmutableMap.of("k1", "v1"));
     Assertions.assertThrows(
         AlreadyExistsException.class, () -> roleMetaService.insertRole(role1Exist, false));
@@ -117,8 +117,8 @@ class TestRoleMetaService extends TestJDBCBackend {
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role1Overwrite",
             auditInfo,
-            SecurableObjects.ofCatalog("catalogOverwrite"),
-            Lists.newArrayList(Privileges.UseCatalog.get()),
+            SecurableObjects.ofCatalog(
+                "catalogOverwrite", Lists.newArrayList(Privileges.UseCatalog.allow())),
             ImmutableMap.of("k2", "v2"));
     Assertions.assertDoesNotThrow(() -> roleMetaService.insertRole(role1Overwrite, true));
     Assertions.assertEquals(
@@ -152,8 +152,8 @@ class TestRoleMetaService extends TestJDBCBackend {
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role1",
             auditInfo,
-            SecurableObjects.ofCatalog("catalog"),
-            Lists.newArrayList(Privileges.UseCatalog.get()),
+            SecurableObjects.ofCatalog(
+                "catalog", Lists.newArrayList(Privileges.UseCatalog.allow())),
             ImmutableMap.of("k1", "v1"));
     Assertions.assertThrows(
         NoSuchEntityException.class,
@@ -172,8 +172,8 @@ class TestRoleMetaService extends TestJDBCBackend {
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role2",
             auditInfo,
-            SecurableObjects.ofCatalog("catalog"),
-            Lists.newArrayList(Privileges.UseCatalog.get()),
+            SecurableObjects.ofCatalog(
+                "catalog", Lists.newArrayList(Privileges.UseCatalog.allow())),
             ImmutableMap.of("k1", "v1"));
     roleMetaService.insertRole(role2, false);
     GroupEntity group1 =

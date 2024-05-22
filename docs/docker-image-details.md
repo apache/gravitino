@@ -84,11 +84,25 @@ Changelog
 
 You can use these kinds of Docker images to facilitate integration testing of all catalog and connector modules within Gravitino.
 
+## Gravitino CI Apache Hive image with kerberos enabled
+
+You can use this kind of image to test the catalog of Apache Hive with kerberos enable
+
+Changelog
+
+- gravitino-ci-kerberos-hive:0.1.0
+    - Set up a Hive cluster with kerberos enabled.
+    - Install a KDC server and create a principal for Hive. For more please see [kerberos-hive](../dev/docker/kerberos-hive)
+
 ## Gravitino CI Apache Hive image
 
 You can use this kind of image to test the catalog of Apache Hive.
 
 Changelog
+
+- gravitino-ci-hive:0.1.11
+  - Remove `yarn` from the startup script; Remove `yarn-site.xml` and `yarn-env.sh` files;
+  - Change the value of `mapreduce.framework.name` from `yarn` to `local` in the `mapred-site.xml` file. 
 
 - gravitino-ci-hive:0.1.10
   - Remove SSH service from the startup script.

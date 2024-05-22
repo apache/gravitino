@@ -1,10 +1,5 @@
 <configuration>
   <property>
-    <name>mapreduce.framework.name</name>
-    <value>local</value>
-  </property>
-
-  <property>
     <name>mapreduce.map.memory.mb</name>
     <value>3072</value>
   </property>
