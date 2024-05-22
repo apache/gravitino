@@ -211,6 +211,26 @@ public class GroupMetaService {
     return newEntity;
   }
 
+  public int deleteGroupMetasByLegacyTimeLine(long legacyTimeLine, int limit) {
+    int[] groupDeletedCount = new int[] {0};
+    int[] groupRoleRelDeletedCount = new int[] {0};
+
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            groupDeletedCount[0] =
+                SessionUtils.doWithoutCommitAndFetchResult(
+                    GroupMetaMapper.class,
+                    mapper -> mapper.deleteGroupMetasByLegacyTimeLine(legacyTimeLine, limit)),
+        () ->
+            groupRoleRelDeletedCount[0] =
+                SessionUtils.doWithoutCommitAndFetchResult(
+                    GroupRoleRelMapper.class,
+                    mapper ->
+                        mapper.deleteGroupRoleRelMetasByLegacyTimeLine(legacyTimeLine, limit)));
+
+    return groupDeletedCount[0] + groupRoleRelDeletedCount[0];
+  }
+
   private void fillGroupPOBuilderParentEntityId(GroupPO.Builder builder, Namespace namespace) {
     AuthorizationUtils.checkGroupNamespace(namespace);
     Long parentEntityId = null;

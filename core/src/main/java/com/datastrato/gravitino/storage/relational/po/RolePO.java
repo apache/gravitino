@@ -17,6 +17,7 @@ public class RolePO {
   private String securableObjectFullName;
   private String securableObjectType;
   private String privileges;
+  private String privilegeConditions;
   private String auditInfo;
   private Long currentVersion;
   private Long lastVersion;
@@ -58,6 +59,10 @@ public class RolePO {
     return privileges;
   }
 
+  public String getPrivilegeConditions() {
+    return privilegeConditions;
+  }
+
   public String getAuditInfo() {
     return auditInfo;
   }
@@ -95,7 +100,8 @@ public class RolePO {
         && Objects.equal(getAuditInfo(), tablePO.getAuditInfo())
         && Objects.equal(getCurrentVersion(), tablePO.getCurrentVersion())
         && Objects.equal(getLastVersion(), tablePO.getLastVersion())
-        && Objects.equal(getDeletedAt(), tablePO.getDeletedAt());
+        && Objects.equal(getDeletedAt(), tablePO.getDeletedAt())
+        && Objects.equal(getPrivilegeConditions(), tablePO.getPrivilegeConditions());
   }
 
   @Override
@@ -113,7 +119,8 @@ public class RolePO {
         getAuditInfo(),
         getCurrentVersion(),
         getLastVersion(),
-        getDeletedAt());
+        getDeletedAt(),
+        getPrivilegeConditions());
   }
 
   public static class Builder {
@@ -168,6 +175,11 @@ public class RolePO {
       return this;
     }
 
+    public Builder withPrivilegeConditions(String privilegeConditions) {
+      rolePO.privilegeConditions = privilegeConditions;
+      return this;
+    }
+
     public Builder withAuditInfo(String auditInfo) {
       rolePO.auditInfo = auditInfo;
       return this;
@@ -198,7 +210,9 @@ public class RolePO {
           rolePO.securableObjectFullName != null, "Securable object full name is required");
       Preconditions.checkArgument(
           rolePO.securableObjectType != null, "Securable object type is required");
-      Preconditions.checkArgument(rolePO.privileges != null, "Privileges is required");
+      Preconditions.checkArgument(rolePO.privileges != null, "Privileges are required");
+      Preconditions.checkArgument(
+          rolePO.privilegeConditions != null, "Privilege conditions are required");
       Preconditions.checkArgument(rolePO.auditInfo != null, "Audit info is required");
       Preconditions.checkArgument(rolePO.currentVersion != null, "Current version is required");
       Preconditions.checkArgument(rolePO.lastVersion != null, "Last version is required");

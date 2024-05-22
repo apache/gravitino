@@ -7,6 +7,7 @@ package com.datastrato.gravitino.storage.relational.mapper;
 
 import com.datastrato.gravitino.storage.relational.po.RolePO;
 import java.util.List;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -35,6 +36,7 @@ public interface RoleMetaMapper {
           + " securable_object_full_name as securableObjectFullName,"
           + " securable_object_type as securableObjectType,"
           + " privileges as privileges,"
+          + " privilege_conditions as privilegeConditions,"
           + " audit_info as auditInfo, current_version as currentVersion,"
           + " last_version as lastVersion, deleted_at as deletedAt"
           + " FROM "
@@ -62,6 +64,7 @@ public interface RoleMetaMapper {
           + " securable_object_full_name as securableObjectFullName,"
           + " securable_object_type as securableObjectType,"
           + " ro.privileges as privileges,"
+          + " ro.privilege_conditions as privilegeConditions,"
           + " ro.audit_info as auditInfo, ro.current_version as currentVersion,"
           + " ro.last_version as lastVersion, ro.deleted_at as deletedAt"
           + " FROM "
@@ -83,6 +86,7 @@ public interface RoleMetaMapper {
           + " ro.securable_object_full_name as securableObjectFullName,"
           + " ro.securable_object_type as securableObjectType,"
           + " ro.privileges as privileges,"
+          + " ro.privilege_conditions as privilegeConditions,"
           + " ro.audit_info as auditInfo, ro.current_version as currentVersion,"
           + " ro.last_version as lastVersion, ro.deleted_at as deletedAt"
           + " FROM "
@@ -103,6 +107,7 @@ public interface RoleMetaMapper {
           + " securable_object_full_name,"
           + " securable_object_type,"
           + " privileges,"
+          + " privilege_conditions,"
           + " audit_info, current_version, last_version, deleted_at)"
           + " VALUES("
           + " #{roleMeta.roleId},"
@@ -114,6 +119,7 @@ public interface RoleMetaMapper {
           + " #{roleMeta.securableObjectFullName},"
           + " #{roleMeta.securableObjectType},"
           + " #{roleMeta.privileges},"
+          + " #{roleMeta.privilegeConditions},"
           + " #{roleMeta.auditInfo},"
           + " #{roleMeta.currentVersion},"
           + " #{roleMeta.lastVersion},"
@@ -130,6 +136,7 @@ public interface RoleMetaMapper {
           + " securable_object_full_name,"
           + " securable_object_type,"
           + " privileges,"
+          + " privilege_conditions,"
           + " audit_info, current_version, last_version, deleted_at)"
           + " VALUES("
           + " #{roleMeta.roleId},"
@@ -141,6 +148,7 @@ public interface RoleMetaMapper {
           + " #{roleMeta.securableObjectFullName},"
           + " #{roleMeta.securableObjectType},"
           + " #{roleMeta.privileges},"
+          + " #{roleMeta.privilegeConditions},"
           + " #{roleMeta.auditInfo},"
           + " #{roleMeta.currentVersion},"
           + " #{roleMeta.lastVersion},"
@@ -154,6 +162,7 @@ public interface RoleMetaMapper {
           + " securable_object_full_name = #{roleMeta.securableObjectFullName},"
           + " securable_object_type = #{roleMeta.securableObjectType},"
           + " privileges = #{roleMeta.privileges},"
+          + " privilege_conditions = #{roleMeta.privilegeConditions},"
           + " audit_info = #{roleMeta.auditInfo},"
           + " current_version = #{roleMeta.currentVersion},"
           + " last_version = #{roleMeta.lastVersion},"
@@ -173,4 +182,11 @@ public interface RoleMetaMapper {
           + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
           + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0")
   void softDeleteRoleMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
+
+  @Delete(
+      "DELETE FROM "
+          + ROLE_TABLE_NAME
+          + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeLine} LIMIT #{limit}")
+  Integer deleteRoleMetasByLegacyTimeLine(
+      @Param("legacyTimeLine") Long legacyTimeLine, @Param("limit") int limit);
 }

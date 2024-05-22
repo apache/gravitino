@@ -124,6 +124,32 @@ public class RoleMetaService {
     return true;
   }
 
+  public int deleteRoleMetasByLegacyTimeLine(long legacyTimeLine, int limit) {
+    int[] roleDeletedCount = new int[] {0};
+    int[] userRoleRelDeletedCount = new int[] {0};
+    int[] groupRoleRelDeletedCount = new int[] {0};
+
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            roleDeletedCount[0] =
+                SessionUtils.doWithoutCommitAndFetchResult(
+                    RoleMetaMapper.class,
+                    mapper -> mapper.deleteRoleMetasByLegacyTimeLine(legacyTimeLine, limit)),
+        () ->
+            userRoleRelDeletedCount[0] =
+                SessionUtils.doWithoutCommitAndFetchResult(
+                    UserRoleRelMapper.class,
+                    mapper -> mapper.deleteUserRoleRelMetasByLegacyTimeLine(legacyTimeLine, limit)),
+        () ->
+            groupRoleRelDeletedCount[0] =
+                SessionUtils.doWithoutCommitAndFetchResult(
+                    GroupRoleRelMapper.class,
+                    mapper ->
+                        mapper.deleteGroupRoleRelMetasByLegacyTimeLine(legacyTimeLine, limit)));
+
+    return roleDeletedCount[0] + userRoleRelDeletedCount[0] + groupRoleRelDeletedCount[0];
+  }
+
   private void fillRolePOBuilderParentEntityId(RolePO.Builder builder, Namespace namespace) {
     AuthorizationUtils.checkRoleNamespace(namespace);
     Long parentEntityId = null;

@@ -150,6 +150,7 @@ CREATE TABLE IF NOT EXISTS `role_meta` (
     `securable_object_full_name` VARCHAR(256) NOT NULL COMMENT 'securable object full name',
     `securable_object_type` VARCHAR(32) NOT NULL COMMENT 'securable object type',
     `privileges` VARCHAR(64) NOT NULL COMMENT 'securable privileges',
+    `privilege_conditions` VARCHAR(64) NOT NULL COMMENT 'securable privilege conditions',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'role audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'role current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'role last version',
