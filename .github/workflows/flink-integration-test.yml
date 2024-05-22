@@ -39,7 +39,6 @@ jobs:
               - server/**
               - server-common/**
               - flink-connector/**
-              - web/**
               - docs/open-api/**
               - build.gradle.kts
               - gradle.properties
@@ -88,17 +87,17 @@ jobs:
         run: |
           dev/ci/util_free_space.sh
 
-      - name: Frontend Integration Test
+      - name: Flink Integration Test
         id: integrationTest
         run: |
-          ./gradlew --rerun-tasks -PskipTests -PtestMode=embedded -PjdkVersion=${{ matrix.java-version }} :integration-test:test --tests "com.datastrato.gravitino.flink.connector.integration.test.**" -i
-          ./gradlew --rerun-tasks -PskipTests -PtestMode=deploy -PjdkVersion=${{ matrix.java-version }} :integration-test:test --tests "com.datastrato.gravitino.flink.connector.integration.test.**" -i
+          ./gradlew --rerun-tasks -PskipTests -PtestMode=embedded -PjdkVersion=${{ matrix.java-version }} :flink-connector:test --tests "com.datastrato.gravitino.flink.connector.integration.test.**" -i
+          ./gradlew --rerun-tasks -PskipTests -PtestMode=deploy -PjdkVersion=${{ matrix.java-version }} :flink-connector:test --tests "com.datastrato.gravitino.flink.connector.integration.test.**" -i
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
         if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
         with:
-          name: integrate-test-reports-${{ matrix.java-version }}
+          name: flink-connector-integrate-test-reports-${{ matrix.java-version }}
           path: |
             build/reports
             flink-connector/build/flink-connector-integration-test.log
