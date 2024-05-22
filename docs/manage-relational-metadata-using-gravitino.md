@@ -724,7 +724,36 @@ The following types that Gravitino supports:
 
 The related java doc is [here](pathname:///docs/0.5.0/api/java/com/datastrato/gravitino/rel/types/Type.html).
 
-##### Unparsed type
+##### External type
+
+External type is a special type of column type, when you need to use a data type that is not in the Gravitino type
+system, and you explicitly know its string representation in an external catalog (usually used in JDBC catalogs), then
+you can use the ExternalType to represent the type. Similarly, if the original type is unsolvable, it will be
+represented by ExternalType.
+The following shows the data structure of an external type in JSON and Java, enabling easy retrieval of its string value.
+
+<Tabs>
+  <TabItem value="Json" label="Json">
+
+```json
+{
+  "type": "external",
+  "catalogString": "user-defined"
+}
+```
+
+  </TabItem>
+  <TabItem value="java" label="Java">
+
+```java
+// The result of the following type is a string "user-defined"
+String typeString = ((ExternalType) type).catalogString();
+```
+
+  </TabItem>
+</Tabs>
+
+##### ~~Unparsed type~~ (Deprecated, please use `Types.UnparsedType.get()` instead)
 
 Unparsed type is a special type of column type, currently serves exclusively for presenting the data type of a column when it's unsolvable.
 The following shows the data structure of an unparsed type in JSON and Java, enabling easy retrieval of its value.
@@ -834,7 +863,7 @@ tableCatalog.loadTable(NameIdentifier.of("metalake", "hive_catalog", "schema", "
 </Tabs>
 
 :::note
-- When Gravitino loads a table from a catalog with various data types, if Gravitino is unable to parse the data type, it will use an **[Unparsed Type](#unparsed-type)** to preserve the original data type, ensuring that the table can be loaded successfully.
+- When Gravitino loads a table from a catalog with various data types, if Gravitino is unable to parse the data type, it will use an **[External Type](#external-type)** to preserve the original data type, ensuring that the table can be loaded successfully.
 - When Gravitino loads a table from a catalog that supports default value, if Gravitino is unable to parse the default value, it will use an **[Unparsed Expression](./expression.md#unparsed-expression)** to preserve the original default value, ensuring that the table can be loaded successfully.
 :::
 

@@ -48,10 +48,11 @@ public class TestMysqlTypeConverter {
     checkJdbcTypeToGravitinoType(Types.StringType.get(), TEXT, null, null);
     checkJdbcTypeToGravitinoType(Types.BinaryType.get(), BINARY, null, null);
     checkJdbcTypeToGravitinoType(
-        Types.UnparsedType.of(USER_DEFINED_TYPE), USER_DEFINED_TYPE, null, null);
+        Types.ExternalType.of(USER_DEFINED_TYPE), USER_DEFINED_TYPE, null, null);
   }
 
   @Test
+  @SuppressWarnings("deprecation")
   public void testFromGravitinoType() {
     checkGravitinoTypeToJdbcType(TINYINT, Types.ByteType.get());
     checkGravitinoTypeToJdbcType(INT, Types.IntegerType.get());
@@ -67,6 +68,7 @@ public class TestMysqlTypeConverter {
     checkGravitinoTypeToJdbcType(CHAR + "(20)", Types.FixedCharType.of(20));
     checkGravitinoTypeToJdbcType(TEXT, Types.StringType.get());
     checkGravitinoTypeToJdbcType(BINARY, Types.BinaryType.get());
+    checkGravitinoTypeToJdbcType(USER_DEFINED_TYPE, Types.ExternalType.of(USER_DEFINED_TYPE));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> MYSQL_TYPE_CONVERTER.fromGravitinoType(Types.UnparsedType.of(USER_DEFINED_TYPE)));

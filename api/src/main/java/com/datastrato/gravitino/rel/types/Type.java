@@ -78,8 +78,16 @@ public interface Type {
     /** The null type. A null type represents a value that is null. */
     NULL,
 
-    /** The unparsed type. An unparsed type represents an unresolvable type. */
-    UNPARSED
+    /**
+     * The unparsed type. An unparsed type represents an unresolvable type.
+     *
+     * @deprecated This type will be removed, use {@link #EXTERNAL} instead.
+     */
+    @Deprecated
+    UNPARSED,
+
+    /** The external type. An external type represents a type that is not supported by Gravitino. */
+    EXTERNAL
   }
 
   /** The base type of all primitive types. */

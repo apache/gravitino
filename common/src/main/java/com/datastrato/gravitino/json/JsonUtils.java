@@ -105,6 +105,8 @@ public class JsonUtils {
   private static final String UNION = "union";
   private static final String UNPARSED = "unparsed";
   private static final String UNPARSED_TYPE = "unparsedType";
+  private static final String EXTERNAL = "external";
+  private static final String CATALOG_STRING = "catalogString";
   private static final String FIELDS = "fields";
   private static final String UNION_TYPES = "types";
   private static final String STRUCT_FIELD_NAME = "name";
@@ -614,6 +616,7 @@ public class JsonUtils {
    * @param gen JSON generator used to write the type
    * @throws IOException if the type cannot be written
    */
+  @SuppressWarnings("deprecation")
   private static void writeDataType(Type dataType, JsonGenerator gen) throws IOException {
     switch (dataType.name()) {
       case BOOLEAN:
@@ -653,6 +656,9 @@ public class JsonUtils {
         break;
       case UNPARSED:
         writeUnparsedType((Types.UnparsedType) dataType, gen);
+        break;
+      case EXTERNAL:
+        writeExternalType((Types.ExternalType) dataType, gen);
         break;
       default:
         writeUnparsedType(dataType.simpleString(), gen);
@@ -697,6 +703,10 @@ public class JsonUtils {
 
       if (UNPARSED.equals(type)) {
         return readUnparsedType(node);
+      }
+
+      if (EXTERNAL.equals(type)) {
+        return readExternalType(node);
       }
     }
 
@@ -768,6 +778,7 @@ public class JsonUtils {
     gen.writeEndObject();
   }
 
+  @SuppressWarnings("deprecation")
   private static void writeUnparsedType(Types.UnparsedType unparsedType, JsonGenerator gen)
       throws IOException {
     writeUnparsedType(unparsedType.unparsedType(), gen);
@@ -777,6 +788,14 @@ public class JsonUtils {
     gen.writeStartObject();
     gen.writeStringField(TYPE, UNPARSED);
     gen.writeStringField(UNPARSED_TYPE, unparsedType);
+    gen.writeEndObject();
+  }
+
+  private static void writeExternalType(Types.ExternalType externalType, JsonGenerator gen)
+      throws IOException {
+    gen.writeStartObject();
+    gen.writeStringField(TYPE, EXTERNAL);
+    gen.writeStringField(CATALOG_STRING, externalType.catalogString());
     gen.writeEndObject();
   }
 
@@ -882,11 +901,21 @@ public class JsonUtils {
     return Types.StructType.Field.of(name, type, nullable, comment);
   }
 
+  @SuppressWarnings("deprecation")
   private static Types.UnparsedType readUnparsedType(JsonNode node) {
     Preconditions.checkArgument(
         node.has(UNPARSED_TYPE), "Cannot parse unparsed type from missing unparsed type: %s", node);
 
     return Types.UnparsedType.of(node.get(UNPARSED_TYPE).asText());
+  }
+
+  private static Types.ExternalType readExternalType(JsonNode node) {
+    Preconditions.checkArgument(
+        node.has(CATALOG_STRING),
+        "Cannot parse external type from missing catalogString: %s",
+        node);
+
+    return Types.ExternalType.of(node.get(CATALOG_STRING).asText());
   }
 
   // Nested classes for custom serialization and deserialization

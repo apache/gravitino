@@ -67,6 +67,7 @@ public class TestJsonUtils {
   }
 
   @Test
+  @SuppressWarnings("deprecation")
   public void testTypeSerDe() throws Exception {
     Type type = Types.BooleanType.get();
     String jsonValue = JsonUtils.objectMapper().writeValueAsString(type);
@@ -159,6 +160,12 @@ public class TestJsonUtils {
     jsonValue = JsonUtils.objectMapper().writeValueAsString(type);
     expected =
         "{\n" + "    \"type\": \"unparsed\",\n" + "    \"unparsedType\": \"user-defined\"\n" + "}";
+    Assertions.assertEquals(objectMapper.readTree(expected), objectMapper.readTree(jsonValue));
+
+    type = Types.ExternalType.of("user-defined");
+    jsonValue = JsonUtils.objectMapper().writeValueAsString(type);
+    expected =
+        "{\n" + "    \"type\": \"external\",\n" + "    \"catalogString\": \"user-defined\"\n" + "}";
     Assertions.assertEquals(objectMapper.readTree(expected), objectMapper.readTree(jsonValue));
   }
 

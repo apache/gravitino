@@ -73,11 +73,11 @@ public class TestTypeConverter {
                     getPrimitiveTypeInfo(STRING_TYPE_NAME), getPrimitiveTypeInfo(INT_TYPE_NAME)))
             .getTypeName());
     Assertions.assertEquals(
-        Types.UnparsedType.of(USER_DEFINED_TYPE),
+        Types.ExternalType.of(USER_DEFINED_TYPE),
         FromHiveType.toGravitinoType(new UserDefinedTypeInfo()));
     Assertions.assertThrows(
         UnsupportedOperationException.class,
-        () -> ToHiveType.convert(Types.UnparsedType.of(USER_DEFINED_TYPE)));
+        () -> ToHiveType.convert(Types.ExternalType.of(USER_DEFINED_TYPE)));
   }
 
   private void testConverter(String typeName) {

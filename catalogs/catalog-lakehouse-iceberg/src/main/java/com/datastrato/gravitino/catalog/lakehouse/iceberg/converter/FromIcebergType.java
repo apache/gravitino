@@ -98,7 +98,8 @@ public class FromIcebergType extends TypeUtil.SchemaVisitor<Type> {
         return com.datastrato.gravitino.rel.types.Types.DecimalType.of(
             decimal.precision(), decimal.scale());
       default:
-        return com.datastrato.gravitino.rel.types.Types.UnparsedType.of(primitive.typeId().name());
+        throw new UnsupportedOperationException(
+            "Cannot convert unknown type to Gravitino: " + primitive);
     }
   }
 }

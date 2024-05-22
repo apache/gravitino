@@ -167,6 +167,7 @@ components:
 
     UnparsedType:
       type: object
+      description: Deprecated. Use `ExternalType` instead.
       required:
         - type
         - unparsedType
@@ -184,3 +185,21 @@ components:
           "user-defined"
         ]
       }
+
+  ExternalType:
+    type: object
+    required:
+      - type
+      - catalogString
+    properties:
+      type:
+        type: string
+        enum:
+          - "external"
+      catalogString:
+        type: string
+        description: The string representation of this type in the catalog
+    example: {
+      "type": "external",
+      "externalType": "user-defined"
+    }

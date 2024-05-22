@@ -51,7 +51,7 @@ public class TestPostgreSqlTypeConverter {
     checkJdbcTypeToGravitinoType(Types.StringType.get(), TEXT, null, null);
     checkJdbcTypeToGravitinoType(Types.BinaryType.get(), BYTEA, null, null);
     checkJdbcTypeToGravitinoType(
-        Types.UnparsedType.of(USER_DEFINED_TYPE), USER_DEFINED_TYPE, null, null);
+        Types.ExternalType.of(USER_DEFINED_TYPE), USER_DEFINED_TYPE, null, null);
   }
 
   @Test
@@ -76,6 +76,7 @@ public class TestPostgreSqlTypeConverter {
   }
 
   @Test
+  @SuppressWarnings("deprecation")
   public void testFromGravitinoType() {
     checkGravitinoTypeToJdbcType(BOOL, Types.BooleanType.get());
     checkGravitinoTypeToJdbcType(INT_2, Types.ShortType.get());
@@ -91,6 +92,7 @@ public class TestPostgreSqlTypeConverter {
     checkGravitinoTypeToJdbcType(BPCHAR + "(20)", Types.FixedCharType.of(20));
     checkGravitinoTypeToJdbcType(TEXT, Types.StringType.get());
     checkGravitinoTypeToJdbcType(BYTEA, Types.BinaryType.get());
+    checkGravitinoTypeToJdbcType(USER_DEFINED_TYPE, Types.ExternalType.of(USER_DEFINED_TYPE));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->

@@ -1020,7 +1020,11 @@ public class Types {
   /**
    * Represents a type that is not parsed yet. The parsed type is represented by other types of
    * {@link Types}.
+   *
+   * @deprecated This class is deprecated and will be removed in the future. Please use the {@link
+   *     ExternalType} instead.
    */
+  @Deprecated
   public static class UnparsedType implements Type {
 
     /**
@@ -1074,6 +1078,55 @@ public class Types {
     @Override
     public String toString() {
       return unparsedType;
+    }
+  }
+
+  public static class ExternalType implements Type {
+    private final String catalogString;
+
+    public static ExternalType of(String stringFormat) {
+      return new ExternalType(stringFormat);
+    }
+
+    public ExternalType(String catalogString) {
+      this.catalogString = catalogString;
+    }
+
+    /** @return The string representation of this type in the catalog. */
+    public String catalogString() {
+      return catalogString;
+    }
+
+    @Override
+    public Name name() {
+      return Name.EXTERNAL;
+    }
+
+    @Override
+    public String simpleString() {
+      return String.format("external(%s)", catalogString);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof ExternalType)) {
+        return false;
+      }
+      ExternalType that = (ExternalType) o;
+      return Objects.equals(catalogString, that.catalogString);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(catalogString);
+    }
+
+    @Override
+    public String toString() {
+      return simpleString();
     }
   }
 

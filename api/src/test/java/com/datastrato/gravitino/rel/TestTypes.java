@@ -181,11 +181,21 @@ public class TestTypes {
   }
 
   @Test
+  @SuppressWarnings("deprecation")
   public void testUnparsedType() {
     Types.UnparsedType unparsedType = Types.UnparsedType.of("bit");
     Assertions.assertEquals(Type.Name.UNPARSED, unparsedType.name());
     Assertions.assertEquals("unparsed(bit)", unparsedType.simpleString());
     Assertions.assertEquals("bit", unparsedType.unparsedType());
     Assertions.assertEquals(unparsedType, Types.UnparsedType.of("bit"));
+  }
+
+  @Test
+  public void testExternalType() {
+    Types.ExternalType externalType = Types.ExternalType.of("bit");
+    Assertions.assertEquals(Type.Name.EXTERNAL, externalType.name());
+    Assertions.assertEquals("external(bit)", externalType.simpleString());
+    Assertions.assertEquals("bit", externalType.catalogString());
+    Assertions.assertEquals(externalType, Types.ExternalType.of("bit"));
   }
 }
