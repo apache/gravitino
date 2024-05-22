@@ -100,6 +100,10 @@ You can use this kind of image to test the catalog of Apache Hive.
 
 Changelog
 
+- gravitino-ci-hive:0.1.11
+  - Remove `yarn` from the startup script; Remove `yarn-site.xml` and `yarn-env.sh` files;
+  - Change the value of `mapreduce.framework.name` from `yarn` to `local` in the `mapred-site.xml` file. 
+
 - gravitino-ci-hive:0.1.10
   - Remove SSH service from the startup script.
   - Use `hadoop-daemon.sh` to start HDFS services.
