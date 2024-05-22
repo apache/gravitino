@@ -68,7 +68,6 @@ dependencies {
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.junit.jupiter)
   testImplementation(libs.testcontainers.mysql)
-  testImplementation(libs.testcontainers.postgresql)
 
   testImplementation(libs.hadoop2.common) {
     exclude("*")
@@ -100,6 +99,14 @@ dependencies {
     exclude("org.eclipse.jetty.orbit", "javax.servlet")
     exclude("org.slf4j")
   }
+
+  testImplementation(libs.jline.terminal)
+  testImplementation(libs.minikdc) {
+    exclude("org.apache.directory.api", "api-ldap-schema-data")
+  }
+  testImplementation(libs.mockito.core)
+  testImplementation(libs.mybatis)
+  testImplementation(libs.mysql.driver)
 
   testImplementation("org.apache.flink:flink-table-api-bridge-base:$flinkVersion") {
     exclude("commons-cli", "commons-cli")
