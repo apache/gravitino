@@ -14,6 +14,7 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHel
 import com.datastrato.gravitino.connector.CatalogInfo;
 import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.PropertiesMetadata;
+import com.datastrato.gravitino.connector.SupportsSchemas;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
@@ -29,7 +30,6 @@ import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
-import com.datastrato.gravitino.schema.SupportsSchemas;
 import com.datastrato.gravitino.utils.MapUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
