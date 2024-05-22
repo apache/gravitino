@@ -6,6 +6,7 @@
 package com.datastrato.gravitino.storage.relational.utils;
 
 import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.authorization.Privilege;
 import com.datastrato.gravitino.authorization.Privileges;
@@ -24,6 +25,7 @@ import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.meta.TopicEntity;
 import com.datastrato.gravitino.meta.UserEntity;
+import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.datastrato.gravitino.storage.relational.po.CatalogPO;
 import com.datastrato.gravitino.storage.relational.po.FilesetPO;
 import com.datastrato.gravitino.storage.relational.po.FilesetVersionPO;
@@ -39,6 +41,7 @@ import com.datastrato.gravitino.storage.relational.po.UserRoleRelPO;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.Lists;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -922,6 +925,120 @@ public class POConverters {
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
+
+  /**
+   * Initialize System CatalogPO
+   *
+   * @param metalakeId the metalake id
+   * @return System CatalogPO object with version initialized
+   */
+  public static CatalogPO initializeSystemCatalogPO(Long metalakeId) {
+    try {
+      AuditInfo auditInfo =
+          AuditInfo.builder().withCreator("system").withCreateTime(Instant.now()).build();
+
+      return CatalogPO.builder()
+          .withCatalogId(RandomIdGenerator.INSTANCE.nextId())
+          .withCatalogName(Entity.SYSTEM_CATALOG_RESERVED_NAME)
+          .withMetalakeId(metalakeId)
+          .withType(Entity.SYSTEM_CATALOG_RESERVED_NAME)
+          .withProvider(Entity.SYSTEM_CATALOG_RESERVED_NAME)
+          .withCatalogComment("system catalog")
+          .withProperties(null)
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
+          .withCurrentVersion(INIT_VERSION)
+          .withLastVersion(INIT_VERSION)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  /**
+   * Initialize User SchemaPO
+   *
+   * @param metalakeId the metalake id
+   * @param catalogId the catalog id
+   * @return User SchemaPO object with version initialized
+   */
+  public static SchemaPO initializeUserSchemaPO(Long metalakeId, Long catalogId) {
+    try {
+      AuditInfo auditInfo =
+          AuditInfo.builder().withCreator("system").withCreateTime(Instant.now()).build();
+
+      return SchemaPO.builder()
+          .withSchemaId(RandomIdGenerator.INSTANCE.nextId())
+          .withSchemaName(Entity.USER_SCHEMA_NAME)
+          .withMetalakeId(metalakeId)
+          .withCatalogId(catalogId)
+          .withSchemaComment("user schema")
+          .withProperties(null)
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
+          .withCurrentVersion(INIT_VERSION)
+          .withLastVersion(INIT_VERSION)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  /**
+   * Initialize Group SchemaPO
+   *
+   * @param metalakeId the metalake id
+   * @return Group SchemaPO object with version initialized
+   */
+  public static SchemaPO initializeGroupSchemaPO(Long metalakeId, Long catalogId) {
+    try {
+      AuditInfo auditInfo =
+          AuditInfo.builder().withCreator("system").withCreateTime(Instant.now()).build();
+
+      return SchemaPO.builder()
+          .withSchemaId(RandomIdGenerator.INSTANCE.nextId())
+          .withSchemaName(Entity.GROUP_SCHEMA_NAME)
+          .withMetalakeId(metalakeId)
+          .withCatalogId(catalogId)
+          .withSchemaComment("group schema")
+          .withProperties(null)
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
+          .withCurrentVersion(INIT_VERSION)
+          .withLastVersion(INIT_VERSION)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  /**
+   * Initialize Role SchemaPO
+   *
+   * @param metalakeId the metalake id
+   * @return Role SchemaPO object with version initialized
+   */
+  public static SchemaPO initializeRoleSchemaPO(Long metalakeId, Long catalogId) {
+    try {
+      AuditInfo auditInfo =
+          AuditInfo.builder().withCreator("system").withCreateTime(Instant.now()).build();
+
+      return SchemaPO.builder()
+          .withSchemaId(RandomIdGenerator.INSTANCE.nextId())
+          .withSchemaName(Entity.ROLE_SCHEMA_NAME)
+          .withMetalakeId(metalakeId)
+          .withCatalogId(catalogId)
+          .withSchemaComment("role schema")
+          .withProperties(null)
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
+          .withCurrentVersion(INIT_VERSION)
+          .withLastVersion(INIT_VERSION)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
     }
   }
 }

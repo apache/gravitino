@@ -25,7 +25,9 @@ import com.datastrato.gravitino.storage.relational.mapper.TableMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.TopicMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.UserMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.UserRoleRelMapper;
+import com.datastrato.gravitino.storage.relational.po.CatalogPO;
 import com.datastrato.gravitino.storage.relational.po.MetalakePO;
+import com.datastrato.gravitino.storage.relational.po.SchemaPO;
 import com.datastrato.gravitino.storage.relational.utils.ExceptionUtils;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
@@ -84,16 +86,66 @@ public class MetalakeMetaService {
   public void insertMetalake(BaseMetalake baseMetalake, boolean overwrite) {
     try {
       NameIdentifier.checkMetalake(baseMetalake.nameIdentifier());
-      SessionUtils.doWithCommit(
-          MetalakeMetaMapper.class,
-          mapper -> {
-            MetalakePO po = POConverters.initializeMetalakePOWithVersion(baseMetalake);
-            if (overwrite) {
-              mapper.insertMetalakeMetaOnDuplicateKeyUpdate(po);
-            } else {
-              mapper.insertMetalakeMeta(po);
-            }
-          });
+
+      CatalogPO systemCatalogPO = POConverters.initializeSystemCatalogPO(baseMetalake.id());
+      SchemaPO userSchemaPO =
+          POConverters.initializeUserSchemaPO(baseMetalake.id(), systemCatalogPO.getCatalogId());
+      SchemaPO groupSchemaPO =
+          POConverters.initializeGroupSchemaPO(baseMetalake.id(), systemCatalogPO.getCatalogId());
+      SchemaPO roleSchemaPO =
+          POConverters.initializeRoleSchemaPO(baseMetalake.id(), systemCatalogPO.getCatalogId());
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              SessionUtils.doWithoutCommit(
+                  MetalakeMetaMapper.class,
+                  mapper -> {
+                    MetalakePO po = POConverters.initializeMetalakePOWithVersion(baseMetalake);
+                    if (overwrite) {
+                      mapper.insertMetalakeMetaOnDuplicateKeyUpdate(po);
+                    } else {
+                      mapper.insertMetalakeMeta(po);
+                    }
+                  }),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  CatalogMetaMapper.class,
+                  mapper -> {
+                    if (overwrite) {
+                      mapper.insertCatalogMetaOnDuplicateKeyUpdate(systemCatalogPO);
+                    } else {
+                      mapper.insertCatalogMeta(systemCatalogPO);
+                    }
+                  }),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  SchemaMetaMapper.class,
+                  mapper -> {
+                    if (overwrite) {
+                      mapper.insertSchemaMetaOnDuplicateKeyUpdate(userSchemaPO);
+                    } else {
+                      mapper.insertSchemaMeta(userSchemaPO);
+                    }
+                  }),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  SchemaMetaMapper.class,
+                  mapper -> {
+                    if (overwrite) {
+                      mapper.insertSchemaMetaOnDuplicateKeyUpdate(groupSchemaPO);
+                    } else {
+                      mapper.insertSchemaMeta(groupSchemaPO);
+                    }
+                  }),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  SchemaMetaMapper.class,
+                  mapper -> {
+                    if (overwrite) {
+                      mapper.insertSchemaMetaOnDuplicateKeyUpdate(roleSchemaPO);
+                    } else {
+                      mapper.insertSchemaMeta(roleSchemaPO);
+                    }
+                  }));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.METALAKE, baseMetalake.nameIdentifier().toString());
