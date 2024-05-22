@@ -122,7 +122,7 @@ class FilesetCatalog(BaseSchemaCatalog):
         req = FilesetCreateRequest(
             name=ident.name(),
             comment=comment,
-            type=fileset_type,
+            fileset_type=fileset_type,
             storage_location=storage_location,
             properties=properties,
         )
