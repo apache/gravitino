@@ -11,9 +11,9 @@ import com.datastrato.gravitino.rel.TableCatalog;
 import java.util.Map;
 
 /**
- * The client interface of a catalog. The catalog is the second level entity in the gravitino
- * system, containing a set of tables. The server side should use the other one with the same name
- * in the core module.
+ * The interface of a catalog. The catalog is the second level entity in the gravitino system,
+ * containing a set of tables. The server side should use the other one with the same name in the
+ * core module.
  */
 @Evolving
 public interface Catalog extends Auditable {
@@ -48,7 +48,7 @@ public interface Catalog extends Auditable {
   String name();
 
   /** @return The type of the catalog. */
-  Catalog.Type type();
+  Type type();
 
   /** @return The provider of the catalog. */
   String provider();
