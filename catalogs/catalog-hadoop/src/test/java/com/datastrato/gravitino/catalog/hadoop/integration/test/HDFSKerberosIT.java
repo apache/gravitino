@@ -10,6 +10,7 @@ import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.security.PrivilegedAction;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -33,33 +34,40 @@ public class HDFSKerberosIT {
   private static final String CLIENT_PRINCIPAL = "cli@HADOOPKRB";
   private static UserGroupInformation clientUGI;
 
+  private static String keytabPath;
+
   @BeforeAll
   public static void setup() throws IOException {
     containerSuite.startKerberosHiveContainer();
 
+    File baseDir = new File(System.getProperty("java.io.tmpdir"));
+    File file = Files.createTempDirectory(baseDir.toPath(), "test").toFile();
+    file.deleteOnExit();
+
     // Copy the keytab and krb5.conf from the container
+    keytabPath = file.getAbsolutePath() + "/client.keytab";
     containerSuite
         .getKerberosHiveContainer()
         .getContainer()
-        .copyFileFromContainer("/etc/admin.keytab", "/tmp/client.keytab");
+        .copyFileFromContainer("/etc/admin.keytab", keytabPath);
 
+    String krb5TmpPath = file.getAbsolutePath() + "/krb5.conf_tmp";
+    String krb5Path = file.getAbsolutePath() + "/krb5.conf";
     containerSuite
         .getKerberosHiveContainer()
         .getContainer()
-        .copyFileFromContainer("/etc/krb5.conf", "/tmp/krb5.conf_tmp");
-
-    String ip = containerSuite.getKerberosHiveContainer().getContainerIpAddress();
+        .copyFileFromContainer("/etc/krb5.conf", krb5TmpPath);
 
     // Modify the krb5.conf and change the kdc and admin_server to the container IP
-    String content =
-        FileUtils.readFileToString(new File("/tmp/krb5.conf_tmp"), StandardCharsets.UTF_8);
+    String ip = containerSuite.getKerberosHiveContainer().getContainerIpAddress();
+    String content = FileUtils.readFileToString(new File(krb5TmpPath), StandardCharsets.UTF_8);
     content = content.replace("kdc = localhost:88", "kdc = " + ip + ":88");
     content = content.replace("admin_server = localhost", "admin_server = " + ip + ":749");
-    FileUtils.write(new File("/tmp/krb5.conf"), content, StandardCharsets.UTF_8);
+    FileUtils.write(new File(krb5Path), content, StandardCharsets.UTF_8);
 
     LOG.info("Kerberos kdc config:\n{}", content);
 
-    System.setProperty("java.security.krb5.conf", "/tmp/krb5.conf");
+    System.setProperty("java.security.krb5.conf", krb5Path);
     System.setProperty("sun.security.krb5.debug", "true");
   }
 
@@ -67,6 +75,10 @@ public class HDFSKerberosIT {
   public static void tearDown() {
     // Reset the UGI
     UserGroupInformation.reset();
+
+    // Clean up the kerberos configuration
+    System.clearProperty("java.security.krb5.conf");
+    System.clearProperty("sun.security.krb5.debug");
   }
 
   @Test
@@ -77,9 +89,7 @@ public class HDFSKerberosIT {
     conf.set("hadoop.security.authentication", "kerberos");
 
     UserGroupInformation.setConfiguration(conf);
-    clientUGI =
-        UserGroupInformation.loginUserFromKeytabAndReturnUGI(
-            CLIENT_PRINCIPAL, "/tmp/client.keytab");
+    clientUGI = UserGroupInformation.loginUserFromKeytabAndReturnUGI(CLIENT_PRINCIPAL, keytabPath);
     PrivilegedAction<?> action =
         (PrivilegedAction)
             () -> {
