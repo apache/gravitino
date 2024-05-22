@@ -110,9 +110,7 @@ public class ContainerSuite implements Closeable {
           HiveContainer.Builder hiveBuilder =
               HiveContainer.builder()
                   .withHostName("gravitino-ci-kerberos-hive")
-                  .withEnvVars(
-                      ImmutableMap.<String, String>builder()
-                          .build())
+                  .withEnvVars(ImmutableMap.<String, String>builder().build())
                   .withKerberosEnabled(true)
                   .withNetwork(network);
           HiveContainer container = closer.register(hiveBuilder.build());
