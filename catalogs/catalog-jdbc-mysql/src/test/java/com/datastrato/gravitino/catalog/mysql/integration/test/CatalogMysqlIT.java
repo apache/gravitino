@@ -1584,4 +1584,48 @@ public class CatalogMysqlIT extends AbstractIT {
         Indexes.EMPTY_INDEXES,
         table);
   }
+
+  @Test
+  public void testMySqlIntegerTypes() {
+    Column col1 = Column.of("col_1", Types.ByteType.get(), "byte type", true, false, null);
+    Column col2 =
+        Column.of("col_2", Types.ByteType.of(false), "byte unsigned type", true, false, null);
+    Column col3 = Column.of("col_3", Types.ShortType.get(), "short type", true, false, null);
+    Column col4 =
+        Column.of("col_4", Types.ShortType.of(false), "short unsigned type ", true, false, null);
+    Column col5 = Column.of("col_5", Types.IntegerType.get(), "integer type", true, false, null);
+    Column col6 =
+        Column.of("col_6", Types.IntegerType.of(false), "integer unsigned type", true, false, null);
+    Column col7 = Column.of("col_7", Types.LongType.get(), "long type", true, false, null);
+    Column col8 =
+        Column.of("col_8", Types.LongType.of(false), "long unsigned type", true, false, null);
+    String tableName = "default_integer_types_table";
+    Column[] newColumns = new Column[] {col1, col2, col3, col4, col5, col6, col7, col8};
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        newColumns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0],
+        Indexes.EMPTY_INDEXES);
+
+    Table table = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(8, table.columns().length);
+    Column[] columns = table.columns();
+    Assertions.assertEquals(columns[0].dataType().simpleString(), "byte");
+    Assertions.assertEquals(columns[1].dataType().simpleString(), "byte unsigned");
+    Assertions.assertEquals(columns[2].dataType().simpleString(), "short");
+    Assertions.assertEquals(columns[3].dataType().simpleString(), "short unsigned");
+    Assertions.assertEquals(columns[4].dataType().simpleString(), "integer");
+    Assertions.assertEquals(columns[5].dataType().simpleString(), "integer unsigned");
+    Assertions.assertEquals(columns[6].dataType().simpleString(), "long");
+    Assertions.assertEquals(columns[7].dataType().simpleString(), "long unsigned");
+  }
 }

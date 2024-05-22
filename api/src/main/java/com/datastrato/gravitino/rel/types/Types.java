@@ -58,14 +58,20 @@ public class Types {
 
   /** The byte type in Gravitino. */
   public static class ByteType extends Type.IntegralType {
-    private static final ByteType INSTANCE = new ByteType();
+    private static final ByteType INSTANCE = new ByteType(true);
+
+    public static ByteType of(boolean signed) {
+      return new ByteType(signed);
+    }
 
     /** @return The singleton instance of {@link ByteType}. */
     public static ByteType get() {
       return INSTANCE;
     }
 
-    private ByteType() {}
+    private ByteType(boolean signed) {
+      super(signed);
+    }
 
     @Override
     public Name name() {
@@ -74,20 +80,26 @@ public class Types {
 
     @Override
     public String simpleString() {
-      return "byte";
+      return signed() ? "byte" : "byte unsigned";
     }
   }
 
   /** The short type in Gravitino. */
   public static class ShortType extends Type.IntegralType {
-    private static final ShortType INSTANCE = new ShortType();
+    private static final ShortType INSTANCE = new ShortType(true);
+
+    public static ShortType of(boolean signed) {
+      return new ShortType(signed);
+    }
 
     /** @return The singleton instance of {@link ShortType}. */
     public static ShortType get() {
       return INSTANCE;
     }
 
-    private ShortType() {}
+    private ShortType(boolean signed) {
+      super(signed);
+    }
 
     @Override
     public Name name() {
@@ -96,20 +108,26 @@ public class Types {
 
     @Override
     public String simpleString() {
-      return "short";
+      return signed() ? "short" : "short unsigned";
     }
   }
 
   /** The integer type in Gravitino. */
   public static class IntegerType extends Type.IntegralType {
-    private static final IntegerType INSTANCE = new IntegerType();
+    private static final IntegerType INSTANCE = new IntegerType(true);
+
+    public static IntegerType of(boolean signed) {
+      return new IntegerType(signed);
+    }
 
     /** @return The singleton instance of {@link IntegerType}. */
     public static IntegerType get() {
       return INSTANCE;
     }
 
-    private IntegerType() {}
+    private IntegerType(boolean signed) {
+      super(signed);
+    }
 
     @Override
     public Name name() {
@@ -118,20 +136,26 @@ public class Types {
 
     @Override
     public String simpleString() {
-      return "integer";
+      return signed() ? "integer" : "integer unsigned";
     }
   }
 
   /** The long type in Gravitino. */
   public static class LongType extends Type.IntegralType {
-    private static final LongType INSTANCE = new LongType();
+    private static final LongType INSTANCE = new LongType(true);
+
+    public static LongType of(boolean signed) {
+      return new LongType(signed);
+    }
 
     /** @return The singleton instance of {@link LongType}. */
     public static LongType get() {
       return INSTANCE;
     }
 
-    private LongType() {}
+    private LongType(boolean signed) {
+      super(signed);
+    }
 
     @Override
     public Name name() {
@@ -140,7 +164,7 @@ public class Types {
 
     @Override
     public String simpleString() {
-      return "long";
+      return signed() ? "long" : "long unsigned";
     }
   }
 

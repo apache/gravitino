@@ -127,9 +127,13 @@ public class JsonUtils {
           ImmutableList.of(
               Types.BooleanType.get(),
               Types.ByteType.get(),
+              Types.ByteType.of(false),
               Types.ShortType.get(),
+              Types.ShortType.of(false),
               Types.IntegerType.get(),
+              Types.IntegerType.of(false),
               Types.LongType.get(),
+              Types.LongType.of(false),
               Types.FloatType.get(),
               Types.DoubleType.get(),
               Types.DateType.get(),
