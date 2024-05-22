@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.converter;
 
+import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.FunctionExpression;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
@@ -72,9 +73,13 @@ public class TestFromIcebergSortOrder extends TestBaseConvert {
                         return ((NamedReference.FieldReference) sortOrder.expression())
                             .fieldName()[0];
                       } else if (sortOrder.expression() instanceof FunctionExpression) {
-                        return ((NamedReference.FieldReference)
-                                ((FunctionExpression) sortOrder.expression()).arguments()[0])
-                            .fieldName()[0];
+                        Expression[] arguments =
+                            ((FunctionExpression) sortOrder.expression()).arguments();
+                        if (arguments.length == 1) {
+                          return ((NamedReference.FieldReference) arguments[0]).fieldName()[0];
+                        } else {
+                          return ((NamedReference.FieldReference) arguments[1]).fieldName()[0];
+                        }
                       }
                       throw new RuntimeException("Unsupported sort expression type");
                     },
@@ -96,6 +101,10 @@ public class TestFromIcebergSortOrder extends TestBaseConvert {
               ? NullOrdering.NULLS_FIRST
               : NullOrdering.NULLS_LAST,
           sortOrder.nullOrdering());
+      String icebergSortOrderString = getIcebergTransfromString(sortField, schema);
+      String gravitinoSortOrderString =
+          getGravitinoSortOrderExpressionString(sortOrder.expression());
+      Assertions.assertEquals(icebergSortOrderString, gravitinoSortOrderString);
     }
   }
 }
