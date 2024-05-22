@@ -64,7 +64,11 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testRuntimeOnly(libs.junit.jupiter.engine)
+  testImplementation(libs.sqlite.jdbc)
   testImplementation(libs.testcontainers)
+  testImplementation(libs.testcontainers.junit.jupiter)
+  testImplementation(libs.testcontainers.mysql)
+  testImplementation(libs.testcontainers.postgresql)
 
   testImplementation(libs.hadoop2.common) {
     exclude("*")
