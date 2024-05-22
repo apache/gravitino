@@ -1,4 +1,4 @@
-name: Backend Integration Test
+name: Flink Integration Test
 
 # Controls when the workflow will run
 on:
@@ -35,14 +35,10 @@ jobs:
               - core/**
               - dev/**
               - gradle/**
-              - integration-test/**
-              - integration-test-common/**
               - meta/**
               - server/**
               - server-common/**
-              - spark-connector/**
               - flink-connector/**
-              - trino-connector/**
               - web/**
               - docs/open-api/**
               - build.gradle.kts
@@ -57,13 +53,11 @@ jobs:
     needs: changes
     if: needs.changes.outputs.source_changes == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
     strategy:
       matrix:
         architecture: [linux/amd64]
-        java-version: [ 8, 11, 17 ]
-        test-mode: [ embedded, deploy ]
-        backend: [ jdbcBackend, kvBackend]
+        java-version: [ 8 ]
     env:
       PLATFORM: ${{ matrix.architecture }}
     steps:
@@ -82,8 +76,8 @@ jobs:
           dev/ci/check_commands.sh
 
       - name: Package Gravitino
-        if : ${{ matrix.test-mode == 'deploy' }}
         run: |
+          ./gradlew build -x test -PjdkVersion=${{ matrix.java-version }}
           ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
 
       - name: Setup debug Github Action
@@ -94,22 +88,21 @@ jobs:
         run: |
           dev/ci/util_free_space.sh
 
-      - name: Backend Integration Test
+      - name: Frontend Integration Test
         id: integrationTest
         run: |
-          ./gradlew test --rerun-tasks -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PskipWebITs -P${{ matrix.backend }} -PskipPyClientITs -PskipFlinkITs
+          ./gradlew --rerun-tasks -PskipTests -PtestMode=embedded -PjdkVersion=${{ matrix.java-version }} :integration-test:test --tests "com.datastrato.gravitino.flink.connector.integration.test.**" -i
+          ./gradlew --rerun-tasks -PskipTests -PtestMode=deploy -PjdkVersion=${{ matrix.java-version }} :integration-test:test --tests "com.datastrato.gravitino.flink.connector.integration.test.**" -i
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
         if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
         with:
-          name: integrate-test-reports-${{ matrix.java-version }}-${{ matrix.test-mode }}-${{ matrix.backend }}
+          name: integrate-test-reports-${{ matrix.java-version }}
           path: |
             build/reports
-            integration-test/build/*.log
-            integration-test/build/*.tar
-            integration-test/build/trino-ci-container-log/hive/*.*
-            integration-test/build/trino-ci-container-log/hdfs/*.*
+            flink-connector/build/flink-connector-integration-test.log
+            flink-connector/build/*.tar
             distribution/package/logs/gravitino-server.out
             distribution/package/logs/gravitino-server.log
             catalogs/**/*.log
