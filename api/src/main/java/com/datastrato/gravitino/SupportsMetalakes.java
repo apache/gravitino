@@ -2,10 +2,8 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.rel;
+package com.datastrato.gravitino;
 
-import com.datastrato.gravitino.Metalake;
-import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
