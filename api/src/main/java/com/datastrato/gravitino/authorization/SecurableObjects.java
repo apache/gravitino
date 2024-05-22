@@ -115,13 +115,13 @@ public class SecurableObjects {
 
   private static class SecurableObjectImpl implements SecurableObject {
 
-    private final String parentFullName;
+    private final String parent;
     private final String name;
     private final Type type;
     private List<Privilege> privileges;
 
-    SecurableObjectImpl(String parentFullName, String name, Type type, List<Privilege> privileges) {
-      this.parentFullName = parentFullName;
+    SecurableObjectImpl(String parent, String name, Type type, List<Privilege> privileges) {
+      this.parent = parent;
       this.name = name;
       this.type = type;
       this.privileges = ImmutableList.copyOf(privileges);
@@ -129,7 +129,7 @@ public class SecurableObjects {
 
     @Override
     public String parent() {
-      return parentFullName;
+      return parent;
     }
 
     @Override
@@ -154,13 +154,13 @@ public class SecurableObjects {
 
     @Override
     public int hashCode() {
-      return Objects.hash(parentFullName, name, type, privileges);
+      return Objects.hash(parent, name, type, privileges);
     }
 
     @Override
     public String toString() {
-      if (parentFullName != null) {
-        return parentFullName + "." + name;
+      if (parent != null) {
+        return parent + "." + name;
       } else {
         return name;
       }
@@ -173,7 +173,7 @@ public class SecurableObjects {
       }
 
       SecurableObject otherSecurableObject = (SecurableObject) other;
-      return Objects.equals(parentFullName, otherSecurableObject.parent())
+      return Objects.equals(parent, otherSecurableObject.parent())
           && Objects.equals(name, otherSecurableObject.name())
           && Objects.equals(type, otherSecurableObject.type())
           && Objects.equals(privileges, otherSecurableObject.privileges());
