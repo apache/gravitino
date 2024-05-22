@@ -62,24 +62,25 @@ public class TestHiveSchema extends MiniHiveMetastoreService {
   public void testCreateHiveSchema() {
     HiveCatalog hiveCatalog = initHiveCatalog();
 
+    HiveCatalogOperations catalogOperations = (HiveCatalogOperations)hiveCatalog.ops();
+
     NameIdentifier ident = NameIdentifier.of("metalake", hiveCatalog.name(), genRandomName());
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");
     String comment = "comment";
-    com.datastrato.gravitino.schema.SupportsSchemas schemas = hiveCatalog.asSchemas();
 
-    Schema schema = schemas.createSchema(ident, comment, properties);
+    Schema schema = catalogOperations.createSchema(ident, comment, properties);
     Assertions.assertEquals(ident.name(), schema.name());
     Assertions.assertEquals(comment, schema.comment());
     Assertions.assertEquals(properties, schema.properties());
 
-    Assertions.assertTrue(schemas.schemaExists(ident));
+    Assertions.assertTrue(catalogOperations.schemaExists(ident));
 
-    NameIdentifier[] idents = schemas.listSchemas(ident.namespace());
+    NameIdentifier[] idents = catalogOperations.listSchemas(ident.namespace());
     Assertions.assertTrue(Arrays.asList(idents).contains(ident));
 
-    Schema loadedSchema = schemas.loadSchema(ident);
+    Schema loadedSchema = catalogOperations.loadSchema(ident);
     Assertions.assertEquals(schema.auditInfo().creator(), loadedSchema.auditInfo().creator());
     Assertions.assertNull(loadedSchema.auditInfo().createTime());
     Assertions.assertEquals("val1", loadedSchema.properties().get("key1"));
@@ -90,7 +91,7 @@ public class TestHiveSchema extends MiniHiveMetastoreService {
         Assertions.assertThrows(
             SchemaAlreadyExistsException.class,
             () -> {
-              schemas.createSchema(ident, comment, properties);
+              catalogOperations.createSchema(ident, comment, properties);
             });
     Assertions.assertTrue(exception.getMessage().contains("already exists in Hive Metastore"));
   }
@@ -98,6 +99,7 @@ public class TestHiveSchema extends MiniHiveMetastoreService {
   @Test
   public void testAlterSchema() {
     HiveCatalog hiveCatalog = initHiveCatalog();
+    HiveCatalogOperations catalogOperations = (HiveCatalogOperations)hiveCatalog.ops();
 
     NameIdentifier ident = NameIdentifier.of("metalake", hiveCatalog.name(), genRandomName());
     Map<String, String> properties = Maps.newHashMap();
@@ -105,20 +107,19 @@ public class TestHiveSchema extends MiniHiveMetastoreService {
     properties.put("key2", "val2");
     String comment = "comment";
 
-    Schema createdSchema = hiveCatalog.asSchemas().createSchema(ident, comment, properties);
-    Assertions.assertTrue(hiveCatalog.asSchemas().schemaExists(ident));
+    Schema createdSchema = catalogOperations.createSchema(ident, comment, properties);
+    Assertions.assertTrue(catalogOperations.schemaExists(ident));
 
-    Map<String, String> properties1 = hiveCatalog.asSchemas().loadSchema(ident).properties();
+    Map<String, String> properties1 = catalogOperations.loadSchema(ident).properties();
     Assertions.assertEquals("val1", properties1.get("key1"));
     Assertions.assertEquals("val2", properties1.get("key2"));
 
-    hiveCatalog
-        .asSchemas()
+    catalogOperations
         .alterSchema(
             ident,
             SchemaChange.removeProperty("key1"),
             SchemaChange.setProperty("key2", "val2-alter"));
-    Schema alteredSchema = hiveCatalog.asSchemas().loadSchema(ident);
+    Schema alteredSchema = catalogOperations.loadSchema(ident);
     Map<String, String> properties2 = alteredSchema.properties();
     Assertions.assertFalse(properties2.containsKey("key1"));
     Assertions.assertEquals("val2-alter", properties2.get("key2"));
@@ -129,13 +130,12 @@ public class TestHiveSchema extends MiniHiveMetastoreService {
     Assertions.assertNull(alteredSchema.auditInfo().lastModifier());
     Assertions.assertNull(alteredSchema.auditInfo().lastModifiedTime());
 
-    hiveCatalog
-        .asSchemas()
+    catalogOperations
         .alterSchema(
             ident,
             SchemaChange.setProperty("key3", "val3"),
             SchemaChange.setProperty("key4", "val4"));
-    Schema alteredSchema1 = hiveCatalog.asSchemas().loadSchema(ident);
+    Schema alteredSchema1 = catalogOperations.loadSchema(ident);
     Map<String, String> properties3 = alteredSchema1.properties();
     Assertions.assertEquals("val3", properties3.get("key3"));
     Assertions.assertEquals("val4", properties3.get("key4"));
@@ -150,6 +150,7 @@ public class TestHiveSchema extends MiniHiveMetastoreService {
   @Test
   public void testDropSchema() {
     HiveCatalog hiveCatalog = initHiveCatalog();
+    HiveCatalogOperations catalogOperations = (HiveCatalogOperations)hiveCatalog.ops();
 
     NameIdentifier ident = NameIdentifier.of("metalake", hiveCatalog.name(), genRandomName());
     Map<String, String> properties = Maps.newHashMap();
@@ -157,9 +158,9 @@ public class TestHiveSchema extends MiniHiveMetastoreService {
     properties.put("key2", "val2");
     String comment = "comment";
 
-    hiveCatalog.asSchemas().createSchema(ident, comment, properties);
-    Assertions.assertTrue(hiveCatalog.asSchemas().schemaExists(ident));
-    hiveCatalog.asSchemas().dropSchema(ident, true);
-    Assertions.assertFalse(hiveCatalog.asSchemas().schemaExists(ident));
+    catalogOperations.createSchema(ident, comment, properties);
+    Assertions.assertTrue(catalogOperations.schemaExists(ident));
+    catalogOperations.dropSchema(ident, true);
+    Assertions.assertFalse(catalogOperations.schemaExists(ident));
   }
 }

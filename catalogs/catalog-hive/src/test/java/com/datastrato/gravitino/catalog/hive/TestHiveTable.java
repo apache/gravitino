@@ -50,6 +50,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
   protected static final String HIVE_SCHEMA_NAME = "test_schema";
   protected static final String HIVE_COMMENT = "test_comment";
   private static HiveCatalog hiveCatalog;
+  private static HiveCatalogOperations hiveCatalogOperations;
   private static HiveSchema hiveSchema;
   private static final NameIdentifier schemaIdent =
       NameIdentifier.of(META_LAKE_NAME, HIVE_CATALOG_NAME, HIVE_SCHEMA_NAME);
@@ -57,12 +58,13 @@ public class TestHiveTable extends MiniHiveMetastoreService {
   @BeforeAll
   private static void setup() {
     hiveCatalog = initHiveCatalog();
+    hiveCatalogOperations = (HiveCatalogOperations) hiveCatalog.ops();
     hiveSchema = initHiveSchema(hiveCatalog);
   }
 
   @AfterEach
   private void resetSchema() {
-    hiveCatalog.asSchemas().dropSchema(schemaIdent, true);
+    hiveCatalogOperations.dropSchema(schemaIdent, true);
     hiveSchema = initHiveSchema(hiveCatalog);
   }
 
@@ -71,7 +73,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     properties.put("key1", "val1");
     properties.put("key2", "val2");
 
-    return (HiveSchema) hiveCatalog.asSchemas().createSchema(schemaIdent, HIVE_COMMENT, properties);
+    return hiveCatalogOperations.createSchema(schemaIdent, HIVE_COMMENT, properties);
   }
 
   protected static HiveCatalog initHiveCatalog() {
@@ -144,23 +146,22 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     Distribution distribution = createDistribution();
     SortOrder[] sortOrders = createSortOrder();
 
+    HiveCatalogOperations hiveCatalogOperations = (HiveCatalogOperations) hiveCatalog.ops();
     Table table =
-        hiveCatalog
-            .asTableCatalog()
-            .createTable(
-                tableIdentifier,
-                columns,
-                HIVE_COMMENT,
-                properties,
-                new Transform[0],
-                distribution,
-                sortOrders);
+        hiveCatalogOperations.createTable(
+            tableIdentifier,
+            columns,
+            HIVE_COMMENT,
+            properties,
+            new Transform[0],
+            distribution,
+            sortOrders);
     Assertions.assertEquals(tableIdentifier.name(), table.name());
     Assertions.assertEquals(HIVE_COMMENT, table.comment());
     Assertions.assertEquals("val1", table.properties().get("key1"));
     Assertions.assertEquals("val2", table.properties().get("key2"));
 
-    Table loadedTable = hiveCatalog.asTableCatalog().loadTable(tableIdentifier);
+    Table loadedTable = hiveCatalogOperations.loadTable(tableIdentifier);
     Assertions.assertEquals(table.auditInfo().creator(), loadedTable.auditInfo().creator());
     Assertions.assertNull(loadedTable.auditInfo().lastModifier());
     Assertions.assertNull(loadedTable.auditInfo().lastModifiedTime());
@@ -168,9 +169,8 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     Assertions.assertEquals("val1", loadedTable.properties().get("key1"));
     Assertions.assertEquals("val2", loadedTable.properties().get("key2"));
 
-    Assertions.assertTrue(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));
-    NameIdentifier[] tableIdents =
-        hiveCatalog.asTableCatalog().listTables(tableIdentifier.namespace());
+    Assertions.assertTrue(hiveCatalogOperations.tableExists(tableIdentifier));
+    NameIdentifier[] tableIdents = hiveCatalogOperations.listTables(tableIdentifier.namespace());
     Assertions.assertTrue(Arrays.asList(tableIdents).contains(tableIdentifier));
 
     // Compare sort and order
@@ -185,7 +185,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     }
 
     // Test exception
-    TableCatalog tableCatalog = hiveCatalog.asTableCatalog();
+    TableCatalog tableCatalog = hiveCatalogOperations;
     Throwable exception =
         Assertions.assertThrows(
             TableAlreadyExistsException.class,
@@ -225,16 +225,16 @@ public class TestHiveTable extends MiniHiveMetastoreService {
 
     Transform[] partitions = new Transform[] {identity(col2.name())};
 
-    TableCatalog tableCatalog = hiveCatalog.asTableCatalog();
     Table table =
-        tableCatalog.createTable(tableIdentifier, columns, HIVE_COMMENT, properties, partitions);
+        hiveCatalogOperations.createTable(
+            tableIdentifier, columns, HIVE_COMMENT, properties, partitions);
     Assertions.assertEquals(tableIdentifier.name(), table.name());
     Assertions.assertEquals(HIVE_COMMENT, table.comment());
     Assertions.assertEquals("val1", table.properties().get("key1"));
     Assertions.assertEquals("val2", table.properties().get("key2"));
     Assertions.assertArrayEquals(partitions, table.partitioning());
 
-    Table loadedTable = tableCatalog.loadTable(tableIdentifier);
+    Table loadedTable = hiveCatalogOperations.loadTable(tableIdentifier);
 
     Assertions.assertEquals(table.auditInfo().creator(), loadedTable.auditInfo().creator());
     Assertions.assertNull(loadedTable.auditInfo().lastModifier());
@@ -244,8 +244,8 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     Assertions.assertEquals("val2", loadedTable.properties().get("key2"));
     Assertions.assertArrayEquals(partitions, loadedTable.partitioning());
 
-    Assertions.assertTrue(tableCatalog.tableExists(tableIdentifier));
-    NameIdentifier[] tableIdents = tableCatalog.listTables(tableIdentifier.namespace());
+    Assertions.assertTrue(hiveCatalogOperations.tableExists(tableIdentifier));
+    NameIdentifier[] tableIdents = hiveCatalogOperations.listTables(tableIdentifier.namespace());
     Assertions.assertTrue(Arrays.asList(tableIdents).contains(tableIdentifier));
 
     // Test exception
@@ -254,7 +254,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () ->
-                tableCatalog.createTable(
+                hiveCatalogOperations.createTable(
                     tableIdentifier, columns, HIVE_COMMENT, properties, partitions2));
     Assertions.assertTrue(
         exception.getMessage().contains("Hive partition only supports identity transform"));
@@ -268,7 +268,9 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     exception =
         Assertions.assertThrows(
             RuntimeException.class,
-            () -> tableCatalog.createTable(randid, columns, HIVE_COMMENT, properties, partitions3));
+            () ->
+                hiveCatalogOperations.createTable(
+                    randid, columns, HIVE_COMMENT, properties, partitions3));
     Assertions.assertTrue(
         exception.getMessage().contains("Hive partition does not support nested field"));
 
@@ -277,7 +279,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () ->
-                tableCatalog.createTable(
+                hiveCatalogOperations.createTable(
                     tableIdentifier, columns, HIVE_COMMENT, properties, partitions4));
     Assertions.assertEquals(
         "The partition field must be placed at the end of the columns in order",
@@ -306,8 +308,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
             .build();
     Column[] columns = new Column[] {col1, col2};
 
-    hiveCatalog
-        .asTableCatalog()
+    hiveCatalogOperations
         .createTable(
             tableIdentifier,
             columns,
@@ -317,15 +318,15 @@ public class TestHiveTable extends MiniHiveMetastoreService {
             Distributions.NONE,
             new SortOrder[0]);
 
-    Assertions.assertTrue(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));
-    hiveCatalog.asTableCatalog().dropTable(tableIdentifier);
-    Assertions.assertFalse(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));
+    Assertions.assertTrue(hiveCatalogOperations.tableExists(tableIdentifier));
+    hiveCatalogOperations.dropTable(tableIdentifier);
+    Assertions.assertFalse(hiveCatalogOperations.tableExists(tableIdentifier));
   }
 
   @Test
   public void testListTableException() {
     Namespace tableNs = Namespace.of("metalake", hiveCatalog.name(), "not_exist_db");
-    TableCatalog tableCatalog = hiveCatalog.asTableCatalog();
+    TableCatalog tableCatalog = hiveCatalogOperations;
     Throwable exception =
         Assertions.assertThrows(
             NoSuchSchemaException.class, () -> tableCatalog.listTables(tableNs));
@@ -358,7 +359,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     Distribution distribution = createDistribution();
     SortOrder[] sortOrders = createSortOrder();
 
-    TableCatalog tableCatalog = hiveCatalog.asTableCatalog();
+    TableCatalog tableCatalog = hiveCatalogOperations;
     Table createdTable =
         tableCatalog.createTable(
             tableIdentifier,
@@ -368,7 +369,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
             new Transform[] {identity(col2.name())},
             distribution,
             sortOrders);
-    Assertions.assertTrue(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));
+    Assertions.assertTrue(hiveCatalogOperations.tableExists(tableIdentifier));
 
     TableChange tableChange1 =
         TableChange.updateColumnPosition(
@@ -522,8 +523,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     Distribution distribution = createDistribution();
     SortOrder[] sortOrders = createSortOrder();
 
-    hiveCatalog
-        .asTableCatalog()
+    hiveCatalogOperations
         .createTable(
             tableIdentifier,
             columns,
@@ -532,9 +532,9 @@ public class TestHiveTable extends MiniHiveMetastoreService {
             new Transform[0],
             distribution,
             sortOrders);
-    Assertions.assertTrue(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));
-    hiveCatalog.asTableCatalog().purgeTable(tableIdentifier);
-    Assertions.assertFalse(hiveCatalog.asTableCatalog().tableExists(tableIdentifier));
+    Assertions.assertTrue(hiveCatalogOperations.tableExists(tableIdentifier));
+    hiveCatalogOperations.purgeTable(tableIdentifier);
+    Assertions.assertFalse(hiveCatalogOperations.tableExists(tableIdentifier));
   }
 
   @Test
@@ -561,9 +561,8 @@ public class TestHiveTable extends MiniHiveMetastoreService {
 
     Distribution distribution = createDistribution();
     SortOrder[] sortOrders = createSortOrder();
-    TableCatalog tableCatalog = hiveCatalog.asTableCatalog();
 
-    tableCatalog.createTable(
+    hiveCatalogOperations.createTable(
         tableIdentifier,
         columns,
         HIVE_COMMENT,
@@ -571,13 +570,13 @@ public class TestHiveTable extends MiniHiveMetastoreService {
         new Transform[0],
         distribution,
         sortOrders);
-    Assertions.assertTrue(tableCatalog.tableExists(tableIdentifier));
+    Assertions.assertTrue(hiveCatalogOperations.tableExists(tableIdentifier));
     Assertions.assertThrows(
         UnsupportedOperationException.class,
         () -> {
-          tableCatalog.purgeTable(tableIdentifier);
+          hiveCatalogOperations.purgeTable(tableIdentifier);
         },
         "Can't purge a external hive table");
-    Assertions.assertTrue(tableCatalog.tableExists(tableIdentifier));
+    Assertions.assertTrue(hiveCatalogOperations.tableExists(tableIdentifier));
   }
 }
