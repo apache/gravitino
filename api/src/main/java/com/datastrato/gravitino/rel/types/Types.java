@@ -1081,18 +1081,25 @@ public class Types {
     }
   }
 
+  /** Represents a type that is defined in an external catalog. */
   public static class ExternalType implements Type {
     private final String catalogString;
 
-    public static ExternalType of(String stringFormat) {
-      return new ExternalType(stringFormat);
+    /**
+     * Creates a new {@link ExternalType} with the given catalog string.
+     *
+     * @param catalogString The string representation of this type in the catalog.
+     * @return A new {@link ExternalType} with the given catalog string.
+     */
+    public static ExternalType of(String catalogString) {
+      return new ExternalType(catalogString);
     }
 
-    public ExternalType(String catalogString) {
+    private ExternalType(String catalogString) {
       this.catalogString = catalogString;
     }
 
-    /** @return The string representation of this type in the catalog. */
+    /** @return The string representation of this type in external catalog. */
     public String catalogString() {
       return catalogString;
     }
