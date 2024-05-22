@@ -112,7 +112,6 @@ public class ContainerSuite implements Closeable {
                   .withHostName("gravitino-ci-kerberos-hive")
                   .withEnvVars(
                       ImmutableMap.<String, String>builder()
-                          .put("HADOOP_USER_NAME", "datastrato")
                           .build())
                   .withKerberosEnabled(true)
                   .withNetwork(network);
