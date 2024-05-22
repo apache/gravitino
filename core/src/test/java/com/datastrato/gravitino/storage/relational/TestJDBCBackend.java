@@ -22,7 +22,6 @@ import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.authorization.Privilege;
 import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.SecurableObjects;
@@ -765,14 +764,16 @@ public class TestJDBCBackend {
 
   public static RoleEntity createRoleEntity(
       Long id, Namespace namespace, String name, AuditInfo auditInfo) {
+    SecurableObject securableObject =
+        SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
+
     return RoleEntity.builder()
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
         .withProperties(null)
         .withAuditInfo(auditInfo)
-        .withSecurableObject(SecurableObjects.ofCatalog("catalog"))
-        .withPrivileges(Lists.newArrayList(Privileges.fromName(Privilege.Name.USE_CATALOG)))
+        .withSecurableObject(securableObject)
         .build();
   }
 
@@ -811,8 +812,8 @@ public class TestJDBCBackend {
       String name,
       AuditInfo auditInfo,
       SecurableObject securableObject,
-      List<Privilege> privileges,
       Map<String, String> properties) {
+
     return RoleEntity.builder()
         .withId(id)
         .withName(name)
@@ -820,7 +821,6 @@ public class TestJDBCBackend {
         .withNamespace(namespace)
         .withAuditInfo(auditInfo)
         .withSecurableObject(securableObject)
-        .withPrivileges(privileges)
         .build();
   }
 }
