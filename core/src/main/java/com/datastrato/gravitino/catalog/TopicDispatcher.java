@@ -5,7 +5,7 @@
 
 package com.datastrato.gravitino.catalog;
 
-import com.datastrato.gravitino.messaging.TopicCatalog;
+import com.datastrato.gravitino.connector.TopicCatalog;
 
 /**
  * {@code TopicDispatcher} interface acts as a specialization of the {@link TopicCatalog} interface.

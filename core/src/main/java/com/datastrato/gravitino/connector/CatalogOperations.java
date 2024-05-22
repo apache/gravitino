@@ -6,14 +6,14 @@ package com.datastrato.gravitino.connector;
 
 import com.datastrato.gravitino.SupportsSchemas;
 import com.datastrato.gravitino.annotation.Evolving;
-import com.datastrato.gravitino.connector.TableCatalog;
 import java.io.Closeable;
 import java.util.Map;
 
 /**
  * A catalog operation interface that is used to trigger the operations of a catalog. This interface
  * should be mixed with other Catalog interface like {@link SupportsSchemas} to provide schema
- * operation, {@link TableCatalog} to support table operations, etc.
+ * operation, {@link com.datastrato.gravitino.connector.TableCatalog} to support table operations,
+ * etc.
  */
 @Evolving
 public interface CatalogOperations extends Closeable {

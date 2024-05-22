@@ -6,14 +6,14 @@ package com.datastrato.gravitino.connector;
 
 import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.file.Fileset;
-import com.datastrato.gravitino.file.FilesetCatalog;
 import com.datastrato.gravitino.meta.AuditInfo;
 import java.util.Map;
 import javax.annotation.Nullable;
 
 /**
- * An abstract class representing a base fileset for {@link FilesetCatalog}. Developers should
- * extend this class to implement a custom fileset for their fileset catalog.
+ * An abstract class representing a base fileset for {@link
+ * com.datastrato.gravitino.connector.FilesetCatalog}. Developers should extend this class to
+ * implement a custom fileset for their fileset catalog.
  */
 @Evolving
 public abstract class BaseFileset implements Fileset {

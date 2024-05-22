@@ -20,6 +20,8 @@
 
 package com.datastrato.gravitino.connector;
 
+import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
+
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.annotation.Evolving;
@@ -35,10 +37,7 @@ import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
-
 import java.util.Map;
-
-import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
 
 /**
  * The TableCatalog interface defines the public API for managing tables in a schema. If the catalog
@@ -91,7 +90,7 @@ public interface TableCatalog {
    * @throws TableAlreadyExistsException If the table already exists.
    */
   default Table createTable(
-          NameIdentifier ident, Column[] columns, String comment, Map<String, String> properties)
+      NameIdentifier ident, Column[] columns, String comment, Map<String, String> properties)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     return createTable(
         ident, columns, comment, properties, EMPTY_TRANSFORM, Distributions.NONE, new SortOrder[0]);
