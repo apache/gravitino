@@ -13,15 +13,16 @@ import com.google.common.cache.CacheBuilder;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** GravitinoCatalogManager is used to retrieve catalogs from Gravitino server. */
 public class GravitinoCatalogManager {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoCatalogManager.class);
-  private static GravitinoCatalogManager gravitinoCatalogManager;
+  private static volatile GravitinoCatalogManager gravitinoCatalogManager;
 
-  private volatile boolean isClosed = false;
+  private final AtomicBoolean closed = new AtomicBoolean();
   private final Cache<String, Catalog> gravitinoCatalogs;
   private final String metalakeName;
   private final GravitinoMetalake metalake;
@@ -38,7 +39,11 @@ public class GravitinoCatalogManager {
   public static GravitinoCatalogManager create(String gravitinoUrl, String metalakeName) {
     Preconditions.checkState(
         gravitinoCatalogManager == null, "Should not create duplicate GravitinoCatalogManager");
-    gravitinoCatalogManager = new GravitinoCatalogManager(gravitinoUrl, metalakeName);
+    synchronized (GravitinoCatalogManager.class) {
+      if (gravitinoCatalogManager == null) {
+        gravitinoCatalogManager = new GravitinoCatalogManager(gravitinoUrl, metalakeName);
+      }
+    }
     return gravitinoCatalogManager;
   }
 
@@ -46,13 +51,18 @@ public class GravitinoCatalogManager {
     Preconditions.checkState(
         gravitinoCatalogManager != null, "GravitinoCatalogManager has not created yet");
     Preconditions.checkState(
-        !gravitinoCatalogManager.isClosed, "GravitinoCatalogManager is already closed");
+        !gravitinoCatalogManager.isClosed(), "GravitinoCatalogManager is already closed");
     return gravitinoCatalogManager;
   }
 
+  public boolean isClosed() {
+    return closed.get();
+  }
+
   public void close() {
-    Preconditions.checkState(!isClosed, "Gravitino Catalog is already closed");
-    isClosed = true;
+    if (!closed.compareAndSet(false, true)) {
+      throw new IllegalStateException("Gravitino Catalog is already closed");
+    }
     gravitinoClient.close();
     gravitinoCatalogManager = null;
   }
