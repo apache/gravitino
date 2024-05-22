@@ -9,7 +9,7 @@ on:
     branches: [ "main", "branch-*" ]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-flink
   cancel-in-progress: true
 
 jobs:
@@ -90,8 +90,8 @@ jobs:
       - name: Flink Integration Test
         id: integrationTest
         run: |
-          ./gradlew --rerun-tasks -PskipTests -PtestMode=embedded -PjdkVersion=${{ matrix.java-version }} :flink-connector:test --tests "com.datastrato.gravitino.flink.connector.integration.test.**" -i
-          ./gradlew --rerun-tasks -PskipTests -PtestMode=deploy -PjdkVersion=${{ matrix.java-version }} :flink-connector:test --tests "com.datastrato.gravitino.flink.connector.integration.test.**" -i
+          ./gradlew --rerun-tasks -PskipTests -PtestMode=embedded -PjdkVersion=${{ matrix.java-version }} :flink-connector:test --tests "com.datastrato.gravitino.flink.connector.integration.test.**"
+          ./gradlew --rerun-tasks -PskipTests -PtestMode=deploy -PjdkVersion=${{ matrix.java-version }} :flink-connector:test --tests "com.datastrato.gravitino.flink.connector.integration.test.**"
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3

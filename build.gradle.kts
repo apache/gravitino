@@ -172,7 +172,6 @@ allprojects {
 
       val testMode = project.properties["testMode"] as? String ?: "embedded"
       param.systemProperty("gravitino.log.path", project.buildDir.path + "/${project.name}-integration-test.log")
-      param.environment("org.gradle.parallel", "false")
       project.delete(project.buildDir.path + "/${project.name}-integration-test.log")
       if (testMode == "deploy") {
         param.environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package")
