@@ -29,21 +29,20 @@ public class GravitinoCatalogManager {
   private GravitinoCatalogManager(String gravitinoUri, String metalakeName) {
     this.metalakeName = metalakeName;
     this.gravitinoClient = GravitinoAdminClient.builder(gravitinoUri).build();
-    // Will not evict catalog by default
     this.metalake = gravitinoClient.loadMetalake(metalakeName);
   }
 
   /**
-   * Create GravitinoCatalogManager with Gravitino server url and metalake name.
+   * Create GravitinoCatalogManager with Gravitino server uri and metalake name.
    *
-   * @param gravitinoUrl Gravitino server url
+   * @param gravitinoUri Gravitino server uri
    * @param metalakeName Metalake name
    * @return GravitinoCatalogManager
    */
-  public static GravitinoCatalogManager create(String gravitinoUrl, String metalakeName) {
+  public static GravitinoCatalogManager create(String gravitinoUri, String metalakeName) {
     Preconditions.checkState(
         gravitinoCatalogManager == null, "Should not create duplicate GravitinoCatalogManager");
-    gravitinoCatalogManager = new GravitinoCatalogManager(gravitinoUrl, metalakeName);
+    gravitinoCatalogManager = new GravitinoCatalogManager(gravitinoUri, metalakeName);
     return gravitinoCatalogManager;
   }
 

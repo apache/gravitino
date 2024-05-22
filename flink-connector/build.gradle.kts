@@ -22,17 +22,18 @@ dependencies {
   implementation(project(":clients:client-java"))
   implementation(project(":catalogs:bundled-catalog", configuration = "shadow"))
 
+  implementation(libs.bundles.log4j)
+  implementation(libs.commons.lang3)
+  implementation(libs.guava)
+  implementation(libs.httpclient5)
   implementation(libs.jackson.databind)
   implementation(libs.jackson.annotations)
   implementation(libs.jackson.datatype.jdk8)
   implementation(libs.jackson.datatype.jsr310)
-  implementation(libs.httpclient5)
-  implementation(libs.commons.lang3)
-  implementation(libs.bundles.log4j)
-  implementation(libs.guava)
+
+  implementation("org.apache.flink:flink-connector-hive_$scalaVersion:$flinkVersion")
   implementation("org.apache.flink:flink-table-common:$flinkVersion")
   implementation("org.apache.flink:flink-table-api-java:$flinkVersion")
-  implementation("org.apache.flink:flink-connector-hive_$scalaVersion:$flinkVersion")
 
   implementation(libs.hive2.exec) {
     artifact {
@@ -63,7 +64,8 @@ dependencies {
   testImplementation(project(":server-common"))
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
-  testRuntimeOnly(libs.junit.jupiter.engine)
+  testImplementation(libs.mockito.core)
+  testImplementation(libs.mysql.driver)
   testImplementation(libs.sqlite.jdbc)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.junit.jupiter)
@@ -99,16 +101,14 @@ dependencies {
     exclude("org.eclipse.jetty.orbit", "javax.servlet")
     exclude("org.slf4j")
   }
-
-  testImplementation(libs.mockito.core)
-  testImplementation(libs.mysql.driver)
-
   testImplementation("org.apache.flink:flink-table-api-bridge-base:$flinkVersion") {
     exclude("commons-cli", "commons-cli")
     exclude("commons-io", "commons-io")
     exclude("com.google.code.findbugs", "jsr305")
   }
   testImplementation("org.apache.flink:flink-table-planner_$scalaVersion:$flinkVersion")
+
+  testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks.test {
