@@ -10,7 +10,6 @@ import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 
 /** Represents a response for a role. */
@@ -52,8 +51,7 @@ public class RoleResponse extends BaseResponse {
         StringUtils.isNotBlank(role.name()), "role 'name' must not be null and empty");
     Preconditions.checkArgument(role.auditInfo() != null, "role 'auditInfo' must not be null");
     Preconditions.checkArgument(
-        !CollectionUtils.isEmpty(role.privileges()), "role 'privileges' can't be empty");
-    Preconditions.checkArgument(
-        role.securableObject() != null, "role 'securableObject' can't null");
+        role.securableObjects() != null && !role.securableObjects().isEmpty(),
+        "role 'securableObjects' can't null or empty");
   }
 }
