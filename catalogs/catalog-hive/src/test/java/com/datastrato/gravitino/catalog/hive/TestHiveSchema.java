@@ -62,7 +62,7 @@ public class TestHiveSchema extends MiniHiveMetastoreService {
   public void testCreateHiveSchema() {
     HiveCatalog hiveCatalog = initHiveCatalog();
 
-    HiveCatalogOperations catalogOperations = (HiveCatalogOperations)hiveCatalog.ops();
+    HiveCatalogOperations catalogOperations = (HiveCatalogOperations) hiveCatalog.ops();
 
     NameIdentifier ident = NameIdentifier.of("metalake", hiveCatalog.name(), genRandomName());
     Map<String, String> properties = Maps.newHashMap();
@@ -99,7 +99,7 @@ public class TestHiveSchema extends MiniHiveMetastoreService {
   @Test
   public void testAlterSchema() {
     HiveCatalog hiveCatalog = initHiveCatalog();
-    HiveCatalogOperations catalogOperations = (HiveCatalogOperations)hiveCatalog.ops();
+    HiveCatalogOperations catalogOperations = (HiveCatalogOperations) hiveCatalog.ops();
 
     NameIdentifier ident = NameIdentifier.of("metalake", hiveCatalog.name(), genRandomName());
     Map<String, String> properties = Maps.newHashMap();
@@ -114,11 +114,8 @@ public class TestHiveSchema extends MiniHiveMetastoreService {
     Assertions.assertEquals("val1", properties1.get("key1"));
     Assertions.assertEquals("val2", properties1.get("key2"));
 
-    catalogOperations
-        .alterSchema(
-            ident,
-            SchemaChange.removeProperty("key1"),
-            SchemaChange.setProperty("key2", "val2-alter"));
+    catalogOperations.alterSchema(
+        ident, SchemaChange.removeProperty("key1"), SchemaChange.setProperty("key2", "val2-alter"));
     Schema alteredSchema = catalogOperations.loadSchema(ident);
     Map<String, String> properties2 = alteredSchema.properties();
     Assertions.assertFalse(properties2.containsKey("key1"));
@@ -130,11 +127,8 @@ public class TestHiveSchema extends MiniHiveMetastoreService {
     Assertions.assertNull(alteredSchema.auditInfo().lastModifier());
     Assertions.assertNull(alteredSchema.auditInfo().lastModifiedTime());
 
-    catalogOperations
-        .alterSchema(
-            ident,
-            SchemaChange.setProperty("key3", "val3"),
-            SchemaChange.setProperty("key4", "val4"));
+    catalogOperations.alterSchema(
+        ident, SchemaChange.setProperty("key3", "val3"), SchemaChange.setProperty("key4", "val4"));
     Schema alteredSchema1 = catalogOperations.loadSchema(ident);
     Map<String, String> properties3 = alteredSchema1.properties();
     Assertions.assertEquals("val3", properties3.get("key3"));
@@ -150,7 +144,7 @@ public class TestHiveSchema extends MiniHiveMetastoreService {
   @Test
   public void testDropSchema() {
     HiveCatalog hiveCatalog = initHiveCatalog();
-    HiveCatalogOperations catalogOperations = (HiveCatalogOperations)hiveCatalog.ops();
+    HiveCatalogOperations catalogOperations = (HiveCatalogOperations) hiveCatalog.ops();
 
     NameIdentifier ident = NameIdentifier.of("metalake", hiveCatalog.name(), genRandomName());
     Map<String, String> properties = Maps.newHashMap();

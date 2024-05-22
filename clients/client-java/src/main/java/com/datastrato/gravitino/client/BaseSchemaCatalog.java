@@ -50,7 +50,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
   BaseSchemaCatalog(
       Namespace namespace,
       String name,
-      Type type,
+      Catalog.Type type,
       String provider,
       String comment,
       Map<String, String> properties,

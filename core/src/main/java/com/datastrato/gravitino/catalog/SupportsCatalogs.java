@@ -4,13 +4,12 @@
  */
 package com.datastrato.gravitino.catalog;
 
-import com.datastrato.gravitino.CatalogBasicInfo;
+import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.CatalogProvider;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.annotation.Evolving;
-import com.datastrato.gravitino.connector.Catalog;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
@@ -83,7 +82,7 @@ public interface SupportsCatalogs {
    */
   Catalog createCatalog(
       NameIdentifier ident,
-      CatalogBasicInfo.Type type,
+      Catalog.Type type,
       String provider,
       String comment,
       Map<String, String> properties)

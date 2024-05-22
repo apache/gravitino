@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.kafka;
 
-import static com.datastrato.gravitino.CatalogBasicInfo.Type.MESSAGING;
+import static com.datastrato.gravitino.Catalog.Type.MESSAGING;
 import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_STORE;

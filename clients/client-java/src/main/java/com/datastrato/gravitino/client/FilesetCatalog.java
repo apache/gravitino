@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.client;
 
+import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.dto.AuditDTO;
@@ -40,7 +41,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
   FilesetCatalog(
       Namespace namespace,
       String name,
-      Type type,
+      Catalog.Type type,
       String provider,
       String comment,
       Map<String, String> properties,

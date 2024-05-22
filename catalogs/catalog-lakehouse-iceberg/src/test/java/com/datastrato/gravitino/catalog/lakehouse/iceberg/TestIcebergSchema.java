@@ -96,21 +96,15 @@ public class TestIcebergSchema {
     Assertions.assertEquals("val1", properties1.get("key1"));
     Assertions.assertEquals("val2", properties1.get("key2"));
 
-    catalogOperations
-        .alterSchema(
-            ident,
-            SchemaChange.removeProperty("key1"),
-            SchemaChange.setProperty("key2", "val2-alter"));
+    catalogOperations.alterSchema(
+        ident, SchemaChange.removeProperty("key1"), SchemaChange.setProperty("key2", "val2-alter"));
     Schema alteredSchema = catalogOperations.loadSchema(ident);
     Map<String, String> properties2 = alteredSchema.properties();
     Assertions.assertFalse(properties2.containsKey("key1"));
     Assertions.assertEquals("val2-alter", properties2.get("key2"));
 
-    catalogOperations
-        .alterSchema(
-            ident,
-            SchemaChange.setProperty("key3", "val3"),
-            SchemaChange.setProperty("key4", "val4"));
+    catalogOperations.alterSchema(
+        ident, SchemaChange.setProperty("key3", "val3"), SchemaChange.setProperty("key4", "val4"));
     Schema alteredSchema1 = catalogOperations.loadSchema(ident);
     Map<String, String> properties3 = alteredSchema1.properties();
     Assertions.assertEquals("val3", properties3.get("key3"));

@@ -6,9 +6,6 @@ package com.datastrato.gravitino.catalog.hadoop;
 
 import com.datastrato.gravitino.connector.BaseCatalog;
 import com.datastrato.gravitino.connector.CatalogOperations;
-import com.datastrato.gravitino.connector.capability.Capability;
-import com.datastrato.gravitino.file.FilesetCatalog;
-import com.datastrato.gravitino.schema.SupportsSchemas;
 import java.util.Map;
 
 /**
@@ -27,20 +24,5 @@ public class HadoopCatalog extends BaseCatalog<HadoopCatalog> {
   protected CatalogOperations newOps(Map<String, String> config) {
     HadoopCatalogOperations ops = new HadoopCatalogOperations();
     return ops;
-  }
-
-  @Override
-  protected Capability newCapability() {
-    return new HadoopCatalogCapability();
-  }
-
-  @Override
-  public SupportsSchemas asSchemas() {
-    return (HadoopCatalogOperations) ops();
-  }
-
-  @Override
-  public FilesetCatalog asFilesetCatalog() {
-    return (HadoopCatalogOperations) ops();
   }
 }

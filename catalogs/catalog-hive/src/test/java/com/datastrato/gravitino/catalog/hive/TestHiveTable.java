@@ -308,15 +308,14 @@ public class TestHiveTable extends MiniHiveMetastoreService {
             .build();
     Column[] columns = new Column[] {col1, col2};
 
-    hiveCatalogOperations
-        .createTable(
-            tableIdentifier,
-            columns,
-            HIVE_COMMENT,
-            properties,
-            new Transform[0],
-            Distributions.NONE,
-            new SortOrder[0]);
+    hiveCatalogOperations.createTable(
+        tableIdentifier,
+        columns,
+        HIVE_COMMENT,
+        properties,
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0]);
 
     Assertions.assertTrue(hiveCatalogOperations.tableExists(tableIdentifier));
     hiveCatalogOperations.dropTable(tableIdentifier);
@@ -523,15 +522,14 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     Distribution distribution = createDistribution();
     SortOrder[] sortOrders = createSortOrder();
 
-    hiveCatalogOperations
-        .createTable(
-            tableIdentifier,
-            columns,
-            HIVE_COMMENT,
-            properties,
-            new Transform[0],
-            distribution,
-            sortOrders);
+    hiveCatalogOperations.createTable(
+        tableIdentifier,
+        columns,
+        HIVE_COMMENT,
+        properties,
+        new Transform[0],
+        distribution,
+        sortOrders);
     Assertions.assertTrue(hiveCatalogOperations.tableExists(tableIdentifier));
     hiveCatalogOperations.purgeTable(tableIdentifier);
     Assertions.assertFalse(hiveCatalogOperations.tableExists(tableIdentifier));

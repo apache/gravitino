@@ -6,7 +6,6 @@
 package com.datastrato.gravitino.client;
 
 import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.CatalogBasicInfo;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.SupportsCatalogs;
@@ -76,7 +75,7 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
   @Override
   public Catalog createCatalog(
       String catalogName,
-      CatalogBasicInfo.Type type,
+      Catalog.Type type,
       String provider,
       String comment,
       Map<String, String> properties)

@@ -75,8 +75,8 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
     Transform[] partitioning = new Transform[] {identity(col1.name()), identity(col2.name())};
 
     return (HiveTable)
-            hiveCatalogOperations
-            .createTable(tableIdentifier, columns, HIVE_COMMENT, properties, partitioning);
+        hiveCatalogOperations.createTable(
+            tableIdentifier, columns, HIVE_COMMENT, properties, partitioning);
   }
 
   @Test

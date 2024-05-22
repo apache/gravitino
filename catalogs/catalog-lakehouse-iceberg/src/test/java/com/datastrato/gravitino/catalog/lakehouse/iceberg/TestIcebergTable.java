@@ -241,8 +241,8 @@ public class TestIcebergTable {
         };
 
     Table table =
-            icebergCatalogOperations
-            .createTable(tableIdentifier, columns, ICEBERG_COMMENT, properties, partitions);
+        icebergCatalogOperations.createTable(
+            tableIdentifier, columns, ICEBERG_COMMENT, properties, partitions);
     Assertions.assertEquals(tableIdentifier.name(), table.name());
     Assertions.assertEquals(ICEBERG_COMMENT, table.comment());
     Assertions.assertEquals("val1", table.properties().get("key1"));
@@ -365,15 +365,14 @@ public class TestIcebergTable {
     SortOrder[] sortOrders = createSortOrder();
 
     Table createdTable =
-            icebergCatalogOperations
-            .createTable(
-                tableIdentifier,
-                columns,
-                ICEBERG_COMMENT,
-                properties,
-                new Transform[0],
-                distribution,
-                sortOrders);
+        icebergCatalogOperations.createTable(
+            tableIdentifier,
+            columns,
+            ICEBERG_COMMENT,
+            properties,
+            new Transform[0],
+            distribution,
+            sortOrders);
     Assertions.assertTrue(icebergCatalogOperations.tableExists(tableIdentifier));
 
     TableChange update = TableChange.updateComment(ICEBERG_COMMENT + "_new");

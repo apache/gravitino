@@ -12,8 +12,6 @@ import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import com.datastrato.gravitino.connector.BaseCatalog;
 import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.PropertyEntry;
-import com.datastrato.gravitino.rel.TableCatalog;
-import com.datastrato.gravitino.schema.SupportsSchemas;
 import java.util.Collections;
 import java.util.Map;
 
@@ -38,18 +36,6 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
             createJdbcTablePropertiesMetadata(),
             createJdbcColumnDefaultValueConverter());
     return ops;
-  }
-
-  /** @return The Jdbc catalog operations as {@link JdbcCatalogOperations}. */
-  @Override
-  public SupportsSchemas asSchemas() {
-    return (JdbcCatalogOperations) ops();
-  }
-
-  /** @return The Jdbc catalog operations as {@link JdbcCatalogOperations}. */
-  @Override
-  public TableCatalog asTableCatalog() {
-    return (JdbcCatalogOperations) ops();
   }
 
   /** @return The {@link JdbcExceptionConverter} to be used by the catalog. */

@@ -7,6 +7,7 @@ package com.datastrato.gravitino.client;
 import static com.datastrato.gravitino.dto.util.DTOConverters.toDTO;
 import static com.datastrato.gravitino.dto.util.DTOConverters.toDTOs;
 
+import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.dto.AuditDTO;
@@ -53,7 +54,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
   RelationalCatalog(
       Namespace namespace,
       String name,
-      Type type,
+      Catalog.Type type,
       String provider,
       String comment,
       Map<String, String> properties,

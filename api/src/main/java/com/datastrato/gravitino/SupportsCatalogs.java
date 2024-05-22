@@ -75,7 +75,7 @@ public interface SupportsCatalogs {
    */
   Catalog createCatalog(
       String catalogName,
-      CatalogBasicInfo.Type type,
+      Catalog.Type type,
       String provider,
       String comment,
       Map<String, String> properties)

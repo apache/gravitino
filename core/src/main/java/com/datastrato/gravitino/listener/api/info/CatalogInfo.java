@@ -5,7 +5,7 @@
 package com.datastrato.gravitino.listener.api.info;
 
 import com.datastrato.gravitino.Audit;
-import com.datastrato.gravitino.CatalogBasicInfo;
+import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.annotation.DeveloperApi;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
@@ -15,7 +15,7 @@ import javax.annotation.Nullable;
 @DeveloperApi
 public final class CatalogInfo {
   private final String name;
-  private final CatalogBasicInfo.Type type;
+  private final Catalog.Type type;
   private final String provider;
   @Nullable private final String comment;
   private final Map<String, String> properties;
@@ -26,7 +26,7 @@ public final class CatalogInfo {
    *
    * @param catalog The source catalog.
    */
-  public CatalogInfo(CatalogBasicInfo catalog) {
+  public CatalogInfo(Catalog catalog) {
     this(
         catalog.name(),
         catalog.type(),
@@ -48,7 +48,7 @@ public final class CatalogInfo {
    */
   public CatalogInfo(
       String name,
-      CatalogBasicInfo.Type type,
+      Catalog.Type type,
       String provider,
       String comment,
       Map<String, String> properties,
@@ -75,7 +75,7 @@ public final class CatalogInfo {
    *
    * @return Catalog type.
    */
-  public CatalogBasicInfo.Type type() {
+  public Catalog.Type type() {
     return type;
   }
 
