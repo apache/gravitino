@@ -70,14 +70,6 @@ public class RoleOperations {
   @ResponseMetered(name = "create-role", absolute = true)
   public Response createRole(@PathParam("metalake") String metalake, RoleCreateRequest request) {
     try {
-      // TODO: Supports multiple securable objects. There will be some limited support for multiple
-      //  securable objects in the future.
-      //  The securable objects in the same role should under the same catalog.
-      //  If a role contains a metalake securable object, the role can't contain any other securable
-      //  object.
-      Preconditions.checkArgument(
-          request.getSecurableObjects() != null && request.getSecurableObjects().length == 1,
-          "The size of securable objects must be 1");
 
       return Utils.doAs(
           httpRequest,
