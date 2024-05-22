@@ -8,10 +8,10 @@ package com.datastrato.gravitino.client;
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.SupportsMetalakes;
 import com.datastrato.gravitino.authorization.Group;
-import com.datastrato.gravitino.authorization.Privilege;
 import com.datastrato.gravitino.authorization.Role;
 import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.User;
+import com.datastrato.gravitino.dto.authorization.SecurableObjectDTO;
 import com.datastrato.gravitino.dto.requests.GroupAddRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeCreateRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeUpdateRequest;
@@ -41,7 +41,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -426,8 +425,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
    * @param metalake The Metalake of the Role.
    * @param role The name of the Role.
    * @param properties The properties of the Role.
-   * @param securableObject The securable object of the Role.
-   * @param privileges The privileges of the Role.
+   * @param securableObjects The securable objects of the Role.
    * @return The created Role instance.
    * @throws RoleAlreadyExistsException If a Role with the same name already exists.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
@@ -437,18 +435,15 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
       String metalake,
       String role,
       Map<String, String> properties,
-      SecurableObject securableObject,
-      List<Privilege> privileges)
+      List<SecurableObject> securableObjects)
       throws RoleAlreadyExistsException, NoSuchMetalakeException {
     RoleCreateRequest req =
         new RoleCreateRequest(
             role,
             properties,
-            privileges.stream()
-                .map(Privilege::name)
-                .map(Objects::toString)
-                .collect(Collectors.toList()),
-            DTOConverters.toSecurableObject(securableObject));
+            securableObjects.stream()
+                .map(DTOConverters::toSecurableObject)
+                .toArray(SecurableObjectDTO[]::new));
     req.validate();
 
     RoleResponse resp =

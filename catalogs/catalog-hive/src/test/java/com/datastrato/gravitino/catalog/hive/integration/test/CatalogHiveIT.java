@@ -1024,7 +1024,7 @@ public class CatalogHiveIT extends AbstractIT {
 
     for (int i = 0; i < sortOrders.length; i++) {
       Assertions.assertEquals(
-          sortOrders[i].direction() == SortDirection.ASCENDING ? 0 : 1,
+          sortOrders[i].direction() == SortDirection.ASCENDING ? 1 : 0,
           hiveTab.getSd().getSortCols().get(i).getOrder());
       Assertions.assertEquals(
           ((NamedReference.FieldReference) sortOrders[i].expression()).fieldName()[0],

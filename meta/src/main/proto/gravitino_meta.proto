@@ -122,8 +122,9 @@ message Role {
   uint64 id = 1;
   string name = 2;
   repeated string privileges = 3;
-  string securable_object_full_name = 4;
-  string securable_object_type = 5;
-  map<string, string> properties = 6;
-  AuditInfo audit_info = 7;
+  repeated string privilege_conditions = 4;
+  string securable_object_full_name = 5;
+  string securable_object_type = 6;
+  map<string, string> properties = 7;
+  AuditInfo audit_info = 8;
 }

@@ -11,6 +11,7 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Metalake;
 import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.authorization.Group;
+import com.datastrato.gravitino.authorization.Privilege;
 import com.datastrato.gravitino.authorization.Role;
 import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.User;
@@ -19,6 +20,7 @@ import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
 import com.datastrato.gravitino.dto.SchemaDTO;
 import com.datastrato.gravitino.dto.authorization.GroupDTO;
+import com.datastrato.gravitino.dto.authorization.PrivilegeDTO;
 import com.datastrato.gravitino.dto.authorization.RoleDTO;
 import com.datastrato.gravitino.dto.authorization.SecurableObjectDTO;
 import com.datastrato.gravitino.dto.authorization.UserDTO;
@@ -396,8 +398,10 @@ public class DTOConverters {
 
     return RoleDTO.builder()
         .withName(role.name())
-        .withSecurableObject(toDTO(role.securableObject()))
-        .withPrivileges(role.privileges())
+        .withSecurableObjects(
+            role.securableObjects().stream()
+                .map(DTOConverters::toDTO)
+                .toArray(SecurableObjectDTO[]::new))
         .withProperties(role.properties())
         .withAudit(toDTO(role.auditInfo()))
         .build();
@@ -417,6 +421,27 @@ public class DTOConverters {
     return SecurableObjectDTO.builder()
         .withFullName(securableObject.fullName())
         .withType(securableObject.type())
+        .withPrivileges(
+            securableObject.privileges().stream()
+                .map(DTOConverters::toDTO)
+                .toArray(PrivilegeDTO[]::new))
+        .build();
+  }
+
+  /**
+   * Converts a privilege implementation to a PrivilegeDTO.
+   *
+   * @param privilege The privilege implementation.
+   * @return The privilege DTO.
+   */
+  public static PrivilegeDTO toDTO(Privilege privilege) {
+    if (privilege instanceof PrivilegeDTO) {
+      return (PrivilegeDTO) privilege;
+    }
+
+    return PrivilegeDTO.builder()
+        .withName(privilege.name())
+        .withCondition(privilege.condition())
         .build();
   }
 

@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.authorization.Privileges;
+import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
@@ -19,6 +20,7 @@ import com.datastrato.gravitino.dto.MetalakeDTO;
 import com.datastrato.gravitino.dto.SchemaDTO;
 import com.datastrato.gravitino.dto.authorization.GroupDTO;
 import com.datastrato.gravitino.dto.authorization.RoleDTO;
+import com.datastrato.gravitino.dto.authorization.SecurableObjectDTO;
 import com.datastrato.gravitino.dto.authorization.UserDTO;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.TableDTO;
@@ -265,11 +267,12 @@ public class TestResponses {
   void testRoleResponse() throws IllegalArgumentException {
     AuditDTO audit =
         AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    SecurableObject securableObject =
+        SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
     RoleDTO role =
         RoleDTO.builder()
             .withName("role1")
-            .withPrivileges(Lists.newArrayList(Privileges.UseCatalog.get()))
-            .withSecurableObject(DTOConverters.toDTO(SecurableObjects.ofCatalog("catalog")))
+            .withSecurableObjects(new SecurableObjectDTO[] {DTOConverters.toDTO(securableObject)})
             .withAudit(audit)
             .build();
     RoleResponse response = new RoleResponse(role);

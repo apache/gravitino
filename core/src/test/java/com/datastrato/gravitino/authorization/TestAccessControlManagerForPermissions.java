@@ -85,8 +85,9 @@ public class TestAccessControlManagerForPermissions {
           .withId(1L)
           .withName("role")
           .withProperties(Maps.newHashMap())
-          .withPrivileges(Lists.newArrayList(Privileges.UseCatalog.get()))
-          .withSecurableObject(SecurableObjects.ofCatalog(CATALOG))
+          .withSecurableObject(
+              SecurableObjects.ofCatalog(
+                  CATALOG, Lists.newArrayList(Privileges.UseCatalog.allow())))
           .withAuditInfo(auditInfo)
           .build();
 
@@ -270,8 +271,9 @@ public class TestAccessControlManagerForPermissions {
             .withId(1L)
             .withName(anotherRole)
             .withProperties(Maps.newHashMap())
-            .withPrivileges(Lists.newArrayList(Privileges.UseCatalog.get()))
-            .withSecurableObject(SecurableObjects.ofCatalog(CATALOG))
+            .withSecurableObject(
+                SecurableObjects.ofCatalog(
+                    CATALOG, Lists.newArrayList(Privileges.UseCatalog.allow())))
             .withAuditInfo(auditInfo)
             .build();
 
