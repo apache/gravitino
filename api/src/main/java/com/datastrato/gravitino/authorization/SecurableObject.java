@@ -50,7 +50,7 @@ public interface SecurableObject {
    * @return The parent full name of securable object.
    */
   @Nullable
-  String parentFullName();
+  String parent();
 
   /**
    * The name of th securable object.

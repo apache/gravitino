@@ -57,7 +57,7 @@ public class SecurableObjectDTO implements SecurableObject {
 
   @Nullable
   @Override
-  public String parentFullName() {
+  public String parent() {
     return parent;
   }
 

@@ -128,7 +128,7 @@ public class SecurableObjects {
     }
 
     @Override
-    public String parentFullName() {
+    public String parent() {
       return parentFullName;
     }
 
@@ -173,7 +173,7 @@ public class SecurableObjects {
       }
 
       SecurableObject otherSecurableObject = (SecurableObject) other;
-      return Objects.equals(parentFullName, otherSecurableObject.parentFullName())
+      return Objects.equals(parentFullName, otherSecurableObject.parent())
           && Objects.equals(name, otherSecurableObject.name())
           && Objects.equals(type, otherSecurableObject.type())
           && Objects.equals(privileges, otherSecurableObject.privileges());

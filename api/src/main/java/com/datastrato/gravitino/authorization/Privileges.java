@@ -148,7 +148,7 @@ public class Privileges {
         return GetRole.allow();
 
       default:
-        throw new IllegalArgumentException("Don't support the privilege: " + name);
+        throw new IllegalArgumentException("Doesn't support the privilege: " + name);
     }
   }
 
@@ -258,7 +258,7 @@ public class Privileges {
         return GetRole.deny();
 
       default:
-        throw new IllegalArgumentException("Don't support the privilege: " + name);
+        throw new IllegalArgumentException("Doesn't support the privilege: " + name);
     }
   }
 

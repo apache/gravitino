@@ -164,8 +164,8 @@ public class TestRole extends TestBase {
     Assertions.assertEquals("schema", testParentRole.securableObjects().get(0).name());
     Assertions.assertEquals(
         SecurableObject.Type.SCHEMA, testParentRole.securableObjects().get(0).type());
-    Assertions.assertEquals("catalog", testParentRole.securableObjects().get(0).parentFullName());
-    Assertions.assertEquals("catalog", testParentRole.securableObjects().get(0).parentFullName());
+    Assertions.assertEquals("catalog", testParentRole.securableObjects().get(0).parent());
+    Assertions.assertEquals("catalog", testParentRole.securableObjects().get(0).parent());
   }
 
   @Test
