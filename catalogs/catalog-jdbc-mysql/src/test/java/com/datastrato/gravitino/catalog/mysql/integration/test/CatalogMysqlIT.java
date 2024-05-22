@@ -589,6 +589,87 @@ public class CatalogMysqlIT extends AbstractIT {
   }
 
   @Test
+  void testColumnTypeConverter() {
+    // test convert from MySQL to Gravitino
+    String tableName = GravitinoITUtils.genRandomName("test_type_converter");
+    String fullTableName = schemaName + "." + tableName;
+    String sql =
+        "CREATE TABLE "
+            + fullTableName
+            + " (\n"
+            + "  tinyint_col tinyint,\n"
+            + "  smallint_col smallint,\n"
+            + "  int_col int,\n"
+            + "  bigint_col bigint,\n"
+            + "  float_col float,\n"
+            + "  double_col double,\n"
+            + "  date_col date,\n"
+            + "  time_col time,\n"
+            + "  timestamp_col timestamp,\n"
+            + "  datetime_col datetime,\n"
+            + "  decimal_6_2_col decimal(6, 2),\n"
+            + "  varchar20_col varchar(20),\n"
+            + "  text_col text,\n"
+            + "  binary_col binary\n"
+            + ");\n";
+
+    mysqlService.executeQuery(sql);
+    Table loadedTable =
+        catalog
+            .asTableCatalog()
+            .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+
+    for (Column column : loadedTable.columns()) {
+      switch (column.name()) {
+        case "tinyint_col":
+          Assertions.assertEquals(Types.ByteType.get(), column.dataType());
+          break;
+        case "smallint_col":
+          Assertions.assertEquals(Types.ShortType.get(), column.dataType());
+          break;
+        case "int_col":
+          Assertions.assertEquals(Types.IntegerType.get(), column.dataType());
+          break;
+        case "bigint_col":
+          Assertions.assertEquals(Types.LongType.get(), column.dataType());
+          break;
+        case "float_col":
+          Assertions.assertEquals(Types.FloatType.get(), column.dataType());
+          break;
+        case "double_col":
+          Assertions.assertEquals(Types.DoubleType.get(), column.dataType());
+          break;
+        case "date_col":
+          Assertions.assertEquals(Types.DateType.get(), column.dataType());
+          break;
+        case "time_col":
+          Assertions.assertEquals(Types.TimeType.get(), column.dataType());
+          break;
+        case "timestamp_col":
+          Assertions.assertEquals(Types.TimestampType.withTimeZone(), column.dataType());
+          break;
+        case "datetime_col":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(), column.dataType());
+          break;
+        case "decimal_6_2_col":
+          Assertions.assertEquals(Types.DecimalType.of(6, 2), column.dataType());
+          break;
+        case "varchar20_col":
+          Assertions.assertEquals(Types.VarCharType.of(20), column.dataType());
+          break;
+        case "text_col":
+          Assertions.assertEquals(Types.StringType.get(), column.dataType());
+          break;
+        case "binary_col":
+          Assertions.assertEquals(Types.BinaryType.get(), column.dataType());
+          break;
+        default:
+          Assertions.fail("Unexpected column name: " + column.name());
+      }
+    }
+  }
+
+  @Test
   void testAlterAndDropMysqlTable() {
     Column[] columns = createColumns();
     catalog
