@@ -30,7 +30,6 @@ public class MySQLContainer extends BaseContainer {
   public static final String DEFAULT_IMAGE = "mysql:8.0";
   public static final String HOST_NAME = "gravitino-ci-mysql";
   public static final int MYSQL_PORT = 3306;
-
   public static final String USER_NAME = "root";
   public static final String PASSWORD = "root";
 
