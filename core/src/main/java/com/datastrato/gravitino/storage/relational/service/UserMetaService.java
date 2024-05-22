@@ -7,6 +7,7 @@ package com.datastrato.gravitino.storage.relational.service;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.authorization.AuthorizationUtils;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.UserEntity;
@@ -37,11 +38,11 @@ public class UserMetaService {
 
   private UserMetaService() {}
 
-  private UserPO getUserPOByMetalakeIdAndName(Long metalakeId, String userName) {
+  private UserPO getUserPOBySchemaIdAndName(Long schemaId, String userName) {
     UserPO userPO =
         SessionUtils.getWithoutCommit(
             UserMetaMapper.class,
-            mapper -> mapper.selectUserMetaByMetalakeIdAndName(metalakeId, userName));
+            mapper -> mapper.selectUserMetaBySchemaIdAndName(schemaId, userName));
 
     if (userPO == null) {
       throw new NoSuchEntityException(
@@ -52,11 +53,11 @@ public class UserMetaService {
     return userPO;
   }
 
-  private Long getUserIdByMetalakeIdAndName(Long metalakeId, String userName) {
+  private Long getUserIdBySchemaIdAndName(Long schemeId, String userName) {
     Long userId =
         SessionUtils.getWithoutCommit(
             UserMetaMapper.class,
-            mapper -> mapper.selectUserIdByMetalakeIdAndName(metalakeId, userName));
+            mapper -> mapper.selectUserIdBySchemaIdAndName(schemeId, userName));
 
     if (userId == null) {
       throw new NoSuchEntityException(
@@ -70,9 +71,9 @@ public class UserMetaService {
   public UserEntity getUserByIdentifier(NameIdentifier identifier) {
     AuthorizationUtils.checkUser(identifier);
 
-    Long metalakeId =
-        MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
-    UserPO userPO = getUserPOByMetalakeIdAndName(metalakeId, identifier.name());
+    Long schemaId =
+        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
+    UserPO userPO = getUserPOBySchemaIdAndName(schemaId, identifier.name());
     List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(userPO.getUserId());
 
     return POConverters.fromUserPO(userPO, rolePOs, identifier.namespace());
@@ -82,9 +83,8 @@ public class UserMetaService {
     try {
       AuthorizationUtils.checkUser(userEntity.nameIdentifier());
 
-      Long metalakeId =
-          MetalakeMetaService.getInstance().getMetalakeIdByName(userEntity.namespace().level(0));
-      UserPO.Builder builder = UserPO.builder().withMetalakeId(metalakeId);
+      UserPO.Builder builder = UserPO.builder();
+      fillUserPOBuilderParentEntityId(builder, userEntity.namespace());
       UserPO userPO = POConverters.initializeUserPOWithVersion(userEntity, builder);
 
       List<Long> roleIds = Optional.ofNullable(userEntity.roleIds()).orElse(Lists.newArrayList());
@@ -126,9 +126,9 @@ public class UserMetaService {
   public boolean deleteUser(NameIdentifier identifier) {
     AuthorizationUtils.checkUser(identifier);
 
-    Long metalakeId =
-        MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
-    Long userId = getUserIdByMetalakeIdAndName(metalakeId, identifier.name());
+    Long schemaId =
+        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
+    Long userId = getUserIdBySchemaIdAndName(schemaId, identifier.name());
 
     SessionUtils.doMultipleWithCommit(
         () ->
@@ -144,9 +144,9 @@ public class UserMetaService {
       NameIdentifier identifier, Function<E, E> updater) {
     AuthorizationUtils.checkUser(identifier);
 
-    Long metalakeId =
-        MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
-    UserPO oldUserPO = getUserPOByMetalakeIdAndName(metalakeId, identifier.name());
+    Long schemaId =
+        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
+    UserPO oldUserPO = getUserPOBySchemaIdAndName(schemaId, identifier.name());
     List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(oldUserPO.getUserId());
     UserEntity oldUserEntity = POConverters.fromUserPO(oldUserPO, rolePOs, identifier.namespace());
 
@@ -206,5 +206,30 @@ public class UserMetaService {
       throw re;
     }
     return newEntity;
+  }
+
+  private void fillUserPOBuilderParentEntityId(UserPO.Builder builder, Namespace namespace) {
+    AuthorizationUtils.checkUserNamespace(namespace);
+    Long parentEntityId = null;
+    for (int level = 0; level < namespace.levels().length; level++) {
+      String name = namespace.level(level);
+      switch (level) {
+        case 0:
+          parentEntityId = MetalakeMetaService.getInstance().getMetalakeIdByName(name);
+          builder.withMetalakeId(parentEntityId);
+          continue;
+        case 1:
+          parentEntityId =
+              CatalogMetaService.getInstance()
+                  .getCatalogIdByMetalakeIdAndName(parentEntityId, name);
+          builder.withCatalogId(parentEntityId);
+          continue;
+        case 2:
+          parentEntityId =
+              SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(parentEntityId, name);
+          builder.withSchemaId(parentEntityId);
+          break;
+      }
+    }
   }
 }

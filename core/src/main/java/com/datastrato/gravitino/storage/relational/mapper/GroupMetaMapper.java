@@ -27,34 +27,39 @@ public interface GroupMetaMapper {
   @Select(
       "SELECT group_id as groupId FROM "
           + GROUP_TABLE_NAME
-          + " WHERE metalake_id = #{metalakeId} AND group_name = #{groupName}"
+          + " WHERE schema_id = #{schemaId} AND group_name = #{groupName}"
           + " AND deleted_at = 0")
   Long selectGroupIdBySchemaIdAndName(
-      @Param("metalakeId") Long metalakeId, @Param("groupName") String name);
+      @Param("schemaId") Long schemaId, @Param("groupName") String name);
 
   @Select(
       "SELECT group_id as groupId, group_name as groupName,"
           + " metalake_id as metalakeId,"
+          + " catalog_id as catalogId,"
+          + " schema_id as schemaId,"
           + " audit_info as auditInfo,"
           + " current_version as currentVersion, last_version as lastVersion,"
           + " deleted_at as deletedAt"
           + " FROM "
           + GROUP_TABLE_NAME
-          + " WHERE metalake_id = #{metalakeId} AND group_name = #{groupName}"
+          + " WHERE schema_id = #{schemaId} AND group_name = #{groupName}"
           + " AND deleted_at = 0")
-  GroupPO selectGroupMetaByMetalakeIdAndName(
-      @Param("metalakeId") Long metalakeId, @Param("groupName") String name);
+  GroupPO selectGroupMetaBySchemaIdAndName(
+      @Param("schemaId") Long schemaId, @Param("groupName") String name);
 
   @Insert(
       "INSERT INTO "
           + GROUP_TABLE_NAME
           + "(group_id, group_name,"
-          + " metalake_id, audit_info,"
+          + " metalake_id, catalog_id, schema_id,"
+          + " audit_info,"
           + " current_version, last_version, deleted_at)"
           + " VALUES("
           + " #{groupMeta.groupId},"
           + " #{groupMeta.groupName},"
           + " #{groupMeta.metalakeId},"
+          + " #{groupMeta.catalogId},"
+          + " #{groupMeta.schemaId},"
           + " #{groupMeta.auditInfo},"
           + " #{groupMeta.currentVersion},"
           + " #{groupMeta.lastVersion},"
@@ -66,12 +71,15 @@ public interface GroupMetaMapper {
       "INSERT INTO "
           + GROUP_TABLE_NAME
           + "(group_id, group_name,"
-          + "metalake_id, audit_info,"
+          + "metalake_id, catalog_id, schema_id, "
+          + "audit_info,"
           + " current_version, last_version, deleted_at)"
           + " VALUES("
           + " #{groupMeta.groupId},"
           + " #{groupMeta.groupName},"
           + " #{groupMeta.metalakeId},"
+          + " #{groupMeta.catalogId},"
+          + " #{groupMeta.schemaId},"
           + " #{groupMeta.auditInfo},"
           + " #{groupMeta.currentVersion},"
           + " #{groupMeta.lastVersion},"
@@ -80,6 +88,8 @@ public interface GroupMetaMapper {
           + " ON DUPLICATE KEY UPDATE"
           + " group_name = #{groupMeta.groupName},"
           + " metalake_id = #{groupMeta.metalakeId},"
+          + " catalog_id = #{groupMeta.catalogId},"
+          + " schema_id = #{groupMeta.schemaId},"
           + " audit_info = #{groupMeta.auditInfo},"
           + " current_version = #{groupMeta.currentVersion},"
           + " last_version = #{groupMeta.lastVersion},"
@@ -105,6 +115,8 @@ public interface GroupMetaMapper {
           + GROUP_TABLE_NAME
           + " SET group_name = #{newGroupMeta.groupName},"
           + " metalake_id = #{newGroupMeta.metalakeId},"
+          + " catalog_id = #{newGroupMeta.catalogId},"
+          + " schema_id = #{newGroupMeta.schemaId},"
           + " audit_info = #{newGroupMeta.auditInfo},"
           + " current_version = #{newGroupMeta.currentVersion},"
           + " last_version = #{newGroupMeta.lastVersion},"
@@ -112,6 +124,8 @@ public interface GroupMetaMapper {
           + " WHERE group_id = #{oldGroupMeta.groupId}"
           + " AND group_name = #{oldGroupMeta.groupName}"
           + " AND metalake_id = #{oldGroupMeta.metalakeId}"
+          + " AND catalog_id = #{oldGroupMeta.catalogId}"
+          + " AND schema_id = #{oldGroupMeta.schemaId}"
           + " AND audit_info = #{oldGroupMeta.auditInfo}"
           + " AND current_version = #{oldGroupMeta.currentVersion}"
           + " AND last_version = #{oldGroupMeta.lastVersion}"
@@ -120,8 +134,11 @@ public interface GroupMetaMapper {
       @Param("newGroupMeta") GroupPO newGroupPO, @Param("oldGroupMeta") GroupPO oldGroupPO);
 
   @Select(
-      "SELECT gr.group_id as groupId, gr.group_name as groupName,"
+      "SELECT gr.group_id as groupId, "
+          + " gr.group_name as groupName,"
           + " gr.metalake_id as metalakeId,"
+          + " gr.catalog_id as catalogId,"
+          + " gr.schema_id as schemaId,"
           + " gr.audit_info as auditInfo, gr.current_version as currentVersion,"
           + " gr.last_version as lastVersion, gr.deleted_at as deletedAt"
           + " FROM "

@@ -11,6 +11,8 @@ public class RolePO {
   private Long roleId;
   private String roleName;
   private Long metalakeId;
+  private Long catalogId;
+  private Long schemaId;
   private String properties;
   private String securableObjectFullName;
   private String securableObjectType;
@@ -30,6 +32,14 @@ public class RolePO {
 
   public Long getMetalakeId() {
     return metalakeId;
+  }
+
+  public Long getCatalogId() {
+    return catalogId;
+  }
+
+  public Long getSchemaId() {
+    return schemaId;
   }
 
   public String getProperties() {
@@ -76,6 +86,8 @@ public class RolePO {
     return Objects.equal(getRoleId(), tablePO.getRoleId())
         && Objects.equal(getRoleName(), tablePO.getRoleName())
         && Objects.equal(getMetalakeId(), tablePO.getMetalakeId())
+        && Objects.equal(getCatalogId(), tablePO.getCatalogId())
+        && Objects.equal(getSchemaId(), tablePO.getSchemaId())
         && Objects.equal(getProperties(), tablePO.getProperties())
         && Objects.equal(getSecurableObjectFullName(), tablePO.getSecurableObjectFullName())
         && Objects.equal(getSecurableObjectType(), tablePO.getSecurableObjectType())
@@ -92,6 +104,8 @@ public class RolePO {
         getRoleId(),
         getRoleName(),
         getMetalakeId(),
+        getCatalogId(),
+        getSchemaId(),
         getProperties(),
         getSecurableObjectFullName(),
         getSecurableObjectType(),
@@ -121,6 +135,16 @@ public class RolePO {
 
     public Builder withMetalakeId(Long metalakeId) {
       rolePO.metalakeId = metalakeId;
+      return this;
+    }
+
+    public Builder withCatalogId(Long catalogId) {
+      rolePO.catalogId = catalogId;
+      return this;
+    }
+
+    public Builder withSchemaId(Long schemaId) {
+      rolePO.schemaId = schemaId;
       return this;
     }
 
@@ -168,6 +192,8 @@ public class RolePO {
       Preconditions.checkArgument(rolePO.roleId != null, "Role id is required");
       Preconditions.checkArgument(rolePO.roleName != null, "Role name is required");
       Preconditions.checkArgument(rolePO.metalakeId != null, "Metalake id is required");
+      Preconditions.checkArgument(rolePO.catalogId != null, "Catalog id is required");
+      Preconditions.checkArgument(rolePO.schemaId != null, "Schema id is required");
       Preconditions.checkArgument(
           rolePO.securableObjectFullName != null, "Securable object full name is required");
       Preconditions.checkArgument(

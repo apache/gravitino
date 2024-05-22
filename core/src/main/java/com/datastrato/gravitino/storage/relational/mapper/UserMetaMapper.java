@@ -27,34 +27,39 @@ public interface UserMetaMapper {
   @Select(
       "SELECT user_id as userId FROM "
           + USER_TABLE_NAME
-          + " WHERE metalake_id = #{metalakeId} AND user_name = #{userName}"
+          + " WHERE schema_id = #{schemaId} AND user_name = #{userName}"
           + " AND deleted_at = 0")
-  Long selectUserIdByMetalakeIdAndName(
-      @Param("metalakeId") Long metalakeId, @Param("userName") String name);
+  Long selectUserIdBySchemaIdAndName(
+      @Param("schemaId") Long schemaId, @Param("userName") String name);
 
   @Select(
       "SELECT user_id as userId, user_name as userName,"
           + " metalake_id as metalakeId,"
+          + " catalog_id as catalogId,"
+          + " schema_id as schemaId,"
           + " audit_info as auditInfo,"
           + " current_version as currentVersion, last_version as lastVersion,"
           + " deleted_at as deletedAt"
           + " FROM "
           + USER_TABLE_NAME
-          + " WHERE metalake_id = #{metalakeId} AND user_name = #{userName}"
+          + " WHERE schema_id = #{schemaId} AND user_name = #{userName}"
           + " AND deleted_at = 0")
-  UserPO selectUserMetaByMetalakeIdAndName(
-      @Param("metalakeId") Long metalakeId, @Param("userName") String name);
+  UserPO selectUserMetaBySchemaIdAndName(
+      @Param("schemaId") Long schemaId, @Param("userName") String name);
 
   @Insert(
       "INSERT INTO "
           + USER_TABLE_NAME
           + "(user_id, user_name,"
-          + " metalake_id, audit_info,"
+          + " metalake_id, catalog_id, schema_id,"
+          + " audit_info,"
           + " current_version, last_version, deleted_at)"
           + " VALUES("
           + " #{userMeta.userId},"
           + " #{userMeta.userName},"
           + " #{userMeta.metalakeId},"
+          + " #{userMeta.catalogId},"
+          + " #{userMeta.schemaId},"
           + " #{userMeta.auditInfo},"
           + " #{userMeta.currentVersion},"
           + " #{userMeta.lastVersion},"
@@ -66,12 +71,15 @@ public interface UserMetaMapper {
       "INSERT INTO "
           + USER_TABLE_NAME
           + "(user_id, user_name,"
-          + "metalake_id, audit_info,"
+          + " metalake_id, catalog_id, schema_id,"
+          + " audit_info,"
           + " current_version, last_version, deleted_at)"
           + " VALUES("
           + " #{userMeta.userId},"
           + " #{userMeta.userName},"
           + " #{userMeta.metalakeId},"
+          + " #{userMeta.catalogId},"
+          + " #{userMeta.schemaId},"
           + " #{userMeta.auditInfo},"
           + " #{userMeta.currentVersion},"
           + " #{userMeta.lastVersion},"
@@ -80,6 +88,8 @@ public interface UserMetaMapper {
           + " ON DUPLICATE KEY UPDATE"
           + " user_name = #{userMeta.userName},"
           + " metalake_id = #{userMeta.metalakeId},"
+          + " catalog_id = #{userMeta.catalogId},"
+          + " schema_id = #{userMeta.schemaId},"
           + " audit_info = #{userMeta.auditInfo},"
           + " current_version = #{userMeta.currentVersion},"
           + " last_version = #{userMeta.lastVersion},"
@@ -105,6 +115,8 @@ public interface UserMetaMapper {
           + USER_TABLE_NAME
           + " SET user_name = #{newUserMeta.userName},"
           + " metalake_id = #{newUserMeta.metalakeId},"
+          + " catalog_id = #{newUserMeta.catalogId},"
+          + " schema_id = #{newUserMeta.schemaId},"
           + " audit_info = #{newUserMeta.auditInfo},"
           + " current_version = #{newUserMeta.currentVersion},"
           + " last_version = #{newUserMeta.lastVersion},"
@@ -112,6 +124,8 @@ public interface UserMetaMapper {
           + " WHERE user_id = #{oldUserMeta.userId}"
           + " AND user_name = #{oldUserMeta.userName}"
           + " AND metalake_id = #{oldUserMeta.metalakeId}"
+          + " AND catalog_id = #{oldUserMeta.catalogId}"
+          + " AND schema_id = #{oldUserMeta.schemaId}"
           + " AND audit_info = #{oldUserMeta.auditInfo}"
           + " AND current_version = #{oldUserMeta.currentVersion}"
           + " AND last_version = #{oldUserMeta.lastVersion}"
@@ -120,8 +134,11 @@ public interface UserMetaMapper {
       @Param("newUserMeta") UserPO newUserPO, @Param("oldUserMeta") UserPO oldUserPO);
 
   @Select(
-      "SELECT us.user_id as userId, us.user_name as userName,"
+      "SELECT us.user_id as userId, "
+          + " us.user_name as userName,"
           + " us.metalake_id as metalakeId,"
+          + " us.catalog_id as catalogId,"
+          + " us.schema_id as schemaId,"
           + " us.audit_info as auditInfo, us.current_version as currentVersion,"
           + " us.last_version as lastVersion, us.deleted_at as deletedAt"
           + " FROM "

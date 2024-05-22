@@ -11,6 +11,8 @@ public class GroupPO {
   private Long groupId;
   private String groupName;
   private Long metalakeId;
+  private Long catalogId;
+  private Long schemaId;
   private String auditInfo;
   private Long currentVersion;
   private Long lastVersion;
@@ -26,6 +28,14 @@ public class GroupPO {
 
   public Long getMetalakeId() {
     return metalakeId;
+  }
+
+  public Long getCatalogId() {
+    return catalogId;
+  }
+
+  public Long getSchemaId() {
+    return schemaId;
   }
 
   public String getAuditInfo() {
@@ -56,6 +66,8 @@ public class GroupPO {
     return Objects.equal(getGroupId(), tablePO.getGroupId())
         && Objects.equal(getGroupName(), tablePO.getGroupName())
         && Objects.equal(getMetalakeId(), tablePO.getMetalakeId())
+        && Objects.equal(getCatalogId(), tablePO.getCatalogId())
+        && Objects.equal(getSchemaId(), tablePO.getSchemaId())
         && Objects.equal(getAuditInfo(), tablePO.getAuditInfo())
         && Objects.equal(getCurrentVersion(), tablePO.getCurrentVersion())
         && Objects.equal(getLastVersion(), tablePO.getLastVersion())
@@ -68,6 +80,8 @@ public class GroupPO {
         getGroupId(),
         getGroupName(),
         getMetalakeId(),
+        getCatalogId(),
+        getSchemaId(),
         getAuditInfo(),
         getCurrentVersion(),
         getLastVersion(),
@@ -96,6 +110,16 @@ public class GroupPO {
       return this;
     }
 
+    public Builder withCatalogId(Long catalogId) {
+      groupPO.catalogId = catalogId;
+      return this;
+    }
+
+    public Builder withSchemaId(Long schemaId) {
+      groupPO.schemaId = schemaId;
+      return this;
+    }
+
     public Builder withAuditInfo(String auditInfo) {
       groupPO.auditInfo = auditInfo;
       return this;
@@ -120,6 +144,8 @@ public class GroupPO {
       Preconditions.checkArgument(groupPO.groupId != null, "Group id is required");
       Preconditions.checkArgument(groupPO.groupName != null, "Group name is required");
       Preconditions.checkArgument(groupPO.metalakeId != null, "Metalake id is required");
+      Preconditions.checkArgument(groupPO.catalogId != null, "Catalog id is required");
+      Preconditions.checkArgument(groupPO.schemaId != null, "Schema id is required");
       Preconditions.checkArgument(groupPO.auditInfo != null, "Audit info is required");
       Preconditions.checkArgument(groupPO.currentVersion != null, "Current version is required");
       Preconditions.checkArgument(groupPO.lastVersion != null, "Last version is required");

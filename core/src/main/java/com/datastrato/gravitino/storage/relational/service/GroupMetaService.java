@@ -7,6 +7,7 @@ package com.datastrato.gravitino.storage.relational.service;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.authorization.AuthorizationUtils;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.GroupEntity;
@@ -37,11 +38,11 @@ public class GroupMetaService {
 
   private GroupMetaService() {}
 
-  private GroupPO getGroupPOByMetalakeIdAndName(Long metalakeId, String groupName) {
+  private GroupPO getGroupPOBySchemaIdAndName(Long schemaId, String groupName) {
     GroupPO GroupPO =
         SessionUtils.getWithoutCommit(
             GroupMetaMapper.class,
-            mapper -> mapper.selectGroupMetaByMetalakeIdAndName(metalakeId, groupName));
+            mapper -> mapper.selectGroupMetaBySchemaIdAndName(schemaId, groupName));
 
     if (GroupPO == null) {
       throw new NoSuchEntityException(
@@ -52,11 +53,11 @@ public class GroupMetaService {
     return GroupPO;
   }
 
-  private Long getGroupIdByMetalakeIdAndName(Long metalakeId, String groupName) {
+  private Long getGroupIdBySchemaIdAndName(Long schemaId, String groupName) {
     Long groupId =
         SessionUtils.getWithoutCommit(
             GroupMetaMapper.class,
-            mapper -> mapper.selectGroupIdBySchemaIdAndName(metalakeId, groupName));
+            mapper -> mapper.selectGroupIdBySchemaIdAndName(schemaId, groupName));
 
     if (groupId == null) {
       throw new NoSuchEntityException(
@@ -70,9 +71,9 @@ public class GroupMetaService {
   public GroupEntity getGroupByIdentifier(NameIdentifier identifier) {
     AuthorizationUtils.checkGroup(identifier);
 
-    Long metalakeId =
-        MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
-    GroupPO groupPO = getGroupPOByMetalakeIdAndName(metalakeId, identifier.name());
+    Long schemaId =
+        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
+    GroupPO groupPO = getGroupPOBySchemaIdAndName(schemaId, identifier.name());
     List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByGroupId(groupPO.getGroupId());
 
     return POConverters.fromGroupPO(groupPO, rolePOs, identifier.namespace());
@@ -82,9 +83,8 @@ public class GroupMetaService {
     try {
       AuthorizationUtils.checkGroup(groupEntity.nameIdentifier());
 
-      Long metalakeId =
-          MetalakeMetaService.getInstance().getMetalakeIdByName(groupEntity.namespace().level(0));
-      GroupPO.Builder builder = GroupPO.builder().withMetalakeId(metalakeId);
+      GroupPO.Builder builder = GroupPO.builder();
+      fillGroupPOBuilderParentEntityId(builder, groupEntity.namespace());
       GroupPO GroupPO = POConverters.initializeGroupPOWithVersion(groupEntity, builder);
 
       List<Long> roleIds = Optional.ofNullable(groupEntity.roleIds()).orElse(Lists.newArrayList());
@@ -126,9 +126,9 @@ public class GroupMetaService {
   public boolean deleteGroup(NameIdentifier identifier) {
     AuthorizationUtils.checkGroup(identifier);
 
-    Long metalakeId =
-        MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
-    Long groupId = getGroupIdByMetalakeIdAndName(metalakeId, identifier.name());
+    Long schemaId =
+        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
+    Long groupId = getGroupIdBySchemaIdAndName(schemaId, identifier.name());
 
     SessionUtils.doMultipleWithCommit(
         () ->
@@ -145,9 +145,9 @@ public class GroupMetaService {
       NameIdentifier identifier, Function<E, E> updater) {
     AuthorizationUtils.checkGroup(identifier);
 
-    Long metalakeId =
-        MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
-    GroupPO oldGroupPO = getGroupPOByMetalakeIdAndName(metalakeId, identifier.name());
+    Long schemaId =
+        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
+    GroupPO oldGroupPO = getGroupPOBySchemaIdAndName(schemaId, identifier.name());
     List<RolePO> rolePOs =
         RoleMetaService.getInstance().listRolesByGroupId(oldGroupPO.getGroupId());
     GroupEntity oldGroupEntity =
@@ -209,5 +209,30 @@ public class GroupMetaService {
       throw re;
     }
     return newEntity;
+  }
+
+  private void fillGroupPOBuilderParentEntityId(GroupPO.Builder builder, Namespace namespace) {
+    AuthorizationUtils.checkGroupNamespace(namespace);
+    Long parentEntityId = null;
+    for (int level = 0; level < namespace.levels().length; level++) {
+      String name = namespace.level(level);
+      switch (level) {
+        case 0:
+          parentEntityId = MetalakeMetaService.getInstance().getMetalakeIdByName(name);
+          builder.withMetalakeId(parentEntityId);
+          continue;
+        case 1:
+          parentEntityId =
+              CatalogMetaService.getInstance()
+                  .getCatalogIdByMetalakeIdAndName(parentEntityId, name);
+          builder.withCatalogId(parentEntityId);
+          continue;
+        case 2:
+          parentEntityId =
+              SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(parentEntityId, name);
+          builder.withSchemaId(parentEntityId);
+          break;
+      }
+    }
   }
 }
