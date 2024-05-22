@@ -16,6 +16,8 @@ import { initialVersion } from '@/lib/store/sys'
 import { to } from '../utils'
 import { getAuthConfigs, setAuthToken } from '../store/auth'
 
+import { useIdle } from 'react-use'
+
 const authProvider = {
   version: '',
   loading: true,
@@ -34,6 +36,14 @@ const AuthProvider = ({ children }) => {
   const version = (typeof window !== 'undefined' && localStorage.getItem('version')) || null
   const searchParams = useSearchParams()
   const paramsSize = [...searchParams.keys()].length
+
+  const isIdle = useIdle(18e5) // 30 minutes
+
+  useEffect(() => {
+    if (isIdle) {
+      localStorage.setItem('isIdle', true)
+    }
+  }, [isIdle])
 
   const goToMetalakeListPage = () => {
     if (paramsSize) {
