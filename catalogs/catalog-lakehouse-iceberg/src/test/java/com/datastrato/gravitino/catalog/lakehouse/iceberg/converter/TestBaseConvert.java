@@ -8,18 +8,25 @@ import static com.datastrato.gravitino.rel.expressions.NamedReference.field;
 
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergColumn;
 import com.datastrato.gravitino.rel.Column;
+import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.FunctionExpression;
+import com.datastrato.gravitino.rel.expressions.NamedReference;
+import com.datastrato.gravitino.rel.expressions.literals.Literal;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.types.Type;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.lang.math.RandomUtils;
+import org.apache.iceberg.Schema;
+import org.apache.iceberg.SortField;
 import org.apache.iceberg.types.Types;
 
 /** Provide some basic usage methods and test classes for basic fields. */
@@ -98,9 +105,16 @@ public class TestBaseConvert {
     return results.toArray(new SortOrder[0]);
   }
 
-  protected static SortOrder createFunctionSortOrder(String name, String colName) {
+  protected static SortOrder createSortOrder(String name, String colName) {
     return SortOrders.of(
         FunctionExpression.of(name, field(colName)),
+        RandomUtils.nextBoolean() ? SortDirection.DESCENDING : SortDirection.ASCENDING,
+        RandomUtils.nextBoolean() ? NullOrdering.NULLS_FIRST : NullOrdering.NULLS_LAST);
+  }
+
+  protected static SortOrder createSortOrder(String name, int width, String colName) {
+    return SortOrders.of(
+        FunctionExpression.of(name, Literals.integerLiteral(width), field(colName)),
         RandomUtils.nextBoolean() ? SortDirection.DESCENDING : SortDirection.ASCENDING,
         RandomUtils.nextBoolean() ? NullOrdering.NULLS_FIRST : NullOrdering.NULLS_LAST);
   }
@@ -118,6 +132,66 @@ public class TestBaseConvert {
               i + 1, RandomUtils.nextBoolean(), colNames[i], getRandomIcebergType(), TEST_COMMENT));
     }
     return results.toArray(new Types.NestedField[0]);
+  }
+
+  // Iceberg supports function expressions as SortOrder expressions, the function expression is used
+  // to evaluate the input value and return a result.
+  // And in Iceberg, these function expressions are represented by
+  // `org.apache.iceberg.transforms.Transform`, such as a Bucket(10, column) Transform.
+  protected static String getIcebergTransfromString(SortField sortField, Schema schema) {
+    String transform = sortField.transform().toString();
+    Map<Integer, String> idToName = schema.idToName();
+    if (transform.startsWith("year")
+        || transform.startsWith("month")
+        || transform.startsWith("day")
+        || transform.startsWith("hour")
+        || transform.startsWith("identity")) {
+      return String.format("%s(%s)", transform, idToName.get(sortField.sourceId()));
+    } else if (transform.startsWith("truncate") || transform.startsWith("bucket")) {
+      return String.format(
+          "%s, %s)",
+          transform.replace("[", "(").replace("]", ""), idToName.get(sortField.sourceId()));
+    } else {
+      throw new RuntimeException("Unsupported Iceberg transform type");
+    }
+  }
+
+  protected static String getGravitinoSortOrderExpressionString(Expression sortOrderExpression) {
+    if (sortOrderExpression instanceof NamedReference.FieldReference) {
+      NamedReference.FieldReference fieldReference =
+          (NamedReference.FieldReference) sortOrderExpression;
+      return String.format("identity(%s)", fieldReference.fieldName()[0]);
+    } else if (sortOrderExpression instanceof FunctionExpression) {
+      FunctionExpression functionExpression = (FunctionExpression) sortOrderExpression;
+      String functionName = functionExpression.functionName();
+      Expression[] arguments = functionExpression.arguments();
+      if (arguments.length == 1) {
+        return String.format(
+            "%s(%s)", functionName, ((NamedReference.FieldReference) arguments[0]).fieldName()[0]);
+      } else if (arguments.length == 2) {
+        Expression firstArg = arguments[0];
+        Preconditions.checkArgument(
+            firstArg instanceof Literal
+                && ((Literal<?>) firstArg).dataType()
+                    instanceof com.datastrato.gravitino.rel.types.Types.IntegerType,
+            "The first argument must be a integer literal");
+        return String.format(
+            "%s(%s, %s)",
+            functionName,
+            Integer.parseInt(String.valueOf(((Literal<?>) firstArg).value())),
+            ((NamedReference.FieldReference) arguments[1]).fieldName()[0]);
+      } else {
+        throw new IllegalArgumentException(
+            String.format(
+                "Iceberg FunctionExpression in Gravitino should have 1 or 2 arguments, but got %d arguments",
+                arguments.length));
+      }
+    } else {
+      throw new UnsupportedOperationException(
+          String.format(
+              "Unsupported Gravitino expression type: %s",
+              sortOrderExpression.getClass().getName()));
+    }
   }
 
   private static Type getRandomGravitinoType() {

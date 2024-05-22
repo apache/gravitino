@@ -21,9 +21,11 @@ import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.FunctionExpression;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
@@ -113,7 +115,17 @@ public class TestIcebergTable {
   private SortOrder[] createSortOrder() {
     return new SortOrder[] {
       SortOrders.of(
-          NamedReference.field("col_2"), SortDirection.DESCENDING, NullOrdering.NULLS_FIRST)
+          NamedReference.field("col_2"), SortDirection.DESCENDING, NullOrdering.NULLS_FIRST),
+      SortOrders.of(
+          FunctionExpression.of(
+              "bucket", Literals.integerLiteral(10), NamedReference.field("col_1")),
+          SortDirection.DESCENDING,
+          NullOrdering.NULLS_FIRST),
+      SortOrders.of(
+          FunctionExpression.of(
+              "truncate", Literals.integerLiteral(1), NamedReference.field("col_1")),
+          SortDirection.DESCENDING,
+          NullOrdering.NULLS_FIRST)
     };
   }
 
@@ -194,6 +206,8 @@ public class TestIcebergTable {
     Assertions.assertEquals(sortOrders.length, loadedTable.sortOrder().length);
     for (int i = 0; i < loadedTable.sortOrder().length; i++) {
       Assertions.assertEquals(sortOrders[i].direction(), loadedTable.sortOrder()[i].direction());
+      Assertions.assertEquals(
+          (sortOrders[i]).nullOrdering(), loadedTable.sortOrder()[i].nullOrdering());
       Assertions.assertEquals(
           (sortOrders[i]).expression(), loadedTable.sortOrder()[i].expression());
     }
@@ -432,7 +446,17 @@ public class TestIcebergTable {
     Assertions.assertFalse(alteredTable.properties().containsKey("key1"));
     Assertions.assertEquals("val2_new", alteredTable.properties().get("key2"));
 
+    sortOrders[0] =
+        SortOrders.of(
+            NamedReference.field("col_2_new"), SortDirection.DESCENDING, NullOrdering.NULLS_FIRST);
     Assertions.assertEquals(sortOrders.length, alteredTable.sortOrder().length);
+    for (int i = 0; i < alteredTable.sortOrder().length; i++) {
+      Assertions.assertEquals(sortOrders[i].direction(), alteredTable.sortOrder()[i].direction());
+      Assertions.assertEquals(
+          (sortOrders[i]).nullOrdering(), alteredTable.sortOrder()[i].nullOrdering());
+      Assertions.assertEquals(
+          (sortOrders[i]).expression(), alteredTable.sortOrder()[i].expression());
+    }
 
     Column[] expected =
         new Column[] {
@@ -455,17 +479,15 @@ public class TestIcebergTable {
     Assertions.assertArrayEquals(expected, alteredTable.columns());
 
     // test delete column change
-    icebergCatalog
-        .asTableCatalog()
-        .alterTable(
-            NameIdentifier.of(tableIdentifier.namespace(), "test_iceberg_table_new"),
-            TableChange.deleteColumn(new String[] {"col_1"}, false));
+    icebergCatalogOperations.alterTable(
+        NameIdentifier.of(tableIdentifier.namespace(), "test_iceberg_table_new"),
+        TableChange.deleteColumn(new String[] {"col_3"}, false));
     Table alteredTable1 =
         icebergCatalog
             .asTableCatalog()
             .loadTable(NameIdentifier.of(tableIdentifier.namespace(), "test_iceberg_table_new"));
     expected =
-        Arrays.stream(expected).filter(c -> !"col_1".equals(c.name())).toArray(Column[]::new);
+        Arrays.stream(expected).filter(c -> !"col_3".equals(c.name())).toArray(Column[]::new);
     Assertions.assertArrayEquals(expected, alteredTable1.columns());
 
     Assertions.assertNotNull(alteredTable.partitioning());

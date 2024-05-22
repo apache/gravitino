@@ -6,6 +6,7 @@ package com.datastrato.gravitino.catalog.lakehouse.iceberg.converter;
 
 import com.datastrato.gravitino.rel.expressions.FunctionExpression;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
@@ -38,13 +39,13 @@ public class FromIcebergSortOrder implements SortOrderVisitor<SortOrder> {
   @Override
   public SortOrder bucket(
       String sourceName, int id, int width, SortDirection direction, NullOrder nullOrder) {
-    return functionSortOrder("bucket", id, direction, nullOrder);
+    return functionSortOrder("bucket", width, id, direction, nullOrder);
   }
 
   @Override
   public SortOrder truncate(
       String sourceName, int id, int width, SortDirection direction, NullOrder nullOrder) {
-    return functionSortOrder("truncate", id, direction, nullOrder);
+    return functionSortOrder("truncate", width, id, direction, nullOrder);
   }
 
   @Override
@@ -76,6 +77,15 @@ public class FromIcebergSortOrder implements SortOrderVisitor<SortOrder> {
       String name, int id, SortDirection direction, NullOrder nullOrder) {
     return SortOrders.of(
         FunctionExpression.of(name, NamedReference.field(idToName.get(id))),
+        toGravitino(direction),
+        toGravitino(nullOrder));
+  }
+
+  private SortOrder functionSortOrder(
+      String name, int width, int id, SortDirection direction, NullOrder nullOrder) {
+    return SortOrders.of(
+        FunctionExpression.of(
+            name, Literals.integerLiteral(width), NamedReference.field(idToName.get(id))),
         toGravitino(direction),
         toGravitino(nullOrder));
   }
