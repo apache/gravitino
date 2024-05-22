@@ -30,13 +30,13 @@ class FilesetCreateRequest(RESTRequest):
         self,
         name: str,
         comment: Optional[str] = None,
-        type: Fileset.Type = None,
+        fileset_type: Fileset.Type = None,
         storage_location: Optional[str] = None,
         properties: Optional[Dict[str, str]] = None,
     ):
         self._name = name
         self._comment = comment
-        self._type = type
+        self._type = fileset_type
         self._storage_location = storage_location
         self._properties = properties
 

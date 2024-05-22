@@ -27,13 +27,13 @@ class CatalogCreateRequest(RESTRequest):
     def __init__(
         self,
         name: str = None,
-        type: Catalog.Type = Catalog.Type.UNSUPPORTED,
+        catalog_type: Catalog.Type = Catalog.Type.UNSUPPORTED,
         provider: str = None,
         comment: str = None,
         properties: Dict[str, str] = None,
     ):
         self._name = name
-        self._type = type
+        self._type = catalog_type
         self._provider = provider
         self._comment = comment
         self._properties = properties
