@@ -41,6 +41,8 @@ import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.connector.SortItem;
 import io.trino.spi.connector.TopNApplicationResult;
 import io.trino.spi.expression.ConnectorExpression;
+import io.trino.spi.predicate.NullableValue;
+import io.trino.spi.predicate.TupleDomain;
 import io.trino.spi.security.TrinoPrincipal;
 import io.trino.spi.statistics.ComputedStatistics;
 import io.trino.spi.statistics.TableStatistics;
@@ -50,6 +52,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 
@@ -416,27 +419,9 @@ public class GravitinoMetadata implements ConnectorMetadata {
   @Override
   public Optional<ConstraintApplicationResult<ConnectorTableHandle>> applyFilter(
       ConnectorSession session, ConnectorTableHandle tableHandle, Constraint constraint) {
-    Constraint constraint1 = null;
-    if (constraint.predicate().isPresent()) {
-      constraint1 =
-          new Constraint(
-              constraint.getSummary().transformKeys((GravitinoHandle::unWrap)),
-              constraint.getExpression(),
-              GravitinoHandle.unWrap(constraint.getAssignments()),
-              constraint.predicate().get(),
-              constraint.getPredicateColumns().get().stream()
-                  .map(GravitinoHandle::unWrap)
-                  .collect(Collectors.toSet()));
-    } else {
-      constraint1 =
-          new Constraint(
-              constraint.getSummary().transformKeys((GravitinoHandle::unWrap)),
-              constraint.getExpression(),
-              GravitinoHandle.unWrap(constraint.getAssignments()));
-    }
-
     return internalMetadata
-        .applyFilter(session, GravitinoHandle.unWrap(tableHandle), constraint1)
+        .applyFilter(
+            session, GravitinoHandle.unWrap(tableHandle), new GravitinoConstraint(constraint))
         .map(
             result ->
                 new ConstraintApplicationResult<ConnectorTableHandle>(
@@ -588,5 +573,77 @@ public class GravitinoMetadata implements ConnectorMetadata {
           String.format("Column %s does not exist in the internal connector", columnHandle));
     }
     return internalMetadataColumnMetadata.getName();
+  }
+
+  class GravitinoConstraint extends Constraint {
+    private final Constraint delegate;
+
+    GravitinoConstraint(Constraint constraint) {
+      super(constraint.getSummary());
+      this.delegate = constraint;
+    }
+
+    @Override
+    public TupleDomain<ColumnHandle> getSummary() {
+      return delegate.getSummary().transformKeys(GravitinoHandle::unWrap);
+    }
+
+    @Override
+    public ConnectorExpression getExpression() {
+      return delegate.getExpression();
+    }
+
+    @Override
+    public Map<String, ColumnHandle> getAssignments() {
+      return GravitinoHandle.unWrap(delegate.getAssignments());
+    }
+
+    @Override
+    public Optional<Predicate<Map<ColumnHandle, NullableValue>>> predicate() {
+      return delegate.predicate().map(GravitinoPredicate::new);
+    }
+
+    @Override
+    public Optional<Set<ColumnHandle>> getPredicateColumns() {
+      return delegate
+          .getPredicateColumns()
+          .map(result -> result.stream().map(GravitinoHandle::unWrap).collect(Collectors.toSet()));
+    }
+
+    @Override
+    public String toString() {
+      return delegate.toString();
+    }
+
+    class GravitinoPredicate implements Predicate<Map<ColumnHandle, NullableValue>> {
+
+      private final Predicate delegate;
+
+      GravitinoPredicate(Predicate<Map<ColumnHandle, NullableValue>> predicate) {
+        this.delegate = predicate;
+      }
+
+      @Override
+      public boolean test(Map<ColumnHandle, NullableValue> columnHandleNullableValueMap) {
+        return delegate.test(columnHandleNullableValueMap);
+      }
+
+      @Override
+      public Predicate<Map<ColumnHandle, NullableValue>> and(
+          Predicate<? super Map<ColumnHandle, NullableValue>> other) {
+        return delegate.and(other);
+      }
+
+      @Override
+      public Predicate<Map<ColumnHandle, NullableValue>> negate() {
+        return delegate.negate();
+      }
+
+      @Override
+      public Predicate<Map<ColumnHandle, NullableValue>> or(
+          Predicate<? super Map<ColumnHandle, NullableValue>> other) {
+        return delegate.or(other);
+      }
+    }
   }
 }

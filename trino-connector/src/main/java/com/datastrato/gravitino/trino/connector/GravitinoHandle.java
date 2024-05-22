@@ -61,8 +61,7 @@ interface GravitinoHandle<T> {
                 .readValue(valueString);
         return new HandleWrapper<>(newHandle);
       } catch (Exception e) {
-        throw new TrinoException(
-            GRAVITINO_ILLEGAL_ARGUMENT, "Invalid handle string: " + valueString);
+        throw new TrinoException(GRAVITINO_ILLEGAL_ARGUMENT, "Can not deserialize from json", e);
       }
     }
 
@@ -75,8 +74,7 @@ interface GravitinoHandle<T> {
                   .writerFor(clazz)
                   .writeValueAsString(this.handle);
         } catch (Exception e) {
-          throw new TrinoException(
-              GRAVITINO_ILLEGAL_ARGUMENT, "Invalid handle string: " + valueString);
+          throw new TrinoException(GRAVITINO_ILLEGAL_ARGUMENT, "Can not serialize to json", e);
         }
       }
       return valueString;

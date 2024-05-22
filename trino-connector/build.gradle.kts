@@ -19,7 +19,7 @@ dependencies {
   implementation(libs.commons.lang3)
   // implementation(libs.guava)
   implementation(libs.httpclient5)
-  implementation("io.airlift:json:237")
+  compileOnly("io.airlift:json:237")
   implementation(libs.trino.jdbc)
   compileOnly(libs.trino.spi) {
     exclude("org.apache.logging.log4j")

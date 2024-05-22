@@ -15,6 +15,8 @@ import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import io.airlift.json.RecordAutoDetectModule;
+import io.trino.spi.block.Block;
+import io.trino.spi.block.BlockEncodingSerde;
 import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ConnectorInsertTableHandle;
 import io.trino.spi.connector.ConnectorSplit;
@@ -41,13 +43,19 @@ public class JsonCodec {
     if (INSTANCE != null) {
       return INSTANCE;
     }
-    INSTANCE = new JsonCodec(appClassLoader);
+    INSTANCE = new JsonCodec(appClassLoader, null);
+    return INSTANCE;
+  }
+
+  public static synchronized JsonCodec instance(
+      ClassLoader appClassLoader, TypeManager typeManager) {
+    INSTANCE = new JsonCodec(appClassLoader, typeManager);
     return INSTANCE;
   }
 
   public final Map<String, ClassLoader> classLoaders = new ConcurrentHashMap<>();
 
-  public JsonCodec(ClassLoader appClassLoader) {
+  public JsonCodec(ClassLoader appClassLoader, TypeManager typeManager) {
 
     createClassLoaders(appClassLoader);
 
@@ -78,24 +86,65 @@ public class JsonCodec {
         };
 
     try {
-      Class typeManagerClass = appClassLoader.loadClass("io.trino.type.InternalTypeManager");
-      Class typeRegistryClass = appClassLoader.loadClass("io.trino.metadata.TypeRegistry");
-      Class typeOperatorsClass = appClassLoader.loadClass("io.trino.spi.type.TypeOperators");
-      Class featuresConfigClass = appClassLoader.loadClass("io.trino.FeaturesConfig");
-      TypeManager typeManager =
-          (TypeManager)
-              typeManagerClass
-                  .getConstructor(typeRegistryClass)
-                  .newInstance(
-                      typeRegistryClass
-                          .getConstructor(typeOperatorsClass, featuresConfigClass)
-                          .newInstance(
-                              typeOperatorsClass.getConstructor().newInstance(),
-                              featuresConfigClass.getConstructor().newInstance()));
+      if (typeManager == null) {
+        Class internalTypeManagerClass =
+            appClassLoader.loadClass("io.trino.type.InternalTypeManager");
+        Class typeManagerClass = appClassLoader.loadClass("io.trino.spi.type.TypeManager");
+        Class typeRegistryClass = appClassLoader.loadClass("io.trino.metadata.TypeRegistry");
+        Class typeOperatorsClass = appClassLoader.loadClass("io.trino.spi.type.TypeOperators");
+        Class featuresConfigClass = appClassLoader.loadClass("io.trino.FeaturesConfig");
+        Class internalBlockEncodingSerdeClass =
+            appClassLoader.loadClass("io.trino.metadata.InternalBlockEncodingSerde");
+        Class blockEncodingSerdeClass =
+            appClassLoader.loadClass("io.trino.spi.block.BlockEncodingSerde");
+        Class jsonPath2016TypeClass = appClassLoader.loadClass("io.trino.type.JsonPath2016Type");
+        Class typeDeserializerClass = appClassLoader.loadClass("io.trino.type.TypeDeserializer");
+        Class blockEncodingManagerClass =
+            appClassLoader.loadClass("io.trino.metadata.BlockEncodingManager");
+        Class typeClass = appClassLoader.loadClass("io.trino.spi.type.Type");
+
+        Object typeRegistry =
+            typeRegistryClass
+                .getConstructor(typeOperatorsClass, featuresConfigClass)
+                .newInstance(
+                    typeOperatorsClass.getConstructor().newInstance(),
+                    featuresConfigClass.getConstructor().newInstance());
+        typeManager =
+            (TypeManager)
+                internalTypeManagerClass
+                    .getConstructor(typeRegistryClass)
+                    .newInstance(typeRegistry);
+
+        /*
+        Object jsonPath2016Type =
+            jsonPath2016TypeClass
+                .getConstructor(typeDeserializerClass, blockEncodingSerdeClass)
+                .newInstance(
+                    typeDeserializerClass.getConstructor(typeManagerClass).newInstance(typeManager),
+                    internalBlockEncodingSerdeClass
+                        .getConstructor(blockEncodingManagerClass, typeManagerClass)
+                        .newInstance(
+                            blockEncodingManagerClass.getConstructor().newInstance(), typeManager));
+        typeRegistryClass.getMethod("addType", typeClass).invoke(typeRegistry, jsonPath2016Type);
+         */
+      }
+
       buildMapper(typeManager, nameResolver, classResolver);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+  }
+
+  BlockEncodingSerde createBlockEncodingSerde(TypeManager typeManager) throws Exception {
+    ClassLoader classLoader = typeManager.getClass().getClassLoader();
+    Class blockEncodingManagerClass =
+        classLoader.loadClass("io.trino.metadata.BlockEncodingManager");
+    Class internalBlockEncodingSerdeClass =
+        classLoader.loadClass("io.trino.metadata.InternalBlockEncodingSerde");
+    return (BlockEncodingSerde)
+        internalBlockEncodingSerdeClass
+            .getConstructor(blockEncodingManagerClass, TypeManager.class)
+            .newInstance(blockEncodingManagerClass.getConstructor().newInstance(), typeManager);
   }
 
   private void createClassLoaders(ClassLoader appClassLoader) {
@@ -199,6 +248,10 @@ public class JsonCodec {
       module.addDeserializer(
           TypeSignature.class,
           new TypeSignatureDeserializer(typeManger.getClass().getClassLoader()));
+
+      BlockEncodingSerde blockEncodingSerde = createBlockEncodingSerde(typeManger);
+      module.addSerializer(Block.class, new BlockJsonSerde.Serializer(blockEncodingSerde));
+      module.addDeserializer(Block.class, new BlockJsonSerde.Deserializer(blockEncodingSerde));
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
