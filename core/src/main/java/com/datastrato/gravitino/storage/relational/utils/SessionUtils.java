@@ -74,12 +74,8 @@ public class SessionUtils {
    * @param <R> the type of the result
    */
   public static <T, R> R doWithoutCommitAndFetchResult(Class<T> mapperClazz, Function<T, R> func) {
-    try {
       T mapper = SqlSessions.getMapper(mapperClazz);
       return func.apply(mapper);
-    } catch (Throwable t) {
-      throw t;
-    }
   }
 
   /**
@@ -91,12 +87,8 @@ public class SessionUtils {
    * @param <T> the type of the mapper
    */
   public static <T> void doWithoutCommit(Class<T> mapperClazz, Consumer<T> consumer) {
-    try {
       T mapper = SqlSessions.getMapper(mapperClazz);
       consumer.accept(mapper);
-    } catch (Throwable t) {
-      throw t;
-    }
   }
 
   /**
