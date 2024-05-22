@@ -4,11 +4,18 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata.CURRENT_SNAPSHOT_ID;
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata.DISTRIBUTION_MODE;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata.FORMAT;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata.FORMAT_VERSION;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata.IDENTIFIER_FIELDS;
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata.LOCATION;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata.PROVIDER;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata.SORT_ORDER;
 import static org.apache.iceberg.TableProperties.DEFAULT_FILE_FORMAT;
 
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.ConvertUtil;
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.DescribeIcebergSortOrderVisitor;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.FromIcebergPartitionSpec;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.FromIcebergSortOrder;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.ToIcebergPartitionSpec;
@@ -21,17 +28,21 @@ import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.iceberg.DistributionMode;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.transforms.SortOrderVisitor;
 
 /** Represents an Iceberg Table entity in the Iceberg table. */
 @ToString
@@ -134,7 +145,7 @@ public class IcebergTable extends BaseTable {
    */
   public static IcebergTable fromIcebergTable(TableMetadata table, String tableName) {
     Map<String, String> properties = new HashMap<>(table.properties());
-    properties.put(LOCATION, table.location());
+    properties.putAll(buildReservedProperties(table));
     Schema schema = table.schema();
     Transform[] partitionSpec = FromIcebergPartitionSpec.fromPartitionSpec(table.spec(), schema);
     SortOrder[] sortOrder = FromIcebergSortOrder.fromSortOrder(table.sortOrder());
@@ -221,5 +232,40 @@ public class IcebergTable extends BaseTable {
    */
   public static Builder builder() {
     return new Builder();
+  }
+
+  private static Map<String, String> buildReservedProperties(TableMetadata table) {
+    Map<String, String> properties = new HashMap<>();
+    String fileFormat =
+        table
+            .properties()
+            .getOrDefault(
+                TableProperties.DEFAULT_FILE_FORMAT, TableProperties.DEFAULT_FILE_FORMAT_DEFAULT);
+    properties.put(FORMAT, String.join("/", DEFAULT_ICEBERG_PROVIDER, fileFormat));
+    properties.put(PROVIDER, DEFAULT_ICEBERG_PROVIDER);
+    String currentSnapshotId =
+        table.currentSnapshot() != null
+            ? String.valueOf(table.currentSnapshot().snapshotId())
+            : "none";
+    properties.put(CURRENT_SNAPSHOT_ID, currentSnapshotId);
+    properties.put(LOCATION, table.location());
+
+    properties.put(FORMAT_VERSION, String.valueOf(table.formatVersion()));
+
+    if (table.sortOrder().isUnsorted()) {
+      properties.put(SORT_ORDER, describeIcebergSortOrder(table.sortOrder()));
+    }
+
+    Set<String> identifierFields = table.schema().identifierFieldNames();
+    if (!identifierFields.isEmpty()) {
+      properties.put(IDENTIFIER_FIELDS, "[" + String.join(",", identifierFields) + "]");
+    }
+
+    return properties;
+  }
+
+  private static String describeIcebergSortOrder(org.apache.iceberg.SortOrder sortOrder) {
+    return Joiner.on(", ")
+        .join(SortOrderVisitor.visit(sortOrder, DescribeIcebergSortOrderVisitor.INSTANCE));
   }
 }
