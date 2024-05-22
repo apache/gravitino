@@ -72,10 +72,7 @@ const LoginPage = () => {
                 height={24}
                 alt='logo'
               />
-              <Typography
-                variant='h6'
-                className={clsx('twc-ml-2 twc-font-semibold twc-text-[1.5rem]', fonts.className)}
-              >
+              <Typography variant='h6' className={clsx('twc-text-[black] twc-ml-2 twc-text-[1.5rem]', fonts.className)}>
                 Gravitino
               </Typography>
             </Box>
