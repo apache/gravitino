@@ -25,6 +25,8 @@ public class HiveContainer extends BaseContainer {
   public static final Logger LOG = LoggerFactory.getLogger(HiveContainer.class);
 
   public static final String DEFAULT_IMAGE = System.getenv("GRAVITINO_CI_HIVE_DOCKER_IMAGE");
+  public static final String KERBEROS_IMAGE =
+      System.getenv("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE");
   public static final String HOST_NAME = "gravitino-ci-hive";
   private static final int MYSQL_PORT = 3306;
   public static final int HDFS_DEFAULTFS_PORT = 9000;
@@ -51,7 +53,7 @@ public class HiveContainer extends BaseContainer {
   @Override
   protected void setupContainer() {
     super.setupContainer();
-    withLogConsumer(new PrintingContainerLog(format("%-14s| ", "HiveContainer")));
+    withLogConsumer(new PrintingContainerLog(format("%-14s| ", "HiveContainer-" + hostName)));
   }
 
   @Override
@@ -113,40 +115,37 @@ public class HiveContainer extends BaseContainer {
               return false;
             });
 
-    String sql = "show databases";
+    final String showDatabaseSQL = "show databases";
     await()
         .atMost(30, TimeUnit.SECONDS)
         .pollInterval(30 / retryLimit, TimeUnit.SECONDS)
         .until(
             () -> {
               try {
-                Container.ExecResult result = executeInContainer("hive", "-e", sql);
+                Container.ExecResult result = executeInContainer("hive", "-e", showDatabaseSQL);
                 if (result.getStdout().contains("default")) {
                   return true;
                 }
               } catch (Exception e) {
-                LOG.error("Failed to execute sql: {}", sql, e);
+                LOG.error("Failed to execute sql: {}", showDatabaseSQL, e);
               }
               return false;
             });
-
+    final String createTableSQL =
+        "CREATE TABLE IF NOT EXISTS default.employee ( eid int, name String, "
+            + "salary String, destination String) ";
     await()
         .atMost(30, TimeUnit.SECONDS)
         .pollInterval(30 / retryLimit, TimeUnit.SECONDS)
         .until(
             () -> {
               try {
-                Container.ExecResult result =
-                    executeInContainer(
-                        "hive",
-                        "-e",
-                        "CREATE TABLE IF NOT EXISTS default.employee ( eid int, name String, "
-                            + "salary String, destination String) ");
+                Container.ExecResult result = executeInContainer("hive", "-e", createTableSQL);
                 if (result.getExitCode() == 0) {
                   return true;
                 }
               } catch (Exception e) {
-                LOG.error("Failed to execute sql: {}", sql, e);
+                LOG.error("Failed to execute sql: {}", createTableSQL, e);
               }
               return false;
             });
@@ -183,7 +182,13 @@ public class HiveContainer extends BaseContainer {
     @Override
     public HiveContainer build() {
       return new HiveContainer(
-          image, hostName, exposePorts, extraHosts, filesToMount, envVars, network);
+          kerberosEnabled ? KERBEROS_IMAGE : image,
+          kerberosEnabled ? "kerberos-" + hostName : hostName,
+          exposePorts,
+          extraHosts,
+          filesToMount,
+          envVars,
+          network);
     }
   }
 }
