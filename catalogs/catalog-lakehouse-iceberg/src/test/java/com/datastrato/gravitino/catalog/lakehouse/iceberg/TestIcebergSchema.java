@@ -6,14 +6,14 @@ package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.Schema;
+import com.datastrato.gravitino.SchemaChange;
 import com.datastrato.gravitino.catalog.PropertiesMetadataHelpers;
 import com.datastrato.gravitino.connector.PropertiesMetadata;
+import com.datastrato.gravitino.connector.SupportsSchemas;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
-import com.datastrato.gravitino.rel.Schema;
-import com.datastrato.gravitino.rel.SchemaChange;
-import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Arrays;
@@ -35,27 +35,28 @@ public class TestIcebergSchema {
   @Test
   public void testCreateIcebergSchema() {
     IcebergCatalog icebergCatalog = initIcebergCatalog("testCreateIcebergSchema");
+    IcebergCatalogOperations catalogOperations = (IcebergCatalogOperations) icebergCatalog.ops();
 
     NameIdentifier ident = NameIdentifier.of("metalake", icebergCatalog.name(), "test");
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");
 
-    Schema schema = icebergCatalog.asSchemas().createSchema(ident, COMMENT_VALUE, properties);
+    Schema schema = catalogOperations.createSchema(ident, COMMENT_VALUE, properties);
     Assertions.assertEquals(ident.name(), schema.name());
     Assertions.assertEquals(COMMENT_VALUE, schema.comment());
     Assertions.assertEquals(properties, schema.properties());
 
-    Assertions.assertTrue(icebergCatalog.asSchemas().schemaExists(ident));
+    Assertions.assertTrue(catalogOperations.schemaExists(ident));
 
     Set<String> names =
-        Arrays.stream(icebergCatalog.asSchemas().listSchemas(ident.namespace()))
+        Arrays.stream(catalogOperations.listSchemas(ident.namespace()))
             .map(NameIdentifier::name)
             .collect(Collectors.toSet());
     Assertions.assertTrue(names.contains(ident.name()));
 
     // Test schema already exists
-    SupportsSchemas schemas = icebergCatalog.asSchemas();
+    SupportsSchemas schemas = catalogOperations;
     Throwable exception =
         Assertions.assertThrows(
             SchemaAlreadyExistsException.class,
@@ -68,10 +69,11 @@ public class TestIcebergSchema {
   @Test
   public void testListSchema() {
     IcebergCatalog icebergCatalog = initIcebergCatalog("testListIcebergSchema");
+    IcebergCatalogOperations catalogOperations = (IcebergCatalogOperations) icebergCatalog.ops();
     NameIdentifier ident = NameIdentifier.of("metalake", icebergCatalog.name(), "test");
-    icebergCatalog.asSchemas().createSchema(ident, COMMENT_VALUE, Maps.newHashMap());
+    catalogOperations.createSchema(ident, COMMENT_VALUE, Maps.newHashMap());
 
-    NameIdentifier[] schemas = icebergCatalog.asSchemas().listSchemas(ident.namespace());
+    NameIdentifier[] schemas = catalogOperations.listSchemas(ident.namespace());
     Assertions.assertEquals(1, schemas.length);
     Assertions.assertEquals(ident.name(), schemas[0].name());
     Assertions.assertEquals(ident.namespace(), schemas[0].namespace());
@@ -80,37 +82,30 @@ public class TestIcebergSchema {
   @Test
   public void testAlterSchema() {
     IcebergCatalog icebergCatalog = initIcebergCatalog("testAlterSchema");
+    IcebergCatalogOperations catalogOperations = (IcebergCatalogOperations) icebergCatalog.ops();
 
     NameIdentifier ident = NameIdentifier.of("metalake", icebergCatalog.name(), "test");
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");
 
-    icebergCatalog.asSchemas().createSchema(ident, COMMENT_VALUE, properties);
-    Assertions.assertTrue(icebergCatalog.asSchemas().schemaExists(ident));
+    catalogOperations.createSchema(ident, COMMENT_VALUE, properties);
+    Assertions.assertTrue(catalogOperations.schemaExists(ident));
 
-    Map<String, String> properties1 = icebergCatalog.asSchemas().loadSchema(ident).properties();
+    Map<String, String> properties1 = catalogOperations.loadSchema(ident).properties();
     Assertions.assertEquals("val1", properties1.get("key1"));
     Assertions.assertEquals("val2", properties1.get("key2"));
 
-    icebergCatalog
-        .asSchemas()
-        .alterSchema(
-            ident,
-            SchemaChange.removeProperty("key1"),
-            SchemaChange.setProperty("key2", "val2-alter"));
-    Schema alteredSchema = icebergCatalog.asSchemas().loadSchema(ident);
+    catalogOperations.alterSchema(
+        ident, SchemaChange.removeProperty("key1"), SchemaChange.setProperty("key2", "val2-alter"));
+    Schema alteredSchema = catalogOperations.loadSchema(ident);
     Map<String, String> properties2 = alteredSchema.properties();
     Assertions.assertFalse(properties2.containsKey("key1"));
     Assertions.assertEquals("val2-alter", properties2.get("key2"));
 
-    icebergCatalog
-        .asSchemas()
-        .alterSchema(
-            ident,
-            SchemaChange.setProperty("key3", "val3"),
-            SchemaChange.setProperty("key4", "val4"));
-    Schema alteredSchema1 = icebergCatalog.asSchemas().loadSchema(ident);
+    catalogOperations.alterSchema(
+        ident, SchemaChange.setProperty("key3", "val3"), SchemaChange.setProperty("key4", "val4"));
+    Schema alteredSchema1 = catalogOperations.loadSchema(ident);
     Map<String, String> properties3 = alteredSchema1.properties();
     Assertions.assertEquals("val3", properties3.get("key3"));
     Assertions.assertEquals("val4", properties3.get("key4"));
@@ -119,23 +114,23 @@ public class TestIcebergSchema {
   @Test
   public void testDropSchema() {
     IcebergCatalog icebergCatalog = initIcebergCatalog("testDropSchema");
+    IcebergCatalogOperations catalogOperations = (IcebergCatalogOperations) icebergCatalog.ops();
 
     NameIdentifier ident = NameIdentifier.of("metalake", icebergCatalog.name(), "test");
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");
 
-    icebergCatalog.asSchemas().createSchema(ident, COMMENT_VALUE, properties);
-    Assertions.assertTrue(icebergCatalog.asSchemas().schemaExists(ident));
-    icebergCatalog.asSchemas().dropSchema(ident, false);
-    Assertions.assertFalse(icebergCatalog.asSchemas().schemaExists(ident));
+    catalogOperations.createSchema(ident, COMMENT_VALUE, properties);
+    Assertions.assertTrue(catalogOperations.schemaExists(ident));
+    catalogOperations.dropSchema(ident, false);
+    Assertions.assertFalse(catalogOperations.schemaExists(ident));
 
-    Assertions.assertFalse(icebergCatalog.asSchemas().dropSchema(ident, false));
+    Assertions.assertFalse(catalogOperations.dropSchema(ident, false));
 
-    SupportsSchemas schemas = icebergCatalog.asSchemas();
     Throwable exception =
         Assertions.assertThrows(
-            IllegalArgumentException.class, () -> schemas.dropSchema(ident, true));
+            IllegalArgumentException.class, () -> catalogOperations.dropSchema(ident, true));
     Assertions.assertTrue(
         exception.getMessage().contains("Iceberg does not support cascading delete operations"));
   }

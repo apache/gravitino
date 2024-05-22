@@ -53,19 +53,10 @@ public class GravitinoIcebergCatalog extends BaseCatalog
   protected org.apache.spark.sql.connector.catalog.Table createSparkTable(
       Identifier identifier,
       Table gravitinoTable,
+      org.apache.spark.sql.connector.catalog.Table sparkTable,
       TableCatalog sparkIcebergCatalog,
       PropertiesConverter propertiesConverter,
       SparkTransformConverter sparkTransformConverter) {
-    org.apache.spark.sql.connector.catalog.Table sparkTable;
-    try {
-      sparkTable = sparkIcebergCatalog.loadTable(identifier);
-    } catch (NoSuchTableException e) {
-      throw new RuntimeException(
-          String.format(
-              "Failed to load the real sparkTable: %s",
-              String.join(".", getDatabase(identifier), identifier.name())),
-          e);
-    }
     return new SparkIcebergTable(
         identifier,
         gravitinoTable,
@@ -128,6 +119,44 @@ public class GravitinoIcebergCatalog extends BaseCatalog
     return ((SparkCatalog) sparkCatalog).icebergCatalog();
   }
 
+  @Override
+  public org.apache.spark.sql.connector.catalog.Table loadTable(Identifier ident, String version)
+      throws NoSuchTableException {
+    try {
+      com.datastrato.gravitino.rel.Table gravitinoTable = loadGravitinoTable(ident);
+      org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident, version);
+      // Will create a catalog specific table
+      return createSparkTable(
+          ident,
+          gravitinoTable,
+          sparkTable,
+          sparkCatalog,
+          propertiesConverter,
+          sparkTransformConverter);
+    } catch (com.datastrato.gravitino.exceptions.NoSuchTableException e) {
+      throw new NoSuchTableException(ident);
+    }
+  }
+
+  @Override
+  public org.apache.spark.sql.connector.catalog.Table loadTable(Identifier ident, long timestamp)
+      throws NoSuchTableException {
+    try {
+      com.datastrato.gravitino.rel.Table gravitinoTable = loadGravitinoTable(ident);
+      org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident, timestamp);
+      // Will create a catalog specific table
+      return createSparkTable(
+          ident,
+          gravitinoTable,
+          sparkTable,
+          sparkCatalog,
+          propertiesConverter,
+          sparkTransformConverter);
+    } catch (com.datastrato.gravitino.exceptions.NoSuchTableException e) {
+      throw new NoSuchTableException(ident);
+    }
+  }
+
   private boolean isSystemNamespace(String[] namespace)
       throws NoSuchMethodException, InvocationTargetException, IllegalAccessException,
           ClassNotFoundException {
@@ -135,5 +164,31 @@ public class GravitinoIcebergCatalog extends BaseCatalog
     Method isSystemNamespace = baseCatalog.getDeclaredMethod("isSystemNamespace", String[].class);
     isSystemNamespace.setAccessible(true);
     return (Boolean) isSystemNamespace.invoke(baseCatalog, (Object) namespace);
+  }
+
+  private org.apache.spark.sql.connector.catalog.Table loadSparkTable(
+      Identifier ident, String version) {
+    try {
+      return sparkCatalog.loadTable(ident, version);
+    } catch (NoSuchTableException e) {
+      throw new RuntimeException(
+          String.format(
+              "Failed to load the real sparkTable: %s",
+              String.join(".", getDatabase(ident), ident.name())),
+          e);
+    }
+  }
+
+  private org.apache.spark.sql.connector.catalog.Table loadSparkTable(
+      Identifier ident, long timestamp) {
+    try {
+      return sparkCatalog.loadTable(ident, timestamp);
+    } catch (NoSuchTableException e) {
+      throw new RuntimeException(
+          String.format(
+              "Failed to load the real sparkTable: %s",
+              String.join(".", getDatabase(ident), ident.name())),
+          e);
+    }
   }
 }

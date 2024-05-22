@@ -683,7 +683,6 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
             Types.FixedType.of(10),
             Types.IntervalDayType.get(),
             Types.IntervalYearType.get(),
-            Types.TimestampType.withTimeZone(),
             Types.UUIDType.get(),
             Types.ListType.of(Types.DateType.get(), true),
             Types.MapType.of(Types.StringType.get(), Types.IntegerType.get(), true),

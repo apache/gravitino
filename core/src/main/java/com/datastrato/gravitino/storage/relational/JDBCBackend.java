@@ -224,12 +224,20 @@ public class JDBCBackend implements RelationalBackend {
         return TopicMetaService.getInstance()
             .deleteTopicMetasByLegacyTimeLine(
                 legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
-
-      case COLUMN:
       case USER:
+        return UserMetaService.getInstance()
+            .deleteUserMetasByLegacyTimeLine(
+                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case GROUP:
-      case AUDIT:
+        return GroupMetaService.getInstance()
+            .deleteGroupMetasByLegacyTimeLine(
+                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case ROLE:
+        return RoleMetaService.getInstance()
+            .deleteRoleMetasByLegacyTimeLine(
+                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case COLUMN:
+      case AUDIT:
         return 0;
         // TODO: Implement hard delete logic for these entity types.
 

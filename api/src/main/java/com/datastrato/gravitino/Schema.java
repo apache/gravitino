@@ -2,9 +2,8 @@
  * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.rel;
+package com.datastrato.gravitino;
 
-import com.datastrato.gravitino.Auditable;
 import com.datastrato.gravitino.annotation.Evolving;
 import java.util.Collections;
 import java.util.Map;
@@ -16,7 +15,7 @@ import javax.annotation.Nullable;
  * which means it can be schema1.schema2.table.
  *
  * <p>This defines the basic properties of a schema. A catalog implementation with {@link
- * SupportsSchemas} should implement this interface.
+ * com.datastrato.gravitino.SupportsSchemas} should implement this interface.
  */
 @Evolving
 public interface Schema extends Auditable {
