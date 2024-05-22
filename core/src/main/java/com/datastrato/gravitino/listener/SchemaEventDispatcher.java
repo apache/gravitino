@@ -7,6 +7,8 @@ package com.datastrato.gravitino.listener;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.Schema;
+import com.datastrato.gravitino.SchemaChange;
 import com.datastrato.gravitino.catalog.SchemaDispatcher;
 import com.datastrato.gravitino.catalog.SchemaOperationDispatcher;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
@@ -24,8 +26,6 @@ import com.datastrato.gravitino.listener.api.event.ListSchemaFailureEvent;
 import com.datastrato.gravitino.listener.api.event.LoadSchemaEvent;
 import com.datastrato.gravitino.listener.api.event.LoadSchemaFailureEvent;
 import com.datastrato.gravitino.listener.api.info.SchemaInfo;
-import com.datastrato.gravitino.rel.Schema;
-import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import java.util.Map;
 

@@ -8,8 +8,6 @@ import com.datastrato.gravitino.connector.BaseCatalog;
 import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.ProxyPlugin;
 import com.datastrato.gravitino.connector.capability.Capability;
-import com.datastrato.gravitino.rel.SupportsSchemas;
-import com.datastrato.gravitino.rel.TableCatalog;
 import java.util.Map;
 import java.util.Optional;
 
@@ -41,26 +39,6 @@ public class HiveCatalog extends BaseCatalog<HiveCatalog> {
   @Override
   public Capability newCapability() {
     return new HiveCatalogCapability();
-  }
-
-  /**
-   * Returns the Hive catalog operations as a {@link SupportsSchemas}.
-   *
-   * @return The Hive catalog operations as {@link HiveCatalogOperations}.
-   */
-  @Override
-  public SupportsSchemas asSchemas() {
-    return (SupportsSchemas) ops();
-  }
-
-  /**
-   * Returns the Hive catalog operations as a {@link TableCatalog}.
-   *
-   * @return The Hive catalog operations as {@link HiveCatalogOperations}.
-   */
-  @Override
-  public TableCatalog asTableCatalog() {
-    return (TableCatalog) ops();
   }
 
   @Override

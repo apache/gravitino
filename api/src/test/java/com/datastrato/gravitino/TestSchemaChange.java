@@ -9,9 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.datastrato.gravitino.rel.SchemaChange;
-import com.datastrato.gravitino.rel.SchemaChange.RemoveProperty;
-import com.datastrato.gravitino.rel.SchemaChange.SetProperty;
+import com.datastrato.gravitino.SchemaChange.RemoveProperty;
+import com.datastrato.gravitino.SchemaChange.SetProperty;
 import org.junit.jupiter.api.Test;
 
 public class TestSchemaChange {

@@ -2,10 +2,9 @@
  * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.dto.rel;
+package com.datastrato.gravitino.dto;
 
-import com.datastrato.gravitino.dto.AuditDTO;
-import com.datastrato.gravitino.rel.Schema;
+import com.datastrato.gravitino.Schema;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;

@@ -7,6 +7,7 @@ package com.datastrato.gravitino.client;
 import static com.datastrato.gravitino.dto.util.DTOConverters.toDTO;
 import static com.datastrato.gravitino.dto.util.DTOConverters.toDTOs;
 
+import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.dto.AuditDTO;
@@ -51,14 +52,15 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
   private static final Logger LOG = LoggerFactory.getLogger(RelationalCatalog.class);
 
   RelationalCatalog(
+      Namespace namespace,
       String name,
-      Type type,
+      Catalog.Type type,
       String provider,
       String comment,
       Map<String, String> properties,
       AuditDTO auditDTO,
       RESTClient restClient) {
-    super(name, type, provider, comment, properties, auditDTO, restClient);
+    super(namespace, name, type, provider, comment, properties, auditDTO, restClient);
   }
 
   @Override
@@ -277,8 +279,15 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
   static class Builder extends CatalogDTO.Builder<Builder> {
     /** The REST client to send the requests. */
     private RESTClient restClient;
+    /** The namespace of the catalog */
+    private Namespace namespace;
 
     protected Builder() {}
+
+    Builder withNamespace(Namespace namespace) {
+      this.namespace = namespace;
+      return this;
+    }
 
     Builder withRestClient(RESTClient restClient) {
       this.restClient = restClient;
@@ -287,13 +296,15 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
 
     @Override
     public RelationalCatalog build() {
+      Namespace.checkCatalog(namespace);
       Preconditions.checkArgument(restClient != null, "restClient must be set");
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name must not be blank");
       Preconditions.checkArgument(type != null, "type must not be null");
       Preconditions.checkArgument(StringUtils.isNotBlank(provider), "provider must not be blank");
       Preconditions.checkArgument(audit != null, "audit must not be null");
 
-      return new RelationalCatalog(name, type, provider, comment, properties, audit, restClient);
+      return new RelationalCatalog(
+          namespace, name, type, provider, comment, properties, audit, restClient);
     }
   }
 }
