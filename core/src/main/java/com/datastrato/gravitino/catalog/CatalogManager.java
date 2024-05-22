@@ -38,7 +38,7 @@ import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.rel.SupportsPartitions;
 import com.datastrato.gravitino.rel.Table;
-import com.datastrato.gravitino.rel.TableCatalog;
+import com.datastrato.gravitino.connector.TableCatalog;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.IsolatedClassLoader;
 import com.datastrato.gravitino.utils.PrincipalUtils;

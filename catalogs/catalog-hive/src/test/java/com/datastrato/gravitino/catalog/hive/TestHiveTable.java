@@ -20,7 +20,7 @@ import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Table;
-import com.datastrato.gravitino.rel.TableCatalog;
+import com.datastrato.gravitino.connector.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;

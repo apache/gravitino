@@ -13,7 +13,6 @@ import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.connector.PropertyEntry;
 import com.datastrato.gravitino.connector.TestCatalogOperations;
 import com.datastrato.gravitino.connector.capability.Capability;
-import com.datastrato.gravitino.rel.TableCatalog;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 
@@ -40,11 +39,6 @@ public class TestCatalog extends BaseCatalog<TestCatalog> {
   @Override
   protected Capability newCapability() {
     return new TestCatalogCapabilities();
-  }
-
-  @Override
-  public TableCatalog asTableCatalog() {
-    return (TableCatalog) ops();
   }
 
   @Override

@@ -5,7 +5,7 @@
 
 package com.datastrato.gravitino.catalog;
 
-import com.datastrato.gravitino.rel.TableCatalog;
+import com.datastrato.gravitino.connector.TableCatalog;
 
 /**
  * {@code TableDispatcher} interface acts as a specialization of the {@link TableCatalog} interface.
