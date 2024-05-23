@@ -26,7 +26,7 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class HiveCatalogStoreIT extends FlinkEnvIT {
+public class FlinkHiveCatalogIT extends FlinkEnvIT {
 
   private static final String DEFAULT_CATALOG = "default_catalog";
 

@@ -39,10 +39,11 @@ public class GravitinoCatalogStoreFactory implements CatalogStoreFactory {
 
     ReadableConfig options = factoryHelper.getOptions();
     String gravitinoUri =
-        Preconditions.checkNotNull(options.get(GRAVITINO_URI), "The metalake.uri must be set.");
+        Preconditions.checkNotNull(
+            options.get(GRAVITINO_URI), "The %s must be set.", GRAVITINO_URI.key());
     String gravitinoName =
         Preconditions.checkNotNull(
-            options.get(GRAVITINO_METALAKE), "The metalake.name must be set.");
+            options.get(GRAVITINO_METALAKE), "The %s must be set.", GRAVITINO_METALAKE.key());
     this.catalogManager = GravitinoCatalogManager.create(gravitinoUri, gravitinoName);
   }
 

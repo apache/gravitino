@@ -40,8 +40,8 @@ public class GravitinoHiveCatalogFactory implements CatalogFactory {
     String hiveConfDir = helper.getOptions().get(HiveCatalogFactoryOptions.HIVE_CONF_DIR);
     String hadoopConfDir = helper.getOptions().get(HiveCatalogFactoryOptions.HADOOP_CONF_DIR);
     HiveConf hiveConf = HiveCatalog.createHiveConf(hiveConfDir, hadoopConfDir);
-    // Put the hadoop properties managed by gravitino into the hiveConf
-    PropertyUtils.filterHadoopProperties(context.getOptions()).forEach(hiveConf::set);
+    // Put the hadoop properties managed by Gravitino into the hiveConf
+    PropertyUtils.getHadoopAndHivePorperties(context.getOptions()).forEach(hiveConf::set);
     return new GravitinoHiveCatalog(
         context.getName(),
         helper.getOptions().get(HiveCatalogFactoryOptions.DEFAULT_DATABASE),

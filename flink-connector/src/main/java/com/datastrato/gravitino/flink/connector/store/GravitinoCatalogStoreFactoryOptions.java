@@ -18,10 +18,10 @@ public class GravitinoCatalogStoreFactoryOptions {
       ConfigOptions.key("gravitino.uri")
           .stringType()
           .noDefaultValue()
-          .withDescription("The uri of gravitino uri");
+          .withDescription("The uri of Gravitino server");
   public static final ConfigOption<String> GRAVITINO_METALAKE =
       ConfigOptions.key("gravitino.metalake")
           .stringType()
           .noDefaultValue()
-          .withDescription("The name of gravitino metalake");
+          .withDescription("The name of Gravitino metalake");
 }

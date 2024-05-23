@@ -31,7 +31,7 @@ public abstract class FlinkEnvIT extends AbstractIT {
     initGravitinoEnv();
     initMetalake();
     initFlinkEnv();
-    LOG.info("Startup Flink env successfully, gravitino uri: {}.", gravitinoUri);
+    LOG.info("Startup Flink env successfully, Gravitino uri: {}.", gravitinoUri);
   }
 
   @AfterAll

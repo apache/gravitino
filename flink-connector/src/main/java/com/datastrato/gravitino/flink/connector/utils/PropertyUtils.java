@@ -15,7 +15,7 @@ public class PropertyUtils {
   public static final String FS_PREFIX = "hive.";
   public static final String DFS_PREFIX = "dfs.";
 
-  public static Map<String, String> filterHadoopProperties(Map<String, String> properties) {
+  public static Map<String, String> getHadoopAndHivePorperties(Map<String, String> properties) {
     if (properties == null) {
       return Collections.emptyMap();
     }
