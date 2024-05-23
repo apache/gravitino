@@ -19,8 +19,6 @@ val baseName = "${rootProject.name}-spark-connector-runtime-${sparkMajorVersion}
 dependencies {
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
   implementation(project(":spark-connector:spark-connector"))
-
-  implementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
 }
 
 tasks.withType<ShadowJar>(ShadowJar::class.java) {
