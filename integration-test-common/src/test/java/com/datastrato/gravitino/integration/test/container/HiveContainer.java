@@ -59,7 +59,7 @@ public class HiveContainer extends BaseContainer {
   @Override
   public void start() {
     super.start();
-    Preconditions.check("Hive container startup failed!", checkContainerStatus(10));
+    Preconditions.check("Hive container startup failed!", checkContainerStatus(15));
   }
 
   @Override
@@ -90,7 +90,7 @@ public class HiveContainer extends BaseContainer {
   @Override
   protected boolean checkContainerStatus(int retryLimit) {
     await()
-        .atMost(100, TimeUnit.SECONDS)
+        .atMost(150, TimeUnit.SECONDS)
         .pollInterval(100 / retryLimit, TimeUnit.SECONDS)
         .until(
             () -> {
