@@ -54,7 +54,10 @@ public interface Tag extends Auditable {
   /** The extended information of the tag. */
   interface Extended {
     /** @return The number of objects that are using this tag. */
-    int inUse();
+    default int inUse() {
+      MetadataObject[] objects = usedObjects();
+      return objects == null ? 0 : objects.length;
+    }
 
     /** @return The list of objects that are using this tag. */
     MetadataObject[] usedObjects();
