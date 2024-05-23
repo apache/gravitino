@@ -4,3 +4,6 @@
 # the tools to publish the python client to Pypi
 requests
 dataclasses-json
+readerwriterlock
+fsspec>=2024.3.1
+pyarrow>=15.0.2
