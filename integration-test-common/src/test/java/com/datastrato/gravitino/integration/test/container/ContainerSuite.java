@@ -52,8 +52,9 @@ public class ContainerSuite implements Closeable {
   protected static final CloseableGroup closer = CloseableGroup.create();
 
   private static void init() {
-    try (DockerClient dockerClient = DockerClientFactory.instance().client()) {
-      // Check if docker is available
+    try {
+      // Check if docker is available and you should never close the global DockerClient!
+      DockerClient dockerClient = DockerClientFactory.instance().client();
       Info info = dockerClient.infoCmd().exec();
       LOG.info("Docker info: {}", info);
 
