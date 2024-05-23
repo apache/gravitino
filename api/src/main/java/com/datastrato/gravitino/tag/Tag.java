@@ -46,21 +46,21 @@ public interface Tag extends Auditable {
    */
   Optional<Boolean> inherited();
 
-  /** @return Extended information of the tag. */
-  default Extended extended() {
-    throw new UnsupportedOperationException("The extended method is not supported.");
+  /** @return The associated objects of the tag. */
+  default AssociatedObjects associatedObjects() {
+    throw new UnsupportedOperationException("The associatedObjects method is not supported.");
   }
 
-  /** The extended information of the tag. */
-  interface Extended {
+  /** The interface of the associated objects of the tag. */
+  interface AssociatedObjects {
 
     /** @return The number of objects that are associated with this Tag */
-    default int inAssociation() {
-      MetadataObject[] objects = associatedObjects();
+    default int count() {
+      MetadataObject[] objects = objects();
       return objects == null ? 0 : objects.length;
     }
 
     /** @return The list of objects that are associated with this tag. */
-    MetadataObject[] associatedObjects();
+    MetadataObject[] objects();
   }
 }
