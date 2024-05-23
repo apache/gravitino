@@ -92,7 +92,7 @@ class FilesetCatalog(BaseSchemaCatalog):
         self,
         ident: NameIdentifier,
         comment: str,
-        type: Catalog.Type,
+        type: Fileset.Type,
         storage_location: str,
         properties: Dict[str, str],
     ) -> Fileset:
