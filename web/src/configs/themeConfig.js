@@ -20,13 +20,7 @@ const themeConfig = {
    * @description message box duration in milliseconds
    * @type {number}
    */
-  toastDuration: 4000,
-
-  /**
-   * @description tracks whether user is being inactive in milliseconds, default is 30 minutes
-   * @type {number}
-   */
-  idleOn: 18e5
+  toastDuration: 4000
 }
 
 export default themeConfig

@@ -17,9 +17,6 @@ import { to } from '../utils'
 import { getAuthConfigs, setAuthToken } from '../store/auth'
 
 import { useIdle } from 'react-use'
-import themeConfig from '@/src/configs/themeConfig'
-
-const { idleOn } = themeConfig
 
 const authProvider = {
   version: '',
@@ -40,7 +37,8 @@ const AuthProvider = ({ children }) => {
   const searchParams = useSearchParams()
   const paramsSize = [...searchParams.keys()].length
 
-  const isIdle = useIdle(idleOn)
+  const expiredIn = localStorage.getItem('expiredIn') && JSON.parse(localStorage.getItem('expiredIn')) // seconds
+  const isIdle = useIdle(expiredIn * 1000)
 
   useEffect(() => {
     if (isIdle) {
