@@ -814,13 +814,25 @@ public class TestJDBCBackend {
       SecurableObject securableObject,
       Map<String, String> properties) {
 
+    return createRoleEntity(
+        id, namespace, name, auditInfo, Lists.newArrayList(securableObject), properties);
+  }
+
+  public static RoleEntity createRoleEntity(
+      Long id,
+      Namespace namespace,
+      String name,
+      AuditInfo auditInfo,
+      List<SecurableObject> securableObjects,
+      Map<String, String> properties) {
+
     return RoleEntity.builder()
         .withId(id)
         .withName(name)
         .withProperties(properties)
         .withNamespace(namespace)
         .withAuditInfo(auditInfo)
-        .withSecurableObjects(Lists.newArrayList(securableObject))
+        .withSecurableObjects(securableObjects)
         .build();
   }
 }

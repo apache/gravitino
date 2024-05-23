@@ -915,7 +915,7 @@ public class POConverters {
                     .equals(privilegeMap.get(PRIVILEGE_CONDITION))) {
                   privileges.add(Privileges.allow(privilegeMap.get(PRIVILEGE_NAME)));
                 } else {
-                  privileges.add(Privileges.deny(privilegeMap.get(PRIVILEGE_CONDITION)));
+                  privileges.add(Privileges.deny(privilegeMap.get(PRIVILEGE_NAME)));
                 }
               }
               return SecurableObjects.parse(

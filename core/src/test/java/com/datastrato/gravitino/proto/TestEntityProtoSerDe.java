@@ -381,10 +381,14 @@ public class TestEntityProtoSerDe {
         Namespace.of("metalake", Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.ROLE_SCHEMA_NAME);
     Long roleId = 1L;
     String roleName = "testRole";
+    String anotherCatalogName = "another_catalog";
     SecurableObject securableObject =
         SecurableObjects.ofCatalog(
             catalogName,
             Lists.newArrayList(Privileges.UseCatalog.allow(), Privileges.DropCatalog.deny()));
+    SecurableObject anotherSecurableObject =
+        SecurableObjects.ofCatalog(
+            anotherCatalogName, Lists.newArrayList(Privileges.UseCatalog.allow()));
 
     RoleEntity roleEntity =
         RoleEntity.builder()
@@ -392,7 +396,7 @@ public class TestEntityProtoSerDe {
             .withName(roleName)
             .withNamespace(roleNamespace)
             .withAuditInfo(auditInfo)
-            .withSecurableObjects(Lists.newArrayList(securableObject))
+            .withSecurableObjects(Lists.newArrayList(securableObject, anotherSecurableObject))
             .withProperties(props)
             .build();
     byte[] roleBytes = protoEntitySerDe.serialize(roleEntity);
@@ -406,7 +410,7 @@ public class TestEntityProtoSerDe {
             .withName(roleName)
             .withNamespace(roleNamespace)
             .withAuditInfo(auditInfo)
-            .withSecurableObjects(Lists.newArrayList(securableObject))
+            .withSecurableObjects(Lists.newArrayList(securableObject, anotherSecurableObject))
             .build();
     roleBytes = protoEntitySerDe.serialize(roleWithoutFields);
     roleFromBytes = protoEntitySerDe.deserialize(roleBytes, RoleEntity.class, roleNamespace);

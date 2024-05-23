@@ -82,8 +82,13 @@ class TestRoleMetaService extends TestJDBCBackend {
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role1",
             auditInfo,
-            SecurableObjects.ofCatalog(
-                "catalog", Lists.newArrayList(Privileges.UseCatalog.allow())),
+            Lists.newArrayList(
+                SecurableObjects.ofCatalog(
+                    "catalog",
+                    Lists.newArrayList(
+                        Privileges.UseCatalog.allow(), Privileges.DropCatalog.deny())),
+                SecurableObjects.ofCatalog(
+                    "another_catalog", Lists.newArrayList(Privileges.UseCatalog.allow()))),
             ImmutableMap.of("k1", "v1"));
     Assertions.assertThrows(
         NoSuchEntityException.class,
