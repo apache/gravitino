@@ -42,6 +42,7 @@ import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -94,6 +95,7 @@ public class HadoopUserImpersonationIT extends AbstractIT {
 
     String krb5ConfFile = kdc.getKrb5conf().getAbsolutePath();
     System.setProperty("java.security.krb5.conf", krb5ConfFile);
+
     // Reload config when krb5 conf is setup
     if (SystemUtils.isJavaVersionAtMost(JavaVersion.JAVA_1_8)) {
       Class<?> classRef;
@@ -132,6 +134,7 @@ public class HadoopUserImpersonationIT extends AbstractIT {
     conf.set("hadoop.proxyuser.hdfs.groups", "*");
     conf.set("hadoop.proxyuser.hdfs.users", "*");
 
+    KerberosName.resetDefaultRealm();
     UserGroupInformation.setConfiguration(conf);
     UserGroupInformation.loginUserFromKeytab(
         SERVER_PRINCIPAL.replaceAll("_HOST", HOSTNAME) + "@" + kdc.getRealm(),
@@ -188,6 +191,8 @@ public class HadoopUserImpersonationIT extends AbstractIT {
     if (kdcWorkDir != null) {
       kdcWorkDir.delete();
     }
+
+    System.clearProperty("sun.security.krb5.debug");
   }
 
   @Test
@@ -254,11 +259,6 @@ public class HadoopUserImpersonationIT extends AbstractIT {
     Assertions.assertEquals(comment, loadSchema.comment());
     Assertions.assertEquals("val1", loadSchema.properties().get("key1"));
     Assertions.assertEquals("val2", loadSchema.properties().get("key2"));
-  }
-
-  private static void dropSchema() {
-    catalog.asSchemas().dropSchema(schemaName, true);
-    Assertions.assertFalse(catalog.asSchemas().schemaExists(schemaName));
   }
 
   private String storageLocation(String filesetName) {
