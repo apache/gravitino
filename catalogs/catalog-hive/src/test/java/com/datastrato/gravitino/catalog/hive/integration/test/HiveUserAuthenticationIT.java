@@ -35,6 +35,7 @@ import java.nio.file.Files;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -143,6 +144,8 @@ public class HiveUserAuthenticationIT extends AbstractIT {
     LOG.info("Kerberos kdc config:\n{}", content);
     System.setProperty("java.security.krb5.conf", krb5Path);
     System.setProperty("sun.security.krb5.debug", "true");
+
+    KerberosName.resetDefaultRealm();
   }
 
   private static void addKerberosConfig() {

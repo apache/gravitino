@@ -74,6 +74,7 @@ import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -201,6 +202,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             new ScheduledThreadPoolExecutor(
                 1, getThreadFactory(String.format("Kerberos-check-%s", info.id())));
 
+        KerberosName.resetDefaultRealm();
         UserGroupInformation.loginUserFromKeytab(catalogPrincipal, keytabFile.getAbsolutePath());
 
         UserGroupInformation kerberosLoginUgi = UserGroupInformation.getCurrentUser();

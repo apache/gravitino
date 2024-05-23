@@ -199,7 +199,9 @@ public class CatalogHiveIT extends AbstractIT {
 
   @AfterAll
   public static void stop() throws IOException {
-    client.dropMetalake(metalakeName);
+    if (client != null) {
+      client.dropMetalake(metalakeName);
+    }
     if (hiveClientPool != null) {
       hiveClientPool.close();
     }
