@@ -3,7 +3,7 @@
  *  This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.integration.test.util.spark;
+package com.datastrato.gravitino.spark.connector.integration.test.util;
 
 import com.datastrato.gravitino.spark.connector.ConnectorConstants;
 import com.datastrato.gravitino.spark.connector.hive.SparkHiveTable;
@@ -15,7 +15,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import javax.ws.rs.NotSupportedException;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.spark.sql.connector.catalog.SupportsMetadataColumns;
@@ -88,7 +87,7 @@ public class SparkTableInfo {
         || (partition instanceof ApplyTransform && "truncate".equalsIgnoreCase(partition.name()))) {
       this.partitions.add(partition);
     } else {
-      throw new NotSupportedException("Doesn't support " + partition.name());
+      throw new UnsupportedOperationException("Doesn't support " + partition.name());
     }
   }
 
@@ -133,7 +132,7 @@ public class SparkTableInfo {
                       && "truncate".equalsIgnoreCase(transform.name()))) {
                 sparkTableInfo.addPartition(transform);
               } else {
-                throw new NotSupportedException(
+                throw new UnsupportedOperationException(
                     "Doesn't support Spark transform: " + transform.name());
               }
             });
