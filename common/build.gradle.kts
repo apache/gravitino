@@ -55,7 +55,7 @@ fun getGitCommitId(): String {
   return gitCommitId
 }
 
-val propertiesFile = "src/main/resources/project.properties"
+val propertiesFile = "src/main/resources/gravitino-build-info.properties"
 fun writeProjectPropertiesFile() {
   val propertiesFile = file(propertiesFile)
   if (propertiesFile.exists()) {
@@ -93,7 +93,7 @@ tasks {
     }
 
     from("src/main/resources") {
-      include("project.properties").duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+      include("gravitino-build-info.properties").duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     }
   }
 

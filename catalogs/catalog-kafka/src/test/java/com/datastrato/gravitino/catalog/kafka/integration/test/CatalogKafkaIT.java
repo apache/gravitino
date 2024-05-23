@@ -14,6 +14,8 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.Schema;
+import com.datastrato.gravitino.SchemaChange;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
@@ -21,8 +23,6 @@ import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.messaging.Topic;
 import com.datastrato.gravitino.messaging.TopicChange;
-import com.datastrato.gravitino.rel.Schema;
-import com.datastrato.gravitino.rel.SchemaChange;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -179,7 +179,7 @@ public class CatalogKafkaIT extends AbstractIT {
     // Test BOOTSTRAP_SERVERS that cannot be linked
     Catalog kafka =
         metalake.createCatalog(
-            NameIdentifier.of(METALAKE_NAME, catalogName),
+            catalogName,
             Catalog.Type.MESSAGING,
             PROVIDER,
             "comment",
@@ -207,15 +207,11 @@ public class CatalogKafkaIT extends AbstractIT {
 
   @Test
   public void testDefaultSchema() {
-    NameIdentifier[] schemas =
-        catalog.asSchemas().listSchemas(Namespace.ofSchema(METALAKE_NAME, CATALOG_NAME));
+    NameIdentifier[] schemas = catalog.asSchemas().listSchemas();
     Assertions.assertEquals(1, schemas.length);
     Assertions.assertEquals(DEFAULT_SCHEMA_NAME, schemas[0].name());
 
-    Schema loadSchema =
-        catalog
-            .asSchemas()
-            .loadSchema(NameIdentifier.ofSchema(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME));
+    Schema loadSchema = catalog.asSchemas().loadSchema(DEFAULT_SCHEMA_NAME);
     Assertions.assertEquals(
         "The default schema of Kafka catalog including all topics", loadSchema.comment());
 
@@ -226,17 +222,11 @@ public class CatalogKafkaIT extends AbstractIT {
             () ->
                 catalog
                     .asSchemas()
-                    .alterSchema(
-                        NameIdentifier.ofSchema(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME),
-                        SchemaChange.removeProperty("key1")));
+                    .alterSchema(DEFAULT_SCHEMA_NAME, SchemaChange.removeProperty("key1")));
     Assertions.assertTrue(exception.getMessage().contains("Cannot alter the default schema"));
 
     // test drop default schema
-    boolean dropped =
-        catalog
-            .asSchemas()
-            .dropSchema(
-                NameIdentifier.ofSchema(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME), true);
+    boolean dropped = catalog.asSchemas().dropSchema(DEFAULT_SCHEMA_NAME, true);
     Assertions.assertFalse(dropped);
   }
 
@@ -246,21 +236,14 @@ public class CatalogKafkaIT extends AbstractIT {
     Exception ex =
         Assertions.assertThrows(
             UnsupportedOperationException.class,
-            () ->
-                catalog
-                    .asSchemas()
-                    .createSchema(
-                        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaName),
-                        "comment",
-                        Collections.emptyMap()));
+            () -> catalog.asSchemas().createSchema(schemaName, "comment", Collections.emptyMap()));
     Assertions.assertTrue(
         ex.getMessage().contains("Kafka catalog does not support schema creation"));
   }
 
   @Test
   public void testListSchema() {
-    NameIdentifier[] schemas =
-        catalog.asSchemas().listSchemas(Namespace.ofSchema(METALAKE_NAME, CATALOG_NAME));
+    NameIdentifier[] schemas = catalog.asSchemas().listSchemas();
     Assertions.assertEquals(1, schemas.length);
     Assertions.assertEquals(DEFAULT_SCHEMA_NAME, schemas[0].name());
   }

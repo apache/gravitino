@@ -207,4 +207,24 @@ public class UserMetaService {
     }
     return newEntity;
   }
+
+  public int deleteUserMetasByLegacyTimeLine(long legacyTimeLine, int limit) {
+    int[] userDeletedCount = new int[] {0};
+    int[] userRoleRelDeletedCount = new int[] {0};
+
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            userDeletedCount[0] =
+                SessionUtils.doWithoutCommitAndFetchResult(
+                    UserMetaMapper.class,
+                    mapper -> mapper.deleteUserMetasByLegacyTimeLine(legacyTimeLine, limit)),
+        () ->
+            userRoleRelDeletedCount[0] =
+                SessionUtils.doWithoutCommitAndFetchResult(
+                    UserRoleRelMapper.class,
+                    mapper ->
+                        mapper.deleteUserRoleRelMetasByLegacyTimeLine(legacyTimeLine, limit)));
+
+    return userDeletedCount[0] + userRoleRelDeletedCount[0];
+  }
 }
