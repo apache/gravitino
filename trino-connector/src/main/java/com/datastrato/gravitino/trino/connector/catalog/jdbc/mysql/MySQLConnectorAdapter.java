@@ -12,17 +12,18 @@ import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadata
 import com.datastrato.gravitino.trino.connector.catalog.HasPropertyMeta;
 import com.datastrato.gravitino.trino.connector.catalog.jdbc.JDBCCatalogPropertyConverter;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
+import io.trino.spi.connector.Connector;
 import io.trino.spi.session.PropertyMetadata;
+import org.apache.commons.lang3.NotImplementedException;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /** Transforming MySQL connector configuration and components into Gravitino connector. */
 public class MySQLConnectorAdapter implements CatalogConnectorAdapter {
 
   private final PropertyConverter catalogConverter;
-  private static final AtomicInteger VERSION = new AtomicInteger(0);
   private final HasPropertyMeta propertyMetadata;
 
   public MySQLConnectorAdapter() {
@@ -31,18 +32,20 @@ public class MySQLConnectorAdapter implements CatalogConnectorAdapter {
   }
 
   @Override
-  public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog)
+  public Map<String, String> buildInternalConnectorConfig(GravitinoCatalog catalog)
       throws Exception {
-    Map<String, Object> config = new HashMap<>();
-    config.put(
-        "catalogHandle",
-        String.format("%s_v%d:normal:default", catalog.getName(), VERSION.getAndIncrement()));
-    config.put("connectorName", "mysql");
+    Map<String, String> config = new HashMap<>();
+    config.put("connector.name", "mysql");
 
     Map<String, String> properties =
         catalogConverter.gravitinoToEngineProperties(catalog.getProperties());
-    config.put("properties", properties);
+    config.putAll(properties);
     return config;
+  }
+
+  @Override
+  public Connector buildInternalConnector(Map<String, String> config) throws Exception {
+    throw new NotImplementedException();
   }
 
   @Override

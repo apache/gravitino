@@ -8,10 +8,13 @@ import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.trino.connector.GravitinoConnector;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
 import com.google.common.base.Preconditions;
+import io.trino.spi.TrinoException;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.session.PropertyMetadata;
 import java.util.List;
 import java.util.Map;
+
+import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_CREATE_INTERNAL_CONNECTOR_ERROR;
 
 /**
  * The CatalogConnector serves as a communication bridge between the Gravitino connector and its
@@ -82,42 +85,35 @@ public class CatalogConnectorContext {
 
   static class Builder {
     private final CatalogConnectorAdapter connectorAdapter;
-    private GravitinoMetalake metalake;
-    private Connector internalConnector;
     private GravitinoCatalog catalog;
+    private GravitinoMetalake metalake;
 
     Builder(CatalogConnectorAdapter connectorAdapter) {
       this.connectorAdapter = connectorAdapter;
     }
 
-    public Builder clone() {
-      return new Builder(connectorAdapter);
+    private Builder(CatalogConnectorAdapter connectorAdapter, GravitinoCatalog catalog) {
+      this.connectorAdapter = connectorAdapter;
+      this.catalog = catalog;
     }
 
-    public Map<String, Object> buildConfig(GravitinoCatalog catalog) throws Exception {
-      return connectorAdapter.buildInternalConnectorConfig(catalog);
+    public Builder clone(GravitinoCatalog catalog) {
+      return new Builder(connectorAdapter, catalog);
     }
+
 
     Builder withMetalake(GravitinoMetalake metalake) {
       this.metalake = metalake;
       return this;
     }
 
-    Builder withInternalConnector(Connector internalConnector) {
-      this.internalConnector = internalConnector;
-      return this;
-    }
-
-    Builder withCatalog(GravitinoCatalog catalog) {
-      this.catalog = catalog;
-      return this;
-    }
-
-    CatalogConnectorContext build() {
+    CatalogConnectorContext build() throws Exception {
       Preconditions.checkArgument(metalake != null, "metalake is not null");
-      Preconditions.checkArgument(internalConnector != null, "internalConnector is not null");
       Preconditions.checkArgument(catalog != null, "catalog is not null");
-      return new CatalogConnectorContext(catalog, metalake, internalConnector, connectorAdapter);
+      Map<String, String> connectorConfig = connectorAdapter.buildInternalConnectorConfig(catalog);
+      Connector connector = connectorAdapter.buildInternalConnector(connectorConfig);
+
+      return new CatalogConnectorContext(catalog, metalake, connector, connectorAdapter);
     }
   }
 }
