@@ -4,12 +4,12 @@
  */
 package com.datastrato.gravitino.spark.connector.integration.test.iceberg;
 
+import com.datastrato.gravitino.spark.connector.iceberg.IcebergPropertiesConstants;
 import com.datastrato.gravitino.spark.connector.iceberg.SparkIcebergTable;
 import com.datastrato.gravitino.spark.connector.integration.test.SparkCommonIT;
 import com.datastrato.gravitino.spark.connector.integration.test.util.SparkMetadataColumnInfo;
 import com.datastrato.gravitino.spark.connector.integration.test.util.SparkTableInfo;
 import com.datastrato.gravitino.spark.connector.integration.test.util.SparkTableInfoChecker;
-import com.datastrato.gravitino.spark.connector.iceberg.IcebergPropertiesConstants;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
