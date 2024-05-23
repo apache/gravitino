@@ -9,7 +9,6 @@ import com.datastrato.gravitino.spark.connector.GravitinoSparkConfig;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import javax.ws.rs.NotSupportedException;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 import org.junit.jupiter.api.Assertions;
@@ -31,7 +30,7 @@ public class TestHivePropertiesConverter {
     Assertions.assertEquals(
         "PARQUET", hiveProperties.get(HivePropertiesConstants.GRAVITINO_HIVE_FORMAT));
     Assertions.assertThrowsExactly(
-        NotSupportedException.class,
+        UnsupportedOperationException.class,
         () ->
             hivePropertiesConverter.toGravitinoTableProperties(
                 ImmutableMap.of(HivePropertiesConstants.SPARK_HIVE_STORED_AS, "notExists")));
@@ -49,7 +48,7 @@ public class TestHivePropertiesConverter {
         hiveProperties.get(HivePropertiesConstants.GRAVITINO_HIVE_FORMAT),
         HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_TEXTFILE);
     Assertions.assertThrowsExactly(
-        NotSupportedException.class,
+        UnsupportedOperationException.class,
         () ->
             hivePropertiesConverter.toGravitinoTableProperties(
                 ImmutableMap.of(TableCatalog.PROP_PROVIDER, "notExists")));
