@@ -49,6 +49,9 @@ public class HiveUserAuthenticationIT extends AbstractIT {
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
+  private static final String SDK_KERBEROS_PRINCIPAL_KEY = "client.kerberos.principal";
+  private static final String SDK_KERBEROS_KEYTAB_KEY = "client.kerberos.keytab";
+
   private static final String GRAVITINO_CLIENT_PRINCIPAL = "gravitino_client@HADOOPKRB";
   private static final String GRAVITINO_CLIENT_KEYTAB = "/gravitino_client.keytab";
 
@@ -148,6 +151,8 @@ public class HiveUserAuthenticationIT extends AbstractIT {
         "gravitino.authenticator.kerberos.principal", GRAVITINO_SERVER_PRINCIPAL);
     AbstractIT.customConfigs.put(
         "gravitino.authenticator.kerberos.keytab", TMP_DIR + GRAVITINO_SERVER_KEYTAB);
+    AbstractIT.customConfigs.put(SDK_KERBEROS_KEYTAB_KEY, TMP_DIR + GRAVITINO_CLIENT_KEYTAB);
+    AbstractIT.customConfigs.put(SDK_KERBEROS_PRINCIPAL_KEY, GRAVITINO_CLIENT_PRINCIPAL);
   }
 
   @Test

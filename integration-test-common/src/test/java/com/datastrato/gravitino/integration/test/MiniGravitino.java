@@ -11,8 +11,13 @@ import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
+import com.datastrato.gravitino.client.ErrorHandlers;
+import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.client.HTTPClient;
+import com.datastrato.gravitino.client.KerberosTokenProvider;
 import com.datastrato.gravitino.client.RESTClient;
+import com.datastrato.gravitino.dto.responses.VersionResponse;
+import com.datastrato.gravitino.exceptions.RESTException;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.integration.test.util.KerberosProviderHelper;
 import com.datastrato.gravitino.integration.test.util.OAuthMockDataProvider;
@@ -25,8 +30,10 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -48,6 +55,7 @@ public class MiniGravitino {
   private final File mockConfDir;
   private final ServerConfig serverConfig = new ServerConfig();
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
+  private Properties properties;
 
   private String host;
 
@@ -80,7 +88,7 @@ public class MiniGravitino {
         Paths.get(ITUtils.joinPath(gravitinoRootDir, "conf", "gravitino-env.sh.template")),
         Paths.get(ITUtils.joinPath(mockConfDir.getAbsolutePath(), "gravitino-env.sh")));
 
-    Properties properties =
+    properties =
         serverConfig.loadPropertiesFromFile(
             new File(ITUtils.joinPath(mockConfDir.getAbsolutePath(), "gravitino.conf")));
 
@@ -238,35 +246,51 @@ public class MiniGravitino {
   }
 
   private boolean checkIfServerIsRunning() {
-    //    String URI = String.format("http://%s:%d", host, port);
-    //    LOG.info("checkIfServerIsRunning() URI: {}", URI);
-    //
-    //    VersionResponse response = null;
-    //    try {
-    //      response =
-    //          restClient.get(
-    //              "api/version",
-    //              VersionResponse.class,
-    //              Collections.emptyMap(),
-    //              ErrorHandlers.restErrorHandler());
-    //    } catch (RESTException e) {
-    //      LOG.warn("checkIfServerIsRunning() fails, GravitinoServer is not running {}",
-    // e.getMessage());
-    //      return false;
-    //    }
-    //    if (response != null && response.getCode() == 0) {
-    //      return true;
-    //    } else {
-    //      LOG.warn("checkIfServerIsRunning() fails, GravitinoServer is not running");
-    //      return false;
-    //    }
+    String URI = String.format("http://%s:%d", host, port);
+    LOG.info("checkIfServerIsRunning() URI: {}", URI);
 
+    // Use kerberos, we need to use sdk to check
+    if (Objects.equals(serverConfig.get(Configs.AUTHENTICATOR), "kerberos")) {
+      try {
+        Thread.sleep(5000);
+        KerberosTokenProvider provider =
+            KerberosTokenProvider.builder()
+                .withClientPrincipal((String) properties.get("client.kerberos.principal"))
+                .withKeyTabFile(new File((String) properties.get("client.kerberos.keytab")))
+                .build();
+        GravitinoAdminClient adminClient =
+            GravitinoAdminClient.builder(URI).withKerberosAuth(provider).build();
+
+        adminClient.listMetalakes();
+        return true;
+      } catch (Exception e) {
+        LOG.warn("Kerberos checkIfServerIsRunning() fails, GravitinoServer is not running {}", e.getMessage());
+        return true;
+      }
+    }
+
+    // Not auth, we can use the rest client to check
+    VersionResponse response = null;
     try {
       Thread.sleep(5000);
-    } catch (Exception e) {
+      response =
+          restClient.get(
+              "api/version",
+              VersionResponse.class,
+              Collections.emptyMap(),
+              ErrorHandlers.restErrorHandler());
+    } catch (RESTException e) {
+      LOG.warn("checkIfServerIsRunning() fails, GravitinoServer is not running {}", e.getMessage());
+      return false;
+    } catch (Exception e1) {
       return false;
     }
 
-    return true;
+    if (response != null && response.getCode() == 0) {
+      return true;
+    } else {
+      LOG.warn("checkIfServerIsRunning() fails, GravitinoServer is not running");
+      return false;
+    }
   }
 }
