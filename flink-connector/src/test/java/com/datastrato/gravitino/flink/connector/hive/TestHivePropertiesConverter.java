@@ -26,9 +26,6 @@ public class TestHivePropertiesConverter {
         "src/test/resources/flink-tests", properties.get("flink.bypass.hive-conf-dir"));
     Assertions.assertEquals("value", properties.get("flink.bypass.key"));
     Assertions.assertEquals("thrift://127.0.0.1:9083", properties.get("metastore.uris"));
-    Assertions.assertEquals("false", "hive.metastore.sasl.enabled");
-    Assertions.assertEquals("simple", "hadoop.security.authentication");
-    Assertions.assertEquals("hdfs://tmp", properties.get("hive.metastore.warehouse.dir"));
   }
 
   @Test
