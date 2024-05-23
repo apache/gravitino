@@ -91,7 +91,7 @@ public class HiveContainer extends BaseContainer {
   protected boolean checkContainerStatus(int retryLimit) {
     await()
         .atMost(150, TimeUnit.SECONDS)
-        .pollInterval(100 / retryLimit, TimeUnit.SECONDS)
+        .pollInterval(150 / retryLimit, TimeUnit.SECONDS)
         .until(
             () -> {
               try {
