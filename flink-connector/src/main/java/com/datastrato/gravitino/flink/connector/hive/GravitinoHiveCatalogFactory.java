@@ -5,7 +5,9 @@
 
 package com.datastrato.gravitino.flink.connector.hive;
 
+import com.datastrato.gravitino.flink.connector.utils.FactoryUtils;
 import com.datastrato.gravitino.flink.connector.utils.PropertyUtils;
+import com.google.common.collect.ImmutableSet;
 import java.util.Set;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.table.catalog.Catalog;
@@ -30,7 +32,7 @@ public class GravitinoHiveCatalogFactory implements CatalogFactory {
   public Catalog createCatalog(Context context) {
     this.hiveCatalogFactory = new HiveCatalogFactory();
     final FactoryUtil.CatalogFactoryHelper helper =
-        FactoryUtil.createCatalogFactoryHelper(this, context);
+        FactoryUtils.createCatalogFactoryHelper(this, context);
     helper.validateExcept(
         PropertyUtils.HIVE_PREFIX,
         PropertyUtils.HADOOP_PREFIX,
@@ -41,7 +43,7 @@ public class GravitinoHiveCatalogFactory implements CatalogFactory {
     String hadoopConfDir = helper.getOptions().get(HiveCatalogFactoryOptions.HADOOP_CONF_DIR);
     HiveConf hiveConf = HiveCatalog.createHiveConf(hiveConfDir, hadoopConfDir);
     // Put the hadoop properties managed by Gravitino into the hiveConf
-    PropertyUtils.getHadoopAndHivePorperties(context.getOptions()).forEach(hiveConf::set);
+    PropertyUtils.getHadoopAndHiveProperties(context.getOptions()).forEach(hiveConf::set);
     return new GravitinoHiveCatalog(
         context.getName(),
         helper.getOptions().get(HiveCatalogFactoryOptions.DEFAULT_DATABASE),
@@ -56,7 +58,10 @@ public class GravitinoHiveCatalogFactory implements CatalogFactory {
 
   @Override
   public Set<ConfigOption<?>> requiredOptions() {
-    return hiveCatalogFactory.requiredOptions();
+    return ImmutableSet.<ConfigOption<?>>builder()
+        .addAll(hiveCatalogFactory.requiredOptions())
+        .add(GravitinoHiveCatalogFactoryOptions.HIVE_METASTORE_URIS)
+        .build();
   }
 
   @Override
