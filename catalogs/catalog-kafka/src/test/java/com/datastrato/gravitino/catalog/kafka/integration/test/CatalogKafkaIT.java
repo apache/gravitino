@@ -114,7 +114,7 @@ public class CatalogKafkaIT extends AbstractIT {
   @Test
   public void testCatalog() throws ExecutionException, InterruptedException {
     // test create catalog
-    String catalogName = GravitinoITUtils.genRandomName("test-catalog");
+    String catalogName = GravitinoITUtils.genRandomName("test_catalog");
     String comment = "test catalog";
     Map<String, String> properties =
         ImmutableMap.of(BOOTSTRAP_SERVERS, kafkaBootstrapServers, "key1", "value1");
@@ -151,7 +151,7 @@ public class CatalogKafkaIT extends AbstractIT {
 
   @Test
   public void testCatalogException() {
-    String catalogName = GravitinoITUtils.genRandomName("test-catalog");
+    String catalogName = GravitinoITUtils.genRandomName("test_catalog");
     Exception exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
