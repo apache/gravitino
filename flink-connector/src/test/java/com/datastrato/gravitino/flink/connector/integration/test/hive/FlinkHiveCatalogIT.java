@@ -8,7 +8,6 @@ import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.ME
 
 import com.datastrato.gravitino.flink.connector.PropertiesConverter;
 import com.datastrato.gravitino.flink.connector.hive.GravitinoHiveCatalog;
-import com.datastrato.gravitino.flink.connector.hive.GravitinoHiveCatalogFactory;
 import com.datastrato.gravitino.flink.connector.hive.GravitinoHiveCatalogFactoryOptions;
 import com.datastrato.gravitino.flink.connector.integration.test.FlinkEnvIT;
 import com.google.common.collect.ImmutableMap;
@@ -39,7 +38,8 @@ public class FlinkHiveCatalogIT extends FlinkEnvIT {
     // Create a new catalog.
     String catalogName = "gravitino_hive";
     Configuration configuration = new Configuration();
-    configuration.set(CommonCatalogOptions.CATALOG_TYPE, GravitinoHiveCatalogFactory.IDENTIFIER);
+    configuration.set(
+        CommonCatalogOptions.CATALOG_TYPE, GravitinoHiveCatalogFactoryOptions.IDENTIFIER);
     configuration.set(HiveCatalogFactoryOptions.HIVE_CONF_DIR, "src/test/resources/flink-tests");
     configuration.set(
         GravitinoHiveCatalogFactoryOptions.HIVE_METASTORE_URIS, "thrift://127.0.0.1:9084");
@@ -60,7 +60,7 @@ public class FlinkHiveCatalogIT extends FlinkEnvIT {
         "src/test/resources/flink-tests",
         flinkProperties.get(flinkByPass(HiveCatalogFactoryOptions.HIVE_CONF_DIR.key())));
     Assertions.assertEquals(
-        GravitinoHiveCatalogFactory.IDENTIFIER,
+        GravitinoHiveCatalogFactoryOptions.IDENTIFIER,
         flinkProperties.get(flinkByPass(CommonCatalogOptions.CATALOG_TYPE.key())));
 
     // Get the created catalog.
@@ -125,7 +125,7 @@ public class FlinkHiveCatalogIT extends FlinkEnvIT {
         "src/test/resources/flink-tests",
         flinkProperties.get(flinkByPass(HiveCatalogFactoryOptions.HIVE_CONF_DIR.key())));
     Assertions.assertEquals(
-        GravitinoHiveCatalogFactory.IDENTIFIER,
+        GravitinoHiveCatalogFactoryOptions.IDENTIFIER,
         flinkProperties.get(flinkByPass(CommonCatalogOptions.CATALOG_TYPE.key())));
     Assertions.assertEquals(
         "unknown.value",

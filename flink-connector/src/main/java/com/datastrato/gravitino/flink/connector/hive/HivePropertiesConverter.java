@@ -48,7 +48,7 @@ public class HivePropertiesConverter implements PropertiesConverter {
   public Map<String, String> toFlinkCatalogProperties(Map<String, String> gravitinoProperties) {
     Map<String, String> flinkCatalogProperties = Maps.newHashMap();
     flinkCatalogProperties.put(
-        CommonCatalogOptions.CATALOG_TYPE.key(), GravitinoHiveCatalogFactory.IDENTIFIER);
+        CommonCatalogOptions.CATALOG_TYPE.key(), GravitinoHiveCatalogFactoryOptions.IDENTIFIER);
 
     gravitinoProperties.forEach(
         (key, value) -> {

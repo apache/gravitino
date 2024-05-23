@@ -10,6 +10,9 @@ import org.apache.hadoop.hive.conf.HiveConf;
 
 public class GravitinoHiveCatalogFactoryOptions {
 
+  /** Identifier for the {@link GravitinoHiveCatalog}. */
+  public static final String IDENTIFIER = "gravitino-hive";
+
   public static final ConfigOption<String> HIVE_METASTORE_URIS =
       ConfigOptions.key(HiveConf.ConfVars.METASTOREURIS.varname)
           .stringType()

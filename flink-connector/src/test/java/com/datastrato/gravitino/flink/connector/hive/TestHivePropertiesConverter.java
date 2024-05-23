@@ -51,7 +51,7 @@ public class TestHivePropertiesConverter {
     Assertions.assertEquals(3, flinkCatalogProperties.size());
     Assertions.assertEquals("value", flinkCatalogProperties.get("key"));
     Assertions.assertEquals(
-        GravitinoHiveCatalogFactory.IDENTIFIER, flinkCatalogProperties.get("type"));
+        GravitinoHiveCatalogFactoryOptions.IDENTIFIER, flinkCatalogProperties.get("type"));
     Assertions.assertEquals("thrift://xxx", flinkCatalogProperties.get("hive.metastore.uris"));
   }
 }

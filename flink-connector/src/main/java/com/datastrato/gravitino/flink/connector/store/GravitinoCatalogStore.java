@@ -8,7 +8,7 @@ package com.datastrato.gravitino.flink.connector.store;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.flink.connector.PropertiesConverter;
 import com.datastrato.gravitino.flink.connector.catalog.GravitinoCatalogManager;
-import com.datastrato.gravitino.flink.connector.hive.GravitinoHiveCatalogFactory;
+import com.datastrato.gravitino.flink.connector.hive.GravitinoHiveCatalogFactoryOptions;
 import com.datastrato.gravitino.flink.connector.hive.HivePropertiesConverter;
 import java.util.Map;
 import java.util.Optional;
@@ -90,7 +90,7 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
             CommonCatalogOptions.CATALOG_TYPE);
 
     switch (catalogType) {
-      case GravitinoHiveCatalogFactory.IDENTIFIER:
+      case GravitinoHiveCatalogFactoryOptions.IDENTIFIER:
         return "hive";
       default:
         throw new IllegalArgumentException(
@@ -106,7 +106,7 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
             CommonCatalogOptions.CATALOG_TYPE);
 
     switch (catalogType) {
-      case GravitinoHiveCatalogFactory.IDENTIFIER:
+      case GravitinoHiveCatalogFactoryOptions.IDENTIFIER:
         return Catalog.Type.RELATIONAL;
       default:
         throw new IllegalArgumentException(

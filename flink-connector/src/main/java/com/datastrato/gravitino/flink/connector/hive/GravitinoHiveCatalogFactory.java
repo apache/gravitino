@@ -5,6 +5,8 @@
 
 package com.datastrato.gravitino.flink.connector.hive;
 
+import static com.datastrato.gravitino.flink.connector.hive.GravitinoHiveCatalogFactoryOptions.IDENTIFIER;
+
 import com.datastrato.gravitino.flink.connector.utils.FactoryUtils;
 import com.datastrato.gravitino.flink.connector.utils.PropertyUtils;
 import com.google.common.collect.ImmutableSet;
@@ -23,9 +25,6 @@ import org.apache.hadoop.hive.conf.HiveConf;
  * discovery in Flink.
  */
 public class GravitinoHiveCatalogFactory implements CatalogFactory {
-  /** Identifier for the {@link GravitinoHiveCatalog}. */
-  public static final String IDENTIFIER = "gravitino-hive";
-
   private HiveCatalogFactory hiveCatalogFactory;
 
   @Override
