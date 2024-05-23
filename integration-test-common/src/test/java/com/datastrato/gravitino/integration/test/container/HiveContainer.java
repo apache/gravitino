@@ -23,6 +23,8 @@ public class HiveContainer extends BaseContainer {
   public static final Logger LOG = LoggerFactory.getLogger(HiveContainer.class);
 
   public static final String DEFAULT_IMAGE = System.getenv("GRAVITINO_CI_HIVE_DOCKER_IMAGE");
+  public static final String KERBEROS_IMAGE =
+      System.getenv("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE");
   public static final String HOST_NAME = "gravitino-ci-hive";
   private static final int MYSQL_PORT = 3306;
   public static final int HDFS_DEFAULTFS_PORT = 9000;
@@ -49,13 +51,13 @@ public class HiveContainer extends BaseContainer {
   @Override
   protected void setupContainer() {
     super.setupContainer();
-    withLogConsumer(new PrintingContainerLog(format("%-14s| ", "HiveContainer")));
+    withLogConsumer(new PrintingContainerLog(format("%-14s| ", "HiveContainer-" + hostName)));
   }
 
   @Override
   public void start() {
     super.start();
-    Preconditions.check("Hive container startup failed!", checkContainerStatus(10));
+    Preconditions.check("Hive container startup failed!", checkContainerStatus(15));
   }
 
   @Override
@@ -85,83 +87,66 @@ public class HiveContainer extends BaseContainer {
 
   @Override
   protected boolean checkContainerStatus(int retryLimit) {
-    int nRetry = 0;
-    boolean isHiveContainerReady = false;
-    int sleepTimeMillis = 10_000;
-    while (nRetry++ < retryLimit) {
-      try {
-        String[] commandAndArgs = new String[] {"bash", "/tmp/check-status.sh"};
-        Container.ExecResult execResult = executeInContainer(commandAndArgs);
-        if (execResult.getExitCode() != 0) {
-          String message =
-              format(
-                  "Command [%s] exited with %s",
-                  String.join(" ", commandAndArgs), execResult.getExitCode());
-          LOG.error("{}", message);
-          LOG.error("stderr: {}", execResult.getStderr());
-          LOG.error("stdout: {}", execResult.getStdout());
-        } else {
-          LOG.info("Hive container startup success!");
-          isHiveContainerReady = true;
-          break;
-        }
-        LOG.info(
-            "Hive container is not ready, recheck({}/{}) after {}ms",
-            nRetry,
-            retryLimit,
-            sleepTimeMillis);
-        Thread.sleep(sleepTimeMillis);
-      } catch (RuntimeException e) {
-        LOG.error(e.getMessage(), e);
-      } catch (InterruptedException e) {
-        // ignore
-      }
-    }
+    await()
+        .atMost(150, TimeUnit.SECONDS)
+        .pollInterval(150 / retryLimit, TimeUnit.SECONDS)
+        .until(
+            () -> {
+              try {
+                String[] commandAndArgs = new String[] {"bash", "/tmp/check-status.sh"};
+                Container.ExecResult execResult = executeInContainer(commandAndArgs);
+                if (execResult.getExitCode() != 0) {
+                  String message =
+                      format(
+                          "Command [%s] exited with %s",
+                          String.join(" ", commandAndArgs), execResult.getExitCode());
+                  LOG.error("{}", message);
+                  LOG.error("stderr: {}", execResult.getStderr());
+                  LOG.error("stdout: {}", execResult.getStdout());
+                } else {
+                  LOG.info("Hive container startup success!");
+                  return true;
+                }
+              } catch (RuntimeException e) {
+                LOG.error(e.getMessage(), e);
+              }
+              return false;
+            });
 
-    // Use JDBC driver to test if hive server is ready
-    boolean isHiveConnectSuccess = false;
-    boolean isHdfsConnectSuccess = false;
-
-    // list all databases
-    int i = 0;
-    Container.ExecResult result;
-    String sql = "show databases";
-    while (i++ < retryLimit) {
-      try {
-        result = executeInContainer("hive", "-e", sql);
-        if (result.getStdout().contains("default")) {
-          isHiveConnectSuccess = true;
-          break;
-        }
-        Thread.sleep(3000);
-      } catch (Exception e) {
-        LOG.error("Failed to execute sql: {}", sql, e);
-      }
-    }
-
-    if (!isHiveConnectSuccess) {
-      return false;
-    }
-
-    i = 0;
-    // Create a simple table and insert a record
-    while (i++ < retryLimit) {
-      try {
-        result =
-            executeInContainer(
-                "hive",
-                "-e",
-                "CREATE TABLE IF NOT EXISTS default.employee ( eid int, name String, "
-                    + "salary String, destination String) ");
-        if (result.getExitCode() == 0) {
-          isHdfsConnectSuccess = true;
-          break;
-        }
-        Thread.sleep(3000);
-      } catch (Exception e) {
-        LOG.error("Failed to execute sql: {}", sql, e);
-      }
-    }
+    final String showDatabaseSQL = "show databases";
+    await()
+        .atMost(30, TimeUnit.SECONDS)
+        .pollInterval(30 / retryLimit, TimeUnit.SECONDS)
+        .until(
+            () -> {
+              try {
+                Container.ExecResult result = executeInContainer("hive", "-e", showDatabaseSQL);
+                if (result.getStdout().contains("default")) {
+                  return true;
+                }
+              } catch (Exception e) {
+                LOG.error("Failed to execute sql: {}", showDatabaseSQL, e);
+              }
+              return false;
+            });
+    final String createTableSQL =
+        "CREATE TABLE IF NOT EXISTS default.employee ( eid int, name String, "
+            + "salary String, destination String) ";
+    await()
+        .atMost(30, TimeUnit.SECONDS)
+        .pollInterval(30 / retryLimit, TimeUnit.SECONDS)
+        .until(
+            () -> {
+              try {
+                Container.ExecResult result = executeInContainer("hive", "-e", createTableSQL);
+                if (result.getExitCode() == 0) {
+                  return true;
+                }
+              } catch (Exception e) {
+                LOG.error("Failed to execute sql: {}", createTableSQL, e);
+              }
+              return false;
+            });
 
     i = 0;
     String containerIp = getContainerIpAddress();
@@ -202,7 +187,13 @@ public class HiveContainer extends BaseContainer {
     @Override
     public HiveContainer build() {
       return new HiveContainer(
-          image, hostName, exposePorts, extraHosts, filesToMount, envVars, network);
+          kerberosEnabled ? KERBEROS_IMAGE : image,
+          kerberosEnabled ? "kerberos-" + hostName : hostName,
+          exposePorts,
+          extraHosts,
+          filesToMount,
+          envVars,
+          network);
     }
   }
 }
