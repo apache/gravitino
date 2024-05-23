@@ -51,10 +51,9 @@ public class ContainerSuite implements Closeable {
 
   protected static final CloseableGroup closer = CloseableGroup.create();
 
-  private ContainerSuite() {
-    try {
+  private static void init() {
+    try (DockerClient dockerClient = DockerClientFactory.instance().client()) {
       // Check if docker is available
-      DockerClient dockerClient = DockerClientFactory.instance().client();
       Info info = dockerClient.infoCmd().exec();
       LOG.info("Docker info: {}", info);
 
@@ -70,6 +69,7 @@ public class ContainerSuite implements Closeable {
     if (instance == null) {
       synchronized (ContainerSuite.class) {
         if (instance == null) {
+          init();
           instance = new ContainerSuite();
         }
       }
