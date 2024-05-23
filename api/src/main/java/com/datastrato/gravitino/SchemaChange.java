@@ -18,7 +18,7 @@
 // Referred from Apache Spark's connector/catalog implementation
 // sql/catalyst/src/main/java/org/apache/spark/sql/connector/catalog/NamespaceChange.java
 
-package com.datastrato.gravitino.rel;
+package com.datastrato.gravitino;
 
 import com.datastrato.gravitino.annotation.Evolving;
 import java.util.Objects;
