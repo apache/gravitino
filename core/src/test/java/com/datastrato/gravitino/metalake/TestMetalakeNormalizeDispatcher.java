@@ -8,7 +8,7 @@ import static com.datastrato.gravitino.Entity.SYSTEM_METALAKE_RESERVED_NAME;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.EntityStore;
-import com.datastrato.gravitino.MetalakeChange;
+import com.datastrato.gravitino.Metalake;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.datastrato.gravitino.storage.memory.TestMemoryEntityStore;
@@ -44,6 +44,15 @@ public class TestMetalakeNormalizeDispatcher {
 
   @Test
   public void testNameSpc() {
+    // Test for valid names
+    String[] legalNames = {"metalake", "_metalake", "1_metalake", "_", "1"};
+    for (String legalName : legalNames) {
+      NameIdentifier metalakeIdent = NameIdentifier.of(legalName);
+      Metalake metalake = metalakeNormalizeDispatcher.createMetalake(metalakeIdent, null, null);
+      Assertions.assertEquals(legalName, metalake.name());
+    }
+
+    // Test for illegal and reserved names
     NameIdentifier metalakeIdent1 = NameIdentifier.of(SYSTEM_METALAKE_RESERVED_NAME);
     Exception exception =
         Assertions.assertThrows(
@@ -51,19 +60,45 @@ public class TestMetalakeNormalizeDispatcher {
             () -> metalakeNormalizeDispatcher.createMetalake(metalakeIdent1, null, null));
     Assertions.assertEquals("The metalake name 'system' is reserved.", exception.getMessage());
 
-    NameIdentifier metalakeIdent2 = NameIdentifier.of("a-b");
-    exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> metalakeNormalizeDispatcher.createMetalake(metalakeIdent2, null, null));
-    Assertions.assertEquals("The metalake name 'a-b' is illegal.", exception.getMessage());
-
-    exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                metalakeNormalizeDispatcher.alterMetalake(
-                    metalakeIdent2, MetalakeChange.rename("a-b")));
-    Assertions.assertEquals("The metalake name 'a-b' is illegal.", exception.getMessage());
+    String[] illegalNames = {
+      "metalake-xxx",
+      "metalake/xxx",
+      "metalake.xxx",
+      "metalake@xxx",
+      "metalake#xxx",
+      "metalake$xxx",
+      "metalake%xxx",
+      "metalake^xxx",
+      "metalake&xxx",
+      "metalake*xxx",
+      "metalake+xxx",
+      "metalake=xxx",
+      "metalake|xxx",
+      "metalake\\xxx",
+      "metalake`xxx",
+      "metalake~xxx",
+      "metalake!xxx",
+      "metalake\"xxx",
+      "metalake'xxx",
+      "metalake<xxx",
+      "metalake>xxx",
+      "metalake,xxx",
+      "metalake?xxx",
+      "metalake:xxx",
+      "metalake;xxx",
+      "metalake[xxx",
+      "metalake]xxx",
+      "metalake{xxx",
+      "metalake}xxx"
+    };
+    for (String illegalName : illegalNames) {
+      NameIdentifier metalakeIdent = NameIdentifier.of(illegalName);
+      exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> metalakeNormalizeDispatcher.createMetalake(metalakeIdent, null, null));
+      Assertions.assertEquals(
+          "The metalake name '" + illegalName + "' is illegal.", exception.getMessage());
+    }
   }
 }

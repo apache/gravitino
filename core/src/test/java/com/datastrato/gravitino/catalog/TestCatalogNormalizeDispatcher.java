@@ -7,7 +7,7 @@ package com.datastrato.gravitino.catalog;
 import static com.datastrato.gravitino.Catalog.Type.RELATIONAL;
 import static com.datastrato.gravitino.Entity.SECURABLE_ENTITY_RESERVED_NAME;
 
-import com.datastrato.gravitino.CatalogChange;
+import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.EntityStore;
@@ -79,6 +79,16 @@ public class TestCatalogNormalizeDispatcher {
 
   @Test
   public void testNameSpc() {
+    // Test for valid names
+    String[] legalNames = {"catalog", "_catalog", "1_catalog", "_", "1"};
+    for (String legalName : legalNames) {
+      NameIdentifier catalogIdent = NameIdentifier.of(metalake, legalName);
+      Catalog catalog =
+          catalogNormalizeDispatcher.createCatalog(catalogIdent, RELATIONAL, "test", null, null);
+      Assertions.assertEquals(legalName, catalog.name());
+    }
+
+    // Test for illegal and reserved names
     NameIdentifier catalogIdent1 = NameIdentifier.of(metalake, SECURABLE_ENTITY_RESERVED_NAME);
     Exception exception =
         Assertions.assertThrows(
@@ -88,21 +98,49 @@ public class TestCatalogNormalizeDispatcher {
                     catalogIdent1, RELATIONAL, "test", null, null));
     Assertions.assertEquals("The catalog name '*' is reserved.", exception.getMessage());
 
-    NameIdentifier catalogIdent2 = NameIdentifier.of(metalake, "a-b");
-    exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                catalogNormalizeDispatcher.createCatalog(
-                    catalogIdent2, RELATIONAL, "test", null, null));
-    Assertions.assertEquals("The catalog name 'a-b' is illegal.", exception.getMessage());
-
-    exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                catalogNormalizeDispatcher.alterCatalog(
-                    catalogIdent2, CatalogChange.rename("a-b")));
-    Assertions.assertEquals("The catalog name 'a-b' is illegal.", exception.getMessage());
+    String[] illegalNames = {
+      "catalog-xxx",
+      "catalog/xxx",
+      "catalog.xxx",
+      "catalog xxx",
+      "catalog(xxx)",
+      "catalog@xxx",
+      "catalog#xxx",
+      "catalog$xxx",
+      "catalog%xxx",
+      "catalog^xxx",
+      "catalog&xxx",
+      "catalog*xxx",
+      "catalog+xxx",
+      "catalog=xxx",
+      "catalog|xxx",
+      "catalog\\xxx",
+      "catalog`xxx",
+      "catalog~xxx",
+      "catalog!xxx",
+      "catalog\"xxx",
+      "catalog'xxx",
+      "catalog<xxx",
+      "catalog>xxx",
+      "catalog,xxx",
+      "catalog?xxx",
+      "catalog:xxx",
+      "catalog;xxx",
+      "catalog[xxx",
+      "catalog]xxx",
+      "catalog{xxx",
+      "catalog}xxx"
+    };
+    for (String illegalName : illegalNames) {
+      NameIdentifier catalogIdent2 = NameIdentifier.of(metalake, illegalName);
+      exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  catalogNormalizeDispatcher.createCatalog(
+                      catalogIdent2, RELATIONAL, "test", null, null));
+      Assertions.assertEquals(
+          "The catalog name '" + illegalName + "' is illegal.", exception.getMessage());
+    }
   }
 }

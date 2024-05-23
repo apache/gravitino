@@ -21,10 +21,10 @@ public class MetalakeNormalizeDispatcher implements MetalakeDispatcher {
   /**
    * Regular expression explanation:
    *
-   * <p>^[a-zA-Z_] - Starts with a letter, digit, or underscore
+   * <p>^[\w] - Starts with a letter, digit, or underscore
    *
-   * <p>[a-zA-Z0-9_]{0,63} - Followed by 0 to 63 characters (making the total length at most 64) of
-   * letters (both cases), digits, underscores
+   * <p>[\w]{0,63} - Followed by 0 to 63 characters (making the total length at most 64) of letters
+   * (both cases), digits, underscores
    *
    * <p>$ - End of the string
    */
