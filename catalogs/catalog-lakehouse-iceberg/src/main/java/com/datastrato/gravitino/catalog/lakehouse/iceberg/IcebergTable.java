@@ -252,7 +252,7 @@ public class IcebergTable extends BaseTable {
 
     properties.put(FORMAT_VERSION, String.valueOf(table.formatVersion()));
 
-    if (table.sortOrder().isUnsorted()) {
+    if (!table.sortOrder().isUnsorted()) {
       properties.put(SORT_ORDER, describeIcebergSortOrder(table.sortOrder()));
     }
 
