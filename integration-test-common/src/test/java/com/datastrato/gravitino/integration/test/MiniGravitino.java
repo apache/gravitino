@@ -264,7 +264,9 @@ public class MiniGravitino {
         adminClient.listMetalakes();
         return true;
       } catch (Exception e) {
-        LOG.warn("Kerberos checkIfServerIsRunning() fails, GravitinoServer is not running {}", e.getMessage());
+        LOG.warn(
+            "Kerberos checkIfServerIsRunning() fails, GravitinoServer is not running {}",
+            e.getMessage());
         return true;
       }
     }
