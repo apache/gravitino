@@ -19,3 +19,4 @@ class TestNameIdentifier(unittest.TestCase):
         identifier_dict = {name_identifier1: "test1", name_identifier2: "test2"}
 
         self.assertEqual("test1", identifier_dict.get(name_identifier1))
+        self.assertNotEqual("test2", identifier_dict.get(name_identifier1))
