@@ -11,11 +11,8 @@ import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
-import com.datastrato.gravitino.client.ErrorHandlers;
 import com.datastrato.gravitino.client.HTTPClient;
 import com.datastrato.gravitino.client.RESTClient;
-import com.datastrato.gravitino.dto.responses.VersionResponse;
-import com.datastrato.gravitino.exceptions.RESTException;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.integration.test.util.KerberosProviderHelper;
 import com.datastrato.gravitino.integration.test.util.OAuthMockDataProvider;
@@ -28,7 +25,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -242,26 +238,35 @@ public class MiniGravitino {
   }
 
   private boolean checkIfServerIsRunning() {
-    String URI = String.format("http://%s:%d", host, port);
-    LOG.info("checkIfServerIsRunning() URI: {}", URI);
+    //    String URI = String.format("http://%s:%d", host, port);
+    //    LOG.info("checkIfServerIsRunning() URI: {}", URI);
+    //
+    //    VersionResponse response = null;
+    //    try {
+    //      response =
+    //          restClient.get(
+    //              "api/version",
+    //              VersionResponse.class,
+    //              Collections.emptyMap(),
+    //              ErrorHandlers.restErrorHandler());
+    //    } catch (RESTException e) {
+    //      LOG.warn("checkIfServerIsRunning() fails, GravitinoServer is not running {}",
+    // e.getMessage());
+    //      return false;
+    //    }
+    //    if (response != null && response.getCode() == 0) {
+    //      return true;
+    //    } else {
+    //      LOG.warn("checkIfServerIsRunning() fails, GravitinoServer is not running");
+    //      return false;
+    //    }
 
-    VersionResponse response = null;
     try {
-      response =
-          restClient.get(
-              "api/version",
-              VersionResponse.class,
-              Collections.emptyMap(),
-              ErrorHandlers.restErrorHandler());
-    } catch (RESTException e) {
-      LOG.warn("checkIfServerIsRunning() fails, GravitinoServer is not running {}", e.getMessage());
+      Thread.sleep(5000);
+    } catch (Exception e) {
       return false;
     }
-    if (response != null && response.getCode() == 0) {
-      return true;
-    } else {
-      LOG.warn("checkIfServerIsRunning() fails, GravitinoServer is not running");
-      return false;
-    }
+
+    return true;
   }
 }

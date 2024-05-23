@@ -50,6 +50,10 @@ public class HiveContainer extends BaseContainer {
     super(image, hostName, ports, extraHosts, filesToMount, envVars, network);
   }
 
+  public String getHostName() {
+    return hostName;
+  }
+
   @Override
   protected void setupContainer() {
     super.setupContainer();
