@@ -1,0 +1,26 @@
+<configuration>
+  <property>
+    <name>mapreduce.map.memory.mb</name>
+    <value>3072</value>
+  </property>
+
+  <property>
+    <name>mapreduce.reduce.memory.mb</name>
+    <value>3072</value>
+  </property>
+
+  <property>
+    <name>mapreduce.map.java.opts</name>
+    <value>-Xmx3G</value>
+  </property>
+
+  <property>
+    <name>mapreduce.reduce.java.opts</name>
+    <value>-Xmx3G</value>
+  </property>
+
+  <property>
+    <name>mapred.child.java.opts</name>
+    <value>-Xmx3G -XX:+UseConcMarkSweepGC</value>
+  </property>
+</configuration>

@@ -10,7 +10,6 @@ import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.ProxyPlugin;
 import com.datastrato.gravitino.connector.capability.Capability;
 import com.datastrato.gravitino.file.FilesetCatalog;
-import com.datastrato.gravitino.rel.SupportsSchemas;
 import java.util.Map;
 import java.util.Optional;
 
@@ -35,11 +34,6 @@ public class HadoopCatalog extends BaseCatalog<HadoopCatalog> {
   @Override
   protected Capability newCapability() {
     return new HadoopCatalogCapability();
-  }
-
-  @Override
-  public SupportsSchemas asSchemas() {
-    return (HadoopCatalogOperations) ops();
   }
 
   @Override

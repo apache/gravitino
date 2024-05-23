@@ -7,13 +7,13 @@ package com.datastrato.gravitino;
 import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.file.FilesetCatalog;
 import com.datastrato.gravitino.messaging.TopicCatalog;
-import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
 import java.util.Map;
 
 /**
  * The interface of a catalog. The catalog is the second level entity in the gravitino system,
- * containing a set of tables.
+ * containing a set of tables. The server side should use the other one with the same name in the
+ * core module.
  */
 @Evolving
 public interface Catalog extends Auditable {
@@ -72,8 +72,8 @@ public interface Catalog extends Auditable {
   /**
    * Return the {@link SupportsSchemas} if the catalog supports schema operations.
    *
-   * @throws UnsupportedOperationException if the catalog does not support schema operations.
    * @return The {@link SupportsSchemas} if the catalog supports schema operations.
+   * @throws UnsupportedOperationException if the catalog does not support schema operations.
    */
   default SupportsSchemas asSchemas() throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Catalog does not support schema operations");

@@ -13,4 +13,15 @@
     <name>yarn.nodemanager.vmem-check-enabled</name>
     <value>false</value>
   </property>
+
+  <property>
+    <name>yarn.resourcemanager.principal</name>
+    <value>>yarn/mockhost@HADOOPKRB</value>
+  </property>
+
+  <property>
+    <name>yarn.resourcemanager.keytab</name>
+    <value>>/yarn.keytab</value>
+  </property>
+
 </configuration>

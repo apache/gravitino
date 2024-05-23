@@ -14,13 +14,13 @@ import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_DATA_TRANSF
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
 import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
-import com.datastrato.gravitino.rel.Schema;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.File;
@@ -243,14 +243,13 @@ public class HadoopUserImpersonationIT extends AbstractIT {
   }
 
   private static void createSchema() {
-    NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");
     String comment = "comment";
 
-    catalog.asSchemas().createSchema(ident, comment, properties);
-    Schema loadSchema = catalog.asSchemas().loadSchema(ident);
+    catalog.asSchemas().createSchema(schemaName, comment, properties);
+    Schema loadSchema = catalog.asSchemas().loadSchema(schemaName);
     Assertions.assertEquals(schemaName, loadSchema.name());
     Assertions.assertEquals(comment, loadSchema.comment());
     Assertions.assertEquals("val1", loadSchema.properties().get("key1"));
@@ -258,9 +257,8 @@ public class HadoopUserImpersonationIT extends AbstractIT {
   }
 
   private static void dropSchema() {
-    NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
-    catalog.asSchemas().dropSchema(ident, true);
-    Assertions.assertFalse(catalog.asSchemas().schemaExists(ident));
+    catalog.asSchemas().dropSchema(schemaName, true);
+    Assertions.assertFalse(catalog.asSchemas().schemaExists(schemaName));
   }
 
   private String storageLocation(String filesetName) {

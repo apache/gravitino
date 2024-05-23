@@ -9,6 +9,7 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.catalog.mysql.integration.test.service.MysqlService;
@@ -21,7 +22,6 @@ import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.integration.test.util.JdbcDriverDownloader;
 import com.datastrato.gravitino.integration.test.util.TestDatabaseName;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.types.Types;
@@ -99,9 +99,8 @@ public class AuditCatalogMysqlIT extends AbstractIT {
     String catalogName = GravitinoITUtils.genRandomName("audit_mysql_schema_catalog");
     String schemaName = GravitinoITUtils.genRandomName("audit_mysql_schema");
     Catalog catalog = createCatalog(catalogName);
-    NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
     Map<String, String> prop = Maps.newHashMap();
-    Schema schema = catalog.asSchemas().createSchema(ident, null, prop);
+    Schema schema = catalog.asSchemas().createSchema(schemaName, null, prop);
     Assertions.assertEquals(expectUser, schema.auditInfo().creator());
     Assertions.assertNull(schema.auditInfo().lastModifier());
   }
@@ -116,9 +115,7 @@ public class AuditCatalogMysqlIT extends AbstractIT {
 
     Column col1 = Column.of("col_1", Types.IntegerType.get(), "col_1_comment");
 
-    catalog
-        .asSchemas()
-        .createSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), null, properties);
+    catalog.asSchemas().createSchema(schemaName, null, properties);
     Table table =
         catalog
             .asTableCatalog()
