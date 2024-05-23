@@ -6,9 +6,9 @@
 package com.datastrato.gravitino.catalog;
 
 import com.datastrato.gravitino.TestCatalog;
-import com.datastrato.gravitino.TestCatalogOperations;
 import com.datastrato.gravitino.connector.BaseCatalog;
 import com.datastrato.gravitino.connector.CatalogOperations;
+import com.datastrato.gravitino.connector.TestCatalogOperations;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.google.common.collect.ImmutableMap;
 import org.junit.jupiter.api.Assertions;

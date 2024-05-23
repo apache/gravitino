@@ -17,7 +17,6 @@ import com.datastrato.gravitino.spark.connector.SparkTransformConverter.Distribu
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import javax.ws.rs.NotSupportedException;
 import org.apache.spark.sql.connector.expressions.BucketTransform;
 import org.apache.spark.sql.connector.expressions.Expressions;
 import org.apache.spark.sql.connector.expressions.FieldReference;
@@ -106,11 +105,11 @@ public class TestSparkTransformConverter {
     if (!supportsBucketPartition) {
       // range and even distribution
       Assertions.assertThrowsExactly(
-          NotSupportedException.class,
+          UnsupportedOperationException.class,
           () -> sparkTransformConverter.toSparkTransform(null, Distributions.RANGE, null));
       Distribution evenDistribution = Distributions.even(bucketNum, NamedReference.field(""));
       Assertions.assertThrowsExactly(
-          NotSupportedException.class,
+          UnsupportedOperationException.class,
           () -> sparkTransformConverter.toSparkTransform(null, evenDistribution, null));
     }
   }

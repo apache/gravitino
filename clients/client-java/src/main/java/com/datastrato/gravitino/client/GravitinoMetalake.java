@@ -7,6 +7,7 @@ package com.datastrato.gravitino.client;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.SupportsCatalogs;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
 import com.datastrato.gravitino.dto.requests.CatalogCreateRequest;
@@ -19,7 +20,6 @@ import com.datastrato.gravitino.dto.responses.EntityListResponse;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
-import com.datastrato.gravitino.rel.SupportsCatalogs;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Collections;
@@ -94,7 +94,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
             ErrorHandlers.catalogErrorHandler());
 
     return Arrays.stream(resp.getCatalogs())
-        .map(c -> DTOConverters.toCatalog(c, restClient))
+        .map(c -> DTOConverters.toCatalog(this.name(), c, restClient))
         .toArray(Catalog[]::new);
   }
 
@@ -116,7 +116,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
             ErrorHandlers.catalogErrorHandler());
     resp.validate();
 
-    return DTOConverters.toCatalog(resp.getCatalog(), restClient);
+    return DTOConverters.toCatalog(this.name(), resp.getCatalog(), restClient);
   }
 
   /**
@@ -153,7 +153,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
             ErrorHandlers.catalogErrorHandler());
     resp.validate();
 
-    return DTOConverters.toCatalog(resp.getCatalog(), restClient);
+    return DTOConverters.toCatalog(this.name(), resp.getCatalog(), restClient);
   }
 
   /**
@@ -185,7 +185,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
             ErrorHandlers.catalogErrorHandler());
     resp.validate();
 
-    return DTOConverters.toCatalog(resp.getCatalog(), restClient);
+    return DTOConverters.toCatalog(this.name(), resp.getCatalog(), restClient);
   }
 
   /**

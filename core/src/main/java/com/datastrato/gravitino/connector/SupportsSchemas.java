@@ -18,10 +18,12 @@
 // Referred from Apache Spark's connector/catalog implementation
 // sql/catalyst/src/main/java/org/apache/spark/sql/connector/catalog/SupportNamespaces.java
 
-package com.datastrato.gravitino.rel;
+package com.datastrato.gravitino.connector;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.Schema;
+import com.datastrato.gravitino.SchemaChange;
 import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
