@@ -57,16 +57,15 @@ public class DynFields {
       try {
         return (T) field.get(target);
       } catch (IllegalAccessException e) {
-        Throwables.throwIfUnchecked(e);
         throw new RuntimeException(e);
       }
     }
 
+    @SuppressWarnings("unchecked")
     public void set(Object target, T value) {
       try {
         field.set(target, value);
       } catch (IllegalAccessException e) {
-        Throwables.throwIfUnchecked(e);
         throw new RuntimeException(e);
       }
     }
