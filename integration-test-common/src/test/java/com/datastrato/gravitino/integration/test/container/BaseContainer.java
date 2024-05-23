@@ -36,7 +36,7 @@ import org.testcontainers.containers.wait.strategy.Wait;
 public abstract class BaseContainer implements AutoCloseable {
   public static final Logger LOG = LoggerFactory.getLogger(BaseContainer.class);
   // Host name of the container
-  private final String hostName;
+  protected final String hostName;
   // Exposed ports of the container
   private final Set<Integer> ports;
   // Files to mount in the container
@@ -153,6 +153,7 @@ public abstract class BaseContainer implements AutoCloseable {
       SELF extends Builder<SELF, CONTAINER>, CONTAINER extends BaseContainer> {
     protected String image;
     protected String hostName;
+    protected boolean kerberosEnabled;
     protected Set<Integer> exposePorts = ImmutableSet.of();
     protected Map<String, String> extraHosts = ImmutableMap.of();
     protected Map<String, String> filesToMount = ImmutableMap.of();
@@ -198,6 +199,11 @@ public abstract class BaseContainer implements AutoCloseable {
 
     public SELF withNetwork(Network network) {
       this.network = Optional.ofNullable(network);
+      return self;
+    }
+
+    public SELF withKerberosEnabled(boolean kerberosEnabled) {
+      this.kerberosEnabled = kerberosEnabled;
       return self;
     }
 
