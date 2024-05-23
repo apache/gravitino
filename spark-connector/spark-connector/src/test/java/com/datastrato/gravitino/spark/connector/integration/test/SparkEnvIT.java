@@ -104,7 +104,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
 
   private void initMetalakeAndCatalogs() {
     AbstractIT.client.createMetalake(NameIdentifier.of(metalakeName), "", Collections.emptyMap());
-    GravitinoMetalake metalake =  AbstractIT.client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake metalake = AbstractIT.client.loadMetalake(NameIdentifier.of(metalakeName));
     Map<String, String> properties = getCatalogConfigs();
     metalake.createCatalog(
         NameIdentifier.of(metalakeName, getCatalogName()),
