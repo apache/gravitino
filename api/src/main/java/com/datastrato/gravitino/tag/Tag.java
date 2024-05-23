@@ -6,13 +6,14 @@
 package com.datastrato.gravitino.tag;
 
 import com.datastrato.gravitino.Auditable;
+import com.datastrato.gravitino.MetadataObject;
 import com.datastrato.gravitino.annotation.Evolving;
 import java.util.Map;
 import java.util.Optional;
 
 /**
  * The interface of a tag. A tag is a label that can be attached to a catalog, schema, table,
- * fileset, topic, or column. It can be used to categorize, classify, or annotate these entities.
+ * fileset, topic, or column. It can be used to categorize, classify, or annotate these objects.
  */
 @Evolving
 public interface Tag extends Auditable {
@@ -34,14 +35,14 @@ public interface Tag extends Auditable {
   Map<String, String> properties();
 
   /**
-   * Check if the tag is inherited from a parent entity or not. If the tag is inherited, it will
-   * return true, if it is owned by the entity itself, it will return false.
+   * Check if the tag is inherited from a parent object or not. If the tag is inherited, it will
+   * return true, if it is owned by the object itself, it will return false.
    *
-   * <p>Note. The return value is optional, only when the tag is associated with an entity, and
-   * called from the entity, the return value will be present. Otherwise, it will be empty.
+   * <p>Note. The return value is optional, only when the tag is associated with an object, and
+   * called from the object, the return value will be present. Otherwise, it will be empty.
    *
-   * @return True if the tag is inherited, false if it is owned by the entity itself. Empty if the
-   *     tag is not associated with any entity.
+   * @return True if the tag is inherited, false if it is owned by the object itself. Empty if the
+   *     tag is not associated with any object.
    */
   Optional<Boolean> inherited();
 
@@ -52,59 +53,10 @@ public interface Tag extends Auditable {
 
   /** The extended information of the tag. */
   interface Extended {
-
-    /** The supported entities that a tag can be attached to. */
-    enum SupportedEntityType {
-      /** Catalog type entity. */
-      CATALOG,
-      /** Schema type entity. */
-      SCHEMA,
-      /** Table type entity. */
-      TABLE,
-      /** Fileset type entity. */
-      FILESET,
-      /** Topic type entity. */
-      TOPIC,
-      /** Column type entity. */
-      COLUMN
-    }
-
-    /** A wrapper class to represent an entity that is using the tag. */
-    final class UsedEntity {
-      private final SupportedEntityType type;
-      private final String identifier;
-
-      private UsedEntity(SupportedEntityType type, String identifier) {
-        this.type = type;
-        this.identifier = identifier;
-      }
-
-      /** @return The type of the entity. */
-      public SupportedEntityType type() {
-        return type;
-      }
-
-      /** @return The String identifier of the entity. */
-      public String identifier() {
-        return identifier;
-      }
-
-      /**
-       * Create a new instance of the used entity.
-       *
-       * @param type The type of the entity.
-       * @param identifier The String identifier of the entity.
-       * @return The used entity.
-       */
-      public static UsedEntity of(SupportedEntityType type, String identifier) {
-        return new UsedEntity(type, identifier);
-      }
-    }
-
-    /** @return The number of entities that are using this tag. */
+    /** @return The number of objects that are using this tag. */
     int inUse();
 
-    /** @return The list of entities that are using this tag. */
-    UsedEntity[] usedEntities();
+    /** @return The list of objects that are using this tag. */
+    MetadataObject[] usedObjects();
   }
 }

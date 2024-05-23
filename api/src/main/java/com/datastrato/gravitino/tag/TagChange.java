@@ -9,7 +9,7 @@ import com.datastrato.gravitino.annotation.Evolving;
 
 /**
  * Interface for supporting tag changes. This interface will be used to provide tag modification
- * operations for each entity.
+ * operations for each tag.
  */
 @Evolving
 public interface TagChange {
