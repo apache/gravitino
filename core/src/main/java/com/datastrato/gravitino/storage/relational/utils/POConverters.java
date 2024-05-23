@@ -41,6 +41,7 @@ import com.datastrato.gravitino.storage.relational.po.UserRoleRelPO;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -667,6 +668,8 @@ public class POConverters {
           .withUserId(oldUserPO.getUserId())
           .withUserName(newUser.name())
           .withMetalakeId(oldUserPO.getMetalakeId())
+          .withCatalogId(oldUserPO.getCatalogId())
+          .withSchemaId(oldUserPO.getSchemaId())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newUser.auditInfo()))
           .withCurrentVersion(nextVersion)
           .withLastVersion(nextVersion)
@@ -849,6 +852,8 @@ public class POConverters {
           .withGroupId(oldGroupPO.getGroupId())
           .withGroupName(newGroup.name())
           .withMetalakeId(oldGroupPO.getMetalakeId())
+          .withCatalogId(oldGroupPO.getCatalogId())
+          .withSchemaId(oldGroupPO.getSchemaId())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newGroup.auditInfo()))
           .withCurrentVersion(nextVersion)
           .withLastVersion(nextVersion)
@@ -946,7 +951,7 @@ public class POConverters {
           .withType(Entity.SYSTEM_CATALOG_RESERVED_NAME)
           .withProvider(Entity.SYSTEM_CATALOG_RESERVED_NAME)
           .withCatalogComment("system catalog")
-          .withProperties(null)
+          .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(Maps.newHashMap()))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
@@ -975,7 +980,7 @@ public class POConverters {
           .withMetalakeId(metalakeId)
           .withCatalogId(catalogId)
           .withSchemaComment("user schema")
-          .withProperties(null)
+          .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(Maps.newHashMap()))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
@@ -1003,7 +1008,7 @@ public class POConverters {
           .withMetalakeId(metalakeId)
           .withCatalogId(catalogId)
           .withSchemaComment("group schema")
-          .withProperties(null)
+          .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(Maps.newHashMap()))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
@@ -1031,7 +1036,7 @@ public class POConverters {
           .withMetalakeId(metalakeId)
           .withCatalogId(catalogId)
           .withSchemaComment("role schema")
-          .withProperties(null)
+          .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(Maps.newHashMap()))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)

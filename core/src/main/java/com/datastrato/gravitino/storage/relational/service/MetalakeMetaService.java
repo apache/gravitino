@@ -256,6 +256,13 @@ public class MetalakeMetaService {
           throw new NonEmptyEntityException(
               "Entity %s has sub-entities, you should remove sub-entities first", ident);
         }
+
+        Long systemCatalogId =
+            SessionUtils.getWithoutCommit(
+                CatalogMetaMapper.class,
+                mapper ->
+                    mapper.selectCatalogIdByMetalakeIdAndName(
+                        metalakeId, Entity.SYSTEM_CATALOG_RESERVED_NAME));
         SessionUtils.doMultipleWithCommit(
             () ->
                 SessionUtils.doWithoutCommit(
@@ -280,7 +287,57 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     RoleMetaMapper.class,
-                    mapper -> mapper.softDeleteRoleMetasByMetalakeId(metalakeId)));
+                    mapper -> mapper.softDeleteRoleMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    CatalogMetaMapper.class,
+                    mapper -> {
+                      if (systemCatalogId != null) {
+                        mapper.softDeleteCatalogMetasByCatalogId(systemCatalogId);
+                      }
+                    }),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    SchemaMetaMapper.class,
+                    mapper -> {
+                      if (systemCatalogId == null) {
+                        return;
+                      }
+                      Long userSchemaId =
+                          mapper.selectSchemaIdByCatalogIdAndName(
+                              systemCatalogId, Entity.USER_SCHEMA_NAME);
+                      if (userSchemaId != null) {
+                        mapper.softDeleteSchemaMetasBySchemaId(userSchemaId);
+                      }
+                    }),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    SchemaMetaMapper.class,
+                    mapper -> {
+                      if (systemCatalogId == null) {
+                        return;
+                      }
+                      Long groupSchemaId =
+                          mapper.selectSchemaIdByCatalogIdAndName(
+                              systemCatalogId, Entity.GROUP_SCHEMA_NAME);
+                      if (groupSchemaId != null) {
+                        mapper.softDeleteSchemaMetasBySchemaId(groupSchemaId);
+                      }
+                    }),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    SchemaMetaMapper.class,
+                    mapper -> {
+                      if (systemCatalogId == null) {
+                        return;
+                      }
+                      Long roleSchemaId =
+                          mapper.selectSchemaIdByCatalogIdAndName(
+                              systemCatalogId, Entity.ROLE_SCHEMA_NAME);
+                      if (roleSchemaId != null) {
+                        mapper.softDeleteSchemaMetasBySchemaId(roleSchemaId);
+                      }
+                    }));
       }
     }
     return true;
