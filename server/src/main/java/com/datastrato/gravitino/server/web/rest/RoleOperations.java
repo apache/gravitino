@@ -33,7 +33,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @NameBindings.AccessControlInterfaces
-@NameBindings.RoleInterface
 @Path("/metalakes/{metalake}/roles")
 public class RoleOperations {
   private static final Logger LOG = LoggerFactory.getLogger(RoleOperations.class);
