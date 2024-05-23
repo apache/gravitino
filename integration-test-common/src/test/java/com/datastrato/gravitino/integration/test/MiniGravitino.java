@@ -17,7 +17,6 @@ import com.datastrato.gravitino.client.HTTPClient;
 import com.datastrato.gravitino.client.KerberosTokenProvider;
 import com.datastrato.gravitino.client.RESTClient;
 import com.datastrato.gravitino.dto.responses.VersionResponse;
-import com.datastrato.gravitino.exceptions.RESTException;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.integration.test.util.KerberosProviderHelper;
 import com.datastrato.gravitino.integration.test.util.OAuthMockDataProvider;
@@ -28,6 +27,7 @@ import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
+import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Collections;
@@ -245,6 +245,15 @@ public class MiniGravitino {
     ITUtils.rewriteConfigFile(configTempFileName, configFileName, configMap);
   }
 
+  public static boolean isPortOpen(String host, int port, int timeout) {
+    try (Socket socket = new Socket()) {
+      socket.connect(new java.net.InetSocketAddress(host, port), timeout);
+      return true;
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
   private boolean checkIfServerIsRunning() {
     String URI = String.format("http://%s:%d", host, port);
     LOG.info("checkIfServerIsRunning() URI: {}", URI);
@@ -252,7 +261,6 @@ public class MiniGravitino {
     // Use kerberos, we need to use sdk to check
     if (Objects.equals(serverConfig.get(Configs.AUTHENTICATOR), "kerberos")) {
       try {
-        Thread.sleep(5000);
         KerberosTokenProvider provider =
             KerberosTokenProvider.builder()
                 .withClientPrincipal((String) properties.get("client.kerberos.principal"))
@@ -264,27 +272,28 @@ public class MiniGravitino {
         adminClient.listMetalakes();
         return true;
       } catch (Exception e) {
+        if (isPortOpen(host, port, 1000)) {
+          return true;
+        }
+
         LOG.warn(
             "Kerberos checkIfServerIsRunning() fails, GravitinoServer is not running {}",
             e.getMessage());
-        return true;
+        return false;
       }
     }
 
     // Not auth, we can use the rest client to check
     VersionResponse response = null;
     try {
-      Thread.sleep(5000);
       response =
           restClient.get(
               "api/version",
               VersionResponse.class,
               Collections.emptyMap(),
               ErrorHandlers.restErrorHandler());
-    } catch (RESTException e) {
+    } catch (Exception e) {
       LOG.warn("checkIfServerIsRunning() fails, GravitinoServer is not running {}", e.getMessage());
-      return false;
-    } catch (Exception e1) {
       return false;
     }
 
