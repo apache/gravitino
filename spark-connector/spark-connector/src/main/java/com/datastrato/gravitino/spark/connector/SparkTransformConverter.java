@@ -17,7 +17,6 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import javax.ws.rs.NotSupportedException;
 import lombok.Getter;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -117,7 +116,7 @@ public class SparkTransformConverter {
                     getFieldNameFromGravitinoNamedReference(
                         (NamedReference) toGravitinoNamedReference(transform.references()[0])));
               } else {
-                throw new NotSupportedException(
+                throw new UnsupportedOperationException(
                     "Doesn't support Spark transform: " + transform.name());
               }
             })
@@ -146,7 +145,7 @@ public class SparkTransformConverter {
                 Distribution distribution = toGravitinoDistribution(bucketTransform);
                 distributionAndSortOrdersInfo.setDistribution(distribution);
               } else {
-                throw new NotSupportedException(
+                throw new UnsupportedOperationException(
                     "Only support BucketTransform and SortedBucketTransform, but get: "
                         + transform.name());
               }
@@ -300,7 +299,7 @@ public class SparkTransformConverter {
         }
         // Spark doesn't support EVEN or RANGE distribution
       default:
-        throw new NotSupportedException(
+        throw new UnsupportedOperationException(
             "Doesn't support distribution strategy: " + distribution.strategy());
     }
   }

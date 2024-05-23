@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.datastrato.gravitino.integration.test.util.spark;
+package com.datastrato.gravitino.spark.connector.integration.test.util;
 
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import java.sql.Timestamp;

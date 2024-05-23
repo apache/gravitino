@@ -3,7 +3,7 @@
  *  This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.integration.test.spark;
+package com.datastrato.gravitino.spark.connector.integration.test;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
@@ -12,10 +12,10 @@ import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
-import com.datastrato.gravitino.integration.test.util.spark.SparkUtilIT;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.datastrato.gravitino.spark.connector.GravitinoSparkConfig;
 import com.datastrato.gravitino.spark.connector.iceberg.IcebergPropertiesConstants;
+import com.datastrato.gravitino.spark.connector.integration.test.util.SparkUtilIT;
 import com.datastrato.gravitino.spark.connector.plugin.GravitinoSparkPlugin;
 import java.io.IOException;
 import java.util.Collections;
@@ -103,8 +103,8 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   public static void stopIntegrationTest() {}
 
   private void initMetalakeAndCatalogs() {
-    client.createMetalake(NameIdentifier.of(metalakeName), "", Collections.emptyMap());
-    GravitinoMetalake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    AbstractIT.client.createMetalake(metalakeName, "", Collections.emptyMap());
+    GravitinoMetalake metalake = AbstractIT.client.loadMetalake(metalakeName);
     Map<String, String> properties = getCatalogConfigs();
     metalake.createCatalog(
         NameIdentifier.of(metalakeName, getCatalogName()),
@@ -116,7 +116,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
 
   private void initGravitinoEnv() {
     // Gravitino server is already started by AbstractIT, just construct gravitinoUrl
-    int gravitinoPort = getGravitinoServerPort();
+    int gravitinoPort = AbstractIT.getGravitinoServerPort();
     gravitinoUri = String.format("http://127.0.0.1:%d", gravitinoPort);
     icebergRestServiceUri = getIcebergRestServiceUri();
   }
