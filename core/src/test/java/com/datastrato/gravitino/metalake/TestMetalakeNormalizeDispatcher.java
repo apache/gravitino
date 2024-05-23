@@ -43,7 +43,7 @@ public class TestMetalakeNormalizeDispatcher {
   }
 
   @Test
-  public void testNameSpc() {
+  public void testNameSpec() {
     // Test for valid names
     String[] legalNames = {"metalake", "_metalake", "1_metalake", "_", "1"};
     for (String legalName : legalNames) {

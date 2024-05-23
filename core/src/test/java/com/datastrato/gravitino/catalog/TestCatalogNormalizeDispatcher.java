@@ -78,7 +78,7 @@ public class TestCatalogNormalizeDispatcher {
   }
 
   @Test
-  public void testNameSpc() {
+  public void testNameSpec() {
     // Test for valid names
     String[] legalNames = {"catalog", "_catalog", "1_catalog", "_", "1"};
     for (String legalName : legalNames) {
