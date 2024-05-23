@@ -39,10 +39,11 @@ public class CatalogRegister {
 
   private static final int MIN_TRINO_SPI_VERSION = 435;
   private String trinoVersion;
-  private String trinoServerURI;
   private Connection connection;
   private boolean isCoordinator;
+  private boolean isStarted = false;
   private String catalogStoreDirectory;
+  private GravitinoConfig config;
 
   private void checkTrinoSpiVersion(ConnectorContext context) {
     this.trinoVersion = context.getSpiVersion();
@@ -63,16 +64,31 @@ public class CatalogRegister {
     return isCoordinator = true;
   }
 
+  boolean isTrinoStarted() {
+    if (isStarted) {
+      return true;
+    }
+
+    String command = "SELECT 1";
+    try {
+      isStarted = connection.createStatement().execute(command);
+      return isStarted;
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
   public void init(ConnectorContext context, GravitinoConfig config) throws Exception {
+    this.config = config;
     checkTrinoSpiVersion(context);
 
     // Register the catalog
-    trinoServerURI = config.getTrinoURI();
     TrinoDriver driver = new TrinoDriver();
 
     Properties properties = new Properties();
     properties.put("user", "admin");
     connection = driver.connect(config.getTrinoURI(), properties);
+    assert connection != null;
 
     catalogStoreDirectory = config.getCatalogStoreDirectory();
     if (!Files.exists(Path.of(catalogStoreDirectory))) {
@@ -87,11 +103,12 @@ public class CatalogRegister {
     ObjectMapper objectMapper = new ObjectMapper();
     String command =
         String.format(
-            "CREATE CATALOG %s USING gravitino WITH ( \"%s\" = 'true', \"%s\" = '%s')",
+            "CREATE CATALOG %s USING gravitino WITH ( \"%s\" = 'true', \"%s\" = '%s', %s)",
             name,
             GRAVITINO_DYNAMIC_CONNECTOR,
             GRAVITINO_DYNAMIC_CONNECTOR_CATALOG_CONFIG,
-            objectMapper.writeValueAsString(gravitinoCatalog));
+            objectMapper.writeValueAsString(gravitinoCatalog),
+            config.toCatalogConfig());
     return command;
   }
 
@@ -133,6 +150,7 @@ public class CatalogRegister {
           }
         } catch (Exception e) {
           createCatalogException = e;
+          LOG.warn("Execute command failed: {}, ", createCatalogCommand, e);
           Thread.sleep(TimeUnit.SECONDS.toMillis(30));
         }
       }
@@ -146,10 +164,30 @@ public class CatalogRegister {
 
   void unResisterCatalog(String name) {
     try {
-      String command = generateDropCatalogCommand(name);
-      connection.createStatement().execute(command);
+      String dropCatalogCommnd = generateDropCatalogCommand(name);
+      String showCatalogCommand = String.format("SHOW CATALOGS like '%s'", name);
+      Exception createCatalogException = null;
+      int retries = 3;
+      while (retries-- > 0) {
+        try {
+          Statement statement = connection.createStatement();
+          statement.execute(showCatalogCommand);
+          ResultSet rs = statement.getResultSet();
+          if (rs.next()) {
+            statement = connection.createStatement();
+            statement.execute(dropCatalogCommnd);
+          }
+        } catch (Exception e) {
+          createCatalogException = e;
+          LOG.warn("Execute command failed: {}, ", dropCatalogCommnd, e);
+          Thread.sleep(TimeUnit.SECONDS.toMillis(30));
+        }
+      }
+      if (createCatalogException != null) {
+        throw createCatalogException;
+      }
     } catch (Exception e) {
-      LOG.error("Failed to register catalog", e);
+      LOG.error("Failed to unregister catalog", e);
     }
   }
 

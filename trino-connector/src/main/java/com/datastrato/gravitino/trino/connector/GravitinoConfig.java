@@ -8,8 +8,11 @@ import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVIT
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import io.trino.spi.TrinoException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import org.apache.logging.log4j.util.Strings;
 
 public class GravitinoConfig {
 
@@ -35,23 +38,21 @@ public class GravitinoConfig {
           false);
 
   private static final ConfigEntry DISCOVERY_URI =
-      new ConfigEntry("discovery.uri", "The uri of Trino server", "", false);
+      new ConfigEntry(
+          "trino.jdbc.uri", "The jdbc uri of Trino server", "jdbc:trino://localhost:8080", false);
 
   private static final ConfigEntry CATALOG_STORE =
       new ConfigEntry(
-          "catalog.store", "The directory of stored catalogs Trino", "etc/catalog", false);
+          "trino.catalog.store", "The directory of stored catalogs Trino", "etc/catalog", false);
 
   public GravitinoConfig(Map<String, String> requiredConfig) {
     config = requiredConfig;
-
-    if (!isDynamicConnector()) {
-      for (Map.Entry<String, ConfigEntry> entry : CONFIG_DEFINITIONS.entrySet()) {
-        ConfigEntry configDefinition = entry.getValue();
-        if (configDefinition.isRequired && !config.containsKey(configDefinition.key)) {
-          String message =
-              String.format("Missing gravitino config, %s is required", configDefinition.key);
-          throw new TrinoException(GRAVITINO_MISSING_CONFIG, message);
-        }
+    for (Map.Entry<String, ConfigEntry> entry : CONFIG_DEFINITIONS.entrySet()) {
+      ConfigEntry configDefinition = entry.getValue();
+      if (configDefinition.isRequired && !config.containsKey(configDefinition.key)) {
+        String message =
+            String.format("Missing gravitino config, %s is required", configDefinition.key);
+        throw new TrinoException(GRAVITINO_MISSING_CONFIG, message);
       }
     }
   }
@@ -91,6 +92,17 @@ public class GravitinoConfig {
 
   public String getCatalogStoreDirectory() {
     return config.getOrDefault(CATALOG_STORE.key, CATALOG_STORE.defaultValue);
+  }
+
+  public String toCatalogConfig() {
+    List<String> stringList = new ArrayList<>();
+    for (Map.Entry<String, ConfigEntry> entry : CONFIG_DEFINITIONS.entrySet()) {
+      String value = config.get(entry.getKey());
+      if (value != null) {
+        stringList.add(String.format("\"%s\"='%s'", entry.getKey(), value));
+      }
+    }
+    return Strings.join(stringList, ',');
   }
 
   static class ConfigEntry {

@@ -62,6 +62,7 @@ import org.slf4j.LoggerFactory;
  * </pre>
  */
 public class CatalogConnectorManager {
+
   private static final Logger LOG = LoggerFactory.getLogger(CatalogConnectorManager.class);
 
   private static final int CATALOG_LOAD_FREQUENCY_SECOND = 10;
@@ -98,17 +99,17 @@ public class CatalogConnectorManager {
             .build());
   }
 
-  public void config(GravitinoConfig config) {
+  public void config(GravitinoConfig config, GravitinoAdminClient client) {
     this.config = Preconditions.checkNotNull(config, "config is not null");
-  }
-
-  public void start(GravitinoAdminClient client, ConnectorContext context) {
     if (client == null) {
       this.gravitinoClient = GravitinoAdminClient.builder(config.getURI()).build();
     } else {
       this.gravitinoClient = client;
     }
+  }
 
+  public void start(ConnectorContext context) throws Exception {
+    catalogRegister.init(context, config);
     if (catalogRegister.isCoordinator()) {
       executorService.scheduleWithFixedDelay(
           this::loadMetalake,
@@ -121,6 +122,11 @@ public class CatalogConnectorManager {
   }
 
   private void loadMetalake() {
+    if (!catalogRegister.isTrinoStarted()) {
+      LOG.info("Waiting for the Trino started.");
+      return;
+    }
+
     for (String usedMetalake : usedMetalakes) {
       try {
         GravitinoMetalake metalake =

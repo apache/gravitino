@@ -65,15 +65,13 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
       if (catalogConnectorManager == null) {
         try {
           CatalogRegister catalogRegister = new CatalogRegister();
-          catalogRegister.init(context, config);
           CatalogConnectorFactory catalogConnectorFactory = new CatalogConnectorFactory();
 
           catalogConnectorManager =
               new CatalogConnectorManager(catalogRegister, catalogConnectorFactory);
-          catalogConnectorManager.config(config);
-          catalogConnectorManager.start(clientProvider().get(), context);
+          catalogConnectorManager.config(config, clientProvider().get());
+          catalogConnectorManager.start(context);
 
-          // JsonCodec.instance(context.getClass().getClassLoader(), context.getTypeManager());
           gravitinoSystemTableFactory = new GravitinoSystemTableFactory(catalogConnectorManager);
         } catch (Exception e) {
           LOG.error("Initialization of the GravitinoConnector failed.", e);
