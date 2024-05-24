@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.storage.relational.po;
 
+import com.datastrato.gravitino.MetadataObject;
 import com.datastrato.gravitino.authorization.SecurableObject;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
@@ -12,7 +13,7 @@ public class SecurableObjectPO {
 
   private Long roleId;
   private String fullName;
-  private SecurableObject.Type type;
+  private  MetadataObject.Type type;
   private String privilegeNames;
   private String privilegeConditions;
   private Long currentVersion;
@@ -27,7 +28,7 @@ public class SecurableObjectPO {
     return fullName;
   }
 
-  public SecurableObject.Type getType() {
+  public MetadataObject.Type getType() {
     return type;
   }
 
