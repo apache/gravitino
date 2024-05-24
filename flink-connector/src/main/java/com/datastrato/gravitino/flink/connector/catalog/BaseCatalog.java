@@ -5,10 +5,24 @@
 
 package com.datastrato.gravitino.flink.connector.catalog;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Schema;
+import com.datastrato.gravitino.SchemaChange;
+import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
+import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
+import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
+import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.commons.compress.utils.Lists;
 import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogDatabase;
+import org.apache.flink.table.catalog.CatalogDatabaseImpl;
 import org.apache.flink.table.catalog.CatalogFunction;
 import org.apache.flink.table.catalog.CatalogPartition;
 import org.apache.flink.table.catalog.CatalogPartitionSpec;
@@ -29,53 +43,101 @@ import org.apache.flink.table.catalog.exceptions.TablePartitionedException;
 import org.apache.flink.table.catalog.stats.CatalogColumnStatistics;
 import org.apache.flink.table.catalog.stats.CatalogTableStatistics;
 import org.apache.flink.table.expressions.Expression;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The BaseCatalog that provides a default implementation for all methods in the {@link
  * org.apache.flink.table.catalog.Catalog} interface.
  */
 public abstract class BaseCatalog extends AbstractCatalog {
+  private static final Logger LOG = LoggerFactory.getLogger(BaseCatalog.class);
+
+  private Catalog catalog;
+
   protected BaseCatalog(String catalogName, String defaultDatabase) {
     super(catalogName, defaultDatabase);
   }
 
   @Override
-  public void open() throws CatalogException {}
+  public void open() throws CatalogException {
+    this.catalog = GravitinoCatalogManager.get().getGravitinoCatalogInfo(getName());
+  }
 
   @Override
   public void close() throws CatalogException {}
 
   @Override
   public List<String> listDatabases() throws CatalogException {
-    throw new UnsupportedOperationException();
+    return Arrays.stream(this.catalog.asSchemas().listSchemas())
+            .map(NameIdentifier::name)
+            .collect(Collectors.toList());
   }
 
   @Override
-  public CatalogDatabase getDatabase(String s) throws DatabaseNotExistException, CatalogException {
-    throw new UnsupportedOperationException();
+  public CatalogDatabase getDatabase(String databaseName) throws DatabaseNotExistException, CatalogException {
+    try {
+      Schema schema = this.catalog.asSchemas().loadSchema(databaseName);
+      return new CatalogDatabaseImpl(schema.properties(), schema.comment());
+    } catch (NoSuchSchemaException e) {
+      throw new DatabaseNotExistException(getName(), databaseName);
+    }
   }
 
   @Override
-  public boolean databaseExists(String s) throws CatalogException {
-    throw new UnsupportedOperationException();
+  public boolean databaseExists(String databaseName) throws CatalogException {
+    return this.catalog.asSchemas().schemaExists(databaseName);
   }
 
   @Override
-  public void createDatabase(String s, CatalogDatabase catalogDatabase, boolean b)
+  public void createDatabase(String databaseName, CatalogDatabase catalogDatabase, boolean ignoreIfExists)
       throws DatabaseAlreadyExistException, CatalogException {
-    throw new UnsupportedOperationException();
+    try {
+      this.catalog.asSchemas().createSchema(databaseName, catalogDatabase.getComment(), catalogDatabase.getProperties());
+    } catch (SchemaAlreadyExistsException e) {
+      if (!ignoreIfExists) {
+        throw new DatabaseAlreadyExistException(getName(), databaseName);
+      } else {
+        LOG.warn("Database {} already exists.", databaseName);
+      }
+    } catch (NoSuchCatalogException e) {
+      throw new CatalogException(e);
+    }
   }
 
   @Override
-  public void dropDatabase(String s, boolean b, boolean b1)
+  public void dropDatabase(String databaseName, boolean ignoreIfNotExists, boolean cascade)
       throws DatabaseNotExistException, DatabaseNotEmptyException, CatalogException {
-    throw new UnsupportedOperationException();
+    try {
+      this.catalog.asSchemas().dropSchema(databaseName, cascade);
+    } catch (NoSuchSchemaException e) {
+      if (!ignoreIfNotExists) {
+        throw new DatabaseNotExistException(getName(), databaseName);
+      } else {
+        LOG.warn("Database {} does not exist.", databaseName);
+      }
+    } catch (NonEmptySchemaException e) {
+        throw new DatabaseNotEmptyException(getName(), databaseName);
+    } catch (NoSuchCatalogException e) {
+      throw new CatalogException(e);
+    }
   }
 
   @Override
-  public void alterDatabase(String s, CatalogDatabase catalogDatabase, boolean b)
+  public void alterDatabase(String databaseName, CatalogDatabase catalogDatabase, boolean ignoreIfNotExists)
       throws DatabaseNotExistException, CatalogException {
-    throw new UnsupportedOperationException();
+    try {
+      SchemaChange[] schemaChanges = getSchemaChange(getDatabase(databaseName), catalogDatabase);
+      this.catalog.asSchemas().alterSchema(databaseName, schemaChanges);
+    } catch (NoSuchSchemaException e) {
+        if (!ignoreIfNotExists) {
+            throw new DatabaseNotExistException(getName(), databaseName);
+        } else {
+            LOG.warn("Database {} does not exist.", databaseName);
+        }
+    } catch (NoSuchCatalogException e) {
+      throw new CatalogException(e);
+    }
   }
 
   @Override
@@ -277,5 +339,24 @@ public abstract class BaseCatalog extends AbstractCatalog {
       boolean b)
       throws PartitionNotExistException, CatalogException {
     throw new UnsupportedOperationException();
+  }
+
+  private SchemaChange[] getSchemaChange(CatalogDatabase current, CatalogDatabase updated) {
+    Map<String, String> currentProperties = current.getProperties();
+    Map<String, String> updatedProperties = updated.getProperties();
+
+    List<SchemaChange> schemaChanges = Lists.newArrayList();
+    for (Map.Entry<String, String> entry : updatedProperties.entrySet()) {
+      String key = entry.getKey();
+      String value = entry.getValue();
+      if (currentProperties.containsKey(key)) {
+        if (!currentProperties.get(key).equals(value)) {
+          schemaChanges.add(SchemaChange.setProperty(key, value));
+        }
+      } else {
+        schemaChanges.add(SchemaChange.removeProperty(key));
+      }
+    }
+    return schemaChanges.toArray(new SchemaChange[0]);
   }
 }
