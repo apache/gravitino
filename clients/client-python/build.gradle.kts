@@ -122,7 +122,7 @@ tasks {
     }
 
     venvExec = "coverage"
-    args = listOf("run", "-m", "unittest")
+    args = listOf("run", "--branch", "-m", "unittest")
     workingDir = projectDir.resolve("./tests/integration")
     environment = mapOf(
       "PROJECT_VERSION" to project.version,
@@ -145,7 +145,7 @@ tasks {
 
   val unitTests by registering(VenvTask::class) {
     venvExec = "coverage"
-    args = listOf("run", "-m", "unittest")
+    args = listOf("run", "--branch", "-m", "unittest")
     workingDir = projectDir.resolve("./tests/unittests")
 
     finalizedBy(unitCoverageReport)
