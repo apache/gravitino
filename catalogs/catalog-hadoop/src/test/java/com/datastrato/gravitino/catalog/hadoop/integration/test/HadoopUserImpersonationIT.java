@@ -42,7 +42,6 @@ import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -135,8 +134,6 @@ public class HadoopUserImpersonationIT extends AbstractIT {
     conf.set("hadoop.proxyuser.hdfs.users", "*");
     conf.set(
         "hadoop.security.auth_to_local", "RULE:[2:$1@$0](.*@EXAMPLE.COM)s/.*/hadoop/\nDEFAULT");
-
-    KerberosName.resetDefaultRealm();
     UserGroupInformation.setConfiguration(conf);
     UserGroupInformation.loginUserFromKeytab(
         SERVER_PRINCIPAL.replaceAll("_HOST", HOSTNAME) + "@" + kdc.getRealm(),

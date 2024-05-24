@@ -20,6 +20,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,6 +50,8 @@ public class KerberosClient {
         principalComponents.size() == 2, "The principal has the wrong format");
 
     // Login
+    UserGroupInformation.setConfiguration(hadoopConf);
+    KerberosName.resetDefaultRealm();
     UserGroupInformation.loginUserFromKeytab(catalogPrincipal, keytabFilePath);
     UserGroupInformation kerberosLoginUgi = UserGroupInformation.getCurrentUser();
 
