@@ -39,7 +39,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
 
   private GravitinoCatalogManager catalogManager;
   private List<String> gravitinoDriverExtensions = new ArrayList<>();
-  private boolean supportsIceberg = false;
+  private boolean enableIcebergSupport = false;
 
   @VisibleForTesting
   static final String ICEBERG_SPARK_EXTENSIONS =
@@ -58,9 +58,10 @@ public class GravitinoDriverPlugin implements DriverPlugin {
         StringUtils.isNotBlank(metalake),
         String.format(
             "%s:%s, should not be empty", GravitinoSparkConfig.GRAVITINO_METALAKE, metalake));
+
     if (conf.contains(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT)
         && "true".equals(conf.get(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT))) {
-      this.supportsIceberg = true;
+      this.enableIcebergSupport = true;
       gravitinoDriverExtensions.add(ICEBERG_SPARK_EXTENSIONS);
     }
 
@@ -88,7 +89,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
               Catalog gravitinoCatalog = entry.getValue();
               String provider = gravitinoCatalog.provider();
               if ("lakehouse-iceberg".equals(provider.toLowerCase(Locale.ROOT))
-                  && supportsIceberg == false) {
+                  && enableIcebergSupport == false) {
                 return;
               }
               try {
