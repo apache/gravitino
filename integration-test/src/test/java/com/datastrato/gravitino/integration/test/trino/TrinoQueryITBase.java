@@ -9,13 +9,13 @@ import static java.lang.Thread.sleep;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.SupportsSchemas;
 import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.exceptions.RESTException;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.TrinoITContainers;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
-import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
 import java.io.File;
 import java.io.IOException;
@@ -184,7 +184,7 @@ public class TrinoQueryITBase {
     }
     Catalog catalog = metalake.loadCatalog(catalogName);
     SupportsSchemas schemas = catalog.asSchemas();
-    Arrays.stream(schemas.listSchemas(Namespace.ofSchema(metalakeName, catalogName)))
+    Arrays.stream(schemas.listSchemas())
         .filter(schema -> schema.name().startsWith("gt_"))
         .forEach(
             schema -> {
@@ -210,8 +210,7 @@ public class TrinoQueryITBase {
                           }
                         });
 
-                schemas.dropSchema(
-                    NameIdentifier.ofSchema(metalakeName, catalogName, schema.name()), false);
+                schemas.dropSchema(schema.name(), false);
               } catch (Exception e) {
                 LOG.error("Failed to drop schema {}", schema);
               }

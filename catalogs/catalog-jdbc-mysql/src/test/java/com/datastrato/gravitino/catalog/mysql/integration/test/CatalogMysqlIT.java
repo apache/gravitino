@@ -11,6 +11,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.Schema;
+import com.datastrato.gravitino.SupportsSchemas;
 import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.catalog.mysql.integration.test.service.MysqlService;
@@ -27,8 +29,6 @@ import com.datastrato.gravitino.integration.test.util.JdbcDriverDownloader;
 import com.datastrato.gravitino.integration.test.util.TestDatabaseName;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Column.ColumnImpl;
-import com.datastrato.gravitino.rel.Schema;
-import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
@@ -154,7 +154,7 @@ public class CatalogMysqlIT extends AbstractIT {
     for (NameIdentifier nameIdentifier : nameIdentifiers) {
       catalog.asTableCatalog().dropTable(nameIdentifier);
     }
-    catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), false);
+    catalog.asSchemas().dropSchema(schemaName, false);
   }
 
   private void createMetalake() {
@@ -196,8 +196,8 @@ public class CatalogMysqlIT extends AbstractIT {
     NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
     Map<String, String> prop = Maps.newHashMap();
 
-    Schema createdSchema = catalog.asSchemas().createSchema(ident, schema_comment, prop);
-    Schema loadSchema = catalog.asSchemas().loadSchema(ident);
+    Schema createdSchema = catalog.asSchemas().createSchema(ident.name(), schema_comment, prop);
+    Schema loadSchema = catalog.asSchemas().loadSchema(ident.name());
     Assertions.assertEquals(createdSchema.name(), loadSchema.name());
     prop.forEach((key, value) -> Assertions.assertEquals(loadSchema.properties().get(key), value));
   }
@@ -256,7 +256,7 @@ public class CatalogMysqlIT extends AbstractIT {
     SupportsSchemas schemas = catalog.asSchemas();
     Namespace namespace = Namespace.of(metalakeName, catalogName);
     // list schema check.
-    NameIdentifier[] nameIdentifiers = schemas.listSchemas(namespace);
+    NameIdentifier[] nameIdentifiers = schemas.listSchemas();
     Set<String> schemaNames =
         Arrays.stream(nameIdentifiers).map(NameIdentifier::name).collect(Collectors.toSet());
     Assertions.assertTrue(schemaNames.contains(schemaName));
@@ -269,8 +269,8 @@ public class CatalogMysqlIT extends AbstractIT {
     // create schema check.
     String testSchemaName = GravitinoITUtils.genRandomName("test_schema_1");
     NameIdentifier schemaIdent = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
-    schemas.createSchema(schemaIdent, schema_comment, Collections.emptyMap());
-    nameIdentifiers = schemas.listSchemas(Namespace.of(metalakeName, catalogName));
+    schemas.createSchema(schemaIdent.name(), schema_comment, Collections.emptyMap());
+    nameIdentifiers = schemas.listSchemas();
     Map<String, NameIdentifier> schemaMap =
         Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v -> v));
     Assertions.assertTrue(schemaMap.containsKey(testSchemaName));
@@ -284,21 +284,21 @@ public class CatalogMysqlIT extends AbstractIT {
     Assertions.assertThrows(
         SchemaAlreadyExistsException.class,
         () -> {
-          schemas.createSchema(schemaIdent, schema_comment, emptyMap);
+          schemas.createSchema(schemaIdent.name(), schema_comment, emptyMap);
         });
 
     // drop schema check.
-    schemas.dropSchema(schemaIdent, false);
-    Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(schemaIdent));
+    schemas.dropSchema(schemaIdent.name(), false);
+    Assertions.assertThrows(
+        NoSuchSchemaException.class, () -> schemas.loadSchema(schemaIdent.name()));
     Assertions.assertThrows(
         NoSuchSchemaException.class, () -> mysqlService.loadSchema(schemaIdent));
 
-    nameIdentifiers = schemas.listSchemas(Namespace.of(metalakeName, catalogName));
+    nameIdentifiers = schemas.listSchemas();
     schemaMap =
         Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v -> v));
     Assertions.assertFalse(schemaMap.containsKey(testSchemaName));
-    Assertions.assertFalse(
-        schemas.dropSchema(NameIdentifier.of(metalakeName, catalogName, "no-exits"), false));
+    Assertions.assertFalse(schemas.dropSchema("no-exits", false));
     TableCatalog tableCatalog = catalog.asTableCatalog();
 
     // create failed check.
@@ -316,8 +316,8 @@ public class CatalogMysqlIT extends AbstractIT {
                 Distributions.NONE,
                 null));
     // drop schema failed check.
-    Assertions.assertFalse(schemas.dropSchema(schemaIdent, true));
-    Assertions.assertFalse(schemas.dropSchema(schemaIdent, false));
+    Assertions.assertFalse(schemas.dropSchema(schemaIdent.name(), true));
+    Assertions.assertFalse(schemas.dropSchema(schemaIdent.name(), false));
     Assertions.assertFalse(tableCatalog.dropTable(table));
     mysqlNamespaces = mysqlService.listSchemas(Namespace.empty());
     schemaNames =
@@ -585,6 +585,87 @@ public class CatalogMysqlIT extends AbstractIT {
   }
 
   @Test
+  void testColumnTypeConverter() {
+    // test convert from MySQL to Gravitino
+    String tableName = GravitinoITUtils.genRandomName("test_type_converter");
+    String fullTableName = schemaName + "." + tableName;
+    String sql =
+        "CREATE TABLE "
+            + fullTableName
+            + " (\n"
+            + "  tinyint_col tinyint,\n"
+            + "  smallint_col smallint,\n"
+            + "  int_col int,\n"
+            + "  bigint_col bigint,\n"
+            + "  float_col float,\n"
+            + "  double_col double,\n"
+            + "  date_col date,\n"
+            + "  time_col time,\n"
+            + "  timestamp_col timestamp,\n"
+            + "  datetime_col datetime,\n"
+            + "  decimal_6_2_col decimal(6, 2),\n"
+            + "  varchar20_col varchar(20),\n"
+            + "  text_col text,\n"
+            + "  binary_col binary\n"
+            + ");\n";
+
+    mysqlService.executeQuery(sql);
+    Table loadedTable =
+        catalog
+            .asTableCatalog()
+            .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+
+    for (Column column : loadedTable.columns()) {
+      switch (column.name()) {
+        case "tinyint_col":
+          Assertions.assertEquals(Types.ByteType.get(), column.dataType());
+          break;
+        case "smallint_col":
+          Assertions.assertEquals(Types.ShortType.get(), column.dataType());
+          break;
+        case "int_col":
+          Assertions.assertEquals(Types.IntegerType.get(), column.dataType());
+          break;
+        case "bigint_col":
+          Assertions.assertEquals(Types.LongType.get(), column.dataType());
+          break;
+        case "float_col":
+          Assertions.assertEquals(Types.FloatType.get(), column.dataType());
+          break;
+        case "double_col":
+          Assertions.assertEquals(Types.DoubleType.get(), column.dataType());
+          break;
+        case "date_col":
+          Assertions.assertEquals(Types.DateType.get(), column.dataType());
+          break;
+        case "time_col":
+          Assertions.assertEquals(Types.TimeType.get(), column.dataType());
+          break;
+        case "timestamp_col":
+          Assertions.assertEquals(Types.TimestampType.withTimeZone(), column.dataType());
+          break;
+        case "datetime_col":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(), column.dataType());
+          break;
+        case "decimal_6_2_col":
+          Assertions.assertEquals(Types.DecimalType.of(6, 2), column.dataType());
+          break;
+        case "varchar20_col":
+          Assertions.assertEquals(Types.VarCharType.of(20), column.dataType());
+          break;
+        case "text_col":
+          Assertions.assertEquals(Types.StringType.get(), column.dataType());
+          break;
+        case "binary_col":
+          Assertions.assertEquals(Types.BinaryType.get(), column.dataType());
+          break;
+        default:
+          Assertions.fail("Unexpected column name: " + column.name());
+      }
+    }
+  }
+
+  @Test
   void testAlterAndDropMysqlTable() {
     Column[] columns = createColumns();
     catalog
@@ -763,10 +844,7 @@ public class CatalogMysqlIT extends AbstractIT {
 
     catalog
         .asSchemas()
-        .createSchema(
-            NameIdentifier.of(metalakeName, catalogName, schemaName),
-            null,
-            ImmutableMap.<String, String>builder().build());
+        .createSchema(schemaName, null, ImmutableMap.<String, String>builder().build());
 
     catalog
         .asTableCatalog()
@@ -778,19 +856,18 @@ public class CatalogMysqlIT extends AbstractIT {
 
     // Try to drop a database, and cascade equals to false, it should not be
     // allowed.
-    catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), false);
+    catalog.asSchemas().dropSchema(schemaName, false);
     // Check the database still exists
-    catalog.asSchemas().loadSchema(NameIdentifier.of(metalakeName, catalogName, schemaName));
+    catalog.asSchemas().loadSchema(schemaName);
 
     // Try to drop a database, and cascade equals to true, it should be allowed.
-    catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), true);
+    catalog.asSchemas().dropSchema(schemaName, true);
     // Check database has been dropped
     SupportsSchemas schemas = catalog.asSchemas();
-    NameIdentifier of = NameIdentifier.of(metalakeName, catalogName, schemaName);
     Assertions.assertThrows(
         NoSuchSchemaException.class,
         () -> {
-          schemas.loadSchema(of);
+          schemas.loadSchema(schemaName);
         });
   }
 
@@ -1036,23 +1113,21 @@ public class CatalogMysqlIT extends AbstractIT {
 
   @Test
   public void testSchemaComment() {
-    String testSchemaName = "test";
-    NameIdentifier identer = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
+    final String testSchemaName = "test";
     RuntimeException exception =
         Assertions.assertThrowsExactly(
             UnsupportedOperationException.class,
-            () -> catalog.asSchemas().createSchema(identer, "comment", null));
+            () -> catalog.asSchemas().createSchema(testSchemaName, "comment", null));
     Assertions.assertTrue(
         exception.getMessage().contains("MySQL doesn't support set schema comment: comment"));
 
     // test null comment
-    testSchemaName = "test2";
-    NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
-    Schema schema = catalog.asSchemas().createSchema(ident, "", null);
+    String testSchemaName2 = "test2";
+    Schema schema = catalog.asSchemas().createSchema(testSchemaName2, "", null);
     Assertions.assertTrue(StringUtils.isEmpty(schema.comment()));
-    schema = catalog.asSchemas().loadSchema(ident);
+    schema = catalog.asSchemas().loadSchema(testSchemaName2);
     Assertions.assertTrue(StringUtils.isEmpty(schema.comment()));
-    catalog.asSchemas().dropSchema(ident, true);
+    catalog.asSchemas().dropSchema(testSchemaName2, true);
   }
 
   @Test
@@ -1254,17 +1329,15 @@ public class CatalogMysqlIT extends AbstractIT {
     String sql = String.format("CREATE DATABASE `%s`", testSchemaName);
     mysqlService.executeQuery(sql);
 
-    NameIdentifier schemaIdent = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
-    Schema schema = catalog.asSchemas().loadSchema(schemaIdent);
+    Schema schema = catalog.asSchemas().loadSchema(testSchemaName);
     Assertions.assertEquals(testSchemaName, schema.name());
 
-    NameIdentifier[] schemaIdents =
-        catalog.asSchemas().listSchemas(Namespace.of(metalakeName, catalogName));
+    NameIdentifier[] schemaIdents = catalog.asSchemas().listSchemas();
     Assertions.assertTrue(
         Arrays.stream(schemaIdents).anyMatch(s -> s.name().equals(testSchemaName)));
 
-    Assertions.assertTrue(catalog.asSchemas().dropSchema(schemaIdent, false));
-    Assertions.assertFalse(catalog.asSchemas().schemaExists(schemaIdent));
+    Assertions.assertTrue(catalog.asSchemas().dropSchema(testSchemaName, false));
+    Assertions.assertFalse(catalog.asSchemas().schemaExists(testSchemaName));
 
     // test operate illegal table name from MySQL
     mysqlService.executeQuery(sql);
@@ -1286,7 +1359,7 @@ public class CatalogMysqlIT extends AbstractIT {
     Assertions.assertTrue(catalog.asTableCatalog().dropTable(tableIdent));
     Assertions.assertFalse(catalog.asTableCatalog().tableExists(tableIdent));
     Assertions.assertFalse(catalog.asTableCatalog().purgeTable(tableIdent));
-    catalog.asSchemas().dropSchema(schemaIdent, true);
+    catalog.asSchemas().dropSchema(testSchemaName, true);
   }
 
   @Test
@@ -1302,13 +1375,12 @@ public class CatalogMysqlIT extends AbstractIT {
     SupportsSchemas schemaSupport = catalog.asSchemas();
 
     for (String schema : schemas) {
-      NameIdentifier schemaIdentifier = NameIdentifier.of(metalakeName, catalogName, schema);
-      schemaSupport.createSchema(schemaIdentifier, null, Collections.emptyMap());
-      Assertions.assertNotNull(schemaSupport.loadSchema(schemaIdentifier));
+      schemaSupport.createSchema(schema, null, Collections.emptyMap());
+      Assertions.assertNotNull(schemaSupport.loadSchema(schema));
     }
 
     Set<String> schemaNames =
-        Arrays.stream(schemaSupport.listSchemas(Namespace.of(metalakeName, catalogName)))
+        Arrays.stream(schemaSupport.listSchemas())
             .map(NameIdentifier::name)
             .collect(Collectors.toSet());
 
@@ -1353,8 +1425,7 @@ public class CatalogMysqlIT extends AbstractIT {
     }
 
     for (String schema : schemas) {
-      NameIdentifier schemaIdentifier = NameIdentifier.of(metalakeName, catalogName, schema);
-      schemaSupport.dropSchema(schemaIdentifier, true);
+      schemaSupport.dropSchema(schema, true);
     }
   }
 

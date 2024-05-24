@@ -5,3 +5,4 @@ dataclasses-json
 pylint
 black
 twine
+coverage

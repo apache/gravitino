@@ -29,6 +29,7 @@ include(
 )
 include("trino-connector")
 include("spark-connector:spark-connector", "spark-connector:spark-connector-runtime")
+include("flink-connector")
 include("web")
 include("docs")
 include("integration-test-common")

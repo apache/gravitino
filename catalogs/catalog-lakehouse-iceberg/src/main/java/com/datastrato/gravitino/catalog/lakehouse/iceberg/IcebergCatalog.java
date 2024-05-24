@@ -7,8 +7,6 @@ package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 import com.datastrato.gravitino.connector.BaseCatalog;
 import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.capability.Capability;
-import com.datastrato.gravitino.rel.SupportsSchemas;
-import com.datastrato.gravitino.rel.TableCatalog;
 import java.util.Map;
 
 /** Implementation of an Iceberg catalog in Gravitino. */
@@ -35,17 +33,5 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
   @Override
   public Capability newCapability() {
     return new IcebergCatalogCapability();
-  }
-
-  /** @return The Iceberg catalog operations as {@link IcebergCatalogOperations}. */
-  @Override
-  public SupportsSchemas asSchemas() {
-    return (IcebergCatalogOperations) ops();
-  }
-
-  /** @return The Iceberg catalog operations as {@link IcebergCatalogOperations}. */
-  @Override
-  public TableCatalog asTableCatalog() {
-    return (IcebergCatalogOperations) ops();
   }
 }

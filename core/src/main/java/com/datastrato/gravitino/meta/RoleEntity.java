@@ -9,9 +9,9 @@ import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Field;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.authorization.Privilege;
 import com.datastrato.gravitino.authorization.Role;
 import com.datastrato.gravitino.authorization.SecurableObject;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.List;
@@ -36,14 +36,10 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
       Field.required(
           "securable_object", SecurableObject.class, "The securable object of the role entity.");
 
-  public static final Field PRIVILEGES =
-      Field.required("privileges", List.class, "The privileges of the role entity.");
-
   private Long id;
   private String name;
   private Map<String, String> properties;
   private AuditInfo auditInfo;
-  private List<Privilege> privileges;
   private Namespace namespace;
   private SecurableObject securableObject;
 
@@ -78,10 +74,10 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
    * securable objects are organized by tree structure. For example: If the securable object is a
    * table, the identifier may be `catalog1.schema1.table1`.
    *
-   * @return The securable object of the role.
+   * @return The securable objects of the role.
    */
   @Override
-  public SecurableObject securableObject() {
+  public List<SecurableObject> securableObjects() {
     // The securable object is a special kind of entities. Some entity types aren't the securable
     // object, such as
     // User, Role, etc.
@@ -91,19 +87,7 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
     // So one type of them can't be the securable object at least if there are the two same
     // identifier
     // entities .
-    return securableObject;
-  }
-
-  /**
-   * The privileges of the role. All privileges belong to one securable object. For example: If the
-   * securable object is a table, the privileges could be `READ TABLE`, `WRITE TABLE`, etc. If a
-   * schema has the privilege of `LOAD TABLE`. It means the role can all tables of the schema.
-   *
-   * @return The privileges of the role.
-   */
-  @Override
-  public List<Privilege> privileges() {
-    return privileges;
+    return Lists.newArrayList(securableObject);
   }
 
   /**
@@ -119,7 +103,6 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
     fields.put(AUDIT_INFO, auditInfo);
     fields.put(PROPERTIES, properties);
     fields.put(SECURABLE_OBJECT, securableObject);
-    fields.put(PRIVILEGES, privileges);
 
     return Collections.unmodifiableMap(fields);
   }
@@ -155,13 +138,12 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
         && Objects.equals(namespace, that.namespace)
         && Objects.equals(auditInfo, that.auditInfo)
         && Objects.equals(properties, that.properties)
-        && Objects.equals(securableObject, that.securableObject)
-        && Objects.equals(privileges, that.privileges);
+        && Objects.equals(securableObject, that.securableObject);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, properties, auditInfo, securableObject, privileges);
+    return Objects.hash(id, name, properties, auditInfo, securableObject);
   }
 
   /**
@@ -237,17 +219,6 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
      */
     public Builder withSecurableObject(SecurableObject securableObject) {
       roleEntity.securableObject = securableObject;
-      return this;
-    }
-
-    /**
-     * Sets the privileges of the role entity.
-     *
-     * @param privileges The privileges of the role entity.
-     * @return The builder instance.
-     */
-    public Builder withPrivileges(List<Privilege> privileges) {
-      roleEntity.privileges = privileges;
       return this;
     }
 

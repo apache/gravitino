@@ -12,9 +12,9 @@ import static org.apache.http.HttpStatus.SC_NOT_FOUND;
 import static org.apache.http.HttpStatus.SC_NOT_IMPLEMENTED;
 
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.dto.SchemaDTO;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.DistributionDTO;
-import com.datastrato.gravitino.dto.rel.SchemaDTO;
 import com.datastrato.gravitino.dto.rel.SortOrderDTO;
 import com.datastrato.gravitino.dto.rel.TableDTO;
 import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
@@ -72,7 +72,7 @@ public class TestRelationalTable extends TestRelationalCatalog {
     SchemaResponse resp = new SchemaResponse(mockedSchema);
     buildMockResource(Method.POST, schemaPath, req, resp, SC_OK);
 
-    catalog.asSchemas().createSchema(schemaId, "comment", Collections.emptyMap());
+    catalog.asSchemas().createSchema(schemaId.name(), "comment", Collections.emptyMap());
 
     // setup partitioned table
     NameIdentifier tableId =

@@ -7,6 +7,7 @@ package com.datastrato.gravitino.storage.relational.mapper;
 
 import com.datastrato.gravitino.storage.relational.po.UserPO;
 import java.util.List;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -132,4 +133,11 @@ public interface UserMetaMapper {
           + " WHERE re.role_id = #{roleId}"
           + " AND us.deleted_at = 0 AND re.deleted_at = 0")
   List<UserPO> listUsersByRoleId(@Param("roleId") Long roleId);
+
+  @Delete(
+      "DELETE FROM "
+          + USER_TABLE_NAME
+          + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeLine} LIMIT #{limit}")
+  Integer deleteUserMetasByLegacyTimeLine(
+      @Param("legacyTimeLine") Long legacyTimeLine, @Param("limit") int limit);
 }

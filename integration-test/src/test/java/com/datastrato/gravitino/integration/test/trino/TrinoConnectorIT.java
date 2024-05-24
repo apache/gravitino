@@ -8,6 +8,7 @@ import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
@@ -17,7 +18,6 @@ import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.integration.test.util.JdbcDriverDownloader;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
@@ -145,8 +145,7 @@ public class TrinoConnectorIT extends AbstractIT {
             HiveContainer.HDFS_DEFAULTFS_PORT,
             databaseName);
     containerSuite.getTrinoContainer().executeUpdateSQL(sql1);
-    NameIdentifier idSchema = NameIdentifier.of(metalakeName, catalogName, databaseName);
-    Schema schema = catalog.asSchemas().loadSchema(idSchema);
+    Schema schema = catalog.asSchemas().loadSchema(databaseName);
     Assertions.assertEquals(schema.name(), databaseName);
 
     ArrayList<ArrayList<String>> r =
@@ -377,8 +376,7 @@ public class TrinoConnectorIT extends AbstractIT {
             catalogName, schemaName);
     containerSuite.getTrinoContainer().executeUpdateSQL(createSchemaSql);
 
-    Schema schema =
-        catalog.asSchemas().loadSchema(NameIdentifier.of(metalakeName, catalogName, schemaName));
+    Schema schema = catalog.asSchemas().loadSchema(schemaName);
     Assertions.assertEquals(
         "hdfs://localhost:9000/user/hive/warehouse/hive_schema_1123123",
         schema.properties().get("location"));
@@ -460,7 +458,7 @@ public class TrinoConnectorIT extends AbstractIT {
     catalog
         .asSchemas()
         .createSchema(
-            NameIdentifier.of(metalakeName, catalogName, schemaName),
+            schemaName,
             "Created by gravitino client",
             ImmutableMap.<String, String>builder()
                 .put("location", "hdfs://localhost:9000/user/hive/warehouse/hive_schema_1223445.db")
@@ -703,7 +701,7 @@ public class TrinoConnectorIT extends AbstractIT {
         catalog
             .asSchemas()
             .createSchema(
-                NameIdentifier.of(metalakeName, catalogName, schemaName),
+                schemaName,
                 "Created by gravitino client",
                 ImmutableMap.<String, String>builder().build());
 
@@ -925,7 +923,7 @@ public class TrinoConnectorIT extends AbstractIT {
         catalog
             .asSchemas()
             .createSchema(
-                NameIdentifier.of(metalakeName, catalogName, schemaName),
+                schemaName,
                 "Created by gravitino client",
                 ImmutableMap.<String, String>builder().build());
 
@@ -1060,7 +1058,7 @@ public class TrinoConnectorIT extends AbstractIT {
     catalog
         .asSchemas()
         .createSchema(
-            NameIdentifier.of(metalakeName, catalogName, schemaName),
+            schemaName,
             "Created by gravitino client",
             ImmutableMap.<String, String>builder().build());
 
@@ -1083,10 +1081,7 @@ public class TrinoConnectorIT extends AbstractIT {
     }
 
     // Do not support the cascade drop
-    success =
-        catalog
-            .asSchemas()
-            .dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), true);
+    success = catalog.asSchemas().dropSchema(schemaName, true);
     Assertions.assertFalse(success);
     final String sql3 = String.format("show schemas in %s like '%s'", catalogName, schemaName);
     success = checkTrinoHasLoaded(sql3, 30);
@@ -1181,10 +1176,7 @@ public class TrinoConnectorIT extends AbstractIT {
     Schema schema =
         catalog
             .asSchemas()
-            .createSchema(
-                NameIdentifier.of(metalakeName, catalogName, schemaName),
-                null,
-                ImmutableMap.<String, String>builder().build());
+            .createSchema(schemaName, null, ImmutableMap.<String, String>builder().build());
 
     Assertions.assertNotNull(schema);
 
