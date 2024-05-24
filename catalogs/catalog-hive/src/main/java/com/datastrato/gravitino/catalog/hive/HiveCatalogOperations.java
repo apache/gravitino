@@ -51,6 +51,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -78,8 +79,6 @@ import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import sun.security.krb5.Config;
-import sun.security.krb5.KrbException;
 
 /** Operations for interacting with the Hive catalog in Gravitino. */
 public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
@@ -203,7 +202,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             new ScheduledThreadPoolExecutor(
                 1, getThreadFactory(String.format("Kerberos-check-%s", info.id())));
 
-        Config.refresh();
+        refreshKerberosConfig();
         KerberosName.resetDefaultRealm();
         UserGroupInformation.setConfiguration(hadoopConf);
         UserGroupInformation.loginUserFromKeytab(catalogPrincipal, keytabFile.getAbsolutePath());
@@ -229,9 +228,23 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
       } catch (IOException ioe) {
         throw new UncheckedIOException(ioe);
-      } catch (KrbException e) {
-        throw new RuntimeException(e);
       }
+    }
+  }
+
+  private void refreshKerberosConfig() {
+    Class<?> classRef;
+    try {
+      if (System.getProperty("java.vendor").contains("IBM")) {
+        classRef = Class.forName("com.ibm.security.krb5.internal.Config");
+      } else {
+        classRef = Class.forName("sun.security.krb5.Config");
+      }
+
+      Method refershMethod = classRef.getMethod("refresh");
+      refershMethod.invoke(null);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     }
   }
 
