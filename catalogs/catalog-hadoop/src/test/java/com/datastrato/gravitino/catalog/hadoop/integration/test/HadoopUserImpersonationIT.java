@@ -133,6 +133,8 @@ public class HadoopUserImpersonationIT extends AbstractIT {
     conf.set("hadoop.proxyuser.hdfs.hosts", "*");
     conf.set("hadoop.proxyuser.hdfs.groups", "*");
     conf.set("hadoop.proxyuser.hdfs.users", "*");
+    conf.set(
+        "hadoop.security.auth_to_local", "RULE:[2:$1@$0](.*@EXAMPLE.COM)s/.*/hadoop/\nDEFAULT");
 
     KerberosName.resetDefaultRealm();
     UserGroupInformation.setConfiguration(conf);
