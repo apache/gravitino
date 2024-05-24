@@ -38,7 +38,8 @@ const AuthProvider = ({ children }) => {
   const paramsSize = [...searchParams.keys()].length
 
   const expiredIn = localStorage.getItem('expiredIn') && JSON.parse(localStorage.getItem('expiredIn')) // seconds
-  const isIdle = useIdle(expiredIn * 1000)
+  const idleOn = (expiredIn + 60) * 1000
+  const isIdle = useIdle(idleOn)
 
   useEffect(() => {
     if (isIdle) {
