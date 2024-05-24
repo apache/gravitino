@@ -29,6 +29,8 @@ import java.io.File;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.net.URL;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -150,7 +152,12 @@ public class JsonCodec {
   private void createClassLoaders(ClassLoader appClassLoader) {
 
     try {
-      File directory = new File("/usr/local/trino-server/plugin/hive");
+      String jarPath =
+          JsonCodec.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
+
+      Path path = Paths.get(jarPath).getParent().getParent();
+
+      File directory = new File(path.toString() + "/hive");
       List<URL> files =
           Arrays.stream(directory.listFiles())
               .map(File::toURI)
