@@ -39,12 +39,7 @@ export function checkStatus(status: number, msg: string, errorMessageMode: Error
 
     case 401:
       // ** reserve error message
-      errMessage = msg || 'The user does not have permission (token, user name, password error or expired)!'
-
-      localStorage.removeItem('accessToken')
-      localStorage.removeItem('authParams')
-
-      window.location.href = '/'
+      // errMessage = msg || 'The user does not have permission (token, user name, password error or expired)!'
 
       break
     case 403:
