@@ -3,10 +3,21 @@
 -- This software is licensed under the Apache License version 2.
 --
 
-ALTER TABLE `role_meta`
-    ADD COLUMN `securable_objects` TEXT NOT NULL COMMENT 'securable objects' AFTER `properties`;
-
 ALTER TABLE `role_meta` DROP COLUMN `securable_object_full_name`;
 ALTER TABLE `role_meta` DROP COLUMN `securable_object_type`;
 ALTER TABLE `role_meta` DROP COLUMN `privileges`;
 ALTER TABLE `role_meta` DROP COLUMN `privilege_conditions`;
+
+CREATE TABLE IF NOT EXISTS `role_meta_securable_object` (
+    `id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'securable object id',
+    `role_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'role id',
+    `full_name` VARCHAR(246) NOT NULL COMMENT 'securable object full name',
+    `type`  VARCHAR(128) NOT NULL COMMENT 'securable object type',
+    `privilege_names` VARCHAR(256) NOT NULL COMMENT 'securable object privilege names',
+    `privilege_conditions` VARCHAR(256) NOT NULL COMMENT 'securable object privilege conditions',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'securable objectcurrent version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'securable object last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'securable object deleted at',
+    PRIMARY KEY (`id`),
+    KEY `idx_obj_rid` (`role_id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'securable object meta';
