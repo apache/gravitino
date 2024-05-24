@@ -49,13 +49,9 @@ public class TestSparkTypeConverter {
   @BeforeAll
   void init() {
     gravitinoToSparkTypeMapper.put(ByteType.get(), DataTypes.ByteType);
-    gravitinoToSparkTypeMapper.put(ByteType.of(false), DataTypes.ShortType);
     gravitinoToSparkTypeMapper.put(ShortType.get(), DataTypes.ShortType);
-    gravitinoToSparkTypeMapper.put(ShortType.of(false), DataTypes.IntegerType);
     gravitinoToSparkTypeMapper.put(IntegerType.get(), DataTypes.IntegerType);
-    gravitinoToSparkTypeMapper.put(IntegerType.of(false), DataTypes.LongType);
     gravitinoToSparkTypeMapper.put(LongType.get(), DataTypes.LongType);
-    gravitinoToSparkTypeMapper.put(LongType.of(false), DataTypes.createDecimalType(20, 0));
     gravitinoToSparkTypeMapper.put(FloatType.get(), DataTypes.FloatType);
     gravitinoToSparkTypeMapper.put(DoubleType.get(), DataTypes.DoubleType);
     gravitinoToSparkTypeMapper.put(DecimalType.of(10, 2), DataTypes.createDecimalType(10, 2));
@@ -91,7 +87,6 @@ public class TestSparkTypeConverter {
 
   @Test
   void testConvertSparkTypeToGravitino() {
-    // todo spark -> gravitino cannot equal gravitino -> spark
     gravitinoToSparkTypeMapper.forEach(
         (gravitinoType, sparkType) ->
             Assertions.assertEquals(gravitinoType, SparkTypeConverter.toGravitinoType(sparkType)));

@@ -72,7 +72,7 @@ public class TestMySQLDataTypeTransformer {
         generalDataTypeTransformer.getTrinoType(integerType),
         io.trino.spi.type.IntegerType.INTEGER);
 
-    Type unsignedIntegerType = Types.IntegerType.of(false);
+    Type unsignedIntegerType = Types.IntegerType.unsigned();
     Assert.assertEquals(
         generalDataTypeTransformer.getTrinoType(unsignedIntegerType),
         io.trino.spi.type.BigintType.BIGINT);
@@ -81,7 +81,7 @@ public class TestMySQLDataTypeTransformer {
     Assert.assertEquals(
         generalDataTypeTransformer.getTrinoType(bigintType), io.trino.spi.type.BigintType.BIGINT);
 
-    Type unsignBigintType = Types.LongType.of(false);
+    Type unsignBigintType = Types.LongType.unsigned();
     Assert.assertEquals(
         generalDataTypeTransformer.getTrinoType(unsignBigintType),
         io.trino.spi.type.DecimalType.createDecimalType(20, 0));

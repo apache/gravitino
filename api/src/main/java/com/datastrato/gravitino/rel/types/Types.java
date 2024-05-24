@@ -59,9 +59,10 @@ public class Types {
   /** The byte type in Gravitino. */
   public static class ByteType extends Type.IntegralType {
     private static final ByteType INSTANCE = new ByteType(true);
+    private static final ByteType UNSIGNED_INSTANCE = new ByteType(false);
 
-    public static ByteType of(boolean signed) {
-      return new ByteType(signed);
+    public static ByteType unsigned() {
+      return UNSIGNED_INSTANCE;
     }
 
     /** @return The singleton instance of {@link ByteType}. */
@@ -87,9 +88,10 @@ public class Types {
   /** The short type in Gravitino. */
   public static class ShortType extends Type.IntegralType {
     private static final ShortType INSTANCE = new ShortType(true);
+    private static final ShortType UNSIGNED_INSTANCE = new ShortType(false);
 
-    public static ShortType of(boolean signed) {
-      return new ShortType(signed);
+    public static ShortType unsigned() {
+      return UNSIGNED_INSTANCE;
     }
 
     /** @return The singleton instance of {@link ShortType}. */
@@ -115,9 +117,10 @@ public class Types {
   /** The integer type in Gravitino. */
   public static class IntegerType extends Type.IntegralType {
     private static final IntegerType INSTANCE = new IntegerType(true);
+    private static final IntegerType UNSIGNED_INSTANCE = new IntegerType(false);
 
-    public static IntegerType of(boolean signed) {
-      return new IntegerType(signed);
+    public static IntegerType unsigned() {
+      return UNSIGNED_INSTANCE;
     }
 
     /** @return The singleton instance of {@link IntegerType}. */
@@ -143,9 +146,10 @@ public class Types {
   /** The long type in Gravitino. */
   public static class LongType extends Type.IntegralType {
     private static final LongType INSTANCE = new LongType(true);
+    private static final LongType UNSIGNED_INSTANCE = new LongType(false);
 
-    public static LongType of(boolean signed) {
-      return new LongType(signed);
+    public static LongType unsigned() {
+      return UNSIGNED_INSTANCE;
     }
 
     /** @return The singleton instance of {@link LongType}. */

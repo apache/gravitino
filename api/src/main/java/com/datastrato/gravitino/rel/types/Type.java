@@ -108,10 +108,6 @@ public interface Type {
     public boolean signed() {
       return signed;
     }
-
-    public boolean unsigned() {
-      return !signed;
-    }
   }
 
   /** The base type of all fractional types. */

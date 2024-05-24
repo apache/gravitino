@@ -106,9 +106,16 @@ public class TestDataTypeTransformer {
     assertEquals(dataTypeTransformer.getTrinoType(Types.BooleanType.get()), BooleanType.BOOLEAN);
 
     assertEquals(dataTypeTransformer.getTrinoType(Types.ByteType.get()), TinyintType.TINYINT);
+    assertEquals(
+        dataTypeTransformer.getTrinoType(Types.ByteType.unsigned()), SmallintType.SMALLINT);
     assertEquals(dataTypeTransformer.getTrinoType(Types.ShortType.get()), SmallintType.SMALLINT);
+    assertEquals(dataTypeTransformer.getTrinoType(Types.ShortType.unsigned()), IntegerType.INTEGER);
     assertEquals(dataTypeTransformer.getTrinoType(Types.IntegerType.get()), IntegerType.INTEGER);
     assertEquals(dataTypeTransformer.getTrinoType(Types.LongType.get()), BigintType.BIGINT);
+    assertEquals(dataTypeTransformer.getTrinoType(Types.IntegerType.unsigned()), BigintType.BIGINT);
+    assertEquals(
+        dataTypeTransformer.getTrinoType(Types.LongType.unsigned()),
+        DecimalType.createDecimalType(20, 0));
 
     assertEquals(dataTypeTransformer.getTrinoType(Types.FloatType.get()), RealType.REAL);
     assertEquals(dataTypeTransformer.getTrinoType(Types.DoubleType.get()), DoubleType.DOUBLE);

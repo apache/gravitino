@@ -32,19 +32,19 @@ public class MysqlTypeConverter extends JdbcTypeConverter<String> {
       case TINYINT:
         return Types.ByteType.get();
       case TINYINT_UNSIGNED:
-        return Types.ByteType.of(false);
+        return Types.ByteType.unsigned();
       case SMALLINT:
         return Types.ShortType.get();
       case SMALLINT_UNSIGNED:
-        return Types.ShortType.of(false);
+        return Types.ShortType.unsigned();
       case INT:
         return Types.IntegerType.get();
       case INT_UNSIGNED:
-        return Types.IntegerType.of(false);
+        return Types.IntegerType.unsigned();
       case BIGINT:
         return Types.LongType.get();
       case BIGINT_UNSIGNED:
-        return Types.LongType.of(false);
+        return Types.LongType.unsigned();
       case FLOAT:
         return Types.FloatType.get();
       case DOUBLE:
@@ -74,28 +74,28 @@ public class MysqlTypeConverter extends JdbcTypeConverter<String> {
   @Override
   public String fromGravitinoType(Type type) {
     if (type instanceof Types.ByteType) {
-      if (((Types.ByteType) type).unsigned()) {
-        return TINYINT_UNSIGNED;
-      } else {
+      if (((Types.ByteType) type).signed()) {
         return TINYINT;
+      } else {
+        return TINYINT_UNSIGNED;
       }
     } else if (type instanceof Types.ShortType) {
-      if (((Types.ShortType) type).unsigned()) {
-        return SMALLINT_UNSIGNED;
-      } else {
+      if (((Types.ShortType) type).signed()) {
         return SMALLINT;
+      } else {
+        return SMALLINT_UNSIGNED;
       }
     } else if (type instanceof Types.IntegerType) {
-      if (((Types.IntegerType) type).unsigned()) {
-        return INT_UNSIGNED;
-      } else {
+      if (((Types.IntegerType) type).signed()) {
         return INT;
+      } else {
+        return INT_UNSIGNED;
       }
     } else if (type instanceof Types.LongType) {
-      if (((Types.LongType) type).unsigned()) {
-        return BIGINT_UNSIGNED;
-      } else {
+      if (((Types.LongType) type).signed()) {
         return BIGINT;
+      } else {
+        return BIGINT_UNSIGNED;
       }
     } else if (type instanceof Types.FloatType) {
       return type.simpleString();
