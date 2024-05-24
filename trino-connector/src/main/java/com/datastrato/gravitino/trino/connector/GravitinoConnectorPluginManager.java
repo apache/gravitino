@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
 /** This class is mange the internal connector plugin and help to create the connector. */
 public class GravitinoConnectorPluginManager {
 
-  private static final Logger LOG = LoggerFactory.getLogger(GravitinoConnectorFactory.class);
+  private static final Logger LOG = LoggerFactory.getLogger(GravitinoConnectorPluginManager.class);
 
   public static final String CONNECTOR_HIVE = "hive";
   public static final String CONNECTOR_ICEBERG = "iceberg";
