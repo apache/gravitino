@@ -202,6 +202,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             new ScheduledThreadPoolExecutor(
                 1, getThreadFactory(String.format("Kerberos-check-%s", info.id())));
 
+        LOG.info(
+            "kerberosRealm: {}, krb5.conf: {}",
+            kerberosRealm,
+            System.getProperty("java.security.krb5.conf"));
         refreshKerberosConfig();
         KerberosName.resetDefaultRealm();
         UserGroupInformation.setConfiguration(hadoopConf);

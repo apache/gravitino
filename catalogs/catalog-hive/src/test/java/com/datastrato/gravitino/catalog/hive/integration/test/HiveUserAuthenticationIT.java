@@ -113,7 +113,6 @@ public class HiveUserAuthenticationIT extends AbstractIT {
     // Clean up the kerberos configuration
     System.clearProperty("java.security.krb5.conf");
     System.clearProperty("sun.security.krb5.debug");
-    System.clearProperty("java.security.krb5.realm");
   }
 
   private static void prepareKerberosConfig() throws IOException, KrbException {
@@ -145,7 +144,6 @@ public class HiveUserAuthenticationIT extends AbstractIT {
 
     LOG.info("Kerberos kdc config:\n{}", content);
     System.setProperty("java.security.krb5.conf", krb5Path);
-    System.setProperty("java.security.krb5.realm", "HADOOPKRB");
     System.setProperty("sun.security.krb5.debug", "true");
 
     //    Config.refresh();
