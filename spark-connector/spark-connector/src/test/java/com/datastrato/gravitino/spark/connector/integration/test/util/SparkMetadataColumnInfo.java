@@ -3,7 +3,7 @@
  *  This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.integration.test.util.spark;
+package com.datastrato.gravitino.spark.connector.integration.test.util;
 
 import org.apache.spark.sql.connector.catalog.MetadataColumn;
 import org.apache.spark.sql.types.DataType;

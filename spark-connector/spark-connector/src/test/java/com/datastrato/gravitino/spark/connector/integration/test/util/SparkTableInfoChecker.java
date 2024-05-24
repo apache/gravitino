@@ -3,10 +3,10 @@
  *  This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.integration.test.util.spark;
+package com.datastrato.gravitino.spark.connector.integration.test.util;
 
-import com.datastrato.gravitino.integration.test.util.spark.SparkTableInfo.SparkColumnInfo;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
+import com.datastrato.gravitino.spark.connector.integration.test.util.SparkTableInfo.SparkColumnInfo;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;

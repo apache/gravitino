@@ -321,15 +321,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
-
-    if (Entity.SYSTEM_CATALOG_RESERVED_NAME.equals(ident.name())) {
-      throw new IllegalArgumentException("Can't create a catalog with with reserved name `system`");
-    }
-
-    if (Entity.SECURABLE_ENTITY_RESERVED_NAME.equals(ident.name())) {
-      throw new IllegalArgumentException("Can't create a catalog with with reserved name `*`");
-    }
-
     // load catalog-related configuration from catalog-specific configuration file
     Map<String, String> newProperties = Optional.ofNullable(properties).orElse(Maps.newHashMap());
     Map<String, String> catalogSpecificConfig = loadCatalogSpecificConfig(newProperties, provider);
