@@ -37,6 +37,7 @@ import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.transforms.SortOrderVisitor;
 
+/** Referred from org/apache/iceberg/spark/source/SparkTable.java#properties() */
 public class IcebergTablePropertiesUtil {
 
   public static Map<String, String> buildReservedProperties(TableMetadata table) {
@@ -73,4 +74,6 @@ public class IcebergTablePropertiesUtil {
     return Joiner.on(", ")
         .join(SortOrderVisitor.visit(sortOrder, DescribeIcebergSortOrderVisitor.INSTANCE));
   }
+
+  private IcebergTablePropertiesUtil() {}
 }
