@@ -7,6 +7,10 @@ package com.datastrato.gravitino.storage.relational.utils;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.authorization.Privilege;
+import com.datastrato.gravitino.authorization.Privileges;
+import com.datastrato.gravitino.authorization.SecurableObject;
+import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.meta.AuditInfo;
@@ -28,6 +32,7 @@ import com.datastrato.gravitino.storage.relational.po.GroupRoleRelPO;
 import com.datastrato.gravitino.storage.relational.po.MetalakePO;
 import com.datastrato.gravitino.storage.relational.po.RolePO;
 import com.datastrato.gravitino.storage.relational.po.SchemaPO;
+import com.datastrato.gravitino.storage.relational.po.SecurableObjectPO;
 import com.datastrato.gravitino.storage.relational.po.TablePO;
 import com.datastrato.gravitino.storage.relational.po.TopicPO;
 import com.datastrato.gravitino.storage.relational.po.UserPO;
@@ -778,8 +783,6 @@ public class POConverters {
           .withRoleId(roleEntity.id())
           .withRoleName(roleEntity.name())
           .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(roleEntity.properties()))
-          .withSecurableObjects(
-              JsonUtils.anyFieldMapper().writeValueAsString(roleEntity.securableObjects()))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(roleEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
@@ -869,21 +872,77 @@ public class POConverters {
     }
   }
 
-  public static RoleEntity fromRolePO(RolePO rolePO, Namespace namespace) {
+  public static RoleEntity fromRolePO(
+      RolePO rolePO, List<SecurableObjectPO> securableObjectPOS, Namespace namespace) {
     try {
+
+      List<SecurableObject> securableObjects = Lists.newArrayList();
+      for (SecurableObjectPO securableObjectPO : securableObjectPOS) {
+        List<String> privilegeNames =
+            JsonUtils.anyFieldMapper().readValue(securableObjectPO.getPrivilegeNames(), List.class);
+        List<String> privilegeConditions =
+            JsonUtils.anyFieldMapper()
+                .readValue(securableObjectPO.getPrivilegeConditions(), List.class);
+
+        List<Privilege> privileges = Lists.newArrayList();
+        for (int index = 0; index < privilegeNames.size(); index++) {
+          if (Privilege.Condition.ALLOW.name().equals(privilegeConditions.get(index))) {
+            privileges.add(Privileges.allow(privilegeNames.get(index)));
+          } else {
+            privileges.add(Privileges.deny(privilegeNames.get(index)));
+          }
+        }
+        securableObjects.add(
+            SecurableObjects.parse(
+                securableObjectPO.getFullName(), securableObjectPO.getType(), privileges));
+      }
 
       return RoleEntity.builder()
           .withId(rolePO.getRoleId())
           .withName(rolePO.getRoleName())
           .withNamespace(namespace)
           .withProperties(JsonUtils.anyFieldMapper().readValue(rolePO.getProperties(), Map.class))
-          .withSecurableObjects(
-              JsonUtils.anyFieldMapper().readValue(rolePO.getSecurableObjects(), List.class))
+          .withSecurableObjects(securableObjects)
           .withAuditInfo(
               JsonUtils.anyFieldMapper().readValue(rolePO.getAuditInfo(), AuditInfo.class))
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
+
+  public static List<SecurableObjectPO> initializeSecurablePOsWithVersion(RoleEntity roleEntity) {
+    List<SecurableObjectPO> securableObjectPOs = Lists.newArrayList();
+    try {
+      for (SecurableObject securableObject : roleEntity.securableObjects()) {
+        SecurableObjectPO.Builder builder = SecurableObjectPO.builder();
+        securableObjectPOs.add(
+            builder
+                .withRoleId(roleEntity.id())
+                .withFullName(securableObject.fullName())
+                .withType(securableObject.type())
+                .withPrivilegeConditions(
+                    JsonUtils.anyFieldMapper()
+                        .writeValueAsString(
+                            securableObject.privileges().stream()
+                                .map(Privilege::condition)
+                                .map(Privilege.Condition::name)
+                                .collect(Collectors.toList())))
+                .withPrivilegeNames(
+                    JsonUtils.anyFieldMapper()
+                        .writeValueAsString(
+                            securableObject.privileges().stream()
+                                .map(Privilege::name)
+                                .map(Privilege.Name::name)
+                                .collect(Collectors.toList())))
+                .withCurrentVersion(INIT_VERSION)
+                .withLastVersion(INIT_VERSION)
+                .withDeletedAt(DEFAULT_DELETED_AT)
+                .build());
+      }
+      return securableObjectPOs;
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
     }
   }
 }

@@ -12,7 +12,6 @@ public class RolePO {
   private String roleName;
   private Long metalakeId;
   private String properties;
-  private String securableObjects;
   private String auditInfo;
   private Long currentVersion;
   private Long lastVersion;
@@ -50,10 +49,6 @@ public class RolePO {
     return deletedAt;
   }
 
-  public String getSecurableObjects() {
-    return securableObjects;
-  }
-
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -70,8 +65,7 @@ public class RolePO {
         && Objects.equal(getAuditInfo(), tablePO.getAuditInfo())
         && Objects.equal(getCurrentVersion(), tablePO.getCurrentVersion())
         && Objects.equal(getLastVersion(), tablePO.getLastVersion())
-        && Objects.equal(getDeletedAt(), tablePO.getDeletedAt())
-        && Objects.equal(getSecurableObjects(), tablePO.getSecurableObjects());
+        && Objects.equal(getDeletedAt(), tablePO.getDeletedAt());
   }
 
   @Override
@@ -81,7 +75,6 @@ public class RolePO {
         getRoleName(),
         getMetalakeId(),
         getProperties(),
-        getSecurableObjects(),
         getAuditInfo(),
         getCurrentVersion(),
         getLastVersion(),
@@ -115,11 +108,6 @@ public class RolePO {
       return this;
     }
 
-    public Builder withSecurableObjects(String securableObjects) {
-      rolePO.securableObjects = securableObjects;
-      return this;
-    }
-
     public Builder withAuditInfo(String auditInfo) {
       rolePO.auditInfo = auditInfo;
       return this;
@@ -144,8 +132,6 @@ public class RolePO {
       Preconditions.checkArgument(rolePO.roleId != null, "Role id is required");
       Preconditions.checkArgument(rolePO.roleName != null, "Role name is required");
       Preconditions.checkArgument(rolePO.metalakeId != null, "Metalake id is required");
-      Preconditions.checkArgument(
-          rolePO.securableObjects != null, "Securable objects are required");
       Preconditions.checkArgument(rolePO.auditInfo != null, "Audit info is required");
       Preconditions.checkArgument(rolePO.currentVersion != null, "Current version is required");
       Preconditions.checkArgument(rolePO.lastVersion != null, "Last version is required");

@@ -143,7 +143,6 @@ CREATE TABLE IF NOT EXISTS `role_meta` (
     `role_name` VARCHAR(128) NOT NULL COMMENT 'role name',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `properties` MEDIUMTEXT DEFAULT NULL COMMENT 'schema properties',
-    `securable_objects` TEXT NOT NULL COMMENT 'securable objects',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'role audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'role current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'role last version',
@@ -151,6 +150,20 @@ CREATE TABLE IF NOT EXISTS `role_meta` (
     PRIMARY KEY (`role_id`),
     CONSTRAINT `uk_mid_rn_del` UNIQUE (`metalake_id`, `role_name`, `deleted_at`)
 ) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `role_meta_securable_object` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `role_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'role id',
+    `full_name` VARCHAR(246) NOT NULL COMMENT 'securable object full name',
+    `type`  VARCHAR(128) NOT NULL COMMENT 'securable object type',
+    `privilege_names` VARCHAR(256) NOT NULL COMMENT 'securable object privilege names',
+    `privilege_conditions` VARCHAR(256) NOT NULL COMMENT 'securable object privilege conditions',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'securable objectcurrent version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'securable object last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'securable object deleted at',
+    PRIMARY KEY (`id`),
+    KEY `idx_obj_rid` (`role_id`)
+    ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `user_role_rel` (
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',

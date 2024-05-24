@@ -11,8 +11,10 @@ import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.RoleEntity;
 import com.datastrato.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import com.datastrato.gravitino.storage.relational.mapper.RoleMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import com.datastrato.gravitino.storage.relational.mapper.UserRoleRelMapper;
 import com.datastrato.gravitino.storage.relational.po.RolePO;
+import com.datastrato.gravitino.storage.relational.po.SecurableObjectPO;
 import com.datastrato.gravitino.storage.relational.utils.ExceptionUtils;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
@@ -76,16 +78,29 @@ public class RoleMetaService {
           MetalakeMetaService.getInstance().getMetalakeIdByName(roleEntity.namespace().level(0));
       RolePO.Builder builder = RolePO.builder().withMetalakeId(metalakeId);
       RolePO rolePO = POConverters.initializeRolePOWithVersion(roleEntity, builder);
+      List<SecurableObjectPO> securableObjectPOS =
+          POConverters.initializeSecurablePOsWithVersion(roleEntity);
 
-      SessionUtils.doWithCommit(
-          RoleMetaMapper.class,
-          mapper -> {
-            if (overwritten) {
-              mapper.insertRoleMetaOnDuplicateKeyUpdate(rolePO);
-            } else {
-              mapper.insertRoleMeta(rolePO);
-            }
-          });
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              SessionUtils.doWithoutCommit(
+                  SecurableObjectMapper.class,
+                  mapper -> {
+                    if (overwritten) {
+                      mapper.softDeleteSecurableObjectsByRoleId(rolePO.getRoleId());
+                    }
+                    mapper.batchInsertSecurableObjects(securableObjectPOS);
+                  }),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  RoleMetaMapper.class,
+                  mapper -> {
+                    if (overwritten) {
+                      mapper.insertRoleMetaOnDuplicateKeyUpdate(rolePO);
+                    } else {
+                      mapper.insertRoleMeta(rolePO);
+                    }
+                  }));
 
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
@@ -101,7 +116,9 @@ public class RoleMetaService {
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
     RolePO rolePO = getRolePOByMetalakeIdAndName(metalakeId, identifier.name());
 
-    return POConverters.fromRolePO(rolePO, identifier.namespace());
+    List<SecurableObjectPO> securableObjectPOS = listSecurableObjectsByRoleId(rolePO.getRoleId());
+
+    return POConverters.fromRolePO(rolePO, securableObjectPOS, identifier.namespace());
   }
 
   public boolean deleteRole(NameIdentifier identifier) {
@@ -120,7 +137,16 @@ public class RoleMetaService {
                 UserRoleRelMapper.class, mapper -> mapper.softDeleteUserRoleRelByRoleId(roleId)),
         () ->
             SessionUtils.doWithoutCommit(
-                GroupRoleRelMapper.class, mapper -> mapper.softDeleteGroupRoleRelByRoleId(roleId)));
+                GroupRoleRelMapper.class, mapper -> mapper.softDeleteGroupRoleRelByRoleId(roleId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                SecurableObjectMapper.class,
+                mapper -> mapper.softDeleteSecurableObjectsByRoleId(roleId)));
     return true;
+  }
+
+  public List<SecurableObjectPO> listSecurableObjectsByRoleId(Long roleId) {
+    return SessionUtils.getWithoutCommit(
+        SecurableObjectMapper.class, mapper -> mapper.listSecurableObjectsByRoleId(roleId));
   }
 }
