@@ -30,12 +30,14 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.File;
-import java.io.IOException;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authentication.util.KerberosName;
+import org.apache.hadoop.security.authentication.util.KerberosUtil;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -43,7 +45,6 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import sun.security.krb5.KrbException;
 
 @Tag("gravitino-docker-it")
 public class HiveUserAuthenticationIT extends AbstractIT {
@@ -110,12 +111,13 @@ public class HiveUserAuthenticationIT extends AbstractIT {
     // Reset the UGI
     UserGroupInformation.reset();
 
+    LOG.info("krb5 path: {}", System.getProperty("java.security.krb5.conf"));
     // Clean up the kerberos configuration
     System.clearProperty("java.security.krb5.conf");
     System.clearProperty("sun.security.krb5.debug");
   }
 
-  private static void prepareKerberosConfig() throws IOException, KrbException {
+  private static void prepareKerberosConfig() throws Exception {
     // Keytab of the Gravitino SDK client
     kerberosHiveContainer
         .getContainer()
@@ -142,11 +144,30 @@ public class HiveUserAuthenticationIT extends AbstractIT {
     content = content.replace("admin_server = localhost", "admin_server = " + ip + ":749");
     FileUtils.write(new File(krb5Path), content, StandardCharsets.UTF_8);
 
-    LOG.info("Kerberos kdc config:\n{}", content);
+    LOG.info("Kerberos kdc config:\n{}, path: {}", content, krb5Path);
     System.setProperty("java.security.krb5.conf", krb5Path);
     System.setProperty("sun.security.krb5.debug", "true");
 
-    //    Config.refresh();
+    refreshKerberosConfig();
+    KerberosName.resetDefaultRealm();
+
+    LOG.info("Kerberos default realm: {}", KerberosUtil.getDefaultRealm());
+  }
+
+  private static void refreshKerberosConfig() {
+    Class<?> classRef;
+    try {
+      if (System.getProperty("java.vendor").contains("IBM")) {
+        classRef = Class.forName("com.ibm.security.krb5.internal.Config");
+      } else {
+        classRef = Class.forName("sun.security.krb5.Config");
+      }
+
+      Method refershMethod = classRef.getMethod("refresh");
+      refershMethod.invoke(null);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private static void addKerberosConfig() {
