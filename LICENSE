@@ -232,6 +232,8 @@
    ./catalogs/catalog-hive/src/test/java/com/datastrato/gravitino/catalog/hive/miniHMS/ScriptRunner.java
    ./catalogs/catalog-hive/src/test/java/com/datastrato/gravitino/catalog/hive/TestCachedClientPool.java
    ./catalogs/catalog-lakehouse-iceberg/src/main/java/com/datastrato/gravitino/catalog/lakehouse/iceberg/web/IcebergExceptionMapper.java
+   ./catalogs/catalog-lakehouse-iceberg/src/main/java/com/datastrato/gravitino/catalog/lakehouse/iceberg/converter/DescribeIcebergSortOrderVisitor.java
+   ./catalogs/catalog-lakehouse-iceberg/src/main/java/com/datastrato/gravitino/catalog/lakehouse/iceberg/utils/IcebergTablePropertiesUtil.java
    ./clients/client-java/src/main/java/com/datastrato/gravitino/client/HTTPClient.java
    ./clients/client-java/src/main/java/com/datastrato/gravitino/client/RESTClient.java
    ./clients/client-java/src/test/java/com/datastrato/gravitino/client/TestHTTPClient.java

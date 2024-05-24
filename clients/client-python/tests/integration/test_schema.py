@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class TestSchema(IntegrationTestEnv):
-    metalake_name: str = "TestSchema-metalake" + str(randint(1, 10000))
+    metalake_name: str = "TestSchema_metalake" + str(randint(1, 10000))
 
     catalog_name: str = "testCatalog"
     catalog_location_prop: str = "location"  # Fileset Catalog must set `location`

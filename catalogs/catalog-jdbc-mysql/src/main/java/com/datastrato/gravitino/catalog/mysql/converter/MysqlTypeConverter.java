@@ -53,7 +53,13 @@ public class MysqlTypeConverter extends JdbcTypeConverter<String> {
         return Types.DateType.get();
       case TIME:
         return Types.TimeType.get();
+        // MySQL converts TIMESTAMP values from the current time zone to UTC for storage, and back
+        // from UTC to the current time zone for retrieval. (This does not occur for other types
+        // such as DATETIME.) see more details:
+        // https://dev.mysql.com/doc/refman/8.0/en/datetime.html
       case TIMESTAMP:
+        return Types.TimestampType.withTimeZone();
+      case DATETIME:
         return Types.TimestampType.withoutTimeZone();
       case DECIMAL:
         return Types.DecimalType.of(
@@ -107,8 +113,11 @@ public class MysqlTypeConverter extends JdbcTypeConverter<String> {
       return type.simpleString();
     } else if (type instanceof Types.TimeType) {
       return type.simpleString();
-    } else if (type instanceof Types.TimestampType && !((Types.TimestampType) type).hasTimeZone()) {
-      return type.simpleString();
+    } else if (type instanceof Types.TimestampType) {
+      // MySQL converts TIMESTAMP values from the current time zone to UTC for storage, and back
+      // from UTC to the current time zone for retrieval. (This does not occur for other types
+      // such as DATETIME.) see more details: https://dev.mysql.com/doc/refman/8.0/en/datetime.html
+      return ((Types.TimestampType) type).hasTimeZone() ? TIMESTAMP : DATETIME;
     } else if (type instanceof Types.DecimalType) {
       return type.simpleString();
     } else if (type instanceof Types.VarCharType) {

@@ -9,7 +9,7 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 
 import com.datastrato.gravitino.Audit;
-import com.datastrato.gravitino.rel.Schema;
+import com.datastrato.gravitino.Schema;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;

@@ -24,7 +24,8 @@ public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
   public static final String SORT_ORDER = "sort-order";
   public static final String IDENTIFIER_FIELDS = "identifier-fields";
   public static final String PROVIDER = "provider";
-
+  public static final String FORMAT = "format";
+  public static final String FORMAT_VERSION = "format-version";
   public static final String DISTRIBUTION_MODE = TableProperties.WRITE_DISTRIBUTION_MODE;
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
@@ -36,6 +37,7 @@ public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
             stringReservedPropertyEntry(CREATOR, "The table creator", false),
             stringImmutablePropertyEntry(
                 LOCATION, "Iceberg location for table storage", false, null, false, false),
+            stringImmutablePropertyEntry(FORMAT, "The table format", false, null, false, false),
             stringReservedPropertyEntry(
                 CURRENT_SNAPSHOT_ID,
                 "The snapshot represents the current state of the table",
@@ -49,6 +51,8 @@ public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
             stringReservedPropertyEntry(
                 IDENTIFIER_FIELDS, "The identifier field(s) for defining the table", false),
             stringReservedPropertyEntry(DISTRIBUTION_MODE, "Write distribution mode", false),
+            stringImmutablePropertyEntry(
+                FORMAT_VERSION, "The Iceberg table format version, ", false, null, false, false),
             stringImmutablePropertyEntry(
                 PROVIDER,
                 "Iceberg provider for Iceberg table fileFormat, such as parquet, orc, avro, iceberg",

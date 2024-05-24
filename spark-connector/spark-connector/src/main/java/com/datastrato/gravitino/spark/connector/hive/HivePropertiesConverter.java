@@ -16,7 +16,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import javax.ws.rs.NotSupportedException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 
@@ -106,7 +105,7 @@ public class HivePropertiesConverter implements PropertiesConverter {
         gravitinoTableProperties.put(
             HivePropertiesConstants.GRAVITINO_HIVE_FORMAT, gravitinoFormat);
       } else {
-        throw new NotSupportedException("Doesn't support hive file format: " + fileFormat);
+        throw new UnsupportedOperationException("Doesn't support hive file format: " + fileFormat);
       }
     }
 

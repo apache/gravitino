@@ -6,9 +6,9 @@
 package com.datastrato.gravitino.listener.api.event;
 
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.SchemaChange;
 import com.datastrato.gravitino.annotation.DeveloperApi;
 import com.datastrato.gravitino.listener.api.info.SchemaInfo;
-import com.datastrato.gravitino.rel.SchemaChange;
 
 /** Represents an event fired when a schema is successfully altered. */
 @DeveloperApi
