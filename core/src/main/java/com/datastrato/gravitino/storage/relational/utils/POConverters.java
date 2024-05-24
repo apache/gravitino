@@ -923,28 +923,28 @@ public class POConverters {
       for (SecurableObject securableObject : roleEntity.securableObjects()) {
         SecurableObjectPO.Builder builder = SecurableObjectPO.builder();
         securableObjectPOs.add(
-                builder
-                        .withRoleId(roleEntity.id())
-                        .withFullName(securableObject.fullName())
-                        .withType(securableObject.type())
-                        .withPrivilegeConditions(
-                                JsonUtils.anyFieldMapper()
-                                        .writeValueAsString(
-                                                securableObject.privileges().stream()
-                                                        .map(Privilege::condition)
-                                                        .map(Privilege.Condition::name)
-                                                        .collect(Collectors.toList())))
-                        .withPrivilegeNames(
-                                JsonUtils.anyFieldMapper()
-                                        .writeValueAsString(
-                                                securableObject.privileges().stream()
-                                                        .map(Privilege::name)
-                                                        .map(Privilege.Name::name)
-                                                        .collect(Collectors.toList())))
-                        .withCurrentVersion(INIT_VERSION)
-                        .withLastVersion(INIT_VERSION)
-                        .withDeletedAt(DEFAULT_DELETED_AT)
-                        .build());
+            builder
+                .withRoleId(roleEntity.id())
+                .withFullName(securableObject.fullName())
+                .withType(securableObject.type())
+                .withPrivilegeConditions(
+                    JsonUtils.anyFieldMapper()
+                        .writeValueAsString(
+                            securableObject.privileges().stream()
+                                .map(Privilege::condition)
+                                .map(Privilege.Condition::name)
+                                .collect(Collectors.toList())))
+                .withPrivilegeNames(
+                    JsonUtils.anyFieldMapper()
+                        .writeValueAsString(
+                            securableObject.privileges().stream()
+                                .map(Privilege::name)
+                                .map(Privilege.Name::name)
+                                .collect(Collectors.toList())))
+                .withCurrentVersion(INIT_VERSION)
+                .withLastVersion(INIT_VERSION)
+                .withDeletedAt(DEFAULT_DELETED_AT)
+                .build());
       }
       return securableObjectPOs;
     } catch (JsonProcessingException e) {
