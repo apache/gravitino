@@ -32,7 +32,7 @@ The Gravitino Spark connector leverages the Spark DataSourceV2 interface to faci
 | spark.plugins                       | string | (none)        | Gravitino spark plugin name, `com.datastrato.gravitino.spark.connector.plugin.GravitinoSparkPlugin` | Yes      | 0.5.0         |
 | spark.sql.gravitino.metalake        | string | (none)        | The metalake name that spark connector used to request to Gravitino.                                | Yes      | 0.5.0         |
 | spark.sql.gravitino.uri             | string | (none)        | The uri of Gravitino server address.                                                                | Yes      | 0.5.0         |
-| spark.sql.gravitino.supportsIceberg | string | (none)        | Set to `true` to use Gravitino Iceberg catalog.                                                     | No       | 0.5.1         |
+| spark.sql.gravitino.supportsIceberg | string | (none)        | Set to `true` to use Iceberg catalog.                                                               | No       | 0.5.1         |
 
 ```shell
 ./bin/spark-sql -v \
