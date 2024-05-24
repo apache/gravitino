@@ -13,7 +13,7 @@ public class SecurableObjectPO {
 
   private Long roleId;
   private String fullName;
-  private  MetadataObject.Type type;
+  private MetadataObject.Type type;
   private String privilegeNames;
   private String privilegeConditions;
   private Long currentVersion;

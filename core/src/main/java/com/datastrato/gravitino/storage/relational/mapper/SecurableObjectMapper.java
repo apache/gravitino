@@ -5,9 +5,12 @@
 package com.datastrato.gravitino.storage.relational.mapper;
 
 import com.datastrato.gravitino.storage.relational.po.SecurableObjectPO;
-import org.apache.ibatis.annotations.*;
-
 import java.util.List;
+import org.apache.ibatis.annotations.Delete;
+import org.apache.ibatis.annotations.Insert;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 /**
  * A MyBatis Mapper for table meta operation SQLs.
@@ -65,5 +68,5 @@ public interface SecurableObjectMapper {
           + SECURABLE_OBJECT_TABLE_NAME
           + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeLine} LIMIT #{limit}")
   Integer deleteSecurableObjectsByLegacyTimeLine(
-          @Param("legacyTimeLine") Long legacyTimeLine, @Param("limit") int limit);
+      @Param("legacyTimeLine") Long legacyTimeLine, @Param("limit") int limit);
 }
