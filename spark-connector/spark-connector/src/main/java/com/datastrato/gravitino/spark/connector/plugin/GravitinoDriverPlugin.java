@@ -87,7 +87,8 @@ public class GravitinoDriverPlugin implements DriverPlugin {
               String catalogName = entry.getKey();
               Catalog gravitinoCatalog = entry.getValue();
               String provider = gravitinoCatalog.provider();
-              if ("lakehouse-iceberg".equals(provider) && supportsIceberg == false) {
+              if ("lakehouse-iceberg".equals(provider.toLowerCase(Locale.ROOT))
+                  && supportsIceberg == false) {
                 return;
               }
               try {
