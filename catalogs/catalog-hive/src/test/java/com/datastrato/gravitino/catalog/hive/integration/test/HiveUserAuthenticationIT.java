@@ -36,7 +36,6 @@ import java.nio.file.Files;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -44,6 +43,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import sun.security.krb5.KrbException;
 
 @Tag("gravitino-docker-it")
 public class HiveUserAuthenticationIT extends AbstractIT {
@@ -115,7 +115,7 @@ public class HiveUserAuthenticationIT extends AbstractIT {
     System.clearProperty("sun.security.krb5.debug");
   }
 
-  private static void prepareKerberosConfig() throws IOException {
+  private static void prepareKerberosConfig() throws IOException, KrbException {
     // Keytab of the Gravitino SDK client
     kerberosHiveContainer
         .getContainer()
@@ -146,7 +146,7 @@ public class HiveUserAuthenticationIT extends AbstractIT {
     System.setProperty("java.security.krb5.conf", krb5Path);
     System.setProperty("sun.security.krb5.debug", "true");
 
-    KerberosName.resetDefaultRealm();
+    //    Config.refresh();
   }
 
   private static void addKerberosConfig() {
