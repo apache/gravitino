@@ -191,6 +191,10 @@ tasks {
     delete("build")
     delete("dist")
     delete("gravitino.egg-info")
+    delete("tests/unittests/htmlcov")
+    delete("tests/unittests/.coverage")
+    delete("tests/integration/htmlcov")
+    delete("tests/integration/.coverage")
 
     doLast {
       deleteCacheDir(".pytest_cache")
