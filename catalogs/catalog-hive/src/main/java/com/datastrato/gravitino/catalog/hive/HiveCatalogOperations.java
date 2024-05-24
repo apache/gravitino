@@ -145,6 +145,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     // and gravitinoConfig will be passed to Hive config, and gravitinoConfig has higher priority
     mergeConfig.forEach(hadoopConf::set);
     hiveConf = new HiveConf(hadoopConf, HiveCatalogOperations.class);
+    KerberosName.resetDefaultRealm();
     UserGroupInformation.setConfiguration(hadoopConf);
 
     initKerberosIfNecessary(conf, hadoopConf);
