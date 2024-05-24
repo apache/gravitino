@@ -61,6 +61,13 @@ public class PartitionOperations {
       @PathParam("schema") String schema,
       @PathParam("table") String table,
       @QueryParam("details") @DefaultValue("false") boolean verbose) {
+    LOG.info(
+        "received list partition {} request for table: {}.{}.{}.{}",
+        verbose ? "infos" : "names",
+        metalake,
+        catalog,
+        schema,
+        table);
     try {
       return Utils.doAs(
           httpRequest,
@@ -72,10 +79,26 @@ public class PartitionOperations {
                 () -> {
                   if (verbose) {
                     Partition[] partitions = dispatcher.listPartitions(tableIdent);
-                    return Utils.ok(new PartitionListResponse(toDTOs(partitions)));
+                    Response response = Utils.ok(new PartitionListResponse(toDTOs(partitions)));
+                    LOG.info(
+                        "list {} partitions in table {}.{}.{}.{}",
+                        partitions.length,
+                        metalake,
+                        catalog,
+                        schema,
+                        table);
+                    return response;
                   } else {
                     String[] partitionNames = dispatcher.listPartitionNames(tableIdent);
-                    return Utils.ok(new PartitionNameListResponse((partitionNames)));
+                    Response response = Utils.ok(new PartitionNameListResponse((partitionNames)));
+                    LOG.info(
+                        "list {} partition names in table {}.{}.{}.{}",
+                        partitionNames.length,
+                        metalake,
+                        catalog,
+                        schema,
+                        table);
+                    return response;
                   }
                 });
           });
@@ -95,6 +118,13 @@ public class PartitionOperations {
       @PathParam("schema") String schema,
       @PathParam("table") String table,
       @PathParam("partition") String partition) {
+    LOG.info(
+        "received get partition request for partition[{}] of table[{}.{}.{}.{}]",
+        partition,
+        metalake,
+        catalog,
+        schema,
+        table);
     try {
       return Utils.doAs(
           httpRequest,
@@ -105,7 +135,15 @@ public class PartitionOperations {
                 LockType.READ,
                 () -> {
                   Partition p = dispatcher.getPartition(tableIdent, partition);
-                  return Utils.ok(new PartitionResponse(DTOConverters.toDTO(p)));
+                  Response response = Utils.ok(new PartitionResponse(DTOConverters.toDTO(p)));
+                  LOG.info(
+                      "got partition[{}] in table[{}.{}.{}.{}]",
+                      partition,
+                      metalake,
+                      catalog,
+                      schema,
+                      table);
+                  return response;
                 });
           });
     } catch (Exception e) {
@@ -123,6 +161,13 @@ public class PartitionOperations {
       @PathParam("schema") String schema,
       @PathParam("table") String table,
       AddPartitionsRequest request) {
+    LOG.info(
+        "received add {} partition(s) request for table {}.{}.{}.{} ",
+        request.getPartitions().length,
+        metalake,
+        catalog,
+        schema,
+        table);
     Preconditions.checkArgument(
         request.getPartitions().length == 1, "Only one partition is supported");
 
@@ -137,8 +182,17 @@ public class PartitionOperations {
                 () -> {
                   Partition p =
                       dispatcher.addPartition(tableIdent, fromDTO(request.getPartitions()[0]));
-                  return Utils.ok(
-                      new PartitionListResponse(new PartitionDTO[] {DTOConverters.toDTO(p)}));
+                  Response response =
+                      Utils.ok(
+                          new PartitionListResponse(new PartitionDTO[] {DTOConverters.toDTO(p)}));
+                  LOG.info(
+                      "added {} partition(s) to table {}.{}.{}.{} ",
+                      1,
+                      metalake,
+                      catalog,
+                      schema,
+                      table);
+                  return response;
                 });
           });
     } catch (Exception e) {
@@ -158,6 +212,14 @@ public class PartitionOperations {
       @PathParam("table") String table,
       @PathParam("partition") String partition,
       @QueryParam("purge") @DefaultValue("false") boolean purge) {
+    LOG.info(
+        "received {} partition request for partition[{}] of table[{}.{}.{}.{}]",
+        purge ? "purge" : "drop",
+        partition,
+        metalake,
+        catalog,
+        schema,
+        table);
     try {
       return Utils.doAs(
           httpRequest,
@@ -178,7 +240,16 @@ public class PartitionOperations {
                         table,
                         schema);
                   }
-                  return Utils.ok(new DropResponse(dropped));
+                  Response response = Utils.ok(new DropResponse(dropped));
+                  LOG.info(
+                      "partition {} {} in table {}.{}.{}.{}",
+                      partition,
+                      purge ? "purged" : "dropped",
+                      metalake,
+                      catalog,
+                      schema,
+                      table);
+                  return response;
                 });
           });
     } catch (Exception e) {
