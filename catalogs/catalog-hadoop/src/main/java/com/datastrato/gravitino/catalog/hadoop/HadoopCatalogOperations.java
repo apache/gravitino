@@ -125,7 +125,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   }
 
   private void initKerberosAuthentication(Map<String, String> conf, Configuration hadoopConf) {
-    String enableAuth = conf.get(HADOOP_SECURITY_AUTHORIZATION);
+    String enableAuth = hadoopConf.get(HADOOP_SECURITY_AUTHORIZATION);
 
     if (UserGroupInformation.AuthenticationMethod.KERBEROS
             == SecurityUtil.getAuthenticationMethod(hadoopConf)
