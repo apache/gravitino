@@ -105,6 +105,7 @@ public interface Type {
       this.signed = signed;
     }
 
+    /** @return True if the integer type has signed, false otherwise. */
     public boolean signed() {
       return signed;
     }
