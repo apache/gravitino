@@ -49,7 +49,6 @@ public class POConverters {
   private static final long INIT_VERSION = 1L;
   private static final long DEFAULT_DELETED_AT = 0L;
 
-
   private POConverters() {}
 
   /**
