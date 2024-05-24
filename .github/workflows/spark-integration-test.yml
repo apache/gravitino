@@ -57,6 +57,7 @@ jobs:
       matrix:
         architecture: [linux/amd64]
         java-version: [ 8, 11, 17 ]
+        scala-version: [ 2.12, 2.13 ]
         test-mode: [ embedded, deploy ]
     env:
       PLATFORM: ${{ matrix.architecture }}
@@ -91,9 +92,11 @@ jobs:
       - name: Spark Integration Test
         id: integrationTest
         run: |
-          ./gradlew --rerun-tasks -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} :spark-connector:spark-3.3:test --tests "com.datastrato.gravitino.spark.connector.integration.test.**"
-          ./gradlew --rerun-tasks -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} :spark-connector:spark-3.4:test --tests "com.datastrato.gravitino.spark.connector.integration.test.**"
-          ./gradlew --rerun-tasks -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} :spark-connector:spark-3.5:test --tests "com.datastrato.gravitino.spark.connector.integration.test.**"
+          if [ "${{ matrix.scala-version }}" == "2.12" ];then 
+            ./gradlew --rerun-tasks -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PscalaVersion=${{ maxtrix.scala-version }} :spark-connector:spark-3.3:test --tests "com.datastrato.gravitino.spark.connector.integration.test.**"
+          fi
+          ./gradlew --rerun-tasks -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PscalaVersion=${{ maxtrix.scala-version }} :spark-connector:spark-3.4:test --tests "com.datastrato.gravitino.spark.connector.integration.test.**"
+          ./gradlew --rerun-tasks -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PscalaVersion=${{ maxtrix.scala-version }} :spark-connector:spark-3.5:test --tests "com.datastrato.gravitino.spark.connector.integration.test.**"
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
