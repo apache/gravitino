@@ -13,12 +13,14 @@ import com.datastrato.gravitino.spark.connector.GravitinoSparkConfig;
 import com.datastrato.gravitino.spark.connector.catalog.GravitinoCatalogManager;
 import com.datastrato.gravitino.spark.connector.hive.GravitinoHiveCatalog;
 import com.datastrato.gravitino.spark.connector.iceberg.GravitinoIcebergCatalog;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions;
 import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
 import org.apache.spark.api.plugin.DriverPlugin;
@@ -32,11 +34,16 @@ import org.slf4j.LoggerFactory;
  * register Gravitino catalogs to Spark.
  */
 public class GravitinoDriverPlugin implements DriverPlugin {
+
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoDriverPlugin.class);
 
   private GravitinoCatalogManager catalogManager;
-  private static final String[] GRAVITINO_DRIVER_EXTENSIONS =
-      new String[] {IcebergSparkSessionExtensions.class.getName()};
+  private List<String> gravitinoDriverExtensions = new ArrayList<>();
+  private boolean enableIcebergSupport = false;
+
+  @VisibleForTesting
+  static final String ICEBERG_SPARK_EXTENSIONS =
+      "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions";
 
   @Override
   public Map<String, String> init(SparkContext sc, PluginContext pluginContext) {
@@ -52,7 +59,13 @@ public class GravitinoDriverPlugin implements DriverPlugin {
         String.format(
             "%s:%s, should not be empty", GravitinoSparkConfig.GRAVITINO_METALAKE, metalake));
 
-    catalogManager = GravitinoCatalogManager.create(gravitinoUri, metalake);
+    this.enableIcebergSupport =
+        conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT, false);
+    if (enableIcebergSupport) {
+      gravitinoDriverExtensions.add(ICEBERG_SPARK_EXTENSIONS);
+    }
+
+    this.catalogManager = GravitinoCatalogManager.create(gravitinoUri, metalake);
     catalogManager.loadRelationalCatalogs();
     registerGravitinoCatalogs(conf, catalogManager.getCatalogs());
     registerSqlExtensions(conf);
@@ -75,6 +88,10 @@ public class GravitinoDriverPlugin implements DriverPlugin {
               String catalogName = entry.getKey();
               Catalog gravitinoCatalog = entry.getValue();
               String provider = gravitinoCatalog.provider();
+              if ("lakehouse-iceberg".equals(provider.toLowerCase(Locale.ROOT))
+                  && enableIcebergSupport == false) {
+                return;
+              }
               try {
                 registerCatalog(sparkConf, catalogName, provider);
               } catch (Exception e) {
@@ -111,19 +128,20 @@ public class GravitinoDriverPlugin implements DriverPlugin {
   }
 
   private void registerSqlExtensions(SparkConf conf) {
-    String gravitinoDriverExtensions = String.join(COMMA, GRAVITINO_DRIVER_EXTENSIONS);
+    String extensionString = String.join(COMMA, gravitinoDriverExtensions);
     if (conf.contains(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key())) {
       String sparkSessionExtensions = conf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key());
       if (StringUtils.isNotBlank(sparkSessionExtensions)) {
         conf.set(
             StaticSQLConf.SPARK_SESSION_EXTENSIONS().key(),
             removeDuplicateSparkExtensions(
-                GRAVITINO_DRIVER_EXTENSIONS, sparkSessionExtensions.split(COMMA)));
+                gravitinoDriverExtensions.toArray(new String[0]),
+                sparkSessionExtensions.split(COMMA)));
       } else {
-        conf.set(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key(), gravitinoDriverExtensions);
+        conf.set(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key(), extensionString);
       }
     } else {
-      conf.set(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key(), gravitinoDriverExtensions);
+      conf.set(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key(), extensionString);
     }
   }
 }
