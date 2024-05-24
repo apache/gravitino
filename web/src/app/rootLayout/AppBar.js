@@ -74,7 +74,7 @@ const AppBar = () => {
               <Typography
                 variant='h5'
                 className={clsx(
-                  'twc-ml-2 twc-leading-none twc-tracking-[-0.45px] twc-normal-case twc-text-[1.75rem]',
+                  'twc-text-[black] twc-ml-2 twc-leading-none twc-tracking-[-0.45px] twc-normal-case twc-text-[1.75rem]',
                   fonts.className
                 )}
               >

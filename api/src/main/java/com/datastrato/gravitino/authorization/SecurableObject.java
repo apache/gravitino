@@ -4,9 +4,9 @@
  */
 package com.datastrato.gravitino.authorization;
 
+import com.datastrato.gravitino.MetadataObject;
 import com.datastrato.gravitino.annotation.Unstable;
 import java.util.List;
-import javax.annotation.Nullable;
 
 /**
  * The securable object is the entity which access can be granted. Unless allowed by a grant, access
@@ -41,38 +41,7 @@ import javax.annotation.Nullable;
  * can use add `read table` privilege for `catalog1.schema1` directly
  */
 @Unstable
-public interface SecurableObject {
-
-  /**
-   * The parent full name of securable object. If the securable object doesn't have parent, this
-   * method will return null.
-   *
-   * @return The parent full name of securable object.
-   */
-  @Nullable
-  String parent();
-
-  /**
-   * The name of th securable object.
-   *
-   * @return The name of the securable object.
-   */
-  String name();
-
-  /**
-   * The full name of th securable object. If the parent isn't null, the full name will join the
-   * parent full name and the name with `.`, otherwise will return the name.
-   *
-   * @return The name of the securable object.
-   */
-  String fullName();
-
-  /**
-   * The type of securable object
-   *
-   * @return The type of securable object.
-   */
-  Type type();
+public interface SecurableObject extends MetadataObject {
 
   /**
    * The privileges of the securable object. For example: If the securable object is a table, the
@@ -82,34 +51,4 @@ public interface SecurableObject {
    * @return The privileges of the role.
    */
   List<Privilege> privileges();
-
-  /**
-   * The type of securable object in the Gravitino system. Every type will map one kind of the
-   * entity of the underlying system.
-   */
-  enum Type {
-    /**
-     * A catalog is a collection of metadata from a specific metadata source, like Apache Hive
-     * catalog, Apache Iceberg catalog, JDBC catalog, etc.
-     */
-    CATALOG,
-    /**
-     * A schema is a sub collection of the catalog. The schema can contain filesets, tables, topics,
-     * etc.
-     */
-    SCHEMA,
-    /** A fileset is mapped to a directory on a file system like HDFS, S3, ADLS, GCS, etc. */
-    FILESET,
-    /** A table is mapped the table of relational data sources like Apache Hive, MySQL, etc. */
-    TABLE,
-    /**
-     * A topic is mapped the topic of messaging data sources like Apache Kafka, Apache Pulsar, etc.
-     */
-    TOPIC,
-    /**
-     * A metalake is a concept of tenant. It means an organization. A metalake contains many data
-     * sources.
-     */
-    METALAKE
-  }
 }

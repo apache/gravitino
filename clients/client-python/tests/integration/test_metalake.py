@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class TestMetalake(IntegrationTestEnv):
-    metalake_name: str = "TestMetalake-metalake"
+    metalake_name: str = "TestMetalake_metalake"
     metalake_new_name = metalake_name + "_new"
 
     metalake_comment: str = "metalake_comment"
