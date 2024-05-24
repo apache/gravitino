@@ -145,7 +145,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     // and gravitinoConfig will be passed to Hive config, and gravitinoConfig has higher priority
     mergeConfig.forEach(hadoopConf::set);
     hiveConf = new HiveConf(hadoopConf, HiveCatalogOperations.class);
-    UserGroupInformation.setConfiguration(hadoopConf);
 
     initKerberosIfNecessary(conf, hadoopConf);
 
@@ -174,7 +173,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
         String keytabUri =
             (String)
-                catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.KET_TAB_URI);
+                catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.KEY_TAB_URI);
         Preconditions.checkArgument(StringUtils.isNotBlank(keytabUri), "Keytab uri can't be blank");
         // TODO: Support to download the file from Kerberos HDFS
         Preconditions.checkArgument(
@@ -202,8 +201,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             new ScheduledThreadPoolExecutor(
                 1, getThreadFactory(String.format("Kerberos-check-%s", info.id())));
 
-        UserGroupInformation.setConfiguration(hadoopConf);
         KerberosName.resetDefaultRealm();
+        UserGroupInformation.setConfiguration(hadoopConf);
         UserGroupInformation.loginUserFromKeytab(catalogPrincipal, keytabFile.getAbsolutePath());
 
         UserGroupInformation kerberosLoginUgi = UserGroupInformation.getCurrentUser();

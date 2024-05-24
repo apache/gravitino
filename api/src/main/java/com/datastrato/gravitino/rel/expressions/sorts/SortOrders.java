@@ -12,6 +12,7 @@ public class SortOrders {
 
   /** NONE is used to indicate that there is no sort order. */
   public static final SortOrder[] NONE = new SortOrder[0];
+
   /**
    * Create a sort order by the given expression with the ascending sort direction and nulls first
    * ordering.

@@ -6,7 +6,7 @@
 package com.datastrato.gravitino.catalog.hive.integration.test;
 
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.IMPERSONATION_ENABLE;
-import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.KET_TAB_URI;
+import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.KEY_TAB_URI;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.PRINCIPAL;
 import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
@@ -21,6 +21,7 @@ import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.rel.Column;
+import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
@@ -173,23 +174,23 @@ public class HiveUserAuthenticationIT extends AbstractIT {
     GravitinoMetalake gravitinoMetalake =
         adminClient.createMetalake(METALAKE_NAME, null, ImmutableMap.of());
 
+    // Create a catalog
     Map<String, String> properties = Maps.newHashMap();
     properties.put(METASTORE_URIS, HIVE_METASTORE_URI);
     properties.put(IMPERSONATION_ENABLE, "true");
-    properties.put(KET_TAB_URI, TMP_DIR + HIVE_METASTORE_CLIENT_KEYTAB);
+    properties.put(KEY_TAB_URI, TMP_DIR + HIVE_METASTORE_CLIENT_KEYTAB);
     properties.put(PRINCIPAL, HIVE_METASTORE_CLIENT_PRINCIPAL);
-
     properties.put(CATALOG_BYPASS_PREFIX + HADOOP_SECURITY_AUTHENTICATION, "kerberos");
     properties.put(
         CATALOG_BYPASS_PREFIX + "hive.metastore.kerberos.principal",
         "hive/_HOST@HADOOPKRB"
             .replace("_HOST", containerSuite.getKerberosHiveContainer().getHostName()));
     properties.put(CATALOG_BYPASS_PREFIX + "hive.metastore.sasl.enabled", "true");
-
     Catalog catalog =
         gravitinoMetalake.createCatalog(
             CATALOG_NAME, Catalog.Type.RELATIONAL, "hive", "comment", properties);
 
+    // Test create schema
     Exception exception =
         Assertions.assertThrows(
             Exception.class,
@@ -218,6 +219,17 @@ public class HiveUserAuthenticationIT extends AbstractIT {
             Transforms.EMPTY_TRANSFORM,
             Distributions.NONE,
             SortOrders.NONE);
+
+    // Now try to alter the table
+    catalog.asTableCatalog().alterTable(tableNameIdentifier, TableChange.rename("new_table"));
+
+    // Drop table
+    catalog
+        .asTableCatalog()
+        .dropTable(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "new_table"));
+
+    // Drop schema
+    catalog.asSchemas().dropSchema(SCHEMA_NAME, true);
   }
 
   private static Column[] createColumns() {
