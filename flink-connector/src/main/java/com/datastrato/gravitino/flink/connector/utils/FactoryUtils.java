@@ -22,7 +22,11 @@ public class FactoryUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(FactoryUtils.class);
 
-  /** Utility for working with {@link Factory}s. */
+  /**
+   * Utility for working with {@link Factory}s. The {@link GravitinoCatalogFactoryHelper} override
+   * the {@link FactoryUtil.CatalogFactoryHelper#validate()} method to validate the options. For the
+   * unconsumed option keys, it logs a warning instead of throwing an exception.
+   */
   public static class GravitinoCatalogFactoryHelper extends FactoryUtil.CatalogFactoryHelper {
 
     private GravitinoCatalogFactoryHelper(
@@ -42,7 +46,10 @@ public class FactoryUtils {
     }
   }
 
-  /** Validates unconsumed option keys. */
+  /**
+   * Validates unconsumed option keys. Logs a warning for each unconsumed option key instead of
+   * throwing an exception.
+   */
   private static void ignoreUnconsumedKeys(
       String factoryIdentifier,
       Set<String> allOptionKeys,
