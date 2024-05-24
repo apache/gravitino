@@ -263,25 +263,15 @@ public class Privileges {
   }
 
   /** The privilege to create a catalog. */
-  public abstract static class CreateCatalog implements Privilege {
+  public static class CreateCatalog extends BasePrivilege {
 
-    private static final CreateCatalog ALLOW_INSTANCE =
-        new CreateCatalog() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final CreateCatalog ALLOW_INSTANCE = new CreateCatalog(Condition.ALLOW);
 
-    private static final CreateCatalog DENY_INSTANCE =
-        new CreateCatalog() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final CreateCatalog DENY_INSTANCE = new CreateCatalog(Condition.DENY);
 
-    private CreateCatalog() {}
+    private CreateCatalog(Condition condition) {
+      super(CREATE_CATALOG, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static CreateCatalog allow() {
@@ -293,12 +283,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return CREATE_CATALOG;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -307,25 +291,15 @@ public class Privileges {
   }
 
   /** The privilege to alter a catalog. */
-  public abstract static class AlterCatalog implements Privilege {
+  public static class AlterCatalog extends BasePrivilege {
 
-    private static final AlterCatalog ALLOW_INSTANCE =
-        new AlterCatalog() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final AlterCatalog ALLOW_INSTANCE = new AlterCatalog(Condition.ALLOW);
 
-    private static final AlterCatalog DENY_INSTANCE =
-        new AlterCatalog() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final AlterCatalog DENY_INSTANCE = new AlterCatalog(Condition.DENY);
 
-    private AlterCatalog() {}
+    private AlterCatalog(Condition condition) {
+      super(ALTER_CATALOG, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static AlterCatalog allow() {
@@ -337,12 +311,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return ALTER_CATALOG;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -351,25 +319,15 @@ public class Privileges {
   }
 
   /** The privilege to drop a catalog. */
-  public abstract static class DropCatalog implements Privilege {
+  public static class DropCatalog extends BasePrivilege {
 
-    private static final DropCatalog ALLOW_INSTANCE =
-        new DropCatalog() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final DropCatalog ALLOW_INSTANCE = new DropCatalog(Condition.DENY);
 
-    private static final DropCatalog DENY_INSTANCE =
-        new DropCatalog() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final DropCatalog DENY_INSTANCE = new DropCatalog(Condition.DENY);
 
-    private DropCatalog() {}
+    private DropCatalog(Condition condition) {
+      super(DROP_CATALOG, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static DropCatalog allow() {
@@ -381,12 +339,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return DROP_CATALOG;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -395,24 +347,14 @@ public class Privileges {
   }
 
   /** The privilege to use a catalog. */
-  public abstract static class UseCatalog implements Privilege {
-    private static final UseCatalog ALLOW_INSTANCE =
-        new UseCatalog() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+  public static class UseCatalog extends BasePrivilege {
+    private static final UseCatalog ALLOW_INSTANCE = new UseCatalog(Condition.ALLOW);
 
-    private static final UseCatalog DENY_INSTANCE =
-        new UseCatalog() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final UseCatalog DENY_INSTANCE = new UseCatalog(Condition.DENY);
 
-    private UseCatalog() {}
+    private UseCatalog(Condition condition) {
+      super(USE_CATALOG, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static UseCatalog allow() {
@@ -424,12 +366,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return USE_CATALOG;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -438,25 +374,15 @@ public class Privileges {
   }
 
   /** The privilege to use a schema. */
-  public abstract static class UseSchema implements Privilege {
+  public static class UseSchema extends BasePrivilege {
 
-    private static final UseSchema ALLOW_INSTANCE =
-        new UseSchema() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final UseSchema ALLOW_INSTANCE = new UseSchema(Condition.ALLOW);
 
-    private static final UseSchema DENY_INSTANCE =
-        new UseSchema() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final UseSchema DENY_INSTANCE = new UseSchema(Condition.DENY);
 
-    private UseSchema() {}
+    private UseSchema(Condition condition) {
+      super(USE_SCHEMA, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static UseSchema allow() {
@@ -468,12 +394,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return USE_SCHEMA;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -482,25 +402,15 @@ public class Privileges {
   }
 
   /** The privilege to create a schema. */
-  public abstract static class CreateSchema implements Privilege {
+  public static class CreateSchema extends BasePrivilege {
 
-    private static final CreateSchema ALLOW_INSTANCE =
-        new CreateSchema() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final CreateSchema ALLOW_INSTANCE = new CreateSchema(Condition.ALLOW);
 
-    private static final CreateSchema DENY_INSTANCE =
-        new CreateSchema() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final CreateSchema DENY_INSTANCE = new CreateSchema(Condition.DENY);
 
-    private CreateSchema() {}
+    private CreateSchema(Condition condition) {
+      super(CREATE_SCHEMA, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static CreateSchema allow() {
@@ -512,12 +422,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return CREATE_SCHEMA;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -526,25 +430,15 @@ public class Privileges {
   }
 
   /** The privilege to alter a schema. */
-  public abstract static class AlterSchema implements Privilege {
+  public static class AlterSchema extends BasePrivilege {
 
-    private static final AlterSchema ALLOW_INSTANCE =
-        new AlterSchema() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final AlterSchema ALLOW_INSTANCE = new AlterSchema(Condition.ALLOW);
 
-    private static final AlterSchema DENY_INSTANCE =
-        new AlterSchema() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final AlterSchema DENY_INSTANCE = new AlterSchema(Condition.DENY);
 
-    private AlterSchema() {}
+    private AlterSchema(Condition condition) {
+      super(ALTER_SCHEMA, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static AlterSchema allow() {
@@ -556,12 +450,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return ALTER_SCHEMA;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -570,25 +458,15 @@ public class Privileges {
   }
 
   /** The privilege to drop a schema. */
-  public abstract static class DropSchema implements Privilege {
+  public static class DropSchema extends BasePrivilege {
 
-    private static final DropSchema ALLOW_INSTANCE =
-        new DropSchema() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final DropSchema ALLOW_INSTANCE = new DropSchema(Condition.ALLOW);
 
-    private static final DropSchema DENY_INSTANCE =
-        new DropSchema() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final DropSchema DENY_INSTANCE = new DropSchema(Condition.DENY);
 
-    private DropSchema() {}
+    private DropSchema(Condition condition) {
+      super(DROP_SCHEMA, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static DropSchema allow() {
@@ -600,12 +478,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return DROP_SCHEMA;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -614,25 +486,15 @@ public class Privileges {
   }
 
   /** The privilege to create a table. */
-  public abstract static class CreateTable implements Privilege {
+  public static class CreateTable extends BasePrivilege {
 
-    private static final CreateTable ALLOW_INSTANCE =
-        new CreateTable() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final CreateTable ALLOW_INSTANCE = new CreateTable(Condition.ALLOW);
 
-    private static final CreateTable DENY_INSTANCE =
-        new CreateTable() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final CreateTable DENY_INSTANCE = new CreateTable(Condition.DENY);
 
-    private CreateTable() {}
+    private CreateTable(Condition condition) {
+      super(CREATE_TABLE, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static CreateTable allow() {
@@ -644,12 +506,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return CREATE_TABLE;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -658,23 +514,15 @@ public class Privileges {
   }
 
   /** The privilege to drop a table. */
-  public abstract static class DropTable implements Privilege {
+  public static class DropTable extends BasePrivilege {
 
-    private static final DropTable ALLOW_INSTANCE =
-        new DropTable() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final DropTable ALLOW_INSTANCE = new DropTable(Condition.ALLOW);
 
-    private static final DropTable DENY_INSTANCE =
-        new DropTable() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final DropTable DENY_INSTANCE = new DropTable(Condition.DENY);
+
+    private DropTable(Condition condition) {
+      super(DROP_TABLE, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static DropTable allow() {
@@ -686,12 +534,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return DROP_TABLE;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -700,23 +542,15 @@ public class Privileges {
   }
 
   /** The privilege to read a table. */
-  public abstract static class ReadTable implements Privilege {
+  public static class ReadTable extends BasePrivilege {
 
-    private static final ReadTable ALLOW_INSTANCE =
-        new ReadTable() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final ReadTable ALLOW_INSTANCE = new ReadTable(Condition.ALLOW);
 
-    private static final ReadTable DENY_INSTANCE =
-        new ReadTable() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final ReadTable DENY_INSTANCE = new ReadTable(Condition.DENY);
+
+    private ReadTable(Condition condition) {
+      super(READ_TABLE, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static ReadTable allow() {
@@ -728,12 +562,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return READ_TABLE;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -742,23 +570,15 @@ public class Privileges {
   }
 
   /** The privilege to write a table. */
-  public abstract static class WriteTable implements Privilege {
+  public static class WriteTable extends BasePrivilege {
 
-    private static final WriteTable ALLOW_INSTANCE =
-        new WriteTable() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final WriteTable ALLOW_INSTANCE = new WriteTable(Condition.ALLOW);
 
-    private static final WriteTable DENY_INSTANCE =
-        new WriteTable() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final WriteTable DENY_INSTANCE = new WriteTable(Condition.DENY);
+
+    private WriteTable(Condition condition) {
+      super(WRITE_TABLE, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static WriteTable allow() {
@@ -770,12 +590,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return WRITE_TABLE;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -784,23 +598,15 @@ public class Privileges {
   }
 
   /** The privilege to create a fileset. */
-  public abstract static class CreateFileset implements Privilege {
+  public static class CreateFileset extends BasePrivilege {
 
-    private static final CreateFileset ALLOW_INSTANCE =
-        new CreateFileset() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final CreateFileset ALLOW_INSTANCE = new CreateFileset(Condition.ALLOW);
 
-    private static final CreateFileset DENY_INSTANCE =
-        new CreateFileset() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final CreateFileset DENY_INSTANCE = new CreateFileset(Condition.DENY);
+
+    private CreateFileset(Condition condition) {
+      super(CREATE_FILESET, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static CreateFileset allow() {
@@ -812,12 +618,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return CREATE_FILESET;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -826,23 +626,15 @@ public class Privileges {
   }
 
   /** The privilege to drop a fileset. */
-  public abstract static class DropFileset implements Privilege {
+  public static class DropFileset extends BasePrivilege {
 
-    private static final DropFileset ALLOW_INSTANCE =
-        new DropFileset() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final DropFileset ALLOW_INSTANCE = new DropFileset(Condition.ALLOW);
 
-    private static final DropFileset DENY_INSTANCE =
-        new DropFileset() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final DropFileset DENY_INSTANCE = new DropFileset(Condition.DENY);
+
+    private DropFileset(Condition condition) {
+      super(DROP_FILESET, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static DropFileset allow() {
@@ -854,12 +646,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return DROP_FILESET;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -868,23 +654,15 @@ public class Privileges {
   }
 
   /** The privilege to read a fileset. */
-  public abstract static class ReadFileset implements Privilege {
+  public static class ReadFileset extends BasePrivilege {
 
-    private static final ReadFileset ALLOW_INSTANCE =
-        new ReadFileset() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final ReadFileset ALLOW_INSTANCE = new ReadFileset(Condition.ALLOW);
 
-    private static final ReadFileset DENY_INSTANCE =
-        new ReadFileset() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final ReadFileset DENY_INSTANCE = new ReadFileset(Condition.DENY);
+
+    private ReadFileset(Condition condition) {
+      super(READ_FILESET, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static ReadFileset allow() {
@@ -896,12 +674,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return READ_FILESET;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -910,23 +682,15 @@ public class Privileges {
   }
 
   /** The privilege to write a fileset. */
-  public abstract static class WriteFileset implements Privilege {
+  public static class WriteFileset extends BasePrivilege {
 
-    private static final WriteFileset ALLOW_INSTANCE =
-        new WriteFileset() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final WriteFileset ALLOW_INSTANCE = new WriteFileset(Condition.ALLOW);
 
-    private static final WriteFileset DENY_INSTANCE =
-        new WriteFileset() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final WriteFileset DENY_INSTANCE = new WriteFileset(Condition.DENY);
+
+    private WriteFileset(Condition condition) {
+      super(WRITE_FILESET, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static WriteFileset allow() {
@@ -938,12 +702,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return WRITE_FILESET;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -952,25 +710,15 @@ public class Privileges {
   }
 
   /** The privilege to create a topic. */
-  public abstract static class CreateTopic implements Privilege {
+  public static class CreateTopic extends BasePrivilege {
 
-    private static final CreateTopic ALLOW_INSTANCE =
-        new CreateTopic() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final CreateTopic ALLOW_INSTANCE = new CreateTopic(Condition.ALLOW);
 
-    private static final CreateTopic DENY_INSTANCE =
-        new CreateTopic() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final CreateTopic DENY_INSTANCE = new CreateTopic(Condition.DENY);
 
-    private CreateTopic() {}
+    private CreateTopic(Condition condition) {
+      super(CREATE_TOPIC, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static CreateTopic allow() {
@@ -982,12 +730,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return CREATE_TOPIC;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -996,23 +738,15 @@ public class Privileges {
   }
 
   /** The privilege to drop a topic. */
-  public abstract static class DropTopic implements Privilege {
+  public static class DropTopic extends BasePrivilege {
 
-    private static final DropTopic ALLOW_INSTANCE =
-        new DropTopic() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final DropTopic ALLOW_INSTANCE = new DropTopic(Condition.ALLOW);
 
-    private static final DropTopic DENY_INSTANCE =
-        new DropTopic() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final DropTopic DENY_INSTANCE = new DropTopic(Condition.DENY);
+
+    private DropTopic(Condition condition) {
+      super(DROP_TOPIC, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static DropTopic allow() {
@@ -1024,12 +758,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return DROP_TOPIC;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -1038,23 +766,15 @@ public class Privileges {
   }
 
   /** The privilege to read a topic. */
-  public abstract static class ReadTopic implements Privilege {
+  public static class ReadTopic extends BasePrivilege {
 
-    private static final ReadTopic ALLOW_INSTANCE =
-        new ReadTopic() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final ReadTopic ALLOW_INSTANCE = new ReadTopic(Condition.ALLOW);
 
-    private static final ReadTopic DENY_INSTANCE =
-        new ReadTopic() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final ReadTopic DENY_INSTANCE = new ReadTopic(Condition.DENY);
+
+    private ReadTopic(Condition condition) {
+      super(READ_TOPIC, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static ReadTopic allow() {
@@ -1066,12 +786,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return READ_TOPIC;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -1080,23 +794,15 @@ public class Privileges {
   }
 
   /** The privilege to write a topic. */
-  public abstract static class WriteTopic implements Privilege {
+  public static class WriteTopic extends BasePrivilege {
 
-    private static final WriteTopic ALLOW_INSTANCE =
-        new WriteTopic() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final WriteTopic ALLOW_INSTANCE = new WriteTopic(Condition.ALLOW);
 
-    private static final WriteTopic DENY_INSTANCE =
-        new WriteTopic() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final WriteTopic DENY_INSTANCE = new WriteTopic(Condition.DENY);
+
+    private WriteTopic(Condition condition) {
+      super(WRITE_TOPIC, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static WriteTopic allow() {
@@ -1108,12 +814,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return WRITE_TOPIC;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -1122,23 +822,15 @@ public class Privileges {
   }
 
   /** The privilege to manage a metalake. */
-  public abstract static class ManageMetalake implements Privilege {
+  public static class ManageMetalake extends BasePrivilege {
 
-    private static final ManageMetalake ALLOW_INSTANCE =
-        new ManageMetalake() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final ManageMetalake ALLOW_INSTANCE = new ManageMetalake(Condition.ALLOW);
 
-    private static final ManageMetalake DENY_INSTANCE =
-        new ManageMetalake() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final ManageMetalake DENY_INSTANCE = new ManageMetalake(Condition.DENY);
+
+    private ManageMetalake(Condition condition) {
+      super(MANAGE_METALAKE, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static ManageMetalake allow() {
@@ -1150,12 +842,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return MANAGE_METALAKE;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -1164,23 +850,15 @@ public class Privileges {
   }
 
   /** The privilege to manage a metalake. */
-  public abstract static class CreateMetalake implements Privilege {
+  public static class CreateMetalake extends BasePrivilege {
 
-    private static final CreateMetalake ALLOW_INSTANCE =
-        new CreateMetalake() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final CreateMetalake ALLOW_INSTANCE = new CreateMetalake(Condition.ALLOW);
 
-    private static final CreateMetalake DENY_INSTANCE =
-        new CreateMetalake() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final CreateMetalake DENY_INSTANCE = new CreateMetalake(Condition.DENY);
+
+    private CreateMetalake(Condition condition) {
+      super(CREATE_METALAKE, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static CreateMetalake allow() {
@@ -1192,12 +870,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return CREATE_METALAKE;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -1206,25 +878,15 @@ public class Privileges {
   }
 
   /** The privilege to use a metalake. */
-  public abstract static class UseMetalake implements Privilege {
+  public static class UseMetalake extends BasePrivilege {
 
-    private static final UseMetalake ALLOW_INSTANCE =
-        new UseMetalake() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final UseMetalake ALLOW_INSTANCE = new UseMetalake(Condition.ALLOW);
 
-    private static final UseMetalake DENY_INSTANCE =
-        new UseMetalake() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final UseMetalake DENY_INSTANCE = new UseMetalake(Condition.DENY);
 
-    private UseMetalake() {}
+    private UseMetalake(Condition condition) {
+      super(USE_METALAKE, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static UseMetalake allow() {
@@ -1236,12 +898,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return USE_METALAKE;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -1250,23 +906,15 @@ public class Privileges {
   }
 
   /** The privilege to get a user. */
-  public abstract static class GetUser implements Privilege {
+  public static class GetUser extends BasePrivilege {
 
-    private static final GetUser ALLOW_INSTANCE =
-        new GetUser() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final GetUser ALLOW_INSTANCE = new GetUser(Condition.ALLOW);
 
-    private static final GetUser DENY_INSTANCE =
-        new GetUser() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final GetUser DENY_INSTANCE = new GetUser(Condition.DENY);
+
+    private GetUser(Condition condition) {
+      super(GET_USER, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static GetUser allow() {
@@ -1278,12 +926,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return GET_USER;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -1292,25 +934,15 @@ public class Privileges {
   }
 
   /** The privilege to add a user. */
-  public abstract static class AddUser implements Privilege {
+  public static class AddUser extends BasePrivilege {
 
-    private static final AddUser ALLOW_INSTANCE =
-        new AddUser() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final AddUser ALLOW_INSTANCE = new AddUser(Condition.ALLOW);
 
-    private static final AddUser DENY_INSTANCE =
-        new AddUser() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final AddUser DENY_INSTANCE = new AddUser(Condition.DENY);
 
-    private AddUser() {}
+    private AddUser(Condition condition) {
+      super(ADD_USER, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static AddUser allow() {
@@ -1322,12 +954,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return ADD_USER;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -1336,23 +962,15 @@ public class Privileges {
   }
 
   /** The privilege to remove a user. */
-  public abstract static class RemoveUser implements Privilege {
+  public static class RemoveUser extends BasePrivilege {
 
-    private static final RemoveUser ALLOW_INSTANCE =
-        new RemoveUser() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final RemoveUser ALLOW_INSTANCE = new RemoveUser(Condition.ALLOW);
 
-    private static final RemoveUser DENY_INSTANCE =
-        new RemoveUser() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final RemoveUser DENY_INSTANCE = new RemoveUser(Condition.DENY);
+
+    private RemoveUser(Condition condition) {
+      super(REMOVE_USER, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static RemoveUser allow() {
@@ -1364,12 +982,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return REMOVE_USER;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -1378,25 +990,15 @@ public class Privileges {
   }
 
   /** The privilege to add a group. */
-  public abstract static class AddGroup implements Privilege {
+  public static class AddGroup extends BasePrivilege {
 
-    private static final AddGroup ALLOW_INSTANCE =
-        new AddGroup() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final AddGroup ALLOW_INSTANCE = new AddGroup(Condition.ALLOW);
 
-    private static final AddGroup DENY_INSTANCE =
-        new AddGroup() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final AddGroup DENY_INSTANCE = new AddGroup(Condition.DENY);
 
-    private AddGroup() {}
+    private AddGroup(Condition condition) {
+      super(ADD_GROUP, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static AddGroup allow() {
@@ -1408,12 +1010,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return ADD_GROUP;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -1422,25 +1018,15 @@ public class Privileges {
   }
 
   /** The privilege to remove a group. */
-  public abstract static class RemoveGroup implements Privilege {
+  public static class RemoveGroup extends BasePrivilege {
 
-    private static final RemoveGroup ALLOW_INSTANCE =
-        new RemoveGroup() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final RemoveGroup ALLOW_INSTANCE = new RemoveGroup(Condition.ALLOW);
 
-    private static final RemoveGroup DENY_INSTANCE =
-        new RemoveGroup() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final RemoveGroup DENY_INSTANCE = new RemoveGroup(Condition.DENY);
 
-    private RemoveGroup() {}
+    private RemoveGroup(Condition condition) {
+      super(REMOVE_GROUP, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static RemoveGroup allow() {
@@ -1452,12 +1038,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return REMOVE_GROUP;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -1466,25 +1046,15 @@ public class Privileges {
   }
 
   /** The privilege to get a group. */
-  public abstract static class GetGroup implements Privilege {
+  public static class GetGroup extends BasePrivilege {
 
-    private static final GetGroup ALLOW_INSTANCE =
-        new GetGroup() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final GetGroup ALLOW_INSTANCE = new GetGroup(Condition.DENY);
 
-    private static final GetGroup DENY_INSTANCE =
-        new GetGroup() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final GetGroup DENY_INSTANCE = new GetGroup(Condition.DENY);
 
-    private GetGroup() {}
+    private GetGroup(Condition condition) {
+      super(GET_GROUP, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static GetGroup allow() {
@@ -1496,12 +1066,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return GET_GROUP;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -1510,23 +1074,15 @@ public class Privileges {
   }
 
   /** The privilege to create a role. */
-  public abstract static class CreateRole implements Privilege {
+  public static class CreateRole extends BasePrivilege {
 
-    private static final CreateRole ALLOW_INSTANCE =
-        new CreateRole() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final CreateRole ALLOW_INSTANCE = new CreateRole(Condition.ALLOW);
 
-    private static final CreateRole DENY_INSTANCE =
-        new CreateRole() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final CreateRole DENY_INSTANCE = new CreateRole(Condition.DENY);
+
+    private CreateRole(Condition condition) {
+      super(CREATE_ROLE, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static CreateRole allow() {
@@ -1538,12 +1094,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return CREATE_ROLE;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -1552,25 +1102,15 @@ public class Privileges {
   }
 
   /** The privilege to get a role. */
-  public abstract static class GetRole implements Privilege {
+  public static class GetRole extends BasePrivilege {
 
-    private static final GetRole ALLOW_INSTANCE =
-        new GetRole() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final GetRole ALLOW_INSTANCE = new GetRole(Condition.ALLOW);
 
-    private static final GetRole DENY_INSTANCE =
-        new GetRole() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final GetRole DENY_INSTANCE = new GetRole(Condition.DENY);
 
-    private GetRole() {}
+    private GetRole(Condition condition) {
+      super(GET_ROLE, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static GetRole allow() {
@@ -1582,12 +1122,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return GET_ROLE;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -1596,25 +1130,15 @@ public class Privileges {
   }
 
   /** The privilege to delete a role. */
-  public abstract static class DeleteRole implements Privilege {
+  public static class DeleteRole extends BasePrivilege {
 
-    private static final DeleteRole ALLOW_INSTANCE =
-        new DeleteRole() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final DeleteRole ALLOW_INSTANCE = new DeleteRole(Condition.ALLOW);
 
-    private static final DeleteRole DENY_INSTANCE =
-        new DeleteRole() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final DeleteRole DENY_INSTANCE = new DeleteRole(Condition.DENY);
 
-    private DeleteRole() {}
+    private DeleteRole(Condition condition) {
+      super(DELETE_ROLE, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static DeleteRole allow() {
@@ -1626,12 +1150,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return DELETE_ROLE;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -1640,25 +1158,15 @@ public class Privileges {
   }
 
   /** The privilege to grant a role to the user or the group. */
-  public abstract static class GrantRole implements Privilege {
+  public static class GrantRole extends BasePrivilege {
 
-    private static final GrantRole ALLOW_INSTANCE =
-        new GrantRole() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final GrantRole ALLOW_INSTANCE = new GrantRole(Condition.ALLOW);
 
-    private static final GrantRole DENY_INSTANCE =
-        new GrantRole() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final GrantRole DENY_INSTANCE = new GrantRole(Condition.DENY);
 
-    private GrantRole() {}
+    private GrantRole(Condition condition) {
+      super(GRANT_ROLE, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static GrantRole allow() {
@@ -1670,12 +1178,6 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return GRANT_ROLE;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
@@ -1684,25 +1186,15 @@ public class Privileges {
   }
 
   /** The privilege to revoke a role from the user or the group. */
-  public abstract static class RevokeRole implements Privilege {
+  public static class RevokeRole extends BasePrivilege {
 
-    private static final RevokeRole ALLOW_INSTANCE =
-        new RevokeRole() {
-          @Override
-          public Condition condition() {
-            return Condition.ALLOW;
-          }
-        };
+    private static final RevokeRole ALLOW_INSTANCE = new RevokeRole(Condition.ALLOW);
 
-    private static final RevokeRole DENY_INSTANCE =
-        new RevokeRole() {
-          @Override
-          public Condition condition() {
-            return Condition.DENY;
-          }
-        };
+    private static final RevokeRole DENY_INSTANCE = new RevokeRole(Condition.DENY);
 
-    private RevokeRole() {}
+    private RevokeRole(Condition condition) {
+      super(REVOKE_ROLE, condition);
+    }
 
     /** @return The instance with allow condition of the privilege. */
     public static RevokeRole allow() {
@@ -1714,16 +1206,30 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
-    /** @return The generic name of the privilege. */
-    @Override
-    public Name name() {
-      return REVOKE_ROLE;
-    }
-
     /** @return A readable string representation for the privilege. */
     @Override
     public String simpleString() {
       return condition().name() + " revoke role";
+    }
+  }
+
+  private abstract static class BasePrivilege implements Privilege {
+    private final Name name;
+    private final Condition condition;
+
+    protected BasePrivilege(Name name, Condition condition) {
+      this.name = name;
+      this.condition = condition;
+    }
+
+    @Override
+    public Name name() {
+      return name;
+    }
+
+    @Override
+    public Condition condition() {
+      return condition;
     }
   }
 }

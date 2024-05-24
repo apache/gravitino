@@ -7,10 +7,6 @@ package com.datastrato.gravitino.storage.relational.utils;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.authorization.Privilege;
-import com.datastrato.gravitino.authorization.Privileges;
-import com.datastrato.gravitino.authorization.SecurableObject;
-import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.meta.AuditInfo;
@@ -38,7 +34,6 @@ import com.datastrato.gravitino.storage.relational.po.UserPO;
 import com.datastrato.gravitino.storage.relational.po.UserRoleRelPO;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -48,12 +43,6 @@ import org.apache.commons.lang3.StringUtils;
 public class POConverters {
   private static final long INIT_VERSION = 1L;
   private static final long DEFAULT_DELETED_AT = 0L;
-
-  private static final String SECURABLE_OBJECT_FULL_NAME = "fullName";
-  private static final String SECURABLE_OBJECT_TYPE = "type";
-  private static final String SECURABLE_OBJECT_PRIVILEGES = "privileges";
-  private static final String PRIVILEGE_NAME = "name";
-  private static final String PRIVILEGE_CONDITION = "condition";
 
   private POConverters() {}
 
@@ -790,9 +779,7 @@ public class POConverters {
           .withRoleName(roleEntity.name())
           .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(roleEntity.properties()))
           .withSecurableObjects(
-              JsonUtils.anyFieldMapper()
-                  .writeValueAsString(
-                      generateSecurablePersistObjects(roleEntity.securableObjects())))
+              JsonUtils.anyFieldMapper().writeValueAsString(roleEntity.securableObjects()))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(roleEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
@@ -890,59 +877,13 @@ public class POConverters {
           .withName(rolePO.getRoleName())
           .withNamespace(namespace)
           .withProperties(JsonUtils.anyFieldMapper().readValue(rolePO.getProperties(), Map.class))
-          .withSecurableObjects(fromSecurablePersistObjects(rolePO.getSecurableObjects()))
+          .withSecurableObjects(
+              JsonUtils.anyFieldMapper().readValue(rolePO.getSecurableObjects(), List.class))
           .withAuditInfo(
               JsonUtils.anyFieldMapper().readValue(rolePO.getAuditInfo(), AuditInfo.class))
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize json object:", e);
     }
-  }
-
-  private static List<SecurableObject> fromSecurablePersistObjects(String persisteSecurableObjects)
-      throws JsonProcessingException {
-    List<Map<String, Object>> securablePersistObjects =
-        JsonUtils.anyFieldMapper().readValue(persisteSecurableObjects, List.class);
-    return securablePersistObjects.stream()
-        .map(
-            persistObject -> {
-              List<Privilege> privileges = Lists.newArrayList();
-              List<Map<String, String>> privilegeMaps =
-                  (List<Map<String, String>>) persistObject.get(SECURABLE_OBJECT_PRIVILEGES);
-              for (Map<String, String> privilegeMap : privilegeMaps) {
-                if (Privilege.Condition.ALLOW
-                    .name()
-                    .equals(privilegeMap.get(PRIVILEGE_CONDITION))) {
-                  privileges.add(Privileges.allow(privilegeMap.get(PRIVILEGE_NAME)));
-                } else {
-                  privileges.add(Privileges.deny(privilegeMap.get(PRIVILEGE_NAME)));
-                }
-              }
-              return SecurableObjects.parse(
-                  (String) persistObject.get(SECURABLE_OBJECT_FULL_NAME),
-                  SecurableObject.Type.valueOf((String) persistObject.get(SECURABLE_OBJECT_TYPE)),
-                  privileges);
-            })
-        .collect(Collectors.toList());
-  }
-
-  private static List<Map<String, Object>> generateSecurablePersistObjects(
-      List<SecurableObject> securableObjects) {
-    List<Map<String, Object>> securablePersistObjects = Lists.newArrayList();
-    for (SecurableObject securableObject : securableObjects) {
-      Map<String, Object> securableObjectMap = Maps.newHashMap();
-      securableObjectMap.put(SECURABLE_OBJECT_FULL_NAME, securableObject.fullName());
-      securableObjectMap.put(SECURABLE_OBJECT_TYPE, securableObject.type().name());
-      List<Map<String, String>> privileges = Lists.newArrayList();
-      for (Privilege privilege : securableObject.privileges()) {
-        Map<String, String> privilegeMap = Maps.newHashMap();
-        privilegeMap.put(PRIVILEGE_NAME, privilege.name().name());
-        privilegeMap.put(PRIVILEGE_CONDITION, privilege.condition().name());
-        privileges.add(privilegeMap);
-      }
-      securableObjectMap.put(SECURABLE_OBJECT_PRIVILEGES, privileges);
-      securablePersistObjects.add(securableObjectMap);
-    }
-    return securablePersistObjects;
   }
 }
