@@ -61,7 +61,7 @@ public class Types {
     private static final ByteType INSTANCE = new ByteType(true);
     private static final ByteType UNSIGNED_INSTANCE = new ByteType(false);
 
-    /** @return The singleton instance of  unsigned byte type*/
+    /** @return The singleton instance of unsigned byte type */
     public static ByteType unsigned() {
       return UNSIGNED_INSTANCE;
     }
@@ -91,7 +91,7 @@ public class Types {
     private static final ShortType INSTANCE = new ShortType(true);
     private static final ShortType UNSIGNED_INSTANCE = new ShortType(false);
 
-    /** @return The singleton instance of  unsigned short type*/
+    /** @return The singleton instance of unsigned short type */
     public static ShortType unsigned() {
       return UNSIGNED_INSTANCE;
     }
@@ -121,7 +121,7 @@ public class Types {
     private static final IntegerType INSTANCE = new IntegerType(true);
     private static final IntegerType UNSIGNED_INSTANCE = new IntegerType(false);
 
-    /** @return The singleton instance of  unsigned integer type*/
+    /** @return The singleton instance of unsigned integer type */
     public static IntegerType unsigned() {
       return UNSIGNED_INSTANCE;
     }
@@ -151,7 +151,7 @@ public class Types {
     private static final LongType INSTANCE = new LongType(true);
     private static final LongType UNSIGNED_INSTANCE = new LongType(false);
 
-    /** @return The singleton instance of  unsigned long type*/
+    /** @return The singleton instance of unsigned long type */
     public static LongType unsigned() {
       return UNSIGNED_INSTANCE;
     }

@@ -101,10 +101,7 @@ public interface Type {
   abstract class IntegralType extends NumericType {
     private final boolean signed;
 
-    /**
-     * @param signed or unsigned of the integer type.
-     * @return An {@link Type.IntegralType}.
-     */
+    /** @param signed or unsigned of the integer type. */
     public IntegralType(boolean signed) {
       this.signed = signed;
     }
