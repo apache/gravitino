@@ -4,7 +4,7 @@
 --
 
 ALTER TABLE `role_meta`
-    ADD COLUMN `securable_objects` VARCHAR(2048) NOT NULL COMMENT 'securable objects' AFTER `properties`;
+    ADD COLUMN `securable_objects` TEXT NOT NULL COMMENT 'securable objects' AFTER `properties`;
 
 ALTER TABLE `role_meta` DROP COLUMN `securable_object_full_name`;
 ALTER TABLE `role_meta` DROP COLUMN `securable_object_type`;
