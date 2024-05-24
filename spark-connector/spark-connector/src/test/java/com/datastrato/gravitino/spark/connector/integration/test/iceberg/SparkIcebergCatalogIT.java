@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.spark.connector.integration.test.iceberg;
 
+import com.datastrato.gravitino.spark.connector.iceberg.IcebergPropertiesConstants;
 import com.datastrato.gravitino.spark.connector.iceberg.SparkIcebergTable;
 import com.datastrato.gravitino.spark.connector.integration.test.SparkCommonIT;
 import com.datastrato.gravitino.spark.connector.integration.test.util.SparkMetadataColumnInfo;
@@ -22,7 +23,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import lombok.Data;
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.fs.Path;
+import org.apache.iceberg.ReplaceSortOrder;
 import org.apache.spark.sql.Column;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
@@ -319,6 +322,63 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
             String.format("SELECT * FROM %s FOR SYSTEM_VERSION AS OF 'test_tag'", tableName));
     Assertions.assertEquals(1, tableData.size());
     Assertions.assertEquals("1,1,1", tableData.get(0));
+  }
+
+  @Test
+  void testIcebergReservedProperties() throws NoSuchTableException {
+    String tableName = "test_reserved_properties";
+    dropTableIfExists(tableName);
+    sql(
+        String.format(
+            "CREATE TABLE %s (id INT COMMENT 'id comment' NOT NULL, name STRING COMMENT '', age INT)",
+            tableName));
+
+    SparkIcebergTable sparkIcebergTable = getSparkIcebergTableInstance(tableName);
+
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+    Map<String, String> tableProperties = tableInfo.getTableProperties();
+    Assertions.assertNotNull(tableProperties);
+    Assertions.assertEquals(
+        "iceberg", tableProperties.get(IcebergPropertiesConstants.ICEBERG_PROVIDER));
+    Assertions.assertEquals(
+        "iceberg/parquet", tableProperties.get(IcebergPropertiesConstants.ICEBERG_FILE_FORMAT));
+    Assertions.assertTrue(
+        StringUtils.isNotBlank(IcebergPropertiesConstants.ICEBERG_LOCATION)
+            && tableProperties
+                .get(IcebergPropertiesConstants.ICEBERG_LOCATION)
+                .contains(tableName));
+    Assertions.assertTrue(
+        tableProperties.containsKey(IcebergPropertiesConstants.ICEBERG_FORMAT_VERSION));
+
+    Assertions.assertEquals(
+        "none", tableProperties.get(IcebergPropertiesConstants.ICEBERG_CURRENT_SNAPSHOT_ID));
+    Assertions.assertFalse(
+        tableProperties.containsKey(IcebergPropertiesConstants.ICEBERG_SORT_ORDER));
+    Assertions.assertFalse(
+        tableProperties.containsKey(IcebergPropertiesConstants.ICEBERG_IDENTIFIER_FIELDS));
+
+    // create a new snapshot
+    sql(String.format("INSERT INTO %s VALUES(1, '1', 1)", tableName));
+
+    // set Identifier fields
+    sparkIcebergTable.table().updateSchema().setIdentifierFields("id").commit();
+
+    // set sort orders
+    ReplaceSortOrder orderBuilder = sparkIcebergTable.table().replaceSortOrder();
+    orderBuilder.asc("id");
+    orderBuilder.commit();
+
+    sparkIcebergTable.table().refresh();
+
+    tableInfo = getTableInfo(tableName);
+    tableProperties = tableInfo.getTableProperties();
+    Assertions.assertEquals(
+        String.valueOf(sparkIcebergTable.table().currentSnapshot().snapshotId()),
+        tableProperties.get(IcebergPropertiesConstants.ICEBERG_CURRENT_SNAPSHOT_ID));
+    Assertions.assertEquals(
+        "[id]", tableProperties.get(IcebergPropertiesConstants.ICEBERG_IDENTIFIER_FIELDS));
+    Assertions.assertEquals(
+        "id ASC NULLS FIRST", tableProperties.get(IcebergPropertiesConstants.ICEBERG_SORT_ORDER));
   }
 
   private void testMetadataColumns() {
