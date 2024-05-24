@@ -91,6 +91,14 @@ public class HiveContainer extends BaseContainer {
     }
   }
 
+  private void outputHiveStatus() {
+    Container.ExecResult execResult = executeInContainer("hdfs", "dfsadmin", "-report");
+    LOG.info("HDFS report, stdout: {}, stderr: {}", execResult.getStdout(), execResult.getStderr());
+
+    execResult = executeInContainer("hive", "-e", "\"select 1;\"");
+    LOG.info("Hive report, stdout: {}, stderr: {}", execResult.getStdout(), execResult.getStderr());
+  }
+
   @Override
   protected boolean checkContainerStatus(int retryLimit) {
     await()
@@ -109,10 +117,13 @@ public class HiveContainer extends BaseContainer {
                   LOG.error("{}", message);
                   LOG.error("stderr: {}", execResult.getStderr());
                   LOG.error("stdout: {}", execResult.getStdout());
+
+                  outputHiveStatus();
                 } else {
                   LOG.info("Hive container startup success!");
                   return true;
                 }
+
               } catch (RuntimeException e) {
                 LOG.error(e.getMessage(), e);
               }
