@@ -59,9 +59,9 @@ public class GravitinoDriverPlugin implements DriverPlugin {
         String.format(
             "%s:%s, should not be empty", GravitinoSparkConfig.GRAVITINO_METALAKE, metalake));
 
-    if (conf.contains(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT)
-        && "true".equals(conf.get(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT))) {
-      this.enableIcebergSupport = true;
+    this.enableIcebergSupport =
+        conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT, false);
+    if (enableIcebergSupport) {
       gravitinoDriverExtensions.add(ICEBERG_SPARK_EXTENSIONS);
     }
 
