@@ -27,6 +27,7 @@ import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;
 import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.connector.PropertyEntry;
+import com.datastrato.gravitino.connector.SupportsSchemas;
 import com.datastrato.gravitino.connector.capability.Capability;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
@@ -38,7 +39,6 @@ import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.rel.SupportsPartitions;
-import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.storage.IdGenerator;
@@ -321,15 +321,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
-
-    if (Entity.SYSTEM_CATALOG_RESERVED_NAME.equals(ident.name())) {
-      throw new IllegalArgumentException("Can't create a catalog with with reserved name `system`");
-    }
-
-    if (Entity.SECURABLE_ENTITY_RESERVED_NAME.equals(ident.name())) {
-      throw new IllegalArgumentException("Can't create a catalog with with reserved name `*`");
-    }
-
     // load catalog-related configuration from catalog-specific configuration file
     Map<String, String> newProperties = Optional.ofNullable(properties).orElse(Maps.newHashMap());
     Map<String, String> catalogSpecificConfig = loadCatalogSpecificConfig(newProperties, provider);

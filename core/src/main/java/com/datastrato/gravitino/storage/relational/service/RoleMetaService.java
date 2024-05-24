@@ -149,4 +149,37 @@ public class RoleMetaService {
     return SessionUtils.getWithoutCommit(
         SecurableObjectMapper.class, mapper -> mapper.listSecurableObjectsByRoleId(roleId));
   }
+
+  public int deleteRoleMetasByLegacyTimeLine(long legacyTimeLine, int limit) {
+    int[] roleDeletedCount = new int[] {0};
+    int[] userRoleRelDeletedCount = new int[] {0};
+    int[] groupRoleRelDeletedCount = new int[] {0};
+    int[] securableObjectsCount = new int[] {0};
+
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            roleDeletedCount[0] =
+                SessionUtils.doWithoutCommitAndFetchResult(
+                    RoleMetaMapper.class,
+                    mapper -> mapper.deleteRoleMetasByLegacyTimeLine(legacyTimeLine, limit)),
+        () ->
+            userRoleRelDeletedCount[0] =
+                SessionUtils.doWithoutCommitAndFetchResult(
+                    UserRoleRelMapper.class,
+                    mapper -> mapper.deleteUserRoleRelMetasByLegacyTimeLine(legacyTimeLine, limit)),
+        () ->
+            groupRoleRelDeletedCount[0] =
+                SessionUtils.doWithoutCommitAndFetchResult(
+                    GroupRoleRelMapper.class,
+                    mapper ->
+                        mapper.deleteGroupRoleRelMetasByLegacyTimeLine(legacyTimeLine, limit)),
+        () ->
+            securableObjectsCount[0] =
+                SessionUtils.doWithoutCommitAndFetchResult(
+                    SecurableObjectMapper.class,
+                    mapper ->
+                        mapper.deleteSecurableObjectsByLegacyTimeLine(legacyTimeLine, limit)));
+
+    return roleDeletedCount[0] + userRoleRelDeletedCount[0] + groupRoleRelDeletedCount[0];
+  }
 }

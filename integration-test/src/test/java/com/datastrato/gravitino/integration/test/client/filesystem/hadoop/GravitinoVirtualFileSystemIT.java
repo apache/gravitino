@@ -62,9 +62,8 @@ public class GravitinoVirtualFileSystemIT extends AbstractIT {
             catalogName, Catalog.Type.FILESET, "hadoop", "catalog comment", properties);
     Assertions.assertTrue(metalake.catalogExists(catalogName));
 
-    NameIdentifier schemaIdent = NameIdentifier.of(metalakeName, catalogName, schemaName);
-    catalog.asSchemas().createSchema(schemaIdent, "schema comment", properties);
-    Assertions.assertTrue(catalog.asSchemas().schemaExists(schemaIdent));
+    catalog.asSchemas().createSchema(schemaName, "schema comment", properties);
+    Assertions.assertTrue(catalog.asSchemas().schemaExists(schemaName));
 
     conf.set(
         "fs.gvfs.impl", "com.datastrato.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");

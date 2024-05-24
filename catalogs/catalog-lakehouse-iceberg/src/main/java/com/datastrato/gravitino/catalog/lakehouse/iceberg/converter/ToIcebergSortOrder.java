@@ -11,6 +11,7 @@ import com.datastrato.gravitino.rel.expressions.literals.Literal;
 import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.base.Preconditions;
 import java.util.Locale;
 import org.apache.commons.lang3.ArrayUtils;
@@ -58,9 +59,10 @@ public class ToIcebergSortOrder {
 
             Expression firstArg = sortFunc.arguments()[0];
             Preconditions.checkArgument(
-                firstArg instanceof Literal && ((Literal<?>) firstArg).value() instanceof Integer,
+                firstArg instanceof Literal
+                    && ((Literal<?>) firstArg).dataType() instanceof Types.IntegerType,
                 "Bucket sort's first argument must be a integer literal");
-            int numBuckets = (Integer) ((Literal<?>) firstArg).value();
+            int numBuckets = Integer.parseInt(String.valueOf(((Literal<?>) firstArg).value()));
 
             Expression secondArg = sortFunc.arguments()[1];
             Preconditions.checkArgument(
@@ -77,9 +79,10 @@ public class ToIcebergSortOrder {
 
             firstArg = sortFunc.arguments()[0];
             Preconditions.checkArgument(
-                firstArg instanceof Literal && ((Literal<?>) firstArg).value() instanceof Integer,
+                firstArg instanceof Literal
+                    && ((Literal<?>) firstArg).dataType() instanceof Types.IntegerType,
                 "Truncate sort's first argument must be a integer literal");
-            int width = (Integer) ((Literal<?>) firstArg).value();
+            int width = Integer.parseInt(String.valueOf(((Literal<?>) firstArg).value()));
 
             secondArg = sortFunc.arguments()[1];
             Preconditions.checkArgument(

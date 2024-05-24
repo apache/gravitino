@@ -54,6 +54,8 @@ kafka = "3.4.0"
 curator = "2.12.0"
 awaitility = "4.2.1"
 servlet = "3.1.0"
+jodd = "3.5.2"
+flink = "1.18.0"
 
 protobuf-plugin = "0.9.2"
 spotless-plugin = '6.11.0'
@@ -98,6 +100,7 @@ jersey-media-json-jackson = { group = "org.glassfish.jersey.media", name = "jers
 jersey-hk2 = { group = "org.glassfish.jersey.inject", name = "jersey-hk2", version.ref = "jersey" }
 jersey-test-framework-core = { group = "org.glassfish.jersey.test-framework", name = "jersey-test-framework-core", version.ref = "jersey" }
 jersey-test-framework-provider-jetty = { group = "org.glassfish.jersey.test-framework.providers", name = "jersey-test-framework-provider-jetty", version.ref = "jersey" }
+jodd-core = { group = "org.jodd", name = "jodd-core", version.ref = "jodd" }
 mockito-core = { group = "org.mockito", name = "mockito-core", version.ref = "mockito" }
 hive2-metastore = { group = "org.apache.hive", name = "hive-metastore", version.ref = "hive2"}
 hive2-exec = { group = "org.apache.hive", name = "hive-exec", version.ref = "hive2"}

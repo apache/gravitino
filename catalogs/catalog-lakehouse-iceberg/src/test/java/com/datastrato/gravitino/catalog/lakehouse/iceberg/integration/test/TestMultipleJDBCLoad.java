@@ -10,7 +10,6 @@ import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogP
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.integration.test.container.MySQLContainer;
@@ -121,29 +120,15 @@ public class TestMultipleJDBCLoad extends AbstractIT {
             "comment",
             icebergMysqlConf);
 
-    NameIdentifier[] nameIdentifiers =
-        mysqlCatalog.asSchemas().listSchemas(Namespace.of(metalakeName, mysqlCatalogName));
+    NameIdentifier[] nameIdentifiers = mysqlCatalog.asSchemas().listSchemas();
     Assertions.assertEquals(0, nameIdentifiers.length);
-    nameIdentifiers =
-        postgreSqlCatalog
-            .asSchemas()
-            .listSchemas(Namespace.of(metalakeName, postgreSqlCatalogName));
+    nameIdentifiers = postgreSqlCatalog.asSchemas().listSchemas();
     Assertions.assertEquals(0, nameIdentifiers.length);
 
     String schemaName = RandomNameUtils.genRandomName("it_schema");
-    mysqlCatalog
-        .asSchemas()
-        .createSchema(
-            NameIdentifier.of(metalakeName, mysqlCatalogName, schemaName),
-            null,
-            Collections.emptyMap());
+    mysqlCatalog.asSchemas().createSchema(schemaName, null, Collections.emptyMap());
 
-    postgreSqlCatalog
-        .asSchemas()
-        .createSchema(
-            NameIdentifier.of(metalakeName, postgreSqlCatalogName, schemaName),
-            null,
-            Collections.emptyMap());
+    postgreSqlCatalog.asSchemas().createSchema(schemaName, null, Collections.emptyMap());
 
     String tableName = RandomNameUtils.genRandomName("it_table");
 

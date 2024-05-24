@@ -90,6 +90,10 @@ You can use this kind of image to test the catalog of Apache Hive with kerberos 
 
 Changelog
 
+- gravitino-ci-kerberos-hive:0.1.1
+  - Add a principal for Gravitino web server named 'HTTP/localhost@HADOOPKRB'.
+  - Fix bugs about the configuration of proxy users. 
+
 - gravitino-ci-kerberos-hive:0.1.0
     - Set up a Hive cluster with kerberos enabled.
     - Install a KDC server and create a principal for Hive. For more please see [kerberos-hive](../dev/docker/kerberos-hive)
@@ -99,6 +103,9 @@ Changelog
 You can use this kind of image to test the catalog of Apache Hive.
 
 Changelog
+
+- gravitino-ci-hive:0.1.12
+  - Shrink hive Docker image size by 420MB
 
 - gravitino-ci-hive:0.1.11
   - Remove `yarn` from the startup script; Remove `yarn-site.xml` and `yarn-env.sh` files;

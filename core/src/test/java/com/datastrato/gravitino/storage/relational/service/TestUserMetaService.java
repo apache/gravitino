@@ -16,12 +16,18 @@ import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.datastrato.gravitino.storage.relational.TestJDBCBackend;
 import com.datastrato.gravitino.storage.relational.mapper.RoleMetaMapper;
 import com.datastrato.gravitino.storage.relational.po.RolePO;
+import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.Instant;
 import java.util.List;
 import java.util.function.Function;
+import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -608,5 +614,168 @@ class TestUserMetaService extends TestJDBCBackend {
         () -> userMetaService.getUserByIdentifier(user2.nameIdentifier()));
     Assertions.assertEquals(0, roleMetaService.listRolesByUserId(user1.id()).size());
     Assertions.assertEquals(0, roleMetaService.listRolesByUserId(user2.id()).size());
+  }
+
+  @Test
+  void deleteUserMetasByLegacyTimeLine() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    backend.insert(metalake, false);
+
+    UserMetaService userMetaService = UserMetaService.getInstance();
+    RoleMetaService roleMetaService = RoleMetaService.getInstance();
+
+    RoleEntity role1 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role1",
+            auditInfo);
+    RoleEntity role2 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role2",
+            auditInfo);
+    roleMetaService.insertRole(role1, false);
+    roleMetaService.insertRole(role2, false);
+
+    UserEntity user1 =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "user1",
+            auditInfo,
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
+    UserEntity user2 =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "user2",
+            auditInfo,
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
+    UserEntity user3 =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "user3",
+            auditInfo,
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
+    UserEntity user4 =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "user4",
+            auditInfo,
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
+    userMetaService.insertUser(user1, false);
+    userMetaService.insertUser(user2, false);
+    userMetaService.insertUser(user3, false);
+    userMetaService.insertUser(user4, false);
+
+    // hard delete before soft delete
+    int deletedCount =
+        userMetaService.deleteUserMetasByLegacyTimeLine(Instant.now().toEpochMilli() + 1000, 4);
+    Assertions.assertEquals(0, deletedCount);
+    Assertions.assertEquals(
+        user1.name(), userMetaService.getUserByIdentifier(user1.nameIdentifier()).name());
+    Assertions.assertEquals(
+        user2.name(), userMetaService.getUserByIdentifier(user2.nameIdentifier()).name());
+    Assertions.assertEquals(
+        user3.name(), userMetaService.getUserByIdentifier(user3.nameIdentifier()).name());
+    Assertions.assertEquals(
+        user4.name(), userMetaService.getUserByIdentifier(user4.nameIdentifier()).name());
+    Assertions.assertEquals(2, roleMetaService.listRolesByUserId(user1.id()).size());
+    Assertions.assertEquals(2, roleMetaService.listRolesByUserId(user2.id()).size());
+    Assertions.assertEquals(2, roleMetaService.listRolesByUserId(user3.id()).size());
+    Assertions.assertEquals(2, roleMetaService.listRolesByUserId(user4.id()).size());
+    Assertions.assertEquals(4, countUsers(metalake.id()));
+    Assertions.assertEquals(8, countUserRoleRels());
+
+    // delete metalake
+    Assertions.assertTrue(
+        MetalakeMetaService.getInstance().deleteMetalake(metalake.nameIdentifier(), true));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> userMetaService.getUserByIdentifier(user1.nameIdentifier()));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> userMetaService.getUserByIdentifier(user2.nameIdentifier()));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> userMetaService.getUserByIdentifier(user3.nameIdentifier()));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> userMetaService.getUserByIdentifier(user4.nameIdentifier()));
+    Assertions.assertEquals(0, roleMetaService.listRolesByUserId(user1.id()).size());
+    Assertions.assertEquals(0, roleMetaService.listRolesByUserId(user2.id()).size());
+    Assertions.assertEquals(0, roleMetaService.listRolesByUserId(user3.id()).size());
+    Assertions.assertEquals(0, roleMetaService.listRolesByUserId(user4.id()).size());
+    Assertions.assertEquals(4, countUsers(metalake.id()));
+    Assertions.assertEquals(8, countUserRoleRels());
+
+    // hard delete after soft delete
+    deletedCount =
+        userMetaService.deleteUserMetasByLegacyTimeLine(Instant.now().toEpochMilli() + 1000, 3);
+    Assertions.assertEquals(6, deletedCount); // delete 3 user + 3 userRoleRel
+    Assertions.assertEquals(1, countUsers(metalake.id())); // 4 - 3
+    Assertions.assertEquals(5, countUserRoleRels()); // 8 - 3
+
+    deletedCount =
+        userMetaService.deleteUserMetasByLegacyTimeLine(Instant.now().toEpochMilli() + 1000, 3);
+    Assertions.assertEquals(4, deletedCount); // delete 1 user + 3 userRoleRel
+    Assertions.assertEquals(0, countUsers(metalake.id()));
+    Assertions.assertEquals(2, countUserRoleRels()); // 5 - 3
+
+    deletedCount =
+        userMetaService.deleteUserMetasByLegacyTimeLine(Instant.now().toEpochMilli() + 1000, 3);
+    Assertions.assertEquals(2, deletedCount);
+    Assertions.assertEquals(0, countUsers(metalake.id()));
+    Assertions.assertEquals(0, countUserRoleRels());
+
+    deletedCount =
+        userMetaService.deleteUserMetasByLegacyTimeLine(Instant.now().toEpochMilli() + 1000, 3);
+    Assertions.assertEquals(0, deletedCount); // no more to delete
+  }
+
+  private Integer countUsers(Long metalakeId) {
+    int count = 0;
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM user_meta WHERE metalake_id = %d", metalakeId))) {
+      while (rs.next()) {
+        count = rs.getInt(1);
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("SQL execution failed", e);
+    }
+    return count;
+  }
+
+  private Integer countUserRoleRels() {
+    int count = 0;
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs = statement.executeQuery("SELECT count(*) FROM user_role_rel")) {
+      while (rs.next()) {
+        count = rs.getInt(1);
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("SQL execution failed", e);
+    }
+    return count;
   }
 }

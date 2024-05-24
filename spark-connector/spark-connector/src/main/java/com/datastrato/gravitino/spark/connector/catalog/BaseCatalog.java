@@ -8,11 +8,11 @@ package com.datastrato.gravitino.spark.connector.catalog;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.Schema;
+import com.datastrato.gravitino.SchemaChange;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
-import com.datastrato.gravitino.rel.Schema;
-import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.spark.connector.ConnectorConstants;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
@@ -299,8 +299,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
 
   @Override
   public String[][] listNamespaces() throws NoSuchNamespaceException {
-    NameIdentifier[] schemas =
-        gravitinoCatalogClient.asSchemas().listSchemas(Namespace.of(metalakeName, catalogName));
+    NameIdentifier[] schemas = gravitinoCatalogClient.asSchemas().listSchemas();
     return Arrays.stream(schemas)
         .map(schema -> new String[] {schema.name()})
         .toArray(String[][]::new);
@@ -319,10 +318,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
       throws NoSuchNamespaceException {
     validateNamespace(namespace);
     try {
-      Schema schema =
-          gravitinoCatalogClient
-              .asSchemas()
-              .loadSchema(NameIdentifier.of(metalakeName, catalogName, namespace[0]));
+      Schema schema = gravitinoCatalogClient.asSchemas().loadSchema(namespace[0]);
       String comment = schema.comment();
       Map<String, String> properties = schema.properties();
       if (comment != null) {
@@ -344,10 +340,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
     Map<String, String> properties = new HashMap<>(metadata);
     String comment = properties.remove(SupportsNamespaces.PROP_COMMENT);
     try {
-      gravitinoCatalogClient
-          .asSchemas()
-          .createSchema(
-              NameIdentifier.of(metalakeName, catalogName, namespace[0]), comment, properties);
+      gravitinoCatalogClient.asSchemas().createSchema(namespace[0], comment, properties);
     } catch (SchemaAlreadyExistsException e) {
       throw new NamespaceAlreadyExistsException(namespace);
     }
@@ -372,9 +365,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
                 })
             .toArray(SchemaChange[]::new);
     try {
-      gravitinoCatalogClient
-          .asSchemas()
-          .alterSchema(NameIdentifier.of(metalakeName, catalogName, namespace[0]), schemaChanges);
+      gravitinoCatalogClient.asSchemas().alterSchema(namespace[0], schemaChanges);
     } catch (NoSuchSchemaException e) {
       throw new NoSuchNamespaceException(namespace);
     }
@@ -385,9 +376,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
       throws NoSuchNamespaceException, NonEmptyNamespaceException {
     validateNamespace(namespace);
     try {
-      return gravitinoCatalogClient
-          .asSchemas()
-          .dropSchema(NameIdentifier.of(metalakeName, catalogName, namespace[0]), cascade);
+      return gravitinoCatalogClient.asSchemas().dropSchema(namespace[0], cascade);
     } catch (NonEmptySchemaException e) {
       throw new NonEmptyNamespaceException(namespace);
     }
