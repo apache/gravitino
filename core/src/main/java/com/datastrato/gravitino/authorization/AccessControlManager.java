@@ -296,7 +296,7 @@ public class AccessControlManager {
     return doWithNonAdminLock(() -> roleManager.deleteRole(metalake, role));
   }
 
-  List<RoleEntity> getRolesByUserFromMetalake(String metalake, String currentUser) {
+  public List<RoleEntity> getRolesByUserFromMetalake(String metalake, String currentUser) {
     return doWithNonAdminLock(
         () -> {
           User user = getUser(metalake, currentUser);

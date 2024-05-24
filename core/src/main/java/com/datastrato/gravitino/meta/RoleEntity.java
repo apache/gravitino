@@ -300,6 +300,12 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
       return name;
     }
 
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(parent, name);
+    }
+
     @Override
     public boolean equals(Object obj) {
       if (!(obj instanceof InnerSecurableObject)) {
