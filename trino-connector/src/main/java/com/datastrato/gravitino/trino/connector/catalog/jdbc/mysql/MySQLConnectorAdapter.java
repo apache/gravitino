@@ -14,11 +14,10 @@ import com.datastrato.gravitino.trino.connector.catalog.jdbc.JDBCCatalogProperty
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.session.PropertyMetadata;
-import org.apache.commons.lang3.NotImplementedException;
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.NotImplementedException;
 
 /** Transforming MySQL connector configuration and components into Gravitino connector. */
 public class MySQLConnectorAdapter implements CatalogConnectorAdapter {

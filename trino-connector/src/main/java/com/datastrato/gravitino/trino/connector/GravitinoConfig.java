@@ -44,7 +44,8 @@ public class GravitinoConfig {
       }
     }
     if (isDynamicConnector() && !config.containsKey(GRAVITINO_DYNAMIC_CONNECTOR_CATALOG_CONFIG)) {
-      throw new TrinoException(GRAVITINO_MISSING_CONFIG, "Incomplete Dynamic catalog connector config");
+      throw new TrinoException(
+          GRAVITINO_MISSING_CONFIG, "Incomplete Dynamic catalog connector config");
     }
   }
 

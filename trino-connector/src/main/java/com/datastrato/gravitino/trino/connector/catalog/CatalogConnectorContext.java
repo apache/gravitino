@@ -8,13 +8,10 @@ import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.trino.connector.GravitinoConnector;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
 import com.google.common.base.Preconditions;
-import io.trino.spi.TrinoException;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.session.PropertyMetadata;
 import java.util.List;
 import java.util.Map;
-
-import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_CREATE_INTERNAL_CONNECTOR_ERROR;
 
 /**
  * The CatalogConnector serves as a communication bridge between the Gravitino connector and its
@@ -100,7 +97,6 @@ public class CatalogConnectorContext {
     public Builder clone(GravitinoCatalog catalog) {
       return new Builder(connectorAdapter, catalog);
     }
-
 
     Builder withMetalake(GravitinoMetalake metalake) {
       this.metalake = metalake;

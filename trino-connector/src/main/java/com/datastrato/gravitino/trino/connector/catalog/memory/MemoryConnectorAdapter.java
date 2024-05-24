@@ -10,12 +10,11 @@ import com.datastrato.gravitino.trino.connector.catalog.HasPropertyMeta;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.session.PropertyMetadata;
-import org.apache.commons.lang3.NotImplementedException;
-
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.NotImplementedException;
 
 /**
  * Support trino Memory connector for testing. Transforming Memory connector configuration and

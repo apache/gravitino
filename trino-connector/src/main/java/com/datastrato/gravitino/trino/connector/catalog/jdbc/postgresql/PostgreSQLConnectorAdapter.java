@@ -12,10 +12,9 @@ import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadata
 import com.datastrato.gravitino.trino.connector.catalog.jdbc.JDBCCatalogPropertyConverter;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
 import io.trino.spi.connector.Connector;
-import org.apache.commons.lang3.NotImplementedException;
-
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.commons.lang3.NotImplementedException;
 
 /** Transforming PostgreSQL connector configuration and components into Gravitino connector. */
 public class PostgreSQLConnectorAdapter implements CatalogConnectorAdapter {

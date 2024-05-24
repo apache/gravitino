@@ -27,6 +27,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.Connector;
+import io.trino.spi.connector.ConnectorContext;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -39,8 +40,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-
-import io.trino.spi.connector.ConnectorContext;
 import org.apache.commons.lang3.NotImplementedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,7 +70,6 @@ public class CatalogConnectorManager {
 
   private final Set<String> usedMetalakes = new HashSet<>();
   private final Map<String, GravitinoMetalake> metalakes = new ConcurrentHashMap<>();
-
 
   private GravitinoAdminClient gravitinoClient;
   private GravitinoConfig config;
@@ -395,9 +393,8 @@ public class CatalogConnectorManager {
       catalogConnectorContext =
           catalogConnectors.get(getTrinoCatalogName(metalakeName, catalogName));
       if (catalogConnectorContext == null
-          || catalogConnectorContext
-              .getCatalog()
-              .getLastModifiedTime() == oldCatalog.getLastModifiedTime()) {
+          || catalogConnectorContext.getCatalog().getLastModifiedTime()
+              == oldCatalog.getLastModifiedTime()) {
         throw new TrinoException(
             GRAVITINO_OPERATION_FAILED, "Update catalog failed due to the reloading process fails");
       }

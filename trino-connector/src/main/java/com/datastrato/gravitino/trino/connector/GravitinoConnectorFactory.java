@@ -8,7 +8,6 @@ import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVIT
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_MISSING_CONFIG;
 
 import com.datastrato.gravitino.client.GravitinoAdminClient;
-import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorFactory;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogInjector;
@@ -34,6 +33,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
 
   @SuppressWarnings("UnusedVariable")
   private GravitinoSystemTableFactory gravitinoSystemTableFactory;
+
   private CatalogConnectorManager catalogConnectorManager;
 
   @Override
