@@ -5,7 +5,6 @@
 package com.datastrato.gravitino.storage.relational.po;
 
 import com.datastrato.gravitino.MetadataObject;
-import com.datastrato.gravitino.authorization.SecurableObject;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
@@ -101,7 +100,7 @@ public class SecurableObjectPO {
       return this;
     }
 
-    public Builder withType(SecurableObject.Type type) {
+    public Builder withType(MetadataObject.Type type) {
       securableObjectPO.type = type;
       return this;
     }
