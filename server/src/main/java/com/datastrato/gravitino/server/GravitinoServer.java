@@ -140,6 +140,7 @@ public class GravitinoServer extends ResourceConfig {
       System.exit(-1);
     }
     LOG.info("Done, Gravitino server started.");
+    LOG.info("In GravitinoServer, krb5.conf = {}", System.getProperty("java.security.krb5.conf"));
 
     Runtime.getRuntime()
         .addShutdownHook(
