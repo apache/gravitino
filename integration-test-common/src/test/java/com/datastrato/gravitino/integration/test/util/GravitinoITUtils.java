@@ -35,7 +35,9 @@ public class GravitinoITUtils {
             content.replace(
                 "#JAVA_OPTS+=\" -Djava.securit.krb5.conf=/etc/krb5.conf\"",
                 String.format("JAVA_OPTS+=\" -Djava.security.krb5.conf=%s\"", krb5Path));
-        FileUtils.write(new File(modifiedGravitinoStartShell), content, StandardCharsets.UTF_8);
+        File tmp = new File(modifiedGravitinoStartShell);
+        FileUtils.write(tmp, content, StandardCharsets.UTF_8);
+        tmp.setExecutable(true);
         LOG.info("modifiedGravitinoStartShell content: \n{}", content);
       } catch (Exception e) {
         LOG.error("Can replace /etc/krb5.conf with real kerberos configuration", e);
