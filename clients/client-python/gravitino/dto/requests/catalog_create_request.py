@@ -45,7 +45,9 @@ class CatalogCreateRequest(RESTRequest):
             IllegalArgumentException if name or type are not set.
         """
         assert self._name is not None, '"name" field is required and cannot be empty'
-        assert self._type is not None, '"type" field is required and cannot be empty'
+        assert (
+            self._type is not None
+        ), '"catalog_type" field is required and cannot be empty'
         assert (
             self._provider is not None
         ), '"provider" field is required and cannot be empty'

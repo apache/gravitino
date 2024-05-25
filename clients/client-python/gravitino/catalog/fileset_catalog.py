@@ -41,7 +41,9 @@ class FilesetCatalog(BaseSchemaCatalog):
         rest_client: HTTPClient = None,
     ):
 
-        super().__init__(name, catalog_type, provider, comment, properties, audit, rest_client)
+        super().__init__(
+            name, catalog_type, provider, comment, properties, audit, rest_client
+        )
 
     def as_fileset_catalog(self):
         return self

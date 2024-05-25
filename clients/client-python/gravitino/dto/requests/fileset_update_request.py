@@ -89,19 +89,19 @@ class FilesetUpdateRequest:
         _value: str = field(metadata=config(field_name="value"))
         """The value of the property."""
 
-        def __init__(self, property: str, value: str):
+        def __init__(self, fileset_property: str, value: str):
             super().__init__("setProperty")
-            self._property = property
+            self._property = fileset_property
             self._value = value
 
         def validate(self):
             """Validates the fields of the request.
 
             Raises:
-                 IllegalArgumentException if property or value are not set.
+                 IllegalArgumentException if fileset_property or value are not set.
             """
             if not self._property:
-                raise ValueError('"property" field is required and cannot be empty')
+                raise ValueError('"fileset_property" field is required and cannot be empty')
             if not self._value:
                 raise ValueError('"value" field is required and cannot be empty')
 
@@ -115,18 +115,18 @@ class FilesetUpdateRequest:
         _property: str = field(metadata=config(field_name="property"))
         """The property to remove."""
 
-        def __init__(self, property: str):
+        def __init__(self, fileset_property: str):
             super().__init__("removeProperty")
-            self._property = property
+            self._property = fileset_property
 
         def validate(self):
             """Validates the fields of the request.
 
             Raises:
-                 IllegalArgumentException if property is not set.
+                 IllegalArgumentException if fileset_property is not set.
             """
             if not self._property:
-                raise ValueError('"property" field is required and cannot be empty')
+                raise ValueError('"fileset_property" field is required and cannot be empty')
 
         def fileset_change(self):
             return FilesetChange.remove_property(self._property)
