@@ -20,6 +20,7 @@ import com.datastrato.gravitino.client.KerberosTokenProvider;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
+import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
@@ -72,10 +73,10 @@ public class HiveUserAuthenticationIT extends AbstractIT {
 
   private static HiveContainer kerberosHiveContainer;
 
-  private static final String METALAKE_NAME = "test_metalake";
-  private static final String CATALOG_NAME = "test_catalog";
-  private static final String SCHEMA_NAME = "test_schema";
-  private static final String TABLE_NAME = "test_table";
+  private static final String METALAKE_NAME = GravitinoITUtils.genRandomName("test_metalake");
+  private static final String CATALOG_NAME = GravitinoITUtils.genRandomName("test_catalog");
+  private static final String SCHEMA_NAME = GravitinoITUtils.genRandomName("test_schema");
+  private static final String TABLE_NAME = GravitinoITUtils.genRandomName("test_table");
 
   private static final String HIVE_COL_NAME1 = "col1";
   private static final String HIVE_COL_NAME2 = "col2";
@@ -115,6 +116,9 @@ public class HiveUserAuthenticationIT extends AbstractIT {
     // Clean up the kerberos configuration
     System.clearProperty("java.security.krb5.conf");
     System.clearProperty("sun.security.krb5.debug");
+
+    AbstractIT.customConfigs.clear();
+    AbstractIT.client = null;
   }
 
   private static void prepareKerberosConfig() throws Exception {
