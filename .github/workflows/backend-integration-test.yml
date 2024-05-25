@@ -114,3 +114,4 @@ jobs:
             catalogs/**/*.log
             catalogs/**/*.tar
             distribution/**/*.log
+            distribution/package/bin/*.log
