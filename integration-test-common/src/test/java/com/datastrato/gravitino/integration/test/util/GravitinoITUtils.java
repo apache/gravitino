@@ -4,7 +4,10 @@
  */
 package com.datastrato.gravitino.integration.test.util;
 
+import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
+import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,21 +20,20 @@ public class GravitinoITUtils {
 
   public static void startGravitinoServer() {
     String gravitinoStartShell = System.getenv("GRAVITINO_HOME") + "/bin/gravitino.sh";
-    if (System.getProperty("java.security.krb5.conf") != null) {
-      LOG.info("java.security.krb5.conf: {}", System.getProperty("java.security.krb5.conf"));
-      // Replace '/etc/krb5.conf' with the one in the test resources with sed command
-      CommandExecutor.executeCommandLocalHost(
-          "sed -i 's#/etc/krb5.conf#"
-              + System.getProperty("java.security.krb5.conf")
-              + "#g' "
-              + gravitinoStartShell,
-          false,
-          ProcessData.TypesOfData.OUTPUT);
+    String krb5Path = System.getProperty("java.security.krb5.conf");
+    if (krb5Path != null) {
+      LOG.info("java.security.krb5.conf: {}", krb5Path);
 
-      Object o =
-          CommandExecutor.executeCommandLocalHost(
-              "cat " + gravitinoStartShell, false, ProcessData.TypesOfData.OUTPUT);
-      LOG.info("gravitinoStartShell content: \n{}", o);
+      // Replace '/etc/krb5.conf' with the one in the test
+      try {
+        String content =
+            FileUtils.readFileToString(new File(gravitinoStartShell), StandardCharsets.UTF_8);
+        content = content.replace("/etc/krb5.conf", krb5Path);
+        FileUtils.write(new File(gravitinoStartShell), content, StandardCharsets.UTF_8);
+        LOG.info("gravitinoStartShell content: \n{}", content);
+      } catch (Exception e) {
+        LOG.error("Can replace /etc/krb5.conf with real kerberos configuration", e);
+      }
     }
 
     CommandExecutor.executeCommandLocalHost(
