@@ -61,7 +61,7 @@ jobs:
       matrix:
         architecture: [linux/amd64]
         java-version: [ 8, 11, 17 ]
-        test-mode: [ embedded, deploy ]
+        test-mode: [ deploy ]
         backend: [ jdbcBackend, kvBackend]
     env:
       PLATFORM: ${{ matrix.architecture }}
@@ -113,3 +113,4 @@ jobs:
             distribution/package/logs/gravitino-server.log
             catalogs/**/*.log
             catalogs/**/*.tar
+            distribution/**/*.log

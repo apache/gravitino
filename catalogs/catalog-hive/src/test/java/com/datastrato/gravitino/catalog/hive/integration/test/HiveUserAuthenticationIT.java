@@ -133,8 +133,8 @@ public class HiveUserAuthenticationIT extends AbstractIT {
         .getContainer()
         .copyFileFromContainer("/etc/admin.keytab", TMP_DIR + HIVE_METASTORE_CLIENT_KEYTAB);
 
-    String tmpKrb5Path = TMP_DIR + "krb5.conf_tmp";
-    String krb5Path = TMP_DIR + "krb5.conf";
+    String tmpKrb5Path = TMP_DIR + "/krb5.conf_tmp";
+    String krb5Path = TMP_DIR + "/krb5.conf";
     kerberosHiveContainer.getContainer().copyFileFromContainer("/etc/krb5.conf", tmpKrb5Path);
 
     // Modify the krb5.conf and change the kdc and admin_server to the container IP
