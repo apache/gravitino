@@ -16,10 +16,21 @@ public class GravitinoITUtils {
   }
 
   public static void startGravitinoServer() {
+    String gravitinoStartShell = System.getenv("GRAVITINO_HOME") + "/bin/gravitino.sh";
+    if (System.getProperty("java.security.krb5.conf") != null) {
+      LOG.info("java.security.krb5.conf: {}", System.getProperty("java.security.krb5.conf"));
+      // Replace '/etc/krb5.conf' with the one in the test resources with sed command
+      CommandExecutor.executeCommandLocalHost(
+          "sed -i 's#/etc/krb5.conf#"
+              + System.getProperty("java.security.krb5.conf")
+              + "#g' "
+              + gravitinoStartShell,
+          false,
+          ProcessData.TypesOfData.OUTPUT);
+    }
+
     CommandExecutor.executeCommandLocalHost(
-        System.getenv("GRAVITINO_HOME") + "/bin/gravitino.sh start",
-        false,
-        ProcessData.TypesOfData.OUTPUT);
+        gravitinoStartShell + " start", false, ProcessData.TypesOfData.OUTPUT);
     // wait for server to start.
     sleep(3000, false);
   }
