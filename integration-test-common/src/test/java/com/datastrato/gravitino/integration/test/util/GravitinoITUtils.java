@@ -27,6 +27,11 @@ public class GravitinoITUtils {
               + gravitinoStartShell,
           false,
           ProcessData.TypesOfData.OUTPUT);
+
+      Object o =
+          CommandExecutor.executeCommandLocalHost(
+              "cat " + gravitinoStartShell, false, ProcessData.TypesOfData.OUTPUT);
+      LOG.info("gravitinoStartShell content: \n{}", o);
     }
 
     CommandExecutor.executeCommandLocalHost(
