@@ -101,7 +101,9 @@ class FilesetUpdateRequest:
                  IllegalArgumentException if fileset_property or value are not set.
             """
             if not self._property:
-                raise ValueError('"fileset_property" field is required and cannot be empty')
+                raise ValueError(
+                    '"fileset_property" field is required and cannot be empty'
+                )
             if not self._value:
                 raise ValueError('"value" field is required and cannot be empty')
 
@@ -126,7 +128,9 @@ class FilesetUpdateRequest:
                  IllegalArgumentException if fileset_property is not set.
             """
             if not self._property:
-                raise ValueError('"fileset_property" field is required and cannot be empty')
+                raise ValueError(
+                    '"fileset_property" field is required and cannot be empty'
+                )
 
         def fileset_change(self):
             return FilesetChange.remove_property(self._property)

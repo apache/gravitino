@@ -95,7 +95,9 @@ class MetalakeUpdateRequest:
                  IllegalArgumentException if metalake_property or value are not set.
             """
             if not self._property:
-                raise ValueError('"metalake_property" field is required and cannot be empty')
+                raise ValueError(
+                    '"metalake_property" field is required and cannot be empty'
+                )
             if not self._value:
                 raise ValueError('"value" field is required and cannot be empty')
 
@@ -120,7 +122,9 @@ class MetalakeUpdateRequest:
                  IllegalArgumentException if metalake_property is not set.
             """
             if not self._property:
-                raise ValueError('"metalake_property" field is required and cannot be empty')
+                raise ValueError(
+                    '"metalake_property" field is required and cannot be empty'
+                )
 
         def metalake_change(self):
             return MetalakeChange.remove_property(self._property)

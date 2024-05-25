@@ -50,7 +50,9 @@ class SchemaUpdateRequest:
                  IllegalArgumentException if schema_property or value are not set.
             """
             if not self._property:
-                raise ValueError('"schema_property" field is required and cannot be empty')
+                raise ValueError(
+                    '"schema_property" field is required and cannot be empty'
+                )
             if not self._value:
                 raise ValueError('"value" field is required and cannot be empty')
 
@@ -75,7 +77,9 @@ class SchemaUpdateRequest:
                  IllegalArgumentException if schema_property is not set.
             """
             if not self._property:
-                raise ValueError('"schema_property" field is required and cannot be empty')
+                raise ValueError(
+                    '"schema_property" field is required and cannot be empty'
+                )
 
         def schema_change(self):
             return SchemaChange.remove_property(self._property)
