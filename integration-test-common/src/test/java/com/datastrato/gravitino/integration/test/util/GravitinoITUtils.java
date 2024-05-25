@@ -20,12 +20,13 @@ public class GravitinoITUtils {
 
   public static void startGravitinoServer() {
     String gravitinoStartShell = System.getenv("GRAVITINO_HOME") + "/bin/gravitino.sh";
-    String modifiedGravitinoStartShell =
-        System.getenv("GRAVITINO_HOME") + String.format("/bin/gravitino_%s.sh", UUID.randomUUID());
+
     String krb5Path = System.getProperty("java.security.krb5.conf");
     if (krb5Path != null) {
       LOG.info("java.security.krb5.conf: {}", krb5Path);
-
+      String modifiedGravitinoStartShell =
+          System.getenv("GRAVITINO_HOME")
+              + String.format("/bin/gravitino_%s.sh", UUID.randomUUID());
       // Replace '/etc/krb5.conf' with the one in the test
       try {
         String content =
@@ -39,13 +40,16 @@ public class GravitinoITUtils {
         FileUtils.write(tmp, content, StandardCharsets.UTF_8);
         tmp.setExecutable(true);
         LOG.info("modifiedGravitinoStartShell content: \n{}", content);
+
+        CommandExecutor.executeCommandLocalHost(
+            modifiedGravitinoStartShell + " start", false, ProcessData.TypesOfData.OUTPUT);
       } catch (Exception e) {
         LOG.error("Can replace /etc/krb5.conf with real kerberos configuration", e);
       }
+    } else {
+      CommandExecutor.executeCommandLocalHost(
+          gravitinoStartShell + " start", false, ProcessData.TypesOfData.OUTPUT);
     }
-
-    CommandExecutor.executeCommandLocalHost(
-        modifiedGravitinoStartShell + " start", false, ProcessData.TypesOfData.OUTPUT);
     // wait for server to start.
     sleep(3000, false);
   }
