@@ -24,6 +24,42 @@
     <value>*</value>
   </property>
 
+
+  <property>
+    <name>hadoop.proxyuser.hive.users</name>
+    <value>*</value>
+  </property>
+
+  <property>
+    <name>hadoop.proxyuser.cli.hosts</name>
+    <value>*</value>
+  </property>
+
+  <property>
+    <name>hadoop.proxyuser.cli.groups</name>
+    <value>*</value>
+  </property>
+
+  <property>
+    <name>hadoop.proxyuser.cli.users</name>
+    <value>*</value>
+  </property>
+
+  <property>
+    <name>hadoop.proxyuser.hadoop.hosts</name>
+    <value>*</value>
+  </property>
+
+  <property>
+    <name>hadoop.proxyuser.hadoop.groups</name>
+    <value>*</value>
+  </property>
+
+  <property>
+    <name>hadoop.proxyuser.hadoop.users</name>
+    <value>*</value>
+  </property>
+
   <property>
     <name>hadoop.proxyuser.hive.users</name>
     <value>*</value>

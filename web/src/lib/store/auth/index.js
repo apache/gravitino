@@ -61,10 +61,11 @@ export const loginAction = createAsyncThunk('auth/loginAction', async ({ params,
     throw new Error(err)
   }
 
-  const { access_token, expires_in } = res
+  const { access_token, expires_in } = res // `expires_in ` is in seconds, default is 499
 
   localStorage.setItem('accessToken', access_token)
   localStorage.setItem('expiredIn', expires_in)
+  localStorage.setItem('isIdle', false)
   dispatch(setAuthToken(access_token))
   dispatch(setExpiredIn(expires_in))
 
