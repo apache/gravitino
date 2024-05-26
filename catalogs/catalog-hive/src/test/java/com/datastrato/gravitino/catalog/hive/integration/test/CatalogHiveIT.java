@@ -218,9 +218,6 @@ public class CatalogHiveIT extends AbstractIT {
     } catch (Exception e) {
       LOG.error("Failed to close CloseableGroup", e);
     }
-
-    AbstractIT.customConfigs.clear();
-    AbstractIT.client = null;
   }
 
   @AfterEach

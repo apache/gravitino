@@ -108,7 +108,7 @@ public class HiveUserAuthenticationIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void stopIntegrationTest() {
+  public static void stop() {
     // Reset the UGI
     UserGroupInformation.reset();
 
@@ -116,9 +116,6 @@ public class HiveUserAuthenticationIT extends AbstractIT {
     // Clean up the kerberos configuration
     System.clearProperty("java.security.krb5.conf");
     System.clearProperty("sun.security.krb5.debug");
-
-    AbstractIT.customConfigs.clear();
-    AbstractIT.client = null;
   }
 
   private static void prepareKerberosConfig() throws Exception {
