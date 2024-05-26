@@ -25,9 +25,6 @@ import com.datastrato.gravitino.server.web.VersioningFilter;
 import com.datastrato.gravitino.server.web.filter.AccessControlNotAllowedFilter;
 import com.datastrato.gravitino.server.web.ui.WebUIFilter;
 import java.io.File;
-import java.lang.management.ManagementFactory;
-import java.lang.management.RuntimeMXBean;
-import java.util.List;
 import java.util.Properties;
 import javax.servlet.Servlet;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
@@ -143,16 +140,6 @@ public class GravitinoServer extends ResourceConfig {
       System.exit(-1);
     }
 
-    RuntimeMXBean runtimeMxBean = ManagementFactory.getRuntimeMXBean();
-
-    List<String> arguments = runtimeMxBean.getInputArguments();
-
-    // 输出每个参数
-    for (String arg : arguments) {
-      LOG.info(arg);
-    }
-
-    LOG.info("In GravitinoServer, krb5.conf = {}", System.getProperty("java.security.krb5.conf"));
     LOG.info("Done, Gravitino server started.");
 
     Runtime.getRuntime()

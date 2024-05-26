@@ -76,7 +76,6 @@ import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.util.KerberosName;
-import org.apache.hadoop.security.authentication.util.KerberosUtil;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -202,25 +201,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         checkTgtExecutor =
             new ScheduledThreadPoolExecutor(
                 1, getThreadFactory(String.format("Kerberos-check-%s", info.id())));
+
         LOG.info("krb5 path: {}", System.getProperty("java.security.krb5.conf"));
         refreshKerberosConfig();
-
-        try {
-          KerberosUtil.getDefaultRealm();
-        } catch (Exception e) {
-          LOG.info("Before Fail to get default realm: ", e);
-          throw new RuntimeException(e);
-        }
-
         KerberosName.resetDefaultRealm();
-        LOG.info("krb5 path: {}", System.getProperty("java.security.krb5.conf"));
-        try {
-          KerberosUtil.getDefaultRealm();
-        } catch (Exception e) {
-          LOG.info("After Fail to get default realm: ", e);
-          throw new RuntimeException(e);
-        }
-
         UserGroupInformation.setConfiguration(hadoopConf);
         UserGroupInformation.loginUserFromKeytab(catalogPrincipal, keytabFile.getAbsolutePath());
 

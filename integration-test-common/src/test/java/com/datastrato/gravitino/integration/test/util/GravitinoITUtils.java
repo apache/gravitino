@@ -31,7 +31,6 @@ public class GravitinoITUtils {
       try {
         String content =
             FileUtils.readFileToString(new File(gravitinoStartShell), StandardCharsets.UTF_8);
-        LOG.info("Before content: \n{}", content);
         content =
             content.replace(
                 "#JAVA_OPTS+=\" -Djava.securit.krb5.conf=/etc/krb5.conf\"",
@@ -40,7 +39,6 @@ public class GravitinoITUtils {
         FileUtils.write(tmp, content, StandardCharsets.UTF_8);
         tmp.setExecutable(true);
         LOG.info("modifiedGravitinoStartShell content: \n{}", content);
-
         CommandExecutor.executeCommandLocalHost(
             modifiedGravitinoStartShell + " start", false, ProcessData.TypesOfData.OUTPUT);
       } catch (Exception e) {
