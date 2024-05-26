@@ -139,7 +139,6 @@ public class GravitinoServer extends ResourceConfig {
       LOG.error("Error while running jettyServer", e);
       System.exit(-1);
     }
-
     LOG.info("Done, Gravitino server started.");
 
     Runtime.getRuntime()

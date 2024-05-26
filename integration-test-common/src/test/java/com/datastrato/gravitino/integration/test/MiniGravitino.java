@@ -17,6 +17,7 @@ import com.datastrato.gravitino.client.HTTPClient;
 import com.datastrato.gravitino.client.KerberosTokenProvider;
 import com.datastrato.gravitino.client.RESTClient;
 import com.datastrato.gravitino.dto.responses.VersionResponse;
+import com.datastrato.gravitino.exceptions.RESTException;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.integration.test.util.KerberosProviderHelper;
 import com.datastrato.gravitino.integration.test.util.OAuthMockDataProvider;
@@ -292,11 +293,10 @@ public class MiniGravitino {
               VersionResponse.class,
               Collections.emptyMap(),
               ErrorHandlers.restErrorHandler());
-    } catch (Exception e) {
+    } catch (RESTException e) {
       LOG.warn("checkIfServerIsRunning() fails, GravitinoServer is not running {}", e.getMessage());
       return false;
     }
-
     if (response != null && response.getCode() == 0) {
       return true;
     } else {

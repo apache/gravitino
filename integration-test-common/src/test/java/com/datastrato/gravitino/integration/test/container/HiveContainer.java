@@ -123,7 +123,6 @@ public class HiveContainer extends BaseContainer {
                   LOG.info("Hive container startup success!");
                   return true;
                 }
-
               } catch (RuntimeException e) {
                 LOG.error(e.getMessage(), e);
               }
