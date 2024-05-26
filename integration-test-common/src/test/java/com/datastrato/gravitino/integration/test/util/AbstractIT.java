@@ -233,6 +233,7 @@ public class AbstractIT {
       client.close();
     }
 
+    customConfigs.clear();
     LOG.info("Tearing down Gravitino Server");
   }
 
