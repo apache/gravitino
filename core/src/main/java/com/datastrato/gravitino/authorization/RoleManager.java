@@ -183,6 +183,8 @@ class RoleManager {
             RoleEntity.builder()
                 .withId(idGenerator.nextId())
                 .withName(Entity.SYSTEM_METALAKE_MANAGE_USER_ROLE)
+                .withNamespace(
+                    AuthorizationUtils.ofRoleNamespace(Entity.SYSTEM_METALAKE_RESERVED_NAME))
                 .withSecurableObjects(
                     Lists.newArrayList(
                         SecurableObjects.ofMetalake(
@@ -204,6 +206,8 @@ class RoleManager {
         RoleEntity roleEntity =
             RoleEntity.builder()
                 .withId(idGenerator.nextId())
+                .withNamespace(
+                    AuthorizationUtils.ofRoleNamespace(Entity.SYSTEM_METALAKE_RESERVED_NAME))
                 .withName(Entity.METALAKE_CREATE_ROLE)
                 .withSecurableObjects(
                     Lists.newArrayList(

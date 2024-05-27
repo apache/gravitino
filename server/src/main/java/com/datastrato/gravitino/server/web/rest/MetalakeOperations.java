@@ -22,7 +22,6 @@ import com.datastrato.gravitino.lock.LockType;
 import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.metalake.MetalakeDispatcher;
 import com.datastrato.gravitino.metrics.MetricNames;
-import com.datastrato.gravitino.server.authorization.NameBindings;
 import com.datastrato.gravitino.server.web.Utils;
 import java.util.Arrays;
 import javax.inject.Inject;

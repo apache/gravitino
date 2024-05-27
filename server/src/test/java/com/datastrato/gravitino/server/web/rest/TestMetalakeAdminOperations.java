@@ -142,14 +142,6 @@ public class TestMetalakeAdminOperations extends JerseyTest {
     ErrorResponse errorResponse2 = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
-
-    // Test to throw ForbiddenException
-    Response resp4 =
-        target("/admins/")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
-    Assertions.assertEquals(Response.Status.FORBIDDEN.getStatusCode(), resp4.getStatus());
   }
 
   @Test
@@ -193,14 +185,6 @@ public class TestMetalakeAdminOperations extends JerseyTest {
     ErrorResponse errorResponse = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
-
-    // Test to throw ForbiddenException
-    Response resp4 =
-        target("/admins/user1")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .delete();
-    Assertions.assertEquals(Response.Status.FORBIDDEN.getStatusCode(), resp4.getStatus());
   }
 
   private User buildUser(String user) {

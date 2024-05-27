@@ -51,6 +51,10 @@ class AdminManager {
   User addMetalakeAdmin(String user) {
     try {
       if (isServiceAdmin(user)) {
+        if (hasUserMetalakeCreateRole(user)) {
+          throw new EntityAlreadyExistsException(
+              "Metalake admin has added the metalake create role");
+        }
         return updateUserEntity(
             user,
             Lists.newArrayList(
@@ -93,8 +97,12 @@ class AdminManager {
         return store.delete(ofMetalakeAdmin(user), Entity.EntityType.USER);
       }
 
-      updateUserEntity(user, Lists.newArrayList(Entity.SYSTEM_METALAKE_MANAGE_USER_ROLE));
-      return true;
+      if (hasUserMetalakeCreateRole(user)) {
+        updateUserEntity(user, Lists.newArrayList(Entity.SYSTEM_METALAKE_MANAGE_USER_ROLE));
+        return true;
+      } else {
+        return false;
+      }
     } catch (IOException ioe) {
       LOG.error(
           "Removing user {} from the metalake admin {} failed due to storage issues", user, ioe);
@@ -120,6 +128,12 @@ class AdminManager {
     return AuthorizationUtils.ofUser(Entity.SYSTEM_METALAKE_RESERVED_NAME, user);
   }
 
+  private boolean hasUserMetalakeCreateRole(String user) throws IOException {
+    UserEntity userEntity =
+        store.get(ofMetalakeAdmin(user), Entity.EntityType.USER, UserEntity.class);
+    return userEntity.roleNames().contains(Entity.METALAKE_CREATE_ROLE);
+  }
+
   private UserEntity updateUserEntity(String user, List<String> roleNames) throws IOException {
     List<Long> roleIds =
         roleNames.stream()
@@ -127,26 +141,28 @@ class AdminManager {
                 roleName ->
                     roleManager.getRole(Entity.SYSTEM_METALAKE_RESERVED_NAME, roleName).id())
             .collect(Collectors.toList());
+
     return store.update(
         ofMetalakeAdmin(user),
         UserEntity.class,
         Entity.EntityType.USER,
-        userEntity ->
-            UserEntity.builder()
-                .withId(userEntity.id())
-                .withName(userEntity.name())
-                .withNamespace(
-                    AuthorizationUtils.ofUserNamespace(Entity.SYSTEM_METALAKE_RESERVED_NAME))
-                .withRoleNames(roleNames)
-                .withRoleIds(roleIds)
-                .withAuditInfo(
-                    AuditInfo.builder()
-                        .withCreator(userEntity.auditInfo().creator())
-                        .withCreateTime(userEntity.auditInfo().createTime())
-                        .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
-                        .withLastModifiedTime(Instant.now())
-                        .build())
-                .build());
+        userEntity -> {
+          return UserEntity.builder()
+              .withId(userEntity.id())
+              .withName(userEntity.name())
+              .withNamespace(
+                  AuthorizationUtils.ofUserNamespace(Entity.SYSTEM_METALAKE_RESERVED_NAME))
+              .withRoleNames(roleNames)
+              .withRoleIds(roleIds)
+              .withAuditInfo(
+                  AuditInfo.builder()
+                      .withCreator(userEntity.auditInfo().creator())
+                      .withCreateTime(userEntity.auditInfo().createTime())
+                      .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                      .withLastModifiedTime(Instant.now())
+                      .build())
+              .build();
+        });
   }
 
   private void updateSystemMetalakeUsers() {

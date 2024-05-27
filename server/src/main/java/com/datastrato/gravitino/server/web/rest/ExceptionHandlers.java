@@ -6,7 +6,6 @@ package com.datastrato.gravitino.server.web.rest;
 
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
-import com.datastrato.gravitino.exceptions.ForbiddenException;
 import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;

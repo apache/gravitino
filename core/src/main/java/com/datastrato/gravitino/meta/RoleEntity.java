@@ -8,6 +8,7 @@ import com.datastrato.gravitino.Auditable;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Field;
 import com.datastrato.gravitino.HasIdentifier;
+import com.datastrato.gravitino.MetadataObject;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.authorization.Privilege;
 import com.datastrato.gravitino.authorization.Role;
@@ -160,7 +161,7 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
   }
 
   public boolean hasPrivilegeWithCondition(
-      SecurableObject targetObject, Privilege.Name targetPrivilege, Privilege.Condition condition) {
+      MetadataObject targetObject, Privilege.Name targetPrivilege, Privilege.Condition condition) {
     String metalake = namespace.level(0);
     for (SecurableObject object : securableObjects) {
       if (isSameOrParent(
@@ -264,8 +265,8 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
   }
 
   private static InnerSecurableObject convertInnerObject(
-      String metalake, SecurableObject securableObject) {
-    if (SecurableObject.Type.METALAKE.equals(securableObject.type())) {
+      String metalake, MetadataObject securableObject) {
+    if (MetadataObject.Type.METALAKE.equals(securableObject.type())) {
       if ("*".equals(securableObject.name())) {
         return ROOT;
       } else {
@@ -299,7 +300,6 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
     public String getName() {
       return name;
     }
-
 
     @Override
     public int hashCode() {

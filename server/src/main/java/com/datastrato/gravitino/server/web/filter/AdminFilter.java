@@ -15,7 +15,6 @@ import com.datastrato.gravitino.server.authorization.NameBindings;
 import com.datastrato.gravitino.server.web.Utils;
 import com.datastrato.gravitino.server.web.rest.OperationType;
 import com.google.common.collect.Lists;
-
 import java.io.IOException;
 import java.util.List;
 import javax.ws.rs.container.ContainerRequestContext;
@@ -28,16 +27,18 @@ public class AdminFilter implements BasedRoleFilter {
   public void filter(ContainerRequestContext requestContext) throws IOException {
     try {
       AuthorizationUtils.checkPermission(
-              getMetalakeName(requestContext), getSecurableObject(requestContext));
+          getMetalakeName(requestContext), getSecurableObject(requestContext));
 
     } catch (ForbiddenException fe) {
       requestContext.abortWith(
-              Utils.forbidden(
-                      String.format("Fail to operate [%s] metalake admin", getOperateType(requestContext)), fe));
+          Utils.forbidden(
+              String.format("Fail to operate [%s] metalake admin", getOperateType(requestContext)),
+              fe));
     } catch (IllegalArgumentException ie) {
       requestContext.abortWith(
-              Utils.illegalArguments(
-                      String.format("Fail to operate [%s] metalake admin", getOperateType(requestContext)), ie));
+          Utils.illegalArguments(
+              String.format("Fail to operate [%s] metalake admin", getOperateType(requestContext)),
+              ie));
     }
   }
 
@@ -72,6 +73,6 @@ public class AdminFilter implements BasedRoleFilter {
     }
 
     throw new IllegalArgumentException(
-            String.format("Filter doesn't support %s HTTP method", requestContext.getMethod()));
+        String.format("Filter doesn't support %s HTTP method", requestContext.getMethod()));
   }
 }

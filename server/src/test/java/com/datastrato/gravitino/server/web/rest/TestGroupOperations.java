@@ -13,6 +13,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.authorization.Group;
@@ -49,6 +50,7 @@ import org.mockito.Mockito;
 public class TestGroupOperations extends JerseyTest {
 
   private static final AccessControlManager manager = mock(AccessControlManager.class);
+  private static final EntityStore store = mock(EntityStore.class);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
@@ -67,6 +69,7 @@ public class TestGroupOperations extends JerseyTest {
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     GravitinoEnv.getInstance().setLockManager(new LockManager(config));
     GravitinoEnv.getInstance().setAccessControlManager(manager);
+    GravitinoEnv.getInstance().setEntityStore(store);
   }
 
   @Override
@@ -92,10 +95,11 @@ public class TestGroupOperations extends JerseyTest {
   }
 
   @Test
-  public void testAddGroup() {
+  public void testAddGroup() throws IOException {
     GroupAddRequest req = new GroupAddRequest("group1");
     Group group = buildGroup("group1");
     when(manager.addGroup(any(), any())).thenReturn(group);
+    when(store.exists(any(), any())).thenReturn(true);
 
     Response resp =
         target("/metalakes/metalake1/groups")
@@ -161,9 +165,10 @@ public class TestGroupOperations extends JerseyTest {
   }
 
   @Test
-  public void testGetGroup() {
+  public void testGetGroup() throws IOException {
     Group group = buildGroup("group1");
     when(manager.getGroup(any(), any())).thenReturn(group);
+    when(store.exists(any(), any())).thenReturn(true);
 
     Response resp =
         target("/metalakes/metalake1/groups/group1")
@@ -225,8 +230,9 @@ public class TestGroupOperations extends JerseyTest {
   }
 
   @Test
-  public void testRemoveGroup() {
+  public void testRemoveGroup() throws IOException {
     when(manager.removeGroup(any(), any())).thenReturn(true);
+    when(store.exists(any(), any())).thenReturn(true);
 
     Response resp =
         target("/metalakes/metalake1/groups/group1")

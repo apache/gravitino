@@ -13,6 +13,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.authorization.Group;
@@ -51,6 +52,7 @@ import org.mockito.Mockito;
 public class TestPermissionOperations extends JerseyTest {
 
   private static final AccessControlManager manager = mock(AccessControlManager.class);
+  private static final EntityStore store = mock(EntityStore.class);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
@@ -69,6 +71,7 @@ public class TestPermissionOperations extends JerseyTest {
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     GravitinoEnv.getInstance().setLockManager(new LockManager(config));
     GravitinoEnv.getInstance().setAccessControlManager(manager);
+    GravitinoEnv.getInstance().setEntityStore(store);
   }
 
   @Override
@@ -94,7 +97,7 @@ public class TestPermissionOperations extends JerseyTest {
   }
 
   @Test
-  public void testGrantRolesToUser() {
+  public void testGrantRolesToUser() throws IOException {
     UserEntity userEntity =
         UserEntity.builder()
             .withId(1L)
@@ -105,6 +108,7 @@ public class TestPermissionOperations extends JerseyTest {
                 AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
             .build();
     when(manager.grantRolesToUser(any(), any(), any())).thenReturn(userEntity);
+    when(store.exists(any(), any())).thenReturn(true);
 
     RoleGrantRequest request = new RoleGrantRequest(Lists.newArrayList("role1"));
 
@@ -191,7 +195,7 @@ public class TestPermissionOperations extends JerseyTest {
   }
 
   @Test
-  public void testGrantRolesToGroup() {
+  public void testGrantRolesToGroup() throws IOException {
     GroupEntity groupEntity =
         GroupEntity.builder()
             .withId(1L)
@@ -202,6 +206,7 @@ public class TestPermissionOperations extends JerseyTest {
                 AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
             .build();
     when(manager.grantRolesToGroup(any(), any(), any())).thenReturn(groupEntity);
+    when(store.exists(any(), any())).thenReturn(true);
 
     RoleGrantRequest request = new RoleGrantRequest(Lists.newArrayList("role1"));
 
@@ -291,7 +296,7 @@ public class TestPermissionOperations extends JerseyTest {
   }
 
   @Test
-  public void testRevokeRolesFromUser() {
+  public void testRevokeRolesFromUser() throws IOException {
     UserEntity userEntity =
         UserEntity.builder()
             .withId(1L)
@@ -302,6 +307,7 @@ public class TestPermissionOperations extends JerseyTest {
                 AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
             .build();
     when(manager.revokeRolesFromUser(any(), any(), any())).thenReturn(userEntity);
+    when(store.exists(any(), any())).thenReturn(true);
     RoleRevokeRequest request = new RoleRevokeRequest(Lists.newArrayList("role1"));
 
     Response resp =
@@ -336,7 +342,7 @@ public class TestPermissionOperations extends JerseyTest {
   }
 
   @Test
-  public void testRevokeRolesFromGroup() {
+  public void testRevokeRolesFromGroup() throws IOException {
     GroupEntity groupEntity =
         GroupEntity.builder()
             .withId(1L)
@@ -347,6 +353,7 @@ public class TestPermissionOperations extends JerseyTest {
                 AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
             .build();
     when(manager.revokeRolesFromGroup(any(), any(), any())).thenReturn(groupEntity);
+    when(store.exists(any(), any())).thenReturn(true);
     RoleRevokeRequest request = new RoleRevokeRequest(Lists.newArrayList("role1"));
 
     Response resp =

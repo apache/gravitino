@@ -13,6 +13,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.authorization.User;
@@ -49,6 +50,7 @@ import org.mockito.Mockito;
 public class TestUserOperations extends JerseyTest {
 
   private static final AccessControlManager manager = mock(AccessControlManager.class);
+  private static final EntityStore store = mock(EntityStore.class);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
@@ -67,6 +69,7 @@ public class TestUserOperations extends JerseyTest {
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     GravitinoEnv.getInstance().setLockManager(new LockManager(config));
     GravitinoEnv.getInstance().setAccessControlManager(manager);
+    GravitinoEnv.getInstance().setEntityStore(store);
   }
 
   @Override
@@ -92,11 +95,12 @@ public class TestUserOperations extends JerseyTest {
   }
 
   @Test
-  public void testAddUser() {
+  public void testAddUser() throws IOException {
     UserAddRequest req = new UserAddRequest("user1");
     User user = buildUser("user1");
 
     when(manager.addUser(any(), any())).thenReturn(user);
+    when(store.exists(any(), any())).thenReturn(true);
 
     Response resp =
         target("/metalakes/metalake1/users")
@@ -162,10 +166,11 @@ public class TestUserOperations extends JerseyTest {
   }
 
   @Test
-  public void testGetUser() {
+  public void testGetUser() throws IOException {
     User user = buildUser("user1");
 
     when(manager.getUser(any(), any())).thenReturn(user);
+    when(store.exists(any(), any())).thenReturn(true);
 
     Response resp =
         target("/metalakes/metalake1/users/user1")
@@ -227,8 +232,9 @@ public class TestUserOperations extends JerseyTest {
   }
 
   @Test
-  public void testRemoveUser() {
+  public void testRemoveUser() throws IOException {
     when(manager.removeUser(any(), any())).thenReturn(true);
+    when(store.exists(any(), any())).thenReturn(true);
 
     Response resp =
         target("/metalakes/metalake1/users/user1")

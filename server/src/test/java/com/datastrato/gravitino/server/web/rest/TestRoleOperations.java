@@ -13,6 +13,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.authorization.Privileges;
@@ -55,6 +56,7 @@ import org.mockito.Mockito;
 public class TestRoleOperations extends JerseyTest {
 
   private static final AccessControlManager manager = mock(AccessControlManager.class);
+  private static final EntityStore store = mock(EntityStore.class);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
@@ -73,6 +75,7 @@ public class TestRoleOperations extends JerseyTest {
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     GravitinoEnv.getInstance().setLockManager(new LockManager(config));
     GravitinoEnv.getInstance().setAccessControlManager(manager);
+    GravitinoEnv.getInstance().setEntityStore(store);
   }
 
   @Override
@@ -98,7 +101,7 @@ public class TestRoleOperations extends JerseyTest {
   }
 
   @Test
-  public void testCreateRole() {
+  public void testCreateRole() throws IOException {
     SecurableObject securableObject =
         SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
     SecurableObject anotherSecurableObject =
@@ -115,6 +118,7 @@ public class TestRoleOperations extends JerseyTest {
     Role role = buildRole("role1");
 
     when(manager.createRole(any(), any(), any(), any())).thenReturn(role);
+    when(store.exists(any(), any())).thenReturn(true);
 
     Response resp =
         target("/metalakes/metalake1/roles")
@@ -208,10 +212,11 @@ public class TestRoleOperations extends JerseyTest {
   }
 
   @Test
-  public void testGetRole() {
+  public void testGetRole() throws IOException {
     Role role = buildRole("role1");
 
     when(manager.getRole(any(), any())).thenReturn(role);
+    when(store.exists(any(), any())).thenReturn(true);
 
     Response resp =
         target("/metalakes/metalake1/roles/role1")
@@ -300,8 +305,9 @@ public class TestRoleOperations extends JerseyTest {
   }
 
   @Test
-  public void testDeleteRole() {
+  public void testDeleteRole() throws IOException {
     when(manager.deleteRole(any(), any())).thenReturn(true);
+    when(store.exists(any(), any())).thenReturn(true);
 
     Response resp =
         target("/metalakes/metalake1/roles/role1")
