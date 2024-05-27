@@ -197,7 +197,7 @@ public class HiveUserAuthenticationIT extends AbstractIT {
     Assertions.assertEquals(0, metalakes.length);
 
     GravitinoMetalake gravitinoMetalake =
-        adminClient.createMetalake(METALAKE_NAME, null, ImmutableMap.of());
+        adminClient.createMetalake(NameIdentifier.of(METALAKE_NAME), null, ImmutableMap.of());
 
     // Create a catalog
     Map<String, String> properties = Maps.newHashMap();
@@ -213,23 +213,35 @@ public class HiveUserAuthenticationIT extends AbstractIT {
     properties.put(CATALOG_BYPASS_PREFIX + "hive.metastore.sasl.enabled", "true");
     Catalog catalog =
         gravitinoMetalake.createCatalog(
-            CATALOG_NAME, Catalog.Type.RELATIONAL, "hive", "comment", properties);
+            NameIdentifier.of(METALAKE_NAME, CATALOG_NAME),
+            Catalog.Type.RELATIONAL,
+            "hive",
+            "comment",
+            properties);
 
     // Test create schema
     Exception exception =
         Assertions.assertThrows(
             Exception.class,
-            () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
+            () ->
+                catalog
+                    .asSchemas()
+                    .createSchema(
+                        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
+                        "comment",
+                        ImmutableMap.of()));
     String exceptionMessage = Throwables.getStackTraceAsString(exception);
     // Make sure real user is 'gravitino_client'
     Assertions.assertTrue(
         exceptionMessage.contains("Permission denied: user=gravitino_client, access=WRITE"));
 
+    NameIdentifier schemeNameIdentifier =
+        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
     // Now try to give the user the permission to create schema again
     kerberosHiveContainer.executeInContainer(
         "hadoop", "fs", "-chmod", "-R", "777", "/user/hive/warehouse");
     Assertions.assertDoesNotThrow(
-        () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
+        () -> catalog.asSchemas().createSchema(schemeNameIdentifier, "comment", ImmutableMap.of()));
 
     // Create table
     NameIdentifier tableNameIdentifier =
@@ -259,11 +271,12 @@ public class HiveUserAuthenticationIT extends AbstractIT {
     Assertions.assertFalse(catalog.asTableCatalog().tableExists(newTableIdentifier));
 
     // Drop schema
-    catalog.asSchemas().dropSchema(SCHEMA_NAME, true);
-    Assertions.assertFalse(catalog.asSchemas().schemaExists(SCHEMA_NAME));
+    catalog.asSchemas().dropSchema(schemeNameIdentifier, true);
+    Assertions.assertFalse(catalog.asSchemas().schemaExists(schemeNameIdentifier));
 
     // Drop catalog
-    Assertions.assertTrue(gravitinoMetalake.dropCatalog(CATALOG_NAME));
+    Assertions.assertTrue(
+        gravitinoMetalake.dropCatalog(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME)));
   }
 
   private static Column[] createColumns() {
