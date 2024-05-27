@@ -2,11 +2,10 @@
 -- Copyright 2024 Datastrato Pvt Ltd.
 -- This software is licensed under the Apache License version 2.
 --
-
-ALTER TABLE `role_meta` DROP COLUMN `securable_object_full_name`;
-ALTER TABLE `role_meta` DROP COLUMN `securable_object_type`;
-ALTER TABLE `role_meta` DROP COLUMN `privileges`;
-ALTER TABLE `role_meta` DROP COLUMN `privilege_conditions`;
+ALTER TABLE `role_meta` MODIFY COLUMN `securable_object_full_name` VARCHAR(256) NOT NULL DEFAULT '' COMMENT 'deprecated';
+ALTER TABLE `role_meta` MODIFY COLUMN `securable_object_type` VARCHAR(32) NOT NULL DEFAULT '' COMMENT 'deprecated';
+ALTER TABLE `role_meta` MODIFY COLUMN `privileges`  VARCHAR(64) NOT NULL DEFAULT '' COMMENT 'deprecated';
+ALTER TABLE `role_meta` MODIFY COLUMN `privilege_conditions` VARCHAR(64) NOT NULL DEFAULT '' COMMENT 'deprecated';
 
 CREATE TABLE IF NOT EXISTS `role_meta_securable_object` (
     `id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'securable object id',
@@ -21,3 +20,6 @@ CREATE TABLE IF NOT EXISTS `role_meta_securable_object` (
     PRIMARY KEY (`id`),
     KEY `idx_obj_rid` (`role_id`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'securable object meta';
+
+INSERT INTO `role_meta_securable_object` (`role_id`, `full_name`, `type`, `privilege_names`, `privilege_conditions`, `current_version`, `last_version`,  `deleted_at`)
+SELECT `role_id`, `securable_object_full_name`, `securable_object_type`, `privileges`, `privilege_conditions`, `current_version`, `last_version`,  `deleted_at`  from `role_meta`;
