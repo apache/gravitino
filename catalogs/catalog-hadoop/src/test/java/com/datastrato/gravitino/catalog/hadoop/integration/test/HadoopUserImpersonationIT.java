@@ -192,6 +192,7 @@ public class HadoopUserImpersonationIT extends AbstractIT {
     }
 
     System.clearProperty("sun.security.krb5.debug");
+    System.clearProperty("java.security.krb5.conf");
   }
 
   @Test
