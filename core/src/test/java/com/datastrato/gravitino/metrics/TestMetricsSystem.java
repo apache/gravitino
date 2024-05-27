@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestMetricsSystem {
-  MetricsSystem metricsSystem;
+  private MetricsSystem metricsSystem = new MetricsSystem();
 
   @Test
   void testRegisterMetricsSource() {
