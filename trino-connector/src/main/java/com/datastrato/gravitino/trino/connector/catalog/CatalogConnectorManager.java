@@ -435,7 +435,7 @@ public class CatalogConnectorManager {
 
       CatalogConnectorContext connectorContext = builder.build();
       catalogConnectors.put(connectorName, connectorContext);
-      LOG.info("Create connector sucess ");
+      LOG.info("Create connector success");
       return connectorContext.getConnector();
     } catch (Exception e) {
       LOG.error("Failed to create connector: {}", connectorName, e);

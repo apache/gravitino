@@ -12,8 +12,8 @@ import java.util.Map;
 
 public class GravitinoConfig {
 
-  public static String GRAVITINO_DYNAMIC_CONNECTOR = "__gravitino.dynamic.connector";
-  public static String GRAVITINO_DYNAMIC_CONNECTOR_CATALOG_CONFIG =
+  public static final String GRAVITINO_DYNAMIC_CONNECTOR = "__gravitino.dynamic.connector";
+  public static final String GRAVITINO_DYNAMIC_CONNECTOR_CATALOG_CONFIG =
       "__gravitino.dynamic.connector.catalog.config";
   private static final Map<String, ConfigEntry> CONFIG_DEFINITIONS = new HashMap<>();
 

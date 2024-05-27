@@ -177,6 +177,7 @@ public class GravitinoMetadata implements ConnectorMetadata {
   public void createTable(
       ConnectorSession session, ConnectorTableMetadata tableMetadata, SaveMode saveMode) {
     GravitinoTable table = metadataAdapter.createTable(tableMetadata);
+    // saveMode = SaveMode.IGNORE is used to ignore the table creation if it already exists
     catalogConnectorMetadata.createTable(table, saveMode == SaveMode.IGNORE);
   }
 

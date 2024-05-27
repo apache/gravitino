@@ -15,6 +15,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.NotImplementedException;
 
 /** Transforming Hive connector configuration and components into Gravitino connector. */
 public class HiveConnectorAdapter implements CatalogConnectorAdapter {
@@ -41,7 +42,7 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
 
   @Override
   public Connector buildInternalConnector(Map<String, String> config) throws Exception {
-    return null;
+    throw new NotImplementedException();
   }
 
   @Override
