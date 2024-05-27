@@ -11,7 +11,7 @@ import com.datastrato.gravitino.rel.types.Types.ListType;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 
-public class PostgreSqlTypeConverter extends JdbcTypeConverter<String> {
+public class PostgreSqlTypeConverter extends JdbcTypeConverter {
 
   static final String BOOL = "bool";
   static final String INT_2 = "int2";
@@ -28,7 +28,7 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter<String> {
   @VisibleForTesting static final String ARRAY_TOKEN = "[]";
 
   @Override
-  public Type toGravitinoType(JdbcTypeBean typeBean) {
+  public Type toGravitino(JdbcTypeBean typeBean) {
     String typeName = typeBean.getTypeName().toLowerCase();
     if (typeName.startsWith(JDBC_ARRAY_PREFIX)) {
       return toGravitinoArrayType(typeName);
@@ -71,7 +71,7 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter<String> {
   }
 
   @Override
-  public String fromGravitinoType(Type type) {
+  public String fromGravitino(Type type) {
     if (type instanceof Types.BooleanType) {
       return BOOL;
     } else if (type instanceof Types.ShortType) {
@@ -130,13 +130,13 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter<String> {
     Preconditions.checkArgument(
         !(elementType instanceof ListType),
         "PostgreSQL doesn't support multidimensional list internally, please use one dimensional list");
-    String elementTypeString = fromGravitinoType(elementType);
+    String elementTypeString = fromGravitino(elementType);
     return elementTypeString + ARRAY_TOKEN;
   }
 
   private ListType toGravitinoArrayType(String typeName) {
     String elementTypeName = typeName.substring(JDBC_ARRAY_PREFIX.length(), typeName.length());
     JdbcTypeBean bean = new JdbcTypeBean(elementTypeName);
-    return ListType.of(toGravitinoType(bean), false);
+    return ListType.of(toGravitino(bean), false);
   }
 }

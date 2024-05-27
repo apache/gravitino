@@ -11,6 +11,7 @@ import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.PR
 import static com.datastrato.gravitino.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
+import static com.datastrato.gravitino.catalog.hive.converter.HiveDataTypeConverter.CONVERTER;
 import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
 
@@ -18,7 +19,6 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.SchemaChange;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType;
-import com.datastrato.gravitino.catalog.hive.converter.ToHiveType;
 import com.datastrato.gravitino.connector.CatalogInfo;
 import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;
@@ -933,7 +933,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         targetPosition,
         new FieldSchema(
             change.fieldName()[0],
-            ToHiveType.convert(change.getDataType()).getQualifiedName(),
+            CONVERTER.fromGravitino(change.getDataType()).getQualifiedName(),
             change.getComment()));
   }
 
@@ -981,7 +981,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     if (indexOfColumn == -1) {
       throw new IllegalArgumentException("UpdateColumnType does not exist: " + columnName);
     }
-    cols.get(indexOfColumn).setType(ToHiveType.convert(change.getNewDataType()).getQualifiedName());
+    cols.get(indexOfColumn)
+        .setType(CONVERTER.fromGravitino(change.getNewDataType()).getQualifiedName());
   }
 
   /**

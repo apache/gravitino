@@ -16,11 +16,10 @@ import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType.EXTERNAL_TABLE;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType.MANAGED_TABLE;
+import static com.datastrato.gravitino.catalog.hive.converter.HiveDataTypeConverter.CONVERTER;
 import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.identity;
 
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType;
-import com.datastrato.gravitino.catalog.hive.converter.FromHiveType;
-import com.datastrato.gravitino.catalog.hive.converter.ToHiveType;
 import com.datastrato.gravitino.connector.BaseTable;
 import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.connector.TableOperations;
@@ -112,7 +111,7 @@ public class HiveTable extends BaseTable {
                         f ->
                             HiveColumn.builder()
                                 .withName(f.getName())
-                                .withType(FromHiveType.convert(f.getType()))
+                                .withType(CONVERTER.toGravitino(f.getType()))
                                 .withComment(f.getComment())
                                 .build()),
                 table.getPartitionKeys().stream()
@@ -120,7 +119,7 @@ public class HiveTable extends BaseTable {
                         p ->
                             HiveColumn.builder()
                                 .withName(p.getName())
-                                .withType(FromHiveType.convert(p.getType()))
+                                .withType(CONVERTER.toGravitino(p.getType()))
                                 .withComment(p.getComment())
                                 .build()))
             .toArray(Column[]::new);
@@ -239,7 +238,7 @@ public class HiveTable extends BaseTable {
             .collect(Collectors.toList());
     return new FieldSchema(
         partitionColumns.get(0).name(),
-        ToHiveType.convert(partitionColumns.get(0).dataType()).getQualifiedName(),
+        CONVERTER.fromGravitino(partitionColumns.get(0).dataType()).getQualifiedName(),
         partitionColumns.get(0).comment());
   }
 
@@ -254,7 +253,9 @@ public class HiveTable extends BaseTable {
             .map(
                 c ->
                     new FieldSchema(
-                        c.name(), ToHiveType.convert(c.dataType()).getQualifiedName(), c.comment()))
+                        c.name(),
+                        CONVERTER.fromGravitino(c.dataType()).getQualifiedName(),
+                        c.comment()))
             .collect(Collectors.toList()));
 
     // `location` must not be null, otherwise it will result in an NPE when calling HMS `alterTable`
