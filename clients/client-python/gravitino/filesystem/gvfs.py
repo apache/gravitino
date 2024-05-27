@@ -11,8 +11,8 @@ import io
 from contextlib import suppress
 from enum import Enum
 from typing import Dict, Tuple
+import re
 import fsspec
-import regex
 
 from fsspec.utils import infer_storage_options, mirror_from
 from pyarrow.fs import FileType, FileSelector, FileSystem, HadoopFileSystem
@@ -58,8 +58,8 @@ class FilesetContext:
 class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
     protocol = PROTOCOL_NAME
     _gvfs_prefix = "gvfs://fileset"
-    _identifier_pattern = regex.compile(
-        "^(?:gvfs://fileset)?/([^/]+)/([^/]+)/([^/]+)(?>/[^/]+)*/?$"
+    _identifier_pattern = re.compile(
+        "^(?:gvfs://fileset)?/([^/]+)/([^/]+)/([^/]+)(?:/[^/]+)*/?$"
     )
 
     def __init__(self, server_uri, metalake_name, **kwargs):
@@ -183,16 +183,6 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 f"Storage under the fileset: `{src_context.name_identifier}` doesn't support now."
             )
 
-    def rm_file(self, path):
-        context: FilesetContext = self._get_fileset_context(path)
-        if context.actual_path.startswith(StorageType.HDFS.value):
-            actual_path = self._strip_protocol(context.actual_path)
-            context.fs.delete_file(actual_path)
-        else:
-            raise RuntimeError(
-                f"Storage under the fileset: `{context.name_identifier}` doesn't support now."
-            )
-
     def _rm(self, path):
         raise RuntimeError("Deprecated method, use rm_file method instead.")
 
@@ -210,6 +200,26 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                     )
             else:
                 context.fs.delete_file(actual_path)
+        else:
+            raise RuntimeError(
+                f"Storage under the fileset: `{context.name_identifier}` doesn't support now."
+            )
+
+    def rm_file(self, path):
+        context: FilesetContext = self._get_fileset_context(path)
+        if context.actual_path.startswith(StorageType.HDFS.value):
+            actual_path = self._strip_protocol(context.actual_path)
+            context.fs.delete_file(actual_path)
+        else:
+            raise RuntimeError(
+                f"Storage under the fileset: `{context.name_identifier}` doesn't support now."
+            )
+
+    def rmdir(self, path):
+        context: FilesetContext = self._get_fileset_context(path)
+        if context.actual_path.startswith(StorageType.HDFS.value):
+            actual_path = self._strip_protocol(context.actual_path)
+            context.fs.delete_dir(actual_path)
         else:
             raise RuntimeError(
                 f"Storage under the fileset: `{context.name_identifier}` doesn't support now."
@@ -263,16 +273,6 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         if context.actual_path.startswith(StorageType.HDFS.value):
             actual_path = self._strip_protocol(context.actual_path)
             context.fs.create_dir(actual_path)
-        else:
-            raise RuntimeError(
-                f"Storage under the fileset: `{context.name_identifier}` doesn't support now."
-            )
-
-    def rmdir(self, path):
-        context: FilesetContext = self._get_fileset_context(path)
-        if context.actual_path.startswith(StorageType.HDFS.value):
-            actual_path = self._strip_protocol(context.actual_path)
-            context.fs.delete_dir(actual_path)
         else:
             raise RuntimeError(
                 f"Storage under the fileset: `{context.name_identifier}` doesn't support now."
