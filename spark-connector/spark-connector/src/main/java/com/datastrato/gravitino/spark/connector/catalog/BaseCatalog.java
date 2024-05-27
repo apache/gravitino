@@ -449,10 +449,17 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
   static com.datastrato.gravitino.rel.TableChange transformTableChange(TableChange change) {
     if (change instanceof TableChange.SetProperty) {
       TableChange.SetProperty setProperty = (TableChange.SetProperty) change;
-      return com.datastrato.gravitino.rel.TableChange.setProperty(
-          setProperty.property(), setProperty.value());
+      if (ConnectorConstants.COMMENT.equals(setProperty.property())) {
+        return com.datastrato.gravitino.rel.TableChange.updateComment(setProperty.value());
+      } else {
+        return com.datastrato.gravitino.rel.TableChange.setProperty(
+            setProperty.property(), setProperty.value());
+      }
     } else if (change instanceof TableChange.RemoveProperty) {
       TableChange.RemoveProperty removeProperty = (TableChange.RemoveProperty) change;
+      Preconditions.checkArgument(
+          ConnectorConstants.COMMENT.equals(removeProperty.property()) == false,
+          "Gravitino doesn't support remove table comment yet");
       return com.datastrato.gravitino.rel.TableChange.removeProperty(removeProperty.property());
     } else if (change instanceof TableChange.AddColumn) {
       TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
