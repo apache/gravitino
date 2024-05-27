@@ -54,11 +54,12 @@ public class GravitinoConnectorPluginManager {
           CONNECTOR_POSTGRESQL,
           CONNECTOR_MEMORY);
 
-  private Map<String, ClassLoader> pluginClassLoaders = new HashMap<>();
+  private final Map<String, ClassLoader> pluginClassLoaders = new HashMap<>();
   private final ClassLoader appClassloader;
 
   public GravitinoConnectorPluginManager(ClassLoader classLoader) {
     try {
+      // Retrieve plugin directory
       this.appClassloader = classLoader;
       pluginLoaderClass = appClassloader.loadClass(PLUGIN_CLASSLOADER_CLASS_NAME);
       String jarPath =
@@ -73,7 +74,7 @@ public class GravitinoConnectorPluginManager {
       // Load all plugins
       for (String pluginName : usePlugins) {
         loadPlugin(pluginDir, pluginName);
-        LOG.info("Load plugin {} successful", pluginName);
+        LOG.info("Load plugin {}/{} successful", pluginDir, pluginName);
       }
     } catch (Exception e) {
       throw new TrinoException(GRAVITINO_RUNTIME_ERROR, "Error while loading plugins", e);
@@ -155,12 +156,19 @@ public class GravitinoConnectorPluginManager {
       List<Plugin> plugins = ImmutableList.copyOf(serviceLoader);
       if (plugins.isEmpty()) {
         throw new TrinoException(
-            GRAVITINO_RUNTIME_ERROR,
-            String.format(" %s connector does not found connector SIP interface", connectorName));
+            GRAVITINO_CREATE_INTERNAL_CONNECTOR_ERROR,
+            String.format("The %s plugin does not found connector SIP interface", connectorName));
       }
       Plugin plugin = plugins.get(0);
 
       try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(pluginClassLoader)) {
+        if (plugin.getConnectorFactories() == null
+            || !plugin.getConnectorFactories().iterator().hasNext()) {
+          throw new TrinoException(
+              GRAVITINO_CREATE_INTERNAL_CONNECTOR_ERROR,
+              String.format(
+                  "The %s plugin does not contains any ConnectorFactories", connectorName));
+        }
         ConnectorFactory connectorFactory = plugin.getConnectorFactories().iterator().next();
         Connector connector = connectorFactory.create(connectorName, config, context);
         LOG.info("create connector {} with config {} successful", connectorName, config);
