@@ -7,19 +7,10 @@ package com.datastrato.gravitino.metrics;
 
 import com.datastrato.gravitino.metrics.source.TestMetricsSource;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.TestInstance.Lifecycle;
 
-@TestInstance(Lifecycle.PER_CLASS)
 public class TestMetricsSystem {
-  private MetricsSystem metricsSystem;
-
-  @BeforeAll
-  void init() {
-    metricsSystem = new MetricsSystem();
-  }
+  MetricsSystem metricsSystem;
 
   @Test
   void testRegisterMetricsSource() {
