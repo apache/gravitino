@@ -209,6 +209,7 @@
    Apache Spark
    ./api/src/main/java/com/datastrato/gravitino/SchemaChange.java
    ./api/src/main/java/com/datastrato/gravitino/SupportsSchemas.java
+   ./core/src/main/java/com/datastrato/gravitino/connector/SupportsSchemas.java
    ./api/src/main/java/com/datastrato/gravitino/rel/TableCatalog.java
    ./api/src/main/java/com/datastrato/gravitino/rel/TableChange.java
    ./api/src/main/java/com/datastrato/gravitino/rel/expressions/Literal.java
@@ -255,6 +256,7 @@
 
    Apache Hadoop
    ./dev/docker/hive/hadoop-env.sh
+   ./dev/docker/kerberos-hive/hadoop-env.sh
    ./dev/docker/kerberos-hive/yarn-env.sh
    ./common/src/main/java/com/datastrato/gravitino/auth/KerberosUtils.java
    ./server-common/src/main/java/com/datastrato/gravitino/server/authentication/KerberosAuthenticator.java
@@ -262,6 +264,7 @@
    ./server-common/src/main/java/com/datastrato/gravitino/server/authentication/KerberosServerUtils.java
 
    Apache Kafka
+   ./integration-test/src/test/resources/run
    ./catalogs/catalog-kafka/src/test/resources/run
    ./core/src/main/java/com/datastrato/gravitino/utils/Bytes.java
 
