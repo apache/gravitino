@@ -35,8 +35,10 @@ import java.util.function.Function;
 public class JsonCodec {
   private static ObjectMapper mapper;
 
-  private static ObjectMapper buildMapper(ClassLoader appClassLoader) {
+  private static ObjectMapper buildMapper(ClassLoader classLoader) {
     try {
+      ClassLoader appClassLoader =
+          GravitinoConnectorPluginManager.instance(classLoader).getAppClassloader();
       TypeManager typeManager = createTypeManger(appClassLoader);
       return createMapper(typeManager, appClassLoader);
     } catch (Exception e) {
@@ -87,8 +89,8 @@ public class JsonCodec {
             ClassLoader pluginClassloader = obj.getClass().getClassLoader();
             Field idField = pluginClassloader.getClass().getDeclaredField("pluginName");
             idField.setAccessible(true);
-            String id = (String) idField.get(pluginClassloader);
-            return id + ":" + obj.getClass().getName();
+            String classLoaderName = (String) idField.get(pluginClassloader);
+            return classLoaderName + ":" + obj.getClass().getName();
           } catch (Exception e) {
             throw new RuntimeException(e);
           }
@@ -98,9 +100,9 @@ public class JsonCodec {
         name -> {
           try {
             String[] nameParts = name.split(":");
-            String id = nameParts[0];
+            String classLoaderName = nameParts[0];
             String className = nameParts[1];
-            ClassLoader loader = pluginManager.getClassLoader(id);
+            ClassLoader loader = pluginManager.getClassLoader(classLoaderName);
             return loader.loadClass(className);
           } catch (ClassNotFoundException e) {
             throw new RuntimeException(e);

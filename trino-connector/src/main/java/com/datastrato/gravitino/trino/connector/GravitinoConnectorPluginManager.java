@@ -33,6 +33,8 @@ public class GravitinoConnectorPluginManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoConnectorPluginManager.class);
 
+  public static final String APP_CLASS_LOADER_NAME = "app";
+
   public static final String CONNECTOR_HIVE = "hive";
   public static final String CONNECTOR_ICEBERG = "iceberg";
   public static final String CONNECTOR_MYSQL = "mysql";
@@ -86,6 +88,11 @@ public class GravitinoConnectorPluginManager {
     }
     synchronized (GravitinoConnectorPluginManager.class) {
       if (instance == null) {
+        if (!APP_CLASS_LOADER_NAME.equals(classLoader.getName())) {
+          throw new TrinoException(
+              GRAVITINO_RUNTIME_ERROR,
+              "Can not initialize GravitinoConnectorPluginManager when classLoader is not appClassLoader");
+        }
         instance = new GravitinoConnectorPluginManager(classLoader);
       }
       return instance;
@@ -93,7 +100,7 @@ public class GravitinoConnectorPluginManager {
   }
 
   private void loadPlugin(String pluginPath, String pluginName) {
-    String dirName = pluginPath + "." + pluginName;
+    String dirName = pluginPath + "/" + pluginName;
     File directory = new File(dirName);
     if (!directory.exists()) {
       throw new TrinoException(
@@ -121,6 +128,7 @@ public class GravitinoConnectorPluginManager {
     try {
       Constructor<?> constructor =
           pluginLoaderClass.getConstructor(String.class, List.class, ClassLoader.class, List.class);
+      // The classloader name will use to serialize the Handle object
       String classLoaderName = PLUGIN_NAME_PREFIX + pluginName;
       Object pluginClassLoader =
           constructor.newInstance(
@@ -175,11 +183,17 @@ public class GravitinoConnectorPluginManager {
     }
   }
 
-  public ClassLoader getClassLoader(String id) {
-    ClassLoader classLoader = pluginClassLoaders.get(id);
+  public ClassLoader getClassLoader(String classLoaderName) {
+    ClassLoader classLoader =
+        pluginClassLoaders.get(classLoaderName.substring(PLUGIN_NAME_PREFIX.length()));
     if (classLoader == null) {
-      throw new TrinoException(GRAVITINO_RUNTIME_ERROR, "Can not found class loader for " + id);
+      throw new TrinoException(
+          GRAVITINO_RUNTIME_ERROR, "Can not found class loader for " + classLoaderName);
     }
     return classLoader;
+  }
+
+  public ClassLoader getAppClassloader() {
+    return appClassloader;
   }
 }

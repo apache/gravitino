@@ -29,18 +29,11 @@ public class GravitinoRecordSetProvider implements ConnectorRecordSetProvider {
       ConnectorSplit split,
       ConnectorTableHandle table,
       List<? extends ColumnHandle> columns) {
-    if (!(table instanceof GravitinoTableHandle)) {
-      return internalRecordSetProvider.getRecordSet(transaction, session, split, table, columns);
-    }
-
-    GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) table;
-    GravitinoTransactionHandle gravitinoTransactionHandle =
-        (GravitinoTransactionHandle) transaction;
     return internalRecordSetProvider.getRecordSet(
-        gravitinoTransactionHandle.getInternalHandle(),
+        GravitinoHandle.unWrap(transaction),
         session,
-        split,
-        gravitinoTableHandle.getInternalHandle(),
-        columns);
+        GravitinoHandle.unWrap(split),
+        GravitinoHandle.unWrap(table),
+        GravitinoHandle.unWrap(columns));
   }
 }
