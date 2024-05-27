@@ -42,17 +42,11 @@ public class CatalogsPageKafkaTest extends AbstractWebIT {
   private static final String SCHEMA_TOPIC_TITLE = "Topics";
   private static final String METALAKE_NAME = "test";
   private static final String CATALOG_TYPE_MESSAGING = "messaging";
-  private static final String HIVE_CATALOG_NAME = "catalog_hive";
-  private static final String MODIFIED_HIVE_CATALOG_NAME = HIVE_CATALOG_NAME + "_edited";
-  private static final String ICEBERG_CATALOG_NAME = "catalog_iceberg";
-  private static final String FILESET_CATALOG_NAME = "catalog_fileset";
+
   private static final String KAFKA_CATALOG_NAME = "catalog_kafka";
   private static final String SCHEMA_NAME = "default";
   private static final String TOPIC_NAME = "topic1";
-
-  private static final String MYSQL_CATALOG_NAME = "catalog_mysql";
-
-  private static final String PG_CATALOG_NAME = "catalog_pg";
+  public static final int DEFAULT_BROKER_PORT = 9092;
 
   @BeforeAll
   public static void before() throws Exception {
@@ -63,7 +57,7 @@ public class CatalogsPageKafkaTest extends AbstractWebIT {
     containerSuite.startKafkaContainer();
 
     String address = containerSuite.getKafkaContainer().getContainerIpAddress();
-    kafkaUri = String.format("%s:%s", address, "9092");
+    kafkaUri = String.format("%s:%d", address, DEFAULT_BROKER_PORT);
   }
 
   /**
@@ -116,7 +110,7 @@ public class CatalogsPageKafkaTest extends AbstractWebIT {
     clickAndWait(catalogsPage.createCatalogBtn);
     catalogsPage.setCatalogNameField(KAFKA_CATALOG_NAME);
     clickAndWait(catalogsPage.catalogTypeSelector);
-    catalogsPage.clickSelectType("messaging");
+    catalogsPage.clickSelectType(CATALOG_TYPE_MESSAGING);
     catalogsPage.setCatalogCommentField("kafka catalog comment");
     // set kafka catalog props
     catalogsPage.setCatalogFixedProp("bootstrap.servers", kafkaUri);
@@ -135,15 +129,7 @@ public class CatalogsPageKafkaTest extends AbstractWebIT {
     // verify show table title、 schema name and tree node
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(CATALOG_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(SCHEMA_NAME, false));
-    List<String> treeNodes =
-        Arrays.asList(
-            MODIFIED_HIVE_CATALOG_NAME,
-            ICEBERG_CATALOG_NAME,
-            MYSQL_CATALOG_NAME,
-            PG_CATALOG_NAME,
-            FILESET_CATALOG_NAME,
-            KAFKA_CATALOG_NAME,
-            SCHEMA_NAME);
+    List<String> treeNodes = Arrays.asList(KAFKA_CATALOG_NAME, SCHEMA_NAME);
     Assertions.assertTrue(catalogsPage.verifyTreeNodes(treeNodes));
   }
 
@@ -161,16 +147,7 @@ public class CatalogsPageKafkaTest extends AbstractWebIT {
     // 3. verify show table title、 default schema name and tree node
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(SCHEMA_TOPIC_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TOPIC_NAME, false));
-    List<String> treeNodes =
-        Arrays.asList(
-            MODIFIED_HIVE_CATALOG_NAME,
-            ICEBERG_CATALOG_NAME,
-            MYSQL_CATALOG_NAME,
-            PG_CATALOG_NAME,
-            FILESET_CATALOG_NAME,
-            KAFKA_CATALOG_NAME,
-            SCHEMA_NAME,
-            TOPIC_NAME);
+    List<String> treeNodes = Arrays.asList(KAFKA_CATALOG_NAME, SCHEMA_NAME, TOPIC_NAME);
     Assertions.assertTrue(catalogsPage.verifyTreeNodes(treeNodes));
   }
 

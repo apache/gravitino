@@ -62,47 +62,42 @@ public class MySQLContainer extends BaseContainer {
 
   @Override
   protected boolean checkContainerStatus(int retryLimit) {
-    int nRetry = 0;
-    boolean isMySQLContainerReady = false;
-    int sleepTimeMillis = 20_00;
-    while (nRetry++ < retryLimit) {
-      try {
-        String[] commandAndArgs =
-            new String[] {
-              "mysqladmin",
-              "ping",
-              "-h",
-              "localhost",
-              "-u",
-              getUsername(),
-              String.format("-p%s", getPassword())
-            };
-        Container.ExecResult execResult = executeInContainer(commandAndArgs);
-        if (execResult.getExitCode() != 0) {
-          String message =
-              format(
-                  "Command [%s] exited with %s",
-                  String.join(" ", commandAndArgs), execResult.getExitCode());
-          LOG.error("{}", message);
-          LOG.error("stderr: {}", execResult.getStderr());
-          LOG.error("stdout: {}", execResult.getStdout());
-        } else {
-          LOG.info("MySQL container startup success!");
-          isMySQLContainerReady = true;
-          break;
-        }
-        LOG.info(
-            "MySQL container is not ready, recheck({}/{}) after {}ms",
-            nRetry,
-            retryLimit,
-            sleepTimeMillis);
-        await().atLeast(sleepTimeMillis, TimeUnit.MILLISECONDS);
-      } catch (RuntimeException e) {
-        LOG.error(e.getMessage(), e);
-      }
-    }
+    await()
+        .atMost(10, TimeUnit.SECONDS)
+        .pollInterval(10 / retryLimit, TimeUnit.SECONDS)
+        .until(
+            () -> {
+              try {
+                String[] commandAndArgs =
+                    new String[] {
+                      "mysqladmin",
+                      "ping",
+                      "-h",
+                      "localhost",
+                      "-u",
+                      getUsername(),
+                      String.format("-p%s", getPassword())
+                    };
+                Container.ExecResult execResult = executeInContainer(commandAndArgs);
+                if (execResult.getExitCode() != 0) {
+                  String message =
+                      format(
+                          "Command [%s] exited with %s",
+                          String.join(" ", commandAndArgs), execResult.getExitCode());
+                  LOG.error("{}", message);
+                  LOG.error("stderr: {}", execResult.getStderr());
+                  LOG.error("stdout: {}", execResult.getStdout());
+                } else {
+                  LOG.info("MySQL container startup success!");
+                  return true;
+                }
+              } catch (RuntimeException e) {
+                LOG.error(e.getMessage(), e);
+              }
+              return false;
+            });
 
-    return isMySQLContainerReady;
+    return true;
   }
 
   public void createDatabase(TestDatabaseName testDatabaseName) {
@@ -130,6 +125,10 @@ public class MySQLContainer extends BaseContainer {
 
   public String getPassword() {
     return PASSWORD;
+  }
+
+  public String getJdbcUrl() {
+    return format("jdbc:mysql://%s:%d", getContainerIpAddress(), MYSQL_PORT);
   }
 
   public String getJdbcUrl(TestDatabaseName testDatabaseName) {

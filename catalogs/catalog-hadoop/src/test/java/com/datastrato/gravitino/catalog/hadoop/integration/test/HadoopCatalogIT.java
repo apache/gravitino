@@ -198,6 +198,33 @@ public class HadoopCatalogIT extends AbstractIT {
   }
 
   @Test
+  public void testCreateFilesetWithChinese() throws IOException {
+    // create fileset
+    String filesetName = "test_create_fileset_with_chinese";
+    String storageLocation = storageLocation(filesetName) + "/中文目录test";
+    Assertions.assertFalse(
+        hdfs.exists(new Path(storageLocation)), "storage location should not exists");
+    Fileset fileset =
+        createFileset(
+            filesetName,
+            "这是中文comment",
+            Fileset.Type.MANAGED,
+            storageLocation,
+            ImmutableMap.of("k1", "v1", "test", "中文测试test", "中文key", "test1"));
+
+    // verify fileset is created
+    assertFilesetExists(filesetName);
+    Assertions.assertNotNull(fileset, "fileset should be created");
+    Assertions.assertEquals("这是中文comment", fileset.comment());
+    Assertions.assertEquals(Fileset.Type.MANAGED, fileset.type());
+    Assertions.assertEquals(storageLocation, fileset.storageLocation());
+    Assertions.assertEquals(3, fileset.properties().size());
+    Assertions.assertEquals("v1", fileset.properties().get("k1"));
+    Assertions.assertEquals("中文测试test", fileset.properties().get("test"));
+    Assertions.assertEquals("test1", fileset.properties().get("中文key"));
+  }
+
+  @Test
   public void testExternalFileset() throws IOException {
     // create fileset
     String filesetName = "test_external_fileset";

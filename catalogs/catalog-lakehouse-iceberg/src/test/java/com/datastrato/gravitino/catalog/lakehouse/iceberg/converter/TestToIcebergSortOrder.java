@@ -25,10 +25,12 @@ public class TestToIcebergSortOrder extends TestBaseConvert {
   @Test
   public void testToSortOrder() {
     SortOrder[] sortOrders = createSortOrder("col_1", "col_2", "col_3", "col_4", "col_5");
-    sortOrders = ArrayUtils.add(sortOrders, createFunctionSortOrder("day", "col_6"));
-    sortOrders = ArrayUtils.add(sortOrders, createFunctionSortOrder("hour", "col_7"));
-    sortOrders = ArrayUtils.add(sortOrders, createFunctionSortOrder("month", "col_8"));
-    sortOrders = ArrayUtils.add(sortOrders, createFunctionSortOrder("year", "col_9"));
+    sortOrders = ArrayUtils.add(sortOrders, createSortOrder("day", "col_6"));
+    sortOrders = ArrayUtils.add(sortOrders, createSortOrder("hour", "col_7"));
+    sortOrders = ArrayUtils.add(sortOrders, createSortOrder("month", "col_8"));
+    sortOrders = ArrayUtils.add(sortOrders, createSortOrder("year", "col_9"));
+    sortOrders = ArrayUtils.add(sortOrders, createSortOrder("bucket", 10, "col_10"));
+    sortOrders = ArrayUtils.add(sortOrders, createSortOrder("truncate", 2, "col_11"));
 
     Types.NestedField[] nestedFields =
         createNestedField("col_1", "col_2", "col_3", "col_4", "col_5");
@@ -40,6 +42,10 @@ public class TestToIcebergSortOrder extends TestBaseConvert {
         ArrayUtils.add(nestedFields, createNestedField(8, "col_8", Types.DateType.get()));
     nestedFields =
         ArrayUtils.add(nestedFields, createNestedField(9, "col_9", Types.DateType.get()));
+    nestedFields =
+        ArrayUtils.add(nestedFields, createNestedField(10, "col_10", Types.IntegerType.get()));
+    nestedFields =
+        ArrayUtils.add(nestedFields, createNestedField(11, "col_11", Types.StringType.get()));
     Schema schema = new Schema(nestedFields);
     org.apache.iceberg.SortOrder icebergSortOrder =
         ToIcebergSortOrder.toSortOrder(schema, sortOrders);
@@ -58,14 +64,6 @@ public class TestToIcebergSortOrder extends TestBaseConvert {
       String colName = idToName.get(sortField.sourceId());
       Assertions.assertTrue(sortOrderByName.containsKey(colName));
       SortOrder sortOrder = sortOrderByName.get(colName);
-      if (colName.equals("col_6")
-          || colName.equals("col_7")
-          || colName.equals("col_8")
-          || colName.equals("col_9")) {
-        Assertions.assertFalse(sortField.transform().isIdentity());
-      } else {
-        Assertions.assertTrue(sortField.transform().isIdentity());
-      }
       Assertions.assertEquals(
           sortOrder.direction() == SortDirection.ASCENDING
               ? org.apache.iceberg.SortDirection.ASC
@@ -76,6 +74,10 @@ public class TestToIcebergSortOrder extends TestBaseConvert {
               ? NullOrder.NULLS_FIRST
               : NullOrder.NULLS_LAST,
           sortField.nullOrder());
+      String icebergSortOrderString = getIcebergTransfromString(sortField, schema);
+      String gravitinoSortOrderString =
+          getGravitinoSortOrderExpressionString(sortOrder.expression());
+      Assertions.assertEquals(icebergSortOrderString, gravitinoSortOrderString);
     }
   }
 }

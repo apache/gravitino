@@ -6,6 +6,7 @@ package com.datastrato.gravitino.storage.relational.service;
 
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.authorization.AuthorizationUtils;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.RoleEntity;
 import com.datastrato.gravitino.storage.relational.mapper.GroupRoleRelMapper;
@@ -15,7 +16,6 @@ import com.datastrato.gravitino.storage.relational.po.RolePO;
 import com.datastrato.gravitino.storage.relational.utils.ExceptionUtils;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
-import com.google.common.base.Preconditions;
 import java.util.List;
 
 /** The service class for role metadata. It provides the basic database operations for role. */
@@ -70,11 +70,7 @@ public class RoleMetaService {
 
   public void insertRole(RoleEntity roleEntity, boolean overwritten) {
     try {
-      Preconditions.checkArgument(
-          roleEntity.namespace() != null
-              && !roleEntity.namespace().isEmpty()
-              && roleEntity.namespace().levels().length == 3,
-          "The namespace of RoleEntity must have three levels.");
+      AuthorizationUtils.checkRole(roleEntity.nameIdentifier());
 
       Long metalakeId =
           MetalakeMetaService.getInstance().getMetalakeIdByName(roleEntity.namespace().level(0));
@@ -99,11 +95,8 @@ public class RoleMetaService {
   }
 
   public RoleEntity getRoleByIdentifier(NameIdentifier identifier) {
-    Preconditions.checkArgument(
-        identifier != null
-            && !identifier.namespace().isEmpty()
-            && identifier.namespace().levels().length == 3,
-        "The identifier of Role must have three levels.");
+    AuthorizationUtils.checkRole(identifier);
+
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
     RolePO rolePO = getRolePOByMetalakeIdAndName(metalakeId, identifier.name());
@@ -112,11 +105,8 @@ public class RoleMetaService {
   }
 
   public boolean deleteRole(NameIdentifier identifier) {
-    Preconditions.checkArgument(
-        identifier != null
-            && !identifier.namespace().isEmpty()
-            && identifier.namespace().levels().length == 3,
-        "The identifier of Role must have three levels.");
+    AuthorizationUtils.checkRole(identifier);
+
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
     Long roleId = getRoleIdByMetalakeIdAndName(metalakeId, identifier.name());
@@ -132,5 +122,31 @@ public class RoleMetaService {
             SessionUtils.doWithoutCommit(
                 GroupRoleRelMapper.class, mapper -> mapper.softDeleteGroupRoleRelByRoleId(roleId)));
     return true;
+  }
+
+  public int deleteRoleMetasByLegacyTimeLine(long legacyTimeLine, int limit) {
+    int[] roleDeletedCount = new int[] {0};
+    int[] userRoleRelDeletedCount = new int[] {0};
+    int[] groupRoleRelDeletedCount = new int[] {0};
+
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            roleDeletedCount[0] =
+                SessionUtils.doWithoutCommitAndFetchResult(
+                    RoleMetaMapper.class,
+                    mapper -> mapper.deleteRoleMetasByLegacyTimeLine(legacyTimeLine, limit)),
+        () ->
+            userRoleRelDeletedCount[0] =
+                SessionUtils.doWithoutCommitAndFetchResult(
+                    UserRoleRelMapper.class,
+                    mapper -> mapper.deleteUserRoleRelMetasByLegacyTimeLine(legacyTimeLine, limit)),
+        () ->
+            groupRoleRelDeletedCount[0] =
+                SessionUtils.doWithoutCommitAndFetchResult(
+                    GroupRoleRelMapper.class,
+                    mapper ->
+                        mapper.deleteGroupRoleRelMetasByLegacyTimeLine(legacyTimeLine, limit)));
+
+    return roleDeletedCount[0] + userRoleRelDeletedCount[0] + groupRoleRelDeletedCount[0];
   }
 }

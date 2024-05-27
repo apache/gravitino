@@ -11,11 +11,6 @@ plugins {
   id("idea")
 }
 
-val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
-val sparkVersion: String = libs.versions.spark.get()
-val icebergVersion: String = libs.versions.iceberg.get()
-val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
-
 dependencies {
   testAnnotationProcessor(libs.lombok)
 
@@ -93,26 +88,15 @@ dependencies {
   }
   testImplementation(libs.httpclient5)
   testImplementation(libs.jline.terminal)
+  testImplementation(libs.jodd.core)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.minikdc) {
     exclude("org.apache.directory.api", "api-ldap-schema-data")
   }
   testImplementation(libs.mockito.core)
+  testImplementation(libs.mybatis)
   testImplementation(libs.mysql.driver)
-
-  testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion") {
-    exclude("org.apache.hadoop", "hadoop-client-api")
-    exclude("org.apache.hadoop", "hadoop-client-runtime")
-  }
-  testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
-  testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion") {
-    exclude("org.apache.avro")
-    exclude("org.apache.hadoop")
-    exclude("org.apache.zookeeper")
-    exclude("io.dropwizard.metrics")
-    exclude("org.rocksdb")
-  }
 
   testImplementation(libs.okhttp3.loginterceptor)
   testImplementation(libs.postgresql.driver)
@@ -153,9 +137,10 @@ tasks.test {
 
     doFirst {
       // Gravitino CI Docker image
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.10")
+      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.12")
       environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "datastrato/gravitino-ci-trino:0.1.5")
       environment("GRAVITINO_CI_KAFKA_DOCKER_IMAGE", "apache/kafka:3.7.0")
+      environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "datastrato/gravitino-ci-doris:0.1.3")
 
       copy {
         from("${project.rootDir}/dev/docker/trino/conf")

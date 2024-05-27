@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.integration.test.trino;
 
+import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
+
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.client.GravitinoMetalake;
@@ -40,6 +42,7 @@ import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.thrift.TException;
 import org.junit.jupiter.api.AfterAll;
@@ -94,7 +97,9 @@ public class TrinoConnectorIT extends AbstractIT {
         System.getenv("GRAVITINO_ROOT_DIR") + "/trino-connector/build/libs",
         getGravitinoServerPort(),
         metalakeName);
-    containerSuite.getTrinoContainer().checkSyncCatalogFromGravitino(5, metalakeName, catalogName);
+    Assertions.assertTrue(
+        containerSuite.getTrinoContainer().checkSyncCatalogFromGravitino(5, catalogName),
+        "Can not synchronize calatogs from gravitino");
 
     createSchema();
 
@@ -432,7 +437,7 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
-  void testHiveSchemaCreatedByGravitino() throws InterruptedException {
+  void testHiveSchemaCreatedByGravitino() {
     String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
 
@@ -475,50 +480,51 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   private static boolean checkTrinoHasRemoved(String sql, long maxWaitTimeSec) {
-    long current = System.currentTimeMillis();
-    while (System.currentTimeMillis() - current <= maxWaitTimeSec * 1000) {
-      try {
-        ArrayList<ArrayList<String>> lists =
-            containerSuite.getTrinoContainer().executeQuerySQL(sql);
-        if (lists.isEmpty()) {
-          return true;
-        }
+    await()
+        .atMost(maxWaitTimeSec, TimeUnit.SECONDS)
+        .pollInterval(200, TimeUnit.MILLISECONDS)
+        .until(
+            () -> {
+              try {
+                ArrayList<ArrayList<String>> lists =
+                    containerSuite.getTrinoContainer().executeQuerySQL(sql);
+                if (lists.isEmpty()) {
+                  return true;
+                }
 
-        LOG.info("Catalog has not synchronized yet, wait 200ms and retry. The SQL is '{}'", sql);
-      } catch (Exception e) {
-        LOG.warn("Failed to execute sql: {}", sql, e);
-      }
+                LOG.info(
+                    "Catalog has not synchronized yet, wait 200ms and retry. The SQL is '{}'", sql);
+              } catch (Exception e) {
+                LOG.warn("Failed to execute sql: {}", sql, e);
+              }
+              return false;
+            });
 
-      try {
-        Thread.sleep(200);
-      } catch (InterruptedException e) {
-        LOG.warn("Failed to sleep 200ms", e);
-      }
-    }
-
-    return false;
+    return true;
   }
 
-  private static boolean checkTrinoHasLoaded(String sql, long maxWaitTimeSec)
-      throws InterruptedException {
-    long current = System.currentTimeMillis();
-    while (System.currentTimeMillis() - current <= maxWaitTimeSec * 1000) {
-      try {
-        ArrayList<ArrayList<String>> lists =
-            containerSuite.getTrinoContainer().executeQuerySQL(sql);
-        if (!lists.isEmpty()) {
-          return true;
-        }
+  private static boolean checkTrinoHasLoaded(String sql, long maxWaitTimeSec) {
+    await()
+        .atMost(maxWaitTimeSec, TimeUnit.SECONDS)
+        .pollInterval(200, TimeUnit.MILLISECONDS)
+        .until(
+            () -> {
+              try {
+                ArrayList<ArrayList<String>> lists =
+                    containerSuite.getTrinoContainer().executeQuerySQL(sql);
+                if (!lists.isEmpty()) {
+                  return true;
+                }
 
-        LOG.info("Trino has not load the data yet, wait 200ms and retry. The SQL is '{}'", sql);
-      } catch (Exception e) {
-        LOG.warn("Failed to execute sql: {}", sql, e);
-      }
+                LOG.info(
+                    "Trino has not load the data yet, wait 200ms and retry. The SQL is '{}'", sql);
+              } catch (Exception e) {
+                LOG.warn("Failed to execute sql: {}", sql, e);
+              }
+              return false;
+            });
 
-      Thread.sleep(200);
-    }
-
-    return false;
+    return true;
   }
 
   private Column[] createHiveFullTypeColumns() {
@@ -582,7 +588,7 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
-  void testColumnTypeNotNullByTrino() throws InterruptedException {
+  void testColumnTypeNotNullByTrino() {
     String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
     GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     String[] command = {
@@ -672,7 +678,7 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
-  void testHiveTableCreatedByGravitino() throws InterruptedException {
+  void testHiveTableCreatedByGravitino() {
     String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
     String tableName = GravitinoITUtils.genRandomName("table").toLowerCase();
@@ -810,7 +816,7 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
-  void testHiveCatalogCreatedByGravitino() throws InterruptedException {
+  void testHiveCatalogCreatedByGravitino() {
     String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
     GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     createdMetalake.createCatalog(
@@ -852,7 +858,7 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
-  void testWrongHiveCatalogProperty() throws InterruptedException {
+  void testWrongHiveCatalogProperty() {
     String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
     GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     createdMetalake.createCatalog(
@@ -884,13 +890,14 @@ public class TrinoConnectorIT extends AbstractIT {
         "true", catalog.properties().get("trino.bypass.hive.validate-bucketing"));
 
     String sql = String.format("show catalogs like '%s'", catalogName);
-    checkTrinoHasLoaded(sql, 6);
+    await().atLeast(6, TimeUnit.SECONDS);
+
     // Because we assign 'hive.target-max-file-size' a wrong value, trino can't load the catalog
     Assertions.assertTrue(containerSuite.getTrinoContainer().executeQuerySQL(sql).isEmpty());
   }
 
   @Test
-  void testIcebergTableAndSchemaCreatedByGravitino() throws InterruptedException {
+  void testIcebergTableAndSchemaCreatedByGravitino() {
     String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
     String tableName = GravitinoITUtils.genRandomName("table").toLowerCase();
@@ -1005,7 +1012,7 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
-  void testIcebergCatalogCreatedByGravitino() throws InterruptedException {
+  void testIcebergCatalogCreatedByGravitino() {
     String catalogName = GravitinoITUtils.genRandomName("iceberg_catalog").toLowerCase();
     String schemaName = GravitinoITUtils.genRandomName("iceberg_catalog").toLowerCase();
     GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
@@ -1089,7 +1096,7 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
-  void testMySQLCatalogCreatedByGravitino() throws InterruptedException {
+  void testMySQLCatalogCreatedByGravitino() {
     String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
     GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     String[] command = {
@@ -1130,7 +1137,7 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
-  void testMySQLTableCreatedByGravitino() throws InterruptedException {
+  void testMySQLTableCreatedByGravitino() {
     String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
     String schemaName = GravitinoITUtils.genRandomName("mysql_schema").toLowerCase();
     String tableName = GravitinoITUtils.genRandomName("mysql_table").toLowerCase();
@@ -1244,7 +1251,7 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
-  void testMySQLTableCreatedByTrino() throws InterruptedException {
+  void testMySQLTableCreatedByTrino() {
     String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
     String schemaName = GravitinoITUtils.genRandomName("mysql_schema").toLowerCase();
     String tableName = GravitinoITUtils.genRandomName("mysql_table").toLowerCase();
@@ -1366,7 +1373,7 @@ public class TrinoConnectorIT extends AbstractIT {
   }
 
   @Test
-  void testDropCatalogAndCreateAgain() throws InterruptedException {
+  void testDropCatalogAndCreateAgain() {
     String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
     GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
     String[] command = {

@@ -464,6 +464,8 @@ tasks.rat {
     // Ignore files we track but do not need headers
     "**/.github/**/*",
     "dev/docker/**/*.xml",
+    "dev/docker/**/*.conf",
+    "dev/docker/kerberos-hive/kadm5.acl",
     "**/*.log",
     "**/licenses/*.txt",
     "**/licenses/*.md",
@@ -694,7 +696,7 @@ fun printDockerCheckInfo() {
   println("Docker server status ............................................ [${if (dockerRunning) "running" else "stop"}]")
   if (OperatingSystem.current().isMacOsX()) {
     println("mac-docker-connector status ..................................... [${if (macDockerConnector) "running" else "stop"}]")
-    println("OrbStack status ................................................. [${if (isOrbStack) "yes" else "no"}]")
+    println("OrbStack status ................................................. [${if (dockerRunning && isOrbStack) "yes" else "no"}]")
   }
 
   val docker_it_test = project.extra["docker_it_test"] as? Boolean ?: false

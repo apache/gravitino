@@ -36,6 +36,7 @@ jobs:
               - dev/**
               - gradle/**
               - integration-test/**
+              - integration-test-common/**
               - meta/**
               - server/**
               - server-common/**

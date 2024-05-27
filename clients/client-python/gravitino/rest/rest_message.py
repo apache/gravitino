@@ -2,6 +2,7 @@
 Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
+
 from abc import ABC, abstractmethod
 
 from dataclasses_json import DataClassJsonMixin
@@ -31,6 +32,7 @@ class RESTMessage(DataClassJsonMixin, ABC):
 
 class IllegalArgumentException(Exception):
     """Exception raised if a REST message is not valid according to the REST spec."""
+
     pass
 
 

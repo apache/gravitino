@@ -5,5 +5,25 @@
 **/__pycache__/**
 gravitino.egg-info
 vevn
+venv
 .vevn
+.venv
 .idea
+dist
+build
+README.md
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/

@@ -2,6 +2,7 @@
 Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
+
 import logging
 from typing import List, Dict
 
@@ -29,11 +30,20 @@ class FilesetCatalog(BaseSchemaCatalog):
     example, schemas and filesets list, creation, update and deletion. A Fileset catalog is under the metalake.
     """
 
-    def __init__(self, name: str = None, type: Catalog.Type = Catalog.Type.UNSUPPORTED,
-                 provider: str = None, comment: str = None, properties: Dict[str, str] = None,
-                 audit: AuditDTO = None, rest_client: HTTPClient = None):
+    def __init__(
+        self,
+        name: str = None,
+        catalog_type: Catalog.Type = Catalog.Type.UNSUPPORTED,
+        provider: str = None,
+        comment: str = None,
+        properties: Dict[str, str] = None,
+        audit: AuditDTO = None,
+        rest_client: HTTPClient = None,
+    ):
 
-        super().__init__(name, type, provider, comment, properties, audit, rest_client)
+        super().__init__(
+            name, catalog_type, provider, comment, properties, audit, rest_client
+        )
 
     def as_fileset_catalog(self):
         return self
@@ -52,9 +62,7 @@ class FilesetCatalog(BaseSchemaCatalog):
         """
         Namespace.check_fileset(namespace)
 
-        resp = self.rest_client.get(
-            self.format_fileset_request_path(namespace)
-        )
+        resp = self.rest_client.get(self.format_fileset_request_path(namespace))
         entity_list_resp = EntityListResponse.from_json(resp.body, infer_missing=True)
         entity_list_resp.validate()
 
@@ -74,14 +82,22 @@ class FilesetCatalog(BaseSchemaCatalog):
         """
         NameIdentifier.check_fileset(ident)
 
-        resp = self.rest_client.get(f"{self.format_fileset_request_path(ident.namespace())}/{ident.name()}")
+        resp = self.rest_client.get(
+            f"{self.format_fileset_request_path(ident.namespace())}/{ident.name()}"
+        )
         fileset_resp = FilesetResponse.from_json(resp.body, infer_missing=True)
         fileset_resp.validate()
 
         return fileset_resp.fileset()
 
-    def create_fileset(self, ident: NameIdentifier, comment: str, type: Catalog.Type,
-                       storage_location: str, properties: Dict[str, str]) -> Fileset:
+    def create_fileset(
+        self,
+        ident: NameIdentifier,
+        comment: str,
+        fileset_type: Fileset.Type,
+        storage_location: str,
+        properties: Dict[str, str],
+    ) -> Fileset:
         """Create a fileset metadata in the catalog.
 
         If the type of the fileset object is "MANAGED", the underlying storageLocation can be null,
@@ -92,7 +108,7 @@ class FilesetCatalog(BaseSchemaCatalog):
         Args:
             ident: A fileset identifier.
             comment: The comment of the fileset.
-            type: The type of the fileset.
+            fileset_type: The type of the fileset.
             storage_location: The storage location of the fileset.
             properties: The properties of the fileset.
 
@@ -105,10 +121,17 @@ class FilesetCatalog(BaseSchemaCatalog):
         """
         NameIdentifier.check_fileset(ident)
 
-        req = FilesetCreateRequest(name=ident.name(), comment=comment, type=type,
-                                   storage_location=storage_location, properties=properties)
+        req = FilesetCreateRequest(
+            name=ident.name(),
+            comment=comment,
+            fileset_type=fileset_type,
+            storage_location=storage_location,
+            properties=properties,
+        )
 
-        resp = self.rest_client.post(self.format_fileset_request_path(ident.namespace()), req)
+        resp = self.rest_client.post(
+            self.format_fileset_request_path(ident.namespace()), req
+        )
         fileset_resp = FilesetResponse.from_json(resp.body, infer_missing=True)
         fileset_resp.validate()
 
@@ -130,11 +153,15 @@ class FilesetCatalog(BaseSchemaCatalog):
         """
         NameIdentifier.check_fileset(ident)
 
-        updates = [FilesetCatalog.to_fileset_update_request(change) for change in changes]
+        updates = [
+            FilesetCatalog.to_fileset_update_request(change) for change in changes
+        ]
         req = FilesetUpdatesRequest(updates)
         req.validate()
 
-        resp = self.rest_client.put(f"{self.format_fileset_request_path(ident.namespace())}/{ident.name()}", req)
+        resp = self.rest_client.put(
+            f"{self.format_fileset_request_path(ident.namespace())}/{ident.name()}", req
+        )
         fileset_resp = FilesetResponse.from_json(resp.body, infer_missing=True)
         fileset_resp.validate()
 
@@ -163,7 +190,7 @@ class FilesetCatalog(BaseSchemaCatalog):
 
             return drop_resp.dropped()
         except Exception as e:
-            logger.warning(f"Failed to drop fileset {ident}: {e}")
+            logger.warning("Failed to drop fileset %s: %s", ident, e)
             return False
 
     @staticmethod
@@ -175,11 +202,14 @@ class FilesetCatalog(BaseSchemaCatalog):
     def to_fileset_update_request(change: FilesetChange):
         if isinstance(change, FilesetChange.RenameFileset):
             return FilesetUpdateRequest.RenameFilesetRequest(change.new_name())
-        elif isinstance(change, FilesetChange.UpdateFilesetComment):
-            return FilesetUpdateRequest.UpdateFilesetCommentRequest(change.new_comment())
-        elif isinstance(change, FilesetChange.SetProperty):
-            return FilesetUpdateRequest.SetFilesetPropertyRequest(change.property(), change.value())
-        elif isinstance(change, FilesetChange.RemoveProperty):
+        if isinstance(change, FilesetChange.UpdateFilesetComment):
+            return FilesetUpdateRequest.UpdateFilesetCommentRequest(
+                change.new_comment()
+            )
+        if isinstance(change, FilesetChange.SetProperty):
+            return FilesetUpdateRequest.SetFilesetPropertyRequest(
+                change.property(), change.value()
+            )
+        if isinstance(change, FilesetChange.RemoveProperty):
             return FilesetUpdateRequest.RemoveFilesetPropertyRequest(change.property())
-        else:
-            raise ValueError(f"Unknown change type: {type(change).__name__}")
+        raise ValueError(f"Unknown change type: {type(change).__name__}")

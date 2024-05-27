@@ -32,15 +32,17 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-public class TestTableNormalizeDispatcher extends TestTableOperationDispatcher {
+public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
   private static TableNormalizeDispatcher tableNormalizeDispatcher;
   private static SchemaNormalizeDispatcher schemaNormalizeDispatcher;
 
   @BeforeAll
   public static void initialize() throws IOException {
     TestTableOperationDispatcher.initialize();
-    tableNormalizeDispatcher = new TableNormalizeDispatcher(tableOperationDispatcher);
-    schemaNormalizeDispatcher = new SchemaNormalizeDispatcher(schemaOperationDispatcher);
+    tableNormalizeDispatcher =
+        new TableNormalizeDispatcher(TestTableOperationDispatcher.tableOperationDispatcher);
+    schemaNormalizeDispatcher =
+        new SchemaNormalizeDispatcher(TestTableOperationDispatcher.schemaOperationDispatcher);
   }
 
   @Test

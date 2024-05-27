@@ -40,8 +40,6 @@ import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelp
 import java.io.IOException;
 import java.util.List;
 import java.util.function.Function;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * {@link JDBCBackend} is a jdbc implementation of {@link RelationalBackend} interface. You can use
@@ -50,8 +48,6 @@ import org.slf4j.LoggerFactory;
  * according to the {@link Configs#ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY} parameter.
  */
 public class JDBCBackend implements RelationalBackend {
-
-  private static final Logger LOG = LoggerFactory.getLogger(JDBCBackend.class);
 
   /** Initialize the jdbc backend instance. */
   @Override
@@ -203,11 +199,6 @@ public class JDBCBackend implements RelationalBackend {
 
   @Override
   public int hardDeleteLegacyData(Entity.EntityType entityType, long legacyTimeLine) {
-    LOG.info(
-        "Try to physically delete {} legacy data that has been marked deleted before {}",
-        entityType,
-        legacyTimeLine);
-
     switch (entityType) {
       case METALAKE:
         return MetalakeMetaService.getInstance()
@@ -233,12 +224,20 @@ public class JDBCBackend implements RelationalBackend {
         return TopicMetaService.getInstance()
             .deleteTopicMetasByLegacyTimeLine(
                 legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
-
-      case COLUMN:
       case USER:
+        return UserMetaService.getInstance()
+            .deleteUserMetasByLegacyTimeLine(
+                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case GROUP:
-      case AUDIT:
+        return GroupMetaService.getInstance()
+            .deleteGroupMetasByLegacyTimeLine(
+                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case ROLE:
+        return RoleMetaService.getInstance()
+            .deleteRoleMetasByLegacyTimeLine(
+                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case COLUMN:
+      case AUDIT:
         return 0;
         // TODO: Implement hard delete logic for these entity types.
 

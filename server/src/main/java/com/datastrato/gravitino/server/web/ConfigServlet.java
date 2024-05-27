@@ -7,10 +7,8 @@ package com.datastrato.gravitino.server.web;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.config.ConfigEntry;
-import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.server.ServerConfig;
 import com.datastrato.gravitino.server.authentication.OAuthConfig;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -51,9 +49,8 @@ public class ConfigServlet extends HttpServlet {
   protected void doGet(HttpServletRequest req, HttpServletResponse res)
       throws IllegalStateException, IOException {
     try (PrintWriter writer = res.getWriter()) {
-      ObjectMapper objectMapper = JsonUtils.objectMapper();
       res.setContentType("application/json;charset=utf-8");
-      writer.write(objectMapper.writeValueAsString(configs));
+      writer.write(ObjectMapperProvider.objectMapper().writeValueAsString(configs));
     } catch (IllegalStateException exception) {
       LOG.error("Illegal state occurred when calling getWriter()");
     } catch (IOException exception) {

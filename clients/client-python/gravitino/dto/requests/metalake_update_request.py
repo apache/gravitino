@@ -2,6 +2,7 @@
 Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
+
 from abc import abstractmethod
 from dataclasses import dataclass, field
 
@@ -13,10 +14,10 @@ from gravitino.rest.rest_message import RESTRequest
 
 @dataclass
 class MetalakeUpdateRequestBase(RESTRequest):
-    _type: str = field(metadata=config(field_name='@type'))
+    _type: str = field(metadata=config(field_name="@type"))
 
-    def __init__(self, type: str):
-        self._type = type
+    def __init__(self, action_type: str):
+        self._type = action_type
 
     @abstractmethod
     def metalake_change(self):
@@ -30,7 +31,7 @@ class MetalakeUpdateRequest:
     class RenameMetalakeRequest(MetalakeUpdateRequestBase):
         """Represents a request to rename a Metalake."""
 
-        _new_name: str = field(metadata=config(field_name='newName'))
+        _new_name: str = field(metadata=config(field_name="newName"))
         """The new name for the Metalake."""
 
         def __init__(self, new_name: str):
@@ -53,7 +54,7 @@ class MetalakeUpdateRequest:
     class UpdateMetalakeCommentRequest(MetalakeUpdateRequestBase):
         """Represents a request to update the comment on a Metalake."""
 
-        _new_comment: str = field(metadata=config(field_name='newComment'))
+        _new_comment: str = field(metadata=config(field_name="newComment"))
         """The new comment for the Metalake."""
 
         def __init__(self, new_comment: str):
@@ -76,25 +77,27 @@ class MetalakeUpdateRequest:
     class SetMetalakePropertyRequest(MetalakeUpdateRequestBase):
         """Represents a request to set a property on a Metalake."""
 
-        _property: str = field(metadata=config(field_name='property'))
+        _property: str = field(metadata=config(field_name="property"))
         """The property to set."""
 
-        _value: str = field(metadata=config(field_name='value'))
+        _value: str = field(metadata=config(field_name="value"))
         """The value of the property."""
 
-        def __init__(self, property: str, value: str):
+        def __init__(self, metalake_property: str, value: str):
             super().__init__("setProperty")
-            self._property = property
+            self._property = metalake_property
             self._value = value
 
         def validate(self):
             """Validates the fields of the request.
 
             Raises:
-                 IllegalArgumentException if property or value are not set.
+                 IllegalArgumentException if metalake_property or value are not set.
             """
             if not self._property:
-                raise ValueError('"property" field is required and cannot be empty')
+                raise ValueError(
+                    '"metalake_property" field is required and cannot be empty'
+                )
             if not self._value:
                 raise ValueError('"value" field is required and cannot be empty')
 
@@ -105,21 +108,23 @@ class MetalakeUpdateRequest:
     class RemoveMetalakePropertyRequest(MetalakeUpdateRequestBase):
         """Represents a request to remove a property from a Metalake."""
 
-        _property: str = field(metadata=config(field_name='property'))
+        _property: str = field(metadata=config(field_name="property"))
         """The property to remove."""
 
-        def __init__(self, property: str):
+        def __init__(self, metalake_property: str):
             super().__init__("removeProperty")
-            self._property = property
+            self._property = metalake_property
 
         def validate(self):
             """Validates the fields of the request.
 
             Raises:
-                 IllegalArgumentException if property is not set.
+                 IllegalArgumentException if metalake_property is not set.
             """
             if not self._property:
-                raise ValueError('"property" field is required and cannot be empty')
+                raise ValueError(
+                    '"metalake_property" field is required and cannot be empty'
+                )
 
         def metalake_change(self):
             return MetalakeChange.remove_property(self._property)

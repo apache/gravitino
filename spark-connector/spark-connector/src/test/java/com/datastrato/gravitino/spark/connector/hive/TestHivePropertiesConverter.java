@@ -5,10 +5,12 @@
 
 package com.datastrato.gravitino.spark.connector.hive;
 
+import com.datastrato.gravitino.spark.connector.GravitinoSparkConfig;
+import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import javax.ws.rs.NotSupportedException;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
+import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -16,7 +18,8 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 
 @TestInstance(Lifecycle.PER_CLASS)
 public class TestHivePropertiesConverter {
-  HivePropertiesConverter hivePropertiesConverter = new HivePropertiesConverter();
+  private final HivePropertiesConverter hivePropertiesConverter =
+      HivePropertiesConverter.getInstance();
 
   @Test
   void testTableFormat() {
@@ -27,7 +30,7 @@ public class TestHivePropertiesConverter {
     Assertions.assertEquals(
         "PARQUET", hiveProperties.get(HivePropertiesConstants.GRAVITINO_HIVE_FORMAT));
     Assertions.assertThrowsExactly(
-        NotSupportedException.class,
+        UnsupportedOperationException.class,
         () ->
             hivePropertiesConverter.toGravitinoTableProperties(
                 ImmutableMap.of(HivePropertiesConstants.SPARK_HIVE_STORED_AS, "notExists")));
@@ -38,8 +41,14 @@ public class TestHivePropertiesConverter {
             ImmutableMap.of(TableCatalog.PROP_PROVIDER, "PARQUET"));
     Assertions.assertEquals(
         hiveProperties.get(HivePropertiesConstants.GRAVITINO_HIVE_FORMAT), "PARQUET");
+    hiveProperties =
+        hivePropertiesConverter.toGravitinoTableProperties(
+            ImmutableMap.of(TableCatalog.PROP_PROVIDER, "HIVE"));
+    Assertions.assertEquals(
+        hiveProperties.get(HivePropertiesConstants.GRAVITINO_HIVE_FORMAT),
+        HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_TEXTFILE);
     Assertions.assertThrowsExactly(
-        NotSupportedException.class,
+        UnsupportedOperationException.class,
         () ->
             hivePropertiesConverter.toGravitinoTableProperties(
                 ImmutableMap.of(TableCatalog.PROP_PROVIDER, "notExists")));
@@ -132,5 +141,55 @@ public class TestHivePropertiesConverter {
                 "2"));
     Assertions.assertEquals(
         ImmutableMap.of(TableCatalog.OPTION_PREFIX + "a", "1", "b", "2"), properties);
+  }
+
+  @Test
+  void testCatalogProperties() {
+    CaseInsensitiveStringMap caseInsensitiveStringMap =
+        new CaseInsensitiveStringMap(ImmutableMap.of("option-key", "option-value"));
+    Map<String, String> properties =
+        hivePropertiesConverter.toSparkCatalogProperties(
+            caseInsensitiveStringMap,
+            ImmutableMap.of(
+                GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI,
+                "hive-uri",
+                PropertiesConverter.SPARK_PROPERTY_PREFIX + "bypass-key",
+                "bypass-value",
+                "key1",
+                "value1"));
+    Assertions.assertEquals(
+        ImmutableMap.of(
+            GravitinoSparkConfig.SPARK_HIVE_METASTORE_URI,
+            "hive-uri",
+            "option-key",
+            "option-value",
+            "bypass-key",
+            "bypass-value"),
+        properties);
+
+    // test overwrite
+    caseInsensitiveStringMap =
+        new CaseInsensitiveStringMap(
+            ImmutableMap.of(
+                "bypass-key",
+                "overwrite-value",
+                GravitinoSparkConfig.SPARK_HIVE_METASTORE_URI,
+                "hive-uri2"));
+    properties =
+        hivePropertiesConverter.toSparkCatalogProperties(
+            caseInsensitiveStringMap,
+            ImmutableMap.of(
+                GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI,
+                "hive-uri",
+                PropertiesConverter.SPARK_PROPERTY_PREFIX + "bypass-key",
+                "bypass-value"));
+
+    Assertions.assertEquals(
+        ImmutableMap.of(
+            GravitinoSparkConfig.SPARK_HIVE_METASTORE_URI,
+            "hive-uri2",
+            "bypass-key",
+            "overwrite-value"),
+        properties);
   }
 }

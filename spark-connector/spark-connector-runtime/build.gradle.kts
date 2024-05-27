@@ -10,14 +10,15 @@ plugins {
   alias(libs.plugins.shadow)
 }
 
-dependencies {
-  implementation(project(":spark-connector:spark-connector"))
-}
-
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
 val baseName = "${rootProject.name}-spark-connector-runtime-${sparkMajorVersion}_$scalaVersion"
+
+dependencies {
+  implementation(project(":clients:client-java-runtime", configuration = "shadow"))
+  implementation(project(":spark-connector:spark-connector"))
+}
 
 tasks.withType<ShadowJar>(ShadowJar::class.java) {
   isZip64 = true

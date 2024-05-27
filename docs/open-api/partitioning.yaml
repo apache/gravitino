@@ -144,6 +144,11 @@ components:
             - "list"
         fieldNames:
           $ref: "./tables.yaml#/components/schemas/FieldNames"
+        assignments:
+          type: array
+          description: The pre-assigned list partitions
+          items:
+            $ref: "./partitions.yaml#/components/schemas/ListPartition"
 
     RangePartitioning:
       type: object
@@ -157,6 +162,11 @@ components:
             - "range"
         fieldName:
           $ref: "./tables.yaml#/components/schemas/FieldName"
+        assignments:
+          type: array
+          description: The pre-assigned range partitions
+          items:
+            $ref: "./partitions.yaml#/components/schemas/RangePartition"
 
     FunctionPartitioning:
       type: object
