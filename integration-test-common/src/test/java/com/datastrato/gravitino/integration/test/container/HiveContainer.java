@@ -82,10 +82,22 @@ public class HiveContainer extends BaseContainer {
 
       container.copyFileFromContainer(hiveLogJarPath, destPath + File.separator + "hive.tar");
       container.copyFileFromContainer(HdfsLogJarPath, destPath + File.separator + "hdfs.tar");
+
+      outputHiveStatus();
     } catch (Exception e) {
       LOG.warn("Can't copy hive log for:", e);
     }
   }
+
+
+  private void outputHiveStatus() {
+    Container.ExecResult execResult = executeInContainer("hdfs", "dfsadmin", "-report");
+    LOG.info("HDFS report, stdout: {}, stderr: {}", execResult.getStdout(), execResult.getStderr());
+
+    execResult = executeInContainer("hive", "-e", "\"select 1;\"");
+    LOG.info("Hive report, stdout: {}, stderr: {}", execResult.getStdout(), execResult.getStderr());
+  }
+
 
   @Override
   protected boolean checkContainerStatus(int retryLimit) {
