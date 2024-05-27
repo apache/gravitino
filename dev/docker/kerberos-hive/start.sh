@@ -7,7 +7,7 @@
 # start ssh
 HOSTNAME=`hostname`
 service ssh start
-ssh-keyscan localhost >> /root/.ssh/known_hosts
+ssh-keyscan ${HOSTNAME} >> /root/.ssh/known_hosts
 ssh-keyscan 0.0.0.0 >> /root/.ssh/known_hosts
 ssh-keyscan 127.0.0.1 >> /root/.ssh/known_hosts
 
