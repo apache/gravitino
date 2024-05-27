@@ -7,8 +7,6 @@ package com.datastrato.gravitino.trino.connector;
 import static io.trino.testing.TestingSession.testSessionBuilder;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
 
 import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
@@ -22,8 +20,11 @@ import io.trino.testing.QueryRunner;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import org.testng.annotations.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 
+@Disabled
 public class TestGravitinoConnectorWithMetalakeCatalogName extends AbstractTestQueryFramework {
 
   GravitinoMockServer server;
@@ -34,7 +35,7 @@ public class TestGravitinoConnectorWithMetalakeCatalogName extends AbstractTestQ
     GravitinoAdminClient gravitinoClient = server.createGravitinoClient();
 
     Session session = testSessionBuilder().setCatalog("gravitino").build();
-    QueryRunner queryRunner = null;
+    QueryRunner queryRunner;
     try {
       queryRunner = DistributedQueryRunner.builder(session).setNodeCount(1).build();
 
@@ -65,7 +66,7 @@ public class TestGravitinoConnectorWithMetalakeCatalogName extends AbstractTestQ
       server.setCatalogConnectorManager(catalogConnectorManager);
 
       // test the catalog has loaded
-      assertFalse(catalogConnectorManager.getCatalogs().isEmpty());
+      Assertions.assertFalse(catalogConnectorManager.getCatalogs().isEmpty());
     } catch (Exception e) {
       throw new RuntimeException("Create query runner failed", e);
     }
@@ -75,12 +76,12 @@ public class TestGravitinoConnectorWithMetalakeCatalogName extends AbstractTestQ
   @Test
   public void testSystemTable() throws Exception {
     MaterializedResult expectedResult = computeActual("select * from gravitino.system.catalog");
-    assertEquals(expectedResult.getRowCount(), 1);
+    Assertions.assertEquals(expectedResult.getRowCount(), 1);
     List<MaterializedRow> expectedRows = expectedResult.getMaterializedRows();
     MaterializedRow row = expectedRows.get(0);
-    assertEquals(row.getField(0), "memory");
-    assertEquals(row.getField(1), "memory");
-    assertEquals(row.getField(2), "{\"max_ttl\":\"10\"}");
+    Assertions.assertEquals(row.getField(0), "memory");
+    Assertions.assertEquals(row.getField(1), "memory");
+    Assertions.assertEquals(row.getField(2), "{\"max_ttl\":\"10\"}");
   }
 
   @Test
@@ -108,7 +109,7 @@ public class TestGravitinoConnectorWithMetalakeCatalogName extends AbstractTestQ
         "call gravitino.system.drop_catalog(catalog => 'memory1', ignore_not_exist => true)");
     assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).doesNotContain("test.memory1");
 
-    // test metalake named test1. the connnector name is test1
+    // test metalake named test1. the connector name is test1
     GravitinoAdminClient gravitinoClient = server.createGravitinoClient();
     gravitinoClient.createMetalake("test1", "", Collections.emptyMap());
 

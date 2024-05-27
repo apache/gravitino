@@ -11,32 +11,34 @@ import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.jdbc.JDBCCatalogPropertyConverter;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
+import io.trino.spi.connector.Connector;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.commons.lang3.NotImplementedException;
 
 /** Transforming PostgreSQL connector configuration and components into Gravitino connector. */
 public class PostgreSQLConnectorAdapter implements CatalogConnectorAdapter {
   private final PropertyConverter catalogConverter;
-  private static final AtomicInteger VERSION = new AtomicInteger(0);
 
   public PostgreSQLConnectorAdapter() {
     this.catalogConverter = new JDBCCatalogPropertyConverter();
   }
 
   @Override
-  public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog)
+  public Map<String, String> buildInternalConnectorConfig(GravitinoCatalog catalog)
       throws Exception {
-    Map<String, Object> config = new HashMap<>();
-    config.put(
-        "catalogHandle",
-        String.format("%s_v%d:normal:default", catalog.getName(), VERSION.getAndIncrement()));
-    config.put("connectorName", "postgresql");
+    Map<String, String> config = new HashMap<>();
+    config.put("connector.name", "postgresql");
 
     Map<String, String> properties =
         catalogConverter.gravitinoToEngineProperties(catalog.getProperties());
-    config.put("properties", properties);
+    config.putAll(properties);
     return config;
+  }
+
+  @Override
+  public Connector buildInternalConnector(Map<String, String> config) throws Exception {
+    throw new NotImplementedException();
   }
 
   @Override
