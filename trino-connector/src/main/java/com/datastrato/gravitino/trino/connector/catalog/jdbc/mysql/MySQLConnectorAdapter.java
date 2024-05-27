@@ -14,7 +14,6 @@ import com.datastrato.gravitino.trino.connector.catalog.HasPropertyMeta;
 import com.datastrato.gravitino.trino.connector.catalog.jdbc.JDBCCatalogPropertyConverter;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
 import io.trino.spi.session.PropertyMetadata;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -32,11 +31,7 @@ public class MySQLConnectorAdapter implements CatalogConnectorAdapter {
   @Override
   public Map<String, String> buildInternalConnectorConfig(GravitinoCatalog catalog)
       throws Exception {
-    Map<String, String> config = new HashMap<>();
-    Map<String, String> properties =
-        catalogConverter.gravitinoToEngineProperties(catalog.getProperties());
-    config.putAll(properties);
-    return config;
+    return catalogConverter.gravitinoToEngineProperties(catalog.getProperties());
   }
 
   @Override

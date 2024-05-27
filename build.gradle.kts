@@ -407,7 +407,6 @@ subprojects {
     reports.html.outputLocation.set(file("${rootProject.projectDir}/build/reports/"))
     val skipTests = project.hasProperty("skipTests")
     if (!skipTests) {
-      maxHeapSize = "2G"
       useJUnitPlatform()
 
       jvmArgs(project.property("extraJvmArgs") as List<*>)
