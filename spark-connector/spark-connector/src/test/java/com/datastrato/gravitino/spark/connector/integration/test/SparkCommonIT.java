@@ -4,10 +4,10 @@
  */
 package com.datastrato.gravitino.spark.connector.integration.test;
 
+import com.datastrato.gravitino.spark.connector.ConnectorConstants;
 import com.datastrato.gravitino.spark.connector.integration.test.util.SparkTableInfo;
 import com.datastrato.gravitino.spark.connector.integration.test.util.SparkTableInfo.SparkColumnInfo;
 import com.datastrato.gravitino.spark.connector.integration.test.util.SparkTableInfoChecker;
-import com.datastrato.gravitino.spark.connector.ConnectorConstants;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
