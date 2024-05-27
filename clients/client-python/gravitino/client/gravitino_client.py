@@ -71,13 +71,13 @@ class GravitinoClient(GravitinoClientBase):
     def create_catalog(
         self,
         ident: NameIdentifier,
-        type: Catalog.Type,
+        catalog_type: Catalog.Type,
         provider: str,
         comment: str,
         properties: Dict[str, str],
     ) -> Catalog:
         return self.get_metalake().create_catalog(
-            ident, type, provider, comment, properties
+            ident, catalog_type, provider, comment, properties
         )
 
     def alter_catalog(self, ident: NameIdentifier, *changes: CatalogChange):
