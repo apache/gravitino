@@ -8,6 +8,7 @@ import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVIT
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_OPERATION_FAILED;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR;
 
+import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
 import com.google.common.collect.ImmutableList;
 import io.trino.spi.Plugin;
 import io.trino.spi.TrinoException;
@@ -173,5 +174,13 @@ public class GravitinoConnectorPluginManager {
       throw new TrinoException(
           GRAVITINO_RUNTIME_ERROR, "Failed to create connector " + connectorName, e);
     }
+  }
+
+  public ClassLoader getClassLoader(String id) {
+    ClassLoader classLoader = pluginClassLoaders.get(id);
+    if (classLoader == null) {
+      throw new TrinoException(GRAVITINO_RUNTIME_ERROR, "Can not found class loader for " + id);
+    }
+    return classLoader;
   }
 }
