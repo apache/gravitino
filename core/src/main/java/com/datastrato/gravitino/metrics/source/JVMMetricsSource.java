@@ -9,12 +9,11 @@ import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.jvm.BufferPoolMetricSet;
 import com.codahale.metrics.jvm.GarbageCollectorMetricSet;
 import com.codahale.metrics.jvm.MemoryUsageGaugeSet;
-import com.datastrato.gravitino.Config;
 import java.lang.management.ManagementFactory;
 
 public class JVMMetricsSource extends MetricsSource {
-  public JVMMetricsSource(Config config) {
-    super(MetricsSource.JVM_METRIC_NAME, config);
+  public JVMMetricsSource() {
+    super(MetricsSource.JVM_METRIC_NAME);
     MetricRegistry metricRegistry = getMetricRegistry();
     metricRegistry.registerAll(new GarbageCollectorMetricSet());
     metricRegistry.registerAll(new MemoryUsageGaugeSet());

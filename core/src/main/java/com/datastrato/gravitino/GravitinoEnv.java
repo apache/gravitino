@@ -141,8 +141,8 @@ public class GravitinoEnv {
     LOG.info("Initializing Gravitino Environment...");
 
     this.config = config;
-    this.metricsSystem = new MetricsSystem(config);
-    metricsSystem.register(new JVMMetricsSource(config));
+    this.metricsSystem = new MetricsSystem();
+    metricsSystem.register(new JVMMetricsSource());
 
     // Initialize EntityStore
     this.entityStore = EntityStoreFactory.createEntityStore(config);

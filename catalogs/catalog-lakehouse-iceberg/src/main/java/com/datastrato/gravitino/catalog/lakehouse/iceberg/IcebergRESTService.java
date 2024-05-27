@@ -43,22 +43,18 @@ public class IcebergRESTService implements GravitinoAuxiliaryService {
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     server.initialize(serverConfig, SERVICE_NAME, false /* shouldEnableUI */);
 
-    ResourceConfig resourceConfig = new ResourceConfig();
-    resourceConfig.packages("com.datastrato.gravitino.catalog.lakehouse.iceberg.web.rest");
+    ResourceConfig config = new ResourceConfig();
+    config.packages("com.datastrato.gravitino.catalog.lakehouse.iceberg.web.rest");
 
-    resourceConfig.register(IcebergObjectMapperProvider.class).register(JacksonFeature.class);
-    resourceConfig.register(IcebergExceptionMapper.class);
+    config.register(IcebergObjectMapperProvider.class).register(JacksonFeature.class);
+    config.register(IcebergExceptionMapper.class);
     HttpServerMetricsSource httpServerMetricsSource =
-        new HttpServerMetricsSource(
-            MetricsSource.ICEBERG_REST_SERVER_METRIC_NAME,
-            resourceConfig,
-            server,
-            metricsSystem.getServerConfig());
+        new HttpServerMetricsSource(MetricsSource.ICEBERG_REST_SERVER_METRIC_NAME, config, server);
     metricsSystem.register(httpServerMetricsSource);
 
     icebergTableOps = new IcebergTableOps(icebergConfig);
     icebergMetricsManager = new IcebergMetricsManager(icebergConfig);
-    resourceConfig.register(
+    config.register(
         new AbstractBinder() {
           @Override
           protected void configure() {
@@ -67,7 +63,7 @@ public class IcebergRESTService implements GravitinoAuxiliaryService {
           }
         });
 
-    Servlet servlet = new ServletContainer(resourceConfig);
+    Servlet servlet = new ServletContainer(config);
     server.addServlet(servlet, ICEBERG_SPEC);
     server.addCustomFilters(ICEBERG_SPEC);
     server.addSystemFilters(ICEBERG_SPEC);

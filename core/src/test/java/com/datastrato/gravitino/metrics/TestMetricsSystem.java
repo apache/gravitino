@@ -5,15 +5,12 @@
 
 package com.datastrato.gravitino.metrics;
 
-import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.metrics.source.TestMetricsSource;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
-import org.mockito.Mockito;
 
 @TestInstance(Lifecycle.PER_CLASS)
 public class TestMetricsSystem {
@@ -21,9 +18,7 @@ public class TestMetricsSystem {
 
   @BeforeAll
   void init() {
-    Config config = Mockito.mock(Config.class);
-    Mockito.when(config.get(Configs.METRICS_TIME_SLIDING_WINDOW_SECONDS)).thenReturn(60);
-    metricsSystem = new MetricsSystem(config);
+    metricsSystem = new MetricsSystem();
   }
 
   @Test

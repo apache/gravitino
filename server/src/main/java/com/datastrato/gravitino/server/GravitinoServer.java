@@ -96,8 +96,7 @@ public class GravitinoServer extends ResourceConfig {
 
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     HttpServerMetricsSource httpServerMetricsSource =
-        new HttpServerMetricsSource(
-            MetricsSource.GRAVITINO_SERVER_METRIC_NAME, this, server, serverConfig);
+        new HttpServerMetricsSource(MetricsSource.GRAVITINO_SERVER_METRIC_NAME, this, server);
     metricsSystem.register(httpServerMetricsSource);
 
     Servlet servlet = new ServletContainer(this);
