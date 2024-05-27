@@ -13,16 +13,19 @@
  */
 package com.datastrato.gravitino.trino.connector.util.json;
 
+import static java.util.Objects.requireNonNull;
+
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.deser.std.FromStringDeserializer;
 import io.trino.spi.type.Type;
 import io.trino.spi.type.TypeId;
 import io.trino.spi.type.TypeManager;
-
 import java.util.function.Function;
 
-import static java.util.Objects.requireNonNull;
-
+/**
+ * This class is reference to Trino source code io.trino.plugin.base.TypeDeserializer, It use to
+ * handle Type serialization
+ */
 public final class TypeDeserializer extends FromStringDeserializer<Type> {
   private final Function<TypeId, Type> typeLoader;
 

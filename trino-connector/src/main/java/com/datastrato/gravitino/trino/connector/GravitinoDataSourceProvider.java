@@ -12,7 +12,10 @@ import io.trino.spi.connector.ConnectorSplit;
 import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.ConnectorTransactionHandle;
 import io.trino.spi.connector.DynamicFilter;
+import io.trino.spi.predicate.TupleDomain;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 /** This class provides a ConnectorPageSource for trino read data from internal connector. */
 public class GravitinoDataSourceProvider implements ConnectorPageSourceProvider {
@@ -31,23 +34,45 @@ public class GravitinoDataSourceProvider implements ConnectorPageSourceProvider 
       ConnectorTableHandle table,
       List<ColumnHandle> columns,
       DynamicFilter dynamicFilter) {
-    if (!(table instanceof GravitinoTableHandle)) {
-      if (transaction instanceof GravitinoTransactionHandle) {
-        transaction = ((GravitinoTransactionHandle) transaction).getInternalTransactionHandle();
-      }
-      return internalPageSourceProvider.createPageSource(
-          transaction, session, split, table, columns, dynamicFilter);
+    return internalPageSourceProvider.createPageSource(
+        GravitinoHandle.unWrap(transaction),
+        session,
+        GravitinoHandle.unWrap(split),
+        GravitinoHandle.unWrap(table),
+        GravitinoHandle.unWrap(columns),
+        new GravitinoDynamicFilter(dynamicFilter));
+  }
+
+  static class GravitinoDynamicFilter implements DynamicFilter {
+    private final DynamicFilter delegate;
+
+    GravitinoDynamicFilter(DynamicFilter dynamicFilter) {
+      delegate = dynamicFilter;
     }
 
-    GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) table;
-    GravitinoTransactionHandle gravitinoTransactionHandle =
-        (GravitinoTransactionHandle) transaction;
-    return internalPageSourceProvider.createPageSource(
-        gravitinoTransactionHandle.getInternalTransactionHandle(),
-        session,
-        split,
-        gravitinoTableHandle.getInternalTableHandle(),
-        columns,
-        dynamicFilter);
+    @Override
+    public Set<ColumnHandle> getColumnsCovered() {
+      return delegate.getColumnsCovered();
+    }
+
+    @Override
+    public CompletableFuture<?> isBlocked() {
+      return delegate.isBlocked();
+    }
+
+    @Override
+    public boolean isComplete() {
+      return delegate.isComplete();
+    }
+
+    @Override
+    public boolean isAwaitable() {
+      return delegate.isAwaitable();
+    }
+
+    @Override
+    public TupleDomain<ColumnHandle> getCurrentPredicate() {
+      return delegate.getCurrentPredicate().transformKeys(GravitinoHandle::unWrap);
+    }
   }
 }
