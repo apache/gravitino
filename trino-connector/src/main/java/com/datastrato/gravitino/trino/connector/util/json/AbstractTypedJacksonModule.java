@@ -13,6 +13,10 @@
  */
 package com.datastrato.gravitino.trino.connector.util.json;
 
+import static com.fasterxml.jackson.annotation.JsonTypeInfo.As.PROPERTY;
+import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
+
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
@@ -34,14 +38,13 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.BeanSerializerFactory;
 import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 import com.fasterxml.jackson.databind.type.TypeFactory;
-
 import java.io.IOException;
 import java.util.function.Function;
 
-import static com.fasterxml.jackson.annotation.JsonTypeInfo.As.PROPERTY;
-import static com.google.common.base.Preconditions.checkArgument;
-import static java.util.Objects.requireNonNull;
-
+/**
+ * This class is reference to Trino source code io.trino.metadata.AbstractTypedJacksonModule, It
+ * used to preform XXXHandle serialization
+ */
 public abstract class AbstractTypedJacksonModule<T> extends SimpleModule {
   private static final String TYPE_PROPERTY = "@gravitino-connector-type";
 

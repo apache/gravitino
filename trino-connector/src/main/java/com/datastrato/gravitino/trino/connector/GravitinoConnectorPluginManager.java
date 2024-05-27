@@ -8,7 +8,6 @@ import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVIT
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_OPERATION_FAILED;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR;
 
-import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
 import com.google.common.collect.ImmutableList;
 import io.trino.spi.Plugin;
 import io.trino.spi.TrinoException;

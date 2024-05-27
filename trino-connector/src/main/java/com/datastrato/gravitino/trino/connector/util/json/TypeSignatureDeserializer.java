@@ -17,10 +17,13 @@ import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.deser.std.FromStringDeserializer;
 import com.google.common.collect.ImmutableSet;
 import io.trino.spi.type.TypeSignature;
-
 import java.lang.reflect.Method;
 import java.util.Set;
 
+/**
+ * This class is reference to Trino source code io.trino.type.TypeSignatureDeserializer, use
+ * refactoring to call the key method to handle Type serialization
+ */
 public final class TypeSignatureDeserializer extends FromStringDeserializer<TypeSignature> {
   private final Method parseTypeSignatureMethod;
 

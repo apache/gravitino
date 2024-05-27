@@ -13,6 +13,8 @@
  */
 package com.datastrato.gravitino.trino.connector.util.json;
 
+import static java.lang.Math.toIntExact;
+
 import com.fasterxml.jackson.core.Base64Variants;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
@@ -26,13 +28,16 @@ import io.airlift.slice.SliceOutput;
 import io.airlift.slice.Slices;
 import io.trino.spi.block.Block;
 import io.trino.spi.block.BlockEncodingSerde;
-
 import java.io.IOException;
 import java.lang.reflect.Method;
 
-import static java.lang.Math.toIntExact;
-
+/**
+ * This class is reference to Trino source code io.trino.block.BlockJsonSerde, use refactoring to
+ * call the key method to avoid class loader isolation
+ */
 public final class BlockJsonSerde {
+  private static final String BLOCK_SERDE_UTIL_CLASS_NAME = "io.trino.block.BlockSerdeUtil";
+
   public static class Serializer extends JsonSerializer<Block> {
     private final BlockEncodingSerde blockEncodingSerde;
     private final Method writeBlock;
@@ -40,7 +45,7 @@ public final class BlockJsonSerde {
     public Serializer(BlockEncodingSerde blockEncodingSerde) throws Exception {
       this.blockEncodingSerde = blockEncodingSerde;
       Class<?> clazz =
-          blockEncodingSerde.getClass().getClassLoader().loadClass("io.trino.block.BlockSerdeUtil");
+          blockEncodingSerde.getClass().getClassLoader().loadClass(BLOCK_SERDE_UTIL_CLASS_NAME);
       this.writeBlock =
           clazz.getDeclaredMethod(
               "writeBlock", BlockEncodingSerde.class, SliceOutput.class, Block.class);
@@ -78,7 +83,7 @@ public final class BlockJsonSerde {
     public Deserializer(BlockEncodingSerde blockEncodingSerde) throws Exception {
       this.blockEncodingSerde = blockEncodingSerde;
       Class<?> clazz =
-          blockEncodingSerde.getClass().getClassLoader().loadClass("io.trino.block.BlockSerdeUtil");
+          blockEncodingSerde.getClass().getClassLoader().loadClass(BLOCK_SERDE_UTIL_CLASS_NAME);
       readBlock = clazz.getDeclaredMethod("readBlock", BlockEncodingSerde.class, Slice.class);
     }
 

@@ -37,10 +37,10 @@ public class GravitinoRecordSetProvider implements ConnectorRecordSetProvider {
     GravitinoTransactionHandle gravitinoTransactionHandle =
         (GravitinoTransactionHandle) transaction;
     return internalRecordSetProvider.getRecordSet(
-        gravitinoTransactionHandle.getInternalTransactionHandle(),
+        gravitinoTransactionHandle.getInternalHandle(),
         session,
         split,
-        gravitinoTableHandle.getInternalTableHandle(),
+        gravitinoTableHandle.getInternalHandle(),
         columns);
   }
 }
