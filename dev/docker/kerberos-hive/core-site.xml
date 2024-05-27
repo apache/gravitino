@@ -24,6 +24,7 @@
     <value>*</value>
   </property>
 
+
   <property>
     <name>hadoop.proxyuser.hive.users</name>
     <value>*</value>
