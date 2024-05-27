@@ -35,6 +35,7 @@ import io.trino.spi.connector.JoinType;
 import io.trino.spi.connector.LimitApplicationResult;
 import io.trino.spi.connector.ProjectionApplicationResult;
 import io.trino.spi.connector.RetryMode;
+import io.trino.spi.connector.SaveMode;
 import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.connector.SortItem;
 import io.trino.spi.connector.TopNApplicationResult;
@@ -174,9 +175,10 @@ public class GravitinoMetadata implements ConnectorMetadata {
 
   @Override
   public void createTable(
-      ConnectorSession session, ConnectorTableMetadata tableMetadata, boolean ignoreExisting) {
+      ConnectorSession session, ConnectorTableMetadata tableMetadata, SaveMode saveMode) {
     GravitinoTable table = metadataAdapter.createTable(tableMetadata);
-    catalogConnectorMetadata.createTable(table);
+    // saveMode = SaveMode.IGNORE is used to ignore the table creation if it already exists
+    catalogConnectorMetadata.createTable(table, saveMode == SaveMode.IGNORE);
   }
 
   @Override

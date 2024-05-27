@@ -42,6 +42,7 @@ import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ConnectorMetadata;
 import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.ConnectorTableMetadata;
+import io.trino.spi.connector.SaveMode;
 import io.trino.spi.connector.SchemaTableName;
 import io.trino.testing.ResourcePresence;
 import java.time.Instant;
@@ -66,7 +67,7 @@ public class GravitinoMockServer implements AutoCloseable {
 
   public GravitinoMockServer() {
     createMetalake(NameIdentifier.ofMetalake(testMetalake));
-    createCatalog(NameIdentifier.ofCatalog(testMetalake, testCatalog));
+    createCatalog(testMetalake, testCatalog);
   }
 
   public void setCatalogConnectorManager(CatalogConnectorManager catalogConnectorManager) {
@@ -145,7 +146,7 @@ public class GravitinoMockServer implements AutoCloseable {
               public Catalog answer(InvocationOnMock invocation) throws Throwable {
                 NameIdentifier catalogName = invocation.getArgument(0);
 
-                Catalog catalog = createCatalog(catalogName);
+                Catalog catalog = createCatalog(metaLake.name(), catalogName.name());
 
                 return catalog;
               }
@@ -192,17 +193,9 @@ public class GravitinoMockServer implements AutoCloseable {
     return metaLake;
   }
 
-  void reloadCatalogs() {
-    GravitinoMetalake metaLake = mock(GravitinoMetalake.class);
-    when(metaLake.name()).thenReturn(testMetalake);
-    when(metaLake.listCatalogs(any()))
-        .thenReturn(new NameIdentifier[] {NameIdentifier.ofCatalog(testMetalake, testCatalog)});
-    catalogConnectorManager.loadCatalogs(metaLake);
-  }
-
-  private Catalog createCatalog(NameIdentifier catalogName) {
+  private Catalog createCatalog(String metalakeName, String catalogName) {
     Catalog catalog = mock(Catalog.class);
-    when(catalog.name()).thenReturn(catalogName.name());
+    when(catalog.name()).thenReturn(catalogName);
     when(catalog.provider()).thenReturn(testCatalogProvider);
     when(catalog.type()).thenReturn(Catalog.Type.RELATIONAL);
     when(catalog.properties()).thenReturn(Map.of("max_ttl", "10"));
@@ -216,7 +209,7 @@ public class GravitinoMockServer implements AutoCloseable {
     when(catalog.asTableCatalog()).thenAnswer(answer -> createTableCatalog(gravitinoCatalog));
 
     when(catalog.asSchemas()).thenAnswer(answer -> createSchemas(gravitinoCatalog));
-    metalakes.get(catalogName.namespace().toString()).catalogs.put(catalogName.name(), catalog);
+    metalakes.get(metalakeName).catalogs.put(catalogName, catalog);
     return catalog;
   }
 
@@ -370,7 +363,7 @@ public class GravitinoMockServer implements AutoCloseable {
                                 catalogConnectorManager.getTrinoCatalogName(catalog))
                             .getInternalConnector();
                 ConnectorMetadata metadata = memoryConnector.getMetadata(null, null);
-                metadata.createTable(null, tableMetadata, false);
+                metadata.createTable(null, tableMetadata, SaveMode.FAIL);
                 return null;
               }
             });
