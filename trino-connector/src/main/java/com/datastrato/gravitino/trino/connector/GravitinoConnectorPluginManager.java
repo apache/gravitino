@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
 /** This class is mange the internal connector plugin and help to create the connector. */
 public class GravitinoConnectorPluginManager {
 
-  private static final Logger LOG = LoggerFactory.getLogger(GravitinoConnectorFactory.class);
+  private static final Logger LOG = LoggerFactory.getLogger(GravitinoConnectorPluginManager.class);
 
   public static final String CONNECTOR_HIVE = "hive";
   public static final String CONNECTOR_ICEBERG = "iceberg";
@@ -60,6 +60,10 @@ public class GravitinoConnectorPluginManager {
   public GravitinoConnectorPluginManager(ClassLoader classLoader) {
     try {
       // Retrieve plugin directory
+      // The Trino plugin director like:
+      //    /data/trino/plugin/hive/**.jar
+      //    /data/trino/plugin/gravitino/**.jar
+      //    /data/trino/plugin/mysql/**.jar
       this.appClassloader = classLoader;
       pluginLoaderClass = appClassloader.loadClass(PLUGIN_CLASSLOADER_CLASS_NAME);
       String jarPath =
@@ -173,9 +177,6 @@ public class GravitinoConnectorPluginManager {
         Connector connector = connectorFactory.create(connectorName, config, context);
         LOG.info("create connector {} with config {} successful", connectorName, config);
         return connector;
-      } catch (Exception e) {
-        throw new TrinoException(
-            GRAVITINO_CREATE_INTERNAL_CONNECTOR_ERROR, "Failed to create internal connector", e);
       }
     } catch (Exception e) {
       throw new TrinoException(
