@@ -316,7 +316,7 @@ public class CatalogInjector {
     return String.format(catalogPropertiesTemplate, catalogName);
   }
 
-  Connector createConnector(String connectorName, Map<String, Object> properties) {
+  Connector createConnector(String connectorName, Map<String, String> properties) {
     String connectorProperties;
     try {
       ObjectMapper objectMapper = new ObjectMapper();

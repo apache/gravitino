@@ -8,7 +8,6 @@ import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVIT
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_MISSING_CONFIG;
 
 import com.datastrato.gravitino.client.GravitinoAdminClient;
-import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorFactory;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogInjector;
@@ -31,6 +30,9 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoConnectorFactory.class);
   private static final String DEFAULT_CONNECTOR_NAME = "gravitino";
+
+  @SuppressWarnings("UnusedVariable")
+  private GravitinoSystemTableFactory gravitinoSystemTableFactory;
 
   private CatalogConnectorManager catalogConnectorManager;
 
@@ -71,8 +73,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
           catalogConnectorManager.config(config);
           catalogConnectorManager.start(clientProvider().get());
 
-          new GravitinoSystemTableFactory(catalogConnectorManager);
-
+          gravitinoSystemTableFactory = new GravitinoSystemTableFactory(catalogConnectorManager);
         } catch (Exception e) {
           LOG.error("Initialization of the GravitinoConnector failed.", e);
           throw e;
@@ -83,10 +84,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
     if (config.isDynamicConnector()) {
       // The dynamic connector is an instance of GravitinoConnector. It is loaded from Gravitino
       // server.
-      CatalogConnectorContext catalogConnectorContext =
-          catalogConnectorManager.getCatalogConnector(catalogName);
-      Preconditions.checkNotNull(catalogConnectorContext, "catalogConnector is not null");
-      return catalogConnectorContext.getConnector();
+      return catalogConnectorManager.createConnector(catalogName, config, context);
     } else {
       // The static connector is an instance of GravitinoSystemConnector. It is loaded by Trino
       // using the connector configuration.
