@@ -5,11 +5,6 @@
 
 package com.datastrato.gravitino.flink.connector.catalog;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Schema;
@@ -18,6 +13,13 @@ import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.MapDifference;
+import com.google.common.collect.Maps;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.commons.compress.utils.Lists;
 import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.CatalogBaseTable;
@@ -70,12 +72,13 @@ public abstract class BaseCatalog extends AbstractCatalog {
   @Override
   public List<String> listDatabases() throws CatalogException {
     return Arrays.stream(this.catalog.asSchemas().listSchemas())
-            .map(NameIdentifier::name)
-            .collect(Collectors.toList());
+        .map(NameIdentifier::name)
+        .collect(Collectors.toList());
   }
 
   @Override
-  public CatalogDatabase getDatabase(String databaseName) throws DatabaseNotExistException, CatalogException {
+  public CatalogDatabase getDatabase(String databaseName)
+      throws DatabaseNotExistException, CatalogException {
     try {
       Schema schema = this.catalog.asSchemas().loadSchema(databaseName);
       return new CatalogDatabaseImpl(schema.properties(), schema.comment());
@@ -90,10 +93,14 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   @Override
-  public void createDatabase(String databaseName, CatalogDatabase catalogDatabase, boolean ignoreIfExists)
+  public void createDatabase(
+      String databaseName, CatalogDatabase catalogDatabase, boolean ignoreIfExists)
       throws DatabaseAlreadyExistException, CatalogException {
     try {
-      this.catalog.asSchemas().createSchema(databaseName, catalogDatabase.getComment(), catalogDatabase.getProperties());
+      this.catalog
+          .asSchemas()
+          .createSchema(
+              databaseName, catalogDatabase.getComment(), catalogDatabase.getProperties());
     } catch (SchemaAlreadyExistsException e) {
       if (!ignoreIfExists) {
         throw new DatabaseAlreadyExistException(getName(), databaseName);
@@ -117,24 +124,25 @@ public abstract class BaseCatalog extends AbstractCatalog {
         LOG.warn("Database {} does not exist.", databaseName);
       }
     } catch (NonEmptySchemaException e) {
-        throw new DatabaseNotEmptyException(getName(), databaseName);
+      throw new DatabaseNotEmptyException(getName(), databaseName);
     } catch (NoSuchCatalogException e) {
       throw new CatalogException(e);
     }
   }
 
   @Override
-  public void alterDatabase(String databaseName, CatalogDatabase catalogDatabase, boolean ignoreIfNotExists)
+  public void alterDatabase(
+      String databaseName, CatalogDatabase catalogDatabase, boolean ignoreIfNotExists)
       throws DatabaseNotExistException, CatalogException {
     try {
       SchemaChange[] schemaChanges = getSchemaChange(getDatabase(databaseName), catalogDatabase);
       this.catalog.asSchemas().alterSchema(databaseName, schemaChanges);
     } catch (NoSuchSchemaException e) {
-        if (!ignoreIfNotExists) {
-            throw new DatabaseNotExistException(getName(), databaseName);
-        } else {
-            LOG.warn("Database {} does not exist.", databaseName);
-        }
+      if (!ignoreIfNotExists) {
+        throw new DatabaseNotExistException(getName(), databaseName);
+      } else {
+        LOG.warn("Database {} does not exist.", databaseName);
+      }
     } catch (NoSuchCatalogException e) {
       throw new CatalogException(e);
     }
@@ -341,22 +349,26 @@ public abstract class BaseCatalog extends AbstractCatalog {
     throw new UnsupportedOperationException();
   }
 
-  private SchemaChange[] getSchemaChange(CatalogDatabase current, CatalogDatabase updated) {
+  @VisibleForTesting
+  static SchemaChange[] getSchemaChange(CatalogDatabase current, CatalogDatabase updated) {
     Map<String, String> currentProperties = current.getProperties();
     Map<String, String> updatedProperties = updated.getProperties();
 
     List<SchemaChange> schemaChanges = Lists.newArrayList();
-    for (Map.Entry<String, String> entry : updatedProperties.entrySet()) {
-      String key = entry.getKey();
-      String value = entry.getValue();
-      if (currentProperties.containsKey(key)) {
-        if (!currentProperties.get(key).equals(value)) {
-          schemaChanges.add(SchemaChange.setProperty(key, value));
-        }
-      } else {
-        schemaChanges.add(SchemaChange.removeProperty(key));
-      }
-    }
+    MapDifference<String, String> difference =
+        Maps.difference(currentProperties, updatedProperties);
+    difference
+        .entriesOnlyOnLeft()
+        .forEach((key, value) -> schemaChanges.add(SchemaChange.removeProperty(key)));
+    difference
+        .entriesOnlyOnRight()
+        .forEach((key, value) -> schemaChanges.add(SchemaChange.setProperty(key, value)));
+    difference
+        .entriesDiffering()
+        .forEach(
+            (key, value) -> {
+              schemaChanges.add(SchemaChange.setProperty(key, value.rightValue()));
+            });
     return schemaChanges.toArray(new SchemaChange[0]);
   }
 }
