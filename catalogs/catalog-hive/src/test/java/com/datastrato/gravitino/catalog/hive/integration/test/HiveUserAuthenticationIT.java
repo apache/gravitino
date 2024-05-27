@@ -247,14 +247,23 @@ public class HiveUserAuthenticationIT extends AbstractIT {
 
     // Now try to alter the table
     catalog.asTableCatalog().alterTable(tableNameIdentifier, TableChange.rename("new_table"));
+    NameIdentifier newTableIdentifier =
+        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "new_table");
+
+    // Old table name should not exist
+    Assertions.assertFalse(catalog.asTableCatalog().tableExists(tableNameIdentifier));
+    Assertions.assertTrue(catalog.asTableCatalog().tableExists(newTableIdentifier));
 
     // Drop table
-    catalog
-        .asTableCatalog()
-        .dropTable(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "new_table"));
+    catalog.asTableCatalog().dropTable(newTableIdentifier);
+    Assertions.assertFalse(catalog.asTableCatalog().tableExists(newTableIdentifier));
 
     // Drop schema
     catalog.asSchemas().dropSchema(SCHEMA_NAME, true);
+    Assertions.assertFalse(catalog.asSchemas().schemaExists(SCHEMA_NAME));
+
+    // Drop catalog
+    Assertions.assertTrue(gravitinoMetalake.dropCatalog(CATALOG_NAME));
   }
 
   private static Column[] createColumns() {
