@@ -113,3 +113,4 @@ jobs:
             distribution/package/logs/gravitino-server.log
             catalogs/**/*.log
             catalogs/**/*.tar
+            distribution/**/*.log
