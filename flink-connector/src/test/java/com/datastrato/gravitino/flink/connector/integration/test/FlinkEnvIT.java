@@ -8,6 +8,7 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.flink.connector.PropertiesConverter;
 import com.datastrato.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions;
+import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.google.common.collect.ImmutableMap;
@@ -24,6 +25,7 @@ import org.slf4j.LoggerFactory;
 
 public abstract class FlinkEnvIT extends AbstractIT {
   private static final Logger LOG = LoggerFactory.getLogger(FlinkEnvIT.class);
+  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   protected static final String gravitinoMetalake = "flink";
   protected static final String defaultHiveCatalog = "default_flink_hive_catalog";
 
