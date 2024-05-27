@@ -144,7 +144,7 @@ CREATE TABLE IF NOT EXISTS `role_meta` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'role metadata';
 
 CREATE TABLE IF NOT EXISTS `role_meta_securable_object` (
-    `id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'securable object id',
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `role_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'role id',
     `full_name` VARCHAR(246) NOT NULL COMMENT 'securable object full name',
     `type`  VARCHAR(128) NOT NULL COMMENT 'securable object type',
