@@ -41,7 +41,7 @@ class DTOConverters:
         if catalog.type() == Catalog.Type.FILESET:
             return FilesetCatalog(
                 name=catalog.name(),
-                type=catalog.type(),
+                catalog_type=catalog.type(),
                 provider=catalog.provider(),
                 comment=catalog.comment(),
                 properties=catalog.properties(),
