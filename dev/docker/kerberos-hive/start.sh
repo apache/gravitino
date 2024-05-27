@@ -8,6 +8,7 @@
 HOSTNAME=`hostname`
 service ssh start
 ssh-keyscan ${HOSTNAME} >> /root/.ssh/known_hosts
+ssh-keyscan localhost >> /root/.ssh/known_hosts
 ssh-keyscan 0.0.0.0 >> /root/.ssh/known_hosts
 ssh-keyscan 127.0.0.1 >> /root/.ssh/known_hosts
 
@@ -66,6 +67,13 @@ ${HADOOP_HOME}/sbin/hadoop-daemon.sh start namenode
 
 echo "Starting DataNode..."
 ${HADOOP_HOME}/sbin/start-secure-dns.sh
+sleep 1
+
+ps -ef | grep DataNode | grep -v "color=auto"
+if [[ $? -ne 0 ]]; then
+  echo "DataNode failed to start, please check the logs"
+  exit 1
+fi
 
 # start mysql and create databases/users for hive
 chown -R mysql:mysql /var/lib/mysql
