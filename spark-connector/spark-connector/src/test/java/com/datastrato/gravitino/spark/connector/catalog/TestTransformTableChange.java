@@ -5,7 +5,9 @@
 
 package com.datastrato.gravitino.spark.connector.catalog;
 
+import com.datastrato.gravitino.rel.TableChange.UpdateComment;
 import com.datastrato.gravitino.rel.expressions.literals.Literals;
+import com.datastrato.gravitino.spark.connector.ConnectorConstants;
 import org.apache.spark.sql.connector.catalog.ColumnDefaultValue;
 import org.apache.spark.sql.connector.catalog.TableChange;
 import org.apache.spark.sql.connector.expressions.LiteralValue;
@@ -41,12 +43,27 @@ public class TestTransformTableChange {
   }
 
   @Test
+  void testTransformUpdateComment() {
+    TableChange sparkSetProperty = TableChange.setProperty(ConnectorConstants.COMMENT, "a");
+    com.datastrato.gravitino.rel.TableChange tableChange =
+        BaseCatalog.transformTableChange(sparkSetProperty);
+    Assertions.assertTrue(
+        tableChange instanceof com.datastrato.gravitino.rel.TableChange.UpdateComment);
+    Assertions.assertEquals("a", ((UpdateComment) tableChange).getNewComment());
+
+    TableChange sparkRemoveProperty = TableChange.removeProperty(ConnectorConstants.COMMENT);
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class,
+        () -> BaseCatalog.transformTableChange(sparkRemoveProperty));
+  }
+
+  @Test
   void testTransformRenameColumn() {
-    String[] oldFiledsName = new String[] {"default_name"};
+    String[] oldFieldsName = new String[] {"default_name"};
     String newFiledName = "new_name";
 
     TableChange.RenameColumn sparkRenameColumn =
-        (TableChange.RenameColumn) TableChange.renameColumn(oldFiledsName, newFiledName);
+        (TableChange.RenameColumn) TableChange.renameColumn(oldFieldsName, newFiledName);
     com.datastrato.gravitino.rel.TableChange gravitinoChange =
         BaseCatalog.transformTableChange(sparkRenameColumn);
 
@@ -55,7 +72,7 @@ public class TestTransformTableChange {
     com.datastrato.gravitino.rel.TableChange.RenameColumn gravitinoRenameColumn =
         (com.datastrato.gravitino.rel.TableChange.RenameColumn) gravitinoChange;
 
-    Assertions.assertArrayEquals(oldFiledsName, gravitinoRenameColumn.getFieldName());
+    Assertions.assertArrayEquals(oldFieldsName, gravitinoRenameColumn.getFieldName());
     Assertions.assertEquals(newFiledName, gravitinoRenameColumn.getNewName());
   }
 
