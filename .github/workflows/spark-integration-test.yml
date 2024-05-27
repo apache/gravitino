@@ -91,9 +91,9 @@ jobs:
       - name: Spark Integration Test
         id: integrationTest
         run: |
-          ./gradlew --rerun-tasks -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} :spark-connector:spark3.3:test --tests "com.datastrato.gravitino.spark.connector.integration.test.**"
-          ./gradlew --rerun-tasks -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} :spark-connector:spark3.4:test --tests "com.datastrato.gravitino.spark.connector.integration.test.**"
-          ./gradlew --rerun-tasks -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} :spark-connector:spark3.5:test --tests "com.datastrato.gravitino.spark.connector.integration.test.**"
+          ./gradlew --rerun-tasks -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} :spark-connector:spark33:test --tests "com.datastrato.gravitino.spark.connector.integration.test.**"
+          ./gradlew --rerun-tasks -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} :spark-connector:spark34:test --tests "com.datastrato.gravitino.spark.connector.integration.test.**"
+          ./gradlew --rerun-tasks -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} :spark-connector:spark35:test --tests "com.datastrato.gravitino.spark.connector.integration.test.**"
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
@@ -102,8 +102,8 @@ jobs:
           name: spark-connector-integrate-test-reports-${{ matrix.java-version }}-${{ matrix.test-mode }}
           path: |
             build/reports
-            spark-connector/spark3.3/build/spark3.3-integration-test.log
-            spark-connector/spark3.4/build/spark3.4-integration-test.log
-            spark-connector/spark3.5/build/spark3.5-integration-test.log
+            spark-connector/v3.3/spark/build/spark33-integration-test.log
+            spark-connector/v3.4/spark/build/spark34-integration-test.log
+            spark-connector/v3.5/spark/build/spark35-integration-test.log
             distribution/package/logs/gravitino-server.out
             distribution/package/logs/gravitino-server.log
