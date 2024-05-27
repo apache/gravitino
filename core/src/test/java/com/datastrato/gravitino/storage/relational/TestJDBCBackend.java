@@ -975,7 +975,6 @@ public class TestJDBCBackend {
       AuditInfo auditInfo,
       List<SecurableObject> securableObjects,
       Map<String, String> properties) {
-
     return RoleEntity.builder()
         .withId(id)
         .withName(name)

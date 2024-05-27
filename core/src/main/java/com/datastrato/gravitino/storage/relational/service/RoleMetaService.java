@@ -116,9 +116,9 @@ public class RoleMetaService {
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
     RolePO rolePO = getRolePOByMetalakeIdAndName(metalakeId, identifier.name());
 
-    List<SecurableObjectPO> securableObjectPOS = listSecurableObjectsByRoleId(rolePO.getRoleId());
+    List<SecurableObjectPO> securableObjectPOs = listSecurableObjectsByRoleId(rolePO.getRoleId());
 
-    return POConverters.fromRolePO(rolePO, securableObjectPOS, identifier.namespace());
+    return POConverters.fromRolePO(rolePO, securableObjectPOs, identifier.namespace());
   }
 
   public boolean deleteRole(NameIdentifier identifier) {
@@ -145,7 +145,7 @@ public class RoleMetaService {
     return true;
   }
 
-  public List<SecurableObjectPO> listSecurableObjectsByRoleId(Long roleId) {
+  private List<SecurableObjectPO> listSecurableObjectsByRoleId(Long roleId) {
     return SessionUtils.getWithoutCommit(
         SecurableObjectMapper.class, mapper -> mapper.listSecurableObjectsByRoleId(roleId));
   }
