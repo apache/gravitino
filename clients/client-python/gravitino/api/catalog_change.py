@@ -37,29 +37,29 @@ class CatalogChange(ABC):
         return CatalogChange.UpdateCatalogComment(new_comment)
 
     @staticmethod
-    def set_property(property, value):
+    def set_property(catalog_property, value):
         """Creates a new catalog change to set the property and value for the catalog.
 
         Args:
-            property: The property name to set.
+            catalog_property: The property name to set.
             value: The value to set the property to.
 
         Returns:
             The catalog change.
         """
-        return CatalogChange.SetProperty(property, value)
+        return CatalogChange.SetProperty(catalog_property, value)
 
     @staticmethod
-    def remove_property(property):
+    def remove_property(catalog_property):
         """Creates a new catalog change to remove a property from the catalog.
 
         Args:
-            property: The property name to remove.
+            catalog_property: The property name to remove.
 
         Returns:
             The catalog change.
         """
-        return CatalogChange.RemoveProperty(property)
+        return CatalogChange.RemoveProperty(catalog_property)
 
     class RenameCatalog:
         """A catalog change to rename the catalog."""
@@ -156,8 +156,8 @@ class CatalogChange(ABC):
     class SetProperty:
         """A catalog change to set the property and value for the catalog."""
 
-        def __init__(self, property, value):
-            self.property = property
+        def __init__(self, catalog_property, value):
+            self.property = catalog_property
             self.value = value
 
         def property(self):
@@ -211,8 +211,8 @@ class CatalogChange(ABC):
     class RemoveProperty:
         """A catalog change to remove a property from the catalog."""
 
-        def __init__(self, property):
-            self._property = property
+        def __init__(self, catalog_property):
+            self._property = catalog_property
 
         def get_property(self):
             """Retrieves the name of the property to be removed from the catalog.

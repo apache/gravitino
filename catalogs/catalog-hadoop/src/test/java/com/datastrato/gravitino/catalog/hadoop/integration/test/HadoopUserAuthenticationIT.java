@@ -84,10 +84,7 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
     file.deleteOnExit();
     TMP_DIR = file.getAbsolutePath();
 
-    HDFS_URL =
-        String.format(
-            "hdfs://%s:9000",
-            kerberosHiveContainer.getContainerIpAddress());
+    HDFS_URL = String.format("hdfs://%s:9000", kerberosHiveContainer.getContainerIpAddress());
 
     // Prepare kerberos related-config;
     prepareKerberosConfig();
@@ -139,7 +136,6 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
     LOG.info("Kerberos kdc config:\n{}", content);
     System.setProperty("java.security.krb5.conf", krb5Path);
     System.setProperty("sun.security.krb5.debug", "true");
-
   }
 
   private static void addKerberosConfig() {
@@ -176,11 +172,11 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
     properties.put(CATALOG_BYPASS_PREFIX + HADOOP_SECURITY_AUTHORIZATION, "true");
     properties.put("location", HDFS_URL + "/user/hadoop/");
 
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-mkdir", "/user/hadoop");
+    kerberosHiveContainer.executeInContainer("hadoop", "fs", "-mkdir", "/user/hadoop");
 
-    Catalog catalog = gravitinoMetalake.createCatalog(
-        CATALOG_NAME, Catalog.Type.FILESET, "hadoop", "comment", properties);
+    Catalog catalog =
+        gravitinoMetalake.createCatalog(
+            CATALOG_NAME, Catalog.Type.FILESET, "hadoop", "comment", properties);
 
     // Test create schema
     Exception exception =
@@ -193,21 +189,22 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
         exceptionMessage.contains("Permission denied: user=gravitino_client, access=WRITE"));
 
     // Now try to give the user the permission to create schema again
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chmod", "-R", "777", "/user/hadoop");
+    kerberosHiveContainer.executeInContainer("hadoop", "fs", "-chmod", "-R", "777", "/user/hadoop");
     Assertions.assertDoesNotThrow(
         () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
 
+    catalog
+        .asFilesetCatalog()
+        .createFileset(
+            NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, TABLE_NAME),
+            "comment",
+            Fileset.Type.MANAGED,
+            null,
+            ImmutableMap.of());
 
-    catalog.asFilesetCatalog().createFileset(
-        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, TABLE_NAME),
-        "comment",
-        Fileset.Type.MANAGED,
-        null,
-        ImmutableMap.of());
-
-    catalog.asFilesetCatalog().dropFileset(
-        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, TABLE_NAME));
+    catalog
+        .asFilesetCatalog()
+        .dropFileset(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, TABLE_NAME));
 
     catalog.asSchemas().alterSchema(SCHEMA_NAME, SchemaChange.setProperty("k1", "value1"));
 

@@ -10,7 +10,7 @@ import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CL
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.FETCH_TIMEOUT_SEC;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.IMPERSONATION_ENABLE;
-import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.KET_TAB_URI;
+import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.KEY_TAB_URI;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.PRINCIPAL;
 import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
@@ -81,7 +81,7 @@ class TestHiveCatalogOperations {
     Assertions.assertFalse(
         propertyEntryMap.get(CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(IMPERSONATION_ENABLE).isRequired());
-    Assertions.assertFalse(propertyEntryMap.get(KET_TAB_URI).isRequired());
+    Assertions.assertFalse(propertyEntryMap.get(KEY_TAB_URI).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(PRINCIPAL).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(CHECK_INTERVAL_SEC).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(FETCH_TIMEOUT_SEC).isRequired());

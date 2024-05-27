@@ -42,6 +42,13 @@ kadmin.local -q "ktadd -norandkey -k ${KRB5_KTNAME} hive/${HOSTNAME}@${FQDN}"
 kadmin.local -q "xst -k /hive.keytab -norandkey hive/${HOSTNAME}@${FQDN}"
 kadmin.local -q "xst -k /cli.keytab -norandkey cli@${FQDN}"
 
+# For Gravitino web server
+echo -e "${PASS}\n${PASS}" | kadmin.local -q "addprinc gravitino_client@${FQDN}"
+kadmin.local -q "ktadd -norandkey -k /gravitino_client.keytab gravitino_client@${FQDN}"
+
+echo -e "${PASS}\n${PASS}" | kadmin.local -q "addprinc HTTP/localhost@${FQDN}"
+kadmin.local -q "ktadd -norandkey -k /gravitino_server.keytab HTTP/localhost@${FQDN}"
+
 echo -e "${PASS}\n" | kinit hive/${HOSTNAME}
 
 # Update the configuration file
