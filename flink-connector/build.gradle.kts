@@ -73,6 +73,7 @@ dependencies {
   testImplementation(libs.hadoop2.common) {
     exclude("*")
   }
+  testImplementation(libs.hadoop2.hdfs)
   testImplementation(libs.hadoop2.mapreduce.client.core) {
     exclude("*")
   }
