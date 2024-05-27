@@ -4,13 +4,13 @@
  */
 package com.datastrato.gravitino.trino.connector;
 
-import static org.testng.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.airlift.json.JsonCodec;
 import io.trino.spi.connector.ConnectorTableHandle;
-import org.testng.annotations.Test;
+import org.junit.jupiter.api.Test;
 
 public class TestGravitinoTableHandle {
   private final JsonCodec<GravitinoTableHandle> codec =

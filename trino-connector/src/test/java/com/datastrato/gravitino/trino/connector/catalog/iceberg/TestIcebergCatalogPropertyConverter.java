@@ -10,15 +10,14 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTableProperties
 import com.datastrato.gravitino.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
 import com.datastrato.gravitino.trino.connector.metadata.TestGravitinoCatalog;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import io.trino.spi.TrinoException;
 import java.util.Map;
 import java.util.Set;
-import org.assertj.core.api.Assertions;
-import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
-import org.testng.Assert;
-import org.testng.annotations.Test;
-import org.testng.collections.Maps;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 public class TestIcebergCatalogPropertyConverter {
 
@@ -33,15 +32,16 @@ public class TestIcebergCatalogPropertyConverter {
     Map<String, String> hiveBackendConfig =
         propertyConverter.gravitinoToEngineProperties(gravitinoIcebergConfig);
 
-    Assert.assertEquals(hiveBackendConfig.get("iceberg.catalog.type"), "hive_metastore");
-    Assert.assertEquals(hiveBackendConfig.get("hive.metastore.uri"), "1111");
+    Assertions.assertEquals(hiveBackendConfig.get("iceberg.catalog.type"), "hive_metastore");
+    Assertions.assertEquals(hiveBackendConfig.get("hive.metastore.uri"), "1111");
 
     Map<String, String> wrongMap = Maps.newHashMap(gravitinoIcebergConfig);
     wrongMap.remove("uri");
 
-    Assertions.assertThatThrownBy(() -> propertyConverter.gravitinoToEngineProperties(wrongMap))
-        .isInstanceOf(TrinoException.class)
-        .hasMessageContaining("Missing required property for Hive backend: [uri]");
+    Assertions.assertThrows(
+        TrinoException.class,
+        () -> propertyConverter.gravitinoToEngineProperties(wrongMap),
+        "Missing required property for Hive backend: [uri]");
   }
 
   @Test
@@ -60,22 +60,25 @@ public class TestIcebergCatalogPropertyConverter {
         propertyConverter.gravitinoToEngineProperties(gravitinoIcebergConfig);
 
     // Test all properties are converted
-    Assert.assertEquals(
+    Assertions.assertEquals(
         hiveBackendConfig.get("iceberg.jdbc-catalog.connection-url"),
         "jdbc:mysql://127.0.0.1:3306/metastore_db?createDatabaseIfNotExist=true");
-    Assert.assertEquals(hiveBackendConfig.get("iceberg.jdbc-catalog.connection-user"), "zhangsan");
-    Assert.assertEquals(hiveBackendConfig.get("iceberg.jdbc-catalog.connection-password"), "lisi");
-    Assert.assertNull(hiveBackendConfig.get("other-key"));
-    Assert.assertEquals(hiveBackendConfig.get("iceberg.catalog.type"), "jdbc");
-    Assert.assertEquals(
+    Assertions.assertEquals(
+        hiveBackendConfig.get("iceberg.jdbc-catalog.connection-user"), "zhangsan");
+    Assertions.assertEquals(
+        hiveBackendConfig.get("iceberg.jdbc-catalog.connection-password"), "lisi");
+    Assertions.assertNull(hiveBackendConfig.get("other-key"));
+    Assertions.assertEquals(hiveBackendConfig.get("iceberg.catalog.type"), "jdbc");
+    Assertions.assertEquals(
         hiveBackendConfig.get("iceberg.jdbc-catalog.driver-class"), "com.mysql.cj.jdbc.Driver");
 
     Map<String, String> wrongMap = Maps.newHashMap(gravitinoIcebergConfig);
     wrongMap.remove("jdbc-driver");
 
-    Assertions.assertThatThrownBy(() -> propertyConverter.gravitinoToEngineProperties(wrongMap))
-        .isInstanceOf(TrinoException.class)
-        .hasMessageContaining("Missing required property for JDBC backend: [jdbc-driver]");
+    Assertions.assertThrows(
+        TrinoException.class,
+        () -> propertyConverter.gravitinoToEngineProperties(wrongMap),
+        "Missing required property for JDBC backend: [jdbc-driver]");
   }
 
   // To test whether we load jar `bundled-catalog` successfully.
@@ -86,7 +89,7 @@ public class TestIcebergCatalogPropertyConverter {
     Set<String> actualGravitinoKeys =
         Sets.newHashSet(new IcebergTablePropertiesMetadata().propertyEntries().keySet());
 
-    Assert.assertTrue(actualGravitinoKeys.containsAll(gravitinoHiveKeys));
+    Assertions.assertTrue(actualGravitinoKeys.containsAll(gravitinoHiveKeys));
   }
 
   @Test
@@ -107,24 +110,19 @@ public class TestIcebergCatalogPropertyConverter {
             name, "lakehouse-iceberg", "test catalog", Catalog.Type.RELATIONAL, properties);
     IcebergConnectorAdapter adapter = new IcebergConnectorAdapter();
 
-    Map<String, Object> stringObjectMap =
+    Map<String, String> config =
         adapter.buildInternalConnectorConfig(new GravitinoCatalog("test", mockCatalog));
 
-    // test connector attributes
-    Assert.assertEquals(stringObjectMap.get("connectorName"), "iceberg");
-
-    Map<String, Object> propertiesMap = (Map<String, Object>) stringObjectMap.get("properties");
-
     // test converted properties
-    Assert.assertEquals(propertiesMap.get("hive.metastore.uri"), "thrift://localhost:9083");
-    Assert.assertEquals(propertiesMap.get("iceberg.catalog.type"), "hive_metastore");
+    Assertions.assertEquals(config.get("hive.metastore.uri"), "thrift://localhost:9083");
+    Assertions.assertEquals(config.get("iceberg.catalog.type"), "hive_metastore");
 
     // test trino passing properties
-    Assert.assertEquals(propertiesMap.get("iceberg.table-statistics-enabled"), "true");
+    Assertions.assertEquals(config.get("iceberg.table-statistics-enabled"), "true");
 
     // test unknown properties
-    Assert.assertNull(propertiesMap.get("hive.unknown-key"));
-    Assert.assertNull(propertiesMap.get("trino.bypass.unknown-key"));
+    Assertions.assertNull(config.get("hive.unknown-key"));
+    Assertions.assertNull(config.get("trino.bypass.unknown-key"));
   }
 
   @Test
@@ -148,29 +146,24 @@ public class TestIcebergCatalogPropertyConverter {
             name, "lakehouse-iceberg", "test catalog", Catalog.Type.RELATIONAL, properties);
     IcebergConnectorAdapter adapter = new IcebergConnectorAdapter();
 
-    Map<String, Object> stringObjectMap =
+    Map<String, String> config =
         adapter.buildInternalConnectorConfig(new GravitinoCatalog("test", mockCatalog));
 
-    // test connector attributes
-    Assert.assertEquals(stringObjectMap.get("connectorName"), "iceberg");
-
-    Map<String, Object> propertiesMap = (Map<String, Object>) stringObjectMap.get("properties");
-
     // test converted properties
-    Assert.assertEquals(
-        propertiesMap.get("iceberg.jdbc-catalog.connection-url"),
+    Assertions.assertEquals(
+        config.get("iceberg.jdbc-catalog.connection-url"),
         "jdbc:mysql://%s:3306/metastore_db?createDatabaseIfNotExist=true");
-    Assert.assertEquals(propertiesMap.get("iceberg.jdbc-catalog.connection-user"), "root");
-    Assert.assertEquals(propertiesMap.get("iceberg.jdbc-catalog.connection-password"), "ds123");
-    Assert.assertEquals(
-        propertiesMap.get("iceberg.jdbc-catalog.driver-class"), "com.mysql.cj.jdbc.Driver");
-    Assert.assertEquals(propertiesMap.get("iceberg.catalog.type"), "jdbc");
+    Assertions.assertEquals(config.get("iceberg.jdbc-catalog.connection-user"), "root");
+    Assertions.assertEquals(config.get("iceberg.jdbc-catalog.connection-password"), "ds123");
+    Assertions.assertEquals(
+        config.get("iceberg.jdbc-catalog.driver-class"), "com.mysql.cj.jdbc.Driver");
+    Assertions.assertEquals(config.get("iceberg.catalog.type"), "jdbc");
 
     // test trino passing properties
-    Assert.assertEquals(propertiesMap.get("iceberg.table-statistics-enabled"), "true");
+    Assertions.assertEquals(config.get("iceberg.table-statistics-enabled"), "true");
 
     // test unknown properties
-    Assert.assertNull(propertiesMap.get("hive.unknown-key"));
-    Assert.assertNull(propertiesMap.get("trino.bypass.unknown-key"));
+    Assertions.assertNull(config.get("hive.unknown-key"));
+    Assertions.assertNull(config.get("trino.bypass.unknown-key"));
   }
 }

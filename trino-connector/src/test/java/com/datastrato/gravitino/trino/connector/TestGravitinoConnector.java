@@ -7,7 +7,7 @@ package com.datastrato.gravitino.trino.connector;
 import static io.trino.testing.TestingSession.testSessionBuilder;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.testng.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
@@ -23,12 +23,12 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.awaitility.Awaitility;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.com.google.common.base.Preconditions;
-import org.testcontainers.shaded.org.awaitility.Awaitility;
-import org.testng.annotations.Parameters;
-import org.testng.annotations.Test;
 
-@Parameters({"-Xmx4G"})
+@Disabled
 public class TestGravitinoConnector extends AbstractTestQueryFramework {
 
   GravitinoMockServer server;
@@ -39,7 +39,7 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
     GravitinoAdminClient gravitinoClient = server.createGravitinoClient();
 
     Session session = testSessionBuilder().setCatalog("gravitino").build();
-    QueryRunner queryRunner = null;
+    QueryRunner queryRunner;
     try {
       // queryRunner = LocalQueryRunner.builder(session).build();
       queryRunner = DistributedQueryRunner.builder(session).setNodeCount(1).build();

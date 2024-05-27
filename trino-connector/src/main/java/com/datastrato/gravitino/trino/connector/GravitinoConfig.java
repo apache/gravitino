@@ -12,7 +12,9 @@ import java.util.Map;
 
 public class GravitinoConfig {
 
-  public static String GRAVITINO_DYNAMIC_CONNECTOR = "__gravitino.dynamic.connector";
+  public static final String GRAVITINO_DYNAMIC_CONNECTOR = "__gravitino.dynamic.connector";
+  public static final String GRAVITINO_DYNAMIC_CONNECTOR_CATALOG_CONFIG =
+      "__gravitino.dynamic.connector.catalog.config";
   private static final Map<String, ConfigEntry> CONFIG_DEFINITIONS = new HashMap<>();
 
   private final Map<String, String> config;
@@ -33,16 +35,17 @@ public class GravitinoConfig {
 
   public GravitinoConfig(Map<String, String> requiredConfig) {
     config = requiredConfig;
-
-    if (!isDynamicConnector()) {
-      for (Map.Entry<String, ConfigEntry> entry : CONFIG_DEFINITIONS.entrySet()) {
-        ConfigEntry configDefinition = entry.getValue();
-        if (configDefinition.isRequired && !config.containsKey(configDefinition.key)) {
-          String message =
-              String.format("Missing gravitino config, %s is required", configDefinition.key);
-          throw new TrinoException(GRAVITINO_MISSING_CONFIG, message);
-        }
+    for (Map.Entry<String, ConfigEntry> entry : CONFIG_DEFINITIONS.entrySet()) {
+      ConfigEntry configDefinition = entry.getValue();
+      if (configDefinition.isRequired && !config.containsKey(configDefinition.key)) {
+        String message =
+            String.format("Missing gravitino config, %s is required", configDefinition.key);
+        throw new TrinoException(GRAVITINO_MISSING_CONFIG, message);
       }
+    }
+    if (isDynamicConnector() && !config.containsKey(GRAVITINO_DYNAMIC_CONNECTOR_CATALOG_CONFIG)) {
+      throw new TrinoException(
+          GRAVITINO_MISSING_CONFIG, "Incomplete Dynamic catalog connector config");
     }
   }
 
@@ -69,6 +72,10 @@ public class GravitinoConfig {
     // in which case the connector's configuration is set to '__gravitino.dynamic.connector=true'.
     // It is dynamic and will create an instance of GravitinoConnector.
     return config.getOrDefault(GRAVITINO_DYNAMIC_CONNECTOR, "false").equals("true");
+  }
+
+  public String getCatalogConfig() {
+    return config.get(GRAVITINO_DYNAMIC_CONNECTOR_CATALOG_CONFIG);
   }
 
   static class ConfigEntry {
