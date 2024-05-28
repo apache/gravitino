@@ -16,6 +16,7 @@ dependencies {
   implementation(project(":catalogs:bundled-catalog", configuration = "shadow"))
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
   implementation(libs.airlift.json)
+  implementation(libs.bundles.log4j)
   implementation(libs.commons.collections4)
   implementation(libs.commons.lang3)
   implementation(libs.httpclient5)

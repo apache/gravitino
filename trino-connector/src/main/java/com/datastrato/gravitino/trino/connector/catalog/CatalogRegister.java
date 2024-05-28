@@ -129,7 +129,7 @@ public class CatalogRegister {
       File catalogFile = new File(catalogFileName);
       if (catalogFile.exists()) {
         String catalogContents = Files.readString(catalogFile.toPath());
-        if (!catalogContents.contains("\"__gravitino.dynamic.connector\" = 'true'")) {
+        if (!catalogContents.contains(GRAVITINO_DYNAMIC_CONNECTOR + "=true")) {
           throw new TrinoException(
               GRAVITINO_DUPLICATED_CATALOGS,
               "Catalog already exists, the catalog is not created by gravitino");
@@ -150,7 +150,9 @@ public class CatalogRegister {
       executeSql(createCatalogCommand);
       LOG.info("Register catalog {} successfully: {}", name, createCatalogCommand);
     } catch (Exception e) {
-      LOG.error("Failed to register catalog", e);
+      String message = String.format("Failed to register catalog %s", name);
+      LOG.error(message);
+      throw new TrinoException(GRAVITINO_RUNTIME_ERROR, message, e);
     }
   }
 
@@ -200,7 +202,7 @@ public class CatalogRegister {
       }
       throw failedException;
     } catch (Exception e) {
-      LOG.error("Execute command failed: {}, ", sql, e);
+      throw new TrinoException(GRAVITINO_RUNTIME_ERROR, "Failed to execute query: " + sql, e);
     }
   }
 
@@ -213,7 +215,9 @@ public class CatalogRegister {
       executeSql(dropCatalogCommand);
       LOG.info("Unregister catalog {} successfully: {}", name, dropCatalogCommand);
     } catch (Exception e) {
-      LOG.error("Failed to unregister catalog", e);
+      String message = String.format("Failed to unregister catalog %s", name);
+      LOG.error(message);
+      throw new TrinoException(GRAVITINO_RUNTIME_ERROR, message, e);
     }
   }
 

@@ -159,7 +159,7 @@ public class GravitinoConnectorPluginManager {
       ServiceLoader<Plugin> serviceLoader =
           ServiceLoader.load(Plugin.class, (ClassLoader) pluginClassLoader);
       List<Plugin> pluginList = ImmutableList.copyOf(serviceLoader);
-      if (connectorPlugins.isEmpty()) {
+      if (pluginList.isEmpty()) {
         throw new TrinoException(
             GRAVITINO_CREATE_INTERNAL_CONNECTOR_ERROR,
             String.format("The %s plugin does not found connector SIP interface", pluginName));
