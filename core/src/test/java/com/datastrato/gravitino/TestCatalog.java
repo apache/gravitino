@@ -104,26 +104,6 @@ public class TestCatalog extends BaseCatalog<TestCatalog> {
             .build();
       }
     };
-    //    else if (config.containsKey("hive")) {
-    //      return new BasePropertiesMetadata() {
-    //        @Override
-    //        protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
-    //          return ImmutableMap.<String, PropertyEntry<?>>builder()
-    //              .put(
-    //                  "hive.metastore.uris",
-    //                  PropertyEntry.stringPropertyEntry(
-    //                      "hive.metastore.uris",
-    //                      "The Hive metastore URIs",
-    //                      true,
-    //                      true,
-    //                      null,
-    //                      false,
-    //                      false))
-    //              .build();
-    //        }
-    //      };
-    //    }
-    // return Maps.newHashMap();
   }
 
   @Override
