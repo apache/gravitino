@@ -163,6 +163,18 @@ public class TestJsonUtils {
   }
 
   @Test
+  public void testTypeSerdeCompatibility() throws JsonProcessingException {
+    String newPrimitiveType = "\"new_primitive_type\"";
+    Type type = objectMapper.readValue(newPrimitiveType, Type.class);
+    Assertions.assertEquals(Types.UnparsedType.of("new_primitive_type"), type);
+
+    String newComplexType = "{\"type\": \"new_complex_type\", \"field\": \"value\"}";
+    type = objectMapper.readValue(newComplexType, Type.class);
+    Assertions.assertEquals(
+        Types.UnparsedType.of("{\"type\":\"new_complex_type\",\"field\":\"value\"}"), type);
+  }
+
+  @Test
   void testGetLong() throws Exception {
     String jsonException = "{\"property\": \"value\"}";
     JsonNode nodeException = objectMapper.readTree(jsonException);
