@@ -10,7 +10,7 @@ ALTER TABLE `role_meta` MODIFY COLUMN `privilege_conditions` VARCHAR(64) NOT NUL
 CREATE TABLE IF NOT EXISTS `role_meta_securable_object` (
     `id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'securable object id',
     `role_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'role id',
-    `full_name` VARCHAR(246) NOT NULL COMMENT 'securable object full name',
+    `entity_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'The entity id of securable object',
     `type`  VARCHAR(128) NOT NULL COMMENT 'securable object type',
     `privilege_names` VARCHAR(256) NOT NULL COMMENT 'securable object privilege names',
     `privilege_conditions` VARCHAR(256) NOT NULL COMMENT 'securable object privilege conditions',
