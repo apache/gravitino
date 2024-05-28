@@ -67,13 +67,33 @@ ${HADOOP_HOME}/sbin/hadoop-daemon.sh start namenode
 
 echo "Starting DataNode..."
 ${HADOOP_HOME}/sbin/start-secure-dns.sh
-sleep 1
+sleep 5
 
+# Check if the DataNode is running
 ps -ef | grep DataNode | grep -v "color=auto"
 if [[ $? -ne 0 ]]; then
   echo "DataNode failed to start, please check the logs"
   exit 1
 fi
+
+retry_times=0
+ready=0
+while [[ ${retry_times} -lt 10 ]]; do
+  hdfs_ready=$(hdfs dfsadmin -report | grep "Live datanodes" | awk '{print $3}')
+  if [[ ${hdfs_ready} == "(1):" ]]; then
+    echo "HDFS is ready, retry_times = ${retry_times}"
+    let "ready=0"
+    break
+  fi
+  retry_times=$((retry_times+1))
+done
+
+if [[ ${ready} -ne 0 ]]; then
+  echo "HDFS is not ready"
+  cat ${HADOOP_HOME}/bin/logs/hadoop-root-datanode-*.log
+  exit 1
+fi
+
 
 # start mysql and create databases/users for hive
 chown -R mysql:mysql /var/lib/mysql
