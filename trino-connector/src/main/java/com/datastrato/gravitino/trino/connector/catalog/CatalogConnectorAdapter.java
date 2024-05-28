@@ -7,7 +7,6 @@ package com.datastrato.gravitino.trino.connector.catalog;
 import static java.util.Collections.emptyList;
 
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
-import io.trino.spi.connector.Connector;
 import io.trino.spi.session.PropertyMetadata;
 import java.util.List;
 import java.util.Map;
@@ -25,8 +24,8 @@ public interface CatalogConnectorAdapter {
   /** @return Return internal connector config with Trino. */
   Map<String, String> buildInternalConnectorConfig(GravitinoCatalog catalog) throws Exception;
 
-  /** @return Return internal connector with Trino. */
-  Connector buildInternalConnector(Map<String, String> config) throws Exception;
+  /** @return Return internal connector name with Trino. */
+  String internalConnectorName();
 
   /** @return SchemaProperties list that used to validate schema properties. */
   default List<PropertyMetadata<?>> getSchemaProperties() {
