@@ -6,9 +6,11 @@ package com.datastrato.gravitino.trino.connector.catalog;
 
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.trino.connector.GravitinoConnector;
+import com.datastrato.gravitino.trino.connector.GravitinoConnectorPluginManager;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
 import com.google.common.base.Preconditions;
 import io.trino.spi.connector.Connector;
+import io.trino.spi.connector.ConnectorContext;
 import io.trino.spi.session.PropertyMetadata;
 import java.util.List;
 import java.util.Map;
@@ -84,6 +86,7 @@ public class CatalogConnectorContext {
     private final CatalogConnectorAdapter connectorAdapter;
     private GravitinoCatalog catalog;
     private GravitinoMetalake metalake;
+    private ConnectorContext context;
 
     Builder(CatalogConnectorAdapter connectorAdapter) {
       this.connectorAdapter = connectorAdapter;
@@ -103,12 +106,21 @@ public class CatalogConnectorContext {
       return this;
     }
 
+    Builder withContext(ConnectorContext context) {
+      this.context = context;
+      return this;
+    }
+
     CatalogConnectorContext build() throws Exception {
       Preconditions.checkArgument(metalake != null, "metalake is not null");
       Preconditions.checkArgument(catalog != null, "catalog is not null");
+      Preconditions.checkArgument(context != null, "context is not null");
       Map<String, String> connectorConfig = connectorAdapter.buildInternalConnectorConfig(catalog);
-      Connector connector = connectorAdapter.buildInternalConnector(connectorConfig);
+      String internalConnectorName = connectorAdapter.internalConnectorName();
 
+      Connector connector =
+          GravitinoConnectorPluginManager.instance(context.getClass().getClassLoader())
+              .createConnector(internalConnectorName, connectorConfig, context);
       return new CatalogConnectorContext(catalog, metalake, connector, connectorAdapter);
     }
   }
