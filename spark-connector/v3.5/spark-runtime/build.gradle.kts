@@ -20,8 +20,7 @@ dependencies {
   when (sparkMajorVersion) {
     "3.5" -> {
       val kyuubiVersion: String = libs.versions.kyuubi4spark35.get()
-      println("Applying Spark 3.5 dependencies")
-      implementation(project(":spark-connector:spark35"))
+      implementation(project(":spark-connector:spark-3.5"))
       implementation("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
     }
     else -> throw IllegalArgumentException("Unsupported Spark version: $sparkMajorVersion")
