@@ -4,18 +4,18 @@
  */
 package com.datastrato.gravitino.trino.connector.catalog.hive;
 
+import static com.datastrato.gravitino.trino.connector.GravitinoConnectorPluginManager.CONNECTOR_HIVE;
+
 import com.datastrato.gravitino.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.HasPropertyMeta;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
-import io.trino.spi.connector.Connector;
 import io.trino.spi.session.PropertyMetadata;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.NotImplementedException;
 
 /** Transforming Hive connector configuration and components into Gravitino connector. */
 public class HiveConnectorAdapter implements CatalogConnectorAdapter {
@@ -41,8 +41,8 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
   }
 
   @Override
-  public Connector buildInternalConnector(Map<String, String> config) throws Exception {
-    throw new NotImplementedException();
+  public String internalConnectorName() {
+    return CONNECTOR_HIVE;
   }
 
   @Override

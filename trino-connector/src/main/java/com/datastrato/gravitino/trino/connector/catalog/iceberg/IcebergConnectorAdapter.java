@@ -4,18 +4,16 @@
  */
 package com.datastrato.gravitino.trino.connector.catalog.iceberg;
 
+import static com.datastrato.gravitino.trino.connector.GravitinoConnectorPluginManager.CONNECTOR_ICEBERG;
 import static java.util.Collections.emptyList;
 
 import com.datastrato.gravitino.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
-import io.trino.spi.connector.Connector;
 import io.trino.spi.session.PropertyMetadata;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.NotImplementedException;
 
 /** Transforming Iceberg connector configuration and components into Gravitino connector. */
 public class IcebergConnectorAdapter implements CatalogConnectorAdapter {
@@ -31,18 +29,12 @@ public class IcebergConnectorAdapter implements CatalogConnectorAdapter {
   @Override
   public Map<String, String> buildInternalConnectorConfig(GravitinoCatalog catalog)
       throws Exception {
-    Map<String, String> config = new HashMap<>();
-    config.put("connector.name", "iceberg");
-
-    Map<String, String> properties =
-        catalogConverter.gravitinoToEngineProperties(catalog.getProperties());
-    config.putAll(properties);
-    return config;
+    return catalogConverter.gravitinoToEngineProperties(catalog.getProperties());
   }
 
   @Override
-  public Connector buildInternalConnector(Map<String, String> config) throws Exception {
-    throw new NotImplementedException();
+  public String internalConnectorName() {
+    return CONNECTOR_ICEBERG;
   }
 
   @Override
