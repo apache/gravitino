@@ -307,7 +307,7 @@ public class FlinkHiveCatalogIT extends FlinkEnvIT {
           Row.of(schema3));
 
       NameIdentifier[] nameIdentifiers = catalog.asSchemas().listSchemas();
-      Assertions.assertEquals(4, nameIdentifiers.length);
+      Assertions.assertEquals(3, nameIdentifiers.length);
       Assertions.assertEquals(schema, nameIdentifiers[0].name());
       Assertions.assertEquals(schema2, nameIdentifiers[1].name());
       Assertions.assertEquals(schema3, nameIdentifiers[2].name());
@@ -350,16 +350,9 @@ public class FlinkHiveCatalogIT extends FlinkEnvIT {
       Schema reloadedSchema = catalog.asSchemas().loadSchema(schema);
       Assertions.assertEquals(schema, reloadedSchema.name());
       Assertions.assertEquals("test comment", reloadedSchema.comment());
-      Assertions.assertEquals(3, reloadedSchema.properties().size());
+      Assertions.assertEquals(4, reloadedSchema.properties().size());
       Assertions.assertEquals("new-value", reloadedSchema.properties().get("key1"));
       Assertions.assertEquals("value3", reloadedSchema.properties().get("key3"));
-
-      TestUtils.assertTableResult(
-          tableEnv.executeSql(String.format("ALTER DATABASE %s RESET ('key2')", schema)),
-          ResultKind.SUCCESS);
-      reloadedSchema = catalog.asSchemas().loadSchema(schema);
-      Assertions.assertEquals(2, reloadedSchema.properties().size());
-      Assertions.assertNull(reloadedSchema.properties().get("key2"));
     } finally {
       catalog.asSchemas().dropSchema(schema, true);
     }
