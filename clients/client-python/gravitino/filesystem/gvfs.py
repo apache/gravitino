@@ -59,7 +59,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
     protocol = PROTOCOL_NAME
     _gvfs_prefix = "gvfs://fileset"
     _identifier_pattern = re.compile(
-        "^(?:gvfs://fileset)?/([^/]+)/([^/]+)/([^/]+)(?:/[^/]+)*/?$"
+        "^(?:gvfs://fileset)?/?([^/]+)/([^/]+)/([^/]+)(?:/[^/]+)*/?$"
     )
 
     def __init__(self, server_uri, metalake_name, **kwargs):
@@ -104,7 +104,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
 
     def info(self, path, **kwargs):
         context: FilesetContext = self._get_fileset_context(path)
-        if context.actual_path.startswith(StorageType.HDFS.value):
+        if context.fileset.storage_location().startswith(StorageType.HDFS.value):
             actual_path = self._strip_protocol(context.actual_path)
             [info] = context.fs.get_file_info([actual_path])
 
@@ -118,11 +118,17 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         )
 
     def exists(self, path, **kwargs):
-        try:
-            self.info(path)
-        except FileNotFoundError:
-            return False
-        return True
+        context: FilesetContext = self._get_fileset_context(path)
+        if context.fileset.storage_location().startswith(StorageType.HDFS.value):
+            actual_path = self._strip_protocol(context.actual_path)
+            try:
+                context.fs.get_file_info([actual_path])
+            except FileNotFoundError:
+                return False
+            return True
+        raise RuntimeError(
+            f"Storage under the fileset: `{context.name_identifier}` doesn't support now."
+        )
 
     def cp_file(self, path1, path2, **kwargs):
         src_identifier: NameIdentifier = self._extract_identifier(path1)
@@ -133,7 +139,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 f"identifier: `{src_identifier}`."
             )
         src_context: FilesetContext = self._get_fileset_context(path1)
-        if src_context.actual_path.startswith(StorageType.HDFS.value):
+        if src_context.fileset.storage_location().startswith(StorageType.HDFS.value):
             if self._check_mount_single_file(src_context.fileset, src_context.fs):
                 raise RuntimeError(
                     f"Cannot cp file of the fileset: {src_identifier} which only mounts to a single file."
@@ -167,7 +173,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 f" should be same with src file path identifier: `{src_identifier}`."
             )
         src_context: FilesetContext = self._get_fileset_context(path1)
-        if src_context.actual_path.startswith(StorageType.HDFS.value):
+        if src_context.fileset.storage_location().startswith(StorageType.HDFS.value):
             if self._check_mount_single_file(src_context.fileset, src_context.fs):
                 raise RuntimeError(
                     f"Cannot cp file of the fileset: {src_identifier} which only mounts to a single file."
@@ -188,7 +194,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
 
     def rm(self, path, recursive=False, maxdepth=None, **kwargs):
         context: FilesetContext = self._get_fileset_context(path)
-        if context.actual_path.startswith(StorageType.HDFS.value):
+        if context.fileset.storage_location().startswith(StorageType.HDFS.value):
             actual_path = self._strip_protocol(context.actual_path).rstrip("/")
             [info] = context.fs.get_file_info([actual_path])
             if info.type is FileType.Directory:
@@ -207,7 +213,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
 
     def rm_file(self, path):
         context: FilesetContext = self._get_fileset_context(path)
-        if context.actual_path.startswith(StorageType.HDFS.value):
+        if context.fileset.storage_location().startswith(StorageType.HDFS.value):
             actual_path = self._strip_protocol(context.actual_path)
             context.fs.delete_file(actual_path)
         else:
@@ -217,7 +223,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
 
     def rmdir(self, path):
         context: FilesetContext = self._get_fileset_context(path)
-        if context.actual_path.startswith(StorageType.HDFS.value):
+        if context.fileset.storage_location().startswith(StorageType.HDFS.value):
             actual_path = self._strip_protocol(context.actual_path)
             context.fs.delete_dir(actual_path)
         else:
@@ -235,7 +241,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         **kwargs,
     ):
         context: FilesetContext = self._get_fileset_context(path)
-        if context.actual_path.startswith(StorageType.HDFS.value):
+        if context.fileset.storage_location().startswith(StorageType.HDFS.value):
             if mode == "rb":
                 method = context.fs.open_input_stream
             elif mode == "wb":
@@ -260,7 +266,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             self.makedirs(path, exist_ok=True)
         else:
             context: FilesetContext = self._get_fileset_context(path)
-            if context.actual_path.startswith(StorageType.HDFS.value):
+            if context.fileset.storage_location().startswith(StorageType.HDFS.value):
                 actual_path = self._strip_protocol(context.actual_path)
                 context.fs.create_dir(actual_path, recursive=False)
             else:
@@ -270,7 +276,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
 
     def makedirs(self, path, exist_ok=True):
         context: FilesetContext = self._get_fileset_context(path)
-        if context.actual_path.startswith(StorageType.HDFS.value):
+        if context.fileset.storage_location().startswith(StorageType.HDFS.value):
             actual_path = self._strip_protocol(context.actual_path)
             context.fs.create_dir(actual_path)
         else:
@@ -283,7 +289,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
 
     def modified(self, path):
         context: FilesetContext = self._get_fileset_context(path)
-        if context.actual_path.startswith(StorageType.HDFS.value):
+        if context.fileset.storage_location().startswith(StorageType.HDFS.value):
             actual_path = self._strip_protocol(context.actual_path)
             return context.fs.get_file_info(actual_path).mtime
         raise RuntimeError(
