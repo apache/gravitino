@@ -430,8 +430,9 @@ public class CatalogConnectorManager {
       GravitinoCatalog catalog = GravitinoCatalog.fromJson(catalogConfig);
       CatalogConnectorContext.Builder builder =
           catalogConnectorFactory.createCatalogConnectorContextBuilder(catalog);
-      builder.withMetalake(
-          metalakes.computeIfAbsent(catalog.getMetalake(), this::retrieveMetalake));
+      builder
+          .withMetalake(metalakes.computeIfAbsent(catalog.getMetalake(), this::retrieveMetalake))
+          .withContext(context);
 
       CatalogConnectorContext connectorContext = builder.build();
       catalogConnectors.put(connectorName, connectorContext);
