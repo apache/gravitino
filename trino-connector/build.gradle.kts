@@ -15,11 +15,11 @@ repositories {
 dependencies {
   implementation(project(":catalogs:bundled-catalog", configuration = "shadow"))
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
+  implementation(libs.airlift.json)
   implementation(libs.commons.collections4)
   implementation(libs.commons.lang3)
   implementation(libs.httpclient5)
   implementation(libs.trino.jdbc)
-  implementation(libs.airlift.json)
   compileOnly(libs.trino.spi) {
     exclude("org.apache.logging.log4j")
   }

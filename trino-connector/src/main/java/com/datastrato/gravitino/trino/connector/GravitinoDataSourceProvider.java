@@ -12,10 +12,7 @@ import io.trino.spi.connector.ConnectorSplit;
 import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.ConnectorTransactionHandle;
 import io.trino.spi.connector.DynamicFilter;
-import io.trino.spi.predicate.TupleDomain;
 import java.util.List;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 
 /** This class provides a ConnectorPageSource for trino read data from internal connector. */
 public class GravitinoDataSourceProvider implements ConnectorPageSourceProvider {
@@ -37,9 +34,9 @@ public class GravitinoDataSourceProvider implements ConnectorPageSourceProvider 
     return internalPageSourceProvider.createPageSource(
         GravitinoHandle.unWrap(transaction),
         session,
-        split,
-        gravitinoTableHandle.getInternalTableHandle(),
-        columns,
-        dynamicFilter);
+        GravitinoHandle.unWrap(split),
+        GravitinoHandle.unWrap(table),
+        GravitinoHandle.unWrap(columns),
+        new GravitinoDynamicFilter(dynamicFilter));
   }
 }
