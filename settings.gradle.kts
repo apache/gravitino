@@ -28,7 +28,18 @@ include(
   "clients:client-python"
 )
 include("trino-connector")
+<<<<<<< HEAD
 include("spark-connector:spark-connector", "spark-connector:spark-connector-runtime")
+=======
+include("spark-connector:spark-common", "spark-connector:spark-3.3", "spark-connector:spark-runtime-3.3", "spark-connector:spark-3.4", "spark-connector:spark-runtime-3.4", "spark-connector:spark-3.5", "spark-connector:spark-runtime-3.5")
+project(":spark-connector:spark-3.3").projectDir = file("spark-connector/v3.3/spark")
+project(":spark-connector:spark-runtime-3.3").projectDir = file("spark-connector/v3.3/spark-runtime")
+project(":spark-connector:spark-3.4").projectDir = file("spark-connector/v3.4/spark")
+project(":spark-connector:spark-runtime-3.4").projectDir = file("spark-connector/v3.4/spark-runtime")
+project(":spark-connector:spark-3.5").projectDir = file("spark-connector/v3.5/spark")
+project(":spark-connector:spark-runtime-3.5").projectDir = file("spark-connector/v3.5/spark-runtime")
+include("flink-connector")
+>>>>>>> 4c61a644 ([#3554] feat(spark-connector): support spark multi Version (#3415))
 include("web")
 include("docs")
 include("integration-test-common")
