@@ -34,6 +34,7 @@ public enum GravitinoErrorCode implements ErrorCodeSupplier {
   GRAVITINO_CATALOG_ALREADY_EXISTS(20, EXTERNAL),
   GRAVITINO_METALAKE_ALREADY_EXISTS(21, EXTERNAL),
   GRAVITINO_OPERATION_FAILED(22, EXTERNAL),
+  GRAVITINO_RUNTIME_ERROR(23, EXTERNAL),
   ;
 
   // suppress ImmutableEnumChecker because ErrorCode is outside the project.

@@ -4,17 +4,16 @@
  */
 package com.datastrato.gravitino.trino.connector.catalog.memory;
 
+import static com.datastrato.gravitino.trino.connector.GravitinoConnectorPluginManager.CONNECTOR_MEMORY;
+
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.HasPropertyMeta;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
-import io.trino.spi.connector.Connector;
 import io.trino.spi.session.PropertyMetadata;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.NotImplementedException;
 
 /**
  * Support trino Memory connector for testing. Transforming Memory connector configuration and
@@ -30,14 +29,12 @@ public class MemoryConnectorAdapter implements CatalogConnectorAdapter {
 
   @Override
   public Map<String, String> buildInternalConnectorConfig(GravitinoCatalog catalog) {
-    Map<String, String> config = new HashMap<>();
-    config.put("connector.name", "memory");
-    return config;
+    return Collections.emptyMap();
   }
 
   @Override
-  public Connector buildInternalConnector(Map<String, String> config) throws Exception {
-    throw new NotImplementedException();
+  public String internalConnectorName() {
+    return CONNECTOR_MEMORY;
   }
 
   @Override
