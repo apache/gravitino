@@ -302,15 +302,17 @@ public class FlinkHiveCatalogIT extends FlinkEnvIT {
       TestUtils.assertTableResult(
           tableEnv.executeSql("SHOW DATABASES"),
           ResultKind.SUCCESS_WITH_CONTENT,
+          Row.of("default"),
           Row.of(schema),
           Row.of(schema2),
           Row.of(schema3));
 
       NameIdentifier[] nameIdentifiers = catalog.asSchemas().listSchemas();
-      Assertions.assertEquals(3, nameIdentifiers.length);
-      Assertions.assertEquals(schema, nameIdentifiers[0].name());
-      Assertions.assertEquals(schema2, nameIdentifiers[1].name());
-      Assertions.assertEquals(schema3, nameIdentifiers[2].name());
+      Assertions.assertEquals(4, nameIdentifiers.length);
+      Assertions.assertEquals("default", nameIdentifiers[0].name());
+      Assertions.assertEquals(schema, nameIdentifiers[1].name());
+      Assertions.assertEquals(schema2, nameIdentifiers[2].name());
+      Assertions.assertEquals(schema3, nameIdentifiers[3].name());
     } finally {
       catalog.asSchemas().dropSchema(schema, true);
       catalog.asSchemas().dropSchema(schema2, true);
