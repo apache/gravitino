@@ -64,8 +64,6 @@ public class GravitinoConnectorPluginManager {
       //    /data/trino/plugin/hive/**.jar
       //    /data/trino/plugin/gravitino/**.jar
       //    /data/trino/plugin/mysql/**.jar
-      this.appClassloader = classLoader;
-      pluginLoaderClass = appClassloader.loadClass(PLUGIN_CLASSLOADER_CLASS_NAME);
       String jarPath =
           GravitinoConnectorPluginManager.class
               .getProtectionDomain()
@@ -74,6 +72,9 @@ public class GravitinoConnectorPluginManager {
               .toURI()
               .getPath();
       String pluginDir = Paths.get(jarPath).getParent().getParent().toString();
+
+      this.appClassloader = classLoader;
+      pluginLoaderClass = appClassloader.loadClass(PLUGIN_CLASSLOADER_CLASS_NAME);
 
       // Load all plugins
       for (String pluginName : usePlugins) {
@@ -127,6 +128,7 @@ public class GravitinoConnectorPluginManager {
       Constructor<?> constructor =
           pluginLoaderClass.getConstructor(String.class, List.class, ClassLoader.class, List.class);
       String classLoaderName = PLUGIN_NAME_PREFIX + pluginName;
+      // Load Trino SPI package and other dependencies refer to io.trino.server.PluginClassLoader
       Object pluginClassLoader =
           constructor.newInstance(
               classLoaderName,
