@@ -250,7 +250,7 @@ public class CatalogConnectorManager {
   }
 
   public String getTrinoCatalogName(String metalake, String catalog) {
-    return config.simplifyCatalogNames() ? catalog : metalake + "." + catalog;
+    return config.simplifyCatalogNames() ? catalog : String.format("\"%s.%s\"", metalake, catalog);
   }
 
   public String getTrinoCatalogName(GravitinoCatalog catalog) {

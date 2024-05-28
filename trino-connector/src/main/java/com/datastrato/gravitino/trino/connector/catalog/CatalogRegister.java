@@ -26,7 +26,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Properties;
-import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,7 +55,7 @@ public class CatalogRegister {
     if (version < MIN_TRINO_SPI_VERSION) {
       String errmsg =
           String.format(
-              "Unsupported trino-%s version. min support version is trino-%d",
+              "Unsupported Trino-%s version. min support version is Trino-%d",
               trinoVersion, MIN_TRINO_SPI_VERSION);
       throw new TrinoException(GRAVITINO_UNSUPPORTED_TRINO_VERSION, errmsg);
     }
@@ -121,7 +120,7 @@ public class CatalogRegister {
   }
 
   private String generateDropCatalogCommand(String name) throws Exception {
-    return String.format("DROP CATALOG %s ", name);
+    return String.format("DROP CATALOG %s", name);
   }
 
   void registerCatalog(String name, GravitinoCatalog catalog) {
@@ -143,58 +142,76 @@ public class CatalogRegister {
         }
       }
 
+      if (checkCatalogExist(name)) {
+        throw new TrinoException(
+            GRAVITINO_DUPLICATED_CATALOGS, "Catalog already exists with unknown reason");
+      }
       String createCatalogCommand = generateCreateCatalogCommand(name, catalog);
-      String showCatalogCommand = String.format("SHOW CATALOGS like '%s'", name);
-      Exception createCatalogException = null;
-      int retries = EXECUTE_QUERY_MAX_RETRIES;
-      while (retries-- > 0) {
-        try (Statement statement = connection.createStatement()) {
-          statement.execute(createCatalogCommand);
-
-          // check the catalog is already created
-          statement.execute(showCatalogCommand);
-          ResultSet rs = statement.getResultSet();
-          if (rs.next() && rs.getString(1).equals(name)) {
-            createCatalogException = null;
-            break;
-          }
-        } catch (Exception e) {
-          createCatalogException = e;
-          LOG.warn("Execute command failed: {}, ", createCatalogCommand, e);
-          Thread.sleep(EXECUTE_QUERY_BACKOFF_TIME * 1000);
-        }
-      }
-      if (createCatalogException != null) {
-        throw createCatalogException;
-      }
+      executeSql(createCatalogCommand);
+      LOG.info("Register catalog {} successfully: {}", name, createCatalogCommand);
     } catch (Exception e) {
       LOG.error("Failed to register catalog", e);
     }
   }
 
-  void unResisterCatalog(String name) {
+  boolean checkCatalogExist(String name) {
+    String showCatalogCommand = String.format("SHOW CATALOGS like '%s'", name);
+    Exception failedException = null;
     try {
-      String dropCatalogCommand = generateDropCatalogCommand(name);
-      String showCatalogCommand = String.format("SHOW CATALOGS like '%s'", name);
-      Exception createCatalogException = null;
-      int retries = 3;
+      int retries = EXECUTE_QUERY_MAX_RETRIES;
       while (retries-- > 0) {
         try (Statement statement = connection.createStatement()) {
-          // check if the catalog exit
+          // check the catalog is already created
           statement.execute(showCatalogCommand);
           ResultSet rs = statement.getResultSet();
-          if (rs.next()) {
-            statement.execute(dropCatalogCommand);
+          while (rs.next()) {
+            String catalogName = rs.getString(1);
+            if (catalogName.equals(name) || catalogName.equals("\"" + name + "\"")) {
+              return true;
+            }
           }
+          return false;
         } catch (Exception e) {
-          createCatalogException = e;
-          LOG.warn("Execute command failed: {}, ", dropCatalogCommand, e);
-          Thread.sleep(TimeUnit.SECONDS.toMillis(30));
+          failedException = e;
+          LOG.warn("Execute command failed: {}, ", showCatalogCommand, e);
+          Thread.sleep(EXECUTE_QUERY_BACKOFF_TIME * 1000);
         }
       }
-      if (createCatalogException != null) {
-        throw createCatalogException;
+      throw failedException;
+    } catch (Exception e) {
+      throw new TrinoException(GRAVITINO_RUNTIME_ERROR, "Failed to check catalog exist", e);
+    }
+  }
+
+  void executeSql(String sql) {
+    try {
+      int retries = EXECUTE_QUERY_MAX_RETRIES;
+      Exception failedException = null;
+      while (retries-- > 0) {
+        try (Statement statement = connection.createStatement()) {
+          // check the catalog is already created
+          statement.execute(sql);
+          return;
+        } catch (Exception e) {
+          failedException = e;
+          LOG.warn("Execute command failed: {}, ", sql, e);
+          Thread.sleep(EXECUTE_QUERY_BACKOFF_TIME * 1000);
+        }
       }
+      throw failedException;
+    } catch (Exception e) {
+      LOG.error("Execute command failed: {}, ", sql, e);
+    }
+  }
+
+  void unResisterCatalog(String name) {
+    try {
+      if (!checkCatalogExist(name)) {
+        return;
+      }
+      String dropCatalogCommand = generateDropCatalogCommand(name);
+      executeSql(dropCatalogCommand);
+      LOG.info("Unregister catalog {} successfully: {}", name, dropCatalogCommand);
     } catch (Exception e) {
       LOG.error("Failed to unregister catalog", e);
     }

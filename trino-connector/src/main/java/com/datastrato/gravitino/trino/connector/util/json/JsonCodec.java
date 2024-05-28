@@ -81,18 +81,22 @@ public class JsonCodec {
   static void registerHandleSerializationModule(
       ObjectMapper objectMapper, ClassLoader classLoader) {
 
-    GravitinoConnectorPluginManager pluginManager =
-        GravitinoConnectorPluginManager.instance(classLoader);
+    GravitinoConnectorPluginManager pluginManager = GravitinoConnectorPluginManager.instance();
     Function<Object, String> nameResolver =
         obj -> {
           try {
             ClassLoader pluginClassloader = obj.getClass().getClassLoader();
+            if (pluginClassloader
+                == GravitinoConnectorPluginManager.instance().getAppClassloader()) {
+              return "app:" + obj.getClass().getName();
+            }
+
             Field idField = pluginClassloader.getClass().getDeclaredField("pluginName");
             idField.setAccessible(true);
             String classLoaderName = (String) idField.get(pluginClassloader);
             return classLoaderName + ":" + obj.getClass().getName();
           } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("Gravitino connector serialize error " + e.getMessage(), e);
           }
         };
 
@@ -105,7 +109,8 @@ public class JsonCodec {
             ClassLoader loader = pluginManager.getClassLoader(classLoaderName);
             return loader.loadClass(className);
           } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException(
+                "Gravitino connector deserialize error " + e.getMessage(), e);
           }
         };
 
