@@ -32,7 +32,7 @@ public class GravitinoSplitManager implements ConnectorSplitManager {
             GravitinoHandle.unWrap(transaction),
             session,
             GravitinoHandle.unWrap(connectorTableHandle),
-            dynamicFilter,
+            new GravitinoDynamicFilter(dynamicFilter),
             constraint);
     return new GravitinoSplitSource(splits);
   }
