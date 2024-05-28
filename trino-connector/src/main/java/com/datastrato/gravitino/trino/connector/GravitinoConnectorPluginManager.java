@@ -110,13 +110,13 @@ public class GravitinoConnectorPluginManager {
     File directory = new File(dirName);
     if (!directory.exists()) {
       throw new TrinoException(
-          GRAVITINO_RUNTIME_ERROR, "Can not found plugin directory " + pluginPath);
+          GRAVITINO_RUNTIME_ERROR, "Can not found plugin directory " + dirName);
     }
 
     File[] pluginFiles = directory.listFiles();
     if (pluginFiles == null || pluginFiles.length == 0) {
       throw new TrinoException(
-          GRAVITINO_RUNTIME_ERROR, "Can not found any files plugin directory " + pluginPath);
+          GRAVITINO_RUNTIME_ERROR, "Can not found any files plugin directory " + dirName);
     }
     List<URL> files =
         Arrays.stream(pluginFiles)
