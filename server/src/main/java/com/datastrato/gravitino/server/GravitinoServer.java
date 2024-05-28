@@ -25,7 +25,6 @@ import com.datastrato.gravitino.server.web.VersioningFilter;
 import com.datastrato.gravitino.server.web.filter.AccessControlNotAllowedFilter;
 import com.datastrato.gravitino.server.web.ui.WebUIFilter;
 import java.io.File;
-import java.util.Arrays;
 import java.util.Properties;
 import javax.servlet.Servlet;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
@@ -132,7 +131,6 @@ public class GravitinoServer extends ResourceConfig {
     ServerConfig serverConfig = loadConfig(confPath);
     GravitinoServer server = new GravitinoServer(serverConfig);
     server.initialize();
-    LOG.info("Gravitino Server arguments:{}", Arrays.toString(args));
 
     try {
       // Instantiates GravitinoServer

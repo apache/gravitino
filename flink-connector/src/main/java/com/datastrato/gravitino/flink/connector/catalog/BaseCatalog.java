@@ -55,23 +55,19 @@ import org.slf4j.LoggerFactory;
 public abstract class BaseCatalog extends AbstractCatalog {
   private static final Logger LOG = LoggerFactory.getLogger(BaseCatalog.class);
 
-  private Catalog catalog;
-
   protected BaseCatalog(String catalogName, String defaultDatabase) {
     super(catalogName, defaultDatabase);
   }
 
   @Override
-  public void open() throws CatalogException {
-    this.catalog = GravitinoCatalogManager.get().getGravitinoCatalogInfo(getName());
-  }
+  public void open() throws CatalogException {}
 
   @Override
   public void close() throws CatalogException {}
 
   @Override
   public List<String> listDatabases() throws CatalogException {
-    return Arrays.stream(this.catalog.asSchemas().listSchemas())
+    return Arrays.stream(catalog().asSchemas().listSchemas())
         .map(NameIdentifier::name)
         .collect(Collectors.toList());
   }
@@ -80,7 +76,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
   public CatalogDatabase getDatabase(String databaseName)
       throws DatabaseNotExistException, CatalogException {
     try {
-      Schema schema = this.catalog.asSchemas().loadSchema(databaseName);
+      Schema schema = catalog().asSchemas().loadSchema(databaseName);
       return new CatalogDatabaseImpl(schema.properties(), schema.comment());
     } catch (NoSuchSchemaException e) {
       throw new DatabaseNotExistException(getName(), databaseName);
@@ -89,7 +85,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
 
   @Override
   public boolean databaseExists(String databaseName) throws CatalogException {
-    return this.catalog.asSchemas().schemaExists(databaseName);
+    return catalog().asSchemas().schemaExists(databaseName);
   }
 
   @Override
@@ -97,7 +93,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
       String databaseName, CatalogDatabase catalogDatabase, boolean ignoreIfExists)
       throws DatabaseAlreadyExistException, CatalogException {
     try {
-      this.catalog
+      catalog()
           .asSchemas()
           .createSchema(
               databaseName, catalogDatabase.getComment(), catalogDatabase.getProperties());
@@ -116,7 +112,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
   public void dropDatabase(String databaseName, boolean ignoreIfNotExists, boolean cascade)
       throws DatabaseNotExistException, DatabaseNotEmptyException, CatalogException {
     try {
-      this.catalog.asSchemas().dropSchema(databaseName, cascade);
+      catalog().asSchemas().dropSchema(databaseName, cascade);
     } catch (NoSuchSchemaException e) {
       if (!ignoreIfNotExists) {
         throw new DatabaseNotExistException(getName(), databaseName);
@@ -136,7 +132,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
       throws DatabaseNotExistException, CatalogException {
     try {
       SchemaChange[] schemaChanges = getSchemaChange(getDatabase(databaseName), catalogDatabase);
-      this.catalog.asSchemas().alterSchema(databaseName, schemaChanges);
+      catalog().asSchemas().alterSchema(databaseName, schemaChanges);
     } catch (NoSuchSchemaException e) {
       if (!ignoreIfNotExists) {
         throw new DatabaseNotExistException(getName(), databaseName);
@@ -370,5 +366,9 @@ public abstract class BaseCatalog extends AbstractCatalog {
               schemaChanges.add(SchemaChange.setProperty(key, value.rightValue()));
             });
     return schemaChanges.toArray(new SchemaChange[0]);
+  }
+
+  private Catalog catalog() {
+    return GravitinoCatalogManager.get().getGravitinoCatalogInfo(getName());
   }
 }

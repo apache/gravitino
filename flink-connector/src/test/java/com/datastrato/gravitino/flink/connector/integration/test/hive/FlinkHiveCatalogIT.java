@@ -6,10 +6,13 @@ package com.datastrato.gravitino.flink.connector.integration.test.hive;
 
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 
+import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.flink.connector.PropertiesConverter;
 import com.datastrato.gravitino.flink.connector.hive.GravitinoHiveCatalog;
 import com.datastrato.gravitino.flink.connector.hive.GravitinoHiveCatalogFactoryOptions;
 import com.datastrato.gravitino.flink.connector.integration.test.FlinkEnvIT;
+import com.datastrato.gravitino.flink.connector.integration.test.utils.TestUtils;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.util.Arrays;
@@ -17,12 +20,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.table.api.ResultKind;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.Catalog;
 import org.apache.flink.table.catalog.CatalogDescriptor;
 import org.apache.flink.table.catalog.CommonCatalogOptions;
 import org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOptions;
+import org.apache.flink.types.Row;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -70,7 +75,7 @@ public class FlinkHiveCatalogIT extends FlinkEnvIT {
 
     // List catalogs.
     String[] catalogs = tableEnv.listCatalogs();
-    Assertions.assertEquals(2, catalogs.length, "Should create a new catalog");
+    Assertions.assertEquals(3, catalogs.length, "Should create a new catalog");
     Assertions.assertTrue(
         Arrays.asList(catalogs).contains(catalogName), "Should create the correct catalog.");
 
@@ -139,14 +144,14 @@ public class FlinkHiveCatalogIT extends FlinkEnvIT {
 
     // List catalogs.
     String[] catalogs = tableEnv.listCatalogs();
-    Assertions.assertEquals(2, catalogs.length, "Should create a new catalog");
+    Assertions.assertEquals(3, catalogs.length, "Should create a new catalog");
     Assertions.assertTrue(
         Arrays.asList(catalogs).contains(catalogName), "Should create the correct catalog.");
 
     // Use SQL to list catalogs.
     TableResult result = tableEnv.executeSql("show catalogs");
     Assertions.assertEquals(
-        2, Lists.newArrayList(result.collect()).size(), "Should have 2 catalogs");
+        3, Lists.newArrayList(result.collect()).size(), "Should have 2 catalogs");
 
     Assertions.assertEquals(
         DEFAULT_CATALOG,
@@ -195,7 +200,7 @@ public class FlinkHiveCatalogIT extends FlinkEnvIT {
   public void testGetCatalogFromGravitino() {
     // list catalogs.
     String[] catalogs = tableEnv.listCatalogs();
-    Assertions.assertEquals(1, catalogs.length, "Only one default catalog");
+    Assertions.assertEquals(2, catalogs.length, "Only have 2 catalog");
 
     // create a new catalog.
     String catalogName = "hive_catalog_in_gravitino";
@@ -215,7 +220,7 @@ public class FlinkHiveCatalogIT extends FlinkEnvIT {
     Assertions.assertNotNull(gravitinoCatalog);
     Assertions.assertEquals(catalogName, gravitinoCatalog.name());
     Assertions.assertTrue(metalake.catalogExists(catalogName));
-    Assertions.assertEquals(2, tableEnv.listCatalogs().length, "Should create a new catalog");
+    Assertions.assertEquals(3, tableEnv.listCatalogs().length, "Should create a new catalog");
 
     // get the catalog from gravitino.
     Optional<Catalog> flinkHiveCatalog = tableEnv.getCatalog(catalogName);
@@ -233,6 +238,130 @@ public class FlinkHiveCatalogIT extends FlinkEnvIT {
     tableEnv.executeSql("drop catalog " + catalogName);
     Assertions.assertFalse(metalake.catalogExists(catalogName));
     Assertions.assertEquals(
-        1, tableEnv.listCatalogs().length, "The created catalog should be dropped.");
+        2, tableEnv.listCatalogs().length, "The created catalog should be dropped.");
+  }
+
+  @Test
+  public void testCreateSchema() {
+    tableEnv.useCatalog(defaultHiveCatalog);
+    com.datastrato.gravitino.Catalog catalog = metalake.loadCatalog(defaultHiveCatalog);
+    String schema = "test_create_schema";
+    try {
+      TableResult tableResult =
+          tableEnv.executeSql(String.format("CREATE DATABASE IF NOT EXISTS %s", schema));
+      TestUtils.assertTableResult(tableResult, ResultKind.SUCCESS);
+      catalog.asSchemas().schemaExists(schema);
+    } finally {
+      catalog.asSchemas().dropSchema(schema, true);
+      Assertions.assertFalse(catalog.asSchemas().schemaExists(schema));
+    }
+  }
+
+  @Test
+  public void testGetSchema() {
+    tableEnv.useCatalog(defaultHiveCatalog);
+    com.datastrato.gravitino.Catalog catalog = metalake.loadCatalog(defaultHiveCatalog);
+    String schema = "test_get_schema";
+
+    try {
+      TestUtils.assertTableResult(
+          tableEnv.executeSql(String.format("CREATE DATABASE IF NOT EXISTS %s", schema)),
+          ResultKind.SUCCESS);
+      TestUtils.assertTableResult(tableEnv.executeSql("USE " + schema), ResultKind.SUCCESS);
+
+      catalog.asSchemas().schemaExists(schema);
+      Schema loadedSchema = catalog.asSchemas().loadSchema(schema);
+      Assertions.assertEquals(schema, loadedSchema.name());
+    } finally {
+      catalog.asSchemas().dropSchema(schema, true);
+      Assertions.assertFalse(catalog.asSchemas().schemaExists(schema));
+    }
+  }
+
+  @Test
+  public void testListSchema() {
+    tableEnv.useCatalog(defaultHiveCatalog);
+    com.datastrato.gravitino.Catalog catalog = metalake.loadCatalog(defaultHiveCatalog);
+    Assertions.assertEquals(1, catalog.asSchemas().listSchemas().length);
+    String schema = "test_list_schema";
+    String schema2 = "test_list_schema2";
+    String schema3 = "test_list_schema3";
+
+    try {
+      TestUtils.assertTableResult(
+          tableEnv.executeSql(String.format("CREATE DATABASE IF NOT EXISTS %s", schema)),
+          ResultKind.SUCCESS);
+
+      TestUtils.assertTableResult(
+          tableEnv.executeSql(String.format("CREATE DATABASE IF NOT EXISTS %s", schema2)),
+          ResultKind.SUCCESS);
+
+      TestUtils.assertTableResult(
+          tableEnv.executeSql(String.format("CREATE DATABASE IF NOT EXISTS %s", schema3)),
+          ResultKind.SUCCESS);
+      TestUtils.assertTableResult(
+          tableEnv.executeSql("SHOW DATABASES"),
+          ResultKind.SUCCESS_WITH_CONTENT,
+          Row.of(schema),
+          Row.of(schema2),
+          Row.of(schema3));
+
+      NameIdentifier[] nameIdentifiers = catalog.asSchemas().listSchemas();
+      Assertions.assertEquals(4, nameIdentifiers.length);
+      Assertions.assertEquals(schema, nameIdentifiers[0].name());
+      Assertions.assertEquals(schema2, nameIdentifiers[1].name());
+      Assertions.assertEquals(schema3, nameIdentifiers[2].name());
+    } finally {
+      catalog.asSchemas().dropSchema(schema, true);
+      catalog.asSchemas().dropSchema(schema2, true);
+      catalog.asSchemas().dropSchema(schema3, true);
+      Assertions.assertEquals(1, catalog.asSchemas().listSchemas().length);
+    }
+  }
+
+  @Test
+  public void testAlterSchema() {
+    tableEnv.useCatalog(defaultHiveCatalog);
+    com.datastrato.gravitino.Catalog catalog = metalake.loadCatalog(defaultHiveCatalog);
+    String schema = "test_alter_schema";
+
+    try {
+      TestUtils.assertTableResult(
+          tableEnv.executeSql(
+              String.format(
+                  "CREATE DATABASE IF NOT EXISTS %s "
+                      + "COMMENT 'test comment'"
+                      + "WITH ('key1' = 'value1', 'key2'='value2')",
+                  schema)),
+          ResultKind.SUCCESS);
+
+      Schema loadedSchema = catalog.asSchemas().loadSchema(schema);
+      Assertions.assertEquals(schema, loadedSchema.name());
+      Assertions.assertEquals("test comment", loadedSchema.comment());
+      Assertions.assertEquals(3, loadedSchema.properties().size());
+      Assertions.assertEquals("value1", loadedSchema.properties().get("key1"));
+      Assertions.assertEquals("value2", loadedSchema.properties().get("key2"));
+      Assertions.assertNotNull(loadedSchema.properties().get("location"));
+
+      TestUtils.assertTableResult(
+          tableEnv.executeSql(
+              String.format("ALTER DATABASE %s SET ('key1'='new-value', 'key3'='value3')", schema)),
+          ResultKind.SUCCESS);
+      Schema reloadedSchema = catalog.asSchemas().loadSchema(schema);
+      Assertions.assertEquals(schema, reloadedSchema.name());
+      Assertions.assertEquals("test comment", reloadedSchema.comment());
+      Assertions.assertEquals(3, reloadedSchema.properties().size());
+      Assertions.assertEquals("new-value", reloadedSchema.properties().get("key1"));
+      Assertions.assertEquals("value3", reloadedSchema.properties().get("key3"));
+
+      TestUtils.assertTableResult(
+          tableEnv.executeSql(String.format("ALTER DATABASE %s RESET ('key2')", schema)),
+          ResultKind.SUCCESS);
+      reloadedSchema = catalog.asSchemas().loadSchema(schema);
+      Assertions.assertEquals(2, reloadedSchema.properties().size());
+      Assertions.assertNull(reloadedSchema.properties().get("key2"));
+    } finally {
+      catalog.asSchemas().dropSchema(schema, true);
+    }
   }
 }

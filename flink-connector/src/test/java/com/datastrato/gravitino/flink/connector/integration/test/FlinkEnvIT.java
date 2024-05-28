@@ -116,7 +116,7 @@ public abstract class FlinkEnvIT extends AbstractIT {
         Catalog.Type.RELATIONAL,
         "hive",
         null,
-        ImmutableMap.of("hive.metastore.uris", hiveMetastoreUri));
+        ImmutableMap.of("metastore.uris", hiveMetastoreUri));
   }
 
   private static void initFlinkEnv() {
