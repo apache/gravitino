@@ -617,8 +617,8 @@ tasks {
   register("copySubprojectDependencies", Copy::class) {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
-        !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark-connector") && it.name != "trino-connector" &&
-        it.name != "integration-test" && it.name != "bundled-catalog"
+        !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark") && it.name != "trino-connector" &&
+        it.name != "integration-test" && it.name != "bundled-catalog" && it.name != "flink-connector"
       ) {
         from(it.configurations.runtimeClasspath)
         into("distribution/package/libs")
@@ -631,7 +631,7 @@ tasks {
       if (!it.name.startsWith("catalog") &&
         !it.name.startsWith("client") &&
         !it.name.startsWith("filesystem") &&
-        !it.name.startsWith("spark-connector") &&
+        !it.name.startsWith("spark") &&
         it.name != "trino-connector" &&
         it.name != "integration-test" &&
         it.name != "bundled-catalog"
