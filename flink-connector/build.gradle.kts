@@ -73,7 +73,15 @@ dependencies {
   testImplementation(libs.hadoop2.common) {
     exclude("*")
   }
-  testImplementation(libs.hadoop2.hdfs)
+  testImplementation(libs.hadoop2.hdfs) {
+    exclude("com.sun.jersey")
+    exclude("commons-cli", "commons-cli")
+    exclude("commons-io", "commons-io")
+    exclude("commons-codec", "commons-codec")
+    exclude("commons-logging", "commons-logging")
+    exclude("javax.servlet", "servlet-api")
+    exclude("org.mortbay.jetty")
+  }
   testImplementation(libs.hadoop2.mapreduce.client.core) {
     exclude("*")
   }
