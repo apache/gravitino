@@ -700,7 +700,7 @@ public class JsonUtils {
       }
     }
 
-    throw new IllegalArgumentException("Cannot parse type from JSON: " + node);
+    return Types.UnparsedType.of(node.toString());
   }
 
   private static void writeUnionType(Types.UnionType unionType, JsonGenerator gen)
@@ -780,7 +780,7 @@ public class JsonUtils {
     gen.writeEndObject();
   }
 
-  private static Type.PrimitiveType fromPrimitiveTypeString(String typeString) {
+  private static Type fromPrimitiveTypeString(String typeString) {
     Type.PrimitiveType primitiveType = TYPES.get(typeString);
     if (primitiveType != null) {
       return primitiveType;
@@ -807,7 +807,7 @@ public class JsonUtils {
           Integer.parseInt(decimal.group(1)), Integer.parseInt(decimal.group(2)));
     }
 
-    throw new IllegalArgumentException("Cannot parse type string to primitiveType: " + typeString);
+    return Types.UnparsedType.of(typeString);
   }
 
   private static Types.StructType readStructType(JsonNode node) {
