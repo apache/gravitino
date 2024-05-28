@@ -98,7 +98,7 @@ public class CatalogIT extends AbstractIT {
     properties.put("metastore.uris", hmsUri);
     Catalog catalog =
         metalake.createCatalog(
-                catalogName, Catalog.Type.RELATIONAL, "hive", "catalog comment", properties);
+            catalogName, Catalog.Type.RELATIONAL, "hive", "catalog comment", properties);
     Assertions.assertTrue(metalake.catalogExists(catalogName));
     Assertions.assertEquals(catalogName, catalog.name());
 

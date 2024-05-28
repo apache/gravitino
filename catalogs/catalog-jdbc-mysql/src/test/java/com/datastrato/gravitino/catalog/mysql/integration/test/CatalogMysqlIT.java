@@ -857,7 +857,10 @@ public class CatalogMysqlIT extends AbstractIT {
 
     // Try to drop a database, and cascade equals to false, it should not be
     // allowed.
-    catalog.asSchemas().dropSchema(schemaName, false);
+    Throwable excep =
+        Assertions.assertThrows(
+            RuntimeException.class, () -> catalog.asSchemas().dropSchema(schemaName, false));
+    Assertions.assertTrue(excep.getMessage().contains("the value of cascade should be true."));
 
     // Check the database still exists
     catalog.asSchemas().loadSchema(schemaName);

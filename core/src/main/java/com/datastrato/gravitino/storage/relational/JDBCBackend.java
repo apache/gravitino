@@ -172,32 +172,28 @@ public class JDBCBackend implements RelationalBackend {
 
   @Override
   public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade) {
-    try {
-      switch (entityType) {
-        case METALAKE:
-          return MetalakeMetaService.getInstance().deleteMetalake(ident, cascade);
-        case CATALOG:
-          return CatalogMetaService.getInstance().deleteCatalog(ident, cascade);
-        case SCHEMA:
-          return SchemaMetaService.getInstance().deleteSchema(ident, cascade);
-        case TABLE:
-          return TableMetaService.getInstance().deleteTable(ident);
-        case FILESET:
-          return FilesetMetaService.getInstance().deleteFileset(ident);
-        case TOPIC:
-          return TopicMetaService.getInstance().deleteTopic(ident);
-        case USER:
-          return UserMetaService.getInstance().deleteUser(ident);
-        case GROUP:
-          return GroupMetaService.getInstance().deleteGroup(ident);
-        case ROLE:
-          return RoleMetaService.getInstance().deleteRole(ident);
-        default:
-          throw new UnsupportedEntityTypeException(
-              "Unsupported entity type: %s for delete operation", entityType);
-      }
-    } catch (NoSuchEntityException nse) {
-      return false;
+    switch (entityType) {
+      case METALAKE:
+        return MetalakeMetaService.getInstance().deleteMetalake(ident, cascade);
+      case CATALOG:
+        return CatalogMetaService.getInstance().deleteCatalog(ident, cascade);
+      case SCHEMA:
+        return SchemaMetaService.getInstance().deleteSchema(ident, cascade);
+      case TABLE:
+        return TableMetaService.getInstance().deleteTable(ident);
+      case FILESET:
+        return FilesetMetaService.getInstance().deleteFileset(ident);
+      case TOPIC:
+        return TopicMetaService.getInstance().deleteTopic(ident);
+      case USER:
+        return UserMetaService.getInstance().deleteUser(ident);
+      case GROUP:
+        return GroupMetaService.getInstance().deleteGroup(ident);
+      case ROLE:
+        return RoleMetaService.getInstance().deleteRole(ident);
+      default:
+        throw new UnsupportedEntityTypeException(
+            "Unsupported entity type: %s for delete operation", entityType);
     }
   }
 

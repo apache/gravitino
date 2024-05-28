@@ -156,6 +156,7 @@ public class TestHiveSchema extends MiniHiveMetastoreService {
     Assertions.assertTrue(catalogOperations.schemaExists(ident));
     catalogOperations.dropSchema(ident, true);
     Assertions.assertFalse(catalogOperations.schemaExists(ident));
-    Assertions.assertFalse(catalogOperations.dropSchema(ident, true), "schema should not be exists");
+    Assertions.assertFalse(
+        catalogOperations.dropSchema(ident, true), "schema should not be exists");
   }
 }

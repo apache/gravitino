@@ -28,8 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Gravitino Metalake is the top-level metadata repository for users. It contains a list of catalogs
@@ -194,14 +192,14 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
   @Override
   public boolean dropCatalog(String catalogName) {
 
-      DropResponse resp =
-          restClient.delete(
-              String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName),
-              DropResponse.class,
-              Collections.emptyMap(),
-              ErrorHandlers.catalogErrorHandler());
-      resp.validate();
-      return resp.dropped();
+    DropResponse resp =
+        restClient.delete(
+            String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName),
+            DropResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.catalogErrorHandler());
+    resp.validate();
+    return resp.dropped();
   }
 
   static class Builder extends MetalakeDTO.Builder<Builder> {

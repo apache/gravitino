@@ -106,9 +106,7 @@ public class AuditCatalogMysqlIT extends AbstractIT {
     Assertions.assertEquals(expectUser, schema.auditInfo().creator());
     Assertions.assertNull(schema.auditInfo().lastModifier());
 
-    catalog
-        .asSchemas()
-        .dropSchema(NameIdentifier.ofSchema(metalakeName, catalogName, schemaName), true);
+    catalog.asSchemas().dropSchema(schemaName, true);
     metalake.dropCatalog(catalogName);
   }
 
@@ -145,9 +143,7 @@ public class AuditCatalogMysqlIT extends AbstractIT {
     catalog
         .asTableCatalog()
         .dropTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
-    catalog
-        .asSchemas()
-        .dropSchema(NameIdentifier.ofSchema(metalakeName, catalogName, schemaName), true);
+    catalog.asSchemas().dropSchema(schemaName, true);
     metalake.dropCatalog(catalogName);
   }
 

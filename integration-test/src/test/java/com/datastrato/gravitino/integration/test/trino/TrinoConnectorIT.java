@@ -1081,8 +1081,11 @@ public class TrinoConnectorIT extends AbstractIT {
     }
 
     // Do not support the cascade drop
-    success = catalog.asSchemas().dropSchema(schemaName, true);
-    Assertions.assertFalse(success);
+    Throwable excep =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> catalog.asSchemas().dropSchema(schemaName, true));
+    Assertions.assertTrue(
+        excep.getMessage().contains("Iceberg does not support cascading delete operations."));
     final String sql3 = String.format("show schemas in %s like '%s'", catalogName, schemaName);
     success = checkTrinoHasLoaded(sql3, 30);
     if (!success) {
