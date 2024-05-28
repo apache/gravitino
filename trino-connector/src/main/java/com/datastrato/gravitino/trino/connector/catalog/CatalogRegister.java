@@ -87,7 +87,6 @@ public class CatalogRegister {
     this.config = config;
     checkTrinoSpiVersion(context);
 
-    // Register the catalog
     TrinoDriver driver = new TrinoDriver();
     DriverManager.registerDriver(driver);
 
@@ -98,7 +97,7 @@ public class CatalogRegister {
       connection = driver.connect(config.getTrinoURI(), properties);
     } catch (SQLException e) {
       throw new TrinoException(
-          GRAVITINO_RUNTIME_ERROR, "Failed to initialize Trino the trino connection. ", e);
+          GRAVITINO_RUNTIME_ERROR, "Failed to initialize Trino the trino connection.", e);
     }
 
     catalogStoreDirectory = config.getCatalogStoreDirectory();
@@ -112,7 +111,7 @@ public class CatalogRegister {
   private String generateCreateCatalogCommand(String name, GravitinoCatalog gravitinoCatalog)
       throws Exception {
     return String.format(
-        "CREATE CATALOG %s USING gravitino WITH ( \"%s\" = 'true', \"%s\" = '%s', %s)",
+        "CREATE CATALOG \"%s\" USING gravitino WITH ( \"%s\" = 'true', \"%s\" = '%s', %s)",
         name,
         GRAVITINO_DYNAMIC_CONNECTOR,
         GRAVITINO_DYNAMIC_CONNECTOR_CATALOG_CONFIG,
@@ -121,7 +120,7 @@ public class CatalogRegister {
   }
 
   private String generateDropCatalogCommand(String name) throws Exception {
-    return String.format("DROP CATALOG %s ", name);
+    return String.format("DROP CATALOG \"%s\" ", name);
   }
 
   void registerCatalog(String name, GravitinoCatalog catalog) {
