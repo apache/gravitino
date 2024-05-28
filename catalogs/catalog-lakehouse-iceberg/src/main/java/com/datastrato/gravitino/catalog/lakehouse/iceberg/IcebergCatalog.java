@@ -6,11 +6,21 @@ package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
 import com.datastrato.gravitino.connector.BaseCatalog;
 import com.datastrato.gravitino.connector.CatalogOperations;
+import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.connector.capability.Capability;
 import java.util.Map;
 
 /** Implementation of an Iceberg catalog in Gravitino. */
 public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
+
+  private static final IcebergCatalogPropertiesMetadata CATALOG_PROPERTIES_META =
+      new IcebergCatalogPropertiesMetadata();
+
+  private static final IcebergSchemaPropertiesMetadata SCHEMA_PROPERTIES_META =
+      new IcebergSchemaPropertiesMetadata();
+
+  private static final IcebergTablePropertiesMetadata TABLE_PROPERTIES_META =
+      new IcebergTablePropertiesMetadata();
 
   /** @return The short name of the catalog. */
   @Override
@@ -33,5 +43,20 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
   @Override
   public Capability newCapability() {
     return new IcebergCatalogCapability();
+  }
+
+  @Override
+  public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
+    return TABLE_PROPERTIES_META;
+  }
+
+  @Override
+  public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
+    return CATALOG_PROPERTIES_META;
+  }
+
+  @Override
+  public PropertiesMetadata schemaPropertiesMetadata() throws UnsupportedOperationException {
+    return SCHEMA_PROPERTIES_META;
   }
 }

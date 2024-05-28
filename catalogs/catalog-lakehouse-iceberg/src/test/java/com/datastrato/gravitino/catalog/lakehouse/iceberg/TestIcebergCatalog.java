@@ -65,10 +65,11 @@ public class TestIcebergCatalog {
     Map<String, String> conf = Maps.newHashMap();
 
     try (IcebergCatalogOperations ops = new IcebergCatalogOperations()) {
-      ops.initialize(conf, entity.toCatalogInfo());
+      IcebergCatalog icebergCatalog = new IcebergCatalog();
+      ops.initialize(conf, entity.toCatalogInfo(), icebergCatalog);
       Map<String, String> map1 = Maps.newHashMap();
       map1.put(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND_NAME, "test");
-      PropertiesMetadata metadata = ops.catalogPropertiesMetadata();
+      PropertiesMetadata metadata = icebergCatalog.catalogPropertiesMetadata();
       Assertions.assertThrows(
           IllegalArgumentException.class,
           () -> {

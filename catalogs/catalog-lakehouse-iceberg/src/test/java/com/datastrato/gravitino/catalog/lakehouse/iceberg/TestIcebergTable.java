@@ -481,7 +481,8 @@ public class TestIcebergTable {
   public void testTableProperty() {
     CatalogEntity entity = createDefaultCatalogEntity();
     try (IcebergCatalogOperations ops = new IcebergCatalogOperations()) {
-      ops.initialize(Maps.newHashMap(), entity.toCatalogInfo());
+      IcebergCatalog icebergCatalog = new IcebergCatalog();
+      ops.initialize(Maps.newHashMap(), entity.toCatalogInfo(), icebergCatalog);
       Map<String, String> map = Maps.newHashMap();
       map.put(IcebergTablePropertiesMetadata.COMMENT, "test");
       map.put(IcebergTablePropertiesMetadata.CREATOR, "test");
@@ -496,7 +497,7 @@ public class TestIcebergTable {
                 put(entry.getKey(), entry.getValue());
               }
             };
-        PropertiesMetadata metadata = ops.tablePropertiesMetadata();
+        PropertiesMetadata metadata = icebergCatalog.tablePropertiesMetadata();
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () -> {
@@ -514,7 +515,7 @@ public class TestIcebergTable {
                 put(entry.getKey(), entry.getValue());
               }
             };
-        PropertiesMetadata metadata = ops.tablePropertiesMetadata();
+        PropertiesMetadata metadata = icebergCatalog.tablePropertiesMetadata();
         Assertions.assertDoesNotThrow(
             () -> {
               PropertiesMetadataHelpers.validatePropertyForCreate(metadata, properties);

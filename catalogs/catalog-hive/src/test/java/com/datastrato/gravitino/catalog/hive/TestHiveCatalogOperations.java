@@ -29,45 +29,48 @@ class TestHiveCatalogOperations {
   @Test
   void testGetClientPoolSize() {
     Map<String, String> maps = Maps.newHashMap();
+    HiveCatalog hiveCatalog = new HiveCatalog();
     maps.put(CLIENT_POOL_SIZE, "10");
     HiveCatalogOperations op = new HiveCatalogOperations();
-    op.initialize(maps, null);
+    op.initialize(maps, null, hiveCatalog);
     Assertions.assertEquals(10, op.getClientPoolSize(maps));
 
     maps.clear();
     maps.put(CLIENT_POOL_SIZE + "_wrong_mark", "10");
     op = new HiveCatalogOperations();
-    op.initialize(maps, null);
+    op.initialize(maps, null, hiveCatalog);
     Assertions.assertNotEquals(10, op.getClientPoolSize(maps));
 
     maps.put(CLIENT_POOL_SIZE, "1");
     op = new HiveCatalogOperations();
-    op.initialize(maps, null);
+    op.initialize(maps, null, hiveCatalog);
     Assertions.assertEquals(1, op.getClientPoolSize(maps));
   }
 
   @Test
   void testInitialize() throws NoSuchFieldException, IllegalAccessException {
     Map<String, String> properties = Maps.newHashMap();
+    HiveCatalog hiveCatalog = new HiveCatalog();
     HiveCatalogOperations hiveCatalogOperations = new HiveCatalogOperations();
-    hiveCatalogOperations.initialize(properties, null);
+    hiveCatalogOperations.initialize(properties, null, hiveCatalog);
     String v = hiveCatalogOperations.hiveConf.get("mapreduce.job.reduces");
     Assertions.assertEquals("10", v);
 
     // Test If we can override the value in hive-site.xml
     properties.put(CATALOG_BYPASS_PREFIX + "mapreduce.job.reduces", "20");
-    hiveCatalogOperations.initialize(properties, null);
+    hiveCatalogOperations.initialize(properties, null, hiveCatalog);
     v = hiveCatalogOperations.hiveConf.get("mapreduce.job.reduces");
     Assertions.assertEquals("20", v);
   }
 
   @Test
   void testPropertyMeta() {
+    HiveCatalog hiveCatalog = new HiveCatalog();
     HiveCatalogOperations hiveCatalogOperations = new HiveCatalogOperations();
-    hiveCatalogOperations.initialize(Maps.newHashMap(), null);
+    hiveCatalogOperations.initialize(Maps.newHashMap(), null, hiveCatalog);
 
     Map<String, PropertyEntry<?>> propertyEntryMap =
-        hiveCatalogOperations.catalogPropertiesMetadata().propertyEntries();
+        hiveCatalog.catalogPropertiesMetadata().propertyEntries();
     Assertions.assertEquals(11, propertyEntryMap.size());
     Assertions.assertTrue(propertyEntryMap.containsKey(METASTORE_URIS));
     Assertions.assertTrue(propertyEntryMap.containsKey(Catalog.PROPERTY_PACKAGE));
@@ -101,7 +104,7 @@ class TestHiveCatalogOperations {
     maps.put(ConfVars.METASTOREURIS.varname, "url2");
     maps.put(CATALOG_BYPASS_PREFIX + ConfVars.METASTOREURIS.varname, "url3");
     HiveCatalogOperations op = new HiveCatalogOperations();
-    op.initialize(maps, null);
+    op.initialize(maps, null, new HiveCatalog());
 
     Assertions.assertEquals("v2", op.hiveConf.get("a.b"));
     Assertions.assertEquals("v4", op.hiveConf.get("c.d"));

@@ -24,14 +24,12 @@ public class MySQLProtocolCompatibleCatalogOperations extends JdbcCatalogOperati
       JdbcTypeConverter jdbcTypeConverter,
       JdbcDatabaseOperations databaseOperation,
       JdbcTableOperations tableOperation,
-      JdbcTablePropertiesMetadata jdbcTablePropertiesMetadata,
       JdbcColumnDefaultValueConverter columnDefaultValueConverter) {
     super(
         exceptionConverter,
         jdbcTypeConverter,
         databaseOperation,
         tableOperation,
-        jdbcTablePropertiesMetadata,
         columnDefaultValueConverter);
   }
 

@@ -153,10 +153,11 @@ public class TestIcebergSchema {
     Map<String, String> conf = Maps.newHashMap();
 
     try (IcebergCatalogOperations ops = new IcebergCatalogOperations()) {
-      ops.initialize(conf, entity.toCatalogInfo());
+      IcebergCatalog icebergCatalog = new IcebergCatalog();
+      ops.initialize(conf, entity.toCatalogInfo(), icebergCatalog);
       Map<String, String> map = Maps.newHashMap();
       map.put(IcebergSchemaPropertiesMetadata.COMMENT, "test");
-      PropertiesMetadata metadata = ops.schemaPropertiesMetadata();
+      PropertiesMetadata metadata = icebergCatalog.schemaPropertiesMetadata();
 
       IllegalArgumentException illegalArgumentException =
           Assertions.assertThrows(

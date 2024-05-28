@@ -93,7 +93,8 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
             .build();
 
     kafkaCatalogOperations = new KafkaCatalogOperations(store, idGenerator);
-    kafkaCatalogOperations.initialize(MOCK_CATALOG_PROPERTIES, kafkaCatalogEntity.toCatalogInfo());
+    kafkaCatalogOperations.initialize(
+        MOCK_CATALOG_PROPERTIES, kafkaCatalogEntity.toCatalogInfo(), new KafkaCatalog());
   }
 
   @AfterAll
@@ -123,7 +124,7 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
     KafkaCatalogOperations ops = new KafkaCatalogOperations(store, idGenerator);
     Assertions.assertNull(ops.adminClientConfig);
 
-    ops.initialize(MOCK_CATALOG_PROPERTIES, catalogEntity.toCatalogInfo());
+    ops.initialize(MOCK_CATALOG_PROPERTIES, catalogEntity.toCatalogInfo(), new KafkaCatalog());
     Assertions.assertNotNull(ops.adminClientConfig);
     Assertions.assertEquals(2, ops.adminClientConfig.size());
     Assertions.assertEquals(
@@ -155,7 +156,7 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
                     .build())
             .build();
     KafkaCatalogOperations ops = new KafkaCatalogOperations(store, idGenerator);
-    ops.initialize(MOCK_CATALOG_PROPERTIES, catalogEntity.toCatalogInfo());
+    ops.initialize(MOCK_CATALOG_PROPERTIES, catalogEntity.toCatalogInfo(), new KafkaCatalog());
 
     Assertions.assertNotNull(ops.defaultSchemaIdent);
     Assertions.assertEquals(DEFAULT_SCHEMA_NAME, ops.defaultSchemaIdent.name());
