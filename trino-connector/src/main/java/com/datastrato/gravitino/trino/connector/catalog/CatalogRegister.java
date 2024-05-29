@@ -41,7 +41,7 @@ public class CatalogRegister {
 
   private static final int MIN_TRINO_SPI_VERSION = 435;
   private static final int EXECUTE_QUERY_MAX_RETRIES = 6;
-  private static final int EXECUTE_QUERY_BACKOFF_TIME = 5;
+  private static final int EXECUTE_QUERY_BACKOFF_TIME_SECOND = 5;
 
   private String trinoVersion;
   private Connection connection;
@@ -179,7 +179,7 @@ public class CatalogRegister {
         } catch (Exception e) {
           failedException = e;
           LOG.warn("Execute command failed: {}, ", showCatalogCommand, e);
-          Awaitility.await().atLeast(EXECUTE_QUERY_BACKOFF_TIME, TimeUnit.SECONDS);
+          Awaitility.await().atLeast(EXECUTE_QUERY_BACKOFF_TIME_SECOND, TimeUnit.SECONDS);
         }
       }
       throw failedException;
@@ -200,7 +200,7 @@ public class CatalogRegister {
         } catch (Exception e) {
           failedException = e;
           LOG.warn("Execute command failed: {}, ", sql, e);
-          Awaitility.await().atLeast(EXECUTE_QUERY_BACKOFF_TIME, TimeUnit.SECONDS);
+          Awaitility.await().atLeast(EXECUTE_QUERY_BACKOFF_TIME_SECOND, TimeUnit.SECONDS);
         }
       }
       throw failedException;
