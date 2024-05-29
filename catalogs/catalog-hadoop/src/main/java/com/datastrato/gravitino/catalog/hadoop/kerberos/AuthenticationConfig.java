@@ -12,7 +12,6 @@ import com.datastrato.gravitino.config.ConfigEntry;
 import com.datastrato.gravitino.connector.PropertyEntry;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import org.apache.commons.lang3.StringUtils;
 
 public class AuthenticationConfig extends Config {
   public static final String AUTH_TYPE_KEY = "hadoop.authentication.type";
@@ -28,7 +27,6 @@ public class AuthenticationConfig extends Config {
           .doc("The type of authentication for Hadoop catalog, currently we only support kerberos")
           .version(ConfigConstants.VERSION_0_5_1)
           .stringConf()
-          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<Boolean> ENABLE_AUTH_ENTRY =
