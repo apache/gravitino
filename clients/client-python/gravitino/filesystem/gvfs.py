@@ -268,8 +268,6 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             **kwargs,
         )
 
-        # pylint: disable=W0221
-
     def get_file(self, rpath, lpath, **kwargs):
         kwargs["seekable"] = False
         context: FilesetContext = self._get_fileset_context(rpath)
@@ -319,13 +317,12 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 self.cache.get(identifier)
             )
             if cache_value is not None:
-                virtual_location = self._get_virtual_location(identifier)
                 actual_path = self._get_actual_path_by_ident(
+                    identifier,
                     cache_value[0],
                     cache_value[1],
-                    virtual_path,
-                    virtual_location,
                     cache_value[2],
+                    virtual_path,
                 )
                 return FilesetContext(
                     identifier,
@@ -342,13 +339,12 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             write_lock.acquire()
             cache_value: Tuple[Fileset, AbstractFileSystem] = self.cache.get(identifier)
             if cache_value is not None:
-                virtual_location = self._get_virtual_location(identifier)
                 actual_path = self._get_actual_path_by_ident(
+                    identifier,
                     cache_value[0],
                     cache_value[1],
-                    virtual_path,
-                    virtual_location,
                     cache_value[2],
+                    virtual_path,
                 )
                 return FilesetContext(
                     identifier,
@@ -369,9 +365,8 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 raise ValueError(
                     f"Storage under the fileset: `{identifier}` doesn't support now."
                 )
-            virtual_location = self._get_virtual_location(identifier)
             actual_path = self._get_actual_path_by_ident(
-                fileset, fs, virtual_path, virtual_location, storage_type
+                identifier, fileset, fs, storage_type, virtual_path
             )
             self.cache[identifier] = (fileset, fs, storage_type)
             context = FilesetContext(identifier, fileset, fs, storage_type, actual_path)
@@ -386,10 +381,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         match = self._identifier_pattern.match(path)
         if match and len(match.groups()) == 3:
             return NameIdentifier.of_fileset(
-                self.metalake,
-                match.group(1),
-                match.group(2),
-                match.group(3),
+                self.metalake, match.group(1), match.group(2), match.group(3)
             )
         raise RuntimeError(f"path: `{path}` doesn't contains valid identifier.")
 
@@ -403,12 +395,13 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
 
     def _get_actual_path_by_ident(
         self,
+        identifier: NameIdentifier,
         fileset: Fileset,
         fs: AbstractFileSystem,
-        virtual_path: str,
-        virtual_location: str,
         storage_type: StorageType,
+        virtual_path: str,
     ) -> str:
+        virtual_location = self._get_virtual_location(identifier)
         storage_location = fileset.storage_location()
         if self._check_mount_single_file(fileset, fs, storage_type):
             if virtual_path != virtual_location:
