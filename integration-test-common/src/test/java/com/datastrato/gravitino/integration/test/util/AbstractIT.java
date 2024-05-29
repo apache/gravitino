@@ -61,8 +61,11 @@ public class AbstractIT {
 
   protected static boolean ignoreIcebergRestService = true;
 
-  private static final String DOWNLOAD_JDBC_DRIVER_URL =
+  private static final String DOWNLOAD_MYSQL_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.26/mysql-connector-java-8.0.26.jar";
+
+  private static final String DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL =
+      "https://jdbc.postgresql.org/download/postgresql-42.7.0.jar";
 
   private static TestDatabaseName META_DATA;
   private static MySQLContainer MYSQL_CONTAINER;
@@ -108,8 +111,10 @@ public class AbstractIT {
   protected static void downLoadMySQLDriver(String relativeDeployLibsPath) throws IOException {
     if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
       String gravitinoHome = System.getenv("GRAVITINO_HOME");
-      java.nio.file.Path tmpPath = Paths.get(gravitinoHome, relativeDeployLibsPath);
-      JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_JDBC_DRIVER_URL, tmpPath.toString());
+      Path tmpPath = Paths.get(gravitinoHome, relativeDeployLibsPath);
+      JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_MYSQL_JDBC_DRIVER_URL, tmpPath.toString());
+      JdbcDriverDownloader.downloadJdbcDriver(
+          DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL, tmpPath.toString());
     }
   }
 
