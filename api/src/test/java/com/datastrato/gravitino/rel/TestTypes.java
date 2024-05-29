@@ -181,7 +181,6 @@ public class TestTypes {
   }
 
   @Test
-  @SuppressWarnings("deprecation")
   public void testUnparsedType() {
     Types.UnparsedType unparsedType = Types.UnparsedType.of("bit");
     Assertions.assertEquals(Type.Name.UNPARSED, unparsedType.name());

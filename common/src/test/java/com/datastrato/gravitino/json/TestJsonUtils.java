@@ -67,7 +67,6 @@ public class TestJsonUtils {
   }
 
   @Test
-  @SuppressWarnings("deprecation")
   public void testTypeSerDe() throws Exception {
     Type type = Types.BooleanType.get();
     String jsonValue = JsonUtils.objectMapper().writeValueAsString(type);

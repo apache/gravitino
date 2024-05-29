@@ -122,7 +122,7 @@ The following table lists the data types mapped from the Hive catalog to Graviti
 | `uniontype`                 | `uniontype`         | 0.2.0         |
 
 :::info
-Since 0.5.1, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type from the Hive catalog.
+Since 0.6.0, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type from the Hive catalog.
 :::
 
 ### Table properties

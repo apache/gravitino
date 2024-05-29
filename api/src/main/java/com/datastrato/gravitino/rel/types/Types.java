@@ -1020,11 +1020,7 @@ public class Types {
   /**
    * Represents a type that is not parsed yet. The parsed type is represented by other types of
    * {@link Types}.
-   *
-   * @deprecated This class is deprecated and will be removed in the future. Please use the {@link
-   *     ExternalType} instead.
    */
-  @Deprecated
   public static class UnparsedType implements Type {
 
     /**

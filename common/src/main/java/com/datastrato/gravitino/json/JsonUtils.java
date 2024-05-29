@@ -616,7 +616,6 @@ public class JsonUtils {
    * @param gen JSON generator used to write the type
    * @throws IOException if the type cannot be written
    */
-  @SuppressWarnings("deprecation")
   private static void writeDataType(Type dataType, JsonGenerator gen) throws IOException {
     switch (dataType.name()) {
       case BOOLEAN:
@@ -778,7 +777,6 @@ public class JsonUtils {
     gen.writeEndObject();
   }
 
-  @SuppressWarnings("deprecation")
   private static void writeUnparsedType(Types.UnparsedType unparsedType, JsonGenerator gen)
       throws IOException {
     writeUnparsedType(unparsedType.unparsedType(), gen);
@@ -901,7 +899,6 @@ public class JsonUtils {
     return Types.StructType.Field.of(name, type, nullable, comment);
   }
 
-  @SuppressWarnings("deprecation")
   private static Types.UnparsedType readUnparsedType(JsonNode node) {
     Preconditions.checkArgument(
         node.has(UNPARSED_TYPE), "Cannot parse unparsed type from missing unparsed type: %s", node);

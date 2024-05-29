@@ -52,7 +52,6 @@ public class TestMysqlTypeConverter {
   }
 
   @Test
-  @SuppressWarnings("deprecation")
   public void testFromGravitinoType() {
     checkGravitinoTypeToJdbcType(TINYINT, Types.ByteType.get());
     checkGravitinoTypeToJdbcType(INT, Types.IntegerType.get());

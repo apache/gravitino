@@ -167,7 +167,6 @@ components:
 
     UnparsedType:
       type: object
-      description: Deprecated. Use `ExternalType` instead.
       required:
         - type
         - unparsedType
@@ -182,7 +181,7 @@ components:
       example: {
         "type": "unparsed",
         "unparsedType": [
-          "user-defined"
+          "unknown-type"
         ]
       }
 

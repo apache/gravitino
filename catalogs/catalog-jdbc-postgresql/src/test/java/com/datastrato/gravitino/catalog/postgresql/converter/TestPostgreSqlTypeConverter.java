@@ -76,7 +76,6 @@ public class TestPostgreSqlTypeConverter {
   }
 
   @Test
-  @SuppressWarnings("deprecation")
   public void testFromGravitinoType() {
     checkGravitinoTypeToJdbcType(BOOL, Types.BooleanType.get());
     checkGravitinoTypeToJdbcType(INT_2, Types.ShortType.get());

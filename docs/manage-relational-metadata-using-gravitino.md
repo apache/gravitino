@@ -753,9 +753,11 @@ String typeString = ((ExternalType) type).catalogString();
   </TabItem>
 </Tabs>
 
-##### ~~Unparsed type~~ (Deprecated, please use `Types.UnparsedType.get()` instead)
+##### Unparsed type
 
-Unparsed type is a special type of column type, currently serves exclusively for presenting the data type of a column when it's unsolvable.
+Unparsed type is a special type of column type, it used to address compatibility issues in type serialization and
+deserialization between the server and client. For instance, if a new column type is introduced on the Gravitino server
+that the client does not recognize, it will be treated as an unparsed type on the client side.
 The following shows the data structure of an unparsed type in JSON and Java, enabling easy retrieval of its value.
 
 <Tabs>
@@ -764,7 +766,7 @@ The following shows the data structure of an unparsed type in JSON and Java, ena
 ```json
 {
   "type": "unparsed",
-  "unparsedType": "user-defined"
+  "unparsedType": "unknown-type"
 }
 ```
 
@@ -772,7 +774,7 @@ The following shows the data structure of an unparsed type in JSON and Java, ena
   <TabItem value="java" label="Java">
 
 ```java
-// The result of the following type is a string "user-defined"
+// The result of the following type is a string "unknown-type"
 String unparsedValue = ((UnparsedType) type).unparsedType();
 ```
 
