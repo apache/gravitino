@@ -71,6 +71,7 @@ public class TestSparkTransformConverter {
         });
   }
 
+  @SuppressWarnings("deprecation")
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   void testGravitinoToSparkDistributionWithoutSortOrder(boolean supportsBucketPartition) {
@@ -180,6 +181,7 @@ public class TestSparkTransformConverter {
     }
   }
 
+  @SuppressWarnings("deprecation")
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   void testGravitinoToSparkDistributionWithSortOrder(boolean supportsBucketPartition) {

@@ -239,6 +239,7 @@ public class SparkTransformConverter {
     return sparkTransforms.toArray(new org.apache.spark.sql.connector.expressions.Transform[0]);
   }
 
+  @SuppressWarnings("deprecation")
   private static Distribution toGravitinoDistribution(BucketTransform bucketTransform) {
     int bucketNum = (Integer) bucketTransform.numBuckets().value();
     Expression[] expressions =
@@ -249,6 +250,7 @@ public class SparkTransformConverter {
   }
 
   // Spark datasourceV2 doesn't support specify sort order direction, use ASCENDING as default.
+  @SuppressWarnings("deprecation")
   private static Pair<Distribution, SortOrder[]> toGravitinoDistributionAndSortOrders(
       SortedBucketTransform sortedBucketTransform) {
     int bucketNum = (Integer) sortedBucketTransform.numBuckets().value();
