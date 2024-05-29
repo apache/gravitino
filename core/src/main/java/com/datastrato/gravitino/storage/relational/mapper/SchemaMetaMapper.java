@@ -44,6 +44,12 @@ public interface SchemaMetaMapper {
       @Param("catalogId") Long catalogId, @Param("schemaName") String name);
 
   @Select(
+          "SELECT schema_name FROM "
+                  + TABLE_NAME
+                  + " WHERE schema_id = #{schemaId} AND deleted_at = 0")
+  String selectSchemaNameById(@Param("schemaId") Long schemaId);
+
+  @Select(
       "SELECT schema_id as schemaId, schema_name as schemaName,"
           + " metalake_id as metalakeId, catalog_id as catalogId,"
           + " schema_comment as schemaComment, properties, audit_info as auditInfo,"

@@ -52,6 +52,12 @@ public interface MetalakeMetaMapper {
           + " WHERE metalake_name = #{metalakeName} and deleted_at = 0")
   Long selectMetalakeIdMetaByName(@Param("metalakeName") String name);
 
+  @Select(
+          "SELECT metalake_name FROM "
+                  + TABLE_NAME
+                  + " WHERE metalake_id = #{metalakeId} and deleted_at = 0")
+  String selectMetalakeNameById(@Param("metalakeId") Long metalakeId);
+
   @Insert(
       "INSERT INTO "
           + TABLE_NAME
