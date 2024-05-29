@@ -650,7 +650,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     return path.makeQualified(defaultFs.getUri(), defaultFs.getWorkingDirectory());
   }
 
-  void setProxyPlugin(HadoopProxyPlugin hiveProxyPlugin) {
-    this.proxyPlugin = hiveProxyPlugin;
+  void setProxyPlugin(HadoopProxyPlugin hadoopProxyPlugin) {
+    this.proxyPlugin = hadoopProxyPlugin;
   }
 }

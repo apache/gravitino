@@ -143,7 +143,7 @@ public class HadoopUserImpersonationIT extends AbstractIT {
     hdfsCluster = builder.build();
     hdfsCluster.waitActive();
 
-    // Hive user 'anonymous' to '/anonymous' rw permission
+    // Hadoop user 'anonymous' to '/anonymous' rw permission
     UserGroupInformation ugiSuperUser = UserGroupInformation.getCurrentUser();
     ugiSuperUser.doAs(
         (PrivilegedExceptionAction<Void>)
