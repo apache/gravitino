@@ -14,20 +14,13 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 
 public class AuthenticationConfig extends Config {
-  public static final String AUTH_TYPE_KEY = "hadoop.authentication.type";
-  public static final String ENABLE_AUTH_KEY = "hadoop.authentication.enable";
+  public static final String ENABLE_AUTH_KEY = "authentication.enable";
+  public static final String AUTH_TYPE_KEY = "authentication.type";
 
   public AuthenticationConfig(Map<String, String> properties) {
     super(false);
     loadFromMap(properties, k -> true);
   }
-
-  public static final ConfigEntry<String> AUTH_TYPE_ENTRY =
-      new ConfigBuilder(AUTH_TYPE_KEY)
-          .doc("The type of authentication for Hadoop catalog, currently we only support kerberos")
-          .version(ConfigConstants.VERSION_0_5_1)
-          .stringConf()
-          .create();
 
   public static final ConfigEntry<Boolean> ENABLE_AUTH_ENTRY =
       new ConfigBuilder(ENABLE_AUTH_KEY)
@@ -35,6 +28,13 @@ public class AuthenticationConfig extends Config {
           .version(ConfigConstants.VERSION_0_5_1)
           .booleanConf()
           .createWithDefault(false);
+
+  public static final ConfigEntry<String> AUTH_TYPE_ENTRY =
+      new ConfigBuilder(AUTH_TYPE_KEY)
+          .doc("The type of authentication for Hadoop catalog, currently we only support kerberos")
+          .version(ConfigConstants.VERSION_0_5_1)
+          .stringConf()
+          .create();
 
   public boolean isEnableAuth() {
     return get(ENABLE_AUTH_ENTRY);

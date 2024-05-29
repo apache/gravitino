@@ -14,17 +14,17 @@ import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 
 public class KerberosConfig extends AuthenticationConfig {
-  public static final String KEY_TAB_URI_KEY = "kerberos.keytab-uri";
+  public static final String KEY_TAB_URI_KEY = "authentication.kerberos.keytab-uri";
 
-  public static final String PRINCIPAL_KEY = "kerberos.principal";
+  public static final String PRINCIPAL_KEY = "authentication.kerberos.principal";
 
-  public static final String CHECK_INTERVAL_SEC_KEY = "kerberos.check-interval-sec";
+  public static final String CHECK_INTERVAL_SEC_KEY = "authentication.kerberos.check-interval-sec";
 
-  public static final String FETCH_TIMEOUT_SEC_KEY = "kerberos.keytab-fetch-timeout-sec";
+  public static final String FETCH_TIMEOUT_SEC_KEY =
+      "authentication.kerberos.keytab-fetch-timeout-sec";
 
-  public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-%s-keytab";
-
-  public static final String IMPERSONATION_ENABLE_KEY = "kerberos.impersonation-enable";
+  public static final String IMPERSONATION_ENABLE_KEY =
+      "authentication.kerberos.impersonation-enable";
 
   public static final boolean DEFAULT_IMPERSONATION_ENABLE = false;
 

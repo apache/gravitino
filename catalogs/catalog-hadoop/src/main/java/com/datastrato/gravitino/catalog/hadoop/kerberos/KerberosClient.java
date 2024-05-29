@@ -5,8 +5,6 @@
 
 package com.datastrato.gravitino.catalog.hadoop.kerberos;
 
-import static com.datastrato.gravitino.catalog.hadoop.kerberos.KerberosConfig.GRAVITINO_KEYTAB_FORMAT;
-
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -25,6 +23,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class KerberosClient {
+
+  public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-%s-keytab";
+
   private static final Logger LOG = LoggerFactory.getLogger(KerberosClient.class);
 
   private final ScheduledThreadPoolExecutor checkTgtExecutor;
