@@ -16,6 +16,9 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.slice.Slice;
 import io.trino.spi.TrinoException;
+import io.trino.spi.connector.AggregateFunction;
+import io.trino.spi.connector.AggregationApplicationResult;
+import io.trino.spi.connector.Assignment;
 import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorInsertTableHandle;
@@ -25,9 +28,21 @@ import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.ConnectorTableVersion;
+import io.trino.spi.connector.Constraint;
+import io.trino.spi.connector.ConstraintApplicationResult;
+import io.trino.spi.connector.JoinApplicationResult;
+import io.trino.spi.connector.JoinStatistics;
+import io.trino.spi.connector.JoinType;
+import io.trino.spi.connector.LimitApplicationResult;
+import io.trino.spi.connector.ProjectionApplicationResult;
 import io.trino.spi.connector.RetryMode;
 import io.trino.spi.connector.SaveMode;
 import io.trino.spi.connector.SchemaTableName;
+import io.trino.spi.connector.SortItem;
+import io.trino.spi.connector.TopNApplicationResult;
+import io.trino.spi.expression.ConnectorExpression;
+import io.trino.spi.predicate.NullableValue;
+import io.trino.spi.predicate.TupleDomain;
 import io.trino.spi.security.TrinoPrincipal;
 import io.trino.spi.statistics.ComputedStatistics;
 import io.trino.spi.statistics.TableStatistics;
@@ -37,6 +52,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 
@@ -288,6 +304,250 @@ public class GravitinoMetadata implements ConnectorMetadata {
       commentString = comment.get();
     }
     catalogConnectorMetadata.setColumnComment(getTableName(tableHandle), columnName, commentString);
+  }
+
+  @Override
+  public Optional<JoinApplicationResult<ConnectorTableHandle>> applyJoin(
+      ConnectorSession session,
+      JoinType joinType,
+      ConnectorTableHandle left,
+      ConnectorTableHandle right,
+      ConnectorExpression joinCondition,
+      Map<String, ColumnHandle> leftAssignments,
+      Map<String, ColumnHandle> rightAssignments,
+      JoinStatistics statistics) {
+    return internalMetadata
+        .applyJoin(
+            session,
+            joinType,
+            GravitinoHandle.unWrap(left),
+            GravitinoHandle.unWrap(right),
+            joinCondition,
+            leftAssignments.entrySet().stream()
+                .collect(
+                    Collectors.toMap(
+                        Map.Entry::getKey, entry -> GravitinoHandle.unWrap(entry.getValue()))),
+            rightAssignments.entrySet().stream()
+                .collect(
+                    Collectors.toMap(
+                        Map.Entry::getKey, entry -> GravitinoHandle.unWrap(entry.getValue()))),
+            statistics)
+        .map(
+            result ->
+                new JoinApplicationResult<>(
+                    new GravitinoTableHandle(
+                        getTableName(left).getSchemaName(),
+                        getTableName(left).getTableName(),
+                        result.getTableHandle()),
+                    result.getLeftColumnHandles().entrySet().stream()
+                        .collect(
+                            Collectors.toMap(
+                                entry ->
+                                    new GravitinoColumnHandle(
+                                        getColumnName(
+                                            session, GravitinoHandle.unWrap(left), entry.getKey()),
+                                        entry.getKey()),
+                                entry ->
+                                    new GravitinoColumnHandle(
+                                        getColumnName(
+                                            session,
+                                            GravitinoHandle.unWrap(left),
+                                            entry.getValue()),
+                                        entry.getValue()))),
+                    result.getRightColumnHandles().entrySet().stream()
+                        .collect(
+                            Collectors.toMap(
+                                entry ->
+                                    new GravitinoColumnHandle(
+                                        getColumnName(
+                                            session, GravitinoHandle.unWrap(right), entry.getKey()),
+                                        entry.getKey()),
+                                entry ->
+                                    new GravitinoColumnHandle(
+                                        getColumnName(
+                                            session,
+                                            GravitinoHandle.unWrap(right),
+                                            entry.getValue()),
+                                        entry.getValue()))),
+                    result.isPrecalculateStatistics()));
+  }
+
+  @Override
+  public Optional<ProjectionApplicationResult<ConnectorTableHandle>> applyProjection(
+      ConnectorSession session,
+      ConnectorTableHandle handle,
+      List<ConnectorExpression> projections,
+      Map<String, ColumnHandle> assignments) {
+    return internalMetadata
+        .applyProjection(
+            session,
+            GravitinoHandle.unWrap(handle),
+            projections,
+            assignments.entrySet().stream()
+                .collect(
+                    Collectors.toMap(
+                        Map.Entry::getKey, entry -> GravitinoHandle.unWrap(entry.getValue()))))
+        .map(
+            result ->
+                new ProjectionApplicationResult<>(
+                    new GravitinoTableHandle(
+                        getTableName(handle).getSchemaName(),
+                        getTableName(handle).getTableName(),
+                        result.getHandle()),
+                    result.getProjections(),
+                    result.getAssignments().stream()
+                        .map(
+                            entry ->
+                                new Assignment(
+                                    entry.getVariable(),
+                                    new GravitinoColumnHandle(
+                                        getColumnName(
+                                            session,
+                                            GravitinoHandle.unWrap(handle),
+                                            entry.getColumn()),
+                                        entry.getColumn()),
+                                    entry.getType()))
+                        .toList(),
+                    result.isPrecalculateStatistics()));
+  }
+
+  @Override
+  public ColumnHandle getMergeRowIdColumnHandle(
+      ConnectorSession session, ConnectorTableHandle tableHandle) {
+    return ConnectorMetadata.super.getMergeRowIdColumnHandle(session, tableHandle);
+  }
+
+  @Override
+  public Optional<ConstraintApplicationResult<ConnectorTableHandle>> applyFilter(
+      ConnectorSession session, ConnectorTableHandle tableHandle, Constraint constraint) {
+    return internalMetadata
+        .applyFilter(
+            session, GravitinoHandle.unWrap(tableHandle), new GravitinoConstraint(constraint))
+        .map(
+            result ->
+                new ConstraintApplicationResult<ConnectorTableHandle>(
+                    new GravitinoTableHandle(
+                        getTableName(tableHandle).getSchemaName(),
+                        getTableName(tableHandle).getTableName(),
+                        result.getHandle()),
+                    result
+                        .getRemainingFilter()
+                        .transformKeys(
+                            (columnHandle) ->
+                                new GravitinoColumnHandle(
+                                    getColumnName(
+                                        session, GravitinoHandle.unWrap(tableHandle), columnHandle),
+                                    columnHandle)),
+                    result.getRemainingExpression().get(),
+                    result.isPrecalculateStatistics()));
+  }
+
+  @Override
+  public Optional<AggregationApplicationResult<ConnectorTableHandle>> applyAggregation(
+      ConnectorSession session,
+      ConnectorTableHandle handle,
+      List<AggregateFunction> aggregates,
+      Map<String, ColumnHandle> assignments,
+      List<List<ColumnHandle>> groupingSets) {
+    return internalMetadata
+        .applyAggregation(
+            session,
+            GravitinoHandle.unWrap(handle),
+            aggregates,
+            assignments.entrySet().stream()
+                .collect(
+                    Collectors.toMap(
+                        Map.Entry::getKey, entry -> GravitinoHandle.unWrap(entry.getValue()))),
+            groupingSets.stream()
+                .map(
+                    innerList ->
+                        innerList.stream()
+                            .map(GravitinoHandle::unWrap)
+                            .collect(Collectors.toList()))
+                .collect(Collectors.toList()))
+        .map(
+            result ->
+                new AggregationApplicationResult<ConnectorTableHandle>(
+                    new GravitinoTableHandle(
+                        getTableName(handle).getSchemaName(),
+                        getTableName(handle).getTableName(),
+                        result.getHandle()),
+                    result.getProjections(),
+                    result.getAssignments().stream()
+                        .map(
+                            entry ->
+                                new Assignment(
+                                    entry.getVariable(),
+                                    new GravitinoColumnHandle(
+                                        getColumnName(
+                                            session,
+                                            GravitinoHandle.unWrap(handle),
+                                            entry.getColumn()),
+                                        entry.getColumn()),
+                                    entry.getType()))
+                        .toList(),
+                    result.getGroupingColumnMapping().entrySet().stream()
+                        .collect(
+                            Collectors.toMap(
+                                entry ->
+                                    new GravitinoColumnHandle(
+                                        getColumnName(
+                                            session,
+                                            GravitinoHandle.unWrap(handle),
+                                            entry.getKey()),
+                                        entry.getKey()),
+                                entry ->
+                                    new GravitinoColumnHandle(
+                                        getColumnName(
+                                            session,
+                                            GravitinoHandle.unWrap(handle),
+                                            entry.getValue()),
+                                        entry.getValue()))),
+                    result.isPrecalculateStatistics()));
+  }
+
+  @Override
+  public Optional<LimitApplicationResult<ConnectorTableHandle>> applyLimit(
+      ConnectorSession session, ConnectorTableHandle handle, long limit) {
+    return internalMetadata
+        .applyLimit(session, GravitinoHandle.unWrap(handle), limit)
+        .map(
+            result ->
+                new LimitApplicationResult<ConnectorTableHandle>(
+                    new GravitinoTableHandle(
+                        getTableName(handle).getSchemaName(),
+                        getTableName(handle).getTableName(),
+                        result.getHandle()),
+                    result.isLimitGuaranteed(),
+                    result.isPrecalculateStatistics()));
+  }
+
+  @Override
+  public Optional<TopNApplicationResult<ConnectorTableHandle>> applyTopN(
+      ConnectorSession session,
+      ConnectorTableHandle handle,
+      long topNCount,
+      List<SortItem> sortItems,
+      Map<String, ColumnHandle> assignments) {
+    return internalMetadata
+        .applyTopN(
+            session,
+            GravitinoHandle.unWrap(handle),
+            topNCount,
+            sortItems,
+            assignments.entrySet().stream()
+                .collect(
+                    Collectors.toMap(
+                        Map.Entry::getKey, entry -> GravitinoHandle.unWrap(entry.getValue()))))
+        .map(
+            result ->
+                new TopNApplicationResult<ConnectorTableHandle>(
+                    new GravitinoTableHandle(
+                        getTableName(handle).getSchemaName(),
+                        getTableName(handle).getTableName(),
+                        result.getHandle()),
+                    result.isTopNGuaranteed(),
+                    result.isPrecalculateStatistics()));
   }
 
   @Override
