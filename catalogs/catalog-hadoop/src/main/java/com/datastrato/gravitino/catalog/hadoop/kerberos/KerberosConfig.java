@@ -5,7 +5,6 @@
 
 package com.datastrato.gravitino.catalog.hadoop.kerberos;
 
-import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.config.ConfigBuilder;
 import com.datastrato.gravitino.config.ConfigConstants;
 import com.datastrato.gravitino.config.ConfigEntry;
@@ -14,8 +13,8 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 
-public class KerberosConfig extends Config {
-  public static final String KET_TAB_URI_KEY = "kerberos.keytab-uri";
+public class KerberosConfig extends AuthenticationConfig {
+  public static final String KEY_TAB_URI_KEY = "kerberos.keytab-uri";
 
   public static final String PRINCIPAL_KEY = "kerberos.principal";
 
@@ -25,7 +24,7 @@ public class KerberosConfig extends Config {
 
   public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-%s-keytab";
 
-  public static final String IMPERSONATION_ENABLE_KEY = "impersonation-enable";
+  public static final String IMPERSONATION_ENABLE_KEY = "kerberos.impersonation-enable";
 
   public static final boolean DEFAULT_IMPERSONATION_ENABLE = false;
 
@@ -38,7 +37,7 @@ public class KerberosConfig extends Config {
           .create();
 
   public static final ConfigEntry<String> KEYTAB_ENTRY =
-      new ConfigBuilder(KET_TAB_URI_KEY)
+      new ConfigBuilder(KEY_TAB_URI_KEY)
           .doc("The keytab of the kerberos connection")
           .version(ConfigConstants.VERSION_0_5_1)
           .stringConf()
@@ -69,7 +68,7 @@ public class KerberosConfig extends Config {
           .createWithDefault(DEFAULT_IMPERSONATION_ENABLE);
 
   public KerberosConfig(Map<String, String> properties) {
-    super(false);
+    super(properties);
     loadFromMap(properties, k -> true);
   }
 
@@ -106,9 +105,9 @@ public class KerberosConfig extends Config {
                   false,
                   false))
           .put(
-              KET_TAB_URI_KEY,
+              KEY_TAB_URI_KEY,
               PropertyEntry.stringImmutablePropertyEntry(
-                  KET_TAB_URI_KEY, "The uri of key tab for the catalog", false, null, false, false))
+                  KEY_TAB_URI_KEY, "The uri of key tab for the catalog", false, null, false, false))
           .put(
               PRINCIPAL_KEY,
               PropertyEntry.stringImmutablePropertyEntry(

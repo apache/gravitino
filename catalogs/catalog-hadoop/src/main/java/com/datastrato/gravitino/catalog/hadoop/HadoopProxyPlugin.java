@@ -37,7 +37,6 @@ public class HadoopProxyPlugin implements ProxyPlugin {
       UserGroupInformation proxyUser;
 
       if (UserGroupInformation.isSecurityEnabled() && ops != null) {
-
         // The Gravitino server may use multiple KDC servers.
         // The http authentication use one KDC server, the Hadoop catalog may use another KDC
         // server.

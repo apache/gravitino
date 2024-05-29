@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.hadoop;
 
+import com.datastrato.gravitino.catalog.hadoop.kerberos.AuthenticationConfig;
 import com.datastrato.gravitino.catalog.hadoop.kerberos.KerberosConfig;
 import com.datastrato.gravitino.connector.BaseCatalogPropertiesMetadata;
 import com.datastrato.gravitino.connector.PropertyEntry;
@@ -30,7 +31,9 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                   null,
                   false /* hidden */))
           .putAll(BASIC_CATALOG_PROPERTY_ENTRIES)
+          // The following two are about authentication.
           .putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES)
+          .putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES)
           .build();
 
   @Override
