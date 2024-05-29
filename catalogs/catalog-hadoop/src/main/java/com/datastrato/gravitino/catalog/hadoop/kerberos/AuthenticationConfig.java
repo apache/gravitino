@@ -59,6 +59,11 @@ public class AuthenticationConfig extends Config {
           .put(
               AUTH_TYPE_KEY,
               PropertyEntry.stringImmutablePropertyEntry(
-                  AUTH_TYPE_KEY, "The uri of key tab for the catalog", false, null, false, false))
+                  AUTH_TYPE_KEY,
+                  "The type of authentication for Hadoop catalog, currently we only support kerberos",
+                  false,
+                  null,
+                  false,
+                  false))
           .build();
 }
