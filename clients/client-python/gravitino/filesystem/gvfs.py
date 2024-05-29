@@ -3,19 +3,17 @@ Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
 
-import errno
-import os
-import secrets
-import shutil
-import io
-from contextlib import suppress
 from enum import Enum
+from pathlib import PurePosixPath
 from typing import Dict, Tuple
 import re
 import fsspec
 
-from fsspec.utils import infer_storage_options, mirror_from
-from pyarrow.fs import FileType, FileSelector, FileSystem, HadoopFileSystem
+from fsspec import AbstractFileSystem
+from fsspec.implementations.local import LocalFileSystem
+from fsspec.implementations.arrow import ArrowFSWrapper
+from fsspec.utils import infer_storage_options
+from pyarrow.fs import HadoopFileSystem
 from readerwriterlock import rwlock
 from gravitino.api.catalog import Catalog
 from gravitino.api.fileset import Fileset
@@ -26,7 +24,8 @@ PROTOCOL_NAME = "gvfs"
 
 
 class StorageType(Enum):
-    HDFS = "hdfs://"
+    HDFS = "hdfs"
+    FILE = "file"
 
 
 class FilesetContext:
@@ -34,12 +33,14 @@ class FilesetContext:
         self,
         name_identifier: NameIdentifier,
         fileset: Fileset,
-        fs: FileSystem,
-        actual_path,
+        fs: AbstractFileSystem,
+        storage_type: StorageType,
+        actual_path: str,
     ):
         self.name_identifier = name_identifier
         self.fileset = fileset
         self.fs = fs
+        self.storage_type = storage_type
         self.actual_path = actual_path
 
     def get_name_identifier(self):
@@ -54,27 +55,22 @@ class FilesetContext:
     def get_actual_path(self):
         return self.actual_path
 
+    def get_storage_type(self):
+        return self.storage_type
+
 
 class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
     protocol = PROTOCOL_NAME
-    _gvfs_prefix = "gvfs://fileset"
-    _identifier_pattern = re.compile(
-        "^(?:gvfs://fileset)?/?([^/]+)/([^/]+)/([^/]+)(?:/[^/]+)*/?$"
-    )
+    _identifier_pattern = re.compile("^fileset/([^/]+)/([^/]+)/([^/]+)(?:/[^/]+)*/?$")
+    _hdfs_host_pattern = re.compile("hdfs://[^/]+")
 
-    def __init__(self, server_uri, metalake_name, **kwargs):
+    def __init__(self, server_uri=None, metalake_name=None, **kwargs):
         self.metalake = metalake_name
         self.client = GravitinoClient(uri=server_uri, metalake_name=metalake_name)
         self.cache: Dict[NameIdentifier, Tuple] = {}
         self.cache_lock = rwlock.RWLockFair()
 
         super().__init__(**kwargs)
-
-    @classmethod
-    def _strip_protocol(cls, path):
-        ops = infer_storage_options(path)
-        path = ops["path"]
-        return path
 
     @property
     def fsid(self):
@@ -85,52 +81,46 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
 
     def ls(self, path, detail=True, **kwargs):
         context: FilesetContext = self._get_fileset_context(path)
-        if context.actual_path.startswith(StorageType.HDFS.value):
-            entries = []
-            for entry in context.fs.get_file_info(
-                FileSelector(self._strip_protocol(context.actual_path))
-            ):
-                entries.append(
-                    self._convert_path_prefix(
-                        entry,
-                        context.fileset.storage_location(),
-                        self._get_virtual_location(context.name_identifier, True),
-                    )
+        if detail:
+            entries = [
+                self._convert_info(entry, context)
+                for entry in context.fs.ls(
+                    self._strip_storage_protocol(
+                        context.storage_type, context.actual_path
+                    ),
+                    detail=True,
                 )
+            ]
             return entries
-        raise RuntimeError(
-            f"Storage under the fileset: `{context.name_identifier}` doesn't support now."
-        )
+        entries = [
+            self._actual_path_to_virtual_path(entry_path, context)
+            for entry_path in context.fs.ls(
+                self._strip_storage_protocol(context.storage_type, context.actual_path),
+                detail=True,
+            )
+        ]
+        return entries
 
     def info(self, path, **kwargs):
         context: FilesetContext = self._get_fileset_context(path)
-        if context.fileset.storage_location().startswith(StorageType.HDFS.value):
-            actual_path = self._strip_protocol(context.actual_path)
-            [info] = context.fs.get_file_info([actual_path])
-
-            return self._convert_path_prefix(
-                info,
-                context.fileset.storage_location(),
-                self._get_virtual_location(context.name_identifier, True),
-            )
-        raise RuntimeError(
-            f"Storage under the fileset: `{context.name_identifier}` doesn't support now."
+        actual_info: Dict = context.fs.info(
+            self._strip_storage_protocol(context.storage_type, context.actual_path)
         )
+        return self._convert_info(actual_info, context)
 
     def exists(self, path, **kwargs):
         context: FilesetContext = self._get_fileset_context(path)
-        if context.fileset.storage_location().startswith(StorageType.HDFS.value):
-            actual_path = self._strip_protocol(context.actual_path)
-            try:
-                context.fs.get_file_info([actual_path])
-            except FileNotFoundError:
-                return False
-            return True
-        raise RuntimeError(
-            f"Storage under the fileset: `{context.name_identifier}` doesn't support now."
-        )
+        try:
+            context.fs.info(
+                self._strip_storage_protocol(context.storage_type, context.actual_path)
+            )
+        except FileNotFoundError:
+            return False
+        return True
 
     def cp_file(self, path1, path2, **kwargs):
+        path1 = self._pre_process_path(path1)
+        path2 = self._pre_process_path(path2)
         src_identifier: NameIdentifier = self._extract_identifier(path1)
         dst_identifier: NameIdentifier = self._extract_identifier(path2)
         if src_identifier != dst_identifier:
@@ -139,32 +129,43 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 f"identifier: `{src_identifier}`."
             )
         src_context: FilesetContext = self._get_fileset_context(path1)
-        if src_context.fileset.storage_location().startswith(StorageType.HDFS.value):
-            if self._check_mount_single_file(src_context.fileset, src_context.fs):
-                raise RuntimeError(
-                    f"Cannot cp file of the fileset: {src_identifier} which only mounts to a single file."
-                )
-            dst_context: FilesetContext = self._get_fileset_context(path2)
-
-            src_actual_path = self._strip_protocol(src_context.actual_path).rstrip("/")
-            dst_actual_path = self._strip_protocol(dst_context.actual_path).rstrip("/")
-
-            with src_context.fs.open_input_stream(src_actual_path) as lstream:
-                tmp_dst_name = f"{dst_actual_path}.tmp.{secrets.token_hex(6)}"
-                try:
-                    with dst_context.fs.open_output_stream(tmp_dst_name) as rstream:
-                        shutil.copyfileobj(lstream, rstream)
-                    dst_context.fs.move(tmp_dst_name, dst_actual_path)
-                except BaseException:  # noqa
-                    with suppress(FileNotFoundError):
-                        dst_context.fs.delete_file(tmp_dst_name)
-                    raise
-        else:
+        if self._check_mount_single_file(
+            src_context.fileset, src_context.fs, src_context.storage_type
+        ):
             raise RuntimeError(
-                f"Storage under the fileset: `{src_context.name_identifier}` doesn't support now."
+                f"Cannot cp file of the fileset: {src_identifier} which only mounts to a single file."
             )
+        dst_context: FilesetContext = self._get_fileset_context(path2)
 
-    def mv(self, path1, path2, recursive=False, maxdepth=None, **kwargs):
+        src_context.fs.cp_file(
+            self._strip_storage_protocol(
+                src_context.storage_type, src_context.actual_path
+            ),
+            self._strip_storage_protocol(
+                dst_context.storage_type, dst_context.actual_path
+            ),
+        )
+
+    # pylint: disable=W0221
+    def mv(self, path1, path2, **kwargs):
+        """
+        1. Supports move a file which src and dst under the same directory.
+            fs.mv(path1='gvfs://fileset/fileset_catalog/tmp/tmp_fileset/ttt/test2.txt',
+                  path2='gvfs://fileset/fileset_catalog/tmp/tmp_fileset/ttt/test3.txt')
+        2. Supports move a directory which src and dst under the same directory.
+            fs.mv(path1='gvfs://fileset/fileset_catalog/tmp/tmp_fileset/ttt/qqq',
+                  path2='gvfs://fileset/fileset_catalog/tmp/tmp_fileset/ttt/zzz')
+        3. Supports move a file which destination's parent directory is existed.
+           The directory `gvfs://fileset/fileset_catalog/tmp/tmp_fileset/xyz/qqq` is existed.
+           fs.mv(path1='gvfs://fileset/fileset_catalog/tmp/tmp_fileset/ttt/test2.txt',
+                  path2='gvfs://fileset/fileset_catalog/tmp/tmp_fileset/xyz/qqq/test3.txt')
+        4. Supports move a directory which destination's parent directory is existed.
+           The directory `gvfs://fileset/fileset_catalog/tmp/tmp_fileset/xyz/qqq` is existed.
+           fs.mv(path1='gvfs://fileset/fileset_catalog/tmp/tmp_fileset/ttt/zzz',
+                  path2='gvfs://fileset/fileset_catalog/tmp/tmp_fileset/xyz/qqq/ppp')
+        """
+        path1 = self._pre_process_path(path1)
+        path2 = self._pre_process_path(path2)
         src_identifier: NameIdentifier = self._extract_identifier(path1)
         dst_identifier: NameIdentifier = self._extract_identifier(path2)
         if src_identifier != dst_identifier:
@@ -173,171 +174,166 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 f" should be same with src file path identifier: `{src_identifier}`."
             )
         src_context: FilesetContext = self._get_fileset_context(path1)
-        if src_context.fileset.storage_location().startswith(StorageType.HDFS.value):
-            if self._check_mount_single_file(src_context.fileset, src_context.fs):
-                raise RuntimeError(
-                    f"Cannot cp file of the fileset: {src_identifier} which only mounts to a single file."
-                )
-            dst_context: FilesetContext = self._get_fileset_context(path2)
-
-            src_actual_path = self._strip_protocol(src_context.actual_path).rstrip("/")
-            dst_actual_path = self._strip_protocol(dst_context.actual_path).rstrip("/")
-
-            src_context.fs.move(src_actual_path, dst_actual_path)
-        else:
+        if self._check_mount_single_file(
+            src_context.fileset, src_context.fs, src_context.storage_type
+        ):
             raise RuntimeError(
-                f"Storage under the fileset: `{src_context.name_identifier}` doesn't support now."
+                f"Cannot cp file of the fileset: {src_identifier} which only mounts to a single file."
             )
+        dst_context: FilesetContext = self._get_fileset_context(path2)
+        src_context.fs.move(
+            self._strip_storage_protocol(
+                src_context.storage_type, src_context.actual_path
+            ),
+            self._strip_storage_protocol(
+                dst_context.storage_type, dst_context.actual_path
+            ),
+        )
 
     def _rm(self, path):
         raise RuntimeError("Deprecated method, use rm_file method instead.")
 
-    def rm(self, path, recursive=False, maxdepth=None, **kwargs):
+    def rm(self, path, recursive=False, maxdepth=None):
         context: FilesetContext = self._get_fileset_context(path)
-        if context.fileset.storage_location().startswith(StorageType.HDFS.value):
-            actual_path = self._strip_protocol(context.actual_path).rstrip("/")
-            [info] = context.fs.get_file_info([actual_path])
-            if info.type is FileType.Directory:
-                if recursive:
-                    context.fs.delete_dir(actual_path)
-                else:
-                    raise RuntimeError(
-                        "Cannot delete directories that recursive is `False`."
-                    )
-            else:
-                context.fs.delete_file(actual_path)
-        else:
-            raise RuntimeError(
-                f"Storage under the fileset: `{context.name_identifier}` doesn't support now."
-            )
+        context.fs.rm(
+            self._strip_storage_protocol(context.storage_type, context.actual_path),
+            recursive,
+            maxdepth,
+        )
 
     def rm_file(self, path):
         context: FilesetContext = self._get_fileset_context(path)
-        if context.fileset.storage_location().startswith(StorageType.HDFS.value):
-            actual_path = self._strip_protocol(context.actual_path)
-            context.fs.delete_file(actual_path)
-        else:
-            raise RuntimeError(
-                f"Storage under the fileset: `{context.name_identifier}` doesn't support now."
-            )
+        context.fs.rm_file(
+            self._strip_storage_protocol(context.storage_type, context.actual_path)
+        )
 
     def rmdir(self, path):
         context: FilesetContext = self._get_fileset_context(path)
-        if context.fileset.storage_location().startswith(StorageType.HDFS.value):
-            actual_path = self._strip_protocol(context.actual_path)
-            context.fs.delete_dir(actual_path)
-        else:
-            raise RuntimeError(
-                f"Storage under the fileset: `{context.name_identifier}` doesn't support now."
-            )
-
-    def _open(
-        self,
-        path,
-        mode="rb",
-        block_size=None,
-        autocommit=True,
-        cache_options=None,
-        **kwargs,
-    ):
-        context: FilesetContext = self._get_fileset_context(path)
-        if context.fileset.storage_location().startswith(StorageType.HDFS.value):
-            if mode == "rb":
-                method = context.fs.open_input_stream
-            elif mode == "wb":
-                method = context.fs.open_output_stream
-            elif mode == "ab":
-                method = context.fs.open_append_stream
-            else:
-                raise RuntimeError(f"Unsupported mode for Arrow FileSystem: {mode!r}.")
-
-            _kwargs = {}
-            stream = method(context.actual_path, **_kwargs)
-
-            return HDFSFile(
-                self, stream, context.actual_path, mode, block_size, **kwargs
-            )
-        raise RuntimeError(
-            f"Storage under the fileset: `{context.name_identifier}` doesn't support now."
+        context.fs.rmdir(
+            self._strip_storage_protocol(context.storage_type, context.actual_path)
         )
+
+    # pylint: disable=W0221
+    def _open(self, path, mode="rb", block_size=None, seekable=True, **kwargs):
+        context: FilesetContext = self._get_fileset_context(path)
+        if context.storage_type == StorageType.HDFS:
+            return context.fs._open(
+                self._strip_storage_protocol(context.storage_type, context.actual_path),
+                mode,
+                block_size,
+                seekable,
+                **kwargs,
+            )
+        if context.storage_type == StorageType.FILE:
+            return context.fs._open(
+                self._strip_storage_protocol(context.storage_type, context.actual_path),
+                mode,
+                block_size,
+                **kwargs,
+            )
+        raise RuntimeError(f"Storage type:{context.storage_type} doesn't support now.")
 
     def mkdir(self, path, create_parents=True, **kwargs):
         if create_parents:
             self.makedirs(path, exist_ok=True)
         else:
             context: FilesetContext = self._get_fileset_context(path)
-            if context.fileset.storage_location().startswith(StorageType.HDFS.value):
-                actual_path = self._strip_protocol(context.actual_path)
-                context.fs.create_dir(actual_path, recursive=False)
-            else:
-                raise RuntimeError(
-                    f"Storage under the fileset: `{context.name_identifier}` doesn't support now."
-                )
+            context.fs.mkdir(
+                self._strip_storage_protocol(context.storage_type, context.actual_path),
+                create_parents,
+            )
 
     def makedirs(self, path, exist_ok=True):
         context: FilesetContext = self._get_fileset_context(path)
-        if context.fileset.storage_location().startswith(StorageType.HDFS.value):
-            actual_path = self._strip_protocol(context.actual_path)
-            context.fs.create_dir(actual_path)
-        else:
-            raise RuntimeError(
-                f"Storage under the fileset: `{context.name_identifier}` doesn't support now."
-            )
+        context.fs.makedirs(
+            self._strip_storage_protocol(context.storage_type, context.actual_path),
+            exist_ok,
+        )
 
     def created(self, path):
         raise RuntimeError("Unsupported method now.")
 
     def modified(self, path):
         context: FilesetContext = self._get_fileset_context(path)
-        if context.fileset.storage_location().startswith(StorageType.HDFS.value):
-            actual_path = self._strip_protocol(context.actual_path)
-            return context.fs.get_file_info(actual_path).mtime
-        raise RuntimeError(
-            f"Storage under the fileset: `{context.name_identifier}` doesn't support now."
-        )
+        return context.fs.modified(
+            self._strip_storage_protocol(context.storage_type, context.actual_path)
+        ).mtime
 
     def cat_file(self, path, start=None, end=None, **kwargs):
-        raise RuntimeError("Unsupported method now.")
+        kwargs["seekable"] = start not in [None, 0]
+        context: FilesetContext = self._get_fileset_context(path)
+        return context.fs.cat_file(
+            self._strip_storage_protocol(context.storage_type, context.actual_path),
+            start,
+            end,
+            **kwargs,
+        )
 
-    def get_file(self, rpath, lpath, callback=None, outfile=None, **kwargs):
-        raise RuntimeError("Unsupported method now.")
+        # pylint: disable=W0221
 
-    def _convert_path_prefix(self, info, storage_location, virtual_location):
-        actual_prefix = self._strip_protocol(storage_location)
-        virtual_prefix = self._strip_protocol(virtual_location)
-        if not info.path.startswith(actual_prefix):
-            raise ValueError(
-                f"Path {info.path} does not start with valid prefix {actual_prefix}."
+    def get_file(self, rpath, lpath, **kwargs):
+        kwargs["seekable"] = False
+        context: FilesetContext = self._get_fileset_context(rpath)
+        return context.fs.get_file(
+            self._strip_storage_protocol(context.storage_type, context.actual_path),
+            lpath,
+            **kwargs,
+        )
+
+    def _actual_path_to_virtual_path(self, path, context: FilesetContext):
+        if context.storage_type == StorageType.HDFS:
+            actual_prefix = infer_storage_options(context.fileset.storage_location())[
+                "path"
+            ]
+        elif context.storage_type == StorageType.FILE:
+            actual_prefix = context.fileset.storage_location()[
+                len(f"{StorageType.FILE.value}:") :
+            ]
+        else:
+            raise RuntimeError(
+                f"Storage type:{context.storage_type} doesn't support now."
             )
 
-        if info.type is FileType.Directory:
-            kind = "directory"
-        elif info.type is FileType.File:
-            kind = "file"
-        elif info.type is FileType.NotFound:
-            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), info.path)
-        else:
-            kind = "other"
+        if not path.startswith(actual_prefix):
+            raise RuntimeError(
+                f"Path {path} does not start with valid prefix {actual_prefix}."
+            )
+        virtual_location = self._get_virtual_location(context.name_identifier)
+        return f"{path.replace(actual_prefix, virtual_location)}"
 
+    def _convert_info(self, entry: Dict, context: FilesetContext):
+        path = self._actual_path_to_virtual_path(entry["name"], context)
         return {
-            "name": f"{self._gvfs_prefix}{info.path.replace(actual_prefix, virtual_prefix)}",
-            "size": info.size,
-            "type": kind,
-            "mtime": info.mtime,
+            "name": path,
+            "size": entry["size"],
+            "type": entry["type"],
+            "mtime": entry["mtime"],
         }
 
     def _get_fileset_context(self, virtual_path: str) -> FilesetContext:
+        virtual_path: str = self._pre_process_path(virtual_path)
         identifier: NameIdentifier = self._extract_identifier(virtual_path)
         read_lock = self.cache_lock.gen_rlock()
         try:
             read_lock.acquire()
-            cache_value: Tuple[Fileset, FileSystem] = self.cache.get(identifier)
+            cache_value: Tuple[Fileset, AbstractFileSystem, StorageType] = (
+                self.cache.get(identifier)
+            )
             if cache_value is not None:
+                virtual_location = self._get_virtual_location(identifier)
                 actual_path = self._get_actual_path_by_ident(
-                    identifier, cache_value[0], cache_value[1], virtual_path
+                    cache_value[0],
+                    cache_value[1],
+                    virtual_path,
+                    virtual_location,
+                    cache_value[2],
                 )
                 return FilesetContext(
-                    identifier, cache_value[0], cache_value[1], actual_path
+                    identifier,
+                    cache_value[0],
+                    cache_value[1],
+                    cache_value[2],
+                    actual_path,
                 )
         finally:
             read_lock.release()
@@ -345,33 +341,49 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         write_lock = self.cache_lock.gen_wlock()
         try:
             write_lock.acquire()
-            cache_value: Tuple[Fileset, FileSystem] = self.cache.get(identifier)
+            cache_value: Tuple[Fileset, AbstractFileSystem] = self.cache.get(identifier)
             if cache_value is not None:
+                virtual_location = self._get_virtual_location(identifier)
                 actual_path = self._get_actual_path_by_ident(
-                    identifier, cache_value[0], cache_value[1], virtual_path
+                    cache_value[0],
+                    cache_value[1],
+                    virtual_path,
+                    virtual_location,
+                    cache_value[2],
                 )
                 return FilesetContext(
-                    identifier, cache_value[0], cache_value[1], actual_path
+                    identifier,
+                    cache_value[0],
+                    cache_value[1],
+                    cache_value[2],
+                    actual_path,
                 )
             fileset: Fileset = self._load_fileset_from_server(identifier)
             storage_location = fileset.storage_location()
-            if storage_location.startswith(StorageType.HDFS.value):
-                fs = HadoopFileSystem.from_uri(storage_location)
-                actual_path = self._get_actual_path_by_ident(
-                    identifier, fileset, fs, virtual_path
+            if storage_location.startswith(f"{StorageType.HDFS.value}://"):
+                fs = ArrowFSWrapper(HadoopFileSystem.from_uri(storage_location))
+                storage_type = StorageType.HDFS
+            elif storage_location.startswith(f"{StorageType.FILE.value}:/"):
+                fs = LocalFileSystem()
+                storage_type = StorageType.FILE
+            else:
+                raise ValueError(
+                    f"Storage under the fileset: `{identifier}` doesn't support now."
                 )
-                self.cache[identifier] = (fileset, fs)
-                context = FilesetContext(identifier, fileset, fs, actual_path)
-                return context
-            raise ValueError(
-                f"Storage under the fileset: `{identifier}` doesn't support now."
+            virtual_location = self._get_virtual_location(identifier)
+            actual_path = self._get_actual_path_by_ident(
+                fileset, fs, virtual_path, virtual_location, storage_type
             )
+            self.cache[identifier] = (fileset, fs, storage_type)
+            context = FilesetContext(identifier, fileset, fs, storage_type, actual_path)
+            return context
         finally:
             write_lock.release()
 
     def _extract_identifier(self, path) -> NameIdentifier:
-        if path is None or len(path) == 0:
-            raise ValueError("path which need be extracted cannot be null or empty.")
+        if path is None:
+            raise RuntimeError("path which need be extracted cannot be null or empty.")
+
         match = self._identifier_pattern.match(path)
         if match and len(match.groups()) == 3:
             return NameIdentifier.of_fileset(
@@ -380,7 +392,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 match.group(2),
                 match.group(3),
             )
-        raise ValueError(f"path: `{path}` doesn't contains valid identifier.")
+        raise RuntimeError(f"path: `{path}` doesn't contains valid identifier.")
 
     def _load_fileset_from_server(self, identifier: NameIdentifier) -> Fileset:
         catalog: Catalog = self.client.load_catalog(
@@ -392,69 +404,59 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
 
     def _get_actual_path_by_ident(
         self,
-        identifier: NameIdentifier,
         fileset: Fileset,
-        fs: FileSystem,
+        fs: AbstractFileSystem,
         virtual_path: str,
+        virtual_location: str,
+        storage_type: StorageType,
     ) -> str:
-        with_scheme = virtual_path.startswith(self._gvfs_prefix)
-        virtual_location = self._get_virtual_location(identifier, with_scheme)
         storage_location = fileset.storage_location()
-        if self._check_mount_single_file(fileset, fs):
+        if self._check_mount_single_file(fileset, fs, storage_type):
             if virtual_path != virtual_location:
-                raise ValueError(
+                raise RuntimeError(
                     f"Path: {virtual_path} should be same with the virtual location: {virtual_location}"
                     " when the fileset only mounts a single file."
                 )
             return storage_location
         return virtual_path.replace(virtual_location, storage_location, 1)
 
-    def _get_virtual_location(
-        self, identifier: NameIdentifier, with_scheme: bool
-    ) -> str:
-        prefix = self._gvfs_prefix if with_scheme is True else ""
+    @staticmethod
+    def _get_virtual_location(identifier: NameIdentifier) -> str:
         return (
-            f"{prefix}"
-            f"/{identifier.namespace().level(1)}"
+            f"fileset/{identifier.namespace().level(1)}"
             f"/{identifier.namespace().level(2)}"
             f"/{identifier.name()}"
         )
 
-    def _check_mount_single_file(self, fileset: Fileset, fs: FileSystem) -> bool:
-        [info] = fs.get_file_info([(self._strip_protocol(fileset.storage_location()))])
-        return info.type is FileType.File
+    def _check_mount_single_file(
+        self, fileset: Fileset, fs: AbstractFileSystem, storage_type: StorageType
+    ) -> bool:
+        result: Dict = fs.info(
+            self._strip_storage_protocol(storage_type, fileset.storage_location())
+        )
+        return result["type"] == "file"
 
+    @staticmethod
+    def _pre_process_path(path):
+        if isinstance(path, PurePosixPath):
+            path = path.as_posix()
+        gvfs_prefix = f"{PROTOCOL_NAME}://"
+        if path.startswith(gvfs_prefix):
+            path = path[len(gvfs_prefix) :]
+        if not path.startswith("fileset/"):
+            raise RuntimeError(
+                f"Invalid path:`{path}`. Expected path to start with `fileset/`."
+                " Example: fileset/{fileset_catalog}/{schema}/{fileset_name}/{sub_path}."
+            )
+        return path
 
-@mirror_from(
-    "stream",
-    [
-        "read",
-        "seek",
-        "tell",
-        "write",
-        "readable",
-        "writable",
-        "close",
-        "size",
-        "seekable",
-    ],
-)
-class HDFSFile(io.IOBase):
-    def __init__(self, fs, stream, path, mode, block_size=None, **kwargs):
-        self.path = path
-        self.mode = mode
-
-        self.fs = fs
-        self.stream = stream
-
-        self.blocksize = self.block_size = block_size
-        self.kwargs = kwargs
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        return self.close()
+    @staticmethod
+    def _strip_storage_protocol(storage_type: StorageType, path: str):
+        if storage_type == StorageType.HDFS:
+            return path
+        if storage_type == StorageType.FILE:
+            return path[len(f"{StorageType.FILE.value}:") :]
+        raise RuntimeError(f"Storage type:{storage_type} doesn't support now.")
 
 
 fsspec.register_implementation(PROTOCOL_NAME, GravitinoVirtualFileSystem)
