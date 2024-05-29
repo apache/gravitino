@@ -20,6 +20,8 @@ import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
+import com.datastrato.gravitino.lock.LockType;
+import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.storage.IdGenerator;
@@ -159,47 +161,17 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
    */
   @Override
   public Schema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
-    NameIdentifier catalogIdentifier = getCatalogIdentifier(ident);
-    Schema schema =
-        doWithCatalog(
-            catalogIdentifier,
-            c -> c.doWithSchemaOps(s -> s.loadSchema(ident)),
-            NoSuchSchemaException.class);
+    EntityCombinedSchema schema =
+        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> loadCombinedSchema(ident));
 
-    // If the Schema is maintained by the Gravitino's store, we don't have to load again.
-    boolean isManagedSchema = isManagedEntity(catalogIdentifier, Capability.Scope.SCHEMA);
-    if (isManagedSchema) {
-      return EntityCombinedSchema.of(schema)
-          .withHiddenPropertiesSet(
-              getHiddenPropertyNames(
-                  catalogIdentifier,
-                  HasPropertyMetadata::schemaPropertiesMetadata,
-                  schema.properties()));
+    if (schema.imported()) {
+      return schema;
     }
 
-    StringIdentifier stringId = getStringIdFromProperties(schema.properties());
-    // Case 1: The schema is not created by Gravitino.
-    if (stringId == null) {
-      return EntityCombinedSchema.of(schema)
-          .withHiddenPropertiesSet(
-              getHiddenPropertyNames(
-                  catalogIdentifier,
-                  HasPropertyMetadata::schemaPropertiesMetadata,
-                  schema.properties()));
-    }
+    TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(ident.namespace().levels()), LockType.WRITE, () -> importSchema(ident));
 
-    SchemaEntity schemaEntity =
-        operateOnEntity(
-            ident,
-            identifier -> store.get(identifier, SCHEMA, SchemaEntity.class),
-            "GET",
-            stringId.id());
-    return EntityCombinedSchema.of(schema, schemaEntity)
-        .withHiddenPropertiesSet(
-            getHiddenPropertyNames(
-                catalogIdentifier,
-                HasPropertyMetadata::schemaPropertiesMetadata,
-                schema.properties()));
+    return schema;
   }
 
   /**
@@ -242,7 +214,8 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
               getHiddenPropertyNames(
                   catalogIdent,
                   HasPropertyMetadata::schemaPropertiesMetadata,
-                  alteredSchema.properties()));
+                  alteredSchema.properties()))
+          .withImported(true);
     }
 
     StringIdentifier stringId = getStringIdFromProperties(alteredSchema.properties());
@@ -253,7 +226,8 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
               getHiddenPropertyNames(
                   catalogIdent,
                   HasPropertyMetadata::schemaPropertiesMetadata,
-                  alteredSchema.properties()));
+                  alteredSchema.properties()))
+          .withImported(isEntityExist(ident));
     }
 
     SchemaEntity updatedSchemaEntity =
@@ -280,12 +254,16 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                             .build()),
             "UPDATE",
             stringId.id());
+
+    boolean imported = updatedSchemaEntity != null;
+
     return EntityCombinedSchema.of(alteredSchema, updatedSchemaEntity)
         .withHiddenPropertiesSet(
             getHiddenPropertyNames(
                 catalogIdent,
                 HasPropertyMetadata::schemaPropertiesMetadata,
-                alteredSchema.properties()));
+                alteredSchema.properties()))
+        .withImported(imported);
   }
 
   /**
@@ -329,5 +307,105 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     return isManagedEntity(catalogIdent, Capability.Scope.SCHEMA)
         ? droppedFromStore
         : droppedFromCatalog;
+  }
+
+  @Override
+  public boolean importSchema(NameIdentifier identifier) {
+    EntityCombinedSchema combinedSchema = loadCombinedSchema(identifier);
+    if (combinedSchema.imported()) {
+      return false;
+    }
+
+    StringIdentifier stringId = getStringIdFromProperties(combinedSchema.schemaProperties());
+    long uid;
+    if (stringId != null) {
+      // If the entity in the store doesn't match the external system, we use the data
+      // of external system to correct it.
+      uid = stringId.id();
+    } else {
+      // If store doesn't exist entity, we sync the entity from the external system.
+      uid = idGenerator.nextId();
+    }
+
+    SchemaEntity schemaEntity =
+        SchemaEntity.builder()
+            .withId(uid)
+            .withName(identifier.name())
+            .withNamespace(identifier.namespace())
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator(combinedSchema.auditInfo().creator())
+                    .withCreateTime(combinedSchema.auditInfo().createTime())
+                    .withLastModifier(combinedSchema.auditInfo().lastModifier())
+                    .withLastModifiedTime(combinedSchema.auditInfo().lastModifiedTime())
+                    .build())
+            .build();
+    try {
+      store.put(schemaEntity, true);
+    } catch (Exception e) {
+      LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
+      throw new RuntimeException("Fail to access underlying storage");
+    }
+
+    return true;
+  }
+
+  private EntityCombinedSchema loadCombinedSchema(NameIdentifier ident) {
+    NameIdentifier catalogIdentifier = getCatalogIdentifier(ident);
+    Schema schema =
+        doWithCatalog(
+            catalogIdentifier,
+            c -> c.doWithSchemaOps(s -> s.loadSchema(ident)),
+            NoSuchSchemaException.class);
+
+    // If the Schema is maintained by the Gravitino's store, we don't have to load again.
+    boolean isManagedSchema = isManagedEntity(catalogIdentifier, Capability.Scope.SCHEMA);
+    if (isManagedSchema) {
+      return EntityCombinedSchema.of(schema)
+          .withHiddenPropertiesSet(
+              getHiddenPropertyNames(
+                  catalogIdentifier,
+                  HasPropertyMetadata::schemaPropertiesMetadata,
+                  schema.properties()))
+          .withImported(true);
+    }
+
+    StringIdentifier stringId = getStringIdFromProperties(schema.properties());
+    // Case 1: The schema is not created by Gravitino.
+    if (stringId == null) {
+      return EntityCombinedSchema.of(schema)
+          .withHiddenPropertiesSet(
+              getHiddenPropertyNames(
+                  catalogIdentifier,
+                  HasPropertyMetadata::schemaPropertiesMetadata,
+                  schema.properties()))
+          .withImported(isEntityExist(ident));
+    }
+
+    SchemaEntity schemaEntity =
+        operateOnEntity(
+            ident,
+            identifier -> store.get(identifier, SCHEMA, SchemaEntity.class),
+            "GET",
+            stringId.id());
+
+    boolean imported = schemaEntity != null;
+
+    return EntityCombinedSchema.of(schema, schemaEntity)
+        .withHiddenPropertiesSet(
+            getHiddenPropertyNames(
+                catalogIdentifier,
+                HasPropertyMetadata::schemaPropertiesMetadata,
+                schema.properties()))
+        .withImported(imported);
+  }
+
+  private boolean isEntityExist(NameIdentifier ident) {
+    try {
+      return store.exists(ident, SCHEMA);
+    } catch (Exception e) {
+      LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "exists", ident, e);
+      throw new RuntimeException("Fail to access underlying storage");
+    }
   }
 }

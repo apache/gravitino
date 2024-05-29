@@ -19,6 +19,7 @@ import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.Role;
 import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.SecurableObjects;
+import com.datastrato.gravitino.catalog.CatalogDispatcher;
 import com.datastrato.gravitino.dto.authorization.RoleDTO;
 import com.datastrato.gravitino.dto.authorization.SecurableObjectDTO;
 import com.datastrato.gravitino.dto.requests.RoleCreateRequest;
@@ -55,6 +56,7 @@ import org.mockito.Mockito;
 public class TestRoleOperations extends JerseyTest {
 
   private static final AccessControlManager manager = mock(AccessControlManager.class);
+  private static final CatalogDispatcher dispatcher = mock(CatalogDispatcher.class);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
@@ -73,6 +75,7 @@ public class TestRoleOperations extends JerseyTest {
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     GravitinoEnv.getInstance().setLockManager(new LockManager(config));
     GravitinoEnv.getInstance().setAccessControlManager(manager);
+    GravitinoEnv.getInstance().setCatalogDispatcher(dispatcher);
   }
 
   @Override
@@ -110,6 +113,7 @@ public class TestRoleOperations extends JerseyTest {
     Role role = buildRole("role1");
 
     when(manager.createRole(any(), any(), any(), any())).thenReturn(role);
+    when(dispatcher.catalogExists(any())).thenReturn(true);
 
     Response resp =
         target("/metalakes/metalake1/roles")

@@ -18,6 +18,8 @@ import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTopicException;
 import com.datastrato.gravitino.exceptions.TopicAlreadyExistsException;
+import com.datastrato.gravitino.lock.LockType;
+import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.messaging.DataLayout;
 import com.datastrato.gravitino.messaging.Topic;
 import com.datastrato.gravitino.messaging.TopicChange;
@@ -70,36 +72,16 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
    */
   @Override
   public Topic loadTopic(NameIdentifier ident) throws NoSuchTopicException {
-    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-    Topic topic =
-        doWithCatalog(
-            catalogIdent,
-            c -> c.doWithTopicOps(t -> t.loadTopic(ident)),
-            NoSuchTopicException.class);
+    EntityCombinedTopic topic =
+        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> loadCombinedTopic(ident));
 
-    StringIdentifier stringId = getStringIdFromProperties(topic.properties());
-    // Case 1: The topic is not created by Gravitino.
-    // Note: for Kafka catalog, stringId will not be null. Because there is no way to store the
-    // Gravitino
-    // ID in Kafka, therefor we use the topic ID as the Gravitino ID
-    if (stringId == null) {
-      return EntityCombinedTopic.of(topic)
-          .withHiddenPropertiesSet(
-              getHiddenPropertyNames(
-                  catalogIdent, HasPropertyMetadata::topicPropertiesMetadata, topic.properties()));
+    if (topic.imported()) {
+      return topic;
     }
 
-    TopicEntity topicEntity =
-        operateOnEntity(
-            ident,
-            identifier -> store.get(identifier, TOPIC, TopicEntity.class),
-            "GET",
-            getStringIdFromProperties(topic.properties()).id());
-
-    return EntityCombinedTopic.of(topic, topicEntity)
-        .withHiddenPropertiesSet(
-            getHiddenPropertyNames(
-                catalogIdent, HasPropertyMetadata::topicPropertiesMetadata, topic.properties()));
+    TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(ident.namespace().levels()), LockType.WRITE, () -> importTopic(ident));
+    return topic;
   }
 
   /**
@@ -237,12 +219,15 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
             "UPDATE",
             getStringIdFromProperties(alteredTopic.properties()).id());
 
+    boolean imported = updatedTopicEntity != null;
+
     return EntityCombinedTopic.of(alteredTopic, updatedTopicEntity)
         .withHiddenPropertiesSet(
             getHiddenPropertyNames(
                 catalogIdent,
                 HasPropertyMetadata::topicPropertiesMetadata,
-                alteredTopic.properties()));
+                alteredTopic.properties()))
+        .withImported(imported);
   }
 
   /**
@@ -281,5 +266,97 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
     return isManagedEntity(catalogIdent, Capability.Scope.TOPIC)
         ? droppedFromStore
         : droppedFromCatalog;
+  }
+
+  @Override
+  public boolean importTopic(NameIdentifier identifier) {
+
+    EntityCombinedTopic combinedTopic = loadCombinedTopic(identifier);
+
+    if (combinedTopic.imported()) {
+      return false;
+    }
+
+    StringIdentifier stringId = getStringIdFromProperties(combinedTopic.topicProperties());
+
+    long uid;
+    if (stringId != null) {
+      // If the entity in the store doesn't match the external system, we use the data
+      // of external system to correct it.
+      uid = stringId.id();
+    } else {
+      // If store doesn't exist entity, we sync the entity from the external system.
+      uid = idGenerator.nextId();
+    }
+
+    TopicEntity topicEntity =
+        TopicEntity.builder()
+            .withId(uid)
+            .withName(combinedTopic.name())
+            .withComment(combinedTopic.comment())
+            .withNamespace(identifier.namespace())
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator(combinedTopic.auditInfo().creator())
+                    .withCreateTime(combinedTopic.auditInfo().createTime())
+                    .withLastModifier(combinedTopic.auditInfo().lastModifier())
+                    .withLastModifiedTime(combinedTopic.auditInfo().lastModifiedTime())
+                    .build())
+            .build();
+
+    try {
+      store.put(topicEntity, true);
+    } catch (Exception e) {
+      LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
+      throw new RuntimeException("Fail to access underlying storage");
+    }
+
+    return true;
+  }
+
+  private boolean isEntityExist(NameIdentifier ident) {
+    try {
+      return store.exists(ident, TOPIC);
+    } catch (Exception e) {
+      LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "exists", ident, e);
+      throw new RuntimeException("Fail to access underlying storage");
+    }
+  }
+
+  private EntityCombinedTopic loadCombinedTopic(NameIdentifier ident) {
+    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+    Topic topic =
+        doWithCatalog(
+            catalogIdent,
+            c -> c.doWithTopicOps(t -> t.loadTopic(ident)),
+            NoSuchTopicException.class);
+
+    StringIdentifier stringId = getStringIdFromProperties(topic.properties());
+    // Case 1: The topic is not created by Gravitino.
+    // Note: for Kafka catalog, stringId will not be null. Because there is no way to store the
+    // Gravitino
+    // ID in Kafka, therefor we use the topic ID as the Gravitino ID
+    if (stringId == null) {
+      return EntityCombinedTopic.of(topic)
+          .withHiddenPropertiesSet(
+              getHiddenPropertyNames(
+                  catalogIdent, HasPropertyMetadata::topicPropertiesMetadata, topic.properties()))
+          .withImported(isEntityExist(ident));
+    }
+
+    TopicEntity topicEntity =
+        operateOnEntity(
+            ident,
+            identifier -> store.get(identifier, TOPIC, TopicEntity.class),
+            "GET",
+            getStringIdFromProperties(topic.properties()).id());
+
+    boolean imported = topicEntity != null;
+
+    return EntityCombinedTopic.of(topic, topicEntity)
+        .withHiddenPropertiesSet(
+            getHiddenPropertyNames(
+                catalogIdent, HasPropertyMetadata::topicPropertiesMetadata, topic.properties()))
+        .withImported(imported);
   }
 }

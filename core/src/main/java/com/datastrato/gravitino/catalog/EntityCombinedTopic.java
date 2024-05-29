@@ -8,6 +8,7 @@ import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.messaging.Topic;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.TopicEntity;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -23,6 +24,7 @@ public class EntityCombinedTopic implements Topic {
 
   // Sets of properties that should be hidden from the user.
   private Set<String> hiddenProperties;
+  private boolean imported;
 
   private EntityCombinedTopic(Topic topic, TopicEntity topicEntity) {
     this.topic = topic;
@@ -39,6 +41,11 @@ public class EntityCombinedTopic implements Topic {
 
   public EntityCombinedTopic withHiddenPropertiesSet(Set<String> hiddenProperties) {
     this.hiddenProperties = hiddenProperties;
+    return this;
+  }
+
+  public EntityCombinedTopic withImported(boolean imported) {
+    this.imported = imported;
     return this;
   }
 
@@ -72,5 +79,13 @@ public class EntityCombinedTopic implements Topic {
     return topicEntity == null
         ? topic.auditInfo()
         : mergedAudit.merge(topicEntity.auditInfo(), true /* overwrite */);
+  }
+
+  public boolean imported() {
+    return imported;
+  }
+
+  Map<String, String> topicProperties() {
+    return Collections.unmodifiableMap(topic.properties());
   }
 }

@@ -19,6 +19,8 @@ import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
+import com.datastrato.gravitino.lock.LockType;
+import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.rel.Column;
@@ -79,37 +81,17 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    */
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
-    NameIdentifier catalogIdentifier = getCatalogIdentifier(ident);
-    Table table =
-        doWithCatalog(
-            catalogIdentifier,
-            c -> c.doWithTableOps(t -> t.loadTable(ident)),
-            NoSuchTableException.class);
+    EntityCombinedTable table =
+        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> loadCombinedTable(ident));
 
-    StringIdentifier stringId = getStringIdFromProperties(table.properties());
-    // Case 1: The table is not created by Gravitino.
-    if (stringId == null) {
-      return EntityCombinedTable.of(table)
-          .withHiddenPropertiesSet(
-              getHiddenPropertyNames(
-                  catalogIdentifier,
-                  HasPropertyMetadata::tablePropertiesMetadata,
-                  table.properties()));
+    if (table.imported()) {
+      return table;
     }
 
-    TableEntity tableEntity =
-        operateOnEntity(
-            ident,
-            identifier -> store.get(identifier, TABLE, TableEntity.class),
-            "GET",
-            stringId.id());
+    TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(ident.namespace().levels()), LockType.WRITE, () -> importTable(ident));
 
-    return EntityCombinedTable.of(table, tableEntity)
-        .withHiddenPropertiesSet(
-            getHiddenPropertyNames(
-                catalogIdentifier,
-                HasPropertyMetadata::tablePropertiesMetadata,
-                table.properties()));
+    return table;
   }
 
   /**
@@ -249,7 +231,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
               getHiddenPropertyNames(
                   getCatalogIdentifier(ident),
                   HasPropertyMetadata::tablePropertiesMetadata,
-                  alteredTable.properties()));
+                  alteredTable.properties()))
+          .withImported(isEntityExist(ident));
     }
 
     TableEntity updatedTableEntity =
@@ -284,12 +267,15 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             "UPDATE",
             stringId.id());
 
+    boolean imported = updatedTableEntity != null;
+
     return EntityCombinedTable.of(alteredTable, updatedTableEntity)
         .withHiddenPropertiesSet(
             getHiddenPropertyNames(
                 getCatalogIdentifier(ident),
                 HasPropertyMetadata::tablePropertiesMetadata,
-                alteredTable.properties()));
+                alteredTable.properties()))
+        .withImported(imported);
   }
 
   /**
@@ -378,5 +364,93 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     return isManagedEntity(catalogIdent, Capability.Scope.TABLE)
         ? droppedFromStore
         : droppedFromCatalog;
+  }
+
+  @Override
+  public boolean importTable(NameIdentifier identifier) {
+    EntityCombinedTable combinedTable = loadCombinedTable(identifier);
+
+    if (combinedTable.imported()) {
+      return false;
+    }
+
+    StringIdentifier stringId = getStringIdFromProperties(combinedTable.tableProperties());
+    long uid;
+    if (stringId != null) {
+      // If the entity in the store doesn't match the external system, we use the data
+      // of external system to correct it.
+      uid = stringId.id();
+    } else {
+      // If store doesn't exist entity, we sync the entity from the external system.
+      uid = idGenerator.nextId();
+    }
+
+    TableEntity tableEntity =
+        TableEntity.builder()
+            .withId(uid)
+            .withName(identifier.name())
+            .withNamespace(identifier.namespace())
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator(combinedTable.auditInfo().creator())
+                    .withCreateTime(combinedTable.auditInfo().createTime())
+                    .withLastModifier(combinedTable.auditInfo().lastModifier())
+                    .withLastModifiedTime(combinedTable.auditInfo().lastModifiedTime())
+                    .build())
+            .build();
+    try {
+      store.put(tableEntity, true);
+    } catch (Exception e) {
+      LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
+      throw new RuntimeException("Fail to access underlying storage");
+    }
+    return true;
+  }
+
+  private boolean isEntityExist(NameIdentifier ident) {
+    try {
+      return store.exists(ident, TABLE);
+    } catch (Exception e) {
+      LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "exists", ident, e);
+      throw new RuntimeException("Fail to access underlying storage");
+    }
+  }
+
+  private EntityCombinedTable loadCombinedTable(NameIdentifier ident) {
+    NameIdentifier catalogIdentifier = getCatalogIdentifier(ident);
+    Table table =
+        doWithCatalog(
+            catalogIdentifier,
+            c -> c.doWithTableOps(t -> t.loadTable(ident)),
+            NoSuchTableException.class);
+
+    StringIdentifier stringId = getStringIdFromProperties(table.properties());
+    // Case 1: The table is not created by Gravitino.
+    if (stringId == null) {
+      return EntityCombinedTable.of(table)
+          .withHiddenPropertiesSet(
+              getHiddenPropertyNames(
+                  catalogIdentifier,
+                  HasPropertyMetadata::tablePropertiesMetadata,
+                  table.properties()))
+          .withImported(isEntityExist(ident));
+    }
+
+    TableEntity tableEntity =
+        operateOnEntity(
+            ident,
+            identifier -> store.get(identifier, TABLE, TableEntity.class),
+            "GET",
+            stringId.id());
+
+    boolean imported = tableEntity != null;
+
+    return EntityCombinedTable.of(table, tableEntity)
+        .withHiddenPropertiesSet(
+            getHiddenPropertyNames(
+                catalogIdentifier,
+                HasPropertyMetadata::tablePropertiesMetadata,
+                table.properties()))
+        .withImported(imported);
   }
 }

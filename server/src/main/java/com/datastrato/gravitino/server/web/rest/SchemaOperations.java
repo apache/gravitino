@@ -133,9 +133,7 @@ public class SchemaOperations {
           httpRequest,
           () -> {
             NameIdentifier ident = NameIdentifierUtil.ofSchema(metalake, catalog, schema);
-            Schema s =
-                TreeLockUtils.doWithTreeLock(
-                    ident, LockType.READ, () -> dispatcher.loadSchema(ident));
+            Schema s = dispatcher.loadSchema(ident);
             Response response = Utils.ok(new SchemaResponse(DTOConverters.toDTO(s)));
             LOG.info("Schema loaded: {}.{}.{}", metalake, catalog, s.name());
             return response;

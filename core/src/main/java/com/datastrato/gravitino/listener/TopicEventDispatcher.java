@@ -128,4 +128,9 @@ public class TopicEventDispatcher implements TopicDispatcher {
       throw e;
     }
   }
+
+  @Override
+  public boolean importTopic(NameIdentifier identifier) {
+    return dispatcher.importTopic(identifier);
+  }
 }

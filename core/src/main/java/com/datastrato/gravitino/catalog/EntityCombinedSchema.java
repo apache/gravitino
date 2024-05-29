@@ -8,6 +8,7 @@ import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.SchemaEntity;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -23,6 +24,7 @@ public final class EntityCombinedSchema implements Schema {
 
   // Sets of properties that should be hidden from the user.
   private Set<String> hiddenProperties;
+  private boolean imported;
 
   private EntityCombinedSchema(Schema schema, SchemaEntity schemaEntity) {
     this.schema = schema;
@@ -39,6 +41,11 @@ public final class EntityCombinedSchema implements Schema {
 
   public EntityCombinedSchema withHiddenPropertiesSet(Set<String> hiddenProperties) {
     this.hiddenProperties = hiddenProperties;
+    return this;
+  }
+
+  public EntityCombinedSchema withImported(boolean imported) {
+    this.imported = imported;
     return this;
   }
 
@@ -72,5 +79,13 @@ public final class EntityCombinedSchema implements Schema {
     return schemaEntity == null
         ? schema.auditInfo()
         : mergedAudit.merge(schemaEntity.auditInfo(), true /* overwrite */);
+  }
+
+  public boolean imported() {
+    return imported;
+  }
+
+  Map<String, String> schemaProperties() {
+    return Collections.unmodifiableMap(schema.properties());
   }
 }

@@ -14,6 +14,7 @@ import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -30,6 +31,7 @@ public final class EntityCombinedTable implements Table {
 
   // Sets of properties that should be hidden from the user.
   private Set<String> hiddenProperties;
+  private boolean imported;
 
   private EntityCombinedTable(Table table, TableEntity tableEntity) {
     this.table = table;
@@ -46,6 +48,11 @@ public final class EntityCombinedTable implements Table {
 
   public EntityCombinedTable withHiddenPropertiesSet(Set<String> hiddenProperties) {
     this.hiddenProperties = hiddenProperties;
+    return this;
+  }
+
+  public EntityCombinedTable withImported(boolean imported) {
+    this.imported = imported;
     return this;
   }
 
@@ -96,6 +103,10 @@ public final class EntityCombinedTable implements Table {
     return table.index();
   }
 
+  public boolean imported() {
+    return imported;
+  }
+
   @Override
   public Audit auditInfo() {
     AuditInfo mergedAudit =
@@ -109,5 +120,9 @@ public final class EntityCombinedTable implements Table {
     return tableEntity == null
         ? table.auditInfo()
         : mergedAudit.merge(tableEntity.auditInfo(), true /* overwrite */);
+  }
+
+  Map<String, String> tableProperties() {
+    return Collections.unmodifiableMap(table.properties());
   }
 }

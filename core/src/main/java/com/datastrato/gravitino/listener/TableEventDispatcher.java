@@ -169,4 +169,9 @@ public class TableEventDispatcher implements TableDispatcher {
   public boolean tableExists(NameIdentifier ident) {
     return dispatcher.tableExists(ident);
   }
+
+  @Override
+  public boolean importTable(NameIdentifier identifier) {
+    return dispatcher.importTable(identifier);
+  }
 }

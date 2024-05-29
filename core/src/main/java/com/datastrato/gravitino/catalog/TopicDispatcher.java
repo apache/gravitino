@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.catalog;
 
+import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.messaging.TopicCatalog;
 
 /**
@@ -13,4 +14,6 @@ import com.datastrato.gravitino.messaging.TopicCatalog;
  * dispatching or handling topic-related events or actions that are not covered by the standard
  * {@code TopicCatalog} operations.
  */
-public interface TopicDispatcher extends TopicCatalog {}
+public interface TopicDispatcher extends TopicCatalog {
+  boolean importTopic(NameIdentifier identifier);
+}

@@ -130,4 +130,9 @@ public class SchemaEventDispatcher implements SchemaDispatcher {
       throw e;
     }
   }
+
+  @Override
+  public boolean importSchema(NameIdentifier identifier) {
+    return dispatcher.importSchema(identifier);
+  }
 }

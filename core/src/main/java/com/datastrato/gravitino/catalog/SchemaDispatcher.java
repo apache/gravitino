@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.catalog;
 
+import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.connector.SupportsSchemas;
 
 /**
@@ -13,4 +14,6 @@ import com.datastrato.gravitino.connector.SupportsSchemas;
  * to dispatching or handling schema-related events or actions that are not covered by the standard
  * {@code SupportsSchemas} operations.
  */
-public interface SchemaDispatcher extends SupportsSchemas {}
+public interface SchemaDispatcher extends SupportsSchemas {
+  boolean importSchema(NameIdentifier identifier);
+}

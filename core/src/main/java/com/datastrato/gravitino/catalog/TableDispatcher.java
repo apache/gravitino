@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.catalog;
 
+import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.rel.TableCatalog;
 
 /**
@@ -13,4 +14,6 @@ import com.datastrato.gravitino.rel.TableCatalog;
  * dispatching or handling table-related events or actions that are not covered by the standard
  * {@code TableCatalog} operations.
  */
-public interface TableDispatcher extends TableCatalog {}
+public interface TableDispatcher extends TableCatalog {
+  boolean importTable(NameIdentifier identifier);
+}
