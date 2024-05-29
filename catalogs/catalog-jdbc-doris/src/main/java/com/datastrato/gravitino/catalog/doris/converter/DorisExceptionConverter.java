@@ -66,7 +66,6 @@ public class DorisExceptionConverter extends JdbcExceptionConverter {
       case CODE_TABLE_EXISTS:
         return new TableAlreadyExistsException(se, se.getMessage());
       case CODE_DATABASE_NOT_EXISTS:
-        return new NoSuchSchemaException(se, se.getMessage());
       case CODE_UNKNOWN_DATABASE:
         return new NoSuchSchemaException(se, se.getMessage());
       case CODE_NO_SUCH_TABLE:

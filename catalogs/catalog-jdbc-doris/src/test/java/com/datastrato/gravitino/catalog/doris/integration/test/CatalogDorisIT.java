@@ -8,7 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.SupportsSchemas;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
@@ -120,14 +119,6 @@ public class CatalogDorisIT extends AbstractIT {
   }
 
   private void clearTableAndSchema() {
-    NameIdentifier[] nameIdentifiers =
-        catalog.asTableCatalog().listTables(Namespace.of(metalakeName, catalogName, schemaName));
-    for (NameIdentifier nameIdentifier : nameIdentifiers) {
-      // The table [test_add_index_*]'s state is SCHEMA_CHANGE, cannot be dropped.
-      if (!nameIdentifier.name().contains("test_add_index")) {
-        catalog.asTableCatalog().dropTable(nameIdentifier);
-      }
-    }
     catalog.asSchemas().dropSchema(schemaName, true);
   }
 
