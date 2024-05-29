@@ -55,6 +55,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     testsetsDir = ITUtils.joinPath(testsetsDir, "testsets");
 
     ciTestsets.add("hive");
+
     ciTestsets.add("lakehouse-iceberg");
     ciTestsets.add("jdbc-mysql");
     ciTestsets.add("jdbc-postgresql");
