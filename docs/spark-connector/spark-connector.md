@@ -18,13 +18,17 @@ The Gravitino Spark connector leverages the Spark DataSourceV2 interface to faci
 
 ## Requirement
 
-* Spark 3.4
-* Scala 2.12
+* Spark 3.3 or 3.4 or 3.5
+* Scala 2.12 or 2.13
 * JDK 8,11,17
+
+:::info
+Gravitino spark connector doesn't support scala 2.13 for Spark3.3.
+:::
 
 ## How to use it
 
-1. [Build](../how-to-build.md) or download the Gravitino spark connector jar, and place it to the classpath of Spark.
+1. [Build](../how-to-build.md) or [download](https://mvnrepository.com/artifact/com.datastrato.gravitino/spark-connector-runtime) the Gravitino spark connector jar, and place it to the classpath of Spark.
 2. Configure the Spark session to use the Gravitino spark connector.
 
 | Property                                 | Type   | Default Value | Description                                                                                         | Required | Since Version |
@@ -39,10 +43,13 @@ The Gravitino Spark connector leverages the Spark DataSourceV2 interface to faci
 --conf spark.plugins="com.datastrato.gravitino.spark.connector.plugin.GravitinoSparkPlugin" \
 --conf spark.sql.gravitino.uri=http://127.0.0.1:8090 \
 --conf spark.sql.gravitino.metalake=test \
+--conf spark.sql.gravitino.enableIcebergSupport=true \
 --conf spark.sql.warehouse.dir=hdfs://127.0.0.1:9000/user/hive/warehouse-hive
 ```
 
-3. Execute the Spark SQL query. 
+3. [Download](https://iceberg.apache.org/releases/) corresponding runtime jars and place it to the classpath of Spark if using Iceberg catalog.
+
+4. Execute the Spark SQL query. 
 
 Suppose there are two catalogs in the metalake `test`, `hive` for Hive catalog and `iceberg` for Iceberg catalog. 
 

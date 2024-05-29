@@ -88,11 +88,11 @@ This software is licensed under the Apache License version 2."
    with specific module name, like:
 
     ```shell
-    ./gradlew spark-connector:spark-connector-runtime:build
+    ./gradlew spark-connector:spark-runtime-3.4:build -PscalaVersion=2.12
     ```
 
    This creates `gravitino-spark-connector-runtime-{sparkVersion}_{scalaVersion}-{version}.jar`
-   under the `spark-connector/spark-connector-runtime/build/libs` directory.
+   under the `spark-connector/v3.4/spark-runtime/build/libs` directory.
 
    :::note
    The first time you build the project, downloading the dependencies may take a while. You can add
