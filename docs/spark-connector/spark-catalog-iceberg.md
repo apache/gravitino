@@ -22,8 +22,8 @@ The Gravitino Spark connector offers the capability to read and write Iceberg ta
 - `DELETE FROM`
 - `UPDATE`
 - `CALL`
-- `TIME TRAVEL`
-- `DESCRIBE SCHEMA AND RESERVED PROPERTIES`
+- `TIME TRAVEL QUERY`
+- `DESCRIBE TABLE`
 
 #### Not supported operations:
 
@@ -61,7 +61,7 @@ VALUES
 (2, 'Bob', 'Marketing', TIMESTAMP '2021-02-01 10:30:00'),
 (3, 'Charlie', 'Sales', TIMESTAMP '2021-03-01 08:45:00');
 
-SELECT * FROM employee WHERE date(hire_date) = '2021-01-01'
+SELECT * FROM employee WHERE date(hire_date) = '2021-01-01';
 
 UPDATE employee SET department = 'Jenny' WHERE id = 1;
 
@@ -90,16 +90,11 @@ CALL iceberg_a.system.set_current_snapshot('iceberg_a.mydatabase.employee', 2);
 SELECT * FROM employee TIMESTAMP AS OF '2024-05-27 01:01:00';
 SELECT * FROM employee FOR SYSTEM_TIME AS OF '2024-05-27 01:01:00';
 
--- Time travel to snapshot with id 1L
-SELECT * FROM employee VERSION AS OF 1;
-SELECT * FROM employee FOR SYSTEM_VERSION AS OF 1;
-
 -- Show the details of employee, such as schema and reserved properties(like location, current-snapshot-id, provider, format, format-version, etc)
 DESC EXTENDED employee;
 ```
 
 For more details about `CALL`, please refer to the [Spark Procedures description](https://iceberg.apache.org/docs/latest/spark-procedures/#spark-procedures) in Iceberg official document. \
-For more details about `Time travel`, please refer to the [Time travel description](https://iceberg.apache.org/docs/latest/spark-queries/#time-travel) in Iceberg official document.
 
 ## Iceberg backend-catalog support
 - HiveCatalog
