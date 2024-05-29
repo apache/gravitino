@@ -26,6 +26,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
+import org.awaitility.Awaitility;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -96,14 +98,16 @@ public class CatalogRegister {
       connection = driver.connect(config.getTrinoURI(), properties);
     } catch (SQLException e) {
       throw new TrinoException(
-          GRAVITINO_RUNTIME_ERROR, "Failed to initialize Trino the trino connection.", e);
+          GRAVITINO_RUNTIME_ERROR, "Failed to initialize the Trino connection.", e);
     }
 
     catalogStoreDirectory = config.getCatalogStoreDirectory();
     if (!Files.exists(Path.of(catalogStoreDirectory))) {
       throw new TrinoException(
           GRAVITINO_MISSING_CONFIG,
-          "Error config for Trino catalog store directory, file not found");
+          String.format(
+              "Error config for Trino catalog store directory %s, file not found",
+              catalogStoreDirectory));
     }
   }
 
@@ -175,7 +179,7 @@ public class CatalogRegister {
         } catch (Exception e) {
           failedException = e;
           LOG.warn("Execute command failed: {}, ", showCatalogCommand, e);
-          Thread.sleep(EXECUTE_QUERY_BACKOFF_TIME * 1000);
+          Awaitility.await().atLeast(EXECUTE_QUERY_BACKOFF_TIME, TimeUnit.SECONDS);
         }
       }
       throw failedException;
@@ -196,7 +200,7 @@ public class CatalogRegister {
         } catch (Exception e) {
           failedException = e;
           LOG.warn("Execute command failed: {}, ", sql, e);
-          Thread.sleep(EXECUTE_QUERY_BACKOFF_TIME * 1000);
+          Awaitility.await().atLeast(EXECUTE_QUERY_BACKOFF_TIME, TimeUnit.SECONDS);
         }
       }
       throw failedException;
