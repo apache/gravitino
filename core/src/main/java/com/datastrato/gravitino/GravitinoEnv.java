@@ -8,9 +8,13 @@ import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
 import com.datastrato.gravitino.catalog.CatalogDispatcher;
 import com.datastrato.gravitino.catalog.CatalogManager;
+import com.datastrato.gravitino.catalog.CatalogNormalizeDispatcher;
 import com.datastrato.gravitino.catalog.FilesetDispatcher;
 import com.datastrato.gravitino.catalog.FilesetNormalizeDispatcher;
 import com.datastrato.gravitino.catalog.FilesetOperationDispatcher;
+import com.datastrato.gravitino.catalog.PartitionDispatcher;
+import com.datastrato.gravitino.catalog.PartitionNormalizeDispatcher;
+import com.datastrato.gravitino.catalog.PartitionOperationDispatcher;
 import com.datastrato.gravitino.catalog.SchemaDispatcher;
 import com.datastrato.gravitino.catalog.SchemaNormalizeDispatcher;
 import com.datastrato.gravitino.catalog.SchemaOperationDispatcher;
@@ -31,6 +35,7 @@ import com.datastrato.gravitino.listener.TopicEventDispatcher;
 import com.datastrato.gravitino.lock.LockManager;
 import com.datastrato.gravitino.metalake.MetalakeDispatcher;
 import com.datastrato.gravitino.metalake.MetalakeManager;
+import com.datastrato.gravitino.metalake.MetalakeNormalizeDispatcher;
 import com.datastrato.gravitino.metrics.MetricsSystem;
 import com.datastrato.gravitino.metrics.source.JVMMetricsSource;
 import com.datastrato.gravitino.storage.IdGenerator;
@@ -58,6 +63,8 @@ public class GravitinoEnv {
   private SchemaDispatcher schemaDispatcher;
 
   private TableDispatcher tableDispatcher;
+
+  private PartitionDispatcher partitionDispatcher;
 
   private FilesetDispatcher filesetDispatcher;
 
@@ -151,11 +158,15 @@ public class GravitinoEnv {
 
     // Create and initialize metalake related modules
     MetalakeManager metalakeManager = new MetalakeManager(entityStore, idGenerator);
-    this.metalakeDispatcher = new MetalakeEventDispatcher(eventBus, metalakeManager);
+    MetalakeNormalizeDispatcher metalakeNormalizeDispatcher =
+        new MetalakeNormalizeDispatcher(metalakeManager);
+    this.metalakeDispatcher = new MetalakeEventDispatcher(eventBus, metalakeNormalizeDispatcher);
 
     // Create and initialize Catalog related modules
     this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
-    this.catalogDispatcher = new CatalogEventDispatcher(eventBus, catalogManager);
+    CatalogNormalizeDispatcher catalogNormalizeDispatcher =
+        new CatalogNormalizeDispatcher(catalogManager);
+    this.catalogDispatcher = new CatalogEventDispatcher(eventBus, catalogNormalizeDispatcher);
 
     SchemaOperationDispatcher schemaOperationDispatcher =
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
@@ -168,6 +179,11 @@ public class GravitinoEnv {
     TableNormalizeDispatcher tableNormalizeDispatcher =
         new TableNormalizeDispatcher(tableOperationDispatcher);
     this.tableDispatcher = new TableEventDispatcher(eventBus, tableNormalizeDispatcher);
+
+    PartitionOperationDispatcher partitionOperationDispatcher =
+        new PartitionOperationDispatcher(catalogManager, entityStore, idGenerator);
+    // todo: support PartitionEventDispatcher
+    this.partitionDispatcher = new PartitionNormalizeDispatcher(partitionOperationDispatcher);
 
     FilesetOperationDispatcher filesetOperationDispatcher =
         new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator);
@@ -242,6 +258,10 @@ public class GravitinoEnv {
    */
   public TableDispatcher tableDispatcher() {
     return tableDispatcher;
+  }
+
+  public PartitionDispatcher partitionDispatcher() {
+    return partitionDispatcher;
   }
 
   /**

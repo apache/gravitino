@@ -32,6 +32,8 @@ import com.datastrato.gravitino.dto.rel.indexes.IndexDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.DayPartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.IdentityPartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
+import com.datastrato.gravitino.dto.rel.partitioning.RangePartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitions.RangePartitionDTO;
 import com.datastrato.gravitino.dto.requests.CatalogCreateRequest;
 import com.datastrato.gravitino.dto.requests.SchemaCreateRequest;
 import com.datastrato.gravitino.dto.requests.SchemaUpdateRequest;
@@ -556,6 +558,60 @@ public class TestRelationalCatalog extends TestBase {
                     tableId, new Column[0], "comment", emptyMap, errorPartitioning));
     Assertions.assertTrue(
         ex3.getMessage().contains("\"columns\" field is required and cannot be empty"));
+
+    // Test partitioning with assignments
+    Partitioning[] partitioningWithAssignments = {
+      RangePartitioningDTO.of(
+          new String[] {columns[0].name()},
+          new RangePartitionDTO[] {
+            RangePartitionDTO.builder()
+                .withName("p1")
+                .withLower(
+                    LiteralDTO.builder()
+                        .withDataType(Types.IntegerType.get())
+                        .withValue("1")
+                        .build())
+                .withUpper(
+                    LiteralDTO.builder()
+                        .withDataType(Types.IntegerType.get())
+                        .withValue("10")
+                        .build())
+                .build()
+          })
+    };
+    expectedTable =
+        createMockTable(
+            "table1",
+            columns,
+            "comment",
+            Collections.emptyMap(),
+            partitioningWithAssignments,
+            DistributionDTO.NONE,
+            SortOrderDTO.EMPTY_SORT);
+
+    req =
+        new TableCreateRequest(
+            tableId.name(),
+            "comment",
+            columns,
+            Collections.emptyMap(),
+            SortOrderDTO.EMPTY_SORT,
+            DistributionDTO.NONE,
+            partitioningWithAssignments,
+            IndexDTO.EMPTY_INDEXES);
+    resp = new TableResponse(expectedTable);
+    buildMockResource(Method.POST, tablePath, req, resp, SC_OK);
+
+    table =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                tableId,
+                fromDTOs(columns),
+                "comment",
+                Collections.emptyMap(),
+                partitioningWithAssignments);
+    assertTableEquals(fromDTO(expectedTable), table);
   }
 
   @Test

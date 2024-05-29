@@ -19,10 +19,11 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -35,8 +36,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 
@@ -73,7 +76,7 @@ public class DorisTableOperations extends JdbcTableOperations {
       Map<String, String> properties,
       Transform[] partitioning,
       Distribution distribution,
-      com.datastrato.gravitino.rel.indexes.Index[] indexes) {
+      Index[] indexes) {
 
     validateIncrementCol(columns);
     validateDistribution(distribution, columns);
@@ -107,6 +110,9 @@ public class DorisTableOperations extends JdbcTableOperations {
       sqlBuilder.append(" COMMENT \"").append(comment).append("\"");
     }
 
+    // Add Partition Info
+    appendPartitionSql(partitioning, columns, sqlBuilder);
+
     // Add distribution info
     if (distribution.strategy() == Strategy.HASH) {
       sqlBuilder.append(NEW_LINE).append(" DISTRIBUTED BY HASH(");
@@ -125,12 +131,6 @@ public class DorisTableOperations extends JdbcTableOperations {
 
     // Add table properties
     sqlBuilder.append(NEW_LINE).append(DorisUtils.generatePropertiesSql(properties));
-
-    // Add Partition Info
-    if (partitioning != null && partitioning.length > 0) {
-      // TODO: Add partitioning support
-      throw new UnsupportedOperationException("Currently we do not support Partitioning in Doris");
-    }
 
     // Return the generated SQL statement
     String result = sqlBuilder.toString();
@@ -169,9 +169,7 @@ public class DorisTableOperations extends JdbcTableOperations {
     }
   }
 
-  @VisibleForTesting
-  static void appendIndexesSql(
-      com.datastrato.gravitino.rel.indexes.Index[] indexes, StringBuilder sqlBuilder) {
+  private static void appendIndexesSql(Index[] indexes, StringBuilder sqlBuilder) {
 
     if (indexes.length == 0) {
       return;
@@ -192,6 +190,57 @@ public class DorisTableOperations extends JdbcTableOperations {
             .collect(Collectors.joining(",\n"));
 
     sqlBuilder.append(",").append(NEW_LINE).append(indexSql);
+  }
+
+  private static void appendPartitionSql(
+      Transform[] partitioning, JdbcColumn[] columns, StringBuilder sqlBuilder) {
+    if (ArrayUtils.isEmpty(partitioning)) {
+      return;
+    }
+    Preconditions.checkArgument(
+        partitioning.length == 1, "Composite partition type is not supported");
+
+    StringBuilder partitionSqlBuilder = new StringBuilder();
+    Set<String> columnNames =
+        Arrays.stream(columns).map(JdbcColumn::name).collect(Collectors.toSet());
+
+    if (partitioning[0] instanceof Transforms.RangeTransform) {
+      partitionSqlBuilder.append(NEW_LINE).append(" PARTITION BY RANGE(");
+      // TODO support multi-column range partitioning in doris
+      Transforms.RangeTransform rangePartition = (Transforms.RangeTransform) partitioning[0];
+
+      Preconditions.checkArgument(
+          rangePartition.fieldName().length == 1, "Doris partition does not support nested field");
+      Preconditions.checkArgument(
+          columnNames.contains(rangePartition.fieldName()[0]),
+          "The partition field must be one of the columns");
+
+      String partitionColumn = BACK_QUOTE + rangePartition.fieldName()[0] + BACK_QUOTE;
+      // TODO we currently do not support pre-assign partition when creating range partitioning
+      partitionSqlBuilder.append(partitionColumn).append(") () ");
+    } else if (partitioning[0] instanceof Transforms.ListTransform) {
+      Transforms.ListTransform listPartition = (Transforms.ListTransform) partitioning[0];
+      partitionSqlBuilder.append(" PARTITION BY LIST(");
+
+      ImmutableList.Builder<String> partitionColumnsBuilder = ImmutableList.builder();
+      String[][] filedNames = listPartition.fieldNames();
+      for (String[] filedName : filedNames) {
+        Preconditions.checkArgument(
+            filedName.length == 1, "Doris partition does not support nested field");
+        Preconditions.checkArgument(
+            columnNames.contains(filedName[0]), "The partition field must be one of the columns");
+
+        partitionColumnsBuilder.add(BACK_QUOTE + filedName[0] + BACK_QUOTE);
+      }
+      String partitionColumns =
+          partitionColumnsBuilder.build().stream().collect(Collectors.joining(","));
+      // TODO we currently do not support pre-assign partition when creating list partitioning table
+      partitionSqlBuilder.append(partitionColumns).append(") () ");
+    } else {
+      throw new IllegalArgumentException("Unsupported partition type of Doris");
+    }
+
+    sqlBuilder.append(partitionSqlBuilder);
   }
 
   @Override
@@ -249,7 +298,6 @@ public class DorisTableOperations extends JdbcTableOperations {
   protected void correctJdbcTableFields(
       Connection connection, String databaseName, String tableName, JdbcTable.Builder tableBuilder)
       throws SQLException {
-
     if (StringUtils.isNotEmpty(tableBuilder.comment())) {
       return;
     }
@@ -268,6 +316,48 @@ public class DorisTableOperations extends JdbcTableOperations {
         }
       }
       tableBuilder.withComment(comment.toString());
+    } catch (SQLException e) {
+      throw exceptionMapper.toGravitinoException(e);
+    }
+
+    getTableStatus(connection, databaseName, tableName);
+  }
+
+  protected void getTableStatus(Connection connection, String databaseName, String tableName) {
+    // sql is `SHOW ALTER TABLE COLUMN WHERE TableName = 'test_table'`
+    // database name must be specified in connection, so the SQL do not need to specify database
+    // name
+    String sql =
+        String.format(
+            "SHOW ALTER TABLE COLUMN WHERE TableName = '%s' ORDER BY JobId DESC limit 1",
+            tableName);
+
+    // Just print each column name and type from resultSet
+    // TODO: add to table properties or other fields
+    try (PreparedStatement preparedStatement = connection.prepareStatement(sql);
+        ResultSet resultSet = preparedStatement.executeQuery()) {
+
+      StringBuilder jobStatus = new StringBuilder();
+      while (resultSet.next()) {
+        int columnCount = resultSet.getMetaData().getColumnCount();
+        for (int i = 1; i <= columnCount; i++) {
+          jobStatus
+              .append(resultSet.getMetaData().getColumnName(i))
+              .append(" : ")
+              .append(resultSet.getString(i))
+              .append(", ");
+        }
+        jobStatus.append(" | ");
+      }
+
+      if (jobStatus.length() > 0) {
+        LOG.info(
+            "Table {}.{} schema-change execution status: {}",
+            databaseName,
+            tableName,
+            jobStatus.toString());
+      }
+
     } catch (SQLException e) {
       throw exceptionMapper.toGravitinoException(e);
     }

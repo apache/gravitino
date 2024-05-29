@@ -199,7 +199,9 @@ public class CatalogHiveIT extends AbstractIT {
 
   @AfterAll
   public static void stop() throws IOException {
-    client.dropMetalake(NameIdentifier.of(metalakeName));
+    if (client != null) {
+      client.dropMetalake(NameIdentifier.of(metalakeName));
+    }
     if (hiveClientPool != null) {
       hiveClientPool.close();
     }
@@ -216,6 +218,9 @@ public class CatalogHiveIT extends AbstractIT {
     } catch (Exception e) {
       LOG.error("Failed to close CloseableGroup", e);
     }
+
+    AbstractIT.customConfigs.clear();
+    AbstractIT.client = null;
   }
 
   @AfterEach
@@ -1029,7 +1034,7 @@ public class CatalogHiveIT extends AbstractIT {
 
     for (int i = 0; i < sortOrders.length; i++) {
       Assertions.assertEquals(
-          sortOrders[i].direction() == SortDirection.ASCENDING ? 0 : 1,
+          sortOrders[i].direction() == SortDirection.ASCENDING ? 1 : 0,
           hiveTab.getSd().getSortCols().get(i).getOrder());
       Assertions.assertEquals(
           ((NamedReference.FieldReference) sortOrders[i].expression()).fieldName()[0],

@@ -464,6 +464,8 @@ tasks.rat {
     // Ignore files we track but do not need headers
     "**/.github/**/*",
     "dev/docker/**/*.xml",
+    "dev/docker/**/*.conf",
+    "dev/docker/kerberos-hive/kadm5.acl",
     "**/*.log",
     "**/licenses/*.txt",
     "**/licenses/*.md",
@@ -615,7 +617,7 @@ tasks {
   register("copySubprojectDependencies", Copy::class) {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
-        !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark-connector") && it.name != "trino-connector" &&
+        !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark") && it.name != "trino-connector" &&
         it.name != "integration-test" && it.name != "bundled-catalog"
       ) {
         from(it.configurations.runtimeClasspath)
@@ -629,7 +631,7 @@ tasks {
       if (!it.name.startsWith("catalog") &&
         !it.name.startsWith("client") &&
         !it.name.startsWith("filesystem") &&
-        !it.name.startsWith("spark-connector") &&
+        !it.name.startsWith("spark") &&
         it.name != "trino-connector" &&
         it.name != "integration-test" &&
         it.name != "bundled-catalog"
@@ -694,7 +696,7 @@ fun printDockerCheckInfo() {
   println("Docker server status ............................................ [${if (dockerRunning) "running" else "stop"}]")
   if (OperatingSystem.current().isMacOsX()) {
     println("mac-docker-connector status ..................................... [${if (macDockerConnector) "running" else "stop"}]")
-    println("OrbStack status ................................................. [${if (isOrbStack) "yes" else "no"}]")
+    println("OrbStack status ................................................. [${if (dockerRunning && isOrbStack) "yes" else "no"}]")
   }
 
   val docker_it_test = project.extra["docker_it_test"] as? Boolean ?: false

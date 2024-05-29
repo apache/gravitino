@@ -254,8 +254,11 @@ public interface Configs {
           .doc("The admins of Gravitino service")
           .version(ConfigConstants.VERSION_0_5_0)
           .stringConf()
-          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .toSequence()
+          .checkValue(
+              valueList ->
+                  valueList != null && valueList.stream().allMatch(StringUtils::isNotBlank),
+              ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   ConfigEntry<Long> ROLE_CACHE_EVICTION_INTERVAL_MS =
@@ -264,4 +267,12 @@ public interface Configs {
           .version(ConfigConstants.VERSION_0_5_0)
           .longConf()
           .createWithDefault(60 * 60 * 1000L);
+
+  public static final int DEFAULT_METRICS_TIME_SLIDING_WINDOW_SECONDS = 60;
+  public static final ConfigEntry<Integer> METRICS_TIME_SLIDING_WINDOW_SECONDS =
+      new ConfigBuilder("gravitino.metrics.timeSlidingWindowSecs")
+          .doc("The seconds of Gravitino metrics time sliding window")
+          .version(ConfigConstants.VERSION_0_5_1)
+          .intConf()
+          .createWithDefault(DEFAULT_METRICS_TIME_SLIDING_WINDOW_SECONDS);
 }

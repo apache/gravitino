@@ -7,6 +7,7 @@ package com.datastrato.gravitino.storage.relational.service;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.authorization.AuthorizationUtils;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.GroupEntity;
 import com.datastrato.gravitino.storage.relational.mapper.GroupMetaMapper;
@@ -67,11 +68,8 @@ public class GroupMetaService {
   }
 
   public GroupEntity getGroupByIdentifier(NameIdentifier identifier) {
-    Preconditions.checkArgument(
-        identifier != null
-            && !identifier.namespace().isEmpty()
-            && identifier.namespace().levels().length == 3,
-        "The identifier should not be null and should have three level.");
+    AuthorizationUtils.checkGroup(identifier);
+
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
     GroupPO groupPO = getGroupPOByMetalakeIdAndName(metalakeId, identifier.name());
@@ -82,11 +80,7 @@ public class GroupMetaService {
 
   public void insertGroup(GroupEntity groupEntity, boolean overwritten) {
     try {
-      Preconditions.checkArgument(
-          groupEntity.namespace() != null
-              && !groupEntity.namespace().isEmpty()
-              && groupEntity.namespace().levels().length == 3,
-          "The namespace of groupEntity should not be null and should have three level.");
+      AuthorizationUtils.checkGroup(groupEntity.nameIdentifier());
 
       Long metalakeId =
           MetalakeMetaService.getInstance().getMetalakeIdByName(groupEntity.namespace().level(0));
@@ -130,11 +124,8 @@ public class GroupMetaService {
   }
 
   public boolean deleteGroup(NameIdentifier identifier) {
-    Preconditions.checkArgument(
-        identifier != null
-            && !identifier.namespace().isEmpty()
-            && identifier.namespace().levels().length == 3,
-        "The identifier should not be null and should have three level.");
+    AuthorizationUtils.checkGroup(identifier);
+
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
     Long groupId = getGroupIdByMetalakeIdAndName(metalakeId, identifier.name());
@@ -152,11 +143,7 @@ public class GroupMetaService {
 
   public <E extends Entity & HasIdentifier> GroupEntity updateGroup(
       NameIdentifier identifier, Function<E, E> updater) {
-    Preconditions.checkArgument(
-        identifier != null
-            && !identifier.namespace().isEmpty()
-            && identifier.namespace().levels().length == 3,
-        "The identifier should not be null and should have three level.");
+    AuthorizationUtils.checkGroup(identifier);
 
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
@@ -222,5 +209,25 @@ public class GroupMetaService {
       throw re;
     }
     return newEntity;
+  }
+
+  public int deleteGroupMetasByLegacyTimeLine(long legacyTimeLine, int limit) {
+    int[] groupDeletedCount = new int[] {0};
+    int[] groupRoleRelDeletedCount = new int[] {0};
+
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            groupDeletedCount[0] =
+                SessionUtils.doWithoutCommitAndFetchResult(
+                    GroupMetaMapper.class,
+                    mapper -> mapper.deleteGroupMetasByLegacyTimeLine(legacyTimeLine, limit)),
+        () ->
+            groupRoleRelDeletedCount[0] =
+                SessionUtils.doWithoutCommitAndFetchResult(
+                    GroupRoleRelMapper.class,
+                    mapper ->
+                        mapper.deleteGroupRoleRelMetasByLegacyTimeLine(legacyTimeLine, limit)));
+
+    return groupDeletedCount[0] + groupRoleRelDeletedCount[0];
   }
 }

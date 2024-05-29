@@ -11,7 +11,7 @@ import com.datastrato.gravitino.NameIdentifier;
 import io.trino.spi.TrinoException;
 import java.time.Instant;
 import java.util.Map;
-import org.apache.logging.log4j.util.Strings;
+import org.apache.commons.lang3.StringUtils;
 
 /** Help Gravitino connector access CatalogMetadata from gravitino client. */
 public class GravitinoCatalog {
@@ -46,7 +46,7 @@ public class GravitinoCatalog {
 
   public String getRequiredProperty(String name) throws Exception {
     String value = catalog.properties().getOrDefault(name, "");
-    if (Strings.isBlank(value)) {
+    if (StringUtils.isBlank(value)) {
       throw new TrinoException(GRAVITINO_MISSING_CONFIG, "Missing required config: " + name);
     }
     return value;

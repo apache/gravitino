@@ -17,13 +17,14 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-public class TestSchemaNormalizeDispatcher extends TestSchemaOperationDispatcher {
+public class TestSchemaNormalizeDispatcher extends TestOperationDispatcher {
   private static SchemaNormalizeDispatcher schemaNormalizeDispatcher;
 
   @BeforeAll
   public static void initialize() throws IOException {
     TestSchemaOperationDispatcher.initialize();
-    schemaNormalizeDispatcher = new SchemaNormalizeDispatcher(dispatcher);
+    schemaNormalizeDispatcher =
+        new SchemaNormalizeDispatcher(TestSchemaOperationDispatcher.dispatcher);
   }
 
   @Test

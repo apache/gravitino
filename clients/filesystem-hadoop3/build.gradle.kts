@@ -20,6 +20,7 @@ dependencies {
   testImplementation(libs.hadoop3.common)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.minikdc)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mockserver.netty) {
     exclude("com.google.guava", "guava")

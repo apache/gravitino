@@ -12,7 +12,9 @@ import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
 import com.datastrato.gravitino.client.ErrorHandlers;
+import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.client.HTTPClient;
+import com.datastrato.gravitino.client.KerberosTokenProvider;
 import com.datastrato.gravitino.client.RESTClient;
 import com.datastrato.gravitino.dto.responses.VersionResponse;
 import com.datastrato.gravitino.exceptions.RESTException;
@@ -26,11 +28,13 @@ import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
+import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -41,6 +45,10 @@ import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * MiniGravitino is a mini Gravitino server for integration tests. It starts a Gravitino server in
+ * the same JVM process.
+ */
 public class MiniGravitino {
   private static final Logger LOG = LoggerFactory.getLogger(MiniGravitino.class);
   private MiniGravitinoContext context;
@@ -48,6 +56,7 @@ public class MiniGravitino {
   private final File mockConfDir;
   private final ServerConfig serverConfig = new ServerConfig();
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
+  private Properties properties;
 
   private String host;
 
@@ -80,7 +89,7 @@ public class MiniGravitino {
         Paths.get(ITUtils.joinPath(gravitinoRootDir, "conf", "gravitino-env.sh.template")),
         Paths.get(ITUtils.joinPath(mockConfDir.getAbsolutePath(), "gravitino-env.sh")));
 
-    Properties properties =
+    properties =
         serverConfig.loadPropertiesFromFile(
             new File(ITUtils.joinPath(mockConfDir.getAbsolutePath(), "gravitino.conf")));
 
@@ -237,10 +246,45 @@ public class MiniGravitino {
     ITUtils.rewriteConfigFile(configTempFileName, configFileName, configMap);
   }
 
+  public static boolean isPortOpen(String host, int port, int timeout) {
+    try (Socket socket = new Socket()) {
+      socket.connect(new java.net.InetSocketAddress(host, port), timeout);
+      return true;
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
   private boolean checkIfServerIsRunning() {
     String URI = String.format("http://%s:%d", host, port);
     LOG.info("checkIfServerIsRunning() URI: {}", URI);
 
+    // Use kerberos, we need to use sdk to check
+    if (Objects.equals(serverConfig.get(Configs.AUTHENTICATOR), "kerberos")) {
+      try {
+        KerberosTokenProvider provider =
+            KerberosTokenProvider.builder()
+                .withClientPrincipal((String) properties.get("client.kerberos.principal"))
+                .withKeyTabFile(new File((String) properties.get("client.kerberos.keytab")))
+                .build();
+        GravitinoAdminClient adminClient =
+            GravitinoAdminClient.builder(URI).withKerberosAuth(provider).build();
+
+        adminClient.listMetalakes();
+        return true;
+      } catch (Exception e) {
+        if (isPortOpen(host, port, 1000)) {
+          return true;
+        }
+
+        LOG.warn(
+            "Kerberos checkIfServerIsRunning() fails, GravitinoServer is not running {}",
+            e.getMessage());
+        return false;
+      }
+    }
+
+    // Not auth, we can use the rest client to check
     VersionResponse response = null;
     try {
       response =

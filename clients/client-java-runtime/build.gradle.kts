@@ -24,6 +24,7 @@ tasks.withType<ShadowJar>(ShadowJar::class.java) {
   relocate("com.fasterxml", "com.datastrato.gravitino.shaded.com.fasterxml")
   relocate("org.apache.httpcomponents", "com.datastrato.gravitino.shaded.org.apache.httpcomponents")
   relocate("org.apache.commons", "com.datastrato.gravitino.shaded.org.apache.commons")
+  relocate("org.apache.logging", "com.datastrato.gravitino.shaded.org.apache.logging")
   relocate("org.antlr", "com.datastrato.gravitino.shaded.org.antlr")
 }
 

@@ -16,7 +16,10 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.DockerClientFactory;
@@ -39,15 +42,18 @@ public class ContainerSuite implements Closeable {
   private static volatile TrinoITContainers trinoITContainers;
   private static volatile KafkaContainer kafkaContainer;
   private static volatile DorisContainer dorisContainer;
+  private static volatile HiveContainer kerberosHiveContainer;
 
   private static volatile MySQLContainer mySQLContainer;
   private static volatile MySQLContainer mySQLVersion5Container;
+  private static volatile Map<PGImageName, PostgreSQLContainer> pgContainerMap =
+      new EnumMap<>(PGImageName.class);
 
   protected static final CloseableGroup closer = CloseableGroup.create();
 
-  private ContainerSuite() {
+  private static void init() {
     try {
-      // Check if docker is available
+      // Check if docker is available and you should never close the global DockerClient!
       DockerClient dockerClient = DockerClientFactory.instance().client();
       Info info = dockerClient.infoCmd().exec();
       LOG.info("Docker info: {}", info);
@@ -64,6 +70,7 @@ public class ContainerSuite implements Closeable {
     if (instance == null) {
       synchronized (ContainerSuite.class) {
         if (instance == null) {
+          init();
           instance = new ContainerSuite();
         }
       }
@@ -91,6 +98,24 @@ public class ContainerSuite implements Closeable {
           HiveContainer container = closer.register(hiveBuilder.build());
           container.start();
           hiveContainer = container;
+        }
+      }
+    }
+  }
+
+  public void startKerberosHiveContainer() {
+    if (kerberosHiveContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (kerberosHiveContainer == null) {
+          // Start Hive container
+          HiveContainer.Builder hiveBuilder =
+              HiveContainer.builder()
+                  .withHostName("gravitino-ci-kerberos-hive")
+                  .withKerberosEnabled(true)
+                  .withNetwork(network);
+          HiveContainer container = closer.register(hiveBuilder.build());
+          container.start();
+          kerberosHiveContainer = container;
         }
       }
     }
@@ -208,6 +233,39 @@ public class ContainerSuite implements Closeable {
     }
   }
 
+  public void startPostgreSQLContainer(TestDatabaseName testDatabaseName, PGImageName pgImageName) {
+    if (!pgContainerMap.containsKey(pgImageName)) {
+      synchronized (ContainerSuite.class) {
+        if (!pgContainerMap.containsKey(pgImageName)) {
+          // Start PostgreSQL container
+          PostgreSQLContainer.Builder pgBuilder =
+              PostgreSQLContainer.builder()
+                  .withImage(pgImageName.toString())
+                  .withHostName(PostgreSQLContainer.HOST_NAME)
+                  .withEnvVars(
+                      ImmutableMap.<String, String>builder()
+                          .put("POSTGRES_USER", PostgreSQLContainer.USER_NAME)
+                          .put("POSTGRES_PASSWORD", PostgreSQLContainer.PASSWORD)
+                          .build())
+                  .withExposePorts(ImmutableSet.of(PostgreSQLContainer.PG_PORT))
+                  .withNetwork(network);
+
+          PostgreSQLContainer container = closer.register(pgBuilder.build());
+          container.start();
+          pgContainerMap.put(pgImageName, container);
+        }
+      }
+    }
+    synchronized (PostgreSQLContainer.class) {
+      pgContainerMap.get(pgImageName).createDatabase(testDatabaseName);
+    }
+  }
+
+  public void startPostgreSQLContainer(TestDatabaseName testDatabaseName) {
+    // Apply default image
+    startPostgreSQLContainer(testDatabaseName, PGImageName.VERSION_13);
+  }
+
   public void startKafkaContainer() {
     if (kafkaContainer == null) {
       synchronized (ContainerSuite.class) {
@@ -246,6 +304,10 @@ public class ContainerSuite implements Closeable {
     return hiveContainer;
   }
 
+  public HiveContainer getKerberosHiveContainer() {
+    return kerberosHiveContainer;
+  }
+
   public DorisContainer getDorisContainer() {
     return dorisContainer;
   }
@@ -256,6 +318,21 @@ public class ContainerSuite implements Closeable {
 
   public MySQLContainer getMySQLVersion5Container() {
     return mySQLVersion5Container;
+  }
+
+  public PostgreSQLContainer getPostgreSQLContainer() throws NoSuchElementException {
+    return getPostgreSQLContainer(PGImageName.VERSION_13);
+  }
+
+  public PostgreSQLContainer getPostgreSQLContainer(PGImageName pgImageName)
+      throws NoSuchElementException {
+    if (!pgContainerMap.containsKey(pgImageName)) {
+      throw new NoSuchElementException(
+          String.format(
+              "PostgreSQL container %s not found, please create it by calling startPostgreSQLContainer() first",
+              pgImageName));
+    }
+    return pgContainerMap.get(pgImageName);
   }
 
   // Let containers assign addresses in a fixed subnet to avoid

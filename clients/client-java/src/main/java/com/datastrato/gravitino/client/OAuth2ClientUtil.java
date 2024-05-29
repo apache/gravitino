@@ -126,7 +126,8 @@ class OAuth2ClientUtil {
 
     JsonNode node;
     try {
-      node = JsonUtils.objectMapper().readTree(Base64.getUrlDecoder().decode(parts.get(1)));
+      node =
+          ObjectMapperProvider.objectMapper().readTree(Base64.getUrlDecoder().decode(parts.get(1)));
     } catch (IOException e) {
       return null;
     }

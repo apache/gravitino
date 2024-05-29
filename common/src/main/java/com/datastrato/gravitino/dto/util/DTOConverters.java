@@ -10,6 +10,7 @@ import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Metalake;
 import com.datastrato.gravitino.authorization.Group;
+import com.datastrato.gravitino.authorization.Privilege;
 import com.datastrato.gravitino.authorization.Role;
 import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.User;
@@ -17,6 +18,7 @@ import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
 import com.datastrato.gravitino.dto.authorization.GroupDTO;
+import com.datastrato.gravitino.dto.authorization.PrivilegeDTO;
 import com.datastrato.gravitino.dto.authorization.RoleDTO;
 import com.datastrato.gravitino.dto.authorization.SecurableObjectDTO;
 import com.datastrato.gravitino.dto.authorization.UserDTO;
@@ -301,20 +303,30 @@ public class DTOConverters {
         default:
           throw new IllegalArgumentException("Unsupported transform: " + transform.name());
       }
+
     } else if (transform instanceof Transforms.BucketTransform) {
       return BucketPartitioningDTO.of(
           ((Transforms.BucketTransform) transform).numBuckets(),
           ((Transforms.BucketTransform) transform).fieldNames());
+
     } else if (transform instanceof Transforms.TruncateTransform) {
       return TruncatePartitioningDTO.of(
           ((Transforms.TruncateTransform) transform).width(),
           ((Transforms.TruncateTransform) transform).fieldName());
+
     } else if (transform instanceof Transforms.ListTransform) {
-      return ListPartitioningDTO.of(((Transforms.ListTransform) transform).fieldNames());
+      Transforms.ListTransform listTransform = (Transforms.ListTransform) transform;
+      return ListPartitioningDTO.of(
+          listTransform.fieldNames(), (ListPartitionDTO[]) toDTOs(listTransform.assignments()));
+
     } else if (transform instanceof Transforms.RangeTransform) {
-      return RangePartitioningDTO.of(((Transforms.RangeTransform) transform).fieldName());
+      Transforms.RangeTransform rangeTransform = (Transforms.RangeTransform) transform;
+      return RangePartitioningDTO.of(
+          rangeTransform.fieldName(), (RangePartitionDTO[]) toDTOs(rangeTransform.assignments()));
+
     } else if (transform instanceof Transforms.ApplyTransform) {
       return FunctionPartitioningDTO.of(transform.name(), toFunctionArg(transform.arguments()));
+
     } else {
       throw new IllegalArgumentException("Unsupported transform: " + transform.name());
     }
@@ -386,8 +398,10 @@ public class DTOConverters {
 
     return RoleDTO.builder()
         .withName(role.name())
-        .withSecurableObject(toDTO(role.securableObject()))
-        .withPrivileges(role.privileges())
+        .withSecurableObjects(
+            role.securableObjects().stream()
+                .map(DTOConverters::toDTO)
+                .toArray(SecurableObjectDTO[]::new))
         .withProperties(role.properties())
         .withAudit(toDTO(role.auditInfo()))
         .build();
@@ -407,6 +421,27 @@ public class DTOConverters {
     return SecurableObjectDTO.builder()
         .withFullName(securableObject.fullName())
         .withType(securableObject.type())
+        .withPrivileges(
+            securableObject.privileges().stream()
+                .map(DTOConverters::toDTO)
+                .toArray(PrivilegeDTO[]::new))
+        .build();
+  }
+
+  /**
+   * Converts a privilege implementation to a PrivilegeDTO.
+   *
+   * @param privilege The privilege implementation.
+   * @return The privilege DTO.
+   */
+  public static PrivilegeDTO toDTO(Privilege privilege) {
+    if (privilege instanceof PrivilegeDTO) {
+      return (PrivilegeDTO) privilege;
+    }
+
+    return PrivilegeDTO.builder()
+        .withName(privilege.name())
+        .withCondition(privilege.condition())
         .build();
   }
 
@@ -840,9 +875,19 @@ public class DTOConverters {
             ((TruncatePartitioningDTO) partitioning).width(),
             ((TruncatePartitioningDTO) partitioning).fieldName());
       case LIST:
-        return Transforms.list(((ListPartitioningDTO) partitioning).fieldNames());
+        ListPartitioningDTO listPartitioningDTO = (ListPartitioningDTO) partitioning;
+        ListPartition[] listPartitions =
+            Arrays.stream(listPartitioningDTO.assignments())
+                .map(p -> (ListPartition) fromDTO(p))
+                .toArray(ListPartition[]::new);
+        return Transforms.list(listPartitioningDTO.fieldNames(), listPartitions);
       case RANGE:
-        return Transforms.range(((RangePartitioningDTO) partitioning).fieldName());
+        RangePartitioningDTO rangePartitioningDTO = (RangePartitioningDTO) partitioning;
+        RangePartition[] rangePartitions =
+            Arrays.stream(rangePartitioningDTO.assignments())
+                .map(p -> (RangePartition) fromDTO(p))
+                .toArray(RangePartition[]::new);
+        return Transforms.range(rangePartitioningDTO.fieldName(), rangePartitions);
       case FUNCTION:
         return Transforms.apply(
             ((FunctionPartitioningDTO) partitioning).functionName(),

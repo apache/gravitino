@@ -40,7 +40,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@ExtendWith(PrintFuncNameExtension.class)
+@ExtendWith({PrintFuncNameExtension.class, CloseContainerExtension.class})
 public class AbstractIT {
   protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
@@ -215,10 +215,7 @@ public class AbstractIT {
         .toLowerCase()
         .equals(customConfigs.get(Configs.AUTHENTICATOR.getKey()))) {
       serverUri = "http://localhost:" + jettyServerConfig.getHttpPort();
-      client =
-          GravitinoAdminClient.builder(serverUri)
-              .withKerberosAuth(KerberosProviderHelper.getProvider())
-              .build();
+      client = null;
     } else {
       client = GravitinoAdminClient.builder(serverUri).build();
     }

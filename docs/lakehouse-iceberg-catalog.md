@@ -27,21 +27,24 @@ Builds with Hadoop 2.10.x, there may be compatibility issues when accessing Hado
 
 ### Catalog capabilities
 
-- Works as a catalog proxy, supporting `HiveCatalog` and `JdbcCatalog`.
+- Works as a catalog proxy, supporting `HiveCatalog`, `JdbcCatalog` and `RESTCatalog`.
 - Supports DDL operations for Iceberg schemas and tables.
 - Doesn't support snapshot or table management operations.
 
 ### Catalog properties
 
-| Property name     | Description                                                                                                                                                          | Default value | Required | Since Version |
-|-------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `catalog-backend` | Catalog backend of Gravitino Iceberg catalog. Supports `hive` or `jdbc`.                                                                                             | (none)        | Yes      | 0.2.0         |
-| `uri`             | The URI configuration of the Iceberg catalog. `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db`. | (none)        | Yes      | 0.2.0         |
-| `warehouse`       | Warehouse directory of catalog. `file:///user/hive/warehouse-hive/` for local fs or `hdfs://namespace/hdfs/path` for HDFS.                                           | (none)        | Yes      | 0.2.0         |
+| Property name     | Description                                                                                                                                                                                     | Default value | Required | Since Version |
+|-------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `catalog-backend` | Catalog backend of Gravitino Iceberg catalog. Supports `hive` or `jdbc` or `rest`.                                                                                                              | (none)        | Yes      | 0.2.0         |
+| `uri`             | The URI configuration of the Iceberg catalog. `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db` or `http://127.0.0.1:9001`. | (none)        | Yes      | 0.2.0         |
+| `warehouse`       | Warehouse directory of catalog. `file:///user/hive/warehouse-hive/` for local fs or `hdfs://namespace/hdfs/path` for HDFS.                                                                      | (none)        | Yes      | 0.2.0         |
 
 Any properties not defined by Gravitino with `gravitino.bypass.` prefix will pass to Iceberg catalog properties and HDFS configuration. For example, if specify `gravitino.bypass.list-all-tables`, `list-all-tables` will pass to Iceberg catalog properties.
 
 When you use the Gravitino with Trino. You can pass the Trino Iceberg connector configuration using prefix `trino.bypass.`. For example, using `trino.bypass.iceberg.table-statistics-enabled` to pass the `iceberg.table-statistics-enabled` to the Gravitino Iceberg catalog in Trino runtime.
+
+When you use the Gravitino with Spark. You can pass the Spark Iceberg connector configuration using prefix `spark.bypass.`. For example, using `spark.bypass.io-impl` to pass the `io-impl` to the Spark Iceberg connector in Spark runtime.
+
 
 #### JDBC catalog
 

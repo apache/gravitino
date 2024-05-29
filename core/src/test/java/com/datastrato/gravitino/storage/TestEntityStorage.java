@@ -31,6 +31,7 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.authorization.AuthorizationUtils;
 import com.datastrato.gravitino.authorization.Privileges;
+import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
@@ -1261,13 +1262,15 @@ public class TestEntityStorage {
   }
 
   private static RoleEntity createRole(Long id, String metalake, String name, AuditInfo auditInfo) {
+    SecurableObject securableObject =
+        SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
+
     return RoleEntity.builder()
         .withId(id)
         .withNamespace(AuthorizationUtils.ofRoleNamespace(metalake))
         .withName(name)
         .withAuditInfo(auditInfo)
-        .withSecurableObject(SecurableObjects.ofCatalog("catalog"))
-        .withPrivileges(Lists.newArrayList(Privileges.UseCatalog.get()))
+        .withSecurableObject(securableObject)
         .withProperties(null)
         .build();
   }
@@ -1277,6 +1280,8 @@ public class TestEntityStorage {
     // Delete the topic 'metalake.catalog.schema1.topic1'
     Assertions.assertTrue(store.delete(topic1.nameIdentifier(), Entity.EntityType.TOPIC));
     Assertions.assertFalse(store.exists(topic1.nameIdentifier(), Entity.EntityType.TOPIC));
+    // Delete again should return false
+    Assertions.assertFalse(store.delete(topic1.nameIdentifier(), Entity.EntityType.TOPIC));
   }
 
   private void validateDeleteFilesetCascade(EntityStore store, FilesetEntity fileset1)
@@ -1284,6 +1289,9 @@ public class TestEntityStorage {
     // Delete the fileset 'metalake.catalog.schema1.fileset1'
     Assertions.assertTrue(store.delete(fileset1.nameIdentifier(), Entity.EntityType.FILESET, true));
     Assertions.assertFalse(store.exists(fileset1.nameIdentifier(), Entity.EntityType.FILESET));
+    // Delete again should return false
+    Assertions.assertFalse(
+        store.delete(fileset1.nameIdentifier(), Entity.EntityType.FILESET, true));
   }
 
   private void validateDeleteTableCascade(EntityStore store, TableEntity table1)
@@ -1291,6 +1299,8 @@ public class TestEntityStorage {
     // Delete the table 'metalake.catalog.schema1.table1'
     Assertions.assertTrue(store.delete(table1.nameIdentifier(), Entity.EntityType.TABLE, true));
     Assertions.assertFalse(store.exists(table1.nameIdentifier(), Entity.EntityType.TABLE));
+    // Delete again should return false
+    Assertions.assertFalse(store.delete(table1.nameIdentifier(), Entity.EntityType.TABLE, true));
   }
 
   private void validateDeleteFileset(
@@ -1304,6 +1314,9 @@ public class TestEntityStorage {
         store.delete(fileset1InSchema2.nameIdentifier(), Entity.EntityType.FILESET));
     Assertions.assertFalse(
         store.exists(fileset1InSchema2.nameIdentifier(), Entity.EntityType.FILESET));
+    // Delete again should return false
+    Assertions.assertFalse(
+        store.delete(fileset1InSchema2.nameIdentifier(), Entity.EntityType.FILESET));
 
     // Make sure fileset 'metalake.catalog.schema1.fileset1' still exist;
     Assertions.assertEquals(
@@ -1320,6 +1333,8 @@ public class TestEntityStorage {
     // Delete the topic 'metalake.catalog.schema2.topic1'
     Assertions.assertTrue(store.delete(topic1InSchema2.nameIdentifier(), Entity.EntityType.TOPIC));
     Assertions.assertFalse(store.exists(topic1InSchema2.nameIdentifier(), Entity.EntityType.TOPIC));
+    // Delete again should return false
+    Assertions.assertFalse(store.delete(topic1InSchema2.nameIdentifier(), Entity.EntityType.TOPIC));
 
     // Make sure topic 'metalake.catalog.schema1.topic1' still exist;
     Assertions.assertEquals(
@@ -1352,6 +1367,10 @@ public class TestEntityStorage {
     Assertions.assertFalse(store.exists(userNew.nameIdentifier(), Entity.EntityType.USER));
     Assertions.assertFalse(store.exists(groupNew.nameIdentifier(), EntityType.GROUP));
     Assertions.assertFalse(store.exists(roleNew.nameIdentifier(), EntityType.ROLE));
+
+    // Delete again should return false
+    Assertions.assertFalse(
+        store.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE, true));
   }
 
   private void validateDeleteCatalogCascade(
@@ -1368,6 +1387,8 @@ public class TestEntityStorage {
     Assertions.assertThrowsExactly(
         NoSuchEntityException.class,
         () -> store.get(schema2.nameIdentifier(), Entity.EntityType.SCHEMA, SchemaEntity.class));
+    // Delete again should return false
+    Assertions.assertFalse(store.delete(catalog.nameIdentifier(), Entity.EntityType.CATALOG, true));
   }
 
   private void validateDeleteSchemaCascade(
@@ -1419,6 +1440,8 @@ public class TestEntityStorage {
       Assertions.assertTrue(e instanceof NoSuchEntityException);
       Assertions.assertTrue(e.getMessage().contains("schema1"));
     }
+    // Delete again should return false
+    Assertions.assertFalse(store.delete(schema1.nameIdentifier(), Entity.EntityType.SCHEMA, true));
 
     Assertions.assertThrows(
         NoSuchEntityException.class,
@@ -1453,6 +1476,8 @@ public class TestEntityStorage {
     Assertions.assertFalse(store.exists(user2.nameIdentifier(), Entity.EntityType.USER));
     Assertions.assertFalse(store.exists(group2.nameIdentifier(), Entity.EntityType.GROUP));
     Assertions.assertFalse(store.exists(role2.nameIdentifier(), Entity.EntityType.ROLE));
+    // Delete again should return false
+    Assertions.assertFalse(store.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE));
   }
 
   private static void validateDeleteCatalog(
@@ -1488,6 +1513,8 @@ public class TestEntityStorage {
 
     store.delete(catalog.nameIdentifier(), Entity.EntityType.CATALOG);
     Assertions.assertFalse(store.exists(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
+    // Delete again should return false
+    Assertions.assertFalse(store.delete(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
   }
 
   private static void validateDeleteSchema(
@@ -1521,6 +1548,13 @@ public class TestEntityStorage {
     Assertions.assertFalse(store.exists(fileset1.nameIdentifier(), Entity.EntityType.FILESET));
     Assertions.assertFalse(store.exists(topic1.nameIdentifier(), Entity.EntityType.TOPIC));
     Assertions.assertFalse(store.exists(schema1.nameIdentifier(), Entity.EntityType.SCHEMA));
+
+    // Delete again should return false
+    Assertions.assertFalse(store.delete(table1.nameIdentifier(), Entity.EntityType.TABLE));
+    Assertions.assertFalse(store.delete(fileset1.nameIdentifier(), Entity.EntityType.FILESET));
+    Assertions.assertFalse(store.delete(topic1.nameIdentifier(), Entity.EntityType.TOPIC));
+    Assertions.assertFalse(store.delete(schema1.nameIdentifier(), Entity.EntityType.SCHEMA));
+
     // Now we re-insert schema1, table1, fileset1 and topic1, and everything should be OK
     SchemaEntity schema1New =
         createSchemaEntity(
@@ -1567,6 +1601,8 @@ public class TestEntityStorage {
     Assertions.assertTrue(store.exists(user1.nameIdentifier(), Entity.EntityType.USER));
     Assertions.assertTrue(store.delete(user1.nameIdentifier(), Entity.EntityType.USER));
     Assertions.assertFalse(store.exists(user1.nameIdentifier(), Entity.EntityType.USER));
+    // delete again should return false
+    Assertions.assertFalse(store.delete(user1.nameIdentifier(), Entity.EntityType.USER));
 
     UserEntity user =
         createUser(RandomIdGenerator.INSTANCE.nextId(), "metalake", "user1", user1.auditInfo());
@@ -1577,6 +1613,8 @@ public class TestEntityStorage {
   private void validateDeleteGroup(EntityStore store, GroupEntity group1) throws IOException {
     Assertions.assertTrue(store.delete(group1.nameIdentifier(), EntityType.GROUP));
     Assertions.assertFalse(store.exists(group1.nameIdentifier(), Entity.EntityType.GROUP));
+    // delete again should return false
+    Assertions.assertFalse(store.delete(group1.nameIdentifier(), Entity.EntityType.GROUP));
 
     GroupEntity group =
         createGroup(RandomIdGenerator.INSTANCE.nextId(), "metalake", "group1", group1.auditInfo());
@@ -1587,6 +1625,8 @@ public class TestEntityStorage {
   private void validateDeleteRole(EntityStore store, RoleEntity role1) throws IOException {
     Assertions.assertTrue(store.delete(role1.nameIdentifier(), EntityType.ROLE));
     Assertions.assertFalse(store.exists(role1.nameIdentifier(), Entity.EntityType.ROLE));
+    // delete again should return false
+    Assertions.assertFalse(store.delete(role1.nameIdentifier(), Entity.EntityType.ROLE));
 
     RoleEntity role =
         createRole(RandomIdGenerator.INSTANCE.nextId(), "metalake", "role1", role1.auditInfo());
@@ -1600,6 +1640,8 @@ public class TestEntityStorage {
     // Delete the table 'metalake.catalog.schema2.table1'
     Assertions.assertTrue(store.delete(table1InSchema2.nameIdentifier(), Entity.EntityType.TABLE));
     Assertions.assertFalse(store.exists(table1InSchema2.nameIdentifier(), Entity.EntityType.TABLE));
+    // delete again should return false
+    Assertions.assertFalse(store.delete(table1InSchema2.nameIdentifier(), Entity.EntityType.TABLE));
 
     // Make sure table 'metalake.catalog.schema1.table1' still exist;
     Assertions.assertEquals(

@@ -51,6 +51,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -74,6 +75,7 @@ import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -104,11 +106,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   // will only need to set the configuration 'METASTORE_URL' in Gravitino and Gravitino will change
   // it to `METASTOREURIS` automatically and pass it to Hive.
   public static final Map<String, String> GRAVITINO_CONFIG_TO_HIVE =
-      ImmutableMap.of(
-          METASTORE_URIS,
-          ConfVars.METASTOREURIS.varname,
-          PRINCIPAL,
-          ConfVars.METASTORE_KERBEROS_PRINCIPAL.varname);
+      ImmutableMap.of(METASTORE_URIS, ConfVars.METASTOREURIS.varname);
 
   /**
    * Initializes the Hive catalog operations with the provided configuration.
@@ -148,7 +146,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     // and gravitinoConfig will be passed to Hive config, and gravitinoConfig has higher priority
     mergeConfig.forEach(hadoopConf::set);
     hiveConf = new HiveConf(hadoopConf, HiveCatalogOperations.class);
-    UserGroupInformation.setConfiguration(hadoopConf);
 
     initKerberosIfNecessary(conf, hadoopConf);
 
@@ -177,7 +174,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
         String keytabUri =
             (String)
-                catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.KET_TAB_URI);
+                catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.KEY_TAB_URI);
         Preconditions.checkArgument(StringUtils.isNotBlank(keytabUri), "Keytab uri can't be blank");
         // TODO: Support to download the file from Kerberos HDFS
         Preconditions.checkArgument(
@@ -205,6 +202,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             new ScheduledThreadPoolExecutor(
                 1, getThreadFactory(String.format("Kerberos-check-%s", info.id())));
 
+        LOG.info("krb5 path: {}", System.getProperty("java.security.krb5.conf"));
+        refreshKerberosConfig();
+        KerberosName.resetDefaultRealm();
+        UserGroupInformation.setConfiguration(hadoopConf);
         UserGroupInformation.loginUserFromKeytab(catalogPrincipal, keytabFile.getAbsolutePath());
 
         UserGroupInformation kerberosLoginUgi = UserGroupInformation.getCurrentUser();
@@ -228,7 +229,25 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
       } catch (IOException ioe) {
         throw new UncheckedIOException(ioe);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
       }
+    }
+  }
+
+  private void refreshKerberosConfig() {
+    Class<?> classRef;
+    try {
+      if (System.getProperty("java.vendor").contains("IBM")) {
+        classRef = Class.forName("com.ibm.security.krb5.internal.Config");
+      } else {
+        classRef = Class.forName("sun.security.krb5.Config");
+      }
+
+      Method refershMethod = classRef.getMethod("refresh");
+      refershMethod.invoke(null);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     }
   }
 
