@@ -10,6 +10,7 @@ import io.trino.spi.predicate.NullableValue;
 import java.util.Map;
 import java.util.function.Predicate;
 
+/** The GravitinoPredicate is used to warp Predicate */
 public class GravitinoPredicate implements Predicate<Map<ColumnHandle, NullableValue>> {
 
       private final Predicate delegate;
