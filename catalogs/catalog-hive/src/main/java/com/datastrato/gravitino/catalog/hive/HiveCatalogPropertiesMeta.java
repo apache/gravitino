@@ -28,7 +28,7 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
 
   public static final boolean DEFAULT_IMPERSONATION_ENABLE = false;
 
-  public static final String KET_TAB_URI = "kerberos.keytab-uri";
+  public static final String KEY_TAB_URI = "kerberos.keytab-uri";
 
   public static final String PRINCIPAL = "kerberos.principal";
 
@@ -69,9 +69,9 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
                   false,
                   false))
           .put(
-              KET_TAB_URI,
+              KEY_TAB_URI,
               PropertyEntry.stringImmutablePropertyEntry(
-                  KET_TAB_URI, "The uri of key tab for the catalog", false, null, false, false))
+                  KEY_TAB_URI, "The uri of key tab for the catalog", false, null, false, false))
           .put(
               PRINCIPAL,
               PropertyEntry.stringImmutablePropertyEntry(

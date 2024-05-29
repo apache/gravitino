@@ -2,7 +2,6 @@
  * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-import java.util.*
 
 plugins {
   `maven-publish`
@@ -24,10 +23,6 @@ dependencies {
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
-  testImplementation(project(":spark-connector:spark-connector")) {
-    exclude("org.apache.hadoop", "hadoop-client-api")
-    exclude("org.apache.hadoop", "hadoop-client-runtime")
-  }
 
   testImplementation(libs.commons.cli)
   testImplementation(libs.commons.lang3)

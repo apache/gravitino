@@ -156,6 +156,8 @@ if [ "$JVM_VERSION" -eq 17 ]; then
   JAVA_OPTS+=" --add-opens java.security.jgss/sun.security.krb5=ALL-UNNAMED"
 fi
 
+#JAVA_OPTS+=" -Djava.securit.krb5.conf=/etc/krb5.conf"
+
 addJarInDir "${GRAVITINO_HOME}/libs"
 
 case "${1}" in

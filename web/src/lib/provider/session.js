@@ -16,6 +16,8 @@ import { initialVersion } from '@/lib/store/sys'
 import { to } from '../utils'
 import { getAuthConfigs, setAuthToken } from '../store/auth'
 
+import { useIdle } from 'react-use'
+
 const authProvider = {
   version: '',
   loading: true,
@@ -34,6 +36,16 @@ const AuthProvider = ({ children }) => {
   const version = (typeof window !== 'undefined' && localStorage.getItem('version')) || null
   const searchParams = useSearchParams()
   const paramsSize = [...searchParams.keys()].length
+
+  const expiredIn = localStorage.getItem('expiredIn') && JSON.parse(localStorage.getItem('expiredIn')) // seconds
+  const idleOn = (expiredIn + 60) * 1000
+  const isIdle = useIdle(idleOn)
+
+  useEffect(() => {
+    if (isIdle) {
+      localStorage.setItem('isIdle', true)
+    }
+  }, [isIdle])
 
   const goToMetalakeListPage = () => {
     if (paramsSize) {

@@ -11,11 +11,11 @@ import static org.apache.hadoop.minikdc.MiniKdc.MAX_TICKET_LIFETIME;
 
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.auth.AuthenticatorType;
+import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.client.GravitinoVersion;
 import com.datastrato.gravitino.client.KerberosTokenProvider;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
-import com.datastrato.gravitino.integration.test.util.KerberosProviderHelper;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
@@ -44,7 +44,9 @@ public class KerberosOperationsIT extends AbstractIT {
       new File(System.getProperty("test.dir", "target"), UUID.randomUUID().toString())
           .getAbsolutePath();
 
+  // The following two keytab are needed both.
   private static final String serverPrincipal = "HTTP/localhost@EXAMPLE.COM";
+  private static final String serverPrincipalWithAll = "HTTP/0.0.0.0@EXAMPLE.COM";
 
   private static final String clientPrincipal = "client@EXAMPLE.COM";
 
@@ -54,17 +56,24 @@ public class KerberosOperationsIT extends AbstractIT {
     initKeyTab();
 
     Map<String, String> configs = Maps.newHashMap();
-    KerberosProviderHelper.setProvider(
-        KerberosTokenProvider.builder()
-            .withClientPrincipal(clientPrincipal)
-            .withKeyTabFile(new File(keytabFile))
-            .build());
     configs.put(Configs.AUTHENTICATOR.getKey(), AuthenticatorType.KERBEROS.name().toLowerCase());
     configs.put(PRINCIPAL.getKey(), serverPrincipal);
     configs.put(KEYTAB.getKey(), keytabFile);
+    configs.put("client.kerberos.principal", clientPrincipal);
+    configs.put("client.kerberos.keytab", keytabFile);
+
     registerCustomConfigs(configs);
 
     AbstractIT.startIntegrationTest();
+
+    client =
+        GravitinoAdminClient.builder(serverUri)
+            .withKerberosAuth(
+                KerberosTokenProvider.builder()
+                    .withClientPrincipal(clientPrincipal)
+                    .withKeyTabFile(new File(keytabFile))
+                    .build())
+            .build();
   }
 
   @AfterAll
@@ -94,7 +103,10 @@ public class KerberosOperationsIT extends AbstractIT {
     File newKeytabFile = new File(keytabFile);
     String newClientPrincipal = removeRealm(clientPrincipal);
     String newServerPrincipal = removeRealm(serverPrincipal);
-    kdc.getKdc().createPrincipal(newKeytabFile, newClientPrincipal, newServerPrincipal);
+    String newServerPrincipalAll = removeRealm(serverPrincipalWithAll);
+    kdc.getKdc()
+        .createPrincipal(
+            newKeytabFile, newClientPrincipal, newServerPrincipal, newServerPrincipalAll);
   }
 
   private static String removeRealm(String principal) {

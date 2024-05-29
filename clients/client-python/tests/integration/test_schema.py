@@ -72,7 +72,7 @@ class TestSchema(IntegrationTestEnv):
         )
         self.gravitino_client.create_catalog(
             ident=self.catalog_ident,
-            type=Catalog.Type.FILESET,
+            catalog_type=Catalog.Type.FILESET,
             provider=self.catalog_provider,
             comment="",
             properties={self.catalog_location_prop: "/tmp/test_schema"},
