@@ -99,7 +99,7 @@ public class KerberosConfig extends Config {
               IMPERSONATION_ENABLE_KEY,
               PropertyEntry.booleanPropertyEntry(
                   IMPERSONATION_ENABLE_KEY,
-                  "Enable user impersonation for Hive catalog",
+                  "Whether to enable impersonation for the Hadoop catalog",
                   false,
                   true,
                   DEFAULT_IMPERSONATION_ENABLE,
