@@ -163,17 +163,17 @@ public class CatalogKafkaIT extends AbstractIT {
 
   @Test
   public void testCatalogException() {
-    String catalogName = GravitinoITUtils.genRandomName("test_catalog");
+    String catalogName1 = GravitinoITUtils.genRandomName("test_catalog");
+    Catalog catalog1 =
+        metalake.createCatalog(
+            catalogName1,
+            Catalog.Type.MESSAGING,
+            PROVIDER,
+            "comment",
+            ImmutableMap.of(BOOTSTRAP_SERVERS, "2"));
     Exception exception =
         Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                metalake.createCatalog(
-                    catalogName,
-                    Catalog.Type.MESSAGING,
-                    PROVIDER,
-                    "comment",
-                    ImmutableMap.of(BOOTSTRAP_SERVERS, "2")));
+            IllegalArgumentException.class, () -> catalog1.asSchemas().listSchemas());
     Assertions.assertTrue(exception.getMessage().contains("Invalid url in bootstrap.servers: 2"));
 
     exception =
@@ -181,18 +181,21 @@ public class CatalogKafkaIT extends AbstractIT {
             IllegalArgumentException.class,
             () ->
                 metalake.createCatalog(
-                    catalogName,
+                    GravitinoITUtils.genRandomName("test_catalog"),
                     Catalog.Type.MESSAGING,
                     PROVIDER,
                     "comment",
                     ImmutableMap.of("abc", "2")));
     Assertions.assertTrue(
-        exception.getMessage().contains("Missing configuration: bootstrap.servers"));
+        exception
+            .getMessage()
+            .contains("Properties are required and must be set: [bootstrap.servers]"));
 
     // Test BOOTSTRAP_SERVERS that cannot be linked
+    String catalogName2 = GravitinoITUtils.genRandomName("test_catalog");
     Catalog kafka =
         metalake.createCatalog(
-            catalogName,
+            catalogName2,
             Catalog.Type.MESSAGING,
             PROVIDER,
             "comment",
@@ -210,7 +213,7 @@ public class CatalogKafkaIT extends AbstractIT {
                 kafka
                     .asTopicCatalog()
                     .listTopics(
-                        Namespace.ofTopic(METALAKE_NAME, catalogName, DEFAULT_SCHEMA_NAME)));
+                        Namespace.ofTopic(METALAKE_NAME, catalogName2, DEFAULT_SCHEMA_NAME)));
     Assertions.assertTrue(
         exception
             .getMessage()
