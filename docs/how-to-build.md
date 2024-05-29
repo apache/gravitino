@@ -92,7 +92,8 @@ This software is licensed under the Apache License version 2."
     ```
 
    This creates `gravitino-spark-connector-runtime-{sparkVersion}_{scalaVersion}-{version}.jar`
-   under the `spark-connector/v3.4/spark-runtime/build/libs` directory.
+   under the `spark-connector/v3.4/spark-runtime/build/libs` directory. The default scala version 
+   is `2.12` if not specifying `-PscalaVersion`.
 
    :::note
    The first time you build the project, downloading the dependencies may take a while. You can add
