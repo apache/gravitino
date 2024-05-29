@@ -15,7 +15,6 @@ repositories {
 dependencies {
   implementation(project(":catalogs:bundled-catalog", configuration = "shadow"))
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
-  implementation(libs.awaitility)
   implementation(libs.commons.collections4)
   implementation(libs.commons.lang3)
   implementation(libs.httpclient5)
@@ -24,6 +23,7 @@ dependencies {
   compileOnly(libs.trino.spi) {
     exclude("org.apache.logging.log4j")
   }
+  testImplementation(libs.awaitility)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.trino.memory) {
