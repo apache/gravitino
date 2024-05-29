@@ -203,7 +203,7 @@ public class CatalogConnectorManager {
       return;
     }
 
-    catalogRegister.unResisterCatalog(catalogFullName);
+    catalogRegister.unregisterCatalog(catalogFullName);
     catalogConnectors.remove(catalogFullName);
 
     loadCatalogImpl(catalog);
@@ -228,7 +228,7 @@ public class CatalogConnectorManager {
 
   private void unloadCatalog(GravitinoCatalog catalog) {
     String catalogFullName = getTrinoCatalogName(catalog);
-    catalogRegister.unResisterCatalog(catalogFullName);
+    catalogRegister.unregisterCatalog(catalogFullName);
     catalogConnectors.remove(catalogFullName);
     LOG.info(
         "Remove catalog '{}' in metalake {} successfully.",

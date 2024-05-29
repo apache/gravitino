@@ -124,7 +124,7 @@ public class CatalogRegister {
     return String.format("DROP CATALOG %s", name);
   }
 
-  void registerCatalog(String name, GravitinoCatalog catalog) {
+  public void registerCatalog(String name, GravitinoCatalog catalog) {
     try {
       String catalogFileName = String.format("%s/%s.properties", catalogStoreDirectory, name);
       File catalogFile = new File(catalogFileName);
@@ -157,7 +157,7 @@ public class CatalogRegister {
     }
   }
 
-  boolean checkCatalogExist(String name) {
+  private boolean checkCatalogExist(String name) {
     String showCatalogCommand = String.format("SHOW CATALOGS like '%s'", name);
     Exception failedException = null;
     try {
@@ -186,7 +186,7 @@ public class CatalogRegister {
     }
   }
 
-  void executeSql(String sql) {
+  private void executeSql(String sql) {
     try {
       int retries = EXECUTE_QUERY_MAX_RETRIES;
       Exception failedException = null;
@@ -207,9 +207,10 @@ public class CatalogRegister {
     }
   }
 
-  void unResisterCatalog(String name) {
+  public void unregisterCatalog(String name) {
     try {
       if (!checkCatalogExist(name)) {
+        LOG.warn("Catalog {} does not exist", name);
         return;
       }
       String dropCatalogCommand = generateDropCatalogCommand(name);
