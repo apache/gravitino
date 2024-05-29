@@ -84,7 +84,7 @@ public class KerberosClient {
 
     java.io.File keytabsDir = new File("keytabs");
     if (!keytabsDir.exists()) {
-      // Ignore the return value, because there exists many Hive catalog operations making
+      // Ignore the return value, because there exists many Hadoop catalog operations making
       // this directory.
       keytabsDir.mkdir();
     }
@@ -96,7 +96,6 @@ public class KerberosClient {
           String.format("Fail to delete keytab file %s", keytabFile.getAbsolutePath()));
     }
 
-    // TODO: Make the configuration
     int fetchKeytabFileTimeout = kerberosConfig.getFetchTimeoutSec();
     FetchFileUtils.fetchFileFromUri(keyTabUri, keytabFile, fetchKeytabFileTimeout, hadoopConf);
 
