@@ -32,7 +32,7 @@ public class KerberosConfig extends Config {
   public static final ConfigEntry<String> PRINCIPAL_ENTRY =
       new ConfigBuilder(PRINCIPAL_KEY)
           .doc("The principal of the kerberos connection")
-          .version(ConfigConstants.VERSION_0_3_0)
+          .version(ConfigConstants.VERSION_0_5_1)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
@@ -40,7 +40,7 @@ public class KerberosConfig extends Config {
   public static final ConfigEntry<String> KEYTAB_ENTRY =
       new ConfigBuilder(KET_TAB_URI_KEY)
           .doc("The keytab of the kerberos connection")
-          .version(ConfigConstants.VERSION_0_3_0)
+          .version(ConfigConstants.VERSION_0_5_1)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
@@ -48,7 +48,7 @@ public class KerberosConfig extends Config {
   public static final ConfigEntry<Integer> CHECK_INTERVAL_SEC_ENTRY =
       new ConfigBuilder(CHECK_INTERVAL_SEC_KEY)
           .doc("The check interval of the kerberos connection for Hadoop catalog")
-          .version(ConfigConstants.VERSION_0_3_0)
+          .version(ConfigConstants.VERSION_0_5_1)
           .intConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(2);
@@ -56,7 +56,7 @@ public class KerberosConfig extends Config {
   public static final ConfigEntry<Integer> FETCH_TIMEOUT_SEC_ENTRY =
       new ConfigBuilder(FETCH_TIMEOUT_SEC_KEY)
           .doc("The fetch timeout of the kerberos connection")
-          .version(ConfigConstants.VERSION_0_3_0)
+          .version(ConfigConstants.VERSION_0_5_1)
           .intConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(2);
@@ -64,7 +64,7 @@ public class KerberosConfig extends Config {
   public static final ConfigEntry<Boolean> ENABLE_IMPERSONATION_ENTRY =
       new ConfigBuilder(IMPERSONATION_ENABLE_KEY)
           .doc("Whether to enable impersonation for the Hadoop catalog")
-          .version(ConfigConstants.VERSION_0_3_0)
+          .version(ConfigConstants.VERSION_0_5_1)
           .booleanConf()
           .createWithDefault(DEFAULT_IMPERSONATION_ENABLE);
 
