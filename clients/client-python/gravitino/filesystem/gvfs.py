@@ -62,7 +62,6 @@ class FilesetContext:
 class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
     protocol = PROTOCOL_NAME
     _identifier_pattern = re.compile("^fileset/([^/]+)/([^/]+)/([^/]+)(?:/[^/]+)*/?$")
-    _hdfs_host_pattern = re.compile("hdfs://[^/]+")
 
     def __init__(self, server_uri=None, metalake_name=None, **kwargs):
         self.metalake = metalake_name
