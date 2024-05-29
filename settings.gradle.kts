@@ -10,7 +10,6 @@ rootProject.name = "gravitino"
 
 val scalaVersion: String = gradle.startParameter.projectProperties["scalaVersion"]?.toString()
   ?: settings.extra["defaultScalaVersion"]?.toString()
-  ?: "2.12"
 
 include("api", "common", "core", "meta", "server", "integration-test", "server-common")
 include("catalogs:bundled-catalog")
