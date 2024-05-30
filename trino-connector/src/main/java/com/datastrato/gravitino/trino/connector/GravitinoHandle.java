@@ -13,11 +13,22 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+/** this interface for GravitinoXXXHande to communicate with Trino */
 interface GravitinoHandle<T> {
   String HANDLE_STRING = "handleString";
 
+  /**
+   * Serialize handle to json string
+   *
+   * @return the json string
+   */
   public String getHandleString();
 
+  /**
+   * Retrieve the internal handle
+   *
+   * @return the internal handle
+   */
   public T getInternalHandle();
 
   public static <T> T unWrap(T handle) {
