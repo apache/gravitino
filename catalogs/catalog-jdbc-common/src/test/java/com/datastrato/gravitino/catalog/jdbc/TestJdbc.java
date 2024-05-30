@@ -2,13 +2,10 @@
  * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.catalog.jdbc.integration.test;
+package com.datastrato.gravitino.catalog.jdbc;
 
 import static com.datastrato.gravitino.dto.util.DTOConverters.toDTO;
 
-import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
-import com.datastrato.gravitino.catalog.jdbc.JdbcSchema;
-import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
@@ -34,7 +31,7 @@ import org.junit.jupiter.api.Assertions;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.shaded.com.google.common.collect.Maps;
 
-public abstract class TestJdbcAbstractIT {
+public abstract class TestJdbc {
   protected static JdbcDatabaseContainer<?> CONTAINER;
 
   protected static JdbcDatabaseOperations DATABASE_OPERATIONS;

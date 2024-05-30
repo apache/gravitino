@@ -2,7 +2,7 @@
  * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.catalog.doris.integration.test;
+package com.datastrato.gravitino.catalog.doris.operation;
 
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
@@ -33,7 +33,7 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 @Tag("gravitino-docker-it")
-public class DorisTableOperationsIT extends TestDorisAbstractIT {
+public class TestDorisTableOperations extends TestDoris {
   private static final Type VARCHAR_255 = Types.VarCharType.of(255);
   private static final Type VARCHAR_1024 = Types.VarCharType.of(1024);
 
@@ -52,7 +52,7 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
 
   @BeforeAll
   public static void startup() {
-    TestDorisAbstractIT.startup();
+    TestDoris.startup();
     createDatabase();
   }
 

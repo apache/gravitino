@@ -2,7 +2,7 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.catalog.doris.integration.test;
+package com.datastrato.gravitino.catalog.doris.operation;
 
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.utils.RandomNameUtils;
@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-it")
-public class TestDorisDatabaseOperations extends TestDorisAbstractIT {
+public class TestDorisDatabaseOperations extends TestDoris {
 
   @Test
   public void testBaseOperationDatabase() {
