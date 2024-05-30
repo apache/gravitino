@@ -5,6 +5,8 @@
 
 package com.datastrato.gravitino.catalog.hadoop.kerberos;
 
+import static com.datastrato.gravitino.catalog.hadoop.kerberos.KerberosConfig.DEFAULT_IMPERSONATION_ENABLE;
+
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.config.ConfigBuilder;
 import com.datastrato.gravitino.config.ConfigConstants;
@@ -14,20 +16,16 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 
 public class AuthenticationConfig extends Config {
-  public static final String ENABLE_AUTH_KEY = "authentication.enable";
+
+  // The key for the authentication type, currently we support kerberos and simple
   public static final String AUTH_TYPE_KEY = "authentication.type";
+
+  public static final String IMPERSONATION_ENABLE_KEY = "authentication.impersonation-enable";
 
   public AuthenticationConfig(Map<String, String> properties) {
     super(false);
     loadFromMap(properties, k -> true);
   }
-
-  public static final ConfigEntry<Boolean> ENABLE_AUTH_ENTRY =
-      new ConfigBuilder(ENABLE_AUTH_KEY)
-          .doc("Whether to enable authentication for Hadoop catalog")
-          .version(ConfigConstants.VERSION_0_5_1)
-          .booleanConf()
-          .createWithDefault(false);
 
   public static final ConfigEntry<String> AUTH_TYPE_ENTRY =
       new ConfigBuilder(AUTH_TYPE_KEY)
@@ -36,24 +34,31 @@ public class AuthenticationConfig extends Config {
           .stringConf()
           .create();
 
-  public boolean isEnableAuth() {
-    return get(ENABLE_AUTH_ENTRY);
-  }
+  public static final ConfigEntry<Boolean> ENABLE_IMPERSONATION_ENTRY =
+      new ConfigBuilder(IMPERSONATION_ENABLE_KEY)
+          .doc("Whether to enable impersonation for the Hadoop catalog")
+          .version(ConfigConstants.VERSION_0_5_1)
+          .booleanConf()
+          .createWithDefault(DEFAULT_IMPERSONATION_ENABLE);
 
   public String getAuthType() {
     return get(AUTH_TYPE_ENTRY);
   }
 
+  public boolean isImpersonationEnabled() {
+    return get(ENABLE_IMPERSONATION_ENTRY);
+  }
+
   public static final Map<String, PropertyEntry<?>> AUTHENTICATION_PROPERTY_ENTRIES =
       new ImmutableMap.Builder<String, PropertyEntry<?>>()
           .put(
-              ENABLE_AUTH_KEY,
+              IMPERSONATION_ENABLE_KEY,
               PropertyEntry.booleanPropertyEntry(
-                  ENABLE_AUTH_KEY,
-                  "Whether to enable authentication for Hadoop catalog",
+                  IMPERSONATION_ENABLE_KEY,
+                  "Whether to enable impersonation for the Hadoop catalog",
                   false,
                   true,
-                  false,
+                  DEFAULT_IMPERSONATION_ENABLE,
                   false,
                   false))
           .put(

@@ -123,10 +123,9 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   private void initAuthentication(Map<String, String> conf, Configuration hadoopConf) {
     AuthenticationConfig config = new AuthenticationConfig(conf);
-    boolean enableAuth = config.isEnableAuth();
     String authType = config.getAuthType();
 
-    if (enableAuth && StringUtils.equalsIgnoreCase(authType, "kerberos")) {
+    if (StringUtils.equalsIgnoreCase(authType, "kerberos")) {
       hadoopConf.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
       UserGroupInformation.setConfiguration(hadoopConf);
       try {

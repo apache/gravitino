@@ -23,9 +23,6 @@ public class KerberosConfig extends AuthenticationConfig {
   public static final String FETCH_TIMEOUT_SEC_KEY =
       "authentication.kerberos.keytab-fetch-timeout-sec";
 
-  public static final String IMPERSONATION_ENABLE_KEY =
-      "authentication.kerberos.impersonation-enable";
-
   public static final boolean DEFAULT_IMPERSONATION_ENABLE = false;
 
   public static final ConfigEntry<String> PRINCIPAL_ENTRY =
@@ -60,20 +57,9 @@ public class KerberosConfig extends AuthenticationConfig {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(2);
 
-  public static final ConfigEntry<Boolean> ENABLE_IMPERSONATION_ENTRY =
-      new ConfigBuilder(IMPERSONATION_ENABLE_KEY)
-          .doc("Whether to enable impersonation for the Hadoop catalog")
-          .version(ConfigConstants.VERSION_0_5_1)
-          .booleanConf()
-          .createWithDefault(DEFAULT_IMPERSONATION_ENABLE);
-
   public KerberosConfig(Map<String, String> properties) {
     super(properties);
     loadFromMap(properties, k -> true);
-  }
-
-  public boolean isImpersonationEnabled() {
-    return get(ENABLE_IMPERSONATION_ENTRY);
   }
 
   public String getPrincipalName() {
@@ -94,16 +80,6 @@ public class KerberosConfig extends AuthenticationConfig {
 
   public static final Map<String, PropertyEntry<?>> KERBEROS_PROPERTY_ENTRIES =
       new ImmutableMap.Builder<String, PropertyEntry<?>>()
-          .put(
-              IMPERSONATION_ENABLE_KEY,
-              PropertyEntry.booleanPropertyEntry(
-                  IMPERSONATION_ENABLE_KEY,
-                  "Whether to enable impersonation for the Hadoop catalog",
-                  false,
-                  true,
-                  DEFAULT_IMPERSONATION_ENABLE,
-                  false,
-                  false))
           .put(
               KEY_TAB_URI_KEY,
               PropertyEntry.stringImmutablePropertyEntry(
