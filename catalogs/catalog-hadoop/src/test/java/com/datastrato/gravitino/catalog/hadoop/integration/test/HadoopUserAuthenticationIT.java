@@ -13,7 +13,6 @@ import static com.datastrato.gravitino.catalog.hadoop.kerberos.KerberosConfig.PR
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.SchemaChange;
 import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.client.KerberosTokenProvider;
@@ -22,6 +21,7 @@ import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
+import com.datastrato.gravitino.rel.SchemaChange;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -163,7 +163,7 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
     Assertions.assertEquals(0, metalakes.length);
 
     GravitinoMetalake gravitinoMetalake =
-        adminClient.createMetalake(METALAKE_NAME, null, ImmutableMap.of());
+        adminClient.createMetalake(NameIdentifier.of(METALAKE_NAME), null, ImmutableMap.of());
 
     // Create a catalog
     Map<String, String> properties = Maps.newHashMap();
@@ -179,13 +179,18 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
 
     Catalog catalog =
         gravitinoMetalake.createCatalog(
-            CATALOG_NAME, Catalog.Type.FILESET, "hadoop", "comment", properties);
+            NameIdentifier.of(METALAKE_NAME, CATALOG_NAME),
+            Catalog.Type.FILESET,
+            "hadoop",
+            "comment",
+            properties);
 
+    NameIdentifier schemaIdentifier = NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
     // Test create schema
     Exception exception =
         Assertions.assertThrows(
             Exception.class,
-            () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
+            () -> catalog.asSchemas().createSchema(schemaIdentifier, "comment", ImmutableMap.of()));
     String exceptionMessage = Throwables.getStackTraceAsString(exception);
     // Make sure real user is 'gravitino_client'
     Assertions.assertTrue(
@@ -194,7 +199,7 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
     // Now try to give the user the permission to create schema again
     kerberosHiveContainer.executeInContainer("hadoop", "fs", "-chmod", "-R", "777", "/user/hadoop");
     Assertions.assertDoesNotThrow(
-        () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
+        () -> catalog.asSchemas().createSchema(schemaIdentifier, "comment", ImmutableMap.of()));
 
     catalog
         .asFilesetCatalog()
@@ -209,8 +214,8 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
         .asFilesetCatalog()
         .dropFileset(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, TABLE_NAME));
 
-    catalog.asSchemas().alterSchema(SCHEMA_NAME, SchemaChange.setProperty("k1", "value1"));
+    catalog.asSchemas().alterSchema(schemaIdentifier, SchemaChange.setProperty("k1", "value1"));
 
-    catalog.asSchemas().dropSchema(SCHEMA_NAME, true);
+    catalog.asSchemas().dropSchema(schemaIdentifier, true);
   }
 }
