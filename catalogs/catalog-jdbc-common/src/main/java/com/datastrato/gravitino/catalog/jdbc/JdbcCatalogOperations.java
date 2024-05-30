@@ -239,13 +239,12 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    *
    * @param ident The identifier of the schema to drop.
    * @param cascade If set to true, drops all the tables in the schema as well.
-   * @return true if the schema was dropped successfully, false otherwise.
+   * @return true if the schema is successfully dropped; false if the schema does not exist.
    * @throws NonEmptySchemaException If the schema is not empty and 'cascade' is set to false.
    */
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
-    databaseOperation.delete(ident.name(), cascade);
-    return true;
+    return databaseOperation.delete(ident.name(), cascade);
   }
 
   /**
@@ -342,8 +341,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public boolean dropTable(NameIdentifier tableIdent) {
     String databaseName = NameIdentifier.of(tableIdent.namespace().levels()).name();
-    tableOperation.drop(databaseName, tableIdent.name());
-    return true;
+    return tableOperation.drop(databaseName, tableIdent.name());
   }
 
   /**

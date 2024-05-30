@@ -28,8 +28,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * BaseSchemaCatalog is the base abstract class for all the catalog with schema. It provides the
@@ -37,8 +35,6 @@ import org.slf4j.LoggerFactory;
  * create, load, alter and drop a schema with specified identifier.
  */
 abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, SupportsSchemas {
-  private static final Logger LOG = LoggerFactory.getLogger(BaseSchemaCatalog.class);
-
   /** The REST client to send the requests. */
   protected final RESTClient restClient;
   /** The namespace of current catalog, which is the metalake name. */
@@ -180,24 +176,15 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
    */
   @Override
   public boolean dropSchema(String schemaName, boolean cascade) throws NonEmptySchemaException {
-
-    try {
-      DropResponse resp =
-          restClient.delete(
-              formatSchemaRequestPath(schemaNamespace) + "/" + RESTUtils.encodeString(schemaName),
-              Collections.singletonMap("cascade", String.valueOf(cascade)),
-              DropResponse.class,
-              Collections.emptyMap(),
-              ErrorHandlers.schemaErrorHandler());
-      resp.validate();
-      return resp.dropped();
-
-    } catch (NonEmptySchemaException e) {
-      throw e;
-    } catch (Exception e) {
-      LOG.warn("Failed to drop schema {}", schemaName, e);
-      return false;
-    }
+    DropResponse resp =
+        restClient.delete(
+            formatSchemaRequestPath(schemaNamespace) + "/" + RESTUtils.encodeString(schemaName),
+            Collections.singletonMap("cascade", String.valueOf(cascade)),
+            DropResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.schemaErrorHandler());
+    resp.validate();
+    return resp.dropped();
   }
 
   static String formatSchemaRequestPath(Namespace ns) {
