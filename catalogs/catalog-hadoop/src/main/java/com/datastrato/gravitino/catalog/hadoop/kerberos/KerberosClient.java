@@ -5,8 +5,6 @@
 
 package com.datastrato.gravitino.catalog.hadoop.kerberos;
 
-import static com.datastrato.gravitino.catalog.hadoop.kerberos.KerberosConfig.GRAVITINO_KEYTAB_FORMAT;
-
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -25,6 +23,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class KerberosClient {
+  public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-%s-keytab";
+
   private static final Logger LOG = LoggerFactory.getLogger(KerberosClient.class);
 
   private final ScheduledThreadPoolExecutor checkTgtExecutor;
@@ -84,7 +84,7 @@ public class KerberosClient {
 
     java.io.File keytabsDir = new File("keytabs");
     if (!keytabsDir.exists()) {
-      // Ignore the return value, because there exists many Hive catalog operations making
+      // Ignore the return value, because there exists many Hadoop catalog operations making
       // this directory.
       keytabsDir.mkdir();
     }
@@ -96,7 +96,6 @@ public class KerberosClient {
           String.format("Fail to delete keytab file %s", keytabFile.getAbsolutePath()));
     }
 
-    // TODO: Make the configuration
     int fetchKeytabFileTimeout = kerberosConfig.getFetchTimeoutSec();
     FetchFileUtils.fetchFileFromUri(keyTabUri, keytabFile, fetchKeytabFileTimeout, hadoopConf);
 

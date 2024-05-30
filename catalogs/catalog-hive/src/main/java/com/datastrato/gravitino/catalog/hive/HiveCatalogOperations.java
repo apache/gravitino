@@ -51,6 +51,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -74,6 +75,7 @@ import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -144,7 +146,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     // and gravitinoConfig will be passed to Hive config, and gravitinoConfig has higher priority
     mergeConfig.forEach(hadoopConf::set);
     hiveConf = new HiveConf(hadoopConf, HiveCatalogOperations.class);
-    UserGroupInformation.setConfiguration(hadoopConf);
 
     initKerberosIfNecessary(conf, hadoopConf);
 
@@ -173,7 +174,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
         String keytabUri =
             (String)
-                catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.KET_TAB_URI);
+                catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.KEY_TAB_URI);
         Preconditions.checkArgument(StringUtils.isNotBlank(keytabUri), "Keytab uri can't be blank");
         // TODO: Support to download the file from Kerberos HDFS
         Preconditions.checkArgument(
@@ -201,6 +202,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             new ScheduledThreadPoolExecutor(
                 1, getThreadFactory(String.format("Kerberos-check-%s", info.id())));
 
+        LOG.info("krb5 path: {}", System.getProperty("java.security.krb5.conf"));
+        refreshKerberosConfig();
+        KerberosName.resetDefaultRealm();
+        UserGroupInformation.setConfiguration(hadoopConf);
         UserGroupInformation.loginUserFromKeytab(catalogPrincipal, keytabFile.getAbsolutePath());
 
         UserGroupInformation kerberosLoginUgi = UserGroupInformation.getCurrentUser();
@@ -224,7 +229,25 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
       } catch (IOException ioe) {
         throw new UncheckedIOException(ioe);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
       }
+    }
+  }
+
+  private void refreshKerberosConfig() {
+    Class<?> classRef;
+    try {
+      if (System.getProperty("java.vendor").contains("IBM")) {
+        classRef = Class.forName("com.ibm.security.krb5.internal.Config");
+      } else {
+        classRef = Class.forName("sun.security.krb5.Config");
+      }
+
+      Method refershMethod = classRef.getMethod("refresh");
+      refershMethod.invoke(null);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     }
   }
 
@@ -432,7 +455,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    *
    * @param ident The identifier of the schema to drop.
    * @param cascade If set to true, drops all the tables in the schema as well.
-   * @return true if the schema was dropped successfully, false otherwise.
+   * @return true if the schema was dropped successfully, false if the schema does not exist.
    * @throws NonEmptySchemaException If the schema is not empty and 'cascade' is set to false.
    */
   @Override
@@ -964,10 +987,14 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public boolean dropTable(NameIdentifier tableIdent) {
-    if (isExternalTable(tableIdent)) {
-      return dropHiveTable(tableIdent, false, false);
-    } else {
-      return dropHiveTable(tableIdent, true, false);
+    try {
+      if (isExternalTable(tableIdent)) {
+        return dropHiveTable(tableIdent, false, false);
+      } else {
+        return dropHiveTable(tableIdent, true, false);
+      }
+    } catch (NoSuchTableException e) {
+      return false;
     }
   }
 

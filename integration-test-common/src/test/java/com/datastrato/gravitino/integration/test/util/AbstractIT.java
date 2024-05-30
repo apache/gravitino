@@ -215,10 +215,7 @@ public class AbstractIT {
         .toLowerCase()
         .equals(customConfigs.get(Configs.AUTHENTICATOR.getKey()))) {
       serverUri = "http://localhost:" + jettyServerConfig.getHttpPort();
-//      client =
-//          GravitinoAdminClient.builder(serverUri)
-//              .withKerberosAuth(KerberosProviderHelper.getProvider())
-//              .build();
+      client = null;
     } else {
       client = GravitinoAdminClient.builder(serverUri).build();
     }

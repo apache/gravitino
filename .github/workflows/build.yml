@@ -41,6 +41,7 @@ jobs:
               - server/**
               - server-common/**
               - spark-connector/**
+              - flink-connector/**
               - trino-connector/**
               - web/**
               - docs/open-api/**

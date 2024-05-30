@@ -5,7 +5,7 @@
 package com.datastrato.gravitino.catalog.hadoop;
 
 import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
@@ -15,6 +15,7 @@ import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.SchemaChange;
 import com.datastrato.gravitino.StringIdentifier;
+import com.datastrato.gravitino.catalog.hadoop.kerberos.AuthenticationConfig;
 import com.datastrato.gravitino.catalog.hadoop.kerberos.KerberosClient;
 import com.datastrato.gravitino.connector.CatalogInfo;
 import com.datastrato.gravitino.connector.CatalogOperations;
@@ -51,7 +52,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -119,17 +119,19 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
             CATALOG_PROPERTIES_METADATA.getOrDefault(
                 config, HadoopCatalogPropertiesMetadata.LOCATION);
     conf.forEach(hadoopConf::set);
-    initKerberosAuthentication(conf, hadoopConf);
+
+    initAuthentication(conf, hadoopConf);
 
     this.catalogStorageLocation = Optional.ofNullable(catalogLocation).map(Path::new);
   }
 
-  private void initKerberosAuthentication(Map<String, String> conf, Configuration hadoopConf) {
-    String enableAuth = hadoopConf.get(HADOOP_SECURITY_AUTHORIZATION);
+  private void initAuthentication(Map<String, String> conf, Configuration hadoopConf) {
+    AuthenticationConfig config = new AuthenticationConfig(conf);
+    boolean enableAuth = config.isEnableAuth();
+    String authType = config.getAuthType();
 
-    if (UserGroupInformation.AuthenticationMethod.KERBEROS
-            == SecurityUtil.getAuthenticationMethod(hadoopConf)
-        && StringUtils.equalsIgnoreCase(enableAuth, "true")) {
+    if (enableAuth && StringUtils.equalsIgnoreCase(authType, "kerberos")) {
+      hadoopConf.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
       UserGroupInformation.setConfiguration(hadoopConf);
       try {
         KerberosClient kerberosClient = new KerberosClient(conf, hadoopConf);
@@ -650,7 +652,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     return path.makeQualified(defaultFs.getUri(), defaultFs.getWorkingDirectory());
   }
 
-  void setProxyPlugin(HadoopProxyPlugin hiveProxyPlugin) {
-    this.proxyPlugin = hiveProxyPlugin;
+  void setProxyPlugin(HadoopProxyPlugin hadoopProxyPlugin) {
+    this.proxyPlugin = hadoopProxyPlugin;
   }
 }

@@ -1070,6 +1070,11 @@ public class Types {
     public int hashCode() {
       return Objects.hash(unparsedType);
     }
+
+    @Override
+    public String toString() {
+      return unparsedType;
+    }
   }
 
   /**

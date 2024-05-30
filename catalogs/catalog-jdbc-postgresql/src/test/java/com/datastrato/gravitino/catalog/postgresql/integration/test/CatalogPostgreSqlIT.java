@@ -119,6 +119,11 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   @AfterAll
   public void stop() {
     clearTableAndSchema();
+    NameIdentifier[] schemaIdentifiers = catalog.asSchemas().listSchemas();
+    for (NameIdentifier nameIdentifier : schemaIdentifiers) {
+      catalog.asSchemas().dropSchema(nameIdentifier.name(), true);
+    }
+    metalake.dropCatalog(catalogName);
     client.dropMetalake(metalakeName);
     postgreSqlService.close();
   }
@@ -337,7 +342,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     schemaMap =
         Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v -> v));
     Assertions.assertFalse(schemaMap.containsKey(testSchemaName));
-    Assertions.assertFalse(schemas.dropSchema("no-exits", false));
+    Assertions.assertFalse(schemas.dropSchema("no_exits", false));
     TableCatalog tableCatalog = catalog.asTableCatalog();
 
     // create failed check.

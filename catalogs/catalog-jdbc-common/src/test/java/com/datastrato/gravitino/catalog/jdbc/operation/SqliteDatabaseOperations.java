@@ -73,12 +73,12 @@ public class SqliteDatabaseOperations extends JdbcDatabaseOperations {
   }
 
   @Override
-  public void delete(String databaseName, boolean cascade) throws NoSuchSchemaException {
-    delete(databaseName);
+  public boolean delete(String databaseName, boolean cascade) throws NoSuchSchemaException {
+    return delete(databaseName);
   }
 
-  public void delete(String databaseName) {
-    FileUtils.deleteQuietly(new File(dbPath + "/" + databaseName));
+  public boolean delete(String databaseName) {
+    return FileUtils.deleteQuietly(new File(dbPath + "/" + databaseName));
   }
 
   @Override

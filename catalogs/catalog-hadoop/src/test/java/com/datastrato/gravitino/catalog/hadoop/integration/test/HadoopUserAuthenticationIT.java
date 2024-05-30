@@ -5,16 +5,15 @@
 
 package com.datastrato.gravitino.catalog.hadoop.integration.test;
 
-import static com.datastrato.gravitino.catalog.hadoop.kerberos.KerberosConfig.KET_TAB_URI_KEY;
+import static com.datastrato.gravitino.catalog.hadoop.kerberos.AuthenticationConfig.AUTH_TYPE_KEY;
+import static com.datastrato.gravitino.catalog.hadoop.kerberos.AuthenticationConfig.ENABLE_AUTH_KEY;
+import static com.datastrato.gravitino.catalog.hadoop.kerberos.KerberosConfig.IMPERSONATION_ENABLE_KEY;
+import static com.datastrato.gravitino.catalog.hadoop.kerberos.KerberosConfig.KEY_TAB_URI_KEY;
 import static com.datastrato.gravitino.catalog.hadoop.kerberos.KerberosConfig.PRINCIPAL_KEY;
-import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.SchemaChange;
-import com.datastrato.gravitino.catalog.hadoop.kerberos.KerberosConfig;
 import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.client.KerberosTokenProvider;
@@ -84,10 +83,7 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
     file.deleteOnExit();
     TMP_DIR = file.getAbsolutePath();
 
-    HDFS_URL =
-        String.format(
-            "hdfs://%s:9000",
-            kerberosHiveContainer.getContainerIpAddress());
+    HDFS_URL = String.format("hdfs://%s:9000", kerberosHiveContainer.getContainerIpAddress());
 
     // Prepare kerberos related-config;
     prepareKerberosConfig();
@@ -139,7 +135,6 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
     LOG.info("Kerberos kdc config:\n{}", content);
     System.setProperty("java.security.krb5.conf", krb5Path);
     System.setProperty("sun.security.krb5.debug", "true");
-
   }
 
   private static void addKerberosConfig() {
@@ -169,18 +164,19 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
 
     // Create a catalog
     Map<String, String> properties = Maps.newHashMap();
-    properties.put(KerberosConfig.IMPERSONATION_ENABLE_KEY, "true");
-    properties.put(KET_TAB_URI_KEY, TMP_DIR + HADOOP_CLIENT_KEYTAB);
+
+    properties.put(ENABLE_AUTH_KEY, "true");
+    properties.put(AUTH_TYPE_KEY, "kerberos");
+    properties.put(IMPERSONATION_ENABLE_KEY, "true");
+    properties.put(KEY_TAB_URI_KEY, TMP_DIR + HADOOP_CLIENT_KEYTAB);
     properties.put(PRINCIPAL_KEY, HADOOP_CLIENT_PRINCIPAL);
-    properties.put(CATALOG_BYPASS_PREFIX + HADOOP_SECURITY_AUTHENTICATION, "kerberos");
-    properties.put(CATALOG_BYPASS_PREFIX + HADOOP_SECURITY_AUTHORIZATION, "true");
     properties.put("location", HDFS_URL + "/user/hadoop/");
 
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-mkdir", "/user/hadoop");
+    kerberosHiveContainer.executeInContainer("hadoop", "fs", "-mkdir", "/user/hadoop");
 
-    Catalog catalog = gravitinoMetalake.createCatalog(
-        CATALOG_NAME, Catalog.Type.FILESET, "hadoop", "comment", properties);
+    Catalog catalog =
+        gravitinoMetalake.createCatalog(
+            CATALOG_NAME, Catalog.Type.FILESET, "hadoop", "comment", properties);
 
     // Test create schema
     Exception exception =
@@ -193,21 +189,22 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
         exceptionMessage.contains("Permission denied: user=gravitino_client, access=WRITE"));
 
     // Now try to give the user the permission to create schema again
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chmod", "-R", "777", "/user/hadoop");
+    kerberosHiveContainer.executeInContainer("hadoop", "fs", "-chmod", "-R", "777", "/user/hadoop");
     Assertions.assertDoesNotThrow(
         () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
 
+    catalog
+        .asFilesetCatalog()
+        .createFileset(
+            NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, TABLE_NAME),
+            "comment",
+            Fileset.Type.MANAGED,
+            null,
+            ImmutableMap.of());
 
-    catalog.asFilesetCatalog().createFileset(
-        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, TABLE_NAME),
-        "comment",
-        Fileset.Type.MANAGED,
-        null,
-        ImmutableMap.of());
-
-    catalog.asFilesetCatalog().dropFileset(
-        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, TABLE_NAME));
+    catalog
+        .asFilesetCatalog()
+        .dropFileset(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, TABLE_NAME));
 
     catalog.asSchemas().alterSchema(SCHEMA_NAME, SchemaChange.setProperty("k1", "value1"));
 

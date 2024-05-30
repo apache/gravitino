@@ -90,6 +90,10 @@ You can use this kind of image to test the catalog of Apache Hive with kerberos 
 
 Changelog
 
+- gravitino-ci-kerberos-hive:0.1.1
+  - Add a principal for Gravitino web server named 'HTTP/localhost@HADOOPKRB'.
+  - Fix bugs about the configuration of proxy users. 
+
 - gravitino-ci-kerberos-hive:0.1.0
     - Set up a Hive cluster with kerberos enabled.
     - Install a KDC server and create a principal for Hive. For more please see [kerberos-hive](../dev/docker/kerberos-hive)

@@ -96,14 +96,17 @@ public abstract class JdbcTableOperations implements TableOperation {
   }
 
   @Override
-  public void drop(String databaseName, String tableName) throws NoSuchTableException {
+  public boolean drop(String databaseName, String tableName) {
     LOG.info("Attempting to delete table {} from database {}", tableName, databaseName);
-    try (Connection connection = getConnection(databaseName)) {
-      JdbcConnectorUtils.executeUpdate(connection, generateDropTableSql(tableName));
+    try {
+      dropTable(databaseName, tableName);
       LOG.info("Deleted table {} from database {}", tableName, databaseName);
-    } catch (final SQLException se) {
-      throw this.exceptionMapper.toGravitinoException(se);
+    } catch (NoSuchTableException e) {
+      return false;
+    } catch (NoSuchSchemaException e) {
+      return false;
     }
+    return true;
   }
 
   @Override
@@ -254,6 +257,15 @@ public abstract class JdbcTableOperations implements TableOperation {
     try (Connection connection = getConnection(databaseName)) {
       JdbcConnectorUtils.executeUpdate(connection, generatePurgeTableSql(tableName));
       LOG.info("Purge table {} from database {}", tableName, databaseName);
+    } catch (final SQLException se) {
+      throw this.exceptionMapper.toGravitinoException(se);
+    }
+  }
+
+  protected void dropTable(String databaseName, String tableName) {
+    LOG.info("Attempting to delete table {} from database {}", tableName, databaseName);
+    try (Connection connection = getConnection(databaseName)) {
+      JdbcConnectorUtils.executeUpdate(connection, generateDropTableSql(tableName));
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
     }
