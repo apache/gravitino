@@ -41,6 +41,7 @@ import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -53,11 +54,10 @@ public class HadoopUserImpersonationIT extends AbstractIT {
   private static final Logger LOG = LoggerFactory.getLogger(HadoopCatalogIT.class);
 
   public static final String metalakeName =
-      GravitinoITUtils.genRandomName("CatalogFilesetIT_metalake");
+      GravitinoITUtils.genRandomName("CatalogHadoopIT_metalake");
   public static final String catalogName =
-      GravitinoITUtils.genRandomName("CatalogFilesetIT_catalog");
-  public static final String SCHEMA_PREFIX = "CatalogFilesetIT_schema";
-  public static final String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
+      GravitinoITUtils.genRandomName("CatalogHadoopIT_catalog");
+  public static final String schemaName = GravitinoITUtils.genRandomName("CatalogFilesetIT_schema");
   private static final String provider = "hadoop";
   private static GravitinoMetalake metalake;
   private static Catalog catalog;
@@ -77,6 +77,22 @@ public class HadoopUserImpersonationIT extends AbstractIT {
   private static String hdfsUri;
   private static UserGroupInformation clientUGI;
 
+  private static void refreshKerberosConfig() {
+    Class<?> classRef;
+    try {
+      if (System.getProperty("java.vendor").contains("IBM")) {
+        classRef = Class.forName("com.ibm.security.krb5.internal.Config");
+      } else {
+        classRef = Class.forName("sun.security.krb5.Config");
+      }
+
+      Method refershMethod = classRef.getMethod("refresh");
+      refershMethod.invoke(null);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   @BeforeAll
   public static void setup() throws Exception {
     if (!isEmbedded()) {
@@ -92,7 +108,6 @@ public class HadoopUserImpersonationIT extends AbstractIT {
     kdc.start();
 
     String krb5ConfFile = kdc.getKrb5conf().getAbsolutePath();
-    System.setProperty("java.security.krb5.conf", krb5ConfFile);
 
     // Reload config when krb5 conf is setup
     if (SystemUtils.isJavaVersionAtMost(JavaVersion.JAVA_1_8)) {
@@ -133,6 +148,13 @@ public class HadoopUserImpersonationIT extends AbstractIT {
     conf.set("hadoop.proxyuser.hdfs.users", "*");
     conf.set(
         "hadoop.security.auth_to_local", "RULE:[2:$1@$0](.*@EXAMPLE.COM)s/.*/hadoop/\nDEFAULT");
+
+    System.setProperty("java.security.krb5.conf", krb5ConfFile);
+    refreshKerberosConfig();
+    KerberosName.resetDefaultRealm();
+
+    LOG.info("Kerberos kdc config:\n{}", KerberosName.getDefaultRealm());
+
     UserGroupInformation.setConfiguration(conf);
     UserGroupInformation.loginUserFromKeytab(
         SERVER_PRINCIPAL.replaceAll("_HOST", HOSTNAME) + "@" + kdc.getRealm(),
@@ -186,7 +208,9 @@ public class HadoopUserImpersonationIT extends AbstractIT {
       kdcWorkDir.delete();
     }
 
+    UserGroupInformation.reset();
     System.clearProperty("sun.security.krb5.debug");
+    System.clearProperty("java.security.krb5.conf");
   }
 
   @Test
