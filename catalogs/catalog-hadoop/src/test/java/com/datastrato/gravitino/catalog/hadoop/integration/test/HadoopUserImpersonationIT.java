@@ -55,9 +55,9 @@ public class HadoopUserImpersonationIT extends AbstractIT {
   private static final Logger LOG = LoggerFactory.getLogger(HadoopCatalogIT.class);
 
   public static final String metalakeName =
-      GravitinoITUtils.genRandomName("CatalogFilesetIT_metalake");
+      GravitinoITUtils.genRandomName("CatalogHadoopIT_metalake");
   public static final String catalogName =
-      GravitinoITUtils.genRandomName("CatalogFilesetIT_catalog");
+      GravitinoITUtils.genRandomName("CatalogHadoopIT_catalog");
   public static final String schemaName = GravitinoITUtils.genRandomName("CatalogFilesetIT_schema");
   private static final String provider = "hadoop";
   private static GravitinoMetalake metalake;
@@ -190,10 +190,6 @@ public class HadoopUserImpersonationIT extends AbstractIT {
 
   @AfterAll
   public static void stop() {
-    if (client != null) {
-      client.dropMetalake(metalakeName);
-    }
-
     try {
       closer.close();
     } catch (Exception e) {

@@ -21,6 +21,7 @@ import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
+import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -66,9 +67,11 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
 
   private static HiveContainer kerberosHiveContainer;
 
-  private static final String METALAKE_NAME = "test_metalake";
-  private static final String CATALOG_NAME = "test_catalog";
-  private static final String SCHEMA_NAME = "test_schema";
+  private static final String METALAKE_NAME =
+      GravitinoITUtils.genRandomName("CatalogHadoop_metalake");
+  private static final String CATALOG_NAME =
+      GravitinoITUtils.genRandomName("CatalogHadoop_catalog");
+  private static final String SCHEMA_NAME = GravitinoITUtils.genRandomName("CatalogHadoop_schema");
 
   @SuppressWarnings("unused")
   private static final String TABLE_NAME = "test_table";
