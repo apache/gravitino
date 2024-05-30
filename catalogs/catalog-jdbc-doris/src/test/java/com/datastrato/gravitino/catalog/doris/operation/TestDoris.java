@@ -2,15 +2,13 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.catalog.doris.integration.test;
+package com.datastrato.gravitino.catalog.doris.operation;
 
 import com.datastrato.gravitino.catalog.doris.converter.DorisColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.doris.converter.DorisExceptionConverter;
 import com.datastrato.gravitino.catalog.doris.converter.DorisTypeConverter;
-import com.datastrato.gravitino.catalog.doris.operation.DorisDatabaseOperations;
-import com.datastrato.gravitino.catalog.doris.operation.DorisTableOperations;
+import com.datastrato.gravitino.catalog.jdbc.TestJdbc;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
-import com.datastrato.gravitino.catalog.jdbc.integration.test.TestJdbcAbstractIT;
 import com.datastrato.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.DorisContainer;
@@ -21,7 +19,7 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 
-public class TestDorisAbstractIT extends TestJdbcAbstractIT {
+public class TestDoris extends TestJdbc {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   protected static final String DRIVER_CLASS_NAME = "com.mysql.jdbc.Driver";
 

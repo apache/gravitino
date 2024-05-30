@@ -2,7 +2,7 @@
  * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.catalog.mysql.integration.test;
+package com.datastrato.gravitino.catalog.mysql.operation;
 
 import static com.datastrato.gravitino.catalog.mysql.operation.MysqlDatabaseOperations.SYS_MYSQL_DATABASE_NAMES;
 
@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-it")
-public class TestMysqlDatabaseOperations extends TestMysqlAbstractIT {
+public class TestMysqlDatabaseOperations extends TestMysql {
 
   @Test
   public void testBaseOperationDatabase() {
