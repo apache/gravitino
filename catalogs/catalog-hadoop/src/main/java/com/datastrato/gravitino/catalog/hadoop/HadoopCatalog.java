@@ -7,6 +7,7 @@ package com.datastrato.gravitino.catalog.hadoop;
 import com.datastrato.gravitino.catalog.hadoop.kerberos.KerberosConfig;
 import com.datastrato.gravitino.connector.BaseCatalog;
 import com.datastrato.gravitino.connector.CatalogOperations;
+import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.connector.ProxyPlugin;
 import com.datastrato.gravitino.connector.capability.Capability;
 import java.util.Map;
@@ -18,6 +19,15 @@ import java.util.Optional;
  * from different Hadoop Compatible File Systems in the same catalog.
  */
 public class HadoopCatalog extends BaseCatalog<HadoopCatalog> {
+
+  static final HadoopCatalogPropertiesMetadata CATALOG_PROPERTIES_META =
+      new HadoopCatalogPropertiesMetadata();
+
+  static final HadoopSchemaPropertiesMetadata SCHEMA_PROPERTIES_META =
+      new HadoopSchemaPropertiesMetadata();
+
+  static final HadoopFilesetPropertiesMetadata FILESET_PROPERTIES_META =
+      new HadoopFilesetPropertiesMetadata();
 
   @Override
   public String shortName() {
@@ -42,5 +52,20 @@ public class HadoopCatalog extends BaseCatalog<HadoopCatalog> {
       return Optional.empty();
     }
     return Optional.of(new HadoopProxyPlugin());
+  }
+
+  @Override
+  public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
+    return CATALOG_PROPERTIES_META;
+  }
+
+  @Override
+  public PropertiesMetadata schemaPropertiesMetadata() throws UnsupportedOperationException {
+    return SCHEMA_PROPERTIES_META;
+  }
+
+  @Override
+  public PropertiesMetadata filesetPropertiesMetadata() throws UnsupportedOperationException {
+    return FILESET_PROPERTIES_META;
   }
 }

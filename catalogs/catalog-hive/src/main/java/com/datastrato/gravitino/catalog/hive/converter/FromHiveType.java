@@ -98,7 +98,7 @@ public class FromHiveType {
               return Types.DecimalType.of(decimalTypeInfo.precision(), decimalTypeInfo.scale());
             }
 
-            return Types.UnparsedType.of(hiveTypeInfo.getQualifiedName());
+            return Types.ExternalType.of(hiveTypeInfo.getQualifiedName());
         }
       case LIST:
         return Types.ListType.nullable(
@@ -127,7 +127,7 @@ public class FromHiveType {
                 .map(FromHiveType::toGravitinoType)
                 .toArray(Type[]::new));
       default:
-        return Types.UnparsedType.of(hiveTypeInfo.getQualifiedName());
+        return Types.ExternalType.of(hiveTypeInfo.getQualifiedName());
     }
   }
 

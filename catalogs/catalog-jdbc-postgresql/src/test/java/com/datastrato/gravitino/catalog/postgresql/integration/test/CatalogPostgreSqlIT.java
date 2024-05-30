@@ -1282,7 +1282,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         catalog
             .asTableCatalog()
             .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
-    Assertions.assertEquals(Types.UnparsedType.of("bit"), loadedTable.columns()[0].dataType());
+    Assertions.assertEquals(Types.ExternalType.of("bit"), loadedTable.columns()[0].dataType());
   }
 
   @Test

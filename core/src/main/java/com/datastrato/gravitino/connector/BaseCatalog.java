@@ -96,27 +96,32 @@ public abstract class BaseCatalog<T extends BaseCatalog>
 
   @Override
   public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
-    return ops().tablePropertiesMetadata();
+    throw new UnsupportedOperationException(
+        "The catalog does not support table properties metadata");
   }
 
   @Override
   public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
-    return ops().catalogPropertiesMetadata();
+    throw new UnsupportedOperationException(
+        "The catalog does not support catalog properties metadata");
   }
 
   @Override
   public PropertiesMetadata schemaPropertiesMetadata() throws UnsupportedOperationException {
-    return ops().schemaPropertiesMetadata();
+    throw new UnsupportedOperationException(
+        "The catalog does not support schema properties metadata");
   }
 
   @Override
   public PropertiesMetadata filesetPropertiesMetadata() throws UnsupportedOperationException {
-    return ops().filesetPropertiesMetadata();
+    throw new UnsupportedOperationException(
+        "The catalog does not support fileset properties metadata");
   }
 
   @Override
   public PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException {
-    return ops().topicPropertiesMetadata();
+    throw new UnsupportedOperationException(
+        "The catalog does not support topic properties metadata");
   }
 
   /**
@@ -133,7 +138,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
           Preconditions.checkArgument(
               entity != null && conf != null, "entity and conf must be set before calling ops()");
           CatalogOperations newOps = createOps(conf);
-          newOps.initialize(conf, entity.toCatalogInfo());
+          newOps.initialize(conf, entity.toCatalogInfo(), this);
           ops =
               newProxyPlugin(conf)
                   .map(
@@ -245,8 +250,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
           Map<String, String> tempProperties = Maps.newHashMap(entity.getProperties());
           tempProperties
               .entrySet()
-              .removeIf(
-                  entry -> ops().catalogPropertiesMetadata().isHiddenProperty(entry.getKey()));
+              .removeIf(entry -> catalogPropertiesMetadata().isHiddenProperty(entry.getKey()));
           properties = tempProperties;
         }
       }
