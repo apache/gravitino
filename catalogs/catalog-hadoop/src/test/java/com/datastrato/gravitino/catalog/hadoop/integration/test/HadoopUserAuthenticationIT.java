@@ -96,7 +96,7 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void stopIntegrationTest() {
+  public static void stop() {
     // Reset the UGI
     UserGroupInformation.reset();
 
