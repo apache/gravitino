@@ -207,6 +207,12 @@
    Apache Zeppelin
    ./web/WEB-INF/web.xml
 
+   Apache Hive
+   ./web/src/lib/icons/svg/hive.svg
+
+   Apache Doris
+   ./web/src/lib/icons/svg/doris.svg
+
    This product bundles various third-party components also under the
    MIT license.
 
