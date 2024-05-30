@@ -607,7 +607,8 @@ public class CatalogMysqlIT extends AbstractIT {
             + "  decimal_6_2_col decimal(6, 2),\n"
             + "  varchar20_col varchar(20),\n"
             + "  text_col text,\n"
-            + "  binary_col binary\n"
+            + "  binary_col binary,\n"
+            + "  blob_col blob\n"
             + ");\n";
 
     mysqlService.executeQuery(sql);
@@ -659,6 +660,9 @@ public class CatalogMysqlIT extends AbstractIT {
           break;
         case "binary_col":
           Assertions.assertEquals(Types.BinaryType.get(), column.dataType());
+          break;
+        case "blob_col":
+          Assertions.assertEquals(Types.ExternalType.of("BLOB"), column.dataType());
           break;
         default:
           Assertions.fail("Unexpected column name: " + column.name());
@@ -1443,7 +1447,7 @@ public class CatalogMysqlIT extends AbstractIT {
         catalog
             .asTableCatalog()
             .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
-    Assertions.assertEquals(Types.UnparsedType.of("BIT"), loadedTable.columns()[0].dataType());
+    Assertions.assertEquals(Types.ExternalType.of("BIT"), loadedTable.columns()[0].dataType());
   }
 
   @Test
