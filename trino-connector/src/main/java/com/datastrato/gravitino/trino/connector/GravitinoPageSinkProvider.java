@@ -11,6 +11,7 @@ import io.trino.spi.connector.ConnectorPageSinkId;
 import io.trino.spi.connector.ConnectorPageSinkProvider;
 import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.ConnectorTransactionHandle;
+import org.apache.commons.lang3.NotImplementedException;
 
 /** This class provides a ConnectorPageSink for trino to write data to internal connector. */
 public class GravitinoPageSinkProvider implements ConnectorPageSinkProvider {
@@ -27,7 +28,7 @@ public class GravitinoPageSinkProvider implements ConnectorPageSinkProvider {
       ConnectorSession session,
       ConnectorOutputTableHandle outputTableHandle,
       ConnectorPageSinkId pageSinkId) {
-    return null;
+    throw new NotImplementedException();
   }
 
   @Override
@@ -36,15 +37,10 @@ public class GravitinoPageSinkProvider implements ConnectorPageSinkProvider {
       ConnectorSession session,
       ConnectorInsertTableHandle insertTableHandle,
       ConnectorPageSinkId pageSinkId) {
-    GravitinoTransactionHandle gravitinoTransactionHandle =
-        (GravitinoTransactionHandle) transactionHandle;
-    GravitinoInsertTableHandle gravitinoInsertTableHandle =
-        (GravitinoInsertTableHandle) insertTableHandle;
-
     return pageSinkProvider.createPageSink(
-        gravitinoTransactionHandle.getInternalTransactionHandle(),
+        GravitinoHandle.unWrap(transactionHandle),
         session,
-        gravitinoInsertTableHandle.innerHandler(),
+        GravitinoHandle.unWrap(insertTableHandle),
         pageSinkId);
   }
 }
