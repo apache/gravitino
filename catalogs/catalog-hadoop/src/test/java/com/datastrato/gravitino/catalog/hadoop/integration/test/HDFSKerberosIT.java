@@ -18,6 +18,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -68,6 +69,7 @@ public class HDFSKerberosIT {
     LOG.info("Kerberos kdc config:\n{}", content);
 
     System.setProperty("java.security.krb5.conf", krb5Path);
+    KerberosName.resetDefaultRealm();
     System.setProperty("sun.security.krb5.debug", "true");
   }
 
@@ -88,6 +90,7 @@ public class HDFSKerberosIT {
     conf.setBoolean("fs.hdfs.impl.disable.cache", true);
     conf.set("hadoop.security.authentication", "kerberos");
 
+    UserGroupInformation.reset();
     UserGroupInformation.setConfiguration(conf);
     clientUGI = UserGroupInformation.loginUserFromKeytabAndReturnUGI(CLIENT_PRINCIPAL, keytabPath);
     PrivilegedAction<?> action =
