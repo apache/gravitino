@@ -56,4 +56,23 @@ public class GravitinoVersion extends VersionDTO implements Comparable {
     }
     return 0;
   }
+
+  @Override
+    public boolean equals(Object object) {
+      if (!(object instanceof GravitinoVersion)) {
+        return false;
+      }
+  
+      GravitinoVersion othVersion = (GravitinoVersion) object;
+  
+      int[] versionNum = getVersionNumber();
+      int[] othVersionNum = othVersion.getVersionNumber();
+      for (int i = 0; i < VERSION_PART_NUMBER; i++) {
+        if (versionNum[i] != othVersionNum[i]) {
+          return false;
+        }
+      }
+      return true;
+    }
+    
 }

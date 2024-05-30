@@ -7,6 +7,7 @@ package com.datastrato.gravitino.client;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
 import org.junit.jupiter.api.Test;
@@ -70,4 +71,22 @@ public class TestGravitinoVersion {
     version2 = new GravitinoVersion("2.5.3-SNAPSHOT", "2023-01-01", "1234567");
     assertEquals(0, version1.compareTo(version2));
   }
+  @Test
+    void testVersionEquals() {
+      //test equal
+      GravitinoVersion version1 = new GravitinoVersion("3.1.3", "2022-01-01", "1234567");
+      GravitinoVersion version2 = new GravitinoVersion("3.1.3", "2022-01-01", "1234567");
+      assertTrue(version1.equals(version2));
+  
+      //test not equal
+      version1 = new GravitinoVersion("3.1.4", "2022-01-01", "1234567");
+      version2 = new GravitinoVersion("3.1.2", "2022-01-01", "1234567");
+      assertFalse(version1.equals(version2));
+  
+      //test equal with suffix
+      version1 = new GravitinoVersion("3.1.6-BETA", "2022-01-01", "1234567");
+      version2 = new GravitinoVersion("3.1.6", "2022-01-01", "1234567");
+      assertTrue(version1.equals(version2));
+    }
+    
 }
