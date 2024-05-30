@@ -13,7 +13,6 @@ import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
@@ -92,44 +91,6 @@ public class TestCatalogManager {
       catalogManager.close();
       catalogManager = null;
     }
-  }
-
-  @Test
-  void testCreateWithHiveProperty() throws IOException {
-    NameIdentifier ident = NameIdentifier.of("metalake", "test445");
-    Map<String, String> props1 = ImmutableMap.<String, String>builder().put("hive", "hive").build();
-    Assertions.assertThrowsExactly(
-        IllegalArgumentException.class,
-        () ->
-            catalogManager.createCatalog(
-                ident, Catalog.Type.RELATIONAL, provider, "comment", props1));
-    // BUG here, In memory store does not support rollback operation, so the catalog is created in
-    // entity store,
-    // we need to remove it manually
-    reset();
-    Map<String, String> props2 =
-        ImmutableMap.<String, String>builder()
-            .put("hive", "hive")
-            .put("hive.metastore.uris", "mock_url")
-            .build();
-    Assertions.assertDoesNotThrow(
-        () ->
-            catalogManager.createCatalog(
-                ident, Catalog.Type.RELATIONAL, provider, "comment", props2));
-    reset();
-
-    Map<String, String> props3 =
-        ImmutableMap.<String, String>builder()
-            .put("hive", "hive")
-            .put("hive.metastore.uris", "")
-            .put("hive.metastore.sasl.enabled", "true")
-            .put("hive.metastore.kerberos.principal", "mock_principal")
-            .put("hive.metastore.kerberos.keytab.file", "mock_keytab")
-            .build();
-    Assertions.assertDoesNotThrow(
-        () ->
-            catalogManager.createCatalog(
-                ident, Catalog.Type.RELATIONAL, provider, "comment", props3));
   }
 
   @Test
@@ -254,7 +215,10 @@ public class TestCatalogManager {
   @Test
   public void testCreateCatalog() {
     NameIdentifier ident = NameIdentifier.of("metalake", "test1");
+
     Map<String, String> props = Maps.newHashMap();
+    props.put("key1", "value1");
+    props.put("key2", "value2");
 
     Catalog testCatalog =
         catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
@@ -292,14 +256,16 @@ public class TestCatalogManager {
 
     // Test failed creation
     NameIdentifier failedIdent = NameIdentifier.of("metalake", "test2");
-    props.put("fail-create", "true");
+    props.put("reserved_key", "test");
     Throwable exception3 =
         Assertions.assertThrows(
             RuntimeException.class,
             () ->
                 catalogManager.createCatalog(
                     failedIdent, Catalog.Type.RELATIONAL, provider, "comment", props));
-    Assertions.assertTrue(exception3.getMessage().contains("Failed to create Test catalog"));
+    Assertions.assertTrue(
+        exception3.getMessage().contains("Properties are reserved and cannot be set"),
+        exception3.getMessage());
     Assertions.assertNull(catalogManager.catalogCache.getIfPresent(failedIdent));
     // Test failed for the second time
     Throwable exception4 =
@@ -308,7 +274,8 @@ public class TestCatalogManager {
             () ->
                 catalogManager.createCatalog(
                     failedIdent, Catalog.Type.RELATIONAL, provider, "comment", props));
-    Assertions.assertTrue(exception4.getMessage().contains("Failed to create Test catalog"));
+    Assertions.assertTrue(
+        exception4.getMessage().contains("Properties are reserved and cannot be set"));
     Assertions.assertNull(catalogManager.catalogCache.getIfPresent(failedIdent));
   }
 
@@ -316,7 +283,8 @@ public class TestCatalogManager {
   public void testListCatalogs() {
     NameIdentifier ident = NameIdentifier.of("metalake", "test11");
     NameIdentifier ident1 = NameIdentifier.of("metalake", "test12");
-    Map<String, String> props = ImmutableMap.of("provider", "test");
+    Map<String, String> props =
+        ImmutableMap.of("provider", "test", "key1", "value1", "key2", "value2");
 
     catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
     catalogManager.createCatalog(ident1, Catalog.Type.RELATIONAL, provider, "comment", props);
@@ -338,7 +306,8 @@ public class TestCatalogManager {
   public void testListCatalogsInfo() {
     NameIdentifier relIdent = NameIdentifier.of("metalake", "catalog_rel");
     NameIdentifier fileIdent = NameIdentifier.of("metalake", "catalog_file");
-    Map<String, String> props = ImmutableMap.of("provider", "test");
+    Map<String, String> props =
+        ImmutableMap.of("provider", "test", "key1", "value1", "key2", "value2");
 
     catalogManager.createCatalog(relIdent, Catalog.Type.RELATIONAL, provider, "comment", props);
     catalogManager.createCatalog(fileIdent, Catalog.Type.FILESET, provider, "comment", props);
@@ -370,7 +339,8 @@ public class TestCatalogManager {
   @Test
   public void testLoadCatalog() {
     NameIdentifier ident = NameIdentifier.of("metalake", "test21");
-    Map<String, String> props = ImmutableMap.of("provider", "test");
+    Map<String, String> props =
+        ImmutableMap.of("provider", "test", "key1", "value1", "key2", "value2");
 
     catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
 
@@ -395,7 +365,8 @@ public class TestCatalogManager {
   @Test
   public void testAlterCatalog() {
     NameIdentifier ident = NameIdentifier.of("metalake", "test31");
-    Map<String, String> props = ImmutableMap.of("provider", "test");
+    Map<String, String> props =
+        ImmutableMap.of("provider", "test", "key1", "value1", "key2", "value2");
     String comment = "comment";
 
     catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
@@ -414,13 +385,14 @@ public class TestCatalogManager {
     Assertions.assertEquals("comment1", catalog1.comment());
 
     // Test alter properties;
-    CatalogChange change2 = CatalogChange.setProperty("key1", "value1");
-    CatalogChange change3 = CatalogChange.setProperty("key2", "value2");
-    CatalogChange change4 = CatalogChange.removeProperty("key2");
+    CatalogChange change2 = CatalogChange.setProperty("key5", "value1");
+    CatalogChange change3 = CatalogChange.setProperty("key6", "value2");
+    CatalogChange change4 = CatalogChange.removeProperty("key6");
 
     catalogManager.alterCatalog(ident1, change2, change3, change4);
     Catalog catalog2 = catalogManager.loadCatalog(ident1);
-    Map<String, String> expectedProps = ImmutableMap.of("provider", "test", "key1", "value1");
+    Map<String, String> expectedProps =
+        ImmutableMap.of("provider", "test", "key1", "value1", "key2", "value2", "key5", "value1");
     testProperties(expectedProps, catalog2.properties());
 
     // Test Catalog does not exist
@@ -440,7 +412,8 @@ public class TestCatalogManager {
   @Test
   public void testDropCatalog() {
     NameIdentifier ident = NameIdentifier.of("metalake", "test41");
-    Map<String, String> props = ImmutableMap.of("provider", "test");
+    Map<String, String> props =
+        ImmutableMap.of("provider", "test", "key1", "value1", "key2", "value2");
     String comment = "comment";
 
     catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
@@ -464,8 +437,6 @@ public class TestCatalogManager {
           Assertions.assertEquals(v, testProps.get(k));
         });
 
-    Assertions.assertTrue(testProps.containsKey(ID_KEY));
-    StringIdentifier StringId = StringIdentifier.fromString(testProps.get(ID_KEY));
-    Assertions.assertEquals(StringId.toString(), testProps.get(ID_KEY));
+    Assertions.assertFalse(testProps.containsKey(ID_KEY), "`gravitino.identifier` is missing");
   }
 }
