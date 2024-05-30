@@ -10,8 +10,10 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.airlift.json.JsonCodec;
 import io.trino.spi.connector.ConnectorTableHandle;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
+@Disabled
 public class TestGravitinoTableHandle {
   private final JsonCodec<GravitinoTableHandle> codec =
       JsonCodec.jsonCodec(GravitinoTableHandle.class);

@@ -158,7 +158,11 @@ public class CatalogConnectorManager {
     // Delete those catalogs that have been deleted in Gravitino server
     Set<String> catalogNameStrings =
         Arrays.stream(catalogNames)
-            .map(config.simplifyCatalogNames() ? NameIdentifier::name : NameIdentifier::toString)
+            .map(
+                id ->
+                    config.simplifyCatalogNames()
+                        ? id.name()
+                        : getTrinoCatalogName(metalake.name(), id.name()))
             .collect(Collectors.toSet());
 
     for (Map.Entry<String, CatalogConnectorContext> entry : catalogConnectors.entrySet()) {
@@ -250,7 +254,7 @@ public class CatalogConnectorManager {
   }
 
   public String getTrinoCatalogName(String metalake, String catalog) {
-    return config.simplifyCatalogNames() ? catalog : metalake + "." + catalog;
+    return config.simplifyCatalogNames() ? catalog : String.format("\"%s.%s\"", metalake, catalog);
   }
 
   public String getTrinoCatalogName(GravitinoCatalog catalog) {
@@ -305,7 +309,6 @@ public class CatalogConnectorManager {
   public void dropCatalog(String metalakeName, String catalogName, boolean ignoreNotExist) {
     try {
       GravitinoMetalake metalake = gravitinoClient.loadMetalake(metalakeName);
-
       if (!metalake.catalogExists(catalogName)) {
         if (ignoreNotExist) {
           return;
@@ -318,7 +321,7 @@ public class CatalogConnectorManager {
       boolean dropped = metalake.dropCatalog(catalogName);
       if (!dropped) {
         throw new TrinoException(
-            GRAVITINO_UNSUPPORTED_OPERATION, "Drop catalog " + catalogName + " does not support.");
+            GRAVITINO_UNSUPPORTED_OPERATION, "Failed to drop no empty catalog " + catalogName);
       }
       LOG.info("Drop catalog {} in metalake {} successfully.", catalogName, metalake);
 
