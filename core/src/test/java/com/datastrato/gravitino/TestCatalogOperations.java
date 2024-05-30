@@ -2,13 +2,14 @@
  * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino;
+package com.datastrato.gravitino.connector;
 
-import com.datastrato.gravitino.connector.BasePropertiesMetadata;
-import com.datastrato.gravitino.connector.CatalogInfo;
-import com.datastrato.gravitino.connector.CatalogOperations;
-import com.datastrato.gravitino.connector.PropertiesMetadata;
-import com.datastrato.gravitino.connector.PropertyEntry;
+import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.TestFileset;
+import com.datastrato.gravitino.TestSchema;
+import com.datastrato.gravitino.TestTable;
+import com.datastrato.gravitino.TestTopic;
 import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
@@ -38,7 +39,6 @@ import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
@@ -56,16 +56,6 @@ public class TestCatalogOperations
 
   private final Map<NameIdentifier, TestTopic> topics;
 
-  private final BasePropertiesMetadata tablePropertiesMetadata;
-
-  private final BasePropertiesMetadata schemaPropertiesMetadata;
-
-  private final BasePropertiesMetadata filesetPropertiesMetadata;
-
-  private final BasePropertiesMetadata topicPropertiesMetadata;
-
-  private Map<String, String> config;
-
   public static final String FAIL_CREATE = "fail-create";
 
   public TestCatalogOperations(Map<String, String> config) {
@@ -73,15 +63,12 @@ public class TestCatalogOperations
     schemas = Maps.newHashMap();
     filesets = Maps.newHashMap();
     topics = Maps.newHashMap();
-    tablePropertiesMetadata = new TestBasePropertiesMetadata();
-    schemaPropertiesMetadata = new TestBasePropertiesMetadata();
-    filesetPropertiesMetadata = new TestFilesetPropertiesMetadata();
-    topicPropertiesMetadata = new TestBasePropertiesMetadata();
-    this.config = config;
   }
 
   @Override
-  public void initialize(Map<String, String> config, CatalogInfo info) throws RuntimeException {}
+  public void initialize(
+      Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertyMetadata)
+      throws RuntimeException {}
 
   @Override
   public void close() throws IOException {}
@@ -309,102 +296,6 @@ public class TestCatalogOperations
     }
 
     return true;
-  }
-
-  @Override
-  public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
-    return tablePropertiesMetadata;
-  }
-
-  @Override
-  public PropertiesMetadata schemaPropertiesMetadata() throws UnsupportedOperationException {
-    return schemaPropertiesMetadata;
-  }
-
-  @Override
-  public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
-    if (config.containsKey("mock")) {
-      return new BasePropertiesMetadata() {
-        @Override
-        protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
-          return ImmutableMap.<String, PropertyEntry<?>>builder()
-              .put(
-                  "key1",
-                  PropertyEntry.stringPropertyEntry(
-                      "key1", "value1", true, true, null, false, false))
-              .put(
-                  "key2",
-                  PropertyEntry.stringPropertyEntry(
-                      "key2", "value2", true, false, null, false, false))
-              .put(
-                  "key3",
-                  new PropertyEntry.Builder<Integer>()
-                      .withDecoder(Integer::parseInt)
-                      .withEncoder(Object::toString)
-                      .withDefaultValue(1)
-                      .withDescription("key3")
-                      .withHidden(false)
-                      .withReserved(false)
-                      .withImmutable(true)
-                      .withJavaType(Integer.class)
-                      .withRequired(false)
-                      .withName("key3")
-                      .build())
-              .put(
-                  "key4",
-                  PropertyEntry.stringPropertyEntry(
-                      "key4", "value4", false, false, "value4", false, false))
-              .put(
-                  "reserved_key",
-                  PropertyEntry.stringPropertyEntry(
-                      "reserved_key", "reserved_key", false, true, "reserved_value", false, true))
-              .put(
-                  "hidden_key",
-                  PropertyEntry.stringPropertyEntry(
-                      "hidden_key", "hidden_key", false, false, "hidden_value", true, false))
-              .put(
-                  FAIL_CREATE,
-                  PropertyEntry.booleanPropertyEntry(
-                      FAIL_CREATE,
-                      "Whether an exception needs to be thrown on creation",
-                      false,
-                      false,
-                      false,
-                      false,
-                      false))
-              .build();
-        }
-      };
-    } else if (config.containsKey("hive")) {
-      return new BasePropertiesMetadata() {
-        @Override
-        protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
-          return ImmutableMap.<String, PropertyEntry<?>>builder()
-              .put(
-                  "hive.metastore.uris",
-                  PropertyEntry.stringPropertyEntry(
-                      "hive.metastore.uris",
-                      "The Hive metastore URIs",
-                      true,
-                      true,
-                      null,
-                      false,
-                      false))
-              .build();
-        }
-      };
-    }
-    return Maps::newHashMap;
-  }
-
-  @Override
-  public PropertiesMetadata filesetPropertiesMetadata() throws UnsupportedOperationException {
-    return filesetPropertiesMetadata;
-  }
-
-  @Override
-  public PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException {
-    return topicPropertiesMetadata;
   }
 
   @Override
