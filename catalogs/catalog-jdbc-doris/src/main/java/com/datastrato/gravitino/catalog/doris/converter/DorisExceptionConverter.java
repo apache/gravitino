@@ -14,7 +14,6 @@ import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import com.google.common.annotations.VisibleForTesting;
 import java.sql.SQLException;
-import java.util.regex.Pattern;
 
 /** Exception converter to Gravitino exception for Doris. */
 public class DorisExceptionConverter extends JdbcExceptionConverter {
@@ -30,24 +29,10 @@ public class DorisExceptionConverter extends JdbcExceptionConverter {
   static final int CODE_NO_SUCH_COLUMN = 1054;
   static final int CODE_OTHER = 1105;
 
-  private static final String DATABASE_ALREADY_EXISTS_PATTERN_STRING =
-      ".*detailMessage = Can't create database '.*'; database exists";
-  private static final Pattern DATABASE_ALREADY_EXISTS_PATTERN =
-      Pattern.compile(DATABASE_ALREADY_EXISTS_PATTERN_STRING);
-
-  private static final String TABLE_NOT_EXIST_PATTERN_STRING =
-      ".*detailMessage = Unknown table '.*' in .*:.*";
-
-  private static final Pattern TABLE_NOT_EXIST_PATTERN =
-      Pattern.compile(TABLE_NOT_EXIST_PATTERN_STRING);
-
   @SuppressWarnings("FormatStringAnnotation")
   @Override
   public GravitinoRuntimeException toGravitinoException(SQLException se) {
     int errorCode = se.getErrorCode();
-    if (errorCode == CODE_OTHER) {
-      errorCode = getErrorCodeFromMessage(se.getMessage());
-    }
 
     switch (errorCode) {
       case CODE_DATABASE_EXISTS:
@@ -65,21 +50,5 @@ public class DorisExceptionConverter extends JdbcExceptionConverter {
       default:
         return new GravitinoRuntimeException(se, se.getMessage());
     }
-  }
-
-  @VisibleForTesting
-  static int getErrorCodeFromMessage(String message) {
-    if (message.isEmpty()) {
-      return CODE_OTHER;
-    }
-    if (DATABASE_ALREADY_EXISTS_PATTERN.matcher(message).matches()) {
-      return CODE_DATABASE_EXISTS;
-    }
-
-    if (TABLE_NOT_EXIST_PATTERN.matcher(message).matches()) {
-      return CODE_NO_SUCH_TABLE;
-    }
-
-    return CODE_OTHER;
   }
 }
