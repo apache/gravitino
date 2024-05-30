@@ -73,6 +73,8 @@ sleep 5
 ps -ef | grep DataNode | grep -v "color=auto"
 if [[ $? -ne 0 ]]; then
   echo "DataNode failed to start, please check the logs"
+  ehco "HDFS DataNode log start----------------------------"
+  cat ${HADOOP_HOME}/bin/logs/hadoop-root-datanode-*.log
   exit 1
 fi
 
@@ -85,11 +87,13 @@ while [[ ${retry_times} -lt 10 ]]; do
     let "ready=0"
     break
   fi
+  sleep 10
   retry_times=$((retry_times+1))
 done
 
 if [[ ${ready} -ne 0 ]]; then
   echo "HDFS is not ready"
+  ehco "HDFS DataNode log start---------------------------"
   cat ${HADOOP_HOME}/bin/logs/hadoop-root-datanode-*.log
   exit 1
 fi
