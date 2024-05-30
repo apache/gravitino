@@ -2,7 +2,7 @@
  * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.catalog.postgresql.integration.test;
+package com.datastrato.gravitino.catalog.postgresql.operation;
 
 import static com.datastrato.gravitino.catalog.postgresql.operation.PostgreSqlSchemaOperations.SYS_PG_DATABASE_NAMES;
 
@@ -10,7 +10,6 @@ import com.datastrato.gravitino.catalog.jdbc.JdbcSchema;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import com.datastrato.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
-import com.datastrato.gravitino.catalog.postgresql.operation.PostgreSqlSchemaOperations;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.utils.RandomNameUtils;
 import java.sql.Connection;
@@ -26,7 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.com.google.common.collect.Maps;
 
 @Tag("gravitino-docker-it")
-public class TestPostgreSqlSchemaOperations extends TestPostgreSqlAbstractIT {
+public class TestPostgreSqlSchemaOperations extends TestPostgreSql {
 
   @Test
   public void testBaseOperationSchema() {
