@@ -23,7 +23,7 @@ The Gravitino Spark connector leverages the Spark DataSourceV2 interface to faci
 * JDK 8 or 11 or 17
 
 :::info
-Gravitino spark connector doesn't support scala 2.13 for Spark3.3.
+Gravitino Spark connector doesn't support Scala 2.13 for Spark3.3.
 :::
 
 ## How to use it

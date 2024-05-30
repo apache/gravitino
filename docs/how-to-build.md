@@ -93,11 +93,11 @@ This software is licensed under the Apache License version 2."
 
    This creates `gravitino-spark-connector-runtime-{sparkVersion}_{scalaVersion}-{version}.jar`
    under the `spark-connector/v3.4/spark-runtime/build/libs` directory. You could replace `3.4` with 
-   `3.3` or `3.5` to specify different Spark versions, replace `2.12` with `2.13` for different scala 
-   version. The default scala version is `2.12` if not specifying `-PscalaVersion`.
+   `3.3` or `3.5` to specify different Spark versions, replace `2.12` with `2.13` for different Scala 
+   version. The default Scala version is `2.12` if not specifying `-PscalaVersion`.
 
    :::info
-   Gravitino spark connector doesn't support scala 2.13 for Spark3.3.
+   Gravitino Spark connector doesn't support Scala 2.13 for Spark3.3.
    :::
 
    :::note
