@@ -17,7 +17,7 @@ import java.util.Map;
 
 public class AuthenticationConfig extends Config {
 
-  // The key for the authentication type, currently we support kerberos and simple
+  // The key for the authentication type, currently we support Kerberos and simple
   public static final String AUTH_TYPE_KEY = "authentication.type";
 
   public static final String IMPERSONATION_ENABLE_KEY = "authentication.impersonation-enable";
@@ -29,7 +29,7 @@ public class AuthenticationConfig extends Config {
 
   public static final ConfigEntry<String> AUTH_TYPE_ENTRY =
       new ConfigBuilder(AUTH_TYPE_KEY)
-          .doc("The type of authentication for Hadoop catalog, currently we only support kerberos")
+          .doc("The type of authentication for Hadoop catalog, currently we only support Kerberos")
           .version(ConfigConstants.VERSION_0_5_1)
           .stringConf()
           .create();
@@ -65,7 +65,7 @@ public class AuthenticationConfig extends Config {
               AUTH_TYPE_KEY,
               PropertyEntry.stringImmutablePropertyEntry(
                   AUTH_TYPE_KEY,
-                  "The type of authentication for Hadoop catalog, currently we only support kerberos",
+                  "The type of authentication for Hadoop catalog, currently we only support Kerberos",
                   false,
                   null,
                   false,

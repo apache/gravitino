@@ -45,6 +45,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -53,6 +54,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -125,15 +127,17 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     AuthenticationConfig config = new AuthenticationConfig(conf);
     String authType = config.getAuthType();
 
-    if (StringUtils.equalsIgnoreCase(authType, "kerberos")) {
-      hadoopConf.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
+    if (StringUtils.equalsIgnoreCase(authType, AuthenticationMethod.KERBEROS.name())) {
+      hadoopConf.set(
+          HADOOP_SECURITY_AUTHENTICATION,
+          AuthenticationMethod.KERBEROS.name().toLowerCase(Locale.ROOT));
       UserGroupInformation.setConfiguration(hadoopConf);
       try {
         KerberosClient kerberosClient = new KerberosClient(conf, hadoopConf);
         File keytabFile = kerberosClient.saveKeyTabFileFromUri(catalogInfo.id());
         this.kerberosRealm = kerberosClient.login(keytabFile.getAbsolutePath());
       } catch (IOException e) {
-        throw new RuntimeException("Failed to login with kerberos", e);
+        throw new RuntimeException("Failed to login with Kerberos", e);
       }
     }
   }
