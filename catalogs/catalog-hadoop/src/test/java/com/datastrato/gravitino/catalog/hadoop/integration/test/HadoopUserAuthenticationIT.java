@@ -116,7 +116,7 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
         .getContainer()
         .copyFileFromContainer("/gravitino_server.keytab", TMP_DIR + GRAVITINO_SERVER_KEYTAB);
 
-    // Keytab of Gravitino server to connector to Hive
+    // Keytab of Gravitino server to connector to HDFS
     kerberosHiveContainer
         .getContainer()
         .copyFileFromContainer("/etc/admin.keytab", TMP_DIR + HADOOP_CLIENT_KEYTAB);
