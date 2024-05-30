@@ -311,8 +311,8 @@ public class TestHadoopCatalogOperations {
       Assertions.assertFalse(fs.exists(schemaPath));
 
       // Test drop empty schema
-      Assertions.assertFalse(ops.dropSchema(id, true));
-      Assertions.assertFalse(ops.dropSchema(id, false));
+      Assertions.assertFalse(ops.dropSchema(id, true), "schema should be non-existent");
+      Assertions.assertFalse(ops.dropSchema(id, false), "schema should be non-existent");
     }
   }
 
@@ -364,6 +364,9 @@ public class TestHadoopCatalogOperations {
       } else {
         Assertions.assertTrue(fs.exists(expectedPath));
       }
+
+      // Test drop non-existent fileset
+      Assertions.assertFalse(ops.dropFileset(filesetIdent), "fileset should be non-existent");
     }
   }
 

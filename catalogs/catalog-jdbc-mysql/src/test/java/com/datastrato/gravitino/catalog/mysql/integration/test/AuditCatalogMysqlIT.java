@@ -75,9 +75,9 @@ public class AuditCatalogMysqlIT extends AbstractIT {
 
   @AfterAll
   public static void stopIntegrationTest() throws IOException, InterruptedException {
-    AbstractIT.stopIntegrationTest();
     client.dropMetalake(metalakeName);
     mysqlService.close();
+    AbstractIT.stopIntegrationTest();
   }
 
   @Test
@@ -92,6 +92,8 @@ public class AuditCatalogMysqlIT extends AbstractIT {
     catalog = metalake.alterCatalog(catalogName, CatalogChange.setProperty("key1", "value1"));
     Assertions.assertEquals(expectUser, catalog.auditInfo().creator());
     Assertions.assertEquals(expectUser, catalog.auditInfo().lastModifier());
+
+    metalake.dropCatalog(catalogName);
   }
 
   @Test
@@ -103,6 +105,9 @@ public class AuditCatalogMysqlIT extends AbstractIT {
     Schema schema = catalog.asSchemas().createSchema(schemaName, null, prop);
     Assertions.assertEquals(expectUser, schema.auditInfo().creator());
     Assertions.assertNull(schema.auditInfo().lastModifier());
+
+    catalog.asSchemas().dropSchema(schemaName, true);
+    metalake.dropCatalog(catalogName);
   }
 
   @Test
@@ -134,6 +139,12 @@ public class AuditCatalogMysqlIT extends AbstractIT {
                 TableChange.addColumn(new String[] {"col_4"}, Types.StringType.get()));
     Assertions.assertEquals(expectUser, table.auditInfo().creator());
     Assertions.assertEquals(expectUser, table.auditInfo().lastModifier());
+
+    catalog
+        .asTableCatalog()
+        .dropTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+    catalog.asSchemas().dropSchema(schemaName, true);
+    metalake.dropCatalog(catalogName);
   }
 
   private static Catalog createCatalog(String catalogName) throws SQLException {
