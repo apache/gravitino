@@ -18,7 +18,6 @@ import com.datastrato.gravitino.integration.test.container.DorisContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
-import com.datastrato.gravitino.integration.test.util.JdbcDriverDownloader;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.SupportsSchemas;
@@ -35,8 +34,6 @@ import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
@@ -58,8 +55,6 @@ import org.testcontainers.shaded.org.awaitility.Awaitility;
 public class CatalogDorisIT extends AbstractIT {
 
   private static final String provider = "jdbc-doris";
-  private static final String DOWNLOAD_JDBC_DRIVER_URL =
-      "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar";
 
   private static final String DRIVER_CLASS_NAME = "com.mysql.jdbc.Driver";
 
@@ -88,17 +83,8 @@ public class CatalogDorisIT extends AbstractIT {
 
   protected Catalog catalog;
 
-  protected String mysqlDriverDownloadUrl = DOWNLOAD_JDBC_DRIVER_URL;
-
   @BeforeAll
   public void startup() throws IOException {
-
-    if (!ITUtils.EMBEDDED_TEST_MODE.equals(AbstractIT.testMode)) {
-      String gravitinoHome = System.getenv("GRAVITINO_HOME");
-      Path tmpPath = Paths.get(gravitinoHome, "/catalogs/jdbc-doris/libs");
-      JdbcDriverDownloader.downloadJdbcDriver(mysqlDriverDownloadUrl, tmpPath.toString());
-    }
-
     containerSuite.startDorisContainer();
 
     createMetalake();

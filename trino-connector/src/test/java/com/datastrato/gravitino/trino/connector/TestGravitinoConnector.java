@@ -24,11 +24,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.awaitility.Awaitility;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.com.google.common.base.Preconditions;
 
-@Disabled
 public class TestGravitinoConnector extends AbstractTestQueryFramework {
 
   GravitinoMockServer server;
@@ -39,33 +37,41 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
     GravitinoAdminClient gravitinoClient = server.createGravitinoClient();
 
     Session session = testSessionBuilder().setCatalog("gravitino").build();
-    QueryRunner queryRunner;
     try {
-      // queryRunner = LocalQueryRunner.builder(session).build();
-      queryRunner = DistributedQueryRunner.builder(session).setNodeCount(1).build();
+
+      DistributedQueryRunner queryRunner =
+          DistributedQueryRunner.builder(session).setNodeCount(1).build();
 
       TestGravitinoPlugin gravitinoPlugin = new TestGravitinoPlugin(gravitinoClient);
       queryRunner.installPlugin(gravitinoPlugin);
-      queryRunner.installPlugin(new MemoryPlugin());
 
       // create a gravitino connector named gravitino using metalake test
       HashMap<String, String> properties = new HashMap<>();
       properties.put("gravitino.metalake", "test");
       properties.put("gravitino.uri", "http://127.0.0.1:8090");
+      properties.put(
+          "trino.catalog.store", queryRunner.getCoordinator().getBaseDataDir().toString());
+      properties.put(
+          "trino.jdbc.uri",
+          queryRunner.getCoordinator().getBaseUrl().toString().replace("http", "jdbc:trino"));
       queryRunner.createCatalog("gravitino", "gravitino", properties);
 
+      GravitinoConnectorPluginManager.instance(this.getClass().getClassLoader())
+          .installPlugin("memory", new MemoryPlugin());
       CatalogConnectorManager catalogConnectorManager =
           gravitinoPlugin.getCatalogConnectorManager();
       server.setCatalogConnectorManager(catalogConnectorManager);
+
       // Wait for the catalog to be created. Wait for at least 30 seconds.
       Awaitility.await()
           .atMost(30, TimeUnit.SECONDS)
           .pollInterval(1, TimeUnit.SECONDS)
           .until(() -> !catalogConnectorManager.getCatalogs().isEmpty());
+
+      return queryRunner;
     } catch (Exception e) {
       throw new RuntimeException("Create query runner failed", e);
     }
-    return queryRunner;
   }
 
   @Test
