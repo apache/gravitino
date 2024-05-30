@@ -6,8 +6,6 @@ package com.datastrato.gravitino.connector;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.Schema;
-import com.datastrato.gravitino.SchemaChange;
 import com.datastrato.gravitino.TestFileset;
 import com.datastrato.gravitino.TestSchema;
 import com.datastrato.gravitino.TestTable;

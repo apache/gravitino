@@ -154,14 +154,18 @@ public class CatalogKafkaIT extends AbstractIT {
     String catalogName1 = GravitinoITUtils.genRandomName("test_catalog");
     Catalog catalog1 =
         metalake.createCatalog(
-            catalogName1,
+            NameIdentifier.ofCatalog(metalake.name(), catalogName1),
             Catalog.Type.MESSAGING,
             PROVIDER,
             "comment",
             ImmutableMap.of(BOOTSTRAP_SERVERS, "2"));
     Exception exception =
         Assertions.assertThrows(
-            IllegalArgumentException.class, () -> catalog1.asSchemas().listSchemas());
+            IllegalArgumentException.class,
+            () ->
+                catalog1
+                    .asSchemas()
+                    .listSchemas(Namespace.ofSchema(metalake.name(), catalogName1)));
     Assertions.assertTrue(exception.getMessage().contains("Invalid url in bootstrap.servers: 2"));
 
     exception =
@@ -169,7 +173,8 @@ public class CatalogKafkaIT extends AbstractIT {
             IllegalArgumentException.class,
             () ->
                 metalake.createCatalog(
-                    GravitinoITUtils.genRandomName("test_catalog"),
+                    NameIdentifier.ofCatalog(
+                        metalake.name(), GravitinoITUtils.genRandomName("test_catalog")),
                     Catalog.Type.MESSAGING,
                     PROVIDER,
                     "comment",
@@ -183,7 +188,7 @@ public class CatalogKafkaIT extends AbstractIT {
     String catalogName2 = GravitinoITUtils.genRandomName("test_catalog");
     Catalog kafka =
         metalake.createCatalog(
-            catalogName2,
+            NameIdentifier.ofCatalog(metalake.name(), catalogName2),
             Catalog.Type.MESSAGING,
             PROVIDER,
             "comment",

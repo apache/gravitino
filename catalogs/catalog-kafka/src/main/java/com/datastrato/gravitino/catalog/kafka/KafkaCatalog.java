@@ -9,8 +9,6 @@ import com.datastrato.gravitino.connector.BaseCatalog;
 import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.connector.capability.Capability;
-import com.datastrato.gravitino.messaging.TopicCatalog;
-import com.datastrato.gravitino.rel.SupportsSchemas;
 import java.util.Map;
 
 /** Kafka catalog is a messaging catalog that can manage topics on the Kafka messaging system. */

@@ -9,7 +9,6 @@ import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.connector.capability.Capability;
 import com.datastrato.gravitino.rel.SupportsSchemas;
-import com.datastrato.gravitino.rel.TableCatalog;
 import java.util.Map;
 
 /** Implementation of an Iceberg catalog in Gravitino. */
@@ -40,6 +39,11 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
   protected CatalogOperations newOps(Map<String, String> config) {
     IcebergCatalogOperations ops = new IcebergCatalogOperations();
     return ops;
+  }
+
+  @Override
+  public SupportsSchemas asSchemas() {
+    return (SupportsSchemas) ops();
   }
 
   @Override

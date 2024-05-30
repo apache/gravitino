@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino;
 
-import static com.datastrato.gravitino.TestCatalogOperations.FAIL_CREATE;
+import static com.datastrato.gravitino.connector.TestCatalogOperations.FAIL_CREATE;
 
 import com.datastrato.gravitino.connector.BaseCatalog;
 import com.datastrato.gravitino.connector.BasePropertiesMetadata;
