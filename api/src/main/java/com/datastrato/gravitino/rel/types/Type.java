@@ -79,7 +79,10 @@ public interface Type {
     NULL,
 
     /** The unparsed type. An unparsed type represents an unresolvable type. */
-    UNPARSED
+    UNPARSED,
+
+    /** The external type. An external type represents a type that is not supported by Gravitino. */
+    EXTERNAL
   }
 
   /** The base type of all primitive types. */

@@ -168,10 +168,6 @@ public class HadoopUserImpersonationIT extends AbstractIT {
 
   @AfterAll
   public static void stop() {
-    if (client != null) {
-      client.dropMetalake(metalakeName);
-    }
-
     try {
       closer.close();
     } catch (Exception e) {

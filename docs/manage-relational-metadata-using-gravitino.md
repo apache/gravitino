@@ -724,18 +724,21 @@ The following types that Gravitino supports:
 
 The related java doc is [here](pathname:///docs/0.5.0/api/java/com/datastrato/gravitino/rel/types/Type.html).
 
-##### Unparsed type
+##### External type
 
-Unparsed type is a special type of column type, currently serves exclusively for presenting the data type of a column when it's unsolvable.
-The following shows the data structure of an unparsed type in JSON and Java, enabling easy retrieval of its value.
+External type is a special type of column type, when you need to use a data type that is not in the Gravitino type
+system, and you explicitly know its string representation in an external catalog (usually used in JDBC catalogs), then
+you can use the ExternalType to represent the type. Similarly, if the original type is unsolvable, it will be
+represented by ExternalType.
+The following shows the data structure of an external type in JSON and Java, enabling easy retrieval of its string value.
 
 <Tabs>
   <TabItem value="Json" label="Json">
 
 ```json
 {
-  "type": "unparsed",
-  "unparsedType": "user-defined"
+  "type": "external",
+  "catalogString": "user-defined"
 }
 ```
 
@@ -744,6 +747,34 @@ The following shows the data structure of an unparsed type in JSON and Java, ena
 
 ```java
 // The result of the following type is a string "user-defined"
+String typeString = ((ExternalType) type).catalogString();
+```
+
+  </TabItem>
+</Tabs>
+
+##### Unparsed type
+
+Unparsed type is a special type of column type, it used to address compatibility issues in type serialization and
+deserialization between the server and client. For instance, if a new column type is introduced on the Gravitino server
+that the client does not recognize, it will be treated as an unparsed type on the client side.
+The following shows the data structure of an unparsed type in JSON and Java, enabling easy retrieval of its value.
+
+<Tabs>
+  <TabItem value="Json" label="Json">
+
+```json
+{
+  "type": "unparsed",
+  "unparsedType": "unknown-type"
+}
+```
+
+  </TabItem>
+  <TabItem value="java" label="Java">
+
+```java
+// The result of the following type is a string "unknown-type"
 String unparsedValue = ((UnparsedType) type).unparsedType();
 ```
 
@@ -834,7 +865,7 @@ tableCatalog.loadTable(NameIdentifier.of("metalake", "hive_catalog", "schema", "
 </Tabs>
 
 :::note
-- When Gravitino loads a table from a catalog with various data types, if Gravitino is unable to parse the data type, it will use an **[Unparsed Type](#unparsed-type)** to preserve the original data type, ensuring that the table can be loaded successfully.
+- When Gravitino loads a table from a catalog with various data types, if Gravitino is unable to parse the data type, it will use an **[External Type](#external-type)** to preserve the original data type, ensuring that the table can be loaded successfully.
 - When Gravitino loads a table from a catalog that supports default value, if Gravitino is unable to parse the default value, it will use an **[Unparsed Expression](./expression.md#unparsed-expression)** to preserve the original default value, ensuring that the table can be loaded successfully.
 :::
 
