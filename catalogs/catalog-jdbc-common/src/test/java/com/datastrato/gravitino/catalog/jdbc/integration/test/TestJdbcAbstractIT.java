@@ -82,12 +82,15 @@ public abstract class TestJdbcAbstractIT {
 
   protected static void testDropDatabase(String databaseName) {
     List<String> databases;
-    DATABASE_OPERATIONS.delete(databaseName, true);
+    Assertions.assertTrue(
+        DATABASE_OPERATIONS.delete(databaseName, true), "database should be dropped");
 
     Assertions.assertThrows(
         NoSuchSchemaException.class, () -> DATABASE_OPERATIONS.load(databaseName));
     databases = DATABASE_OPERATIONS.listDatabases();
     Assertions.assertFalse(databases.contains(databaseName));
+    Assertions.assertFalse(
+        DATABASE_OPERATIONS.delete(databaseName, true), "database should be non-existent");
   }
 
   protected static void assertionsTableInfo(

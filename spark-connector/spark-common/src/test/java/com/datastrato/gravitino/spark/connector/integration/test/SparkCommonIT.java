@@ -140,9 +140,14 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   @AfterAll
   void cleanUp() {
-    sql("USE " + getCatalogName());
-    getDatabases()
-        .forEach(database -> sql(String.format("DROP DATABASE IF EXISTS %s CASCADE", database)));
+    getDatabases().stream()
+        .filter(database -> !database.equals("default"))
+        .forEach(
+            database -> {
+              sql("USE " + database);
+              listTableNames().forEach(table -> dropTableIfExists(table));
+              dropDatabaseIfExists(database);
+            });
   }
 
   @Test

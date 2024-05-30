@@ -8,7 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.SupportsSchemas;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
@@ -109,6 +108,7 @@ public class CatalogDorisIT extends AbstractIT {
   @AfterAll
   public void stop() {
     clearTableAndSchema();
+    metalake.dropCatalog(catalogName);
     AbstractIT.client.dropMetalake(metalakeName);
   }
 
@@ -119,11 +119,6 @@ public class CatalogDorisIT extends AbstractIT {
   }
 
   private void clearTableAndSchema() {
-    NameIdentifier[] nameIdentifiers =
-        catalog.asTableCatalog().listTables(Namespace.of(metalakeName, catalogName, schemaName));
-    for (NameIdentifier nameIdentifier : nameIdentifiers) {
-      catalog.asTableCatalog().dropTable(nameIdentifier);
-    }
     catalog.asSchemas().dropSchema(schemaName, true);
   }
 
@@ -262,7 +257,10 @@ public class CatalogDorisIT extends AbstractIT {
             null);
 
     // Try to drop a database, and cascade equals to false, it should not be allowed.
-    Assertions.assertFalse(catalog.asSchemas().dropSchema(schemaName, false));
+    Throwable excep =
+        Assertions.assertThrows(
+            RuntimeException.class, () -> catalog.asSchemas().dropSchema(schemaName, false));
+    Assertions.assertTrue(excep.getMessage().contains("the value of cascade should be true."));
 
     // Check the database still exists
     catalog.asSchemas().loadSchema(schemaName);

@@ -10,7 +10,6 @@ import static com.datastrato.gravitino.catalog.mysql.MysqlTablePropertiesMetadat
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
 import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
-import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
@@ -171,9 +170,10 @@ public class MysqlTableOperationsIT extends TestMysqlAbstractIT {
         TEST_DB_NAME.toString(),
         newName,
         TableChange.deleteColumn(new String[] {newColumn.name()}, true));
-    Assertions.assertDoesNotThrow(() -> TABLE_OPERATIONS.drop(TEST_DB_NAME.toString(), newName));
-    Assertions.assertThrows(
-        NoSuchTableException.class, () -> TABLE_OPERATIONS.drop(TEST_DB_NAME.toString(), newName));
+    Assertions.assertTrue(
+        TABLE_OPERATIONS.drop(TEST_DB_NAME.toString(), newName), "table should be dropped");
+    Assertions.assertFalse(
+        TABLE_OPERATIONS.drop(TEST_DB_NAME.toString(), newName), "table should be non-existent");
   }
 
   @Test

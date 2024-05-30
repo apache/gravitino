@@ -246,8 +246,7 @@ public class PostgreSqlTableOperationsIT extends TestPostgreSqlAbstractIT {
                 newName,
                 TableChange.deleteColumn(new String[] {newColumn.name()}, true)));
     Assertions.assertDoesNotThrow(() -> TABLE_OPERATIONS.drop(TEST_DB_NAME, newName));
-    Assertions.assertThrows(
-        NoSuchTableException.class, () -> TABLE_OPERATIONS.drop(TEST_DB_NAME, newName));
+    Assertions.assertFalse(TABLE_OPERATIONS.drop(TEST_DB_NAME, newName));
   }
 
   @Test

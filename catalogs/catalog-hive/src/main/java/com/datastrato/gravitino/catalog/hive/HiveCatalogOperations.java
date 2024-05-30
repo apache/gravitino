@@ -455,7 +455,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    *
    * @param ident The identifier of the schema to drop.
    * @param cascade If set to true, drops all the tables in the schema as well.
-   * @return true if the schema was dropped successfully, false otherwise.
+   * @return true if the schema was dropped successfully, false if the schema does not exist.
    * @throws NonEmptySchemaException If the schema is not empty and 'cascade' is set to false.
    */
   @Override
@@ -987,10 +987,14 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public boolean dropTable(NameIdentifier tableIdent) {
-    if (isExternalTable(tableIdent)) {
-      return dropHiveTable(tableIdent, false, false);
-    } else {
-      return dropHiveTable(tableIdent, true, false);
+    try {
+      if (isExternalTable(tableIdent)) {
+        return dropHiveTable(tableIdent, false, false);
+      } else {
+        return dropHiveTable(tableIdent, true, false);
+      }
+    } catch (NoSuchTableException e) {
+      return false;
     }
   }
 

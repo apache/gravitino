@@ -284,7 +284,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
    *
    * @param ident The identifier of the schema to drop.
    * @param cascade If set to true, drops all the tables in the schema as well.
-   * @return true if the schema was dropped successfully, false otherwise.
+   * @return true if the schema was dropped successfully, false if the schema does not exist.
    * @throws NonEmptySchemaException If the schema is not empty and 'cascade' is set to false.
    */
   @Override

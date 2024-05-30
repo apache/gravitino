@@ -6,7 +6,6 @@ package com.datastrato.gravitino.catalog.doris.integration.test;
 
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
-import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
@@ -107,13 +106,13 @@ public class DorisTableOperationsIT extends TestDorisAbstractIT {
     Assertions.assertDoesNotThrow(() -> TABLE_OPERATIONS.rename(databaseName, tableName, newName));
     Assertions.assertDoesNotThrow(() -> TABLE_OPERATIONS.load(databaseName, newName));
 
-    Assertions.assertDoesNotThrow(() -> TABLE_OPERATIONS.drop(databaseName, newName));
+    Assertions.assertTrue(TABLE_OPERATIONS.drop(databaseName, newName), "table should be dropped");
 
     listTables = TABLE_OPERATIONS.listTables(databaseName);
     Assertions.assertFalse(listTables.contains(newName));
 
-    Assertions.assertThrows(
-        NoSuchTableException.class, () -> TABLE_OPERATIONS.drop(databaseName, newName));
+    Assertions.assertFalse(
+        TABLE_OPERATIONS.drop(databaseName, newName), "table should be non-existent");
   }
 
   @Test
