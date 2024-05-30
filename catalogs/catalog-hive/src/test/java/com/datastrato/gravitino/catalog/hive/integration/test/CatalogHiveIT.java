@@ -1651,11 +1651,9 @@ public class CatalogHiveIT extends AbstractIT {
     properties.put(METASTORE_URIS, HIVE_METASTORE_URIS);
     properties.put(BaseCatalog.CATALOG_OPERATION_IMPL, customImpl);
 
-    metalake.createCatalog(
-        NameIdentifier.of(metalakeName, catalogName),
-        Catalog.Type.RELATIONAL,
-        provider,
-        "comment",
-        properties);
+    Catalog catalog =
+        metalake.createCatalog(
+            catalogName, Catalog.Type.RELATIONAL, provider, "comment", properties);
+    catalog.asSchemas().listSchemas();
   }
 }

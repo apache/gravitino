@@ -6,6 +6,7 @@ package com.datastrato.gravitino.catalog.hive;
 
 import com.datastrato.gravitino.connector.BaseCatalog;
 import com.datastrato.gravitino.connector.CatalogOperations;
+import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.connector.ProxyPlugin;
 import com.datastrato.gravitino.connector.capability.Capability;
 import com.datastrato.gravitino.rel.SupportsSchemas;
@@ -15,6 +16,15 @@ import java.util.Optional;
 
 /** Implementation of a Hive catalog in Gravitino. */
 public class HiveCatalog extends BaseCatalog<HiveCatalog> {
+
+  static final HiveCatalogPropertiesMeta CATALOG_PROPERTIES_METADATA =
+      new HiveCatalogPropertiesMeta();
+
+  static final HiveSchemaPropertiesMetadata SCHEMA_PROPERTIES_METADATA =
+      new HiveSchemaPropertiesMetadata();
+
+  static final HiveTablePropertiesMetadata TABLE_PROPERTIES_METADATA =
+      new HiveTablePropertiesMetadata();
 
   /**
    * Returns the short name of the Hive catalog.
@@ -73,5 +83,20 @@ public class HiveCatalog extends BaseCatalog<HiveCatalog> {
       return Optional.empty();
     }
     return Optional.of(new HiveProxyPlugin());
+  }
+
+  @Override
+  public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
+    return CATALOG_PROPERTIES_METADATA;
+  }
+
+  @Override
+  public PropertiesMetadata schemaPropertiesMetadata() throws UnsupportedOperationException {
+    return SCHEMA_PROPERTIES_METADATA;
+  }
+
+  @Override
+  public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
+    return TABLE_PROPERTIES_METADATA;
   }
 }

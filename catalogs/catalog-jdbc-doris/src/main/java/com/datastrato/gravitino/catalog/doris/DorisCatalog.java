@@ -35,7 +35,6 @@ public class DorisCatalog extends JdbcCatalog {
         jdbcTypeConverter,
         createJdbcDatabaseOperations(),
         createJdbcTableOperations(),
-        createJdbcTablePropertiesMetadata(),
         createJdbcColumnDefaultValueConverter());
   }
 

@@ -20,7 +20,8 @@ import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.connector.CatalogInfo;
 import com.datastrato.gravitino.connector.CatalogOperations;
-import com.datastrato.gravitino.connector.PropertiesMetadata;
+import com.datastrato.gravitino.connector.HasPropertyMetadata;
+import com.datastrato.gravitino.connector.SupportsSchemas;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
@@ -80,12 +81,6 @@ import org.slf4j.LoggerFactory;
 public class KafkaCatalogOperations implements CatalogOperations, SupportsSchemas, TopicCatalog {
 
   private static final Logger LOG = LoggerFactory.getLogger(KafkaCatalogOperations.class);
-  private static final KafkaCatalogPropertiesMetadata CATALOG_PROPERTIES_METADATA =
-      new KafkaCatalogPropertiesMetadata();
-  private static final KafkaSchemaPropertiesMetadata SCHEMA_PROPERTIES_METADATA =
-      new KafkaSchemaPropertiesMetadata();
-  private static final KafkaTopicPropertiesMetadata TOPIC_PROPERTIES_METADATA =
-      new KafkaTopicPropertiesMetadata();
   private static final String DEFAULT_SCHEMA_NAME = "default";
   @VisibleForTesting static final String CLIENT_ID_TEMPLATE = "%s-%s.%s";
 
@@ -95,6 +90,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   @VisibleForTesting Properties adminClientConfig;
   private CatalogInfo info;
   private AdminClient adminClient;
+  private HasPropertyMetadata propertiesMetadata;
 
   @VisibleForTesting
   KafkaCatalogOperations(EntityStore store, IdGenerator idGenerator) {
@@ -107,7 +103,10 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   }
 
   @Override
-  public void initialize(Map<String, String> config, CatalogInfo info) throws RuntimeException {
+  public void initialize(
+      Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
+      throws RuntimeException {
+    this.propertiesMetadata = propertiesMetadata;
     Preconditions.checkArgument(
         config.containsKey(BOOTSTRAP_SERVERS), "Missing configuration: %s", BOOTSTRAP_SERVERS);
     Preconditions.checkArgument(config.containsKey(ID_KEY), "Missing configuration: %s", ID_KEY);
@@ -405,36 +404,11 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   }
 
   @Override
-  public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
-    return CATALOG_PROPERTIES_METADATA;
-  }
-
-  @Override
-  public PropertiesMetadata schemaPropertiesMetadata() throws UnsupportedOperationException {
-    return SCHEMA_PROPERTIES_METADATA;
-  }
-
-  @Override
-  public PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException {
-    return TOPIC_PROPERTIES_METADATA;
-  }
-
-  @Override
   public void close() throws IOException {
     if (adminClient != null) {
       adminClient.close();
       adminClient = null;
     }
-  }
-
-  @Override
-  public PropertiesMetadata filesetPropertiesMetadata() throws UnsupportedOperationException {
-    throw new UnsupportedOperationException("Kafka catalog does not support fileset operations");
-  }
-
-  @Override
-  public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
-    throw new UnsupportedOperationException("Kafka catalog does not support table operations");
   }
 
   /**
@@ -536,10 +510,16 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   private NewTopic buildNewTopic(NameIdentifier ident, Map<String, String> properties) {
     Optional<Integer> partitionCount =
         Optional.ofNullable(
-            (Integer) TOPIC_PROPERTIES_METADATA.getOrDefault(properties, PARTITION_COUNT));
+            (Integer)
+                propertiesMetadata
+                    .topicPropertiesMetadata()
+                    .getOrDefault(properties, PARTITION_COUNT));
     Optional<Short> replicationFactor =
         Optional.ofNullable(
-            (Short) TOPIC_PROPERTIES_METADATA.getOrDefault(properties, REPLICATION_FACTOR));
+            (Short)
+                propertiesMetadata
+                    .topicPropertiesMetadata()
+                    .getOrDefault(properties, REPLICATION_FACTOR));
     NewTopic newTopic = new NewTopic(ident.name(), partitionCount, replicationFactor);
     return newTopic.configs(buildNewTopicConfigs(properties));
   }
