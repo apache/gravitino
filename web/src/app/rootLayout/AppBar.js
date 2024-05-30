@@ -7,7 +7,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { Alata } from 'next/font/google'
+import { Roboto } from 'next/font/google'
 
 import { useState, useEffect } from 'react'
 
@@ -32,7 +32,7 @@ import { useRouter } from 'next/navigation'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
 import { fetchMetalakes } from '@/lib/store/metalakes'
 
-const fonts = Alata({ subsets: ['latin'], weight: ['400'], display: 'swap' })
+const fonts = Roboto({ subsets: ['latin'], weight: ['400'], display: 'swap' })
 
 const AppBar = () => {
   const searchParams = useSearchParams()
