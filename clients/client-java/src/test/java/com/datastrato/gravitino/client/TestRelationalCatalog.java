@@ -1099,7 +1099,8 @@ public class TestRelationalCatalog extends TestBase {
     ErrorResponse errorResp = ErrorResponse.internalError("internal error");
     buildMockResource(Method.DELETE, tablePath, null, errorResp, SC_INTERNAL_SERVER_ERROR);
 
-    Assertions.assertFalse(catalog.asTableCatalog().purgeTable(tableId));
+    Assertions.assertThrowsExactly(
+        RuntimeException.class, () -> catalog.asTableCatalog().purgeTable(tableId));
   }
 
   @Test

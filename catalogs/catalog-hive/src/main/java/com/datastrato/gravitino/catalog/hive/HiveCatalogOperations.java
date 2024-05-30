@@ -1015,10 +1015,14 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public boolean purgeTable(NameIdentifier tableIdent) throws UnsupportedOperationException {
-    if (isExternalTable(tableIdent)) {
-      throw new UnsupportedOperationException("Can't purge a external hive table");
-    } else {
-      return dropHiveTable(tableIdent, true, true);
+    try {
+      if (isExternalTable(tableIdent)) {
+        throw new UnsupportedOperationException("Can't purge a external hive table");
+      } else {
+        return dropHiveTable(tableIdent, true, true);
+      }
+    } catch (NoSuchTableException e) {
+      return false;
     }
   }
 

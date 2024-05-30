@@ -89,7 +89,9 @@ public class TableNormalizeDispatcher implements TableDispatcher {
 
   @Override
   public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
-    return dispatcher.purgeTable(normalizeNameIdentifier(ident));
+    // The constraints of the name spec may be more strict than underlying catalog,
+    // and for compatibility reasons, we only apply case-sensitive capabilities here.
+    return dispatcher.purgeTable(applyCaseSensitive(ident, Capability.Scope.TABLE, dispatcher));
   }
 
   @Override
