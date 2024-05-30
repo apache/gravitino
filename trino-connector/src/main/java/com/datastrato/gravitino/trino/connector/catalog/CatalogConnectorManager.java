@@ -57,8 +57,9 @@ import org.slf4j.LoggerFactory;
 public class CatalogConnectorManager {
   private static final Logger LOG = LoggerFactory.getLogger(CatalogConnectorManager.class);
 
-  private static final int CATALOG_LOAD_FREQUENCY_SECOND = 3;
+  private static final int CATALOG_LOAD_FREQUENCY_SECOND = 10;
   private static final int NUMBER_EXECUTOR_THREAD = 1;
+  private static final int LOAD_METALAKE_TIMEOUT = 30;
 
   private final ScheduledExecutorService executorService;
   private final CatalogRegister catalogRegister;
@@ -160,7 +161,11 @@ public class CatalogConnectorManager {
     // Delete those catalogs that have been deleted in Gravitino server
     Set<String> catalogNameStrings =
         Arrays.stream(catalogNames)
-            .map(config.simplifyCatalogNames() ? NameIdentifier::name : NameIdentifier::toString)
+            .map(
+                id ->
+                    config.simplifyCatalogNames()
+                        ? id.name()
+                        : getTrinoCatalogName(metalake.name(), id.name()))
             .collect(Collectors.toSet());
 
     for (Map.Entry<String, CatalogConnectorContext> entry : catalogConnectors.entrySet()) {
@@ -252,7 +257,7 @@ public class CatalogConnectorManager {
   }
 
   public String getTrinoCatalogName(String metalake, String catalog) {
-    return config.simplifyCatalogNames() ? catalog : metalake + "." + catalog;
+    return config.simplifyCatalogNames() ? catalog : String.format("\"%s.%s\"", metalake, catalog);
   }
 
   public String getTrinoCatalogName(GravitinoCatalog catalog) {
@@ -283,7 +288,7 @@ public class CatalogConnectorManager {
       LOG.info("Create catalog {} in metalake {} successfully.", catalogName, metalake);
 
       Future<?> future = executorService.submit(this::loadMetalake);
-      future.get(CATALOG_LOAD_FREQUENCY_SECOND, TimeUnit.SECONDS);
+      future.get(LOAD_METALAKE_TIMEOUT, TimeUnit.SECONDS);
 
       if (!catalogConnectors.containsKey(getTrinoCatalogName(metalakeName, catalogName))) {
         throw new TrinoException(
@@ -304,26 +309,25 @@ public class CatalogConnectorManager {
 
   public void dropCatalog(String metalakeName, String catalogName, boolean ignoreNotExist) {
     try {
-      GravitinoMetalake metalake =
-          gravitinoClient.loadMetalake(NameIdentifier.ofMetalake(metalakeName));
-
+      GravitinoMetalake metalake = gravitinoClient.loadMetalake(NameIdentifier.parse(metalakeName));
       if (!metalake.catalogExists(NameIdentifier.ofCatalog(metalakeName, catalogName))) {
         if (ignoreNotExist) {
           return;
         }
 
         throw new TrinoException(
-            GRAVITINO_CATALOG_NOT_EXISTS, "Catalog " + catalogName + " not exists.");
+            GRAVITINO_CATALOG_NOT_EXISTS,
+            "Catalog " + NameIdentifier.ofCatalog(metalakeName, catalogName) + " not exists.");
       }
       boolean dropped = metalake.dropCatalog(NameIdentifier.ofCatalog(metalakeName, catalogName));
       if (!dropped) {
         throw new TrinoException(
-            GRAVITINO_UNSUPPORTED_OPERATION, "Drop catalog " + catalogName + " does not support.");
+            GRAVITINO_UNSUPPORTED_OPERATION, "Failed to drop no empty catalog " + catalogName);
       }
       LOG.info("Drop catalog {} in metalake {} successfully.", catalogName, metalake);
 
       Future<?> future = executorService.submit(this::loadMetalake);
-      future.get(CATALOG_LOAD_FREQUENCY_SECOND, TimeUnit.SECONDS);
+      future.get(LOAD_METALAKE_TIMEOUT, TimeUnit.SECONDS);
 
       if (catalogConnectors.containsKey(getTrinoCatalogName(metalakeName, catalogName))) {
         throw new TrinoException(
@@ -382,7 +386,7 @@ public class CatalogConnectorManager {
       metalake.alterCatalog(catalog, changes.toArray(changes.toArray(new CatalogChange[0])));
 
       Future<?> future = executorService.submit(this::loadMetalake);
-      future.get(CATALOG_LOAD_FREQUENCY_SECOND, TimeUnit.SECONDS);
+      future.get(LOAD_METALAKE_TIMEOUT, TimeUnit.SECONDS);
 
       catalogConnectorContext =
           catalogConnectors.get(getTrinoCatalogName(metalakeName, catalogName));
