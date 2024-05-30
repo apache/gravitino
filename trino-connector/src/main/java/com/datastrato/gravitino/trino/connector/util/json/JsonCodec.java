@@ -39,14 +39,14 @@ public class JsonCodec {
     try {
       ClassLoader appClassLoader =
           GravitinoConnectorPluginManager.instance(classLoader).getAppClassloader();
-      TypeManager typeManager = createTypeManger(appClassLoader);
-      return createMapper(typeManager, appClassLoader);
+      TypeManager typeManager = createTypeManager(appClassLoader);
+      return createMapper(typeManager);
     } catch (Exception e) {
       throw new TrinoException(GRAVITINO_RUNTIME_ERROR, "Failed to build ObjectMapper", e);
     }
   }
 
-  static TypeManager createTypeManger(ClassLoader classLoader) {
+  static TypeManager createTypeManager(ClassLoader classLoader) {
     try {
       Class internalTypeManagerClass = classLoader.loadClass("io.trino.type.InternalTypeManager");
       Class typeRegistryClass = classLoader.loadClass("io.trino.metadata.TypeRegistry");
@@ -62,7 +62,7 @@ public class JsonCodec {
       return (TypeManager)
           internalTypeManagerClass.getConstructor(typeRegistryClass).newInstance(typeRegistry);
     } catch (Exception e) {
-      throw new RuntimeException("Failed to create TypeManger :" + e.getMessage(), e);
+      throw new RuntimeException("Failed to create TypeManager :" + e.getMessage(), e);
     }
   }
 
@@ -78,8 +78,7 @@ public class JsonCodec {
             .newInstance(blockEncodingManagerClass.getConstructor().newInstance(), typeManager);
   }
 
-  static void registerHandleSerializationModule(
-      ObjectMapper objectMapper, ClassLoader classLoader) {
+  static void registerHandleSerializationModule(ObjectMapper objectMapper) {
 
     GravitinoConnectorPluginManager pluginManager = GravitinoConnectorPluginManager.instance();
     Function<Object, String> nameResolver =
@@ -134,7 +133,7 @@ public class JsonCodec {
   }
 
   @SuppressWarnings("deprecation")
-  private static ObjectMapper createMapper(TypeManager typeManger, ClassLoader classLoader) {
+  private static ObjectMapper createMapper(TypeManager typeManager) {
     try {
       ObjectMapper objectMapper = new ObjectMapper();
 
@@ -162,22 +161,22 @@ public class JsonCodec {
       objectMapper.registerModule(new RecordAutoDetectModule());
 
       // Handle serialization for plugin classes
-      registerHandleSerializationModule(objectMapper, classLoader);
+      registerHandleSerializationModule(objectMapper);
 
       // Type serialization for plugin classes
-      module.addDeserializer(Type.class, new TypeDeserializer(typeManger));
+      module.addDeserializer(Type.class, new TypeDeserializer(typeManager));
       module.addDeserializer(
           TypeSignature.class,
-          new TypeSignatureDeserializer(typeManger.getClass().getClassLoader()));
+          new TypeSignatureDeserializer(typeManager.getClass().getClassLoader()));
 
       // Block serialization for plugin classes
-      BlockEncodingSerde blockEncodingSerde = createBlockEncodingSerde(typeManger);
+      BlockEncodingSerde blockEncodingSerde = createBlockEncodingSerde(typeManager);
       module.addSerializer(Block.class, new BlockJsonSerde.Serializer(blockEncodingSerde));
       module.addDeserializer(Block.class, new BlockJsonSerde.Deserializer(blockEncodingSerde));
 
       objectMapper.registerModule(module);
       return objectMapper;
-    } catch (Exception e) {;
+    } catch (Exception e) {
       throw new RuntimeException("Failed to create JsonMapper:" + e.getMessage(), e);
     }
   }

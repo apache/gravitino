@@ -19,7 +19,6 @@ dependencies {
   implementation(libs.bundles.log4j)
   implementation(libs.commons.collections4)
   implementation(libs.commons.lang3)
-  implementation(libs.httpclient5)
   implementation(libs.trino.jdbc)
   compileOnly(libs.trino.spi) {
     exclude("org.apache.logging.log4j")
