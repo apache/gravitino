@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.TestIcebergCatalog.ICEBERG_PROPERTIES_METADATA;
+
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.Schema;
@@ -153,11 +155,10 @@ public class TestIcebergSchema {
     Map<String, String> conf = Maps.newHashMap();
 
     try (IcebergCatalogOperations ops = new IcebergCatalogOperations()) {
-      IcebergCatalog icebergCatalog = new IcebergCatalog();
-      ops.initialize(conf, entity.toCatalogInfo(), icebergCatalog);
+      ops.initialize(conf, entity.toCatalogInfo(), ICEBERG_PROPERTIES_METADATA);
       Map<String, String> map = Maps.newHashMap();
       map.put(IcebergSchemaPropertiesMetadata.COMMENT, "test");
-      PropertiesMetadata metadata = icebergCatalog.schemaPropertiesMetadata();
+      PropertiesMetadata metadata = ICEBERG_PROPERTIES_METADATA.schemaPropertiesMetadata();
 
       IllegalArgumentException illegalArgumentException =
           Assertions.assertThrows(

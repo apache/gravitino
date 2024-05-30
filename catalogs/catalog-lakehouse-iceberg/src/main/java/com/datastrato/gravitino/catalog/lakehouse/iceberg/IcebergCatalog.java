@@ -13,13 +13,13 @@ import java.util.Map;
 /** Implementation of an Iceberg catalog in Gravitino. */
 public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
 
-  private static final IcebergCatalogPropertiesMetadata CATALOG_PROPERTIES_META =
+  static final IcebergCatalogPropertiesMetadata CATALOG_PROPERTIES_META =
       new IcebergCatalogPropertiesMetadata();
 
-  private static final IcebergSchemaPropertiesMetadata SCHEMA_PROPERTIES_META =
+  static final IcebergSchemaPropertiesMetadata SCHEMA_PROPERTIES_META =
       new IcebergSchemaPropertiesMetadata();
 
-  private static final IcebergTablePropertiesMetadata TABLE_PROPERTIES_META =
+  static final IcebergTablePropertiesMetadata TABLE_PROPERTIES_META =
       new IcebergTablePropertiesMetadata();
 
   /** @return The short name of the catalog. */

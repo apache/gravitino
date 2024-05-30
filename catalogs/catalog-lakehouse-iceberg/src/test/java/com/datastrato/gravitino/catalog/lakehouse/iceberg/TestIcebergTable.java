@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.TestIcebergCatalog.ICEBERG_PROPERTIES_METADATA;
 import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.bucket;
 import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.day;
 import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.identity;
@@ -481,8 +482,7 @@ public class TestIcebergTable {
   public void testTableProperty() {
     CatalogEntity entity = createDefaultCatalogEntity();
     try (IcebergCatalogOperations ops = new IcebergCatalogOperations()) {
-      IcebergCatalog icebergCatalog = new IcebergCatalog();
-      ops.initialize(Maps.newHashMap(), entity.toCatalogInfo(), icebergCatalog);
+      ops.initialize(Maps.newHashMap(), entity.toCatalogInfo(), ICEBERG_PROPERTIES_METADATA);
       Map<String, String> map = Maps.newHashMap();
       map.put(IcebergTablePropertiesMetadata.COMMENT, "test");
       map.put(IcebergTablePropertiesMetadata.CREATOR, "test");

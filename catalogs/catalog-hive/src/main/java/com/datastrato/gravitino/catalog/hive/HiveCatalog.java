@@ -15,13 +15,13 @@ import java.util.Optional;
 /** Implementation of a Hive catalog in Gravitino. */
 public class HiveCatalog extends BaseCatalog<HiveCatalog> {
 
-  private static final HiveCatalogPropertiesMeta CATALOG_PROPERTIES_META =
+  static final HiveCatalogPropertiesMeta CATALOG_PROPERTIES_METADATA =
       new HiveCatalogPropertiesMeta();
 
-  private static final HiveSchemaPropertiesMetadata SCHEMA_PROPERTIES_META =
+  static final HiveSchemaPropertiesMetadata SCHEMA_PROPERTIES_METADATA =
       new HiveSchemaPropertiesMetadata();
 
-  private static final HiveTablePropertiesMetadata TABLE_PROPERTIES_META =
+  static final HiveTablePropertiesMetadata TABLE_PROPERTIES_METADATA =
       new HiveTablePropertiesMetadata();
 
   /**
@@ -65,16 +65,16 @@ public class HiveCatalog extends BaseCatalog<HiveCatalog> {
 
   @Override
   public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
-    return CATALOG_PROPERTIES_META;
+    return CATALOG_PROPERTIES_METADATA;
   }
 
   @Override
   public PropertiesMetadata schemaPropertiesMetadata() throws UnsupportedOperationException {
-    return SCHEMA_PROPERTIES_META;
+    return SCHEMA_PROPERTIES_METADATA;
   }
 
   @Override
   public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
-    return TABLE_PROPERTIES_META;
+    return TABLE_PROPERTIES_METADATA;
   }
 }

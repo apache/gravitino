@@ -14,11 +14,11 @@ import java.util.Map;
 /** Kafka catalog is a messaging catalog that can manage topics on the Kafka messaging system. */
 public class KafkaCatalog extends BaseCatalog<KafkaCatalog> {
 
-  private static final KafkaCatalogPropertiesMetadata CATALOG_PROPERTIES_METADATA =
+  static final KafkaCatalogPropertiesMetadata CATALOG_PROPERTIES_METADATA =
       new KafkaCatalogPropertiesMetadata();
-  private static final KafkaSchemaPropertiesMetadata SCHEMA_PROPERTIES_METADATA =
+  static final KafkaSchemaPropertiesMetadata SCHEMA_PROPERTIES_METADATA =
       new KafkaSchemaPropertiesMetadata();
-  private static final KafkaTopicPropertiesMetadata TOPIC_PROPERTIES_METADATA =
+  static final KafkaTopicPropertiesMetadata TOPIC_PROPERTIES_METADATA =
       new KafkaTopicPropertiesMetadata();
 
   @Override

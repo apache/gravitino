@@ -20,13 +20,13 @@ import java.util.Optional;
  */
 public class HadoopCatalog extends BaseCatalog<HadoopCatalog> {
 
-  private static final HadoopCatalogPropertiesMetadata CATALOG_PROPERTIES_META =
+  static final HadoopCatalogPropertiesMetadata CATALOG_PROPERTIES_META =
       new HadoopCatalogPropertiesMetadata();
 
-  private static final HadoopSchemaPropertiesMetadata SCHEMA_PROPERTIES_META =
+  static final HadoopSchemaPropertiesMetadata SCHEMA_PROPERTIES_META =
       new HadoopSchemaPropertiesMetadata();
 
-  private static final HadoopFilesetPropertiesMetadata FILESET_PROPERTIES_META =
+  static final HadoopFilesetPropertiesMetadata FILESET_PROPERTIES_META =
       new HadoopFilesetPropertiesMetadata();
 
   @Override
