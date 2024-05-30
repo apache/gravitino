@@ -33,7 +33,6 @@ public class PostgreSqlCatalog extends JdbcCatalog {
         jdbcTypeConverter,
         createJdbcDatabaseOperations(),
         createJdbcTableOperations(),
-        createJdbcTablePropertiesMetadata(),
         createJdbcColumnDefaultValueConverter());
   }
 

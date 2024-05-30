@@ -31,6 +31,7 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.catalog.hive.HiveCatalogOperations;
 import com.datastrato.gravitino.catalog.hive.HiveClientPool;
@@ -1651,11 +1652,13 @@ public class CatalogHiveIT extends AbstractIT {
     properties.put(METASTORE_URIS, HIVE_METASTORE_URIS);
     properties.put(BaseCatalog.CATALOG_OPERATION_IMPL, customImpl);
 
-    metalake.createCatalog(
-        NameIdentifier.of(metalakeName, catalogName),
-        Catalog.Type.RELATIONAL,
-        provider,
-        "comment",
-        properties);
+    Catalog catalog =
+        metalake.createCatalog(
+            NameIdentifier.ofCatalog(metalakeName, catalogName),
+            Catalog.Type.RELATIONAL,
+            provider,
+            "comment",
+            properties);
+    catalog.asSchemas().listSchemas(Namespace.ofSchema(metalakeName, catalogName));
   }
 }
