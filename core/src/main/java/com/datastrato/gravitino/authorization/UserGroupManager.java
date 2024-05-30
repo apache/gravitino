@@ -28,10 +28,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * UserGroupManager is used for add, remove and get users or roles from one metalake.
- * UserGroupManager doesn't manage users or groups, just sets up the relationship between the
- * metalake and the user or group. Metalake is like a concept of the organization. `AddUser` or
- * `AddGroup` means that a role or user enters an organization.
+ * UserGroupManager is used for add, remove and get users or groups from one metalake. Metalake is
+ * like a concept of the organization. `AddUser` or `AddGroup` means that a user or group enters an
+ * organization.
  */
 class UserGroupManager {
 
