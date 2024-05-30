@@ -46,6 +46,13 @@ public class TableMetaService {
     return tablePO;
   }
 
+  public TablePO getTablePOById(Long tableId) {
+    TablePO tablePO =
+        SessionUtils.getWithoutCommit(
+            TableMetaMapper.class, mapper -> mapper.selectTableMetaById(tableId));
+    return tablePO;
+  }
+
   public Long getTableIdBySchemaIdAndName(Long schemaId, String tableName) {
     Long tableId =
         SessionUtils.getWithoutCommit(

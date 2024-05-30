@@ -81,6 +81,16 @@ public class MetalakeMetaService {
     return POConverters.fromMetalakePO(metalakePO);
   }
 
+  public MetalakePO getMetalakePOById(Long id) {
+    MetalakePO metalakePO =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaById(id));
+    if (metalakePO == null) {
+      throw new IllegalStateException("");
+    }
+    return metalakePO;
+  }
+
   public void insertMetalake(BaseMetalake baseMetalake, boolean overwrite) {
     try {
       NameIdentifier.checkMetalake(baseMetalake.nameIdentifier());

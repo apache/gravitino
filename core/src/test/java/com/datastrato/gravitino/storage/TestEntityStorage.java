@@ -492,6 +492,8 @@ public class TestEntityStorage {
 
       BaseMetalake metalake = createBaseMakeLake(1L, "metalake", auditInfo);
       store.put(metalake);
+      CatalogEntity catalog = createCatalog(1L, Namespace.of("metalake"), "catalog", auditInfo);
+      store.put(catalog);
       UserEntity oneUser = createUser(1L, "metalake", "oneUser", auditInfo);
       store.put(oneUser);
       UserEntity anotherUser = createUser(2L, "metalake", "anotherUser", auditInfo);
@@ -510,6 +512,8 @@ public class TestEntityStorage {
       Assertions.assertTrue(store.exists(anotherGroup.nameIdentifier(), Entity.EntityType.GROUP));
       Assertions.assertTrue(store.exists(oneRole.nameIdentifier(), Entity.EntityType.ROLE));
       Assertions.assertTrue(store.exists(anotherRole.nameIdentifier(), Entity.EntityType.ROLE));
+
+      store.delete(catalog.nameIdentifier(), Entity.EntityType.CATALOG);
       store.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE);
       Assertions.assertFalse(store.exists(oneUser.nameIdentifier(), Entity.EntityType.USER));
       Assertions.assertFalse(store.exists(anotherUser.nameIdentifier(), Entity.EntityType.USER));

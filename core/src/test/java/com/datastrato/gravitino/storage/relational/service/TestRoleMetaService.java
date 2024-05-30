@@ -260,13 +260,13 @@ class TestRoleMetaService extends TestJDBCBackend {
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role1",
-            auditInfo);
+            auditInfo, "catalog");
     RoleEntity role2 =
         createRoleEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role2",
-            auditInfo);
+            auditInfo, "catalog");
     GroupEntity group1 =
         createGroupEntity(
             RandomIdGenerator.INSTANCE.nextId(),
@@ -363,13 +363,13 @@ class TestRoleMetaService extends TestJDBCBackend {
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role1",
-            auditInfo);
+            auditInfo, "catalog");
     RoleEntity role2 =
         createRoleEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role2",
-            auditInfo);
+            auditInfo, "catalog");
     GroupEntity group1 =
         createGroupEntity(
             RandomIdGenerator.INSTANCE.nextId(),
@@ -466,13 +466,13 @@ class TestRoleMetaService extends TestJDBCBackend {
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role1",
-            auditInfo);
+            auditInfo, "catalog");
     RoleEntity role2 =
         createRoleEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role2",
-            auditInfo);
+            auditInfo, "catalog");
     roleMetaService.insertRole(role1, false);
     roleMetaService.insertRole(role2, false);
 

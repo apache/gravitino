@@ -44,12 +44,6 @@ public interface TableMetaMapper {
       @Param("schemaId") Long schemaId, @Param("tableName") String name);
 
   @Select(
-          "SELECT table_name FROM "
-                  + TABLE_NAME
-                  + " WHERE table_id = #{tableId} AND deleted_at = 0")
-  Long selectTableNameById(@Param("tableId") Long tableId);
-
-  @Select(
       "SELECT table_id as tableId, table_name as tableName,"
           + " metalake_id as metalakeId, catalog_id as catalogId,"
           + " schema_id as schemaId, audit_info as auditInfo,"
@@ -60,6 +54,17 @@ public interface TableMetaMapper {
           + " WHERE schema_id = #{schemaId} AND table_name = #{tableName} AND deleted_at = 0")
   TablePO selectTableMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("tableName") String name);
+
+  @Select(
+      "SELECT table_id as tableId, table_name as tableName,"
+          + " metalake_id as metalakeId, catalog_id as catalogId,"
+          + " schema_id as schemaId, audit_info as auditInfo,"
+          + " current_version as currentVersion, last_version as lastVersion,"
+          + " deleted_at as deletedAt"
+          + " FROM "
+          + TABLE_NAME
+          + " WHERE schema_id = #{schemaId} AND table_name = #{tableName} AND deleted_at = 0")
+  TablePO selectTableMetaById(@Param("tableId") Long tableId);
 
   @Insert(
       "INSERT INTO "

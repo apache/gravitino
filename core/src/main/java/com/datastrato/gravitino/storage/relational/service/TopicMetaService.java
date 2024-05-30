@@ -124,6 +124,13 @@ public class TopicMetaService {
     return topicPO;
   }
 
+  public TopicPO getTopicPOById(Long topicId) {
+    TopicPO topicPO =
+        SessionUtils.getWithoutCommit(
+            TopicMetaMapper.class, mapper -> mapper.selectTopicMetaById(topicId));
+    return topicPO;
+  }
+
   private void fillTopicPOBuilderParentEntityId(TopicPO.Builder builder, Namespace namespace) {
     Namespace.checkTopic(namespace);
     Long parentEntityId = null;
@@ -184,7 +191,7 @@ public class TopicMetaService {
         });
   }
 
-  private Long getTopicIdBySchemaIdAndName(Long schemaId, String topicName) {
+  public Long getTopicIdBySchemaIdAndName(Long schemaId, String topicName) {
     Long topicId =
         SessionUtils.getWithoutCommit(
             TopicMetaMapper.class,

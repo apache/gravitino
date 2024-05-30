@@ -4,15 +4,14 @@
  */
 package com.datastrato.gravitino.storage.relational.po;
 
-import com.datastrato.gravitino.MetadataObject;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
 public class SecurableObjectPO {
 
   private Long roleId;
-  private String fullName;
-  private MetadataObject.Type type;
+  private Long entityId;
+  private String type;
   private String privilegeNames;
   private String privilegeConditions;
   private Long currentVersion;
@@ -23,11 +22,11 @@ public class SecurableObjectPO {
     return roleId;
   }
 
-  public String getFullName() {
-    return fullName;
+  public Long getEntityId() {
+    return entityId;
   }
 
-  public MetadataObject.Type getType() {
+  public String getType() {
     return type;
   }
 
@@ -61,9 +60,9 @@ public class SecurableObjectPO {
     }
     SecurableObjectPO securableObjectPO = (SecurableObjectPO) o;
     return Objects.equal(getRoleId(), securableObjectPO.getRoleId())
-        && Objects.equal(getFullName(), securableObjectPO.getFullName())
+        && Objects.equal(getEntityId(), securableObjectPO.getEntityId())
         && Objects.equal(getType(), securableObjectPO.getType())
-        && Objects.equal(getPrivilegeConditions(), securableObjectPO.privilegeConditions)
+        && Objects.equal(getPrivilegeConditions(), securableObjectPO.getPrivilegeConditions())
         && Objects.equal(getPrivilegeNames(), securableObjectPO.getPrivilegeNames())
         && Objects.equal(getCurrentVersion(), securableObjectPO.getCurrentVersion())
         && Objects.equal(getLastVersion(), securableObjectPO.getLastVersion())
@@ -74,7 +73,7 @@ public class SecurableObjectPO {
   public int hashCode() {
     return Objects.hashCode(
         getRoleId(),
-        getFullName(),
+        getEntityId(),
         getType(),
         getPrivilegeNames(),
         getPrivilegeConditions(),
@@ -95,12 +94,12 @@ public class SecurableObjectPO {
       return this;
     }
 
-    public Builder withFullName(String fullName) {
-      securableObjectPO.fullName = fullName;
+    public Builder withEntityId(long entityId) {
+      securableObjectPO.entityId = entityId;
       return this;
     }
 
-    public Builder withType(MetadataObject.Type type) {
+    public Builder withType(String type) {
       securableObjectPO.type = type;
       return this;
     }
@@ -132,7 +131,6 @@ public class SecurableObjectPO {
 
     private void validate() {
       Preconditions.checkArgument(securableObjectPO.roleId != null, "Role id is required");
-      Preconditions.checkArgument(securableObjectPO.fullName != null, "Full name is required");
       Preconditions.checkArgument(securableObjectPO.type != null, "Type is required");
       Preconditions.checkArgument(
           securableObjectPO.privilegeNames != null, "Privilege names are required");

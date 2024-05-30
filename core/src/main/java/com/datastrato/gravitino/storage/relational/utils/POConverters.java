@@ -6,6 +6,7 @@
 package com.datastrato.gravitino.storage.relational.utils;
 
 import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.MetadataObject;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.authorization.Privilege;
 import com.datastrato.gravitino.authorization.Privileges;
@@ -872,31 +873,40 @@ public class POConverters {
     }
   }
 
-  public static RoleEntity fromRolePO(
-      RolePO rolePO, List<SecurableObjectPO> securableObjectPOS, Namespace namespace) {
+  public static SecurableObject fromSecurableObjectPO(
+      String fullName, SecurableObjectPO securableObjectPO) {
     try {
+      List<String> privilegeNames =
+          JsonUtils.anyFieldMapper().readValue(securableObjectPO.getPrivilegeNames(), List.class);
+      List<String> privilegeConditions =
+          JsonUtils.anyFieldMapper()
+              .readValue(securableObjectPO.getPrivilegeConditions(), List.class);
 
-      List<SecurableObject> securableObjects = Lists.newArrayList();
-      for (SecurableObjectPO securableObjectPO : securableObjectPOS) {
-        List<String> privilegeNames =
-            JsonUtils.anyFieldMapper().readValue(securableObjectPO.getPrivilegeNames(), List.class);
-        List<String> privilegeConditions =
-            JsonUtils.anyFieldMapper()
-                .readValue(securableObjectPO.getPrivilegeConditions(), List.class);
-
-        List<Privilege> privileges = Lists.newArrayList();
-        for (int index = 0; index < privilegeNames.size(); index++) {
-          if (Privilege.Condition.ALLOW.name().equals(privilegeConditions.get(index))) {
-            privileges.add(Privileges.allow(privilegeNames.get(index)));
-          } else {
-            privileges.add(Privileges.deny(privilegeNames.get(index)));
-          }
+      List<Privilege> privileges = Lists.newArrayList();
+      for (int index = 0; index < privilegeNames.size(); index++) {
+        if (Privilege.Condition.ALLOW.name().equals(privilegeConditions.get(index))) {
+          privileges.add(Privileges.allow(privilegeNames.get(index)));
+        } else {
+          privileges.add(Privileges.deny(privilegeNames.get(index)));
         }
-        securableObjects.add(
-            SecurableObjects.parse(
-                securableObjectPO.getFullName(), securableObjectPO.getType(), privileges));
+      }
+      MetadataObject.Type type;
+
+      if ("ROOT".equals(securableObjectPO.getType())) {
+        type = MetadataObject.Type.METALAKE;
+      } else {
+        type = MetadataObject.Type.valueOf(securableObjectPO.getType());
       }
 
+      return SecurableObjects.parse(fullName, type, privileges);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
+
+  public static RoleEntity fromRolePO(
+      RolePO rolePO, List<SecurableObject> securableObjects, Namespace namespace) {
+    try {
       return RoleEntity.builder()
           .withId(rolePO.getRoleId())
           .withName(rolePO.getRoleName())
@@ -911,36 +921,40 @@ public class POConverters {
     }
   }
 
-  public static List<SecurableObjectPO> initializeSecurablePOsWithVersion(RoleEntity roleEntity) {
-    List<SecurableObjectPO> securableObjectPOs = Lists.newArrayList();
+  public static SecurableObjectPO.Builder initializeSecurablePOBuilderWithVersion(
+      long roleId, SecurableObject securableObject) {
     try {
-      for (SecurableObject securableObject : roleEntity.securableObjects()) {
-        SecurableObjectPO.Builder builder = SecurableObjectPO.builder();
-        securableObjectPOs.add(
-            builder
-                .withRoleId(roleEntity.id())
-                .withFullName(securableObject.fullName())
-                .withType(securableObject.type())
-                .withPrivilegeConditions(
-                    JsonUtils.anyFieldMapper()
-                        .writeValueAsString(
-                            securableObject.privileges().stream()
-                                .map(Privilege::condition)
-                                .map(Privilege.Condition::name)
-                                .collect(Collectors.toList())))
-                .withPrivilegeNames(
-                    JsonUtils.anyFieldMapper()
-                        .writeValueAsString(
-                            securableObject.privileges().stream()
-                                .map(Privilege::name)
-                                .map(Privilege.Name::name)
-                                .collect(Collectors.toList())))
-                .withCurrentVersion(INIT_VERSION)
-                .withLastVersion(INIT_VERSION)
-                .withDeletedAt(DEFAULT_DELETED_AT)
-                .build());
+      String type;
+      if (securableObject.type() == MetadataObject.Type.METALAKE
+          && securableObject.name().equals("*")) {
+        type = "ROOT";
+      } else {
+        type = securableObject.type().name();
       }
-      return securableObjectPOs;
+
+      SecurableObjectPO.Builder builder = SecurableObjectPO.builder();
+      builder
+          .withRoleId(roleId)
+          .withType(type)
+          .withPrivilegeConditions(
+              JsonUtils.anyFieldMapper()
+                  .writeValueAsString(
+                      securableObject.privileges().stream()
+                          .map(Privilege::condition)
+                          .map(Privilege.Condition::name)
+                          .collect(Collectors.toList())))
+          .withPrivilegeNames(
+              JsonUtils.anyFieldMapper()
+                  .writeValueAsString(
+                      securableObject.privileges().stream()
+                          .map(Privilege::name)
+                          .map(Privilege.Name::name)
+                          .collect(Collectors.toList())))
+          .withCurrentVersion(INIT_VERSION)
+          .withLastVersion(INIT_VERSION)
+          .withDeletedAt(DEFAULT_DELETED_AT);
+
+      return builder;
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
     }

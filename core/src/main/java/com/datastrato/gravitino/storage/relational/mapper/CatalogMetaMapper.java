@@ -43,12 +43,6 @@ public interface CatalogMetaMapper {
       @Param("metalakeId") Long metalakeId, @Param("catalogName") String name);
 
   @Select(
-          "SELECT catalog_name FROM "
-                  + TABLE_NAME
-                  + " WHERE catalog_id = #{catalogId} AND deleted_at = 0")
-  Long selectCatalogNameById(@Param("catalogId") Long catalogId);
-
-  @Select(
       "SELECT catalog_id as catalogId, catalog_name as catalogName,"
           + " metalake_id as metalakeId, type, provider,"
           + " catalog_comment as catalogComment, properties, audit_info as auditInfo,"
@@ -59,6 +53,17 @@ public interface CatalogMetaMapper {
           + " WHERE metalake_id = #{metalakeId} AND catalog_name = #{catalogName} AND deleted_at = 0")
   CatalogPO selectCatalogMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("catalogName") String name);
+
+  @Select(
+      "SELECT catalog_id as catalogId, catalog_name as catalogName,"
+          + " metalake_id as metalakeId, type, provider,"
+          + " catalog_comment as catalogComment, properties, audit_info as auditInfo,"
+          + " current_version as currentVersion, last_version as lastVersion,"
+          + " deleted_at as deletedAt"
+          + " FROM "
+          + TABLE_NAME
+          + " WHERE catalog_id = #{catalogId} AND deleted_at = 0")
+  CatalogPO selectCatalogMetaById(@Param("catalogId") Long catalogId);
 
   @Insert(
       "INSERT INTO "

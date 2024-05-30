@@ -53,6 +53,11 @@ public class SchemaMetaService {
     return schemaPO;
   }
 
+  public SchemaPO getSchemaPOById(Long schemaId) {
+    return SessionUtils.getWithoutCommit(
+        SchemaMetaMapper.class, mapper -> mapper.selectSchemaMetaById(schemaId));
+  }
+
   public Long getSchemaIdByCatalogIdAndName(Long catalogId, String schemaName) {
     Long schemaId =
         SessionUtils.getWithoutCommit(

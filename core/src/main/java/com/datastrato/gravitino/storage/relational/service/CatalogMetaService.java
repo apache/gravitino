@@ -55,6 +55,14 @@ public class CatalogMetaService {
     return catalogPO;
   }
 
+  public CatalogPO getCatalogPOById(Long catalogId) {
+    CatalogPO catalogPO =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class, mapper -> mapper.selectCatalogMetaById(catalogId));
+
+    return catalogPO;
+  }
+
   public Long getCatalogIdByMetalakeIdAndName(Long metalakeId, String catalogName) {
     Long catalogId =
         SessionUtils.getWithoutCommit(
