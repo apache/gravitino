@@ -148,7 +148,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
 
     TableResponse resp =
         restClient.post(
-             formatTableRequestPath(ident.namespace()),
+            formatTableRequestPath(ident.namespace()),
             req,
             TableResponse.class,
             Collections.emptyMap(),

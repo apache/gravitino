@@ -5,13 +5,13 @@
 package com.datastrato.gravitino.catalog;
 
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.NameIdentifierUtil;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
 import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.partitions.Partition;
 import com.datastrato.gravitino.rel.partitions.Partitions;
 import com.datastrato.gravitino.rel.types.Types;
+import com.datastrato.gravitino.utils.NameIdentifierUtil;
 import com.google.common.collect.Maps;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
