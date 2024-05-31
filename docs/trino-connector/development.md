@@ -63,7 +63,7 @@ then you can see the `gravitino-trino-connecor` source files and directories in 
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
-    <artifactId>trino-graviton</artifactId>
+    <artifactId>trino-gravitino</artifactId>
     <packaging>trino-plugin</packaging>
     <description>Trino - Graviton Connector</description>
 
