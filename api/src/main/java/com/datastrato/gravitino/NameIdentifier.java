@@ -19,11 +19,11 @@ import java.util.Arrays;
  */
 public class NameIdentifier {
 
-  protected static final Splitter DOT = Splitter.on('.');
+  private static final Splitter DOT = Splitter.on('.');
 
-  protected final Namespace namespace;
+  private final Namespace namespace;
 
-  protected final String name;
+  private final String name;
 
   /**
    * Create the {@link NameIdentifier} with the given levels of names.

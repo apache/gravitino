@@ -70,7 +70,7 @@ public class GravitinoCatalog {
   }
 
   public NameIdentifier geNameIdentifier() {
-    return NameIdentifier.of(metalake, catalog.name());
+    return NameIdentifier.of(metalake, name);
   }
 
   public String getProperty(String name, String defaultValue) {

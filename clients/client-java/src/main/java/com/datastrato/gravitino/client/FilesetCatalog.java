@@ -87,8 +87,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
    */
   @Override
   public Fileset loadFileset(NameIdentifier ident) throws NoSuchFilesetException {
-    //    NameIdentifier.checkFileset(ident);
-
+    checkNameIdentifer(ident);
     FilesetResponse resp =
         restClient.get(
             formatFilesetRequestPath(ident.namespace())
@@ -127,8 +126,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
       String storageLocation,
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
-    //    NameIdentifier.checkFileset(ident);
-
+    checkNameIdentifer(ident);
     FilesetCreateRequest req =
         FilesetCreateRequest.builder()
             .name(RESTUtils.encodeString(ident.name()))
@@ -162,8 +160,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
   @Override
   public Fileset alterFileset(NameIdentifier ident, FilesetChange... changes)
       throws NoSuchFilesetException, IllegalArgumentException {
-    //    NameIdentifier.checkFileset(ident);
-
+    checkNameIdentifer(ident);
     List<FilesetUpdateRequest> updates =
         Arrays.stream(changes)
             .map(DTOConverters::toFilesetUpdateRequest)
@@ -194,8 +191,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
    */
   @Override
   public boolean dropFileset(NameIdentifier ident) {
-    //    NameIdentifier.checkFileset(ident);
-
+    checkNameIdentifer(ident);
     DropResponse resp =
         restClient.delete(
             formatFilesetRequestPath(ident.namespace()) + "/" + ident.name(),
@@ -216,6 +212,19 @@ public class FilesetCatalog extends BaseSchemaCatalog
         .append(RESTUtils.encodeString(ns.level(2)))
         .append("/filesets")
         .toString();
+  }
+
+  /**
+   * Check whether the NameIdentifier is valid
+   *
+   * @param ident The NameIdentifier to check
+   */
+  static void checkNameIdentifer(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "Fileset identifier must not be null");
+    NameIdentifier.check(
+        ident.name() != null && !ident.name().isEmpty(),
+        "Fileset identifier name must not be empty");
+    Namespace.checkFileset(ident.namespace());
   }
 
   /**
