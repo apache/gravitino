@@ -15,11 +15,12 @@ repositories {
 dependencies {
   implementation(project(":catalogs:bundled-catalog", configuration = "shadow"))
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
-  implementation(libs.airlift.json)
-  implementation(libs.bundles.log4j)
-  implementation(libs.commons.collections4)
   implementation(libs.commons.lang3)
-  implementation(libs.trino.jdbc)
+  implementation(libs.guava)
+  implementation(libs.httpclient5)
+  implementation(libs.jackson.annotations)
+  implementation(libs.jackson.databind)
+  implementation(libs.commons.collections4)
   compileOnly(libs.trino.spi) {
     exclude("org.apache.logging.log4j")
   }
@@ -33,7 +34,6 @@ dependencies {
   testImplementation(libs.trino.testing) {
     exclude("org.apache.logging.log4j")
   }
-  testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks.named("generateMetadataFileForMavenJavaPublication") {

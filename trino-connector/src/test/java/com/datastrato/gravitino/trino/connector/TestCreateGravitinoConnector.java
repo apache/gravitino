@@ -12,10 +12,8 @@ import io.trino.Session;
 import io.trino.testing.DistributedQueryRunner;
 import io.trino.testing.QueryRunner;
 import java.util.HashMap;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
-@Disabled
 public class TestCreateGravitinoConnector {
 
   GravitinoMockServer server;

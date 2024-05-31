@@ -6,12 +6,12 @@ package com.datastrato.gravitino.trino.connector;
 
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_METALAKE_NOT_EXISTS;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_MISSING_CONFIG;
-import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR;
 
 import com.datastrato.gravitino.client.GravitinoAdminClient;
+import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorFactory;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
-import com.datastrato.gravitino.trino.connector.catalog.CatalogRegister;
+import com.datastrato.gravitino.trino.connector.catalog.CatalogInjector;
 import com.datastrato.gravitino.trino.connector.system.GravitinoSystemConnector;
 import com.datastrato.gravitino.trino.connector.system.storedprocdure.GravitinoStoredProcedureFactory;
 import com.datastrato.gravitino.trino.connector.system.table.GravitinoSystemTableFactory;
@@ -31,9 +31,6 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoConnectorFactory.class);
   private static final String DEFAULT_CONNECTOR_NAME = "gravitino";
-
-  @SuppressWarnings("UnusedVariable")
-  private GravitinoSystemTableFactory gravitinoSystemTableFactory;
 
   private CatalogConnectorManager catalogConnectorManager;
 
@@ -65,19 +62,20 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
     synchronized (this) {
       if (catalogConnectorManager == null) {
         try {
-          CatalogRegister catalogRegister = new CatalogRegister();
+          CatalogInjector catalogInjector = new CatalogInjector();
+          catalogInjector.init(context);
           CatalogConnectorFactory catalogConnectorFactory = new CatalogConnectorFactory();
 
           catalogConnectorManager =
-              new CatalogConnectorManager(catalogRegister, catalogConnectorFactory);
-          catalogConnectorManager.config(config, clientProvider().get());
-          catalogConnectorManager.start(context);
+              new CatalogConnectorManager(catalogInjector, catalogConnectorFactory);
+          catalogConnectorManager.config(config);
+          catalogConnectorManager.start(clientProvider().get());
 
-          gravitinoSystemTableFactory = new GravitinoSystemTableFactory(catalogConnectorManager);
+          new GravitinoSystemTableFactory(catalogConnectorManager);
+
         } catch (Exception e) {
-          String message = "Initialization of the GravitinoConnector failed" + e.getMessage();
-          LOG.error(message);
-          throw new TrinoException(GRAVITINO_RUNTIME_ERROR, message, e);
+          LOG.error("Initialization of the GravitinoConnector failed.", e);
+          throw e;
         }
       }
     }
@@ -85,7 +83,10 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
     if (config.isDynamicConnector()) {
       // The dynamic connector is an instance of GravitinoConnector. It is loaded from Gravitino
       // server.
-      return catalogConnectorManager.createConnector(catalogName, config, context);
+      CatalogConnectorContext catalogConnectorContext =
+          catalogConnectorManager.getCatalogConnector(catalogName);
+      Preconditions.checkNotNull(catalogConnectorContext, "catalogConnector is not null");
+      return catalogConnectorContext.getConnector();
     } else {
       // The static connector is an instance of GravitinoSystemConnector. It is loaded by Trino
       // using the connector configuration.
@@ -101,6 +102,8 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
       catalogConnectorManager.addMetalake(metalake);
       GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory =
           new GravitinoStoredProcedureFactory(catalogConnectorManager, metalake);
+
+      catalogConnectorManager.loadMetalakeSync();
       return new GravitinoSystemConnector(gravitinoStoredProcedureFactory);
     }
   }

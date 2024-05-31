@@ -218,6 +218,10 @@ nexusPublishing {
   packageGroup.set("com.datastrato.gravitino")
 }
 
+dependencies {
+  testImplementation(libs.testng)
+}
+
 subprojects {
   // Gravitino Python client project didn't need to apply the java plugin
   if (project.name == "client-python") {
@@ -407,8 +411,13 @@ subprojects {
     reports.html.outputLocation.set(file("${rootProject.projectDir}/build/reports/"))
     val skipTests = project.hasProperty("skipTests")
     if (!skipTests) {
-      jvmArgs = listOf("-Xmx2G")
-      useJUnitPlatform()
+      if (project.name == "trino-connector") {
+        useTestNG()
+        maxHeapSize = "2G"
+      } else {
+        useJUnitPlatform()
+      }
+
       jvmArgs(project.property("extraJvmArgs") as List<*>)
       finalizedBy(tasks.getByName("jacocoTestReport"))
     }

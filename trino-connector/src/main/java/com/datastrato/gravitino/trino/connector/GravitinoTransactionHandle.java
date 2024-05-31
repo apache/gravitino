@@ -12,29 +12,18 @@ import io.trino.spi.connector.ConnectorTransactionHandle;
  * The GravitinoFTransactionHandle is used to make Gravitino metadata operations transactional and
  * wrap the inner connector transaction for data access.
  */
-public class GravitinoTransactionHandle
-    implements ConnectorTransactionHandle, GravitinoHandle<ConnectorTransactionHandle> {
-
-  private HandleWrapper<ConnectorTransactionHandle> handleWrapper =
-      new HandleWrapper<>(ConnectorTransactionHandle.class);
+public class GravitinoTransactionHandle implements ConnectorTransactionHandle {
+  ConnectorTransactionHandle internalTransactionHandle;
 
   @JsonCreator
-  public GravitinoTransactionHandle(@JsonProperty(HANDLE_STRING) String handleString) {
-    this.handleWrapper = handleWrapper.fromJson(handleString);
-  }
-
-  public GravitinoTransactionHandle(ConnectorTransactionHandle internalTransactionHandle) {
-    this.handleWrapper = new HandleWrapper<>(internalTransactionHandle);
+  public GravitinoTransactionHandle(
+      @JsonProperty("internalTransactionHandle")
+          ConnectorTransactionHandle internalTransactionHandler) {
+    this.internalTransactionHandle = internalTransactionHandler;
   }
 
   @JsonProperty
-  @Override
-  public String getHandleString() {
-    return handleWrapper.toJson();
-  }
-
-  @Override
-  public ConnectorTransactionHandle getInternalHandle() {
-    return handleWrapper.getHandle();
+  public ConnectorTransactionHandle getInternalTransactionHandle() {
+    return internalTransactionHandle;
   }
 }

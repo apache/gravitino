@@ -112,7 +112,7 @@ public class CatalogConnectorMetadata {
         NameIdentifier.ofTable(metalake.name(), catalogName, schemaName, tableName));
   }
 
-  public void createTable(GravitinoTable table, boolean ignoreExisting) {
+  public void createTable(GravitinoTable table) {
     NameIdentifier identifier =
         NameIdentifier.ofTable(
             metalake.name(), catalogName, table.getSchemaName(), table.getName());
@@ -128,9 +128,7 @@ public class CatalogConnectorMetadata {
     } catch (NoSuchSchemaException e) {
       throw new TrinoException(GRAVITINO_SCHEMA_NOT_EXISTS, SCHEMA_DOES_NOT_EXIST_MSG, e);
     } catch (TableAlreadyExistsException e) {
-      if (!ignoreExisting) {
-        throw new TrinoException(GRAVITINO_TABLE_ALREADY_EXISTS, "Table already exists", e);
-      }
+      throw new TrinoException(GRAVITINO_TABLE_ALREADY_EXISTS, "Table already exists", e);
     }
   }
 

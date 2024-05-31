@@ -15,38 +15,25 @@ import java.util.Objects;
  * The GravitinoTableHandle is used to transform table information between Trino and Gravitino, as
  * well as to wrap the inner connector table handle for data access.
  */
-public final class GravitinoTableHandle
-    implements ConnectorTableHandle, GravitinoHandle<ConnectorTableHandle> {
+public final class GravitinoTableHandle implements ConnectorTableHandle {
 
   private final String schemaName;
   private final String tableName;
 
-  private HandleWrapper<ConnectorTableHandle> handleWrapper =
-      new HandleWrapper<>(ConnectorTableHandle.class);
+  private final ConnectorTableHandle internalTableHandle;
 
   @JsonCreator
   public GravitinoTableHandle(
       @JsonProperty("schemaName") String schemaName,
       @JsonProperty("tableName") String tableName,
-      @JsonProperty(HANDLE_STRING) String handleString) {
-    Preconditions.checkArgument(schemaName != null, "schemaName is not null");
-    Preconditions.checkArgument(tableName != null, "tableName is not null");
-    Preconditions.checkArgument(handleString != null, "handleString is not null");
-
-    this.schemaName = schemaName;
-    this.tableName = tableName;
-    this.handleWrapper = handleWrapper.fromJson(handleString);
-  }
-
-  public GravitinoTableHandle(
-      String schemaName, String tableName, ConnectorTableHandle internalTableHandle) {
+      @JsonProperty("internalTableHandle") ConnectorTableHandle internalTableHandle) {
     Preconditions.checkArgument(schemaName != null, "schemaName is not null");
     Preconditions.checkArgument(tableName != null, "tableName is not null");
     Preconditions.checkArgument(internalTableHandle != null, "internalTableHandle is not null");
 
     this.schemaName = schemaName;
     this.tableName = tableName;
-    this.handleWrapper = new HandleWrapper<>(internalTableHandle);
+    this.internalTableHandle = internalTableHandle;
   }
 
   @JsonProperty
@@ -60,14 +47,8 @@ public final class GravitinoTableHandle
   }
 
   @JsonProperty
-  @Override
-  public String getHandleString() {
-    return handleWrapper.toJson();
-  }
-
-  @Override
-  public ConnectorTableHandle getInternalHandle() {
-    return handleWrapper.getHandle();
+  public ConnectorTableHandle getInternalTableHandle() {
+    return internalTableHandle;
   }
 
   public SchemaTableName toSchemaTableName() {

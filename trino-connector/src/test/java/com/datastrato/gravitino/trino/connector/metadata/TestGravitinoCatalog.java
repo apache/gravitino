@@ -4,16 +4,16 @@
  */
 package com.datastrato.gravitino.trino.connector.metadata;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 
 import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Catalog;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Map;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 public class TestGravitinoCatalog {
 

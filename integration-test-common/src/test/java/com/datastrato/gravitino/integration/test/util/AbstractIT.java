@@ -61,11 +61,8 @@ public class AbstractIT {
 
   protected static boolean ignoreIcebergRestService = true;
 
-  public static final String DOWNLOAD_MYSQL_JDBC_DRIVER_URL =
+  private static final String DOWNLOAD_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.26/mysql-connector-java-8.0.26.jar";
-
-  public static final String DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL =
-      "https://jdbc.postgresql.org/download/postgresql-42.7.0.jar";
 
   private static TestDatabaseName META_DATA;
   private static MySQLContainer MYSQL_CONTAINER;
@@ -108,24 +105,11 @@ public class AbstractIT {
     Files.move(tmpPath, configPath);
   }
 
-  protected static void downLoadJDBCDriver() throws IOException {
-    String gravitinoHome = System.getenv("GRAVITINO_HOME");
+  protected static void downLoadMySQLDriver(String relativeDeployLibsPath) throws IOException {
     if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
-      String serverPath = ITUtils.joinPath(gravitinoHome, "libs");
-      String icebergCatalogPath =
-          ITUtils.joinPath(gravitinoHome, "catalogs", "lakehouse-iceberg", "libs");
-      JdbcDriverDownloader.downloadJdbcDriver(
-          DOWNLOAD_MYSQL_JDBC_DRIVER_URL, serverPath, icebergCatalogPath);
-      JdbcDriverDownloader.downloadJdbcDriver(
-          DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL, serverPath, icebergCatalogPath);
-    } else {
-      Path icebergLibsPath =
-          Paths.get(gravitinoHome, "catalogs", "catalog-lakehouse-iceberg", "build", "libs");
-      JdbcDriverDownloader.downloadJdbcDriver(
-          DOWNLOAD_MYSQL_JDBC_DRIVER_URL, icebergLibsPath.toString());
-
-      JdbcDriverDownloader.downloadJdbcDriver(
-          DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL, icebergLibsPath.toString());
+      String gravitinoHome = System.getenv("GRAVITINO_HOME");
+      java.nio.file.Path tmpPath = Paths.get(gravitinoHome, relativeDeployLibsPath);
+      JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_JDBC_DRIVER_URL, tmpPath.toString());
     }
   }
 
@@ -201,7 +185,7 @@ public class AbstractIT {
     } else {
       rewriteGravitinoServerConfig();
       serverConfig.loadFromFile(GravitinoServer.CONF_FILE);
-      downLoadJDBCDriver();
+      downLoadMySQLDriver("/libs");
       try {
         FileUtils.deleteDirectory(
             FileUtils.getFile(serverConfig.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)));

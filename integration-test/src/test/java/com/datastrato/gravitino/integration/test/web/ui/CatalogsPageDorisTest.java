@@ -12,6 +12,8 @@ import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.DorisContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
+import com.datastrato.gravitino.integration.test.util.ITUtils;
+import com.datastrato.gravitino.integration.test.util.JdbcDriverDownloader;
 import com.datastrato.gravitino.integration.test.web.ui.pages.CatalogsPage;
 import com.datastrato.gravitino.integration.test.web.ui.pages.MetalakePage;
 import com.datastrato.gravitino.integration.test.web.ui.utils.AbstractWebIT;
@@ -21,6 +23,8 @@ import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.Maps;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -61,9 +65,20 @@ public class CatalogsPageDorisTest extends AbstractWebIT {
   private static final String COLUMN_NAME = "col1";
   private static final String PROPERTIES_KEY1 = "key1";
   private static final String PROPERTIES_VALUE1 = "val1";
+  private static final String DOWNLOAD_JDBC_DRIVER_URL =
+      "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar";
 
   @BeforeAll
   public static void before() throws Exception {
+
+    String gravitinoHome = System.getenv("GRAVITINO_HOME");
+    if (!ITUtils.EMBEDDED_TEST_MODE.equals(AbstractIT.testMode)) {
+      Path tmpPath = Paths.get(gravitinoHome, "/catalogs/jdbc-doris/libs");
+      JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_JDBC_DRIVER_URL, tmpPath.toString());
+    } else {
+      Path tmpPath = Paths.get(gravitinoHome, "/catalogs/catalog-jdbc-doris/build/libs");
+      JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_JDBC_DRIVER_URL, tmpPath.toString());
+    }
     gravitinoClient = AbstractIT.getGravitinoClient();
     gravitinoUri = String.format("http://127.0.0.1:%d", AbstractIT.getGravitinoServerPort());
 
