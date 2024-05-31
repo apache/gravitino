@@ -13,6 +13,8 @@ import com.datastrato.gravitino.meta.CatalogEntity;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import java.io.Closeable;
+import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -32,7 +34,7 @@ import org.slf4j.LoggerFactory;
  */
 @Evolving
 public abstract class BaseCatalog<T extends BaseCatalog>
-    implements Catalog, CatalogProvider, HasPropertyMetadata {
+    implements Catalog, CatalogProvider, HasPropertyMetadata, Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(BaseCatalog.class);
 
   // This variable is used as a key in properties of catalogs to inject custom operation to
@@ -151,6 +153,14 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     }
 
     return ops;
+  }
+
+  @Override
+  public void close() throws IOException {
+    if (ops != null) {
+      ops.close();
+      ops = null;
+    }
   }
 
   public Capability capability() {

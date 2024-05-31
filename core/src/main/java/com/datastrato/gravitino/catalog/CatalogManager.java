@@ -162,7 +162,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         classLoader.withClassLoader(
             cl -> {
               if (catalog != null) {
-                catalog.ops().close();
+                catalog.close();
               }
               catalog = null;
               return null;
