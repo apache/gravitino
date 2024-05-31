@@ -43,8 +43,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Gravitino Client for the administrator to interact with the Gravitino API, allowing the client to
@@ -54,7 +52,6 @@ import org.slf4j.LoggerFactory;
  */
 public class GravitinoAdminClient extends GravitinoClientBase implements SupportsMetalakes {
 
-  private static final Logger LOG = LoggerFactory.getLogger(GravitinoAdminClient.class);
   private static final String API_METALAKES_USERS_PATH = "api/metalakes/%s/users/%s";
   private static final String API_METALAKES_GROUPS_PATH = "api/metalakes/%s/groups/%s";
   private static final String API_METALAKES_ROLES_PATH = "api/metalakes/%s/roles/%s";
@@ -184,7 +181,6 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
       return resp.dropped();
 
     } catch (Exception e) {
-      LOG.warn("Failed to drop metadata {}", ident, e);
       return false;
     }
   }
