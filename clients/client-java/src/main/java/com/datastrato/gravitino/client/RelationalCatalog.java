@@ -38,8 +38,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Relational catalog is a catalog implementation that supports relational database like metadata
@@ -47,8 +45,6 @@ import org.slf4j.LoggerFactory;
  * catalog is under the metalake.
  */
 public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog {
-
-  private static final Logger LOG = LoggerFactory.getLogger(RelationalCatalog.class);
 
   RelationalCatalog(
       String name,
@@ -245,11 +241,9 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
               ErrorHandlers.tableErrorHandler());
       resp.validate();
       return resp.dropped();
-
     } catch (UnsupportedOperationException e) {
       throw e;
     } catch (Exception e) {
-      LOG.warn("Failed to purge table {}", ident, e);
       return false;
     }
   }
