@@ -67,7 +67,7 @@ Changelog
 
 Changelog
 
-- trino:426-gravitino-0.5.1
+- trino:435-gravitino-0.5.1
   - Based on Gravitino 0.5.1, you can know more information from 0.5.1 release notes.
 
 
@@ -185,6 +185,9 @@ Changelog
 You can use this image to test Trino.
 
 Changelog
+
+- gravitino-ci-trino:0.1.6
+  - Upgrade trino:426 to trino:435
 
 - gravitino-ci-trino:0.1.5
   - Add check for the version of gravitino-trino-connector
