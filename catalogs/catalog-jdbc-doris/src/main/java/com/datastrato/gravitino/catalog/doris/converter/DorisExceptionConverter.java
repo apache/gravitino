@@ -25,6 +25,7 @@ public class DorisExceptionConverter extends JdbcExceptionConverter {
   static final int CODE_TABLE_EXISTS = 1050;
   static final int CODE_NO_SUCH_SCHEMA = 1049;
   static final int CODE_DATABASE_NOT_EXISTS = 1008;
+  static final int CODE_UNKNOWN_DATABASE = 1049;
   static final int CODE_NO_SUCH_TABLE = 1051;
   static final int CODE_UNAUTHORIZED = 1045;
   static final int CODE_NO_SUCH_COLUMN = 1054;
@@ -34,6 +35,16 @@ public class DorisExceptionConverter extends JdbcExceptionConverter {
       ".*detailMessage = Can't create database '.*'; database exists";
   private static final Pattern DATABASE_ALREADY_EXISTS_PATTERN =
       Pattern.compile(DATABASE_ALREADY_EXISTS_PATTERN_STRING);
+
+  private static final String DATABASE_NOT_EXISTS_PATTERN_STRING =
+      ".*?detailMessage = Can't drop database '.*?'; database doesn't exist";
+  private static final Pattern DATABASE_NOT_EXISTS_PATTERN =
+      Pattern.compile(DATABASE_NOT_EXISTS_PATTERN_STRING);
+
+  private static final String UNKNOWN_DATABASE_PATTERN_STRING =
+      ".*?detailMessage = Unknown database '.*?'";
+  private static final Pattern UNKNOWN_DATABASE_PATTERN_PATTERN =
+      Pattern.compile(UNKNOWN_DATABASE_PATTERN_STRING);
 
   private static final String TABLE_NOT_EXIST_PATTERN_STRING =
       ".*detailMessage = Unknown table '.*' in .*:.*";
@@ -55,6 +66,7 @@ public class DorisExceptionConverter extends JdbcExceptionConverter {
       case CODE_TABLE_EXISTS:
         return new TableAlreadyExistsException(se, se.getMessage());
       case CODE_DATABASE_NOT_EXISTS:
+      case CODE_UNKNOWN_DATABASE:
         return new NoSuchSchemaException(se, se.getMessage());
       case CODE_NO_SUCH_TABLE:
         return new NoSuchTableException(se, se.getMessage());
@@ -74,6 +86,14 @@ public class DorisExceptionConverter extends JdbcExceptionConverter {
     }
     if (DATABASE_ALREADY_EXISTS_PATTERN.matcher(message).matches()) {
       return CODE_DATABASE_EXISTS;
+    }
+
+    if (DATABASE_NOT_EXISTS_PATTERN.matcher(message).matches()) {
+      return CODE_DATABASE_NOT_EXISTS;
+    }
+
+    if (UNKNOWN_DATABASE_PATTERN_PATTERN.matcher(message).matches()) {
+      return CODE_UNKNOWN_DATABASE;
     }
 
     if (TABLE_NOT_EXIST_PATTERN.matcher(message).matches()) {

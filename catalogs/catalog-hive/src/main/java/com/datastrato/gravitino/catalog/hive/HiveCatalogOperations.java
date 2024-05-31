@@ -21,7 +21,7 @@ import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableTy
 import com.datastrato.gravitino.catalog.hive.converter.ToHiveType;
 import com.datastrato.gravitino.connector.CatalogInfo;
 import com.datastrato.gravitino.connector.CatalogOperations;
-import com.datastrato.gravitino.connector.PropertiesMetadata;
+import com.datastrato.gravitino.connector.HasPropertyMetadata;
 import com.datastrato.gravitino.connector.ProxyPlugin;
 import com.datastrato.gravitino.connector.SupportsSchemas;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
@@ -51,6 +51,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -74,6 +75,7 @@ import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,11 +92,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private CatalogInfo info;
 
-  private HiveTablePropertiesMetadata tablePropertiesMetadata;
-
-  private HiveCatalogPropertiesMeta catalogPropertiesMetadata;
-
-  private HiveSchemaPropertiesMetadata schemaPropertiesMetadata;
+  private HasPropertyMetadata propertiesMetadata;
 
   private ScheduledThreadPoolExecutor checkTgtExecutor;
   private String kerberosRealm;
@@ -111,14 +109,15 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    *
    * @param conf The configuration map for the Hive catalog operations.
    * @param info The catalog info associated with this operations instance.
+   * @param propertiesMetadata The properties metadata of Hive catalog.
    * @throws RuntimeException if initialization fails.
    */
   @Override
-  public void initialize(Map<String, String> conf, CatalogInfo info) throws RuntimeException {
+  public void initialize(
+      Map<String, String> conf, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
+      throws RuntimeException {
     this.info = info;
-    this.tablePropertiesMetadata = new HiveTablePropertiesMetadata();
-    this.catalogPropertiesMetadata = new HiveCatalogPropertiesMeta();
-    this.schemaPropertiesMetadata = new HiveSchemaPropertiesMetadata();
+    this.propertiesMetadata = propertiesMetadata;
 
     // Key format like gravitino.bypass.a.b
     Map<String, String> byPassConfig = Maps.newHashMap();
@@ -144,7 +143,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     // and gravitinoConfig will be passed to Hive config, and gravitinoConfig has higher priority
     mergeConfig.forEach(hadoopConf::set);
     hiveConf = new HiveConf(hadoopConf, HiveCatalogOperations.class);
-    UserGroupInformation.setConfiguration(hadoopConf);
 
     initKerberosIfNecessary(conf, hadoopConf);
 
@@ -173,7 +171,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
         String keytabUri =
             (String)
-                catalogPropertiesMetadata.getOrDefault(conf, HiveCatalogPropertiesMeta.KET_TAB_URI);
+                propertiesMetadata
+                    .catalogPropertiesMetadata()
+                    .getOrDefault(conf, HiveCatalogPropertiesMeta.KEY_TAB_URI);
         Preconditions.checkArgument(StringUtils.isNotBlank(keytabUri), "Keytab uri can't be blank");
         // TODO: Support to download the file from Kerberos HDFS
         Preconditions.checkArgument(
@@ -181,14 +181,16 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
         int fetchKeytabFileTimeout =
             (int)
-                catalogPropertiesMetadata.getOrDefault(
-                    conf, HiveCatalogPropertiesMeta.FETCH_TIMEOUT_SEC);
+                propertiesMetadata
+                    .catalogPropertiesMetadata()
+                    .getOrDefault(conf, HiveCatalogPropertiesMeta.FETCH_TIMEOUT_SEC);
 
         FetchFileUtils.fetchFileFromUri(keytabUri, keytabFile, fetchKeytabFileTimeout, hadoopConf);
 
         hiveConf.setVar(ConfVars.METASTORE_KERBEROS_KEYTAB_FILE, keytabFile.getAbsolutePath());
 
-        String catalogPrincipal = (String) catalogPropertiesMetadata.getOrDefault(conf, PRINCIPAL);
+        String catalogPrincipal =
+            (String) propertiesMetadata.catalogPropertiesMetadata().getOrDefault(conf, PRINCIPAL);
         Preconditions.checkArgument(
             StringUtils.isNotBlank(catalogPrincipal), "The principal can't be blank");
         @SuppressWarnings("null")
@@ -201,14 +203,19 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             new ScheduledThreadPoolExecutor(
                 1, getThreadFactory(String.format("Kerberos-check-%s", info.id())));
 
+        LOG.info("krb5 path: {}", System.getProperty("java.security.krb5.conf"));
+        refreshKerberosConfig();
+        KerberosName.resetDefaultRealm();
+        UserGroupInformation.setConfiguration(hadoopConf);
         UserGroupInformation.loginUserFromKeytab(catalogPrincipal, keytabFile.getAbsolutePath());
 
         UserGroupInformation kerberosLoginUgi = UserGroupInformation.getCurrentUser();
 
         int checkInterval =
             (int)
-                catalogPropertiesMetadata.getOrDefault(
-                    conf, HiveCatalogPropertiesMeta.CHECK_INTERVAL_SEC);
+                propertiesMetadata
+                    .catalogPropertiesMetadata()
+                    .getOrDefault(conf, HiveCatalogPropertiesMeta.CHECK_INTERVAL_SEC);
 
         checkTgtExecutor.scheduleAtFixedRate(
             () -> {
@@ -224,18 +231,39 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
       } catch (IOException ioe) {
         throw new UncheckedIOException(ioe);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
       }
+    }
+  }
+
+  private void refreshKerberosConfig() {
+    Class<?> classRef;
+    try {
+      if (System.getProperty("java.vendor").contains("IBM")) {
+        classRef = Class.forName("com.ibm.security.krb5.internal.Config");
+      } else {
+        classRef = Class.forName("sun.security.krb5.Config");
+      }
+
+      Method refershMethod = classRef.getMethod("refresh");
+      refershMethod.invoke(null);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     }
   }
 
   @VisibleForTesting
   int getClientPoolSize(Map<String, String> conf) {
-    return (int) catalogPropertiesMetadata.getOrDefault(conf, CLIENT_POOL_SIZE);
+    return (int)
+        propertiesMetadata.catalogPropertiesMetadata().getOrDefault(conf, CLIENT_POOL_SIZE);
   }
 
   long getCacheEvictionInterval(Map<String, String> conf) {
     return (long)
-        catalogPropertiesMetadata.getOrDefault(conf, CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS);
+        propertiesMetadata
+            .catalogPropertiesMetadata()
+            .getOrDefault(conf, CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS);
   }
 
   /** Closes the Hive catalog and releases the associated client pool. */
@@ -432,7 +460,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    *
    * @param ident The identifier of the schema to drop.
    * @param cascade If set to true, drops all the tables in the schema as well.
-   * @return true if the schema was dropped successfully, false otherwise.
+   * @return true if the schema was dropped successfully, false if the schema does not exist.
    * @throws NonEmptySchemaException If the schema is not empty and 'cascade' is set to false.
    */
   @Override
@@ -672,7 +700,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     validatePartitionForCreate(columns, partitioning);
     validateDistributionAndSort(distribution, sortOrders);
 
-    TableType tableType = (TableType) tablePropertiesMetadata.getOrDefault(properties, TABLE_TYPE);
+    TableType tableType =
+        (TableType)
+            propertiesMetadata.tablePropertiesMetadata().getOrDefault(properties, TABLE_TYPE);
     Preconditions.checkArgument(
         SUPPORT_TABLE_TYPES.contains(tableType.name()),
         "Unsupported table type: " + tableType.name());
@@ -703,7 +733,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
               .build();
       clientPool.run(
           c -> {
-            c.createTable(hiveTable.toHiveTable(tablePropertiesMetadata));
+            c.createTable(hiveTable.toHiveTable(propertiesMetadata.tablePropertiesMetadata()));
             return null;
           });
 
@@ -743,7 +773,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       // TODO(@Minghuang): require a table lock to avoid race condition
       HiveTable table = (HiveTable) loadTable(tableIdent);
       org.apache.hadoop.hive.metastore.api.Table alteredHiveTable =
-          table.toHiveTable(tablePropertiesMetadata);
+          table.toHiveTable(propertiesMetadata.tablePropertiesMetadata());
 
       validateColumnChangeForAlter(changes, alteredHiveTable);
 
@@ -964,10 +994,14 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public boolean dropTable(NameIdentifier tableIdent) {
-    if (isExternalTable(tableIdent)) {
-      return dropHiveTable(tableIdent, false, false);
-    } else {
-      return dropHiveTable(tableIdent, true, false);
+    try {
+      if (isExternalTable(tableIdent)) {
+        return dropHiveTable(tableIdent, false, false);
+      } else {
+        return dropHiveTable(tableIdent, true, false);
+      }
+    } catch (NoSuchTableException e) {
+      return false;
     }
   }
 
@@ -1018,33 +1052,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
-  }
-
-  @Override
-  public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
-    return tablePropertiesMetadata;
-  }
-
-  @Override
-  public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
-    return catalogPropertiesMetadata;
-  }
-
-  @Override
-  public PropertiesMetadata schemaPropertiesMetadata() throws UnsupportedOperationException {
-    return schemaPropertiesMetadata;
-  }
-
-  @Override
-  public PropertiesMetadata filesetPropertiesMetadata() throws UnsupportedOperationException {
-    throw new UnsupportedOperationException(
-        "Hive catalog does not support fileset properties metadata");
-  }
-
-  @Override
-  public PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException {
-    throw new UnsupportedOperationException(
-        "Hive catalog does not support topic properties metadata");
   }
 
   CachedClientPool getClientPool() {

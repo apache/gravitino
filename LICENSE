@@ -207,8 +207,9 @@
    Apache Software License 2.0.
 
    Apache Spark
-   ./api/src/main/java/com/datastrato/gravitino/rel/SchemaChange.java
-   ./api/src/main/java/com/datastrato/gravitino/rel/SupportsSchemas.java
+   ./api/src/main/java/com/datastrato/gravitino/SchemaChange.java
+   ./api/src/main/java/com/datastrato/gravitino/SupportsSchemas.java
+   ./core/src/main/java/com/datastrato/gravitino/connector/SupportsSchemas.java
    ./api/src/main/java/com/datastrato/gravitino/rel/TableCatalog.java
    ./api/src/main/java/com/datastrato/gravitino/rel/TableChange.java
    ./api/src/main/java/com/datastrato/gravitino/rel/expressions/Literal.java
@@ -218,7 +219,7 @@
    ./api/src/main/java/com/datastrato/gravitino/rel/expressions/transforms/Transform.java
    ./api/src/main/java/com/datastrato/gravitino/rel/expressions/Expression.java
    ./api/src/main/java/com/datastrato/gravitino/rel/expressions/NamedReference.java
-   ./integration-test/src/test/java/com/datastrato/gravitino/integration/test/util/spark/SparkUtilIT.java
+   ./spark-connector/spark-connector/src/test/java/com/datastrato/gravitino/spark/connector/integration/test/util/SparkUtilIT.java
 
    Apache Iceberg
    ./api/src/main/java/com/datastrato/gravitino/exceptions/RESTException.java
@@ -232,6 +233,8 @@
    ./catalogs/catalog-hive/src/test/java/com/datastrato/gravitino/catalog/hive/miniHMS/ScriptRunner.java
    ./catalogs/catalog-hive/src/test/java/com/datastrato/gravitino/catalog/hive/TestCachedClientPool.java
    ./catalogs/catalog-lakehouse-iceberg/src/main/java/com/datastrato/gravitino/catalog/lakehouse/iceberg/web/IcebergExceptionMapper.java
+   ./catalogs/catalog-lakehouse-iceberg/src/main/java/com/datastrato/gravitino/catalog/lakehouse/iceberg/converter/DescribeIcebergSortOrderVisitor.java
+   ./catalogs/catalog-lakehouse-iceberg/src/main/java/com/datastrato/gravitino/catalog/lakehouse/iceberg/utils/IcebergTablePropertiesUtil.java
    ./clients/client-java/src/main/java/com/datastrato/gravitino/client/HTTPClient.java
    ./clients/client-java/src/main/java/com/datastrato/gravitino/client/RESTClient.java
    ./clients/client-java/src/test/java/com/datastrato/gravitino/client/TestHTTPClient.java
@@ -253,13 +256,15 @@
 
    Apache Hadoop
    ./dev/docker/hive/hadoop-env.sh
-   ./dev/docker/hive/yarn-env.sh
+   ./dev/docker/kerberos-hive/hadoop-env.sh
+   ./dev/docker/kerberos-hive/yarn-env.sh
    ./common/src/main/java/com/datastrato/gravitino/auth/KerberosUtils.java
-   ./server-common/src/main/java/com/datastrato/gravitino/server/auth/KerberosAuthenticator.java
-   ./server-common/src/test/java/com/datastrato/gravitino/server/auth/KerberosTestUtils.java
-   ./server-common/src/main/java/com/datastrato/gravitino/server/auth/KerberosServerUtils.java
+   ./server-common/src/main/java/com/datastrato/gravitino/server/authentication/KerberosAuthenticator.java
+   ./server-common/src/test/java/com/datastrato/gravitino/server/authentication/KerberosTestUtils.java
+   ./server-common/src/main/java/com/datastrato/gravitino/server/authentication/KerberosServerUtils.java
 
    Apache Kafka
+   ./integration-test/src/test/resources/run
    ./catalogs/catalog-kafka/src/test/resources/run
    ./core/src/main/java/com/datastrato/gravitino/utils/Bytes.java
 
@@ -278,7 +283,7 @@
    Apache Arrow
    ./dev/ci/util_free_space.sh
 
-This product bundles a third-party component under the
+   This product bundles a third-party component under the
    MIT License.
 
    Kyligence/kylinpy

@@ -199,7 +199,20 @@ public class CatalogHiveIT extends AbstractIT {
 
   @AfterAll
   public static void stop() throws IOException {
-    client.dropMetalake(metalakeName);
+    Arrays.stream(catalog.asSchemas().listSchemas())
+        .filter(ident -> !ident.name().equals("default"))
+        .forEach(
+            (ident -> {
+              catalog.asSchemas().dropSchema(ident.name(), true);
+            }));
+    Arrays.stream(metalake.listCatalogs())
+        .forEach(
+            (ident -> {
+              metalake.dropCatalog(ident.name());
+            }));
+    if (client != null) {
+      client.dropMetalake(metalakeName);
+    }
     if (hiveClientPool != null) {
       hiveClientPool.close();
     }
@@ -216,6 +229,9 @@ public class CatalogHiveIT extends AbstractIT {
     } catch (Exception e) {
       LOG.error("Failed to close CloseableGroup", e);
     }
+
+    AbstractIT.customConfigs.clear();
+    AbstractIT.client = null;
   }
 
   @AfterEach
@@ -1640,6 +1656,9 @@ public class CatalogHiveIT extends AbstractIT {
     properties.put(METASTORE_URIS, HIVE_METASTORE_URIS);
     properties.put(BaseCatalog.CATALOG_OPERATION_IMPL, customImpl);
 
-    metalake.createCatalog(catalogName, Catalog.Type.RELATIONAL, provider, "comment", properties);
+    Catalog catalog =
+        metalake.createCatalog(
+            catalogName, Catalog.Type.RELATIONAL, provider, "comment", properties);
+    catalog.asSchemas().listSchemas();
   }
 }

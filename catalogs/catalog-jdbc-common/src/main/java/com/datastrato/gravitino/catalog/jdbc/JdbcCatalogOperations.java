@@ -21,7 +21,7 @@ import com.datastrato.gravitino.catalog.jdbc.operation.TableOperation;
 import com.datastrato.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import com.datastrato.gravitino.connector.CatalogInfo;
 import com.datastrato.gravitino.connector.CatalogOperations;
-import com.datastrato.gravitino.connector.PropertiesMetadata;
+import com.datastrato.gravitino.connector.HasPropertyMetadata;
 import com.datastrato.gravitino.connector.SupportsSchemas;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
@@ -71,8 +71,6 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private JdbcTablePropertiesMetadata jdbcTablePropertiesMetadata;
 
-  private JdbcSchemaPropertiesMetadata jdbcSchemaPropertiesMetadata;
-
   private final JdbcExceptionConverter exceptionConverter;
 
   private final JdbcTypeConverter jdbcTypeConverter;
@@ -92,20 +90,19 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    * @param jdbcTypeConverter The type converter to be used by the operations.
    * @param databaseOperation The database operations to be used by the operations.
    * @param tableOperation The table operations to be used by the operations.
-   * @param jdbcTablePropertiesMetadata The table properties metadata to be used by the operations.
+   * @param columnDefaultValueConverter The column default value converter to be used by the
+   *     operations.
    */
   public JdbcCatalogOperations(
       JdbcExceptionConverter exceptionConverter,
       JdbcTypeConverter jdbcTypeConverter,
       JdbcDatabaseOperations databaseOperation,
       JdbcTableOperations tableOperation,
-      JdbcTablePropertiesMetadata jdbcTablePropertiesMetadata,
       JdbcColumnDefaultValueConverter columnDefaultValueConverter) {
     this.exceptionConverter = exceptionConverter;
     this.jdbcTypeConverter = jdbcTypeConverter;
     this.databaseOperation = databaseOperation;
     this.tableOperation = tableOperation;
-    this.jdbcTablePropertiesMetadata = jdbcTablePropertiesMetadata;
     this.columnDefaultValueConverter = columnDefaultValueConverter;
   }
 
@@ -117,12 +114,18 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    * @throws RuntimeException if initialization fails.
    */
   @Override
-  public void initialize(Map<String, String> conf, CatalogInfo info) throws RuntimeException {
+  public void initialize(
+      Map<String, String> conf, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
+      throws RuntimeException {
+    this.jdbcCatalogPropertiesMetadata =
+        (JdbcCatalogPropertiesMetadata) propertiesMetadata.catalogPropertiesMetadata();
+    this.jdbcTablePropertiesMetadata =
+        (JdbcTablePropertiesMetadata) propertiesMetadata.tablePropertiesMetadata();
+
     // Key format like gravitino.bypass.a.b
     Map<String, String> prefixMap = MapUtils.getPrefixMap(conf, CATALOG_BYPASS_PREFIX);
 
     // Hold keys that lie in JDBC_IMMUTABLE_PROPERTIES
-    this.jdbcCatalogPropertiesMetadata = new JdbcCatalogPropertiesMetadata();
     Map<String, String> gravitinoConfig =
         this.jdbcCatalogPropertiesMetadata.transformProperties(conf);
     Map<String, String> resultConf = Maps.newHashMap(prefixMap);
@@ -133,7 +136,6 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     this.databaseOperation.initialize(dataSource, exceptionConverter, resultConf);
     this.tableOperation.initialize(
         dataSource, exceptionConverter, jdbcTypeConverter, columnDefaultValueConverter, resultConf);
-    this.jdbcSchemaPropertiesMetadata = new JdbcSchemaPropertiesMetadata();
   }
 
   /** Closes the Jdbc catalog and releases the associated client pool. */
@@ -239,13 +241,12 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    *
    * @param ident The identifier of the schema to drop.
    * @param cascade If set to true, drops all the tables in the schema as well.
-   * @return true if the schema was dropped successfully, false otherwise.
+   * @return true if the schema is successfully dropped; false if the schema does not exist.
    * @throws NonEmptySchemaException If the schema is not empty and 'cascade' is set to false.
    */
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
-    databaseOperation.delete(ident.name(), cascade);
-    return true;
+    return databaseOperation.delete(ident.name(), cascade);
   }
 
   /**
@@ -342,8 +343,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public boolean dropTable(NameIdentifier tableIdent) {
     String databaseName = NameIdentifier.of(tableIdent.namespace().levels()).name();
-    tableOperation.drop(databaseName, tableIdent.name());
-    return true;
+    return tableOperation.drop(databaseName, tableIdent.name());
   }
 
   /**
@@ -486,33 +486,6 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   // TODO. We should figure out a better way to get the current user from servlet container.
   private static String currentUser() {
     return System.getProperty("user.name");
-  }
-
-  @Override
-  public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
-    return jdbcTablePropertiesMetadata;
-  }
-
-  @Override
-  public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
-    return jdbcCatalogPropertiesMetadata;
-  }
-
-  @Override
-  public PropertiesMetadata schemaPropertiesMetadata() throws UnsupportedOperationException {
-    return jdbcSchemaPropertiesMetadata;
-  }
-
-  @Override
-  public PropertiesMetadata filesetPropertiesMetadata() throws UnsupportedOperationException {
-    throw new UnsupportedOperationException(
-        "Jdbc catalog doesn't support fileset related operations");
-  }
-
-  @Override
-  public PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException {
-    throw new UnsupportedOperationException(
-        "Jdbc catalog doesn't support topic related operations");
   }
 
   public void deregisterDriver(Driver driver) throws SQLException {

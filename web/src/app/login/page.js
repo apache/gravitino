@@ -7,7 +7,7 @@
 
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { Alata } from 'next/font/google'
+import { Roboto } from 'next/font/google'
 
 import { Box, Card, Grid, Button, CardContent, Typography, TextField, FormControl, FormHelperText } from '@mui/material'
 
@@ -19,7 +19,7 @@ import { yupResolver } from '@hookform/resolvers/yup'
 import { useAppDispatch } from '@/lib/hooks/useStore'
 import { loginAction } from '@/lib/store/auth'
 
-const fonts = Alata({ subsets: ['latin'], weight: ['400'], display: 'swap' })
+const fonts = Roboto({ subsets: ['latin'], weight: ['400'], display: 'swap' })
 
 const defaultValues = {
   grant_type: 'client_credentials',
@@ -72,10 +72,7 @@ const LoginPage = () => {
                 height={24}
                 alt='logo'
               />
-              <Typography
-                variant='h6'
-                className={clsx('twc-ml-2 twc-font-semibold twc-text-[1.5rem]', fonts.className)}
-              >
+              <Typography variant='h6' className={clsx('twc-text-[black] twc-ml-2 twc-text-[1.5rem]', fonts.className)}>
                 Gravitino
               </Typography>
             </Box>

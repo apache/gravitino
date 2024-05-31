@@ -23,9 +23,7 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.connector.BaseCatalog;
-import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;
-import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.connector.PropertyEntry;
 import com.datastrato.gravitino.connector.SupportsSchemas;
 import com.datastrato.gravitino.connector.capability.Capability;
@@ -152,7 +150,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
     public <R> R doWithPropertiesMeta(ThrowableFunction<HasPropertyMetadata, R> fn)
         throws Exception {
-      return classLoader.withClassLoader(cl -> fn.apply(catalog.ops()));
+      return classLoader.withClassLoader(cl -> fn.apply(catalog));
     }
 
     public Capability capabilities() throws Exception {
@@ -164,7 +162,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         classLoader.withClassLoader(
             cl -> {
               if (catalog != null) {
-                catalog.ops().close();
+                catalog.close();
               }
               catalog = null;
               return null;
@@ -321,15 +319,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
-
-    if (Entity.SYSTEM_CATALOG_RESERVED_NAME.equals(ident.name())) {
-      throw new IllegalArgumentException("Can't create a catalog with with reserved name `system`");
-    }
-
-    if (Entity.SECURABLE_ENTITY_RESERVED_NAME.equals(ident.name())) {
-      throw new IllegalArgumentException("Can't create a catalog with with reserved name `*`");
-    }
-
     // load catalog-related configuration from catalog-specific configuration file
     Map<String, String> newProperties = Optional.ofNullable(properties).orElse(Maps.newHashMap());
     Map<String, String> catalogSpecificConfig = loadCatalogSpecificConfig(newProperties, provider);
@@ -586,7 +575,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         cl -> {
           Map<String, String> configWithoutId = Maps.newHashMap(conf);
           configWithoutId.remove(ID_KEY);
-          validatePropertyForCreate(catalog.ops().catalogPropertiesMetadata(), configWithoutId);
+          validatePropertyForCreate(catalog.catalogPropertiesMetadata(), configWithoutId);
 
           // Call wrapper.catalog.properties() to make BaseCatalog#properties in IsolatedClassLoader
           // not null. Why we do this? Because wrapper.catalog.properties() need to be called in the
@@ -609,18 +598,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     try (IsolatedClassLoader classLoader = createClassLoader(provider, conf)) {
       BaseCatalog<?> catalog = createBaseCatalog(classLoader, entity);
       return classLoader.withClassLoader(
-          cl -> {
-            try (CatalogOperations ops = catalog.ops()) {
-              PropertiesMetadata catalogPropertiesMetadata = ops.catalogPropertiesMetadata();
-              return catalogPropertiesMetadata.propertyEntries().values().stream()
+          cl ->
+              catalog.catalogPropertiesMetadata().propertyEntries().values().stream()
                   .filter(PropertyEntry::isHidden)
                   .map(PropertyEntry::getName)
-                  .collect(Collectors.toSet());
-            } catch (Exception e) {
-              LOG.error("Failed to get hidden property names", e);
-              throw e;
-            }
-          },
+                  .collect(Collectors.toSet()),
           RuntimeException.class);
     }
   }

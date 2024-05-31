@@ -24,7 +24,6 @@ import com.datastrato.gravitino.integration.test.container.PostgreSQLContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
-import com.datastrato.gravitino.integration.test.util.JdbcDriverDownloader;
 import com.datastrato.gravitino.integration.test.util.TestDatabaseName;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Table;
@@ -46,8 +45,6 @@ import com.datastrato.gravitino.rel.types.Types.IntegerType;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Arrays;
@@ -72,8 +69,6 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 public class CatalogPostgreSqlIT extends AbstractIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   public static final PGImageName DEFAULT_POSTGRES_IMAGE = PGImageName.VERSION_13;
-  public static final String DOWNLOAD_JDBC_DRIVER_URL =
-      "https://jdbc.postgresql.org/download/postgresql-42.7.0.jar";
 
   public String metalakeName = GravitinoITUtils.genRandomName("postgresql_it_metalake");
   public String catalogName = GravitinoITUtils.genRandomName("postgresql_it_catalog");
@@ -101,12 +96,6 @@ public class CatalogPostgreSqlIT extends AbstractIT {
 
   @BeforeAll
   public void startup() throws IOException, SQLException {
-
-    if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
-      String gravitinoHome = System.getenv("GRAVITINO_HOME");
-      Path tmpPath = Paths.get(gravitinoHome, "/catalogs/jdbc-postgresql/libs");
-      JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_JDBC_DRIVER_URL, tmpPath.toString());
-    }
     containerSuite.startPostgreSQLContainer(TEST_DB_NAME, postgreImageName);
     POSTGRESQL_CONTAINER = containerSuite.getPostgreSQLContainer(postgreImageName);
 
@@ -119,6 +108,11 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   @AfterAll
   public void stop() {
     clearTableAndSchema();
+    NameIdentifier[] schemaIdentifiers = catalog.asSchemas().listSchemas();
+    for (NameIdentifier nameIdentifier : schemaIdentifiers) {
+      catalog.asSchemas().dropSchema(nameIdentifier.name(), true);
+    }
+    metalake.dropCatalog(catalogName);
     client.dropMetalake(metalakeName);
     postgreSqlService.close();
   }
@@ -337,7 +331,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     schemaMap =
         Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v -> v));
     Assertions.assertFalse(schemaMap.containsKey(testSchemaName));
-    Assertions.assertFalse(schemas.dropSchema("no-exits", false));
+    Assertions.assertFalse(schemas.dropSchema("no_exits", false));
     TableCatalog tableCatalog = catalog.asTableCatalog();
 
     // create failed check.
@@ -1277,7 +1271,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         catalog
             .asTableCatalog()
             .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
-    Assertions.assertEquals(Types.UnparsedType.of("bit"), loadedTable.columns()[0].dataType());
+    Assertions.assertEquals(Types.ExternalType.of("bit"), loadedTable.columns()[0].dataType());
   }
 
   @Test

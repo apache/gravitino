@@ -22,6 +22,10 @@ docker run --rm -d -p 8090:8090 -p 9001:9001 datastrato/gravitino
 
 Changelog
 
+- gravitino:0.5.1
+  - Based on Gravitino 0.5.1, you can know more information from 0.5.0 release notes.
+
+
 - gravitino:0.5.0
   - Based on Gravitino 0.5.0, you can know more information from 0.5.0 release notes.
 
@@ -63,6 +67,10 @@ Changelog
 
 Changelog
 
+- trino:426-gravitino-0.5.1
+  - Based on Gravitino 0.5.1, you can know more information from 0.5.1 release notes.
+
+
 - trino:426-gravitino-0.5.0
   - Based on Gravitino 0.5.0, you can know more information from 0.5.0 release notes.
 
@@ -89,6 +97,13 @@ You can use these kinds of Docker images to facilitate integration testing of al
 You can use this kind of image to test the catalog of Apache Hive with kerberos enable
 
 Changelog
+- gravitino-ci-kerberos-hive:0.1.2
+  - Add `${HOSTNAME} >> /root/.ssh/known_hosts` to the startup script.
+  - Add check for the status of DataNode, if the DataNode is not running or ready within 100s, the container will exit.
+
+- gravitino-ci-kerberos-hive:0.1.1
+  - Add a principal for Gravitino web server named 'HTTP/localhost@HADOOPKRB'.
+  - Fix bugs about the configuration of proxy users. 
 
 - gravitino-ci-kerberos-hive:0.1.0
     - Set up a Hive cluster with kerberos enabled.

@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class TestFilesetCatalog(IntegrationTestEnv):
-    metalake_name: str = "TestFilesetCatalog-metalake" + str(randint(1, 10000))
+    metalake_name: str = "TestFilesetCatalog_metalake" + str(randint(1, 10000))
     catalog_name: str = "catalog"
     catalog_location_prop: str = "location"  # Fileset Catalog must set `location`
     catalog_provider: str = "hadoop"
@@ -111,7 +111,7 @@ class TestFilesetCatalog(IntegrationTestEnv):
         )
         catalog = self.gravitino_client.create_catalog(
             ident=self.catalog_ident,
-            type=Catalog.Type.FILESET,
+            catalog_type=Catalog.Type.FILESET,
             provider=self.catalog_provider,
             comment="",
             properties={self.catalog_location_prop: "/tmp/test1"},
@@ -124,7 +124,7 @@ class TestFilesetCatalog(IntegrationTestEnv):
         catalog = self.gravitino_client.load_catalog(ident=self.catalog_ident)
         return catalog.as_fileset_catalog().create_fileset(
             ident=self.fileset_ident,
-            type=Fileset.Type.MANAGED,
+            fileset_type=Fileset.Type.MANAGED,
             comment=self.fileset_comment,
             storage_location=self.fileset_location,
             properties=self.fileset_properties,

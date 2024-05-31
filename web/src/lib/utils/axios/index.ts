@@ -42,6 +42,24 @@ import { joinTimestamp, formatRequestDate } from './helper'
 import { AxiosRetry } from './axiosRetry'
 import axios from 'axios'
 import { useAuth as Auth } from '../../provider/session'
+import qs from 'qs'
+
+let isRefreshing = false
+
+const refreshToken = async () => {
+  const url = localStorage.getItem('oauthUrl')
+  const params = localStorage.getItem('authParams')
+
+  const res = await defHttp.post({ url: `${url}?${qs.stringify(JSON.parse(params))}` }, { withToken: false })
+
+  return res
+}
+
+const resetToLoginState = () => {
+  localStorage.removeItem('accessToken')
+  localStorage.removeItem('authParams')
+  window.location.href = '/login'
+}
 
 /**
  * @description: Data processing to facilitate the distinction of multiple processing methods
@@ -222,6 +240,40 @@ const transform: AxiosTransform = {
     }
 
     checkStatus(error?.response?.status, msg, errorMessageMode)
+
+    if (response?.status === 401 && !originConfig._retry) {
+      // Log out directly if idle for more than 30 minutes
+      const isIdle = localStorage.getItem('isIdle') && JSON.parse(localStorage.getItem('isIdle'))
+      if (isIdle) {
+        console.error('User is idle')
+        resetToLoginState()
+      }
+
+      originConfig._retry = true
+
+      if (!isRefreshing) {
+        isRefreshing = true
+
+        try {
+          refreshToken()
+            .then(res => {
+              const { access_token } = res
+              localStorage.setItem('accessToken', access_token)
+
+              return defHttp.request(originConfig)
+            })
+            .catch(err => {
+              console.error('refreshToken error =>', err)
+              resetToLoginState()
+            })
+        } catch (err) {
+          console.error(err)
+        } finally {
+          isRefreshing = false
+          location.reload()
+        }
+      }
+    }
 
     const retryRequest = new AxiosRetry()
     const { isOpenRetry } = originConfig.requestOptions.retryRequest

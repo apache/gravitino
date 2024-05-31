@@ -7,8 +7,10 @@
 # start ssh
 HOSTNAME=`hostname`
 service ssh start
-ssh-keyscan localhost > /root/.ssh/known_hosts
+ssh-keyscan ${HOSTNAME} >> /root/.ssh/known_hosts
+ssh-keyscan localhost >> /root/.ssh/known_hosts
 ssh-keyscan 0.0.0.0 >> /root/.ssh/known_hosts
+ssh-keyscan 127.0.0.1 >> /root/.ssh/known_hosts
 
 # init the Kerberos database
 echo -e "${PASS}\n${PASS}" | kdb5_util create -s
@@ -42,6 +44,13 @@ kadmin.local -q "ktadd -norandkey -k ${KRB5_KTNAME} hive/${HOSTNAME}@${FQDN}"
 kadmin.local -q "xst -k /hive.keytab -norandkey hive/${HOSTNAME}@${FQDN}"
 kadmin.local -q "xst -k /cli.keytab -norandkey cli@${FQDN}"
 
+# For Gravitino web server
+echo -e "${PASS}\n${PASS}" | kadmin.local -q "addprinc gravitino_client@${FQDN}"
+kadmin.local -q "ktadd -norandkey -k /gravitino_client.keytab gravitino_client@${FQDN}"
+
+echo -e "${PASS}\n${PASS}" | kadmin.local -q "addprinc HTTP/localhost@${FQDN}"
+kadmin.local -q "ktadd -norandkey -k /gravitino_server.keytab HTTP/localhost@${FQDN}"
+
 echo -e "${PASS}\n" | kinit hive/${HOSTNAME}
 
 # Update the configuration file
@@ -58,6 +67,37 @@ ${HADOOP_HOME}/sbin/hadoop-daemon.sh start namenode
 
 echo "Starting DataNode..."
 ${HADOOP_HOME}/sbin/start-secure-dns.sh
+sleep 5
+
+# Check if the DataNode is running
+ps -ef | grep DataNode | grep -v "color=auto"
+if [[ $? -ne 0 ]]; then
+  echo "DataNode failed to start, please check the logs"
+  ehco "HDFS DataNode log start----------------------------"
+  cat ${HADOOP_HOME}/bin/logs/hadoop-root-datanode-*.log
+  exit 1
+fi
+
+retry_times=0
+ready=0
+while [[ ${retry_times} -lt 10 ]]; do
+  hdfs_ready=$(hdfs dfsadmin -report | grep "Live datanodes" | awk '{print $3}')
+  if [[ ${hdfs_ready} == "(1):" ]]; then
+    echo "HDFS is ready, retry_times = ${retry_times}"
+    let "ready=0"
+    break
+  fi
+  sleep 10
+  retry_times=$((retry_times+1))
+done
+
+if [[ ${ready} -ne 0 ]]; then
+  echo "HDFS is not ready"
+  ehco "HDFS DataNode log start---------------------------"
+  cat ${HADOOP_HOME}/bin/logs/hadoop-root-datanode-*.log
+  exit 1
+fi
+
 
 # start mysql and create databases/users for hive
 chown -R mysql:mysql /var/lib/mysql

@@ -199,28 +199,20 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
    * Drop the table with specified identifier.
    *
    * @param ident The identifier of the table.
-   * @return true if the table is dropped successfully, false otherwise.
+   * @return true if the table is dropped successfully, false if the table does not exist.
    */
   @Override
   public boolean dropTable(NameIdentifier ident) {
     NameIdentifier.checkTable(ident);
 
-    try {
-      DropResponse resp =
-          restClient.delete(
-              formatTableRequestPath(ident.namespace())
-                  + "/"
-                  + RESTUtils.encodeString(ident.name()),
-              DropResponse.class,
-              Collections.emptyMap(),
-              ErrorHandlers.tableErrorHandler());
-      resp.validate();
-      return resp.dropped();
-
-    } catch (Exception e) {
-      LOG.warn("Failed to drop table {}", ident, e);
-      return false;
-    }
+    DropResponse resp =
+        restClient.delete(
+            formatTableRequestPath(ident.namespace()) + "/" + RESTUtils.encodeString(ident.name()),
+            DropResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.tableErrorHandler());
+    resp.validate();
+    return resp.dropped();
   }
 
   /**
