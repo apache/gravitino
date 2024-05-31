@@ -915,16 +915,8 @@ public class POConverters {
   }
 
   public static SecurableObjectPO.Builder initializeSecurablePOBuilderWithVersion(
-      long roleId, SecurableObject securableObject) {
+      long roleId, SecurableObject securableObject, String type) {
     try {
-      String type;
-      if (securableObject.type() == MetadataObject.Type.METALAKE
-          && securableObject.name().equals("*")) {
-        type = "ROOT";
-      } else {
-        type = securableObject.type().name();
-      }
-
       SecurableObjectPO.Builder builder = SecurableObjectPO.builder();
       builder
           .withRoleId(roleId)

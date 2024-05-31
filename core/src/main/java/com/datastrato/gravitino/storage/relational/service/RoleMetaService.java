@@ -94,7 +94,8 @@ public class RoleMetaService {
       List<SecurableObjectPO> securableObjectPOS = Lists.newArrayList();
       for (SecurableObject object : roleEntity.securableObjects()) {
         SecurableObjectPO.Builder objectBuilder =
-            POConverters.initializeSecurablePOBuilderWithVersion(roleEntity.id(), object);
+            POConverters.initializeSecurablePOBuilderWithVersion(
+                roleEntity.id(), object, getPOType(object));
         objectBuilder.withEntityId(
             getSecurableObjectEntityId(metalakeId, object.fullName(), object.type()));
         securableObjectPOS.add(objectBuilder.build());
@@ -323,5 +324,16 @@ public class RoleMetaService {
       return MetadataObject.Type.METALAKE;
     }
     return MetadataObject.Type.valueOf(type);
+  }
+
+  private String getPOType(SecurableObject securableObject) {
+    String type;
+    if (securableObject.type() == MetadataObject.Type.METALAKE
+        && securableObject.name().equals("*")) {
+      type = "ROOT";
+    } else {
+      type = securableObject.type().name();
+    }
+    return type;
   }
 }
