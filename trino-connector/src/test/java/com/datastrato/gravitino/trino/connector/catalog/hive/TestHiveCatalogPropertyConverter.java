@@ -9,12 +9,12 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
 import com.datastrato.gravitino.trino.connector.metadata.TestGravitinoCatalog;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import java.util.Map;
 import java.util.Set;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
 public class TestHiveCatalogPropertyConverter {
 
@@ -30,9 +30,9 @@ public class TestHiveCatalogPropertyConverter {
             .build();
 
     Map<String, String> re = hiveCatalogPropertyConverter.gravitinoToEngineProperties(map);
-    Assertions.assertEquals(re.get("hive.immutable-partitions"), "true");
-    Assertions.assertEquals(re.get("hive.compression-codec"), "ZSTD");
-    Assertions.assertNull(re.get("hive.unknown-key"));
+    Assert.assertEquals(re.get("hive.immutable-partitions"), "true");
+    Assert.assertEquals(re.get("hive.compression-codec"), "ZSTD");
+    Assert.assertEquals(re.get("hive.unknown-key"), null);
   }
 
   // To test whether we load jar `bundled-catalog` successfully.
@@ -45,7 +45,7 @@ public class TestHiveCatalogPropertyConverter {
 
     // Needs to confirm whether external should be a property key for Trino.
     gravitinoHiveKeys.remove("external");
-    Assertions.assertTrue(actualGravitinoKeys.containsAll(gravitinoHiveKeys));
+    Assert.assertTrue(actualGravitinoKeys.containsAll(gravitinoHiveKeys));
   }
 
   @Test
@@ -63,21 +63,26 @@ public class TestHiveCatalogPropertyConverter {
         TestGravitinoCatalog.mockCatalog(
             name, "hive", "test catalog", Catalog.Type.RELATIONAL, properties);
     HiveConnectorAdapter adapter = new HiveConnectorAdapter();
-    Map<String, String> config =
+    Map<String, Object> stringObjectMap =
         adapter.buildInternalConnectorConfig(new GravitinoCatalog("test", mockCatalog));
 
+    // test connector attributes
+    Assert.assertEquals(stringObjectMap.get("connectorName"), "hive");
+
+    Map<String, Object> propertiesMap = (Map<String, Object>) stringObjectMap.get("properties");
+
     // test converted properties
-    Assertions.assertEquals(config.get("hive.metastore.uri"), "thrift://localhost:9083");
+    Assert.assertEquals(propertiesMap.get("hive.metastore.uri"), "thrift://localhost:9083");
 
     // test fixed properties
-    Assertions.assertEquals(config.get("hive.security"), "allow-all");
+    Assert.assertEquals(propertiesMap.get("hive.security"), "allow-all");
 
     // test trino passing properties
-    Assertions.assertEquals(
-        config.get("hive.config.resources"), "/tmp/hive-site.xml, /tmp/core-site.xml");
+    Assert.assertEquals(
+        propertiesMap.get("hive.config.resources"), "/tmp/hive-site.xml, /tmp/core-site.xml");
 
     // test unknown properties
-    Assertions.assertNull(config.get("hive.unknown-key"));
-    Assertions.assertNull(config.get("trino.bypass.unknown-key"));
+    Assert.assertNull(propertiesMap.get("hive.unknown-key"));
+    Assert.assertNull(propertiesMap.get("trino.bypass.unknown-key"));
   }
 }

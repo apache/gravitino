@@ -12,7 +12,7 @@ import io.trino.spi.connector.ConnectorFactory;
 public class TestGravitinoPlugin extends GravitinoPlugin {
   private TestGravitinoConnectorFactory factory;
 
-  private final GravitinoAdminClient gravitinoClient;
+  private GravitinoAdminClient gravitinoClient;
 
   public TestGravitinoPlugin(GravitinoAdminClient gravitinoClient) {
     this.gravitinoClient = gravitinoClient;

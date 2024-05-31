@@ -46,6 +46,6 @@ public class CatalogConnectorFactory {
     }
 
     // Avoid using the same builder object to prevent catalog creation errors.
-    return builder.clone(catalog);
+    return builder.clone();
   }
 }

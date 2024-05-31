@@ -4,11 +4,11 @@
  */
 package com.datastrato.gravitino.trino.connector.metadata;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.testng.Assert.assertEquals;
 
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.types.Types;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 public class TestGravitinoColumn {
 

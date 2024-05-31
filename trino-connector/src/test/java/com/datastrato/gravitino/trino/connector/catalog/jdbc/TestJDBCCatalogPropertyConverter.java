@@ -15,10 +15,10 @@ import com.datastrato.gravitino.trino.connector.catalog.jdbc.mysql.MySQLConnecto
 import com.datastrato.gravitino.trino.connector.catalog.jdbc.postgresql.PostgreSQLConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
 import com.datastrato.gravitino.trino.connector.metadata.TestGravitinoCatalog;
-import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
 public class TestJDBCCatalogPropertyConverter {
 
@@ -33,17 +33,17 @@ public class TestJDBCCatalogPropertyConverter {
 
     Map<String, String> trinoProperties =
         propertyConverter.gravitinoToEngineProperties(gravitinoProperties);
-    Assertions.assertEquals(
+    Assert.assertEquals(
         trinoProperties.get(JDBC_CONNECTION_URL_KEY), "jdbc:mysql://localhost:3306");
-    Assertions.assertEquals(trinoProperties.get(JDBC_CONNECTION_USER_KEY), "root");
-    Assertions.assertEquals(trinoProperties.get(JDBC_CONNECTION_PASSWORD_KEY), "root");
+    Assert.assertEquals(trinoProperties.get(JDBC_CONNECTION_USER_KEY), "root");
+    Assert.assertEquals(trinoProperties.get(JDBC_CONNECTION_PASSWORD_KEY), "root");
 
     Map<String, String> gravitinoPropertiesWithoutPassword =
         ImmutableMap.of(
             "jdbc-url", "jdbc:mysql://localhost:3306",
             "jdbc-user", "root");
 
-    Assertions.assertThrows(
+    Assert.assertThrows(
         IllegalArgumentException.class,
         () -> {
           propertyConverter.gravitinoToEngineProperties(gravitinoPropertiesWithoutPassword);
@@ -68,20 +68,26 @@ public class TestJDBCCatalogPropertyConverter {
             name, "jdbc-postgresql", "test catalog", Catalog.Type.RELATIONAL, properties);
     PostgreSQLConnectorAdapter adapter = new PostgreSQLConnectorAdapter();
 
-    Map<String, String> config =
+    Map<String, Object> stringObjectMap =
         adapter.buildInternalConnectorConfig(new GravitinoCatalog("test", mockCatalog));
 
+    // test connector attributes
+    Assert.assertEquals(stringObjectMap.get("connectorName"), "postgresql");
+
+    Map<String, Object> propertiesMap = (Map<String, Object>) stringObjectMap.get("properties");
+
     // test converted properties
-    Assertions.assertEquals(config.get("connection-url"), "jdbc:postgresql://localhost:5432/test");
-    Assertions.assertEquals(config.get("connection-user"), "test");
-    Assertions.assertEquals(config.get("connection-password"), "test");
+    Assert.assertEquals(
+        propertiesMap.get("connection-url"), "jdbc:postgresql://localhost:5432/test");
+    Assert.assertEquals(propertiesMap.get("connection-user"), "test");
+    Assert.assertEquals(propertiesMap.get("connection-password"), "test");
 
     // test trino passing properties
-    Assertions.assertEquals(config.get("join-pushdown.strategy"), "EAGER");
+    Assert.assertEquals(propertiesMap.get("join-pushdown.strategy"), "EAGER");
 
     // test unknown properties
-    Assertions.assertNull(config.get("hive.unknown-key"));
-    Assertions.assertNull(config.get("trino.bypass.unknown-key"));
+    Assert.assertNull(propertiesMap.get("hive.unknown-key"));
+    Assert.assertNull(propertiesMap.get("trino.bypass.unknown-key"));
   }
 
   @Test
@@ -102,19 +108,24 @@ public class TestJDBCCatalogPropertyConverter {
             name, "jdbc-postgresql", "test catalog", Catalog.Type.RELATIONAL, properties);
     MySQLConnectorAdapter adapter = new MySQLConnectorAdapter();
 
-    Map<String, String> config =
+    Map<String, Object> stringObjectMap =
         adapter.buildInternalConnectorConfig(new GravitinoCatalog("test", mockCatalog));
 
+    // test connector attributes
+    Assert.assertEquals(stringObjectMap.get("connectorName"), "mysql");
+
+    Map<String, Object> propertiesMap = (Map<String, Object>) stringObjectMap.get("properties");
+
     // test converted properties
-    Assertions.assertEquals(config.get("connection-url"), "jdbc:mysql://localhost:5432/test");
-    Assertions.assertEquals(config.get("connection-user"), "test");
-    Assertions.assertEquals(config.get("connection-password"), "test");
+    Assert.assertEquals(propertiesMap.get("connection-url"), "jdbc:mysql://localhost:5432/test");
+    Assert.assertEquals(propertiesMap.get("connection-user"), "test");
+    Assert.assertEquals(propertiesMap.get("connection-password"), "test");
 
     // test trino passing properties
-    Assertions.assertEquals(config.get("join-pushdown.strategy"), "EAGER");
+    Assert.assertEquals(propertiesMap.get("join-pushdown.strategy"), "EAGER");
 
     // test unknown properties
-    Assertions.assertNull(config.get("hive.unknown-key"));
-    Assertions.assertNull(config.get("trino.bypass.unknown-key"));
+    Assert.assertNull(propertiesMap.get("hive.unknown-key"));
+    Assert.assertNull(propertiesMap.get("trino.bypass.unknown-key"));
   }
 }

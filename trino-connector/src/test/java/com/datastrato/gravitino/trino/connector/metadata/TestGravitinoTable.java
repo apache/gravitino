@@ -6,6 +6,9 @@ package com.datastrato.gravitino.trino.connector.metadata;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.rel.Column;
@@ -22,8 +25,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 public class TestGravitinoTable {
 
@@ -38,31 +40,30 @@ public class TestGravitinoTable {
 
     GravitinoTable table = new GravitinoTable("db1", "table1", mockTable);
 
-    Assertions.assertEquals(table.getName(), mockTable.name());
-    Assertions.assertEquals(table.getSchemaName(), "db1");
-    Assertions.assertEquals(table.getColumns().size(), mockTable.columns().length);
+    assertEquals(table.getName(), mockTable.name());
+    assertEquals(table.getSchemaName(), "db1");
+    assertEquals(table.getColumns().size(), mockTable.columns().length);
     for (int i = 0; i < table.getColumns().size(); i++) {
-      Assertions.assertEquals(table.getColumns().get(i).getName(), mockTable.columns()[i].name());
+      assertEquals(table.getColumns().get(i).getName(), mockTable.columns()[i].name());
     }
-    Assertions.assertEquals(table.getComment(), mockTable.comment());
-    Assertions.assertEquals(table.getProperties(), mockTable.properties());
+    assertEquals(table.getComment(), mockTable.comment());
+    assertEquals(table.getProperties(), mockTable.properties());
 
     CatalogConnectorMetadataAdapter adapter =
         new HiveMetadataAdapter(
             Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
 
     ConnectorTableMetadata tableMetadata = adapter.getTableMetadata(table);
-    Assertions.assertEquals(tableMetadata.getColumns().size(), table.getColumns().size());
-    Assertions.assertEquals(tableMetadata.getTableSchema().getTable().getSchemaName(), "db1");
-    Assertions.assertEquals(
-        tableMetadata.getTableSchema().getTable().getTableName(), table.getName());
+    assertEquals(tableMetadata.getColumns().size(), table.getColumns().size());
+    assertEquals(tableMetadata.getTableSchema().getTable().getSchemaName(), "db1");
+    assertEquals(tableMetadata.getTableSchema().getTable().getTableName(), table.getName());
 
     for (int i = 0; i < table.getColumns().size(); i++) {
-      Assertions.assertEquals(
+      assertEquals(
           tableMetadata.getColumns().get(i).getName(), table.getColumns().get(i).getName());
     }
-    Assertions.assertTrue(tableMetadata.getComment().isPresent());
-    Assertions.assertEquals(tableMetadata.getComment().get(), mockTable.comment());
+    assertTrue(tableMetadata.getComment().isPresent());
+    assertEquals(tableMetadata.getComment().get(), mockTable.comment());
   }
 
   @Test
@@ -76,13 +77,13 @@ public class TestGravitinoTable {
     Table mockTable = mockTable("table1", columns, null, properties);
 
     GravitinoTable table = new GravitinoTable("db1", "table1", mockTable);
-    Assertions.assertNull(table.getComment());
+    assertNull(table.getComment());
 
     CatalogConnectorMetadataAdapter adapter =
         new HiveMetadataAdapter(
             Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
     ConnectorTableMetadata tableMetadata = adapter.getTableMetadata(table);
-    Assertions.assertTrue(tableMetadata.getComment().isEmpty());
+    assertTrue(tableMetadata.getComment().isEmpty());
   }
 
   public static Table mockTable(

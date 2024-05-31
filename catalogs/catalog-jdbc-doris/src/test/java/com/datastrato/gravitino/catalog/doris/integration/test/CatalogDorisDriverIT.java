@@ -10,5 +10,7 @@ import org.junit.jupiter.api.Tag;
 public class CatalogDorisDriverIT extends CatalogDorisIT {
   public CatalogDorisDriverIT() {
     super();
+    mysqlDriverDownloadUrl =
+        "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.11/mysql-connector-java-8.0.11.jar";
   }
 }
