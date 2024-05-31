@@ -6,7 +6,6 @@
 package com.datastrato.gravitino.catalog.hadoop.integration.test;
 
 import static com.datastrato.gravitino.catalog.hadoop.kerberos.AuthenticationConfig.AUTH_TYPE_KEY;
-import static com.datastrato.gravitino.catalog.hadoop.kerberos.AuthenticationConfig.ENABLE_AUTH_KEY;
 import static com.datastrato.gravitino.catalog.hadoop.kerberos.KerberosConfig.IMPERSONATION_ENABLE_KEY;
 import static com.datastrato.gravitino.catalog.hadoop.kerberos.KerberosConfig.KEY_TAB_URI_KEY;
 import static com.datastrato.gravitino.catalog.hadoop.kerberos.KerberosConfig.PRINCIPAL_KEY;
@@ -168,7 +167,6 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
     // Create a catalog
     Map<String, String> properties = Maps.newHashMap();
 
-    properties.put(ENABLE_AUTH_KEY, "true");
     properties.put(AUTH_TYPE_KEY, "kerberos");
     properties.put(IMPERSONATION_ENABLE_KEY, "true");
     properties.put(KEY_TAB_URI_KEY, TMP_DIR + HADOOP_CLIENT_KEYTAB);

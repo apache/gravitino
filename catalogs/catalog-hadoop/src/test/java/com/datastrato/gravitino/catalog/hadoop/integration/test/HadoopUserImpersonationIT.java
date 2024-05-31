@@ -6,7 +6,6 @@
 package com.datastrato.gravitino.catalog.hadoop.integration.test;
 
 import static com.datastrato.gravitino.catalog.hadoop.kerberos.AuthenticationConfig.AUTH_TYPE_KEY;
-import static com.datastrato.gravitino.catalog.hadoop.kerberos.AuthenticationConfig.ENABLE_AUTH_KEY;
 import static com.datastrato.gravitino.catalog.hadoop.kerberos.KerberosConfig.IMPERSONATION_ENABLE_KEY;
 import static com.datastrato.gravitino.catalog.hadoop.kerberos.KerberosConfig.KEY_TAB_URI_KEY;
 import static com.datastrato.gravitino.catalog.hadoop.kerberos.KerberosConfig.PRINCIPAL_KEY;
@@ -253,7 +252,6 @@ public class HadoopUserImpersonationIT extends AbstractIT {
   private static void createCatalog() {
     ImmutableMap<String, String> catalogProperties =
         new ImmutableMap.Builder<String, String>()
-            .put(ENABLE_AUTH_KEY, "true")
             .put(AUTH_TYPE_KEY, "kerberos")
             .put(IMPERSONATION_ENABLE_KEY, "true")
             .put(PRINCIPAL_KEY, SERVER_PRINCIPAL + "@" + kdc.getRealm())
