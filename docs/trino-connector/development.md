@@ -127,16 +127,22 @@ then you can see the `gravitino-trino-connecor` source files and directories in 
             <version>2.0.9</version>
         </dependency>
 
+        <!--
+            You can switch to the snapshot version as you like,  for example,
+            if you want to use the jar of latest main branch,
+            you can execute the following command to install Gravitino `gravitino-client-java-runtime` jar locally.
+            ./gradlew publishToMavenLocal
+        -->
         <dependency>
             <groupId>com.datastrato.gravitino</groupId>
             <artifactId>gravitino-client-java-runtime</artifactId>
-            <version>0.6.0-SNAPSHOT</version>
+            <version>0.5.0</version>
         </dependency>
 
         <dependency>
             <groupId>com.datastrato.gravitino</groupId>
             <artifactId>gravitino-bundled-catalog</artifactId>
-            <version>0.6.0-SNAPSHOT</version>
+            <version>0.5.0</version>
         </dependency>
 
     </dependencies>
@@ -227,6 +233,7 @@ plugin.bundles=\
 
 node-scheduler.include-coordinator=true
 
+# Note: The Gravitino connector olny supports with The dynamic catalog manager
 catalog.management=dynamic
 ```
 

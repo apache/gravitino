@@ -16,10 +16,10 @@ Please refer to the [Deploying Trino documentation](https://trino.io/docs/curren
    Normally, the directory location is `Trino-server-<version>/plugin`, and the directory contains other catalogs used by Trino.
 3. Add Trino JVM arguments `-Dlog4j.configurationFile=file:////etc/trino/log4j2.properties` to enable logging for the Gravitino connector.
 4. Update Trino coordinator configuration. 
-   you need to set `catalog.management=dynamic` and `catalog.stores=file`
+   You need to set `catalog.management=dynamic` and `catalog.stores=file`
    The config location is `Trino-server-<version>/etc/config.properteis`,  and the contents like:
 
-```test
+```text
 coordinator=true
 node-scheduler.include-coordinator=true
 http-server.http.port=8080
@@ -78,9 +78,9 @@ Now you can see the Gravitino connector directory in the plugin directory.
 
 ### Configuring the Trino
 
-You can find the Trino configuration file in the `/etc/trino/config.properties`. You need changed the file like this:
+You can find the Trino configuration file `config.properties` in the directory `/etc/trino`. You need changed the file like this:
 
-```test
+```text
 #single node install config
 coordinator=true
 node-scheduler.include-coordinator=true
