@@ -9,6 +9,7 @@ import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.Metalake;
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.NameIdentifierUtil;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.dto.MetalakeDTO;
 import com.datastrato.gravitino.dto.requests.MetalakeCreateRequest;
@@ -92,7 +93,7 @@ public class MetalakeOperations {
           httpRequest,
           () -> {
             request.validate();
-            NameIdentifier ident = NameIdentifier.ofMetalake(request.getName());
+            NameIdentifier ident = NameIdentifierUtil.ofMetalake(request.getName());
             Metalake metalake =
                 TreeLockUtils.doWithRootTreeLock(
                     LockType.WRITE,
@@ -120,7 +121,7 @@ public class MetalakeOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            NameIdentifier identifier = NameIdentifier.ofMetalake(metalakeName);
+            NameIdentifier identifier = NameIdentifierUtil.ofMetalake(metalakeName);
             Metalake metalake =
                 TreeLockUtils.doWithTreeLock(
                     identifier, LockType.READ, () -> metalakeDispatcher.loadMetalake(identifier));
@@ -147,7 +148,7 @@ public class MetalakeOperations {
           httpRequest,
           () -> {
             updatesRequest.validate();
-            NameIdentifier identifier = NameIdentifier.ofMetalake(metalakeName);
+            NameIdentifier identifier = NameIdentifierUtil.ofMetalake(metalakeName);
             MetalakeChange[] changes =
                 updatesRequest.getUpdates().stream()
                     .map(MetalakeUpdateRequest::metalakeChange)
@@ -177,7 +178,7 @@ public class MetalakeOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            NameIdentifier identifier = NameIdentifier.ofMetalake(metalakeName);
+            NameIdentifier identifier = NameIdentifierUtil.ofMetalake(metalakeName);
             boolean dropped =
                 TreeLockUtils.doWithRootTreeLock(
                     LockType.WRITE, () -> metalakeDispatcher.dropMetalake(identifier));

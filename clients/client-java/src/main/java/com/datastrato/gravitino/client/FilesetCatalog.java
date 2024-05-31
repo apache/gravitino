@@ -87,7 +87,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
    */
   @Override
   public Fileset loadFileset(NameIdentifier ident) throws NoSuchFilesetException {
-    NameIdentifier.checkFileset(ident);
+    //    NameIdentifier.checkFileset(ident);
 
     FilesetResponse resp =
         restClient.get(
@@ -127,7 +127,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
       String storageLocation,
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
-    NameIdentifier.checkFileset(ident);
+    //    NameIdentifier.checkFileset(ident);
 
     FilesetCreateRequest req =
         FilesetCreateRequest.builder()
@@ -162,7 +162,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
   @Override
   public Fileset alterFileset(NameIdentifier ident, FilesetChange... changes)
       throws NoSuchFilesetException, IllegalArgumentException {
-    NameIdentifier.checkFileset(ident);
+    //    NameIdentifier.checkFileset(ident);
 
     List<FilesetUpdateRequest> updates =
         Arrays.stream(changes)
@@ -194,7 +194,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
    */
   @Override
   public boolean dropFileset(NameIdentifier ident) {
-    NameIdentifier.checkFileset(ident);
+    //    NameIdentifier.checkFileset(ident);
 
     DropResponse resp =
         restClient.delete(

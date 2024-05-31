@@ -5,7 +5,6 @@
 
 package com.datastrato.gravitino.client;
 
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Version;
 import com.datastrato.gravitino.dto.responses.MetalakeResponse;
 import com.datastrato.gravitino.dto.responses.VersionResponse;
@@ -126,7 +125,7 @@ public abstract class GravitinoClientBase implements Closeable {
    * @throws IllegalNameIdentifierException If the Metalake name is invalid.
    */
   public void checkMetalakeName(String metalakeName) {
-    NameIdentifier.checkMetalake(NameIdentifier.parse(metalakeName));
+    //    NameIdentifier.checkMetalake(NameIdentifier.parse(metalakeName));
   }
 
   /**

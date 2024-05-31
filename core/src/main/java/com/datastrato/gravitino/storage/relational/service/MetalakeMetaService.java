@@ -8,6 +8,7 @@ package com.datastrato.gravitino.storage.relational.service;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.NameIdentifierUtil;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
@@ -68,7 +69,7 @@ public class MetalakeMetaService {
   }
 
   public BaseMetalake getMetalakeByIdentifier(NameIdentifier ident) {
-    NameIdentifier.checkMetalake(ident);
+    NameIdentifierUtil.checkMetalake(ident);
     MetalakePO metalakePO =
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(ident.name()));
@@ -83,7 +84,7 @@ public class MetalakeMetaService {
 
   public void insertMetalake(BaseMetalake baseMetalake, boolean overwrite) {
     try {
-      NameIdentifier.checkMetalake(baseMetalake.nameIdentifier());
+      NameIdentifierUtil.checkMetalake(baseMetalake.nameIdentifier());
       SessionUtils.doWithCommit(
           MetalakeMetaMapper.class,
           mapper -> {
@@ -103,7 +104,7 @@ public class MetalakeMetaService {
 
   public <E extends Entity & HasIdentifier> BaseMetalake updateMetalake(
       NameIdentifier ident, Function<E, E> updater) throws IOException {
-    NameIdentifier.checkMetalake(ident);
+    NameIdentifierUtil.checkMetalake(ident);
     MetalakePO oldMetalakePO =
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(ident.name()));
@@ -143,7 +144,7 @@ public class MetalakeMetaService {
   }
 
   public boolean deleteMetalake(NameIdentifier ident, boolean cascade) {
-    NameIdentifier.checkMetalake(ident);
+    NameIdentifierUtil.checkMetalake(ident);
     Long metalakeId = getMetalakeIdByName(ident.name());
     if (metalakeId != null) {
       if (cascade) {

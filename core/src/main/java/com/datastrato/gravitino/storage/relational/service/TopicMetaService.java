@@ -7,6 +7,7 @@ package com.datastrato.gravitino.storage.relational.service;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.NameIdentifierUtil;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.TopicEntity;
@@ -36,7 +37,7 @@ public class TopicMetaService {
 
   public void insertTopic(TopicEntity topicEntity, boolean overwrite) {
     try {
-      NameIdentifier.checkTopic(topicEntity.nameIdentifier());
+      NameIdentifierUtil.checkTopic(topicEntity.nameIdentifier());
 
       TopicPO.Builder builder = TopicPO.builder();
       fillTopicPOBuilderParentEntityId(builder, topicEntity.namespace());
@@ -73,7 +74,7 @@ public class TopicMetaService {
 
   public <E extends Entity & HasIdentifier> TopicEntity updateTopic(
       NameIdentifier ident, Function<E, E> updater) throws IOException {
-    NameIdentifier.checkTopic(ident);
+    NameIdentifierUtil.checkTopic(ident);
 
     String topicName = ident.name();
 
@@ -150,7 +151,7 @@ public class TopicMetaService {
   }
 
   public TopicEntity getTopicByIdentifier(NameIdentifier identifier) {
-    NameIdentifier.checkTopic(identifier);
+    NameIdentifierUtil.checkTopic(identifier);
 
     Long schemaId =
         CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
@@ -161,7 +162,7 @@ public class TopicMetaService {
   }
 
   public boolean deleteTopic(NameIdentifier identifier) {
-    NameIdentifier.checkTopic(identifier);
+    NameIdentifierUtil.checkTopic(identifier);
 
     String topicName = identifier.name();
 

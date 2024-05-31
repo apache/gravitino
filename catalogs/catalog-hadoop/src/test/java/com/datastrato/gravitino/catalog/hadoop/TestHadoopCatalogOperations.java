@@ -221,13 +221,13 @@ public class TestHadoopCatalogOperations {
     String comment = "comment15";
     String catalogPath = TEST_ROOT_PATH + "/" + "catalog15";
     Schema schema = createSchema(name, comment, catalogPath, null);
-    NameIdentifier schema16 = NameIdentifier.ofSchema("m1", "c1", "schema16");
+    NameIdentifier schema16 = NameIdentifier.of("m1", "c1", "schema16");
 
     Assertions.assertEquals(name, schema.name());
 
     try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
       ops.initialize(Maps.newHashMap(), null, HADOOP_PROPERTIES_METADATA);
-      Schema schema1 = ops.loadSchema(NameIdentifier.ofSchema("m1", "c1", name));
+      Schema schema1 = ops.loadSchema(NameIdentifier.of("m1", "c1", name));
       Assertions.assertEquals(name, schema1.name());
       Assertions.assertEquals(comment, schema1.comment());
 
@@ -254,8 +254,8 @@ public class TestHadoopCatalogOperations {
       Set<NameIdentifier> idents =
           Arrays.stream(ops.listSchemas(Namespace.of("m1", "c1"))).collect(Collectors.toSet());
       Assertions.assertTrue(idents.size() >= 2);
-      Assertions.assertTrue(idents.contains(NameIdentifier.ofSchema("m1", "c1", name)));
-      Assertions.assertTrue(idents.contains(NameIdentifier.ofSchema("m1", "c1", name1)));
+      Assertions.assertTrue(idents.contains(NameIdentifier.of("m1", "c1", name)));
+      Assertions.assertTrue(idents.contains(NameIdentifier.of("m1", "c1", name1)));
     }
   }
 
@@ -269,7 +269,7 @@ public class TestHadoopCatalogOperations {
 
     try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
       ops.initialize(Maps.newHashMap(), null, HADOOP_PROPERTIES_METADATA);
-      Schema schema1 = ops.loadSchema(NameIdentifier.ofSchema("m1", "c1", name));
+      Schema schema1 = ops.loadSchema(NameIdentifier.of("m1", "c1", name));
       Assertions.assertEquals(name, schema1.name());
       Assertions.assertEquals(comment, schema1.comment());
 
@@ -279,26 +279,26 @@ public class TestHadoopCatalogOperations {
       String newKey = "k1";
       String newValue = "v1";
       SchemaChange setProperty = SchemaChange.setProperty(newKey, newValue);
-      Schema schema2 = ops.alterSchema(NameIdentifier.ofSchema("m1", "c1", name), setProperty);
+      Schema schema2 = ops.alterSchema(NameIdentifier.of("m1", "c1", name), setProperty);
       Assertions.assertEquals(name, schema2.name());
       Assertions.assertEquals(comment, schema2.comment());
       Map<String, String> props2 = schema2.properties();
       Assertions.assertTrue(props2.containsKey(newKey));
       Assertions.assertEquals(newValue, props2.get(newKey));
 
-      Schema schema3 = ops.loadSchema(NameIdentifier.ofSchema("m1", "c1", name));
+      Schema schema3 = ops.loadSchema(NameIdentifier.of("m1", "c1", name));
       Map<String, String> props3 = schema3.properties();
       Assertions.assertTrue(props3.containsKey(newKey));
       Assertions.assertEquals(newValue, props3.get(newKey));
 
       SchemaChange removeProperty = SchemaChange.removeProperty(newKey);
-      Schema schema4 = ops.alterSchema(NameIdentifier.ofSchema("m1", "c1", name), removeProperty);
+      Schema schema4 = ops.alterSchema(NameIdentifier.of("m1", "c1", name), removeProperty);
       Assertions.assertEquals(name, schema4.name());
       Assertions.assertEquals(comment, schema4.comment());
       Map<String, String> props4 = schema4.properties();
       Assertions.assertFalse(props4.containsKey(newKey));
 
-      Schema schema5 = ops.loadSchema(NameIdentifier.ofSchema("m1", "c1", name));
+      Schema schema5 = ops.loadSchema(NameIdentifier.of("m1", "c1", name));
       Map<String, String> props5 = schema5.properties();
       Assertions.assertFalse(props5.containsKey(newKey));
     }
@@ -311,7 +311,7 @@ public class TestHadoopCatalogOperations {
     String catalogPath = TEST_ROOT_PATH + "/" + "catalog20";
     Schema schema = createSchema(name, comment, catalogPath, null);
     Assertions.assertEquals(name, schema.name());
-    NameIdentifier id = NameIdentifier.ofSchema("m1", "c1", name);
+    NameIdentifier id = NameIdentifier.of("m1", "c1", name);
 
     try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
       ops.initialize(
@@ -369,7 +369,7 @@ public class TestHadoopCatalogOperations {
       catalogProps.put(HadoopCatalogPropertiesMetadata.LOCATION, catalogPath);
     }
 
-    NameIdentifier schemaIdent = NameIdentifier.ofSchema("m1", "c1", schemaName);
+    NameIdentifier schemaIdent = NameIdentifier.of("m1", "c1", schemaName);
     try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
       ops.initialize(catalogProps, null, HADOOP_PROPERTIES_METADATA);
       if (!ops.schemaExists(schemaIdent)) {
@@ -491,7 +491,7 @@ public class TestHadoopCatalogOperations {
       catalogProps.put(HadoopCatalogPropertiesMetadata.LOCATION, catalogPath);
     }
 
-    NameIdentifier schemaIdent = NameIdentifier.ofSchema("m1", "c1", schemaName);
+    NameIdentifier schemaIdent = NameIdentifier.of("m1", "c1", schemaName);
     try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
       ops.initialize(catalogProps, null, HADOOP_PROPERTIES_METADATA);
       if (!ops.schemaExists(schemaIdent)) {
@@ -858,7 +858,7 @@ public class TestHadoopCatalogOperations {
     try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
       ops.initialize(props, null, HADOOP_PROPERTIES_METADATA);
 
-      NameIdentifier schemaIdent = NameIdentifier.ofSchema("m1", "c1", name);
+      NameIdentifier schemaIdent = NameIdentifier.of("m1", "c1", name);
       Map<String, String> schemaProps = Maps.newHashMap();
       StringIdentifier stringId = StringIdentifier.fromId(idGenerator.nextId());
       schemaProps = Maps.newHashMap(StringIdentifier.newPropertiesWithId(stringId, schemaProps));

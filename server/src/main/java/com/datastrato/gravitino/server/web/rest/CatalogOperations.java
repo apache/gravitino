@@ -7,6 +7,7 @@ package com.datastrato.gravitino.server.web.rest;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.NameIdentifierUtil;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.CatalogDispatcher;
 import com.datastrato.gravitino.dto.requests.CatalogCreateRequest;
@@ -102,10 +103,10 @@ public class CatalogOperations {
           httpRequest,
           () -> {
             request.validate();
-            NameIdentifier ident = NameIdentifier.ofCatalog(metalake, request.getName());
+            NameIdentifier ident = NameIdentifierUtil.ofCatalog(metalake, request.getName());
             Catalog catalog =
                 TreeLockUtils.doWithTreeLock(
-                    NameIdentifier.ofMetalake(metalake),
+                    NameIdentifierUtil.ofMetalake(metalake),
                     LockType.WRITE,
                     () ->
                         catalogDispatcher.createCatalog(
@@ -132,7 +133,7 @@ public class CatalogOperations {
       @PathParam("metalake") String metalakeName, @PathParam("catalog") String catalogName) {
     LOG.info("Received load catalog request for catalog: {}.{}", metalakeName, catalogName);
     try {
-      NameIdentifier ident = NameIdentifier.ofCatalog(metalakeName, catalogName);
+      NameIdentifier ident = NameIdentifierUtil.ofCatalog(metalakeName, catalogName);
       Catalog catalog =
           TreeLockUtils.doWithTreeLock(
               ident, LockType.READ, () -> catalogDispatcher.loadCatalog(ident));
@@ -159,14 +160,14 @@ public class CatalogOperations {
           httpRequest,
           () -> {
             request.validate();
-            NameIdentifier ident = NameIdentifier.ofCatalog(metalakeName, catalogName);
+            NameIdentifier ident = NameIdentifierUtil.ofCatalog(metalakeName, catalogName);
             CatalogChange[] changes =
                 request.getUpdates().stream()
                     .map(CatalogUpdateRequest::catalogChange)
                     .toArray(CatalogChange[]::new);
             Catalog catalog =
                 TreeLockUtils.doWithTreeLock(
-                    NameIdentifier.ofMetalake(metalakeName),
+                    NameIdentifierUtil.ofMetalake(metalakeName),
                     LockType.WRITE,
                     () -> catalogDispatcher.alterCatalog(ident, changes));
             Response response = Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
@@ -190,10 +191,10 @@ public class CatalogOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            NameIdentifier ident = NameIdentifier.ofCatalog(metalakeName, catalogName);
+            NameIdentifier ident = NameIdentifierUtil.ofCatalog(metalakeName, catalogName);
             boolean dropped =
                 TreeLockUtils.doWithTreeLock(
-                    NameIdentifier.ofMetalake(metalakeName),
+                    NameIdentifierUtil.ofMetalake(metalakeName),
                     LockType.WRITE,
                     () -> catalogDispatcher.dropCatalog(ident));
             if (!dropped) {

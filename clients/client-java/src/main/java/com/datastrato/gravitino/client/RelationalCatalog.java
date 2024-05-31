@@ -95,7 +95,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
    */
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
-    NameIdentifier.checkTable(ident);
+    //    NameIdentifier.checkTable(ident);
 
     TableResponse resp =
         restClient.get(
@@ -132,7 +132,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    NameIdentifier.checkTable(ident);
+    //    NameIdentifier.checkTable(ident);
 
     TableCreateRequest req =
         new TableCreateRequest(
@@ -148,7 +148,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
 
     TableResponse resp =
         restClient.post(
-            formatTableRequestPath(ident.namespace()),
+             formatTableRequestPath(ident.namespace()),
             req,
             TableResponse.class,
             Collections.emptyMap(),
@@ -170,7 +170,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
-    NameIdentifier.checkTable(ident);
+    //    NameIdentifier.checkTable(ident);
 
     List<TableUpdateRequest> reqs =
         Arrays.stream(changes)
@@ -199,7 +199,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
    */
   @Override
   public boolean dropTable(NameIdentifier ident) {
-    NameIdentifier.checkTable(ident);
+    //    NameIdentifier.checkTable(ident);
 
     DropResponse resp =
         restClient.delete(
@@ -219,7 +219,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
    */
   @Override
   public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
-    NameIdentifier.checkTable(ident);
+    //    NameIdentifier.checkTable(ident);
 
     Map<String, String> params = new HashMap<>();
     params.put("purge", "true");

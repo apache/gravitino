@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.catalog;
 
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.NameIdentifierUtil;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
 import com.datastrato.gravitino.rel.expressions.literals.Literals;
@@ -26,7 +27,7 @@ public class TestPartitionOperationDispatcher extends TestOperationDispatcher {
   private static final String SCHEMA = "test_partition_schema";
   private static final String TABLE = "test_partition_table";
   private static final NameIdentifier TABLE_IDENT =
-      NameIdentifier.ofTable(metalake, catalog, SCHEMA, TABLE);
+      NameIdentifierUtil.ofTable(metalake, catalog, SCHEMA, TABLE);
   private static final Partition PARTITION =
       Partitions.identity(
           "p1",
@@ -59,7 +60,7 @@ public class TestPartitionOperationDispatcher extends TestOperationDispatcher {
     partitionOperationDispatcher =
         new PartitionOperationDispatcher(catalogManager, entityStore, idGenerator);
 
-    NameIdentifier schemaIdent = NameIdentifier.ofSchema(metalake, catalog, SCHEMA);
+    NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema(metalake, catalog, SCHEMA);
     schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);
     Column[] columns =
         new Column[] {

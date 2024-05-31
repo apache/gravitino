@@ -10,6 +10,7 @@ import static com.datastrato.gravitino.dto.util.DTOConverters.fromDTOs;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.NameIdentifierUtil;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.TableDispatcher;
 import com.datastrato.gravitino.dto.requests.TableCreateRequest;
@@ -102,7 +103,7 @@ public class TableOperations {
           () -> {
             request.validate();
             NameIdentifier ident =
-                NameIdentifier.ofTable(metalake, catalog, schema, request.getName());
+                NameIdentifierUtil.ofTable(metalake, catalog, schema, request.getName());
 
             Table table =
                 TreeLockUtils.doWithTreeLock(
@@ -145,7 +146,7 @@ public class TableOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            NameIdentifier ident = NameIdentifier.ofTable(metalake, catalog, schema, table);
+            NameIdentifier ident = NameIdentifierUtil.ofTable(metalake, catalog, schema, table);
             Table t =
                 TreeLockUtils.doWithTreeLock(
                     ident, LockType.READ, () -> dispatcher.loadTable(ident));
@@ -175,7 +176,7 @@ public class TableOperations {
           httpRequest,
           () -> {
             request.validate();
-            NameIdentifier ident = NameIdentifier.ofTable(metalake, catalog, schema, table);
+            NameIdentifier ident = NameIdentifierUtil.ofTable(metalake, catalog, schema, table);
             TableChange[] changes =
                 request.getUpdates().stream()
                     .map(TableUpdateRequest::tableChange)
@@ -217,7 +218,7 @@ public class TableOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            NameIdentifier ident = NameIdentifier.ofTable(metalake, catalog, schema, table);
+            NameIdentifier ident = NameIdentifierUtil.ofTable(metalake, catalog, schema, table);
             boolean dropped =
                 TreeLockUtils.doWithTreeLock(
                     NameIdentifier.of(metalake, catalog, schema),

@@ -133,7 +133,7 @@ public class GravitinoMockServer implements AutoCloseable {
               @Override
               public NameIdentifier[] answer(InvocationOnMock invocation) throws Throwable {
                 return metalakes.get(metalakeName).catalogs.keySet().stream()
-                    .map(catalogName -> NameIdentifier.ofCatalog(metalakeName, catalogName))
+                    .map(catalogName -> NameIdentifier.of(metalakeName, catalogName))
                     .toArray(NameIdentifier[]::new);
               };
             });
@@ -408,7 +408,7 @@ public class GravitinoMockServer implements AutoCloseable {
                 ArrayList<NameIdentifier> tableNames = new ArrayList<>();
                 for (SchemaTableName tableName : metadata.listTables(null, Optional.empty())) {
                   tableNames.add(
-                      NameIdentifier.ofTable(
+                      NameIdentifier.of(
                           schemaName.level(0),
                           schemaName.level(1),
                           schemaName.level(2),

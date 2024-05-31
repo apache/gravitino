@@ -92,7 +92,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
    */
   @Override
   public Topic loadTopic(NameIdentifier ident) throws NoSuchTopicException {
-    NameIdentifier.checkTopic(ident);
+    //    NameIdentifier.checkTopic(ident);
 
     TopicResponse resp =
         restClient.get(
@@ -122,7 +122,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
   public Topic createTopic(
       NameIdentifier ident, String comment, DataLayout dataLayout, Map<String, String> properties)
       throws NoSuchSchemaException, TopicAlreadyExistsException {
-    NameIdentifier.checkTopic(ident);
+    //    NameIdentifier.checkTopic(ident);
 
     TopicCreateRequest req =
         TopicCreateRequest.builder()
@@ -155,7 +155,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
   @Override
   public Topic alterTopic(NameIdentifier ident, TopicChange... changes)
       throws NoSuchTopicException, IllegalArgumentException {
-    NameIdentifier.checkTopic(ident);
+    //    NameIdentifier.checkTopic(ident);
 
     List<TopicUpdateRequest> updates =
         Arrays.stream(changes)
@@ -184,7 +184,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
    */
   @Override
   public boolean dropTopic(NameIdentifier ident) {
-    NameIdentifier.checkTopic(ident);
+    //    NameIdentifier.checkTopic(ident);
 
     DropResponse resp =
         restClient.delete(

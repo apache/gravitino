@@ -116,8 +116,7 @@ public class FilesetMetaServiceIT {
     BaseMetalake metalake = createBaseMakeLake(idGenerator.nextId(), metalakeName, auditInfo);
     MetalakeMetaService.getInstance().insertMetalake(metalake, true);
     assertNotNull(
-        MetalakeMetaService.getInstance()
-            .getMetalakeByIdentifier(NameIdentifier.ofMetalake(metalakeName)));
+        MetalakeMetaService.getInstance().getMetalakeByIdentifier(NameIdentifier.of(metalakeName)));
     String catalogName = GravitinoITUtils.genRandomName("tst_fs_catalog");
     CatalogEntity catalogEntity =
         createCatalog(
@@ -125,7 +124,7 @@ public class FilesetMetaServiceIT {
     CatalogMetaService.getInstance().insertCatalog(catalogEntity, true);
     assertNotNull(
         CatalogMetaService.getInstance()
-            .getCatalogByIdentifier(NameIdentifier.ofCatalog(metalakeName, catalogName)));
+            .getCatalogByIdentifier(NameIdentifier.of(metalakeName, catalogName)));
     String schemaName = GravitinoITUtils.genRandomName("tst_fs_schema");
     SchemaEntity schemaEntity =
         createSchemaEntity(
@@ -136,7 +135,7 @@ public class FilesetMetaServiceIT {
     SchemaMetaService.getInstance().insertSchema(schemaEntity, true);
     assertNotNull(
         SchemaMetaService.getInstance()
-            .getSchemaByIdentifier(NameIdentifier.ofSchema(metalakeName, catalogName, schemaName)));
+            .getSchemaByIdentifier(NameIdentifier.of(metalakeName, catalogName, schemaName)));
     String filesetName = GravitinoITUtils.genRandomName("tst_fs_fileset");
     FilesetEntity filesetEntity =
         createFilesetEntity(
@@ -149,10 +148,10 @@ public class FilesetMetaServiceIT {
     assertNotNull(
         FilesetMetaService.getInstance()
             .getFilesetByIdentifier(
-                NameIdentifier.ofFileset(metalakeName, catalogName, schemaName, filesetName)));
+                NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName)));
     FilesetMetaService.getInstance()
         .updateFileset(
-            NameIdentifier.ofFileset(metalakeName, catalogName, schemaName, filesetName),
+            NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName),
             e -> {
               AuditInfo auditInfo1 =
                   AuditInfo.builder().withCreator("creator5").withCreateTime(Instant.now()).build();

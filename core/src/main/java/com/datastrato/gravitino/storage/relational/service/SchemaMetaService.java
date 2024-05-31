@@ -7,6 +7,7 @@ package com.datastrato.gravitino.storage.relational.service;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.NameIdentifierUtil;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
@@ -69,7 +70,7 @@ public class SchemaMetaService {
   }
 
   public SchemaEntity getSchemaByIdentifier(NameIdentifier identifier) {
-    NameIdentifier.checkSchema(identifier);
+    NameIdentifierUtil.checkSchema(identifier);
     String schemaName = identifier.name();
 
     Long catalogId =
@@ -93,7 +94,7 @@ public class SchemaMetaService {
 
   public void insertSchema(SchemaEntity schemaEntity, boolean overwrite) {
     try {
-      NameIdentifier.checkSchema(schemaEntity.nameIdentifier());
+      NameIdentifierUtil.checkSchema(schemaEntity.nameIdentifier());
 
       SchemaPO.Builder builder = SchemaPO.builder();
       fillSchemaPOBuilderParentEntityId(builder, schemaEntity.namespace());
@@ -117,7 +118,7 @@ public class SchemaMetaService {
 
   public <E extends Entity & HasIdentifier> SchemaEntity updateSchema(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
-    NameIdentifier.checkSchema(identifier);
+    NameIdentifierUtil.checkSchema(identifier);
 
     String schemaName = identifier.name();
     Long catalogId =
@@ -155,7 +156,7 @@ public class SchemaMetaService {
   }
 
   public boolean deleteSchema(NameIdentifier identifier, boolean cascade) {
-    NameIdentifier.checkSchema(identifier);
+    NameIdentifierUtil.checkSchema(identifier);
 
     String schemaName = identifier.name();
     Long catalogId =

@@ -7,6 +7,7 @@ package com.datastrato.gravitino.storage.relational.service;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.NameIdentifierUtil;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
@@ -71,7 +72,7 @@ public class CatalogMetaService {
   }
 
   public CatalogEntity getCatalogByIdentifier(NameIdentifier identifier) {
-    NameIdentifier.checkCatalog(identifier);
+    NameIdentifierUtil.checkCatalog(identifier);
     String catalogName = identifier.name();
 
     Long metalakeId =
@@ -96,7 +97,7 @@ public class CatalogMetaService {
 
   public void insertCatalog(CatalogEntity catalogEntity, boolean overwrite) {
     try {
-      NameIdentifier.checkCatalog(catalogEntity.nameIdentifier());
+      NameIdentifierUtil.checkCatalog(catalogEntity.nameIdentifier());
 
       Long metalakeId =
           CommonMetaService.getInstance().getParentEntityIdByNamespace(catalogEntity.namespace());
@@ -120,7 +121,7 @@ public class CatalogMetaService {
 
   public <E extends Entity & HasIdentifier> CatalogEntity updateCatalog(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
-    NameIdentifier.checkCatalog(identifier);
+    NameIdentifierUtil.checkCatalog(identifier);
 
     String catalogName = identifier.name();
     Long metalakeId =
@@ -160,7 +161,7 @@ public class CatalogMetaService {
   }
 
   public boolean deleteCatalog(NameIdentifier identifier, boolean cascade) {
-    NameIdentifier.checkCatalog(identifier);
+    NameIdentifierUtil.checkCatalog(identifier);
 
     String catalogName = identifier.name();
     Long metalakeId =

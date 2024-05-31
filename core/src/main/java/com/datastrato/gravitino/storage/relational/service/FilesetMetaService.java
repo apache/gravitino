@@ -7,6 +7,7 @@ package com.datastrato.gravitino.storage.relational.service;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.NameIdentifierUtil;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.FilesetEntity;
@@ -71,7 +72,7 @@ public class FilesetMetaService {
   }
 
   public FilesetEntity getFilesetByIdentifier(NameIdentifier identifier) {
-    NameIdentifier.checkFileset(identifier);
+    NameIdentifierUtil.checkFileset(identifier);
 
     String filesetName = identifier.name();
 
@@ -97,7 +98,7 @@ public class FilesetMetaService {
 
   public void insertFileset(FilesetEntity filesetEntity, boolean overwrite) {
     try {
-      NameIdentifier.checkFileset(filesetEntity.nameIdentifier());
+      NameIdentifierUtil.checkFileset(filesetEntity.nameIdentifier());
 
       FilesetPO.Builder builder = FilesetPO.builder();
       fillFilesetPOBuilderParentEntityId(builder, filesetEntity.namespace());
@@ -135,7 +136,7 @@ public class FilesetMetaService {
 
   public <E extends Entity & HasIdentifier> FilesetEntity updateFileset(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
-    NameIdentifier.checkFileset(identifier);
+    NameIdentifierUtil.checkFileset(identifier);
 
     String filesetName = identifier.name();
 
@@ -195,7 +196,7 @@ public class FilesetMetaService {
   }
 
   public boolean deleteFileset(NameIdentifier identifier) {
-    NameIdentifier.checkFileset(identifier);
+    NameIdentifierUtil.checkFileset(identifier);
 
     String filesetName = identifier.name();
 

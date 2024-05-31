@@ -7,6 +7,7 @@ package com.datastrato.gravitino.storage.relational.service;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.NameIdentifierUtil;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.TableEntity;
@@ -62,7 +63,7 @@ public class TableMetaService {
   }
 
   public TableEntity getTableByIdentifier(NameIdentifier identifier) {
-    NameIdentifier.checkTable(identifier);
+    NameIdentifierUtil.checkTable(identifier);
 
     Long schemaId =
         CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
@@ -86,7 +87,7 @@ public class TableMetaService {
 
   public void insertTable(TableEntity tableEntity, boolean overwrite) {
     try {
-      NameIdentifier.checkTable(tableEntity.nameIdentifier());
+      NameIdentifierUtil.checkTable(tableEntity.nameIdentifier());
 
       TablePO.Builder builder = TablePO.builder();
       fillTablePOBuilderParentEntityId(builder, tableEntity.namespace());
@@ -110,7 +111,7 @@ public class TableMetaService {
 
   public <E extends Entity & HasIdentifier> TableEntity updateTable(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
-    NameIdentifier.checkTable(identifier);
+    NameIdentifierUtil.checkTable(identifier);
 
     String tableName = identifier.name();
 
@@ -148,7 +149,7 @@ public class TableMetaService {
   }
 
   public boolean deleteTable(NameIdentifier identifier) {
-    NameIdentifier.checkTable(identifier);
+    NameIdentifierUtil.checkTable(identifier);
 
     String tableName = identifier.name();
 
