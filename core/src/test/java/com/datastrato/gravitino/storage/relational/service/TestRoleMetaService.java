@@ -58,7 +58,7 @@ class TestRoleMetaService extends TestJDBCBackend {
         createCatalog(
             RandomIdGenerator.INSTANCE.nextId(),
             Namespace.of("metalake"),
-            "another_catalog",
+            "anotherCatalog",
             auditInfo);
     backend.insert(anotherCatalog, false);
 
@@ -100,7 +100,7 @@ class TestRoleMetaService extends TestJDBCBackend {
         createCatalog(
             RandomIdGenerator.INSTANCE.nextId(),
             Namespace.of("metalake"),
-            "another_catalog",
+            "anotherCatalog",
             auditInfo);
     backend.insert(anotherCatalog, false);
     CatalogEntity overwriteCatalog =
@@ -126,7 +126,7 @@ class TestRoleMetaService extends TestJDBCBackend {
                     Lists.newArrayList(
                         Privileges.UseCatalog.allow(), Privileges.DropCatalog.deny())),
                 SecurableObjects.ofCatalog(
-                    "another_catalog", Lists.newArrayList(Privileges.UseCatalog.allow()))),
+                    "anotherCatalog", Lists.newArrayList(Privileges.UseCatalog.allow()))),
             ImmutableMap.of("k1", "v1"));
     Assertions.assertThrows(
         NoSuchEntityException.class,
