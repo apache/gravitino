@@ -28,8 +28,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * BaseSchemaCatalog is the base abstract class for all the catalog with schema. It provides the
@@ -37,7 +35,6 @@ import org.slf4j.LoggerFactory;
  * create, load, alter and drop a schema with specified identifier.
  */
 abstract class BaseSchemaCatalog extends CatalogDTO implements SupportsSchemas {
-  private static final Logger LOG = LoggerFactory.getLogger(BaseSchemaCatalog.class);
 
   /** The REST client to send the requests. */
   protected final RESTClient restClient;
@@ -194,7 +191,6 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements SupportsSchemas {
     } catch (NonEmptySchemaException e) {
       throw e;
     } catch (Exception e) {
-      LOG.warn("Failed to drop schema {}", ident, e);
       return false;
     }
   }

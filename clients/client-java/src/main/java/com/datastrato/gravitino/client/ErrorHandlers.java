@@ -36,8 +36,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
 import java.util.List;
 import java.util.function.Consumer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Utility class providing error handling for REST requests and specific to Metalake errors.
@@ -45,8 +43,6 @@ import org.slf4j.LoggerFactory;
  * <p>It also includes utility methods to format error messages and convert stack traces to strings.
  */
 public class ErrorHandlers {
-
-  private static final Logger LOG = LoggerFactory.getLogger(ErrorHandlers.class);
 
   /**
    * Creates an error handler specific to Metalake operations.
@@ -396,11 +392,12 @@ public class ErrorHandlers {
       try {
         OAuth2ErrorResponse response = mapper.readValue(json, OAuth2ErrorResponse.class);
         return ErrorResponse.oauthError(code, response.getType(), response.getMessage());
-      } catch (Exception x) {
-        LOG.warn("Unable to parse error response", x);
+      } catch (Exception e) {
+        String errorMsg =
+            String.format(
+                "Error code: %d, error message: %s, json string: %s", code, e.getMessage(), json);
+        return ErrorResponse.unknownError(errorMsg);
       }
-      String errorMsg = String.format("Error code: %d, message: %s", code, json);
-      return ErrorResponse.unknownError(errorMsg);
     }
 
     /**
@@ -651,11 +648,11 @@ public class ErrorHandlers {
       try {
         return mapper.readValue(json, ErrorResponse.class);
       } catch (Exception e) {
-        LOG.warn("Failed to parse response: {}", json, e);
+        String errorMsg =
+            String.format(
+                "Error code: %d, error message: %s, json string: %s", code, e.getMessage(), json);
+        return ErrorResponse.unknownError(errorMsg);
       }
-
-      String errorMsg = String.format("Error code: %d, message: %s", code, json);
-      return ErrorResponse.unknownError(errorMsg);
     }
 
     @Override

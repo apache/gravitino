@@ -29,8 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Gravitino Metalake is the top-level metadata repository for users. It contains a list of catalogs
@@ -38,8 +36,6 @@ import org.slf4j.LoggerFactory;
  * alter and drop a catalog with specified identifier.
  */
 public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
-
-  private static final Logger LOG = LoggerFactory.getLogger(GravitinoMetalake.class);
 
   private static final String API_METALAKES_CATALOGS_PATH = "api/metalakes/%s/catalogs/%s";
 
@@ -217,7 +213,6 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
       return resp.dropped();
 
     } catch (Exception e) {
-      LOG.warn("Failed to drop catalog {}", ident, e);
       return false;
     }
   }
