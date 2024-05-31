@@ -17,6 +17,8 @@ import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.awaitility.Awaitility;
+import java.util.concurrent.TimeUnit;
 
 public class AuditIT extends AbstractIT {
 
@@ -35,17 +37,33 @@ public class AuditIT extends AbstractIT {
     String metalakeAuditName = RandomNameUtils.genRandomName("metalakeAudit");
     String newName = RandomNameUtils.genRandomName("newmetaname");
 
-    GravitinoMetalake metaLake =
-        client.createMetalake(metalakeAuditName, "metalake A comment", Collections.emptyMap());
+    Awaitility.await().atMost(1, TimeUnit.MINUTES).until(() -> isGravitinoServerUp());
+
+    GravitinoMetalake metaLake = client.createMetalake(metalakeAuditName, "metalake A comment", Collections.emptyMap());
     Assertions.assertEquals(expectUser, metaLake.auditInfo().creator());
     Assertions.assertNull(metaLake.auditInfo().lastModifier());
-    MetalakeChange[] changes =
-        new MetalakeChange[] {
-          MetalakeChange.rename(newName), MetalakeChange.updateComment("new metalake comment")
-        };
+    MetalakeChange[] changes = new MetalakeChange[] {
+        MetalakeChange.rename(newName), MetalakeChange.updateComment("new metalake comment")
+    };
     metaLake = client.alterMetalake(metalakeAuditName, changes);
     Assertions.assertEquals(expectUser, metaLake.auditInfo().creator());
     Assertions.assertEquals(expectUser, metaLake.auditInfo().lastModifier());
     client.dropMetalake(newName);
+  }
+
+  // Method to check if the Gravitino server is up
+  private boolean isGravitinoServerUp() {
+    try {
+      URL url = new URL("http://localhost:8090");
+      HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+      connection.setRequestMethod("GET");
+      connection.setConnectTimeout(1000);
+      connection.connect();
+      int responseCode = connection.getResponseCode();
+      return responseCode == 200;
+      System.out.println("/n/n/n"+responseCode+"/n/n/n");
+    } catch (IOException e) {
+      return false;
+    }
   }
 }

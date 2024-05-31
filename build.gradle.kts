@@ -237,6 +237,10 @@ subprojects {
     mavenLocal()
   }
 
+  dependencies {
+        testImplementation("org.awaitility:awaitility:4.2.1")
+  }
+  
   java {
     toolchain {
       // Some JDK vendors like Homebrew installed OpenJDK 17 have problems in building trino-connector:
