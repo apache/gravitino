@@ -1367,8 +1367,7 @@ public class CatalogMysqlIT extends AbstractIT {
 
     Assertions.assertTrue(catalog.asTableCatalog().dropTable(tableIdent));
     Assertions.assertFalse(catalog.asTableCatalog().tableExists(tableIdent));
-    Assertions.assertThrowsExactly(
-        UnsupportedOperationException.class, () -> catalog.asTableCatalog().purgeTable(tableIdent));
+    Assertions.assertFalse(catalog.asTableCatalog().purgeTable(tableIdent));
     catalog.asSchemas().dropSchema(testSchemaName, true);
   }
 

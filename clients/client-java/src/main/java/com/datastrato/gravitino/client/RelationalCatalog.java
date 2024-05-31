@@ -235,11 +235,10 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
               ErrorHandlers.tableErrorHandler());
       resp.validate();
       return resp.dropped();
+    } catch (UnsupportedOperationException e) {
+      throw e;
     } catch (Exception e) {
-      if (e instanceof RuntimeException) {
-        throw e;
-      }
-      throw new RuntimeException(e);
+      return false;
     }
   }
 
