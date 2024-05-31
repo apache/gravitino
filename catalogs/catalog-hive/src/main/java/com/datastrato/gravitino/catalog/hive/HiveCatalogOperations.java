@@ -6,9 +6,12 @@ package com.datastrato.gravitino.catalog.hive;
 
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE;
+import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.LIST_ALL_TABLES;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.PRINCIPAL;
+import static com.datastrato.gravitino.catalog.hive.HiveTable.ICEBERG_TABLE_TYPE_VALUE;
 import static com.datastrato.gravitino.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
+import static com.datastrato.gravitino.catalog.hive.HiveTable.TABLE_TYPE_PROP;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
 import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
@@ -97,6 +100,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   private ScheduledThreadPoolExecutor checkTgtExecutor;
   private String kerberosRealm;
   private ProxyPlugin proxyPlugin;
+  boolean listAllTables = true;
 
   // Map that maintains the mapping of keys in Gravitino to that in Hive, for example, users
   // will only need to set the configuration 'METASTORE_URL' in Gravitino and Gravitino will change
@@ -148,6 +152,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
     this.clientPool =
         new CachedClientPool(getClientPoolSize(conf), hiveConf, getCacheEvictionInterval(conf));
+
+    this.listAllTables = getListAllTables(conf);
   }
 
   private void initKerberosIfNecessary(Map<String, String> conf, Configuration hadoopConf) {
@@ -265,7 +271,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             .catalogPropertiesMetadata()
             .getOrDefault(conf, CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS);
   }
-
+  boolean getListAllTables(Map<String, String> conf) {
+    return (boolean)
+            propertiesMetadata
+                    .catalogPropertiesMetadata().getOrDefault(conf, LIST_ALL_TABLES);
+  }
   /** Closes the Hive catalog and releases the associated client pool. */
   @Override
   public void close() {
@@ -521,8 +531,22 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       return clientPool.run(
           c ->
               c.getTableObjectsByName(schemaIdent.name(), allTables).stream()
-                  .filter(tb -> SUPPORT_TABLE_TYPES.contains(tb.getTableType()))
-                  .map(tb -> NameIdentifier.of(namespace, tb.getTableName()))
+                  .filter(tb -> {
+                    boolean isSupportTable = SUPPORT_TABLE_TYPES.contains(tb.getTableType());
+                    if (!isSupportTable) {
+                      return false;
+                    }
+                    if (!listAllTables) {
+                      Map<String, String> parameters = tb.getParameters();
+                      if (parameters != null) {
+                        boolean isIcebergTable = ICEBERG_TABLE_TYPE_VALUE.equalsIgnoreCase(parameters.get(TABLE_TYPE_PROP));
+                        if (isIcebergTable) {
+                          return false;
+                        }
+                      }
+                    }
+                    return true;
+                  }).map(tb -> NameIdentifier.of(namespace, tb.getTableName()))
                   .toArray(NameIdentifier[]::new));
     } catch (UnknownDBException e) {
       throw new NoSuchSchemaException(

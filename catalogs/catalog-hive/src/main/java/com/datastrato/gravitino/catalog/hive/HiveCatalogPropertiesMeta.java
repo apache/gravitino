@@ -36,6 +36,10 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
 
   public static final String FETCH_TIMEOUT_SEC = "kerberos.keytab-fetch-timeout-sec";
 
+  public static final String LIST_ALL_TABLES = "list-all-tables";
+
+  public static final boolean DEFAULT_LIST_ALL_TABLES = true;
+
   private static final Map<String, PropertyEntry<?>> HIVE_CATALOG_PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
           .put(
@@ -88,6 +92,16 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
               FETCH_TIMEOUT_SEC,
               PropertyEntry.integerOptionalPropertyEntry(
                   FETCH_TIMEOUT_SEC, "The timeout to fetch key tab", true, 60, false))
+            .put(
+                    LIST_ALL_TABLES,
+                    PropertyEntry.booleanPropertyEntry(
+                            LIST_ALL_TABLES,
+                            "list all tables with iceberg tables",
+                            false,
+                            false,
+                            DEFAULT_LIST_ALL_TABLES,
+                            false,
+                            false))
           .putAll(BASIC_CATALOG_PROPERTY_ENTRIES)
           .build();
 
