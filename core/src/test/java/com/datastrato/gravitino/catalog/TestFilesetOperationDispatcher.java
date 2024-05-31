@@ -141,5 +141,6 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
 
     boolean dropped = filesetOperationDispatcher.dropFileset(filesetIdent1);
     Assertions.assertTrue(dropped);
+    Assertions.assertFalse(filesetOperationDispatcher.dropFileset(filesetIdent1));
   }
 }

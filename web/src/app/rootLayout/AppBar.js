@@ -7,7 +7,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { Alata } from 'next/font/google'
+import { Roboto } from 'next/font/google'
 
 import { useState, useEffect } from 'react'
 
@@ -32,7 +32,7 @@ import { useRouter } from 'next/navigation'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
 import { fetchMetalakes } from '@/lib/store/metalakes'
 
-const fonts = Alata({ subsets: ['latin'], weight: ['400'], display: 'swap' })
+const fonts = Roboto({ subsets: ['latin'], weight: ['400'], display: 'swap' })
 
 const AppBar = () => {
   const searchParams = useSearchParams()
@@ -41,6 +41,7 @@ const AppBar = () => {
   const dispatch = useAppDispatch()
   const [metalakes, setMetalakes] = useState([])
   const router = useRouter()
+  const logoSrc = (process.env.NEXT_PUBLIC_BASE_PATH ?? '') + '/icons/gravitino.svg'
 
   useEffect(() => {
     if (!store.metalakes.length && metalake) {
@@ -69,16 +70,11 @@ const AppBar = () => {
             }
           >
             <Link href='/metalakes' className={'twc-flex twc-items-center twc-no-underline twc-mr-8'}>
-              <Image
-                src={process.env.NEXT_PUBLIC_BASE_PATH ?? '' + '/icons/gravitino.svg'}
-                width={32}
-                height={32}
-                alt='logo'
-              />
+              <Image src={logoSrc} overrideSrc={logoSrc} width={32} height={32} alt='logo' />
               <Typography
                 variant='h5'
                 className={clsx(
-                  'twc-ml-2 twc-leading-none twc-tracking-[-0.45px] twc-normal-case twc-text-[1.75rem]',
+                  'twc-text-[black] twc-ml-2 twc-leading-none twc-tracking-[-0.45px] twc-normal-case twc-text-[1.75rem]',
                   fonts.className
                 )}
               >

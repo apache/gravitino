@@ -17,8 +17,8 @@ from gravitino.rest.rest_message import RESTRequest
 class CatalogUpdateRequestBase(RESTRequest):
     _type: str = field(metadata=config(field_name="@type"))
 
-    def __init__(self, type: str):
-        self._type = type
+    def __init__(self, action_type: str):
+        self._type = action_type
 
     @abstractmethod
     def catalog_change(self):

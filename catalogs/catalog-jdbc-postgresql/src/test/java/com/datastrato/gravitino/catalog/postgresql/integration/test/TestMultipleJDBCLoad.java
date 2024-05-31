@@ -7,15 +7,12 @@ package com.datastrato.gravitino.catalog.postgresql.integration.test;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.MySQLContainer;
 import com.datastrato.gravitino.integration.test.container.PostgreSQLContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
-import com.datastrato.gravitino.integration.test.util.ITUtils;
-import com.datastrato.gravitino.integration.test.util.JdbcDriverDownloader;
 import com.datastrato.gravitino.integration.test.util.TestDatabaseName;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.types.Types;
@@ -23,8 +20,6 @@ import com.datastrato.gravitino.utils.RandomNameUtils;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.net.URISyntaxException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.util.Collections;
 import java.util.Map;
@@ -42,38 +37,8 @@ public class TestMultipleJDBCLoad extends AbstractIT {
   private static MySQLContainer mySQLContainer;
   private static PostgreSQLContainer postgreSQLContainer;
 
-  private static final String DOWNLOAD_JDBC_DRIVER_URL =
-      "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar";
-
   @BeforeAll
   public static void startup() throws IOException {
-    String gravitinoHome = System.getenv("GRAVITINO_HOME");
-
-    // Deploy mode
-    if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
-      Path icebergLibsPath = Paths.get(gravitinoHome, "/catalogs/lakehouse-iceberg/libs");
-      Path pgDirPath = Paths.get(gravitinoHome, "/catalogs/jdbc-postgresql/libs");
-      JdbcDriverDownloader.downloadJdbcDriver(
-          CatalogPostgreSqlIT.DOWNLOAD_JDBC_DRIVER_URL,
-          pgDirPath.toString(),
-          icebergLibsPath.toString());
-
-      JdbcDriverDownloader.downloadJdbcDriver(
-          DOWNLOAD_JDBC_DRIVER_URL, pgDirPath.toString(), icebergLibsPath.toString());
-    } else {
-      // embedded mode
-      Path icebergLibsPath =
-          Paths.get(gravitinoHome, "/catalogs/catalog-lakehouse-iceberg/build/libs");
-      Path pgDirPath = Paths.get(gravitinoHome, "/catalogs/catalog-jdbc-postgresql/build/libs");
-      JdbcDriverDownloader.downloadJdbcDriver(
-          CatalogPostgreSqlIT.DOWNLOAD_JDBC_DRIVER_URL,
-          icebergLibsPath.toString(),
-          pgDirPath.toString());
-
-      JdbcDriverDownloader.downloadJdbcDriver(
-          DOWNLOAD_JDBC_DRIVER_URL, pgDirPath.toString(), icebergLibsPath.toString());
-    }
-
     containerSuite.startMySQLContainer(TEST_DB_NAME);
     mySQLContainer = containerSuite.getMySQLContainer();
     containerSuite.startPostgreSQLContainer(TEST_DB_NAME);
@@ -110,30 +75,16 @@ public class TestMultipleJDBCLoad extends AbstractIT {
         metalake.createCatalog(
             mysqlCatalogName, Catalog.Type.RELATIONAL, "jdbc-mysql", "comment", mysqlConf);
 
-    NameIdentifier[] nameIdentifiers =
-        mysqlCatalog.asSchemas().listSchemas(Namespace.of(metalakeName, mysqlCatalogName));
+    NameIdentifier[] nameIdentifiers = mysqlCatalog.asSchemas().listSchemas();
     Assertions.assertNotEquals(0, nameIdentifiers.length);
-    nameIdentifiers =
-        postgreSqlCatalog
-            .asSchemas()
-            .listSchemas(Namespace.of(metalakeName, postgreSqlCatalogName));
+    nameIdentifiers = postgreSqlCatalog.asSchemas().listSchemas();
     Assertions.assertEquals(1, nameIdentifiers.length);
     Assertions.assertEquals("public", nameIdentifiers[0].name());
 
     String schemaName = RandomNameUtils.genRandomName("it_schema");
-    mysqlCatalog
-        .asSchemas()
-        .createSchema(
-            NameIdentifier.of(metalakeName, mysqlCatalogName, schemaName),
-            null,
-            Collections.emptyMap());
+    mysqlCatalog.asSchemas().createSchema(schemaName, null, Collections.emptyMap());
 
-    postgreSqlCatalog
-        .asSchemas()
-        .createSchema(
-            NameIdentifier.of(metalakeName, postgreSqlCatalogName, schemaName),
-            null,
-            Collections.emptyMap());
+    postgreSqlCatalog.asSchemas().createSchema(schemaName, null, Collections.emptyMap());
 
     String tableName = RandomNameUtils.genRandomName("it_table");
 

@@ -5,7 +5,6 @@
 package com.datastrato.gravitino.catalog.mysql;
 
 import com.datastrato.gravitino.catalog.jdbc.JdbcCatalog;
-import com.datastrato.gravitino.catalog.jdbc.JdbcTablePropertiesMetadata;
 import com.datastrato.gravitino.catalog.jdbc.MySQLProtocolCompatibleCatalogOperations;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
@@ -18,10 +17,14 @@ import com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter;
 import com.datastrato.gravitino.catalog.mysql.operation.MysqlDatabaseOperations;
 import com.datastrato.gravitino.catalog.mysql.operation.MysqlTableOperations;
 import com.datastrato.gravitino.connector.CatalogOperations;
+import com.datastrato.gravitino.connector.PropertiesMetadata;
 import java.util.Map;
 
 /** Implementation of a Mysql catalog in Gravitino. */
 public class MysqlCatalog extends JdbcCatalog {
+
+  private static final MysqlTablePropertiesMetadata TABLE_PROPERTIES_META =
+      new MysqlTablePropertiesMetadata();
 
   @Override
   public String shortName() {
@@ -36,7 +39,6 @@ public class MysqlCatalog extends JdbcCatalog {
         jdbcTypeConverter,
         createJdbcDatabaseOperations(),
         createJdbcTableOperations(),
-        createJdbcTablePropertiesMetadata(),
         createJdbcColumnDefaultValueConverter());
   }
 
@@ -61,12 +63,12 @@ public class MysqlCatalog extends JdbcCatalog {
   }
 
   @Override
-  protected JdbcTablePropertiesMetadata createJdbcTablePropertiesMetadata() {
-    return new MysqlTablePropertiesMetadata();
+  protected JdbcColumnDefaultValueConverter createJdbcColumnDefaultValueConverter() {
+    return new MysqlColumnDefaultValueConverter();
   }
 
   @Override
-  protected JdbcColumnDefaultValueConverter createJdbcColumnDefaultValueConverter() {
-    return new MysqlColumnDefaultValueConverter();
+  public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
+    return TABLE_PROPERTIES_META;
   }
 }

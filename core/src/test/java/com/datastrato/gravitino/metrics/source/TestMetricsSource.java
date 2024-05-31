@@ -28,7 +28,7 @@ public class TestMetricsSource extends MetricsSource {
 
   @BeforeAll
   void init() {
-    metricsSystem = new MetricsSystem();
+    this.metricsSystem = new MetricsSystem();
     metricsSystem.register(this);
   }
 

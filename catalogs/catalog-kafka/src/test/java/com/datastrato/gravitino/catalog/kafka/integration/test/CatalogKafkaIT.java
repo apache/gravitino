@@ -14,6 +14,8 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.Schema;
+import com.datastrato.gravitino.SchemaChange;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
@@ -21,8 +23,6 @@ import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.messaging.Topic;
 import com.datastrato.gravitino.messaging.TopicChange;
-import com.datastrato.gravitino.rel.Schema;
-import com.datastrato.gravitino.rel.SchemaChange;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -99,6 +99,18 @@ public class CatalogKafkaIT extends AbstractIT {
 
   @AfterAll
   public static void shutdown() {
+    Catalog catalog = metalake.loadCatalog(CATALOG_NAME);
+    Arrays.stream(catalog.asSchemas().listSchemas())
+        .filter(ident -> !ident.name().equals("default"))
+        .forEach(
+            (ident -> {
+              catalog.asSchemas().dropSchema(ident.name(), true);
+            }));
+    Arrays.stream(metalake.listCatalogs())
+        .forEach(
+            (ident -> {
+              metalake.dropCatalog(ident.name());
+            }));
     client.dropMetalake(METALAKE_NAME);
     if (adminClient != null) {
       adminClient.close();
@@ -114,7 +126,7 @@ public class CatalogKafkaIT extends AbstractIT {
   @Test
   public void testCatalog() throws ExecutionException, InterruptedException {
     // test create catalog
-    String catalogName = GravitinoITUtils.genRandomName("test-catalog");
+    String catalogName = GravitinoITUtils.genRandomName("test_catalog");
     String comment = "test catalog";
     Map<String, String> properties =
         ImmutableMap.of(BOOTSTRAP_SERVERS, kafkaBootstrapServers, "key1", "value1");
@@ -144,23 +156,24 @@ public class CatalogKafkaIT extends AbstractIT {
         Assertions.assertThrows(
             NoSuchCatalogException.class, () -> metalake.loadCatalog(catalogName));
     Assertions.assertTrue(exception.getMessage().contains(catalogName));
+    Assertions.assertFalse(metalake.dropCatalog(catalogName), "catalog should be non-existent");
     // assert topic exists in Kafka after catalog dropped
     Assertions.assertFalse(adminClient.listTopics().names().get().isEmpty());
   }
 
   @Test
   public void testCatalogException() {
-    String catalogName = GravitinoITUtils.genRandomName("test-catalog");
+    String catalogName1 = GravitinoITUtils.genRandomName("test_catalog");
+    Catalog catalog1 =
+        metalake.createCatalog(
+            catalogName1,
+            Catalog.Type.MESSAGING,
+            PROVIDER,
+            "comment",
+            ImmutableMap.of(BOOTSTRAP_SERVERS, "2"));
     Exception exception =
         Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                metalake.createCatalog(
-                    catalogName,
-                    Catalog.Type.MESSAGING,
-                    PROVIDER,
-                    "comment",
-                    ImmutableMap.of(BOOTSTRAP_SERVERS, "2")));
+            IllegalArgumentException.class, () -> catalog1.asSchemas().listSchemas());
     Assertions.assertTrue(exception.getMessage().contains("Invalid url in bootstrap.servers: 2"));
 
     exception =
@@ -168,18 +181,21 @@ public class CatalogKafkaIT extends AbstractIT {
             IllegalArgumentException.class,
             () ->
                 metalake.createCatalog(
-                    catalogName,
+                    GravitinoITUtils.genRandomName("test_catalog"),
                     Catalog.Type.MESSAGING,
                     PROVIDER,
                     "comment",
                     ImmutableMap.of("abc", "2")));
     Assertions.assertTrue(
-        exception.getMessage().contains("Missing configuration: bootstrap.servers"));
+        exception
+            .getMessage()
+            .contains("Properties are required and must be set: [bootstrap.servers]"));
 
     // Test BOOTSTRAP_SERVERS that cannot be linked
+    String catalogName2 = GravitinoITUtils.genRandomName("test_catalog");
     Catalog kafka =
         metalake.createCatalog(
-            NameIdentifier.of(METALAKE_NAME, catalogName),
+            catalogName2,
             Catalog.Type.MESSAGING,
             PROVIDER,
             "comment",
@@ -197,7 +213,7 @@ public class CatalogKafkaIT extends AbstractIT {
                 kafka
                     .asTopicCatalog()
                     .listTopics(
-                        Namespace.ofTopic(METALAKE_NAME, catalogName, DEFAULT_SCHEMA_NAME)));
+                        Namespace.ofTopic(METALAKE_NAME, catalogName2, DEFAULT_SCHEMA_NAME)));
     Assertions.assertTrue(
         exception
             .getMessage()
@@ -207,15 +223,11 @@ public class CatalogKafkaIT extends AbstractIT {
 
   @Test
   public void testDefaultSchema() {
-    NameIdentifier[] schemas =
-        catalog.asSchemas().listSchemas(Namespace.ofSchema(METALAKE_NAME, CATALOG_NAME));
+    NameIdentifier[] schemas = catalog.asSchemas().listSchemas();
     Assertions.assertEquals(1, schemas.length);
     Assertions.assertEquals(DEFAULT_SCHEMA_NAME, schemas[0].name());
 
-    Schema loadSchema =
-        catalog
-            .asSchemas()
-            .loadSchema(NameIdentifier.ofSchema(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME));
+    Schema loadSchema = catalog.asSchemas().loadSchema(DEFAULT_SCHEMA_NAME);
     Assertions.assertEquals(
         "The default schema of Kafka catalog including all topics", loadSchema.comment());
 
@@ -226,18 +238,15 @@ public class CatalogKafkaIT extends AbstractIT {
             () ->
                 catalog
                     .asSchemas()
-                    .alterSchema(
-                        NameIdentifier.ofSchema(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME),
-                        SchemaChange.removeProperty("key1")));
+                    .alterSchema(DEFAULT_SCHEMA_NAME, SchemaChange.removeProperty("key1")));
     Assertions.assertTrue(exception.getMessage().contains("Cannot alter the default schema"));
 
     // test drop default schema
-    boolean dropped =
-        catalog
-            .asSchemas()
-            .dropSchema(
-                NameIdentifier.ofSchema(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME), true);
-    Assertions.assertFalse(dropped);
+    Throwable excep =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> catalog.asSchemas().dropSchema(DEFAULT_SCHEMA_NAME, true));
+    Assertions.assertTrue(excep.getMessage().contains("Cannot drop the default schema"));
   }
 
   @Test
@@ -246,21 +255,14 @@ public class CatalogKafkaIT extends AbstractIT {
     Exception ex =
         Assertions.assertThrows(
             UnsupportedOperationException.class,
-            () ->
-                catalog
-                    .asSchemas()
-                    .createSchema(
-                        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaName),
-                        "comment",
-                        Collections.emptyMap()));
+            () -> catalog.asSchemas().createSchema(schemaName, "comment", Collections.emptyMap()));
     Assertions.assertTrue(
         ex.getMessage().contains("Kafka catalog does not support schema creation"));
   }
 
   @Test
   public void testListSchema() {
-    NameIdentifier[] schemas =
-        catalog.asSchemas().listSchemas(Namespace.ofSchema(METALAKE_NAME, CATALOG_NAME));
+    NameIdentifier[] schemas = catalog.asSchemas().listSchemas();
     Assertions.assertEquals(1, schemas.length);
     Assertions.assertEquals(DEFAULT_SCHEMA_NAME, schemas[0].name());
   }

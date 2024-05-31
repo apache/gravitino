@@ -39,29 +39,29 @@ class MetalakeChange:
         return MetalakeChange.UpdateMetalakeComment(new_comment)
 
     @staticmethod
-    def set_property(property: str, value: str) -> "SetProperty":
+    def set_property(metalake_property: str, value: str) -> "SetProperty":
         """Creates a new metalake change to set a property and value pair for the metalake.
 
         Args:
-            property: The property name to set.
+            metalake_property: The property name to set.
             value: The value to set the property to.
 
         Returns:
              The metalake change.
         """
-        return MetalakeChange.SetProperty(property, value)
+        return MetalakeChange.SetProperty(metalake_property, value)
 
     @staticmethod
-    def remove_property(property: str) -> "RemoveProperty":
+    def remove_property(metalake_property: str) -> "RemoveProperty":
         """Creates a new metalake change to remove a property from the metalake.
 
         Args:
-            property: The property name to remove.
+            metalake_property: The property name to remove.
 
         Returns:
             The metalake change.
         """
-        return MetalakeChange.RemoveProperty(property)
+        return MetalakeChange.RemoveProperty(metalake_property)
 
     @dataclass(frozen=True)
     class RenameMetalake:

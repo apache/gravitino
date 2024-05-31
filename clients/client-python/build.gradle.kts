@@ -64,15 +64,18 @@ fun generatePypiProjectHomePage() {
     val content = outputFile.readText()
     val docsUrl = "https://datastrato.ai/docs/latest"
 
-    // Use regular expression to match the `[](./a/b/c.md#arg1)` link in the content
-    val patternDocs = "(?<!!)\\[([^]]+)]\\(\\.\\/([^)]*\\.md(?:#[^)]*)?)\\)".toRegex()
+    // Use regular expression to match the `[](./a/b/c.md?language=python)` or `[](./a/b/c.md#arg1)` link in the content
+    // Convert `[](./a/b/c.md?language=python)` to `[](https://datastrato.ai/docs/latest/a/b/c/language=python)`
+    val patternDocs = Regex("""(?<!!)\[([^\]]+)]\(\.\/([^)]+)\.md([?#][^)]+)?\)""")
     val contentUpdateDocs = patternDocs.replace(content) { matchResult ->
-      val linkText = matchResult.groupValues[1]
-      val relativePath = matchResult.groupValues[2].replace(".md", "/")
-      "[$linkText]($docsUrl/$relativePath)"
+      val text = matchResult.groupValues[1]
+      val path = matchResult.groupValues[2]
+      val params = matchResult.groupValues[3]
+      "[$text]($docsUrl/$path/$params)"
     }
 
     // Use regular expression to match the `![](./a/b/c.png)` link in the content
+    // Convert `![](./a/b/c.png)` to `[](https://raw.githubusercontent.com/datastrato/gravitino/main/docs/a/b/c.png)`
     val assertUrl = "https://raw.githubusercontent.com/datastrato/gravitino/main/docs"
     val patternImage = """!\[([^\]]+)]\(\./assets/([^)]+)\)""".toRegex()
     val contentUpdateImage = patternImage.replace(contentUpdateDocs) { matchResult ->
@@ -107,13 +110,19 @@ tasks {
     args = listOf("./gravitino", "./tests")
   }
 
+  val integrationCoverageReport by registering(VenvTask::class){
+    venvExec = "coverage"
+    args = listOf("html")
+    workingDir = projectDir.resolve("./tests/integration")
+  }
+
   val integrationTest by registering(VenvTask::class) {
     doFirst {
       gravitinoServer("start")
     }
 
-    venvExec = "python"
-    args = listOf("-m", "unittest")
+    venvExec = "coverage"
+    args = listOf("run", "--branch", "-m", "unittest")
     workingDir = projectDir.resolve("./tests/integration")
     environment = mapOf(
       "PROJECT_VERSION" to project.version,
@@ -124,12 +133,22 @@ tasks {
     doLast {
       gravitinoServer("stop")
     }
+
+    finalizedBy(integrationCoverageReport)
+  }
+
+  val unitCoverageReport by registering(VenvTask::class){
+    venvExec = "coverage"
+    args = listOf("html")
+    workingDir = projectDir.resolve("./tests/unittests")
   }
 
   val unitTests by registering(VenvTask::class) {
-    venvExec = "python"
-    args = listOf("-m", "unittest")
+    venvExec = "coverage"
+    args = listOf("run", "--branch", "-m", "unittest")
     workingDir = projectDir.resolve("./tests/unittests")
+
+    finalizedBy(unitCoverageReport)
   }
 
   val test by registering(VenvTask::class) {
@@ -147,6 +166,7 @@ tasks {
 
   val distribution by registering(VenvTask::class) {
     doFirst {
+      delete("README.md")
       generatePypiProjectHomePage()
       delete("dist")
     }
@@ -171,6 +191,10 @@ tasks {
     delete("build")
     delete("dist")
     delete("gravitino.egg-info")
+    delete("tests/unittests/htmlcov")
+    delete("tests/unittests/.coverage")
+    delete("tests/integration/htmlcov")
+    delete("tests/integration/.coverage")
 
     doLast {
       deleteCacheDir(".pytest_cache")

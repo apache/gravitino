@@ -80,7 +80,7 @@ public interface SupportsPartitions {
    * Drop a partition with specified name.
    *
    * @param partitionName the name of the partition
-   * @return true if a partition was deleted.
+   * @return true if a partition was deleted successfully, false if the partition does not exist.
    */
   boolean dropPartition(String partitionName);
 

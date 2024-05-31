@@ -22,6 +22,7 @@ import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableTy
 import com.datastrato.gravitino.catalog.hive.converter.FromHiveType;
 import com.datastrato.gravitino.catalog.hive.converter.ToHiveType;
 import com.datastrato.gravitino.connector.BaseTable;
+import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.connector.TableOperations;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
@@ -100,7 +101,7 @@ public class HiveTable extends BaseTable {
                   f ->
                       SortOrders.of(
                           NamedReference.field(f.getCol()),
-                          f.getOrder() == 0 ? SortDirection.ASCENDING : SortDirection.DESCENDING))
+                          f.getOrder() == 1 ? SortDirection.ASCENDING : SortDirection.DESCENDING))
               .toArray(SortOrder[]::new);
     }
 
@@ -184,7 +185,7 @@ public class HiveTable extends BaseTable {
    *
    * @return The converted Table.
    */
-  public Table toHiveTable(HiveTablePropertiesMetadata tablePropertiesMetadata) {
+  public Table toHiveTable(PropertiesMetadata tablePropertiesMetadata) {
     Table hiveTable = new Table();
 
     hiveTable.setTableName(name);
@@ -243,7 +244,7 @@ public class HiveTable extends BaseTable {
   }
 
   private StorageDescriptor buildStorageDescriptor(
-      HiveTablePropertiesMetadata tablePropertiesMetadata, List<FieldSchema> partitionFields) {
+      PropertiesMetadata tablePropertiesMetadata, List<FieldSchema> partitionFields) {
     StorageDescriptor sd = new StorageDescriptor();
     List<String> partitionKeys =
         partitionFields.stream().map(FieldSchema::getName).collect(Collectors.toList());
@@ -276,7 +277,7 @@ public class HiveTable extends BaseTable {
       for (SortOrder sortOrder : sortOrders) {
         String columnName = ((NamedReference.FieldReference) sortOrder.expression()).fieldName()[0];
         sd.addToSortCols(
-            new Order(columnName, sortOrder.direction() == SortDirection.ASCENDING ? 0 : 1));
+            new Order(columnName, sortOrder.direction() == SortDirection.ASCENDING ? 1 : 0));
       }
     }
 
@@ -291,7 +292,7 @@ public class HiveTable extends BaseTable {
     return sd;
   }
 
-  private SerDeInfo buildSerDeInfo(HiveTablePropertiesMetadata tablePropertiesMetadata) {
+  private SerDeInfo buildSerDeInfo(PropertiesMetadata tablePropertiesMetadata) {
     SerDeInfo serDeInfo = new SerDeInfo();
     serDeInfo.setName(properties().getOrDefault(SERDE_NAME, name()));
 

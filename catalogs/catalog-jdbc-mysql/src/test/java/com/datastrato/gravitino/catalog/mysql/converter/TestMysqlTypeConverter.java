@@ -12,6 +12,7 @@ import static com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter.
 import static com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter.BIGINT;
 import static com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter.BINARY;
 import static com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter.CHAR;
+import static com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter.DATETIME;
 import static com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter.DECIMAL;
 import static com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter.DOUBLE;
 import static com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter.FLOAT;
@@ -39,14 +40,15 @@ public class TestMysqlTypeConverter {
     checkJdbcTypeToGravitinoType(Types.DoubleType.get(), DOUBLE, null, null);
     checkJdbcTypeToGravitinoType(Types.DateType.get(), DATE, null, null);
     checkJdbcTypeToGravitinoType(Types.TimeType.get(), TIME, null, null);
-    checkJdbcTypeToGravitinoType(Types.TimestampType.withoutTimeZone(), TIMESTAMP, null, null);
+    checkJdbcTypeToGravitinoType(Types.TimestampType.withoutTimeZone(), DATETIME, null, null);
+    checkJdbcTypeToGravitinoType(Types.TimestampType.withTimeZone(), TIMESTAMP, null, null);
     checkJdbcTypeToGravitinoType(Types.DecimalType.of(10, 2), DECIMAL, "10", "2");
     checkJdbcTypeToGravitinoType(Types.VarCharType.of(20), VARCHAR, "20", null);
     checkJdbcTypeToGravitinoType(Types.FixedCharType.of(20), CHAR, "20", null);
     checkJdbcTypeToGravitinoType(Types.StringType.get(), TEXT, null, null);
     checkJdbcTypeToGravitinoType(Types.BinaryType.get(), BINARY, null, null);
     checkJdbcTypeToGravitinoType(
-        Types.UnparsedType.of(USER_DEFINED_TYPE), USER_DEFINED_TYPE, null, null);
+        Types.ExternalType.of(USER_DEFINED_TYPE), USER_DEFINED_TYPE, null, null);
   }
 
   @Test
@@ -58,12 +60,14 @@ public class TestMysqlTypeConverter {
     checkGravitinoTypeToJdbcType(DOUBLE, Types.DoubleType.get());
     checkGravitinoTypeToJdbcType(DATE, Types.DateType.get());
     checkGravitinoTypeToJdbcType(TIME, Types.TimeType.get());
-    checkGravitinoTypeToJdbcType(TIMESTAMP, Types.TimestampType.withoutTimeZone());
+    checkGravitinoTypeToJdbcType(TIMESTAMP, Types.TimestampType.withTimeZone());
+    checkGravitinoTypeToJdbcType(DATETIME, Types.TimestampType.withoutTimeZone());
     checkGravitinoTypeToJdbcType(DECIMAL + "(10,2)", Types.DecimalType.of(10, 2));
     checkGravitinoTypeToJdbcType(VARCHAR + "(20)", Types.VarCharType.of(20));
     checkGravitinoTypeToJdbcType(CHAR + "(20)", Types.FixedCharType.of(20));
     checkGravitinoTypeToJdbcType(TEXT, Types.StringType.get());
     checkGravitinoTypeToJdbcType(BINARY, Types.BinaryType.get());
+    checkGravitinoTypeToJdbcType(USER_DEFINED_TYPE, Types.ExternalType.of(USER_DEFINED_TYPE));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> MYSQL_TYPE_CONVERTER.fromGravitinoType(Types.UnparsedType.of(USER_DEFINED_TYPE)));

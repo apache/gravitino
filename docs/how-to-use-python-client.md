@@ -29,8 +29,8 @@ install it in your local.
 pip install gravitino
 ```
 
-1. [Manage metalake using Gravitino Python API](./manage-metalake-using-gravitino.md)
-2. [Manage fileset metadata using Gravitino Python API](./manage-fileset-metadata-using-gravitino.md)
+1. [Manage metalake using Gravitino Python API](./manage-metalake-using-gravitino.md?language=python)
+2. [Manage fileset metadata using Gravitino Python API](./manage-fileset-metadata-using-gravitino.md?language=python)
 
 ### Gravitino Fileset Example
 
@@ -40,9 +40,9 @@ document [How to use the playground#Launch AI components of playground](./how-to
 to launch a Gravitino server, HDFS and Jupyter notebook environment in you local Docker environment.
 
 Waiting for the playground Docker environment to start, you can directly open
-`http://localhost:8888/lab/tree/gravitino-fileset-sample.ipynb` in the browser and run the example.
+`http://localhost:8888/lab/tree/gravitino-fileset-example.ipynb` in the browser and run the example.
 
-The [gravitino-fileset-example](https://github.com/datastrato/gravitino-playground/blob/main/init/jupyter/gravitino-fileset-sample.ipynb)
+The [gravitino-fileset-example](https://github.com/datastrato/gravitino-playground/blob/main/init/jupyter/gravitino-fileset-example.ipynb)
 contains the following code snippets:
 
 1. Install HDFS Python client.
