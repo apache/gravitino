@@ -37,7 +37,7 @@ To develop the Gravitino connector locally, you need to do the following steps:
 
 ### IDEA
 
-1. Clone the Trino repository from the [GitHub](https://github.com/trinodb/trino) repository. You need to use the release version at least Trino-435.
+1. Clone the Trino repository from the [GitHub](https://github.com/trinodb/trino) repository. The released version Trino-435 is the least version that Gravitino supports.
 2. Open the Trino project in your IDEA.
 3. Create a new module for the Gravitino connector in the Trino project as the following picture (we will use the name `trino-gravitino` as the module name in the following steps). ![trino-gravitino](../assets/trino/create-gravitino-connector.jpg)
 4. Add a soft link to the Gravitino trino connector module in the Trino project. Assuming the src java main directory of the Gravitino trino connector in project Gravitino is `gravitino/path/to/gravitino-trino-connector/src/main/java`, 
