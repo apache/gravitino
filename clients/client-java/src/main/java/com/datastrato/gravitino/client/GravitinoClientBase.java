@@ -19,8 +19,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collections;
 import java.util.Map;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Base class for Gravitino Java client;
@@ -30,7 +28,6 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class GravitinoClientBase implements Closeable {
 
-  private static final Logger LOG = LoggerFactory.getLogger(GravitinoClientBase.class);
   /** The REST client to communicate with the REST server */
   protected final RESTClient restClient;
   /** The REST API path for listing metalakes */
@@ -156,7 +153,6 @@ public abstract class GravitinoClientBase implements Closeable {
         restClient.close();
       } catch (Exception e) {
         // Swallow the exception
-        LOG.warn("Failed to close the HTTP REST client", e);
       }
     }
   }
