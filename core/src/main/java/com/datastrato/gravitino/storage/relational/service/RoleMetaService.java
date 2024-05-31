@@ -141,7 +141,9 @@ public class RoleMetaService {
     for (SecurableObjectPO securableObjectPO : securableObjectPOs) {
       String fullName = getSecurableObjectFullName(securableObjectPO);
       if (fullName != null) {
-        securableObjects.add(POConverters.fromSecurableObjectPO(fullName, securableObjectPO));
+        securableObjects.add(
+            POConverters.fromSecurableObjectPO(
+                fullName, securableObjectPO, getType(securableObjectPO.getType())));
       }
     }
 
@@ -314,5 +316,12 @@ public class RoleMetaService {
 
     String catalogName = getCatalogFullName(schemaPO.getCatalogId());
     return catalogName + "." + schemaPO.getSchemaName();
+  }
+
+  private MetadataObject.Type getType(String type) {
+    if (ROOT.equals(type)) {
+      return MetadataObject.Type.METALAKE;
+    }
+    return MetadataObject.Type.valueOf(type);
   }
 }

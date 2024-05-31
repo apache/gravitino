@@ -874,7 +874,7 @@ public class POConverters {
   }
 
   public static SecurableObject fromSecurableObjectPO(
-      String fullName, SecurableObjectPO securableObjectPO) {
+      String fullName, SecurableObjectPO securableObjectPO, MetadataObject.Type type) {
     try {
       List<String> privilegeNames =
           JsonUtils.anyFieldMapper().readValue(securableObjectPO.getPrivilegeNames(), List.class);
@@ -889,13 +889,6 @@ public class POConverters {
         } else {
           privileges.add(Privileges.deny(privilegeNames.get(index)));
         }
-      }
-      MetadataObject.Type type;
-
-      if ("ROOT".equals(securableObjectPO.getType())) {
-        type = MetadataObject.Type.METALAKE;
-      } else {
-        type = MetadataObject.Type.valueOf(securableObjectPO.getType());
       }
 
       return SecurableObjects.parse(fullName, type, privileges);

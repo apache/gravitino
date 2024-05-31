@@ -85,9 +85,6 @@ public class MetalakeMetaService {
     MetalakePO metalakePO =
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaById(id));
-    if (metalakePO == null) {
-      throw new IllegalStateException("");
-    }
     return metalakePO;
   }
 
