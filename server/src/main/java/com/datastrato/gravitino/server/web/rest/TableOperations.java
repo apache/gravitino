@@ -63,7 +63,7 @@ public class TableOperations {
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema) {
-    LOG.info("received list tables request for schema: {}.{}.{}", metalake, catalog, schema);
+    LOG.info("Received list tables request for schema: {}.{}.{}", metalake, catalog, schema);
     try {
       return Utils.doAs(
           httpRequest,
@@ -76,7 +76,7 @@ public class TableOperations {
                     () -> dispatcher.listTables(tableNS));
             Response response = Utils.ok(new EntityListResponse(idents));
             LOG.info(
-                "list {} tables under schema: {}.{}.{}", idents.length, metalake, catalog, schema);
+                "List {} tables under schema: {}.{}.{}", idents.length, metalake, catalog, schema);
             return response;
           });
 
@@ -95,7 +95,7 @@ public class TableOperations {
       @PathParam("schema") String schema,
       TableCreateRequest request) {
     LOG.info(
-        "received create table request: {}.{}.{}.{}", metalake, catalog, schema, request.getName());
+        "Received create table request: {}.{}.{}.{}", metalake, catalog, schema, request.getName());
     try {
       return Utils.doAs(
           httpRequest,
@@ -119,7 +119,7 @@ public class TableOperations {
                             fromDTOs(request.getSortOrders()),
                             fromDTOs(request.getIndexes())));
             Response response = Utils.ok(new TableResponse(DTOConverters.toDTO(table)));
-            LOG.info("table created: {}.{}.{}.{}", metalake, catalog, schema, request.getName());
+            LOG.info("Table created: {}.{}.{}.{}", metalake, catalog, schema, request.getName());
             return response;
           });
 
@@ -140,7 +140,7 @@ public class TableOperations {
       @PathParam("schema") String schema,
       @PathParam("table") String table) {
     LOG.info(
-        "received load table request for table: {}.{}.{}.{}", metalake, catalog, schema, table);
+        "Received load table request for table: {}.{}.{}.{}", metalake, catalog, schema, table);
     try {
       return Utils.doAs(
           httpRequest,
@@ -150,7 +150,7 @@ public class TableOperations {
                 TreeLockUtils.doWithTreeLock(
                     ident, LockType.READ, () -> dispatcher.loadTable(ident));
             Response response = Utils.ok(new TableResponse(DTOConverters.toDTO(t)));
-            LOG.info("table loaded: {}.{}.{}.{}", metalake, catalog, schema, table);
+            LOG.info("Table loaded: {}.{}.{}.{}", metalake, catalog, schema, table);
             return response;
           });
     } catch (Exception e) {
@@ -169,7 +169,7 @@ public class TableOperations {
       @PathParam("schema") String schema,
       @PathParam("table") String table,
       TableUpdatesRequest request) {
-    LOG.info("received alter table request: {}.{}.{}.{}", metalake, catalog, schema, table);
+    LOG.info("Received alter table request: {}.{}.{}.{}", metalake, catalog, schema, table);
     try {
       return Utils.doAs(
           httpRequest,
@@ -186,7 +186,7 @@ public class TableOperations {
                     LockType.WRITE,
                     () -> dispatcher.alterTable(ident, changes));
             Response response = Utils.ok(new TableResponse(DTOConverters.toDTO(t)));
-            LOG.info("table altered: {}.{}.{}.{}", metalake, catalog, schema, t.name());
+            LOG.info("Table altered: {}.{}.{}.{}", metalake, catalog, schema, t.name());
             return response;
           });
 
@@ -207,7 +207,7 @@ public class TableOperations {
       @PathParam("table") String table,
       @QueryParam("purge") @DefaultValue("false") boolean purge) {
     LOG.info(
-        "received {} table request: {}.{}.{}.{}",
+        "Received {} table request: {}.{}.{}.{}",
         purge ? "purge" : "drop",
         metalake,
         catalog,
@@ -229,7 +229,7 @@ public class TableOperations {
 
             Response response = Utils.ok(new DropResponse(dropped));
             LOG.info(
-                "table {}: {}.{}.{}.{}",
+                "Table {}: {}.{}.{}.{}",
                 purge ? "purge" : "drop",
                 metalake,
                 catalog,

@@ -62,7 +62,7 @@ public class SchemaOperations {
   @ResponseMetered(name = "list-schema", absolute = true)
   public Response listSchemas(
       @PathParam("metalake") String metalake, @PathParam("catalog") String catalog) {
-    LOG.info("received list schema request for catalog: {}.{}", metalake, catalog);
+    LOG.info("Received list schema request for catalog: {}.{}", metalake, catalog);
     try {
       return Utils.doAs(
           httpRequest,
@@ -74,7 +74,7 @@ public class SchemaOperations {
                     LockType.READ,
                     () -> dispatcher.listSchemas(schemaNS));
             Response response = Utils.ok(new EntityListResponse(idents));
-            LOG.info("list {} schemas in catalog {}.{}", idents.length, metalake, catalog);
+            LOG.info("List {} schemas in catalog {}.{}", idents.length, metalake, catalog);
             return response;
           });
     } catch (Exception e) {
@@ -90,7 +90,7 @@ public class SchemaOperations {
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
       SchemaCreateRequest request) {
-    LOG.info("received create schema request: {}.{}.{}", metalake, catalog, request.getName());
+    LOG.info("Received create schema request: {}.{}.{}", metalake, catalog, request.getName());
     try {
       return Utils.doAs(
           httpRequest,
@@ -105,7 +105,7 @@ public class SchemaOperations {
                         dispatcher.createSchema(
                             ident, request.getComment(), request.getProperties()));
             Response response = Utils.ok(new SchemaResponse(DTOConverters.toDTO(schema)));
-            LOG.info("schema created: {}.{}.{}", metalake, catalog, schema.name());
+            LOG.info("Schema created: {}.{}.{}", metalake, catalog, schema.name());
             return response;
           });
 
@@ -124,7 +124,7 @@ public class SchemaOperations {
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema) {
-    LOG.info("received load schema request for schema: {}.{}.{}", metalake, catalog, schema);
+    LOG.info("Received load schema request for schema: {}.{}.{}", metalake, catalog, schema);
     try {
       return Utils.doAs(
           httpRequest,
@@ -134,7 +134,7 @@ public class SchemaOperations {
                 TreeLockUtils.doWithTreeLock(
                     ident, LockType.READ, () -> dispatcher.loadSchema(ident));
             Response response = Utils.ok(new SchemaResponse(DTOConverters.toDTO(s)));
-            LOG.info("schema loaded: {}.{}.{}", metalake, catalog, s.name());
+            LOG.info("Schema loaded: {}.{}.{}", metalake, catalog, s.name());
             return response;
           });
 
@@ -153,7 +153,7 @@ public class SchemaOperations {
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
       SchemaUpdatesRequest request) {
-    LOG.info("received alter schema request: {}.{}.{}", metalake, catalog, schema);
+    LOG.info("Received alter schema request: {}.{}.{}", metalake, catalog, schema);
     try {
       return Utils.doAs(
           httpRequest,
@@ -170,7 +170,7 @@ public class SchemaOperations {
                     LockType.WRITE,
                     () -> dispatcher.alterSchema(ident, changes));
             Response response = Utils.ok(new SchemaResponse(DTOConverters.toDTO(s)));
-            LOG.info("schema altered: {}.{}.{}", metalake, catalog, s.name());
+            LOG.info("Schema altered: {}.{}.{}", metalake, catalog, s.name());
             return response;
           });
 
@@ -189,7 +189,7 @@ public class SchemaOperations {
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
       @DefaultValue("false") @QueryParam("cascade") boolean cascade) {
-    LOG.info("received drop schema request: {}.{}.{}", metalake, catalog, schema);
+    LOG.info("Received drop schema request: {}.{}.{}", metalake, catalog, schema);
     try {
       return Utils.doAs(
           httpRequest,
@@ -205,7 +205,7 @@ public class SchemaOperations {
             }
 
             Response response = Utils.ok(new DropResponse(dropped));
-            LOG.info("schema dropped: {}.{}.{}", metalake, catalog, schema);
+            LOG.info("Schema dropped: {}.{}.{}", metalake, catalog, schema);
             return response;
           });
     } catch (Exception e) {

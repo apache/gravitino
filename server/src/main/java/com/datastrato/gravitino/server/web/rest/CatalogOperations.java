@@ -77,12 +77,12 @@ public class CatalogOperations {
                     Catalog[] catalogs = catalogDispatcher.listCatalogsInfo(catalogNS);
                     Response response =
                         Utils.ok(new CatalogListResponse(DTOConverters.toDTOs(catalogs)));
-                    LOG.info("list {} catalogs info under metalake: {}", catalogs.length, metalake);
+                    LOG.info("List {} catalogs info under metalake: {}", catalogs.length, metalake);
                     return response;
                   } else {
                     NameIdentifier[] idents = catalogDispatcher.listCatalogs(catalogNS);
                     Response response = Utils.ok(new EntityListResponse(idents));
-                    LOG.info("list {} catalogs under metalake: {}", idents.length, metalake);
+                    LOG.info("List {} catalogs under metalake: {}", idents.length, metalake);
                     return response;
                   }
                 });
@@ -96,7 +96,7 @@ public class CatalogOperations {
   @Produces("application/vnd.gravitino.v1+json")
   public Response createCatalog(
       @PathParam("metalake") String metalake, CatalogCreateRequest request) {
-    LOG.info("received create catalog request for metalake: {}", metalake);
+    LOG.info("Received create catalog request for metalake: {}", metalake);
     try {
       return Utils.doAs(
           httpRequest,
@@ -115,7 +115,7 @@ public class CatalogOperations {
                             request.getComment(),
                             request.getProperties()));
             Response response = Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
-            LOG.info("catalog created: {}.{}", metalake, catalog.name());
+            LOG.info("Catalog created: {}.{}", metalake, catalog.name());
             return response;
           });
 
@@ -130,14 +130,14 @@ public class CatalogOperations {
   @Produces("application/vnd.gravitino.v1+json")
   public Response loadCatalog(
       @PathParam("metalake") String metalakeName, @PathParam("catalog") String catalogName) {
-    LOG.info("received load catalog request for catalog: {}.{}", metalakeName, catalogName);
+    LOG.info("Received load catalog request for catalog: {}.{}", metalakeName, catalogName);
     try {
       NameIdentifier ident = NameIdentifier.ofCatalog(metalakeName, catalogName);
       Catalog catalog =
           TreeLockUtils.doWithTreeLock(
               ident, LockType.READ, () -> catalogDispatcher.loadCatalog(ident));
       Response response = Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
-      LOG.info("catalog loaded: {}.{}", metalakeName, catalogName);
+      LOG.info("Catalog loaded: {}.{}", metalakeName, catalogName);
       return response;
 
     } catch (Exception e) {
@@ -153,7 +153,7 @@ public class CatalogOperations {
       @PathParam("metalake") String metalakeName,
       @PathParam("catalog") String catalogName,
       CatalogUpdatesRequest request) {
-    LOG.info("received alter catalog request for catalog: {}.{}", metalakeName, catalogName);
+    LOG.info("Received alter catalog request for catalog: {}.{}", metalakeName, catalogName);
     try {
       return Utils.doAs(
           httpRequest,
@@ -170,7 +170,7 @@ public class CatalogOperations {
                     LockType.WRITE,
                     () -> catalogDispatcher.alterCatalog(ident, changes));
             Response response = Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
-            LOG.info("catalog altered: {}.{}", metalakeName, catalog.name());
+            LOG.info("Catalog altered: {}.{}", metalakeName, catalog.name());
             return response;
           });
 
@@ -185,7 +185,7 @@ public class CatalogOperations {
   @Produces("application/vnd.gravitino.v1+json")
   public Response dropCatalog(
       @PathParam("metalake") String metalakeName, @PathParam("catalog") String catalogName) {
-    LOG.info("received drop catalog request for catalog: {}.{}", metalakeName, catalogName);
+    LOG.info("Received drop catalog request for catalog: {}.{}", metalakeName, catalogName);
     try {
       return Utils.doAs(
           httpRequest,
@@ -201,7 +201,7 @@ public class CatalogOperations {
             }
 
             Response response = Utils.ok(new DropResponse(dropped));
-            LOG.info("catalog dropped: {}.{}", metalakeName, catalogName);
+            LOG.info("Catalog dropped: {}.{}", metalakeName, catalogName);
             return response;
           });
     } catch (Exception e) {

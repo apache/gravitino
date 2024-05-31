@@ -62,7 +62,7 @@ public class PartitionOperations {
       @PathParam("table") String table,
       @QueryParam("details") @DefaultValue("false") boolean verbose) {
     LOG.info(
-        "received list partition {} request for table: {}.{}.{}.{}",
+        "Received list partition {} request for table: {}.{}.{}.{}",
         verbose ? "infos" : "names",
         metalake,
         catalog,
@@ -81,7 +81,7 @@ public class PartitionOperations {
                     Partition[] partitions = dispatcher.listPartitions(tableIdent);
                     Response response = Utils.ok(new PartitionListResponse(toDTOs(partitions)));
                     LOG.info(
-                        "list {} partitions in table {}.{}.{}.{}",
+                        "List {} partitions in table {}.{}.{}.{}",
                         partitions.length,
                         metalake,
                         catalog,
@@ -92,7 +92,7 @@ public class PartitionOperations {
                     String[] partitionNames = dispatcher.listPartitionNames(tableIdent);
                     Response response = Utils.ok(new PartitionNameListResponse((partitionNames)));
                     LOG.info(
-                        "list {} partition names in table {}.{}.{}.{}",
+                        "List {} partition names in table {}.{}.{}.{}",
                         partitionNames.length,
                         metalake,
                         catalog,
@@ -119,7 +119,7 @@ public class PartitionOperations {
       @PathParam("table") String table,
       @PathParam("partition") String partition) {
     LOG.info(
-        "received get partition request for partition[{}] of table[{}.{}.{}.{}]",
+        "Received get partition request for partition[{}] of table[{}.{}.{}.{}]",
         partition,
         metalake,
         catalog,
@@ -137,7 +137,7 @@ public class PartitionOperations {
                   Partition p = dispatcher.getPartition(tableIdent, partition);
                   Response response = Utils.ok(new PartitionResponse(DTOConverters.toDTO(p)));
                   LOG.info(
-                      "got partition[{}] in table[{}.{}.{}.{}]",
+                      "Got partition[{}] in table[{}.{}.{}.{}]",
                       partition,
                       metalake,
                       catalog,
@@ -162,7 +162,7 @@ public class PartitionOperations {
       @PathParam("table") String table,
       AddPartitionsRequest request) {
     LOG.info(
-        "received add {} partition(s) request for table {}.{}.{}.{} ",
+        "Received add {} partition(s) request for table {}.{}.{}.{} ",
         request.getPartitions().length,
         metalake,
         catalog,
@@ -186,7 +186,7 @@ public class PartitionOperations {
                       Utils.ok(
                           new PartitionListResponse(new PartitionDTO[] {DTOConverters.toDTO(p)}));
                   LOG.info(
-                      "added {} partition(s) to table {}.{}.{}.{} ",
+                      "Added {} partition(s) to table {}.{}.{}.{} ",
                       1,
                       metalake,
                       catalog,
@@ -213,7 +213,7 @@ public class PartitionOperations {
       @PathParam("partition") String partition,
       @QueryParam("purge") @DefaultValue("false") boolean purge) {
     LOG.info(
-        "received {} partition request for partition[{}] of table[{}.{}.{}.{}]",
+        "Received {} partition request for partition[{}] of table[{}.{}.{}.{}]",
         purge ? "purge" : "drop",
         partition,
         metalake,
@@ -242,7 +242,7 @@ public class PartitionOperations {
                   }
                   Response response = Utils.ok(new DropResponse(dropped));
                   LOG.info(
-                      "partition {} {} in table {}.{}.{}.{}",
+                      "Partition {} {} in table {}.{}.{}.{}",
                       partition,
                       purge ? "purged" : "dropped",
                       metalake,

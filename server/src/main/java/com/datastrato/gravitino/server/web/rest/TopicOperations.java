@@ -57,7 +57,7 @@ public class TopicOperations {
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema) {
     try {
-      LOG.info("received list topics request for schema: {}.{}.{}", metalake, catalog, schema);
+      LOG.info("Received list topics request for schema: {}.{}.{}", metalake, catalog, schema);
       return Utils.doAs(
           httpRequest,
           () -> {
@@ -70,7 +70,7 @@ public class TopicOperations {
                     () -> dispatcher.listTopics(topicNS));
             Response response = Utils.ok(new EntityListResponse(topics));
             LOG.info(
-                "list {} topics under schema: {}.{}.{}", topics.length, metalake, catalog, schema);
+                "List {} topics under schema: {}.{}.{}", topics.length, metalake, catalog, schema);
             return response;
           });
     } catch (Exception e) {
@@ -87,7 +87,7 @@ public class TopicOperations {
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
       TopicCreateRequest request) {
-    LOG.info("received create topic request: {}.{}.{}", metalake, catalog, schema);
+    LOG.info("Received create topic request: {}.{}.{}", metalake, catalog, schema);
     try {
       return Utils.doAs(
           httpRequest,
@@ -113,7 +113,7 @@ public class TopicOperations {
                             null /* dataLayout, always null because it's not supported yet.*/,
                             request.getProperties()));
             Response response = Utils.ok(new TopicResponse(DTOConverters.toDTO(topic)));
-            LOG.info("topic created: {}.{}.{}.{}", metalake, catalog, schema, topic.name());
+            LOG.info("Topic created: {}.{}.{}.{}", metalake, catalog, schema, topic.name());
             return response;
           });
     } catch (Exception e) {
@@ -133,7 +133,7 @@ public class TopicOperations {
       @PathParam("schema") String schema,
       @PathParam("topic") String topic) {
     LOG.info(
-        "received load topic request for topic: {}.{}.{}.{}", metalake, catalog, schema, topic);
+        "Received load topic request for topic: {}.{}.{}.{}", metalake, catalog, schema, topic);
     try {
       return Utils.doAs(
           httpRequest,
@@ -144,7 +144,7 @@ public class TopicOperations {
                 TreeLockUtils.doWithTreeLock(
                     ident, LockType.READ, () -> dispatcher.loadTopic(ident));
             Response response = Utils.ok(new TopicResponse(DTOConverters.toDTO(t)));
-            LOG.info("topic loaded: {}.{}.{}.{}", metalake, catalog, schema, topic);
+            LOG.info("Topic loaded: {}.{}.{}.{}", metalake, catalog, schema, topic);
             return response;
           });
     } catch (Exception e) {
@@ -163,7 +163,7 @@ public class TopicOperations {
       @PathParam("schema") String schema,
       @PathParam("topic") String topic,
       TopicUpdatesRequest request) {
-    LOG.info("received alter topic request: {}.{}.{}.{}", metalake, catalog, schema, topic);
+    LOG.info("Received alter topic request: {}.{}.{}.{}", metalake, catalog, schema, topic);
     try {
       return Utils.doAs(
           httpRequest,
@@ -182,7 +182,7 @@ public class TopicOperations {
                     LockType.WRITE,
                     () -> dispatcher.alterTopic(ident, changes));
             Response response = Utils.ok(new TopicResponse(DTOConverters.toDTO(t)));
-            LOG.info("topic altered: {}.{}.{}.{}", metalake, catalog, schema, t.name());
+            LOG.info("Topic altered: {}.{}.{}.{}", metalake, catalog, schema, t.name());
             return response;
           });
     } catch (Exception e) {
@@ -200,7 +200,7 @@ public class TopicOperations {
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
       @PathParam("topic") String topic) {
-    LOG.info("received drop topic request: {}.{}.{}.{}", metalake, catalog, schema, topic);
+    LOG.info("Received drop topic request: {}.{}.{}.{}", metalake, catalog, schema, topic);
     try {
       return Utils.doAs(
           httpRequest,
@@ -218,7 +218,7 @@ public class TopicOperations {
             }
 
             Response response = Utils.ok(new DropResponse(dropped));
-            LOG.info("topic dropped: {}.{}.{}.{}", metalake, catalog, schema, topic);
+            LOG.info("Topic dropped: {}.{}.{}.{}", metalake, catalog, schema, topic);
             return response;
           });
     } catch (Exception e) {
