@@ -20,6 +20,3 @@ CREATE TABLE IF NOT EXISTS `role_meta_securable_object` (
     PRIMARY KEY (`id`),
     KEY `idx_obj_rid` (`role_id`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'securable object meta';
-
-INSERT INTO `role_meta_securable_object` (`role_id`, `full_name`, `type`, `privilege_names`, `privilege_conditions`, `current_version`, `last_version`,  `deleted_at`)
-SELECT `role_id`, `securable_object_full_name`, `securable_object_type`, `privileges`, `privilege_conditions`, `current_version`, `last_version`,  `deleted_at`  from `role_meta`;

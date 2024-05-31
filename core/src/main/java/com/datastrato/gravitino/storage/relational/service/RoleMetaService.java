@@ -15,7 +15,9 @@ import com.datastrato.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import com.datastrato.gravitino.storage.relational.mapper.RoleMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import com.datastrato.gravitino.storage.relational.mapper.UserRoleRelMapper;
+import com.datastrato.gravitino.storage.relational.po.CatalogPO;
 import com.datastrato.gravitino.storage.relational.po.FilesetPO;
+import com.datastrato.gravitino.storage.relational.po.MetalakePO;
 import com.datastrato.gravitino.storage.relational.po.RolePO;
 import com.datastrato.gravitino.storage.relational.po.SchemaPO;
 import com.datastrato.gravitino.storage.relational.po.SecurableObjectPO;
@@ -32,6 +34,8 @@ import java.util.List;
 public class RoleMetaService {
   private static final RoleMetaService INSTANCE = new RoleMetaService();
   private static final Splitter DOT = Splitter.on('.');
+  private static final String ROOT = "ROOT";
+  private static final String ALL_METALAKES = "*";
 
   public static RoleMetaService getInstance() {
     return INSTANCE;
@@ -135,9 +139,10 @@ public class RoleMetaService {
     List<SecurableObject> securableObjects = Lists.newArrayList();
 
     for (SecurableObjectPO securableObjectPO : securableObjectPOs) {
-      securableObjects.add(
-          POConverters.fromSecurableObjectPO(
-              getSecurableObjectFullName(securableObjectPO), securableObjectPO));
+      String fullName = getSecurableObjectFullName(securableObjectPO);
+      if (fullName != null) {
+        securableObjects.add(POConverters.fromSecurableObjectPO(fullName, securableObjectPO));
+      }
     }
 
     return POConverters.fromRolePO(rolePO, securableObjects, identifier.namespace());
@@ -206,7 +211,7 @@ public class RoleMetaService {
   }
 
   long getSecurableObjectEntityId(long metalakeId, String fullName, MetadataObject.Type type) {
-    if (fullName.equals("*") && type == MetadataObject.Type.METALAKE) {
+    if (fullName.equals(ALL_METALAKES) && type == MetadataObject.Type.METALAKE) {
       return 0;
     }
 
@@ -239,15 +244,19 @@ public class RoleMetaService {
   }
 
   String getSecurableObjectFullName(SecurableObjectPO securableObjectPO) {
-    if (securableObjectPO.getType().equals("ROOT")) {
-      return "*";
+    if (securableObjectPO.getType().equals(ROOT)) {
+      return ALL_METALAKES;
     }
 
     MetadataObject.Type type = MetadataObject.Type.valueOf(securableObjectPO.getType());
     if (type == MetadataObject.Type.METALAKE) {
-      return MetalakeMetaService.getInstance()
-          .getMetalakePOById(securableObjectPO.getEntityId())
-          .getMetalakeName();
+      MetalakePO metalakePO =
+          MetalakeMetaService.getInstance().getMetalakePOById(securableObjectPO.getEntityId());
+      if (metalakePO == null) {
+        return null;
+      }
+
+      return metalakePO.getMetalakeName();
     }
 
     if (type == MetadataObject.Type.CATALOG) {
@@ -261,30 +270,48 @@ public class RoleMetaService {
     if (type == MetadataObject.Type.TABLE) {
       TablePO tablePO =
           TableMetaService.getInstance().getTablePOById(securableObjectPO.getEntityId());
+      if (tablePO == null) {
+        return null;
+      }
       return getSchemaFullName(tablePO.getSchemaId()) + "." + tablePO.getTableName();
     }
 
     if (type == MetadataObject.Type.TOPIC) {
       TopicPO topicPO =
           TopicMetaService.getInstance().getTopicPOById(securableObjectPO.getEntityId());
+      if (topicPO == null) {
+        return null;
+      }
       return getSchemaFullName(topicPO.getSchemaId()) + "." + topicPO.getTopicName();
     }
 
     if (type == MetadataObject.Type.FILESET) {
       FilesetPO filesetPO =
           FilesetMetaService.getInstance().getFilesetPOById(securableObjectPO.getEntityId());
+      if (filesetPO == null) {
+        return null;
+      }
       return getSchemaFullName(filesetPO.getSchemaId()) + "." + filesetPO.getFilesetName();
     }
 
     return null;
   }
 
-  String getCatalogFullName(Long entityId) {
-    return CatalogMetaService.getInstance().getCatalogPOById(entityId).getCatalogName();
+  private String getCatalogFullName(Long entityId) {
+    CatalogPO catalogPO = CatalogMetaService.getInstance().getCatalogPOById(entityId);
+    if (catalogPO == null) {
+      return null;
+    }
+    return catalogPO.getCatalogName();
   }
 
-  String getSchemaFullName(Long entityId) {
+  private String getSchemaFullName(Long entityId) {
     SchemaPO schemaPO = SchemaMetaService.getInstance().getSchemaPOById(entityId);
+
+    if (schemaPO == null) {
+      return null;
+    }
+
     String catalogName = getCatalogFullName(schemaPO.getCatalogId());
     return catalogName + "." + schemaPO.getSchemaName();
   }

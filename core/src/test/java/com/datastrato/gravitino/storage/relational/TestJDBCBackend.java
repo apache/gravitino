@@ -476,7 +476,8 @@ public class TestJDBCBackend {
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofRoleNamespace("metalake"),
             "role",
-            auditInfo, "catalog");
+            auditInfo,
+            "catalog");
     backend.insert(role, false);
 
     UserEntity user =
@@ -553,7 +554,8 @@ public class TestJDBCBackend {
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofRoleNamespace("another-metalake"),
             "another-role",
-            auditInfo, "another-catalog");
+            auditInfo,
+            "another-catalog");
     backend.insert(anotherRole, false);
 
     UserEntity anotherUser =
@@ -913,7 +915,7 @@ public class TestJDBCBackend {
   }
 
   public static RoleEntity createRoleEntity(
-          Long id, Namespace namespace, String name, AuditInfo auditInfo, String catalogName) {
+      Long id, Namespace namespace, String name, AuditInfo auditInfo, String catalogName) {
     SecurableObject securableObject =
         SecurableObjects.ofCatalog(catalogName, Lists.newArrayList(Privileges.UseCatalog.allow()));
 
