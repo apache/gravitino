@@ -37,7 +37,7 @@ To develop the Gravitino connector locally, you need to do the following steps:
 
 ### IDEA
 
-1. Clone the Trino repository from the [GitHub](https://github.com/trinodb/trino) repository. We advise you to use the release version 435. 
+1. Clone the Trino repository from the [GitHub](https://github.com/trinodb/trino) repository. You need to use the release version at least Trino-435.
 2. Open the Trino project in your IDEA.
 3. Create a new module for the Gravitino connector in the Trino project as the following picture (we will use the name `trino-gravitino` as the module name in the following steps). ![trino-gravitino](../assets/trino/create-gravitino-connector.jpg)
 4. Add a soft link to the Gravitino trino connector module in the Trino project. Assuming the src java main directory of the Gravitino trino connector in project Gravitino is `gravitino/path/to/gravitino-trino-connector/src/main/java`, 
@@ -130,19 +130,19 @@ then you can see the `gravitino-trino-connecor` source files and directories in 
         <!--
             You can switch to the snapshot version as you like,  for example,
             if you want to use the jar of latest main branch,
-            you can execute the following command to install Gravitino `gravitino-client-java-runtime` jar locally.
+            you can execute the following command to install Gravitino `client-java-runtime` jar locally.
             ./gradlew publishToMavenLocal
         -->
         <dependency>
             <groupId>com.datastrato.gravitino</groupId>
-            <artifactId>gravitino-client-java-runtime</artifactId>
-            <version>0.5.0</version>
+            <artifactId>client-java-runtime</artifactId>
+            <version>0.5.1</version>
         </dependency>
 
         <dependency>
             <groupId>com.datastrato.gravitino</groupId>
-            <artifactId>gravitino-bundled-catalog</artifactId>
-            <version>0.5.0</version>
+            <artifactId>bundled-catalog</artifactId>
+            <version>0.5.1</version>
         </dependency>
 
     </dependencies>
