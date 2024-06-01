@@ -103,15 +103,13 @@ public class GroupMetaService {
                     }
                   }),
           () -> {
-            if (groupRoleRelPOS.isEmpty()) {
-              return;
-            }
             SessionUtils.doWithoutCommit(
                 GroupRoleRelMapper.class,
                 mapper -> {
                   if (overwritten) {
-                    mapper.batchInsertGroupRoleRelOnDuplicateKeyUpdate(groupRoleRelPOS);
-                  } else {
+                    mapper.softDeleteGroupRoleRelByGroupId(groupEntity.id());
+                  }
+                  if (!groupRoleRelPOS.isEmpty()) {
                     mapper.batchInsertGroupRoleRel(groupRoleRelPOS);
                   }
                 });
