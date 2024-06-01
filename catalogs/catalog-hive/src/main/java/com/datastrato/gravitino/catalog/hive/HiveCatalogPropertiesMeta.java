@@ -38,7 +38,7 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
 
   public static final String LIST_ALL_TABLES = "list-all-tables";
 
-  public static final boolean DEFAULT_LIST_ALL_TABLES = true;
+  public static final boolean DEFAULT_LIST_ALL_TABLES = false;
 
   private static final Map<String, PropertyEntry<?>> HIVE_CATALOG_PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
@@ -96,7 +96,7 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
               LIST_ALL_TABLES,
               PropertyEntry.booleanPropertyEntry(
                   LIST_ALL_TABLES,
-                  "list all tables (including the iceberg tables)",
+                  "list all tables (including the Iceberg tables)",
                   false,
                   false,
                   DEFAULT_LIST_ALL_TABLES,

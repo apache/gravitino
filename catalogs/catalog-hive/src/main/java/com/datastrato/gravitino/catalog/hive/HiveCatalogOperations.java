@@ -539,14 +539,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                         }
                         if (!listAllTables) {
                           Map<String, String> parameters = tb.getParameters();
-                          if (parameters != null) {
-                            boolean isIcebergTable =
-                                ICEBERG_TABLE_TYPE_VALUE.equalsIgnoreCase(
-                                    parameters.get(TABLE_TYPE_PROP));
-                            if (isIcebergTable) {
-                              return false;
-                            }
-                          }
+                          return isHiveTable(parameters);
                         }
                         return true;
                       })
@@ -563,6 +556,22 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  boolean isHiveTable(Map<String, String> tableParameters) {
+    if (isIcebergTable(tableParameters)) return false;
+    return true;
+  }
+
+  boolean isIcebergTable(Map<String, String> tableParameters) {
+    if (tableParameters != null) {
+      boolean isIcebergTable =
+          ICEBERG_TABLE_TYPE_VALUE.equalsIgnoreCase(tableParameters.get(TABLE_TYPE_PROP));
+      if (isIcebergTable) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
