@@ -271,10 +271,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             .catalogPropertiesMetadata()
             .getOrDefault(conf, CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS);
   }
+
   boolean getListAllTables(Map<String, String> conf) {
     return (boolean)
-            propertiesMetadata
-                    .catalogPropertiesMetadata().getOrDefault(conf, LIST_ALL_TABLES);
+        propertiesMetadata.catalogPropertiesMetadata().getOrDefault(conf, LIST_ALL_TABLES);
   }
   /** Closes the Hive catalog and releases the associated client pool. */
   @Override
@@ -531,22 +531,26 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       return clientPool.run(
           c ->
               c.getTableObjectsByName(schemaIdent.name(), allTables).stream()
-                  .filter(tb -> {
-                    boolean isSupportTable = SUPPORT_TABLE_TYPES.contains(tb.getTableType());
-                    if (!isSupportTable) {
-                      return false;
-                    }
-                    if (!listAllTables) {
-                      Map<String, String> parameters = tb.getParameters();
-                      if (parameters != null) {
-                        boolean isIcebergTable = ICEBERG_TABLE_TYPE_VALUE.equalsIgnoreCase(parameters.get(TABLE_TYPE_PROP));
-                        if (isIcebergTable) {
+                  .filter(
+                      tb -> {
+                        boolean isSupportTable = SUPPORT_TABLE_TYPES.contains(tb.getTableType());
+                        if (!isSupportTable) {
                           return false;
                         }
-                      }
-                    }
-                    return true;
-                  }).map(tb -> NameIdentifier.of(namespace, tb.getTableName()))
+                        if (!listAllTables) {
+                          Map<String, String> parameters = tb.getParameters();
+                          if (parameters != null) {
+                            boolean isIcebergTable =
+                                ICEBERG_TABLE_TYPE_VALUE.equalsIgnoreCase(
+                                    parameters.get(TABLE_TYPE_PROP));
+                            if (isIcebergTable) {
+                              return false;
+                            }
+                          }
+                        }
+                        return true;
+                      })
+                  .map(tb -> NameIdentifier.of(namespace, tb.getTableName()))
                   .toArray(NameIdentifier[]::new));
     } catch (UnknownDBException e) {
       throw new NoSuchSchemaException(

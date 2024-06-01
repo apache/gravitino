@@ -76,7 +76,6 @@ class TestHiveCatalogOperations {
     Assertions.assertTrue(propertyEntryMap.containsKey(IMPERSONATION_ENABLE));
     Assertions.assertTrue(propertyEntryMap.containsKey(LIST_ALL_TABLES));
 
-
     Assertions.assertTrue(propertyEntryMap.get(METASTORE_URIS).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(Catalog.PROPERTY_PACKAGE).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(CLIENT_POOL_SIZE).isRequired());

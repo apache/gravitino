@@ -92,16 +92,16 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
               FETCH_TIMEOUT_SEC,
               PropertyEntry.integerOptionalPropertyEntry(
                   FETCH_TIMEOUT_SEC, "The timeout to fetch key tab", true, 60, false))
-            .put(
-                    LIST_ALL_TABLES,
-                    PropertyEntry.booleanPropertyEntry(
-                            LIST_ALL_TABLES,
-                            "list all tables (including the iceberg tables)",
-                            false,
-                            false,
-                            DEFAULT_LIST_ALL_TABLES,
-                            false,
-                            false))
+          .put(
+              LIST_ALL_TABLES,
+              PropertyEntry.booleanPropertyEntry(
+                  LIST_ALL_TABLES,
+                  "list all tables (including the iceberg tables)",
+                  false,
+                  false,
+                  DEFAULT_LIST_ALL_TABLES,
+                  false,
+                  false))
           .putAll(BASIC_CATALOG_PROPERTY_ENTRIES)
           .build();
 
