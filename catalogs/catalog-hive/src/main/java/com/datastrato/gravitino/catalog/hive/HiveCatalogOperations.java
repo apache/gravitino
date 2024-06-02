@@ -52,6 +52,9 @@ import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Method;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -164,7 +167,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         // The id of entity is a random unique id.
         File keytabFile = new File(String.format(GRAVITINO_KEYTAB_FORMAT, info.id()));
         keytabFile.deleteOnExit();
-        if (keytabFile.exists() && !keytabFile.delete()) {
+        if (!Files.deleteIfExists(keytabFile.toPath().toAbsolutePath())) {
           throw new IllegalStateException(
               String.format("Fail to delete keytab file %s", keytabFile.getAbsolutePath()));
         }
@@ -278,10 +281,13 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       checkTgtExecutor.shutdown();
       checkTgtExecutor = null;
     }
-
-    File keytabFile = new File(String.format(GRAVITINO_KEYTAB_FORMAT, info.id()));
-    if (keytabFile.exists() && !keytabFile.delete()) {
-      LOG.error("Fail to delete key tab file {}", keytabFile.getAbsolutePath());
+    try {
+      Path keytabPath = Paths.get(String.format(GRAVITINO_KEYTAB_FORMAT, info.id())).toAbsolutePath();
+      if (!Files.deleteIfExists(keytabPath)) {
+        LOG.error("Fail to delete key tab file {}", keytabPath);
+      }
+    } catch (IOException ioe) {
+      throw new UncheckedIOException(ioe);
     }
   }
 
