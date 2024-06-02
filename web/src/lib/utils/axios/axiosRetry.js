@@ -21,29 +21,24 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-
-/**
- * Referred from src/utils/http/axios/axiosRetry.ts
- */
-
-import { AxiosError, AxiosInstance } from 'axios'
-
-export class AxiosRetry {
-  retry(axiosInstance: AxiosInstance, error: AxiosError) {
-    const { config }: any = error.response
-    const { waitTime, count } = config?.requestOptions?.retryRequest ?? {}
-    config.__retryCount = config.__retryCount || 0
-    if (config.__retryCount >= count) {
-      return Promise.reject(error)
+var AxiosRetry = /** @class */ (function () {
+    function AxiosRetry() {
     }
-    config.__retryCount += 1
-
-    delete config.headers
-
-    return this.delay(waitTime).then(() => axiosInstance(config))
-  }
-
-  private delay(waitTime: number) {
-    return new Promise(resolve => setTimeout(resolve, waitTime))
-  }
-}
+    AxiosRetry.prototype.retry = function (axiosInstance, error) {
+        var _a, _b;
+        var config = error.response.config;
+        var _c = (_b = (_a = config === null || config === void 0 ? void 0 : config.requestOptions) === null || _a === void 0 ? void 0 : _a.retryRequest) !== null && _b !== void 0 ? _b : {}, waitTime = _c.waitTime, count = _c.count;
+        config.__retryCount = config.__retryCount || 0;
+        if (config.__retryCount >= count) {
+            return Promise.reject(error);
+        }
+        config.__retryCount += 1;
+        delete config.headers;
+        return this.delay(waitTime).then(function () { return axiosInstance(config); });
+    };
+    AxiosRetry.prototype.delay = function (waitTime) {
+        return new Promise(function (resolve) { return setTimeout(resolve, waitTime); });
+    };
+    return AxiosRetry;
+}());
+export { AxiosRetry };
