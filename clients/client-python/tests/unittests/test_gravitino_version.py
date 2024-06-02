@@ -1,3 +1,8 @@
+"""
+Copyright 2024 Datastrato Pvt Ltd.
+This software is licensed under the Apache License version 2.
+"""
+
 import unittest
 
 from gravitino.client.gravitino_version import GravitinoVersion
