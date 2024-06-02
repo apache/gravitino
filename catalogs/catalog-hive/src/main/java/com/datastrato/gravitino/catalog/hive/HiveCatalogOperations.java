@@ -282,7 +282,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       checkTgtExecutor = null;
     }
     try {
-      Path keytabPath = Paths.get(String.format(GRAVITINO_KEYTAB_FORMAT, info.id())).toAbsolutePath();
+      Path keytabPath =
+          Paths.get(String.format(GRAVITINO_KEYTAB_FORMAT, info.id())).toAbsolutePath();
       if (!Files.deleteIfExists(keytabPath)) {
         LOG.error("Fail to delete key tab file {}", keytabPath);
       }
