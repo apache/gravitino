@@ -136,5 +136,7 @@ tasks.test {
 }
 
 tasks.clean {
+  delete("derby.log")
+  delete("metastore_db")
   delete("spark-warehouse")
 }
