@@ -36,7 +36,10 @@ public class SparkIcebergTable extends SparkTable {
       PropertiesConverter propertiesConverter,
       SparkTransformConverter sparkTransformConverter,
       SparkTypeConverter sparkTypeConverter) {
-    super(sparkTable.table(), true);
+    super(
+        sparkTable.table(), true
+        /** refreshEagerly */
+        );
     this.gravitinoTableInfoHelper =
         new GravitinoTableInfoHelper(
             true,
