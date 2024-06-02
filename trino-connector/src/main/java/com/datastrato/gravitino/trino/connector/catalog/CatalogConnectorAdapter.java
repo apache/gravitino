@@ -22,7 +22,10 @@ public interface CatalogConnectorAdapter {
   }
 
   /** @return Return internal connector config with Trino. */
-  Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog) throws Exception;
+  Map<String, String> buildInternalConnectorConfig(GravitinoCatalog catalog) throws Exception;
+
+  /** @return Return internal connector name with Trino. */
+  String internalConnectorName();
 
   /** @return SchemaProperties list that used to validate schema properties. */
   default List<PropertyMetadata<?>> getSchemaProperties() {

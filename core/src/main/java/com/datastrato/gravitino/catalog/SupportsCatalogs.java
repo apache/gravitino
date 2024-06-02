@@ -104,7 +104,7 @@ public interface SupportsCatalogs {
    * Drop a catalog with specified identifier.
    *
    * @param ident the identifier of the catalog.
-   * @return True if the catalog was dropped, false otherwise.
+   * @return True if the catalog was dropped, false if the catalog does not exist.
    */
   boolean dropCatalog(NameIdentifier ident);
 }

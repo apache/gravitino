@@ -222,7 +222,7 @@ public class RelationalTable implements Table, SupportsPartitions {
    * Drops the partition with the given name.
    *
    * @param partitionName The name of the partition.
-   * @return true if the partition is dropped, false otherwise.
+   * @return true if the partition is dropped, false if the partition does not exist.
    */
   @Override
   public boolean dropPartition(String partitionName) {

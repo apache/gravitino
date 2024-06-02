@@ -54,7 +54,7 @@ public class DorisTypeConverter extends JdbcTypeConverter<String> {
       case TEXT:
         return Types.StringType.get();
       default:
-        throw new IllegalArgumentException("Not a supported type: " + typeBean);
+        return Types.ExternalType.of(typeBean.getTypeName());
     }
   }
 

@@ -180,19 +180,62 @@ class TestUserMetaService extends TestJDBCBackend {
     Assertions.assertThrows(
         AlreadyExistsException.class, () -> userMetaService.insertUser(user2Exist, false));
 
-    // insert overwrite user with roles
+    // insert overwrite user with 2 roles
     UserEntity user2Overwrite =
         createUserEntity(
             user1.id(),
             AuthorizationUtils.ofUserNamespace(metalakeName),
             "user2Overwrite",
-            auditInfo);
+            auditInfo,
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
     Assertions.assertDoesNotThrow(() -> userMetaService.insertUser(user2Overwrite, true));
+
+    UserEntity actualOverwriteUser2 =
+        userMetaService.getUserByIdentifier(user2Overwrite.nameIdentifier());
+    Assertions.assertEquals("user2Overwrite", actualOverwriteUser2.name());
+    Assertions.assertEquals(2, actualOverwriteUser2.roleNames().size());
     Assertions.assertEquals(
-        "user2Overwrite",
-        userMetaService.getUserByIdentifier(user2Overwrite.nameIdentifier()).name());
-    Assertions.assertEquals(
-        user2Overwrite, userMetaService.getUserByIdentifier(user2Overwrite.nameIdentifier()));
+        Sets.newHashSet(role1.name(), role2.name()),
+        Sets.newHashSet(actualOverwriteUser2.roleNames()));
+
+    // insert overwrite user with 1 roles
+    RoleEntity role3 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role3",
+            auditInfo);
+    roleMetaService.insertRole(role3, false);
+    UserEntity user3Overwrite =
+        createUserEntity(
+            user1.id(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "user3Overwrite",
+            auditInfo,
+            Lists.newArrayList(role3.name()),
+            Lists.newArrayList(role3.id()));
+    Assertions.assertDoesNotThrow(() -> userMetaService.insertUser(user3Overwrite, true));
+
+    UserEntity actualOverwriteUser3 =
+        userMetaService.getUserByIdentifier(user3Overwrite.nameIdentifier());
+    Assertions.assertEquals("user3Overwrite", actualOverwriteUser3.name());
+    Assertions.assertEquals(1, actualOverwriteUser3.roleNames().size());
+    Assertions.assertEquals("role3", actualOverwriteUser3.roleNames().get(0));
+
+    // insert overwrite user with 0 roles
+    UserEntity user4Overwrite =
+        createUserEntity(
+            user1.id(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "user4Overwrite",
+            auditInfo);
+    Assertions.assertDoesNotThrow(() -> userMetaService.insertUser(user4Overwrite, true));
+
+    UserEntity actualOverwriteUser4 =
+        userMetaService.getUserByIdentifier(user4Overwrite.nameIdentifier());
+    Assertions.assertEquals("user4Overwrite", actualOverwriteUser4.name());
+    Assertions.assertNull(actualOverwriteUser4.roleNames());
   }
 
   @Test

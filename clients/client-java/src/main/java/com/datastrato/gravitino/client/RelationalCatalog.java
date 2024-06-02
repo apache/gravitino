@@ -39,8 +39,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Relational catalog is a catalog implementation that supports relational database like metadata
@@ -48,8 +46,6 @@ import org.slf4j.LoggerFactory;
  * catalog is under the metalake.
  */
 public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog {
-
-  private static final Logger LOG = LoggerFactory.getLogger(RelationalCatalog.class);
 
   RelationalCatalog(
       Namespace namespace,
@@ -199,28 +195,20 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
    * Drop the table with specified identifier.
    *
    * @param ident The identifier of the table.
-   * @return true if the table is dropped successfully, false otherwise.
+   * @return true if the table is dropped successfully, false if the table does not exist.
    */
   @Override
   public boolean dropTable(NameIdentifier ident) {
     NameIdentifier.checkTable(ident);
 
-    try {
-      DropResponse resp =
-          restClient.delete(
-              formatTableRequestPath(ident.namespace())
-                  + "/"
-                  + RESTUtils.encodeString(ident.name()),
-              DropResponse.class,
-              Collections.emptyMap(),
-              ErrorHandlers.tableErrorHandler());
-      resp.validate();
-      return resp.dropped();
-
-    } catch (Exception e) {
-      LOG.warn("Failed to drop table {}", ident, e);
-      return false;
-    }
+    DropResponse resp =
+        restClient.delete(
+            formatTableRequestPath(ident.namespace()) + "/" + RESTUtils.encodeString(ident.name()),
+            DropResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.tableErrorHandler());
+    resp.validate();
+    return resp.dropped();
   }
 
   /**
@@ -247,11 +235,9 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
               ErrorHandlers.tableErrorHandler());
       resp.validate();
       return resp.dropped();
-
     } catch (UnsupportedOperationException e) {
       throw e;
     } catch (Exception e) {
-      LOG.warn("Failed to purge table {}", ident, e);
       return false;
     }
   }

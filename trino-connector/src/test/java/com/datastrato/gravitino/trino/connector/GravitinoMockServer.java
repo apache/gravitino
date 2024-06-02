@@ -42,6 +42,7 @@ import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ConnectorMetadata;
 import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.ConnectorTableMetadata;
+import io.trino.spi.connector.SaveMode;
 import io.trino.spi.connector.SchemaTableName;
 import io.trino.testing.ResourcePresence;
 import java.time.Instant;
@@ -190,14 +191,6 @@ public class GravitinoMockServer implements AutoCloseable {
             });
     metalakes.put(metalakeName, new Metalake(metaLake));
     return metaLake;
-  }
-
-  void reloadCatalogs() {
-    GravitinoMetalake metaLake = mock(GravitinoMetalake.class);
-    when(metaLake.name()).thenReturn(testMetalake);
-    when(metaLake.listCatalogs())
-        .thenReturn(new NameIdentifier[] {NameIdentifier.ofCatalog(testMetalake, testCatalog)});
-    catalogConnectorManager.loadCatalogs(metaLake);
   }
 
   private Catalog createCatalog(String metalakeName, String catalogName) {
@@ -369,7 +362,7 @@ public class GravitinoMockServer implements AutoCloseable {
                                 catalogConnectorManager.getTrinoCatalogName(catalog))
                             .getInternalConnector();
                 ConnectorMetadata metadata = memoryConnector.getMetadata(null, null);
-                metadata.createTable(null, tableMetadata, false);
+                metadata.createTable(null, tableMetadata, SaveMode.FAIL);
                 return null;
               }
             });
