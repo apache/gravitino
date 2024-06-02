@@ -749,6 +749,19 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
+  void testDropAndWriteTable() {
+    String tableName = "drop_then_create_write_table";
+
+    createSimpleTable(tableName);
+    checkTableReadWrite(getTableInfo(tableName));
+
+    dropTableIfExists(tableName);
+
+    createSimpleTable(tableName);
+    checkTableReadWrite(getTableInfo(tableName));
+  }
+
+  @Test
   @EnabledIf("supportsDelete")
   void testDeleteOperation() {
     String tableName = "test_row_level_delete_table";

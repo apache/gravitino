@@ -75,5 +75,7 @@ public class IcebergPropertiesConstants {
   @VisibleForTesting
   public static final String ICEBERG_FORMAT_VERSION = IcebergTablePropertiesMetadata.FORMAT_VERSION;
 
+  static final String ICEBERG_CATALOG_CACHE_ENABLED = CatalogProperties.CACHE_ENABLED;
+
   private IcebergPropertiesConstants() {}
 }
