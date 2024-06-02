@@ -333,8 +333,6 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
             "CREATE TABLE %s (id INT NOT NULL COMMENT 'id comment', name STRING COMMENT '', age INT)",
             tableName));
 
-    SparkIcebergTable sparkIcebergTable = getSparkIcebergTableInstance(tableName);
-
     SparkTableInfo tableInfo = getTableInfo(tableName);
     Map<String, String> tableProperties = tableInfo.getTableProperties();
     Assertions.assertNotNull(tableProperties);
@@ -360,6 +358,7 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     // create a new snapshot
     sql(String.format("INSERT INTO %s VALUES(1, '1', 1)", tableName));
 
+    SparkIcebergTable sparkIcebergTable = getSparkIcebergTableInstance(tableName);
     // set Identifier fields
     sparkIcebergTable.table().updateSchema().setIdentifierFields("id").commit();
 
