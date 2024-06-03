@@ -123,7 +123,7 @@ public class TestIcebergSchema {
 
     catalogOperations.createSchema(ident, COMMENT_VALUE, properties);
     Assertions.assertTrue(catalogOperations.schemaExists(ident));
-    catalogOperations.dropSchema(ident, true);
+    catalogOperations.dropSchema(ident, false);
     Assertions.assertFalse(catalogOperations.schemaExists(ident));
 
     Assertions.assertFalse(catalogOperations.dropSchema(ident, false));

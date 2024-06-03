@@ -109,6 +109,8 @@ public class HiveBackendProxy implements MethodInterceptor {
 
     // Change the client pool to IcebergHiveCachedClientPool as client pool in iceberg
     // has the username problem.
+    // TODO: we need to close the original client pool and thread pool, or it will cause memory
+    // leak.
     m.set(target, new IcebergHiveCachedClientPool(target.getConf(), properties));
     return token;
   }
