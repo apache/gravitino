@@ -25,27 +25,33 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-*/
+ */
+
 /**
  * Referred from src/enums/httpEnum.ts
  */
 export var ContentTypeEnum;
+
 (function (ContentTypeEnum) {
-    ContentTypeEnum["JSON"] = "application/json;charset=UTF-8";
-    ContentTypeEnum["FORM_URLENCODED"] = "application/x-www-form-urlencoded;charset=UTF-8";
-    ContentTypeEnum["FORM_DATA"] = "multipart/form-data;charset=UTF-8";
+  ContentTypeEnum['JSON'] = 'application/json;charset=UTF-8';
+  ContentTypeEnum['FORM_URLENCODED'] = 'application/x-www-form-urlencoded;charset=UTF-8';
+  ContentTypeEnum['FORM_DATA'] = 'multipart/form-data;charset=UTF-8';
 })(ContentTypeEnum || (ContentTypeEnum = {}));
+
 export var RequestEnum;
+
 (function (RequestEnum) {
-    RequestEnum["GET"] = "GET";
-    RequestEnum["POST"] = "POST";
-    RequestEnum["PUT"] = "PUT";
-    RequestEnum["DELETE"] = "DELETE";
+  RequestEnum['GET'] = 'GET';
+  RequestEnum['POST'] = 'POST';
+  RequestEnum['PUT'] = 'PUT';
+  RequestEnum['DELETE'] = 'DELETE';
 })(RequestEnum || (RequestEnum = {}));
+
 export var ResultEnum;
+
 (function (ResultEnum) {
-    ResultEnum[ResultEnum["SUCCESS"] = 0] = "SUCCESS";
-    ResultEnum[ResultEnum["ERROR"] = -1] = "ERROR";
-    ResultEnum[ResultEnum["TIMEOUT"] = 401] = "TIMEOUT";
-    ResultEnum["TYPE"] = "success";
+  ResultEnum[(ResultEnum['SUCCESS'] = 0)] = 'SUCCESS';
+  ResultEnum[(ResultEnum['ERROR'] = -1)] = 'ERROR';
+  ResultEnum[(ResultEnum['TIMEOUT'] = 401)] = 'TIMEOUT';
+  ResultEnum['TYPE'] = 'success';
 })(ResultEnum || (ResultEnum = {}));

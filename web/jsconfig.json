@@ -1,15 +1,9 @@
 {
   "compilerOptions": {
     "paths": {
-      "@/*": [
-        "./src/*"
-      ]
+      "@/*": ["./src/*"]
     },
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
+    "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": false,
@@ -27,13 +21,6 @@
       }
     ]
   },
-  "include": [
-    "dist/ui/types/**/*.js",
-    "**/*.js",
-    "**/*.jsx",
-    ".next/types/**/*.js"
-  ],
-  "exclude": [
-    "node_modules"
-  ]
+  "include": ["dist/ui/types/**/*.js", "**/*.js", "**/*.jsx", ".next/types/**/*.js"],
+  "exclude": ["node_modules"]
 }

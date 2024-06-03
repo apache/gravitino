@@ -74,4 +74,3 @@ SOFTWARE.
  * @property {string} [filename]
  * @property {Object.<string, any>} [key]
  */
-

@@ -20,44 +20,52 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-*/
+ */
+
 var pendingMap = new Map();
+
 var getPendingUrl = function (config) {
-    return [config.method, config.url].join('&');
+  return [config.method, config.url].join('&');
 };
+
 var AxiosCanceler = /** @class */ (function () {
-    function AxiosCanceler() {
+  function AxiosCanceler() {}
+
+  AxiosCanceler.prototype.addPending = function (config) {
+    this.removePending(config);
+    var url = getPendingUrl(config);
+    var controller = new AbortController();
+    config.signal = config.signal || controller.signal;
+    if (!pendingMap.has(url)) {
+      pendingMap.set(url, controller);
     }
-    AxiosCanceler.prototype.addPending = function (config) {
-        this.removePending(config);
-        var url = getPendingUrl(config);
-        var controller = new AbortController();
-        config.signal = config.signal || controller.signal;
-        if (!pendingMap.has(url)) {
-            pendingMap.set(url, controller);
-        }
-    };
-    AxiosCanceler.prototype.removeAllPending = function () {
-        pendingMap.forEach(function (abortController) {
-            if (abortController) {
-                abortController.abort();
-            }
-        });
-        this.reset();
-    };
-    AxiosCanceler.prototype.removePending = function (config) {
-        var url = getPendingUrl(config);
-        if (pendingMap.has(url)) {
-            var abortController = pendingMap.get(url);
-            if (abortController) {
-                abortController.abort(url);
-            }
-            pendingMap.delete(url);
-        }
-    };
-    AxiosCanceler.prototype.reset = function () {
-        pendingMap.clear();
-    };
-    return AxiosCanceler;
-}());
+  };
+
+  AxiosCanceler.prototype.removeAllPending = function () {
+    pendingMap.forEach(function (abortController) {
+      if (abortController) {
+        abortController.abort();
+      }
+    });
+    this.reset();
+  };
+
+  AxiosCanceler.prototype.removePending = function (config) {
+    var url = getPendingUrl(config);
+    if (pendingMap.has(url)) {
+      var abortController = pendingMap.get(url);
+      if (abortController) {
+        abortController.abort(url);
+      }
+      pendingMap.delete(url);
+    }
+  };
+
+  AxiosCanceler.prototype.reset = function () {
+    pendingMap.clear();
+  };
+
+  return AxiosCanceler;
+})();
+
 export { AxiosCanceler };

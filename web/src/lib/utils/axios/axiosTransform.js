@@ -20,10 +20,12 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-*/
+ */
+
 var AxiosTransform = /** @class */ (function () {
-    function AxiosTransform() {
-    }
-    return AxiosTransform;
-}());
+  function AxiosTransform() {}
+  
+  return AxiosTransform;
+})();
+
 export { AxiosTransform };
