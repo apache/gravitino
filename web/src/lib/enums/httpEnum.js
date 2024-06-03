@@ -1,4 +1,9 @@
 /*
+ * Copyright 2023 Datastrato Pvt Ltd.
+ * This software is licensed under the Apache License version 2.
+ */
+
+/*
 MIT License
 
 Copyright (c) 2020-present, Vben
@@ -21,29 +26,26 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-
 /**
- * Referred from src/utils/http/axios/axiosRetry.ts
+ * Referred from src/enums/httpEnum.ts
  */
-
-import { AxiosError, AxiosInstance } from 'axios'
-
-export class AxiosRetry {
-  retry(axiosInstance: AxiosInstance, error: AxiosError) {
-    const { config }: any = error.response
-    const { waitTime, count } = config?.requestOptions?.retryRequest ?? {}
-    config.__retryCount = config.__retryCount || 0
-    if (config.__retryCount >= count) {
-      return Promise.reject(error)
-    }
-    config.__retryCount += 1
-
-    delete config.headers
-
-    return this.delay(waitTime).then(() => axiosInstance(config))
-  }
-
-  private delay(waitTime: number) {
-    return new Promise(resolve => setTimeout(resolve, waitTime))
-  }
-}
+export var ContentTypeEnum;
+(function (ContentTypeEnum) {
+    ContentTypeEnum["JSON"] = "application/json;charset=UTF-8";
+    ContentTypeEnum["FORM_URLENCODED"] = "application/x-www-form-urlencoded;charset=UTF-8";
+    ContentTypeEnum["FORM_DATA"] = "multipart/form-data;charset=UTF-8";
+})(ContentTypeEnum || (ContentTypeEnum = {}));
+export var RequestEnum;
+(function (RequestEnum) {
+    RequestEnum["GET"] = "GET";
+    RequestEnum["POST"] = "POST";
+    RequestEnum["PUT"] = "PUT";
+    RequestEnum["DELETE"] = "DELETE";
+})(RequestEnum || (RequestEnum = {}));
+export var ResultEnum;
+(function (ResultEnum) {
+    ResultEnum[ResultEnum["SUCCESS"] = 0] = "SUCCESS";
+    ResultEnum[ResultEnum["ERROR"] = -1] = "ERROR";
+    ResultEnum[ResultEnum["TIMEOUT"] = 401] = "TIMEOUT";
+    ResultEnum["TYPE"] = "success";
+})(ResultEnum || (ResultEnum = {}));

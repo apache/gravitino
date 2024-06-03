@@ -28,11 +28,10 @@
     ]
   },
   "include": [
-    "next-env.d.ts",
-    "dist/ui/types/**/*.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts"
+    "dist/ui/types/**/*.js",
+    "**/*.js",
+    "**/*.jsx",
+    ".next/types/**/*.js"
   ],
   "exclude": [
     "node_modules"

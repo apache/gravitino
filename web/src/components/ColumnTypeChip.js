@@ -4,7 +4,7 @@
  */
 
 import { Chip } from '@mui/material'
-import { ColumnTypeColorEnum } from '@/lib/enums/columnTypeEnum'
+import { ColumnTypeColorEnum } from '@/lib/enums/columnTypeEnum.js';
 import colors from '@/lib/theme/colors'
 import { alpha } from '@/lib/utils/color'
 import { isString } from 'lodash-es'

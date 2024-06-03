@@ -21,27 +21,24 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-
-/**
- * Referred from src/enums/httpEnum.ts
- */
-
-export enum ContentTypeEnum {
-  JSON = 'application/json;charset=UTF-8',
-  FORM_URLENCODED = 'application/x-www-form-urlencoded;charset=UTF-8',
-  FORM_DATA = 'multipart/form-data;charset=UTF-8'
-}
-
-export enum RequestEnum {
-  GET = 'GET',
-  POST = 'POST',
-  PUT = 'PUT',
-  DELETE = 'DELETE'
-}
-
-export enum ResultEnum {
-  SUCCESS = 0,
-  ERROR = -1,
-  TIMEOUT = 401,
-  TYPE = 'success'
-}
+var AxiosRetry = /** @class */ (function () {
+    function AxiosRetry() {
+    }
+    AxiosRetry.prototype.retry = function (axiosInstance, error) {
+        var _a, _b;
+        var config = error.response.config;
+        var _c = (_b = (_a = config === null || config === void 0 ? void 0 : config.requestOptions) === null || _a === void 0 ? void 0 : _a.retryRequest) !== null && _b !== void 0 ? _b : {}, waitTime = _c.waitTime, count = _c.count;
+        config.__retryCount = config.__retryCount || 0;
+        if (config.__retryCount >= count) {
+            return Promise.reject(error);
+        }
+        config.__retryCount += 1;
+        delete config.headers;
+        return this.delay(waitTime).then(function () { return axiosInstance(config); });
+    };
+    AxiosRetry.prototype.delay = function (waitTime) {
+        return new Promise(function (resolve) { return setTimeout(resolve, waitTime); });
+    };
+    return AxiosRetry;
+}());
+export { AxiosRetry };
