@@ -153,7 +153,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     this.clientPool =
         new CachedClientPool(getClientPoolSize(conf), hiveConf, getCacheEvictionInterval(conf));
 
-    this.listAllTables = getListAllTables(conf);
+    this.listAllTables = enableListAllTables(conf);
   }
 
   private void initKerberosIfNecessary(Map<String, String> conf, Configuration hadoopConf) {
@@ -272,7 +272,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             .getOrDefault(conf, CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS);
   }
 
-  boolean getListAllTables(Map<String, String> conf) {
+  boolean enableListAllTables(Map<String, String> conf) {
     return (boolean)
         propertiesMetadata.catalogPropertiesMetadata().getOrDefault(conf, LIST_ALL_TABLES);
   }
