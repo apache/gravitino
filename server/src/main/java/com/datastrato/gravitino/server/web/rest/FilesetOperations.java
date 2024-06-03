@@ -23,6 +23,7 @@ import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.server.web.Utils;
 import com.datastrato.gravitino.utils.NameIdentifierUtil;
+import com.datastrato.gravitino.utils.NamespaceUtil;
 import java.util.Optional;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
@@ -65,7 +66,7 @@ public class FilesetOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            Namespace filesetNS = Namespace.ofFileset(metalake, catalog, schema);
+            Namespace filesetNS = NamespaceUtil.ofFileset(metalake, catalog, schema);
             NameIdentifier[] idents =
                 TreeLockUtils.doWithTreeLock(
                     NameIdentifier.of(metalake, catalog, schema),

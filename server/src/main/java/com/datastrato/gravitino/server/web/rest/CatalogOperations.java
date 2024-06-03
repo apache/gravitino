@@ -21,6 +21,7 @@ import com.datastrato.gravitino.lock.LockType;
 import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.server.web.Utils;
 import com.datastrato.gravitino.utils.NameIdentifierUtil;
+import com.datastrato.gravitino.utils.NamespaceUtil;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -68,7 +69,7 @@ public class CatalogOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            Namespace catalogNS = Namespace.ofCatalog(metalake);
+            Namespace catalogNS = NamespaceUtil.ofCatalog(metalake);
             // Lock the root and the metalake with WRITE lock to ensure the consistency of the list.
             return TreeLockUtils.doWithTreeLock(
                 NameIdentifier.of(metalake),

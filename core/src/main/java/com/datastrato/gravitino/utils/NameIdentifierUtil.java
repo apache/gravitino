@@ -5,8 +5,10 @@
 package com.datastrato.gravitino.utils;
 
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.IllegalNameIdentifierException;
+import com.datastrato.gravitino.exceptions.IllegalNamespaceException;
+import com.google.errorprone.annotations.FormatMethod;
+import com.google.errorprone.annotations.FormatString;
 
 /**
  * A name identifier is a sequence of names separated by dots. It's used to identify a metalake, a
@@ -104,7 +106,7 @@ public class NameIdentifierUtil {
     // We don't have to check the name field of NameIdentifier, it's already checked when
     // creating NameIdentifier object.
     NameIdentifier.check(ident != null, "Metalake identifier must not be null");
-    Namespace.checkMetalake(ident.namespace());
+    NamespaceUtil.checkMetalake(ident.namespace());
   }
 
   /**
@@ -115,7 +117,7 @@ public class NameIdentifierUtil {
    */
   public static void checkCatalog(NameIdentifier ident) {
     NameIdentifier.check(ident != null, "Catalog identifier must not be null");
-    Namespace.checkCatalog(ident.namespace());
+    NamespaceUtil.checkCatalog(ident.namespace());
   }
 
   /**
@@ -126,7 +128,7 @@ public class NameIdentifierUtil {
    */
   public static void checkSchema(NameIdentifier ident) {
     NameIdentifier.check(ident != null, "Schema identifier must not be null");
-    Namespace.checkSchema(ident.namespace());
+    NamespaceUtil.checkSchema(ident.namespace());
   }
 
   /**
@@ -137,7 +139,7 @@ public class NameIdentifierUtil {
    */
   public static void checkTable(NameIdentifier ident) {
     NameIdentifier.check(ident != null, "Table identifier must not be null");
-    Namespace.checkTable(ident.namespace());
+    NamespaceUtil.checkTable(ident.namespace());
   }
 
   /**
@@ -148,7 +150,7 @@ public class NameIdentifierUtil {
    */
   public static void checkFileset(NameIdentifier ident) {
     NameIdentifier.check(ident != null, "Fileset identifier must not be null");
-    Namespace.checkFileset(ident.namespace());
+    NamespaceUtil.checkFileset(ident.namespace());
   }
 
   /**
@@ -159,6 +161,20 @@ public class NameIdentifierUtil {
    */
   public static void checkTopic(NameIdentifier ident) {
     NameIdentifier.check(ident != null, "Topic identifier must not be null");
-    Namespace.checkTopic(ident.namespace());
+    NamespaceUtil.checkTopic(ident.namespace());
+  }
+
+  /**
+   * Check the given condition is true. Throw an {@link IllegalNamespaceException} if it's not.
+   *
+   * @param expression The expression to check.
+   * @param message The message to throw.
+   * @param args The arguments to the message.
+   */
+  @FormatMethod
+  public static void check(boolean expression, @FormatString String message, Object... args) {
+    if (!expression) {
+      throw new IllegalNamespaceException(message, args);
+    }
   }
 }

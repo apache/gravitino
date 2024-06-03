@@ -128,7 +128,10 @@ public abstract class GravitinoClientBase implements Closeable {
    */
   public void checkMetalakeName(String metalakeName) {
     NameIdentifier identifier = NameIdentifier.parse(metalakeName);
-    Namespace.checkMetalake(identifier.namespace());
+    Namespace.check(
+        identifier.namespace() != null && identifier.namespace().isEmpty(),
+        "Metalake namespace must be non-null and empty, the input namespace is %s",
+        identifier.namespace());
   }
 
   /**

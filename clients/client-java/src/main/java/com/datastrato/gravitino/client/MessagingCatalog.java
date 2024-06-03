@@ -69,7 +69,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
    */
   @Override
   public NameIdentifier[] listTopics(Namespace namespace) throws NoSuchSchemaException {
-    Namespace.checkTopic(namespace);
+    checkNamespace(namespace);
 
     EntityListResponse resp =
         restClient.get(
@@ -212,7 +212,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
     NameIdentifier.check(ident != null, "Topic identifier must not be null");
     NameIdentifier.check(
         ident.name() != null && !ident.name().isEmpty(), "Topic identifier name must not be empty");
-    Namespace.checkTopic(ident.namespace());
+    // Namespace.checkTopic(ident.namespace());
   }
 
   static class Builder extends CatalogDTO.Builder<Builder> {
@@ -236,7 +236,10 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
 
     @Override
     public MessagingCatalog build() {
-      Namespace.checkCatalog(namespace);
+      Namespace.check(
+          namespace != null && namespace.length() == 1,
+          "Catalog namespace must be non-null and have 1 level, the input namespace is %s",
+          namespace);
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name must not be blank");
       Preconditions.checkArgument(type != null, "type must not be null");
       Preconditions.checkArgument(StringUtils.isNotBlank(provider), "provider must not be blank");

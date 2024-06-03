@@ -26,6 +26,7 @@ import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.server.web.Utils;
 import com.datastrato.gravitino.utils.NameIdentifierUtil;
+import com.datastrato.gravitino.utils.NamespaceUtil;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
@@ -69,7 +70,7 @@ public class TableOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            Namespace tableNS = Namespace.ofTable(metalake, catalog, schema);
+            Namespace tableNS = NamespaceUtil.ofTable(metalake, catalog, schema);
             NameIdentifier[] idents =
                 TreeLockUtils.doWithTreeLock(
                     NameIdentifier.of(metalake, catalog, schema),

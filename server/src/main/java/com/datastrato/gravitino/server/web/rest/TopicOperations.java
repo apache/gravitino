@@ -23,6 +23,7 @@ import com.datastrato.gravitino.messaging.TopicChange;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.server.web.Utils;
 import com.datastrato.gravitino.utils.NameIdentifierUtil;
+import com.datastrato.gravitino.utils.NamespaceUtil;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
@@ -63,7 +64,7 @@ public class TopicOperations {
           httpRequest,
           () -> {
             LOG.info("Listing topics under schema: {}.{}.{}", metalake, catalog, schema);
-            Namespace topicNS = Namespace.ofTopic(metalake, catalog, schema);
+            Namespace topicNS = NamespaceUtil.ofTopic(metalake, catalog, schema);
             NameIdentifier[] topics =
                 TreeLockUtils.doWithTreeLock(
                     NameIdentifier.of(metalake, catalog, schema),

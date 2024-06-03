@@ -16,6 +16,7 @@ import com.datastrato.gravitino.storage.relational.utils.ExceptionUtils;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
 import com.datastrato.gravitino.utils.NameIdentifierUtil;
+import com.datastrato.gravitino.utils.NamespaceUtil;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
@@ -74,7 +75,7 @@ public class TableMetaService {
   }
 
   public List<TableEntity> listTablesByNamespace(Namespace namespace) {
-    Namespace.checkTable(namespace);
+    NamespaceUtil.checkTable(namespace);
 
     Long schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(namespace);
 
@@ -173,7 +174,7 @@ public class TableMetaService {
   }
 
   private void fillTablePOBuilderParentEntityId(TablePO.Builder builder, Namespace namespace) {
-    Namespace.checkTable(namespace);
+    NamespaceUtil.checkTable(namespace);
     Long parentEntityId = null;
     for (int level = 0; level < namespace.levels().length; level++) {
       String name = namespace.level(level);

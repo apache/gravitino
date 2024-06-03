@@ -16,6 +16,7 @@ import com.datastrato.gravitino.storage.relational.utils.ExceptionUtils;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
 import com.datastrato.gravitino.utils.NameIdentifierUtil;
+import com.datastrato.gravitino.utils.NamespaceUtil;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
@@ -61,7 +62,7 @@ public class TopicMetaService {
   }
 
   public List<TopicEntity> listTopicsByNamespace(Namespace namespace) {
-    Namespace.checkTopic(namespace);
+    NamespaceUtil.checkTopic(namespace);
 
     Long schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(namespace);
 
@@ -126,7 +127,7 @@ public class TopicMetaService {
   }
 
   private void fillTopicPOBuilderParentEntityId(TopicPO.Builder builder, Namespace namespace) {
-    Namespace.checkTopic(namespace);
+    NamespaceUtil.checkTopic(namespace);
     Long parentEntityId = null;
     for (int level = 0; level < namespace.levels().length; level++) {
       String name = namespace.level(level);

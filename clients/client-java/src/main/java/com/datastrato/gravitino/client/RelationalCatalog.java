@@ -73,7 +73,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
    */
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
-    Namespace.checkTable(namespace);
+    checkNamespace(namespace);
 
     EntityListResponse resp =
         restClient.get(
@@ -262,7 +262,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
     NameIdentifier.check(ident != null, "Table identifier must not be null");
     NameIdentifier.check(
         ident.name() != null && !ident.name().isEmpty(), "Table identifier name must not be empty");
-    Namespace.checkTable(ident.namespace());
+    // Namespace.checkTable(ident.namespace());
   }
 
   /**
@@ -294,7 +294,10 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
 
     @Override
     public RelationalCatalog build() {
-      Namespace.checkCatalog(namespace);
+      Namespace.check(
+          namespace != null && namespace.length() == 1,
+          "Catalog namespace must be non-null and have 1 level, the input namespace is %s",
+          namespace);
       Preconditions.checkArgument(restClient != null, "restClient must be set");
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name must not be blank");
       Preconditions.checkArgument(type != null, "type must not be null");

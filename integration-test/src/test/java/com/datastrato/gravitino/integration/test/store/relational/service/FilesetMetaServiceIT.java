@@ -31,6 +31,7 @@ import com.datastrato.gravitino.storage.relational.service.FilesetMetaService;
 import com.datastrato.gravitino.storage.relational.service.MetalakeMetaService;
 import com.datastrato.gravitino.storage.relational.service.SchemaMetaService;
 import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import com.datastrato.gravitino.utils.NamespaceUtil;
 import java.io.File;
 import java.io.IOException;
 import java.sql.Connection;
@@ -120,7 +121,7 @@ public class FilesetMetaServiceIT {
     String catalogName = GravitinoITUtils.genRandomName("tst_fs_catalog");
     CatalogEntity catalogEntity =
         createCatalog(
-            idGenerator.nextId(), Namespace.ofCatalog(metalakeName), catalogName, auditInfo);
+            idGenerator.nextId(), NamespaceUtil.ofCatalog(metalakeName), catalogName, auditInfo);
     CatalogMetaService.getInstance().insertCatalog(catalogEntity, true);
     assertNotNull(
         CatalogMetaService.getInstance()
@@ -129,7 +130,7 @@ public class FilesetMetaServiceIT {
     SchemaEntity schemaEntity =
         createSchemaEntity(
             idGenerator.nextId(),
-            Namespace.ofSchema(metalakeName, catalogName),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
             schemaName,
             auditInfo);
     SchemaMetaService.getInstance().insertSchema(schemaEntity, true);
@@ -140,7 +141,7 @@ public class FilesetMetaServiceIT {
     FilesetEntity filesetEntity =
         createFilesetEntity(
             idGenerator.nextId(),
-            Namespace.ofFileset(metalakeName, catalogName, schemaName),
+            NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName),
             filesetName,
             auditInfo,
             "/tmp");

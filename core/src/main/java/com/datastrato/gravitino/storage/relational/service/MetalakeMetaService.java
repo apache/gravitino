@@ -8,7 +8,6 @@ package com.datastrato.gravitino.storage.relational.service;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
 import com.datastrato.gravitino.meta.BaseMetalake;
@@ -30,6 +29,7 @@ import com.datastrato.gravitino.storage.relational.utils.ExceptionUtils;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
 import com.datastrato.gravitino.utils.NameIdentifierUtil;
+import com.datastrato.gravitino.utils.NamespaceUtil;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
@@ -200,7 +200,7 @@ public class MetalakeMetaService {
       } else {
         List<CatalogEntity> catalogEntities =
             CatalogMetaService.getInstance()
-                .listCatalogsByNamespace(Namespace.ofCatalog(ident.name()));
+                .listCatalogsByNamespace(NamespaceUtil.ofCatalog(ident.name()));
         if (!catalogEntities.isEmpty()) {
           throw new NonEmptyEntityException(
               "Entity %s has sub-entities, you should remove sub-entities first", ident);

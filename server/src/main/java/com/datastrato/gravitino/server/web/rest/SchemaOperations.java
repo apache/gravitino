@@ -23,6 +23,7 @@ import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.server.web.Utils;
 import com.datastrato.gravitino.utils.NameIdentifierUtil;
+import com.datastrato.gravitino.utils.NamespaceUtil;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -68,7 +69,7 @@ public class SchemaOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            Namespace schemaNS = Namespace.ofSchema(metalake, catalog);
+            Namespace schemaNS = NamespaceUtil.ofSchema(metalake, catalog);
             NameIdentifier[] idents =
                 TreeLockUtils.doWithTreeLock(
                     NameIdentifier.of(metalake, catalog),

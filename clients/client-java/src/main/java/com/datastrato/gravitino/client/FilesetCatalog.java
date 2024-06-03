@@ -65,7 +65,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
    */
   @Override
   public NameIdentifier[] listFilesets(Namespace namespace) throws NoSuchSchemaException {
-    Namespace.checkFileset(namespace);
+    checkNamespace(namespace);
 
     EntityListResponse resp =
         restClient.get(
@@ -224,7 +224,6 @@ public class FilesetCatalog extends BaseSchemaCatalog
     NameIdentifier.check(
         ident.name() != null && !ident.name().isEmpty(),
         "Fileset identifier name must not be empty");
-    Namespace.checkFileset(ident.namespace());
   }
 
   /**
@@ -256,7 +255,10 @@ public class FilesetCatalog extends BaseSchemaCatalog
 
     @Override
     public FilesetCatalog build() {
-      Namespace.checkCatalog(namespace);
+      Namespace.check(
+          namespace != null && namespace.length() == 1,
+          "Catalog namespace must be non-null and have 1 level, the input namespace is %s",
+          namespace);
       Preconditions.checkArgument(restClient != null, "restClient must be set");
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name must not be blank");
       Preconditions.checkArgument(type != null, "type must not be null");
