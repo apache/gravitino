@@ -124,7 +124,7 @@ public interface FilesetMetaMapper {
           + " fm INNER JOIN "
           + VERSION_TABLE_NAME
           + " vi ON fm.fileset_id = vi.fileset_id AND fm.current_version = vi.version"
-          + " WHERE fm.schema_id = #{filesetId}"
+          + " WHERE fm.fileset_id = #{filesetId}"
           + " AND fm.deleted_at = 0 AND vi.deleted_at = 0")
   @Results({
     @Result(property = "filesetId", column = "fileset_id"),

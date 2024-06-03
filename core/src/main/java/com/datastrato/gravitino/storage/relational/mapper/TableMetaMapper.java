@@ -63,7 +63,7 @@ public interface TableMetaMapper {
           + " deleted_at as deletedAt"
           + " FROM "
           + TABLE_NAME
-          + " WHERE schema_id = #{schemaId} AND table_name = #{tableName} AND deleted_at = 0")
+          + " WHERE table_id = #{tableId} AND deleted_at = 0")
   TablePO selectTableMetaById(@Param("tableId") Long tableId);
 
   @Insert(
