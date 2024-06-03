@@ -220,7 +220,8 @@ class TestGroupMetaService extends TestJDBCBackend {
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role3",
-            auditInfo);
+            auditInfo,
+            "catalog");
     roleMetaService.insertRole(role3, false);
     GroupEntity group3Overwrite =
         createGroupEntity(
