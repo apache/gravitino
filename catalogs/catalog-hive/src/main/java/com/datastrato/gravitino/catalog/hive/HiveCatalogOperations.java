@@ -48,13 +48,12 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -192,9 +191,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                     .catalogPropertiesMetadata()
                     .getOrDefault(conf, HiveCatalogPropertiesMeta.FETCH_TIMEOUT_SEC);
 
-        FetchFileUtils.fetchFileFromUri(keytabUri, keytabPath.toFile(), fetchKeytabFileTimeout, hadoopConf);
+        FetchFileUtils.fetchFileFromUri(
+            keytabUri, keytabPath.toFile(), fetchKeytabFileTimeout, hadoopConf);
 
-        hiveConf.setVar(ConfVars.METASTORE_KERBEROS_KEYTAB_FILE, keytabPath.toAbsolutePath().toString());
+        hiveConf.setVar(
+            ConfVars.METASTORE_KERBEROS_KEYTAB_FILE, keytabPath.toAbsolutePath().toString());
 
         String catalogPrincipal =
             (String) propertiesMetadata.catalogPropertiesMetadata().getOrDefault(conf, PRINCIPAL);
@@ -214,7 +215,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         refreshKerberosConfig();
         KerberosName.resetDefaultRealm();
         UserGroupInformation.setConfiguration(hadoopConf);
-        UserGroupInformation.loginUserFromKeytab(catalogPrincipal, keytabPath.toAbsolutePath().toString());
+        UserGroupInformation.loginUserFromKeytab(
+            catalogPrincipal, keytabPath.toAbsolutePath().toString());
 
         UserGroupInformation kerberosLoginUgi = UserGroupInformation.getCurrentUser();
 
@@ -286,11 +288,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       checkTgtExecutor = null;
     }
 
-
     Path keytabPath = Paths.get(String.format(GRAVITINO_KEYTAB_FORMAT, info.id()));
     if (Files.exists(keytabPath)) {
       try {
-         Files.delete(keytabPath);
+        Files.delete(keytabPath);
       } catch (IOException e) {
         LOG.error("Fail to delete key tab file {}", keytabPath.toAbsolutePath(), e);
       }
