@@ -132,3 +132,8 @@ Gravitino spark connector will transform below property names which are defined 
 | `warehouse`                     | `warehouse`                           | (none)        | No       | Catalog backend warehouse | 0.5.1         |
 
 Gravitino catalog property names with the prefix `spark.bypass.` are passed to Spark Iceberg connector. For example, using `spark.bypass.io-impl` to pass the `io-impl` to the Spark Iceberg connector.
+
+:::info
+Iceberg catalog property `cache-enabled` is setting to `false` internally and not allowed to change.
+:::
+

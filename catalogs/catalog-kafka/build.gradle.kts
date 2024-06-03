@@ -68,7 +68,6 @@ tasks.getByName("generateMetadataFileForMavenJavaPublication") {
   dependsOn("runtimeJars")
 }
 
-// TODO. add test task later on.
 tasks.test {
   val skipUTs = project.hasProperty("skipTests")
   if (skipUTs) {
