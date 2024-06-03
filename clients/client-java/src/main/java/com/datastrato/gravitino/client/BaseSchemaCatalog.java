@@ -71,7 +71,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
    * @throws NoSuchCatalogException if the catalog with specified namespace does not exist.
    */
   @Override
-  public NameIdentifier[] listSchemas() throws NoSuchCatalogException {
+  public String[] listSchemas() throws NoSuchCatalogException {
 
     EntityListResponse resp =
         restClient.get(
@@ -80,8 +80,10 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
             Collections.emptyMap(),
             ErrorHandlers.schemaErrorHandler());
     resp.validate();
+    String[] schemas =
+        Arrays.stream(resp.identifiers()).map(NameIdentifier::name).toArray(String[]::new);
 
-    return resp.identifiers();
+    return schemas;
   }
 
   /**

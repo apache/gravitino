@@ -49,6 +49,7 @@ import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -243,9 +244,8 @@ public class CatalogMysqlIT extends AbstractIT {
     SupportsSchemas schemas = catalog.asSchemas();
     Namespace namespace = Namespace.of(metalakeName, catalogName);
     // list schema check.
-    NameIdentifier[] nameIdentifiers = schemas.listSchemas();
-    Set<String> schemaNames =
-        Arrays.stream(nameIdentifiers).map(NameIdentifier::name).collect(Collectors.toSet());
+    String[] nameIdentifiers = schemas.listSchemas();
+    Set<String> schemaNames = new HashSet<>(Arrays.asList(nameIdentifiers));
     Assertions.assertTrue(schemaNames.contains(schemaName));
 
     NameIdentifier[] mysqlNamespaces = mysqlService.listSchemas(namespace);
@@ -258,9 +258,8 @@ public class CatalogMysqlIT extends AbstractIT {
     NameIdentifier schemaIdent = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
     schemas.createSchema(schemaIdent.name(), schema_comment, Collections.emptyMap());
     nameIdentifiers = schemas.listSchemas();
-    Map<String, NameIdentifier> schemaMap =
-        Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v -> v));
-    Assertions.assertTrue(schemaMap.containsKey(testSchemaName));
+    schemaNames = new HashSet<>(Arrays.asList(nameIdentifiers));
+    Assertions.assertTrue(schemaNames.contains(testSchemaName));
 
     mysqlNamespaces = mysqlService.listSchemas(namespace);
     schemaNames =
@@ -282,9 +281,8 @@ public class CatalogMysqlIT extends AbstractIT {
         NoSuchSchemaException.class, () -> mysqlService.loadSchema(schemaIdent));
 
     nameIdentifiers = schemas.listSchemas();
-    schemaMap =
-        Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v -> v));
-    Assertions.assertFalse(schemaMap.containsKey(testSchemaName));
+    schemaNames = new HashSet<>(Arrays.asList(nameIdentifiers));
+    Assertions.assertFalse(schemaNames.contains(testSchemaName));
     Assertions.assertFalse(schemas.dropSchema("no-exits", false));
     TableCatalog tableCatalog = catalog.asTableCatalog();
 
@@ -1327,9 +1325,8 @@ public class CatalogMysqlIT extends AbstractIT {
     Schema schema = catalog.asSchemas().loadSchema(testSchemaName);
     Assertions.assertEquals(testSchemaName, schema.name());
 
-    NameIdentifier[] schemaIdents = catalog.asSchemas().listSchemas();
-    Assertions.assertTrue(
-        Arrays.stream(schemaIdents).anyMatch(s -> s.name().equals(testSchemaName)));
+    String[] schemaIdents = catalog.asSchemas().listSchemas();
+    Assertions.assertTrue(Arrays.stream(schemaIdents).anyMatch(s -> s.equals(testSchemaName)));
 
     Assertions.assertTrue(catalog.asSchemas().dropSchema(testSchemaName, false));
     Assertions.assertFalse(catalog.asSchemas().schemaExists(testSchemaName));
@@ -1374,10 +1371,7 @@ public class CatalogMysqlIT extends AbstractIT {
       Assertions.assertNotNull(schemaSupport.loadSchema(schema));
     }
 
-    Set<String> schemaNames =
-        Arrays.stream(schemaSupport.listSchemas())
-            .map(NameIdentifier::name)
-            .collect(Collectors.toSet());
+    Set<String> schemaNames = new HashSet<>(Arrays.asList(schemaSupport.listSchemas()));
 
     Assertions.assertTrue(schemaNames.containsAll(Arrays.asList(schemas)));
 

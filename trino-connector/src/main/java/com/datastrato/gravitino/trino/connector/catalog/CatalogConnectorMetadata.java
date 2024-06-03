@@ -71,7 +71,7 @@ public class CatalogConnectorMetadata {
 
   public List<String> listSchemaNames() {
     try {
-      return Arrays.stream(schemaCatalog.listSchemas()).map(NameIdentifier::name).toList();
+      return Arrays.asList(schemaCatalog.listSchemas());
     } catch (NoSuchCatalogException e) {
       throw new TrinoException(GRAVITINO_CATALOG_NOT_EXISTS, CATALOG_DOES_NOT_EXIST_MSG, e);
     }
