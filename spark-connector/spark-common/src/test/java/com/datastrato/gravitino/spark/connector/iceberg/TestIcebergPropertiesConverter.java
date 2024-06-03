@@ -29,6 +29,8 @@ public class TestIcebergPropertiesConverter {
                 "value1"));
     Assertions.assertEquals(
         ImmutableMap.of(
+            IcebergPropertiesConstants.ICEBERG_CATALOG_CACHE_ENABLED,
+            "FALSE",
             IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE,
             IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_HIVE,
             IcebergPropertiesConstants.ICEBERG_CATALOG_URI,
@@ -57,6 +59,8 @@ public class TestIcebergPropertiesConverter {
                 "value1"));
     Assertions.assertEquals(
         ImmutableMap.of(
+            IcebergPropertiesConstants.ICEBERG_CATALOG_CACHE_ENABLED,
+            "FALSE",
             IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE,
             IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_JDBC,
             IcebergPropertiesConstants.ICEBERG_CATALOG_URI,
@@ -85,6 +89,8 @@ public class TestIcebergPropertiesConverter {
                 "value1"));
     Assertions.assertEquals(
         ImmutableMap.of(
+            IcebergPropertiesConstants.ICEBERG_CATALOG_CACHE_ENABLED,
+            "FALSE",
             IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE,
             IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_REST,
             IcebergPropertiesConstants.ICEBERG_CATALOG_URI,
