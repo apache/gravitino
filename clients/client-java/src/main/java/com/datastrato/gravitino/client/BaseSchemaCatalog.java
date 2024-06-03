@@ -67,7 +67,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
   /**
    * List all the schemas under the given catalog namespace.
    *
-   * @return A list of {@link NameIdentifier} of the schemas under the given catalog namespace.
+   * @return A list of the schema names under the given catalog namespace.
    * @throws NoSuchCatalogException if the catalog with specified namespace does not exist.
    */
   @Override
