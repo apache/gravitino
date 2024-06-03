@@ -20,10 +20,10 @@ public interface SupportsCatalogs {
   /**
    * List all catalogs in the metalake.
    *
-   * @return The list of catalog's name identifiers.
+   * @return The list of catalog's names.
    * @throws NoSuchMetalakeException If the metalake with namespace does not exist.
    */
-  NameIdentifier[] listCatalogs() throws NoSuchMetalakeException;
+  String[] listCatalogs() throws NoSuchMetalakeException;
 
   /**
    * List all catalogs with their information in the metalake.

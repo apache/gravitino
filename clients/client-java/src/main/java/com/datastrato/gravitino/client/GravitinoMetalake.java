@@ -56,7 +56,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
    * @throws NoSuchMetalakeException if the metalake with specified namespace does not exist.
    */
   @Override
-  public NameIdentifier[] listCatalogs() throws NoSuchMetalakeException {
+  public String[] listCatalogs() throws NoSuchMetalakeException {
 
     EntityListResponse resp =
         restClient.get(
@@ -66,7 +66,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
             ErrorHandlers.catalogErrorHandler());
     resp.validate();
 
-    return resp.identifiers();
+    return Arrays.stream(resp.identifiers()).map(NameIdentifier::name).toArray(String[]::new);
   }
 
   /**

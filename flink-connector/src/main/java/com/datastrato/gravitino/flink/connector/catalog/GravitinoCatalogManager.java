@@ -13,6 +13,8 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import com.google.common.collect.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -128,12 +130,12 @@ public class GravitinoCatalogManager {
    * @return Set of catalog names
    */
   public Set<String> listCatalogs() {
-    NameIdentifier[] catalogNames = metalake.listCatalogs();
+    String[] catalogNames = metalake.listCatalogs();
     LOG.info(
         "Load metalake {}'s catalogs. catalogs: {}.",
         metalake.name(),
         Arrays.toString(catalogNames));
-    return Arrays.stream(catalogNames).map(NameIdentifier::name).collect(Collectors.toSet());
+    return Sets.newHashSet(catalogNames);
   }
 
   /**
