@@ -63,6 +63,7 @@ public class TableOperations {
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema) {
+    LOG.info("Received list tables request for schema: {}.{}.{}", metalake, catalog, schema);
     try {
       return Utils.doAs(
           httpRequest,
@@ -73,7 +74,10 @@ public class TableOperations {
                     NameIdentifier.of(metalake, catalog, schema),
                     LockType.READ,
                     () -> dispatcher.listTables(tableNS));
-            return Utils.ok(new EntityListResponse(idents));
+            Response response = Utils.ok(new EntityListResponse(idents));
+            LOG.info(
+                "List {} tables under schema: {}.{}.{}", idents.length, metalake, catalog, schema);
+            return response;
           });
 
     } catch (Exception e) {
@@ -90,6 +94,8 @@ public class TableOperations {
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
       TableCreateRequest request) {
+    LOG.info(
+        "Received create table request: {}.{}.{}.{}", metalake, catalog, schema, request.getName());
     try {
       return Utils.doAs(
           httpRequest,
@@ -112,7 +118,9 @@ public class TableOperations {
                             fromDTO(request.getDistribution()),
                             fromDTOs(request.getSortOrders()),
                             fromDTOs(request.getIndexes())));
-            return Utils.ok(new TableResponse(DTOConverters.toDTO(table)));
+            Response response = Utils.ok(new TableResponse(DTOConverters.toDTO(table)));
+            LOG.info("Table created: {}.{}.{}.{}", metalake, catalog, schema, request.getName());
+            return response;
           });
 
     } catch (Exception e) {
@@ -131,6 +139,8 @@ public class TableOperations {
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
       @PathParam("table") String table) {
+    LOG.info(
+        "Received load table request for table: {}.{}.{}.{}", metalake, catalog, schema, table);
     try {
       return Utils.doAs(
           httpRequest,
@@ -139,7 +149,9 @@ public class TableOperations {
             Table t =
                 TreeLockUtils.doWithTreeLock(
                     ident, LockType.READ, () -> dispatcher.loadTable(ident));
-            return Utils.ok(new TableResponse(DTOConverters.toDTO(t)));
+            Response response = Utils.ok(new TableResponse(DTOConverters.toDTO(t)));
+            LOG.info("Table loaded: {}.{}.{}.{}", metalake, catalog, schema, table);
+            return response;
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleTableException(OperationType.LOAD, table, schema, e);
@@ -157,6 +169,7 @@ public class TableOperations {
       @PathParam("schema") String schema,
       @PathParam("table") String table,
       TableUpdatesRequest request) {
+    LOG.info("Received alter table request: {}.{}.{}.{}", metalake, catalog, schema, table);
     try {
       return Utils.doAs(
           httpRequest,
@@ -172,7 +185,9 @@ public class TableOperations {
                     NameIdentifier.of(metalake, catalog, schema),
                     LockType.WRITE,
                     () -> dispatcher.alterTable(ident, changes));
-            return Utils.ok(new TableResponse(DTOConverters.toDTO(t)));
+            Response response = Utils.ok(new TableResponse(DTOConverters.toDTO(t)));
+            LOG.info("Table altered: {}.{}.{}.{}", metalake, catalog, schema, t.name());
+            return response;
           });
 
     } catch (Exception e) {
@@ -191,6 +206,13 @@ public class TableOperations {
       @PathParam("schema") String schema,
       @PathParam("table") String table,
       @QueryParam("purge") @DefaultValue("false") boolean purge) {
+    LOG.info(
+        "Received {} table request: {}.{}.{}.{}",
+        purge ? "purge" : "drop",
+        metalake,
+        catalog,
+        schema,
+        table);
     try {
       return Utils.doAs(
           httpRequest,
@@ -205,7 +227,15 @@ public class TableOperations {
               LOG.warn("Failed to drop table {} under schema {}", table, schema);
             }
 
-            return Utils.ok(new DropResponse(dropped));
+            Response response = Utils.ok(new DropResponse(dropped));
+            LOG.info(
+                "Table {}: {}.{}.{}.{}",
+                purge ? "purge" : "drop",
+                metalake,
+                catalog,
+                schema,
+                table);
+            return response;
           });
 
     } catch (Exception e) {

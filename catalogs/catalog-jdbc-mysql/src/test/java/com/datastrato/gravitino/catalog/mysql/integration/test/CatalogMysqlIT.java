@@ -25,7 +25,6 @@ import com.datastrato.gravitino.integration.test.container.MySQLContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
-import com.datastrato.gravitino.integration.test.util.JdbcDriverDownloader;
 import com.datastrato.gravitino.integration.test.util.TestDatabaseName;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Column.ColumnImpl;
@@ -47,8 +46,6 @@ import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -72,8 +69,6 @@ import org.junit.jupiter.api.condition.EnabledIf;
 public class CatalogMysqlIT extends AbstractIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static final String provider = "jdbc-mysql";
-  public static final String DOWNLOAD_JDBC_DRIVER_URL =
-      "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar";
 
   public String metalakeName = GravitinoITUtils.genRandomName("mysql_it_metalake");
   public String catalogName = GravitinoITUtils.genRandomName("mysql_it_catalog");
@@ -104,21 +99,12 @@ public class CatalogMysqlIT extends AbstractIT {
 
   protected String mysqlImageName = defaultMysqlImageName;
 
-  protected String mysqlDriverDownloadUrl = DOWNLOAD_JDBC_DRIVER_URL;
-
   boolean SupportColumnDefaultValueExpression() {
     return true;
   }
 
   @BeforeAll
   public void startup() throws IOException, SQLException {
-
-    if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
-      String gravitinoHome = System.getenv("GRAVITINO_HOME");
-      Path tmpPath = Paths.get(gravitinoHome, "/catalogs/jdbc-mysql/libs");
-      JdbcDriverDownloader.downloadJdbcDriver(mysqlDriverDownloadUrl, tmpPath.toString());
-    }
-
     TEST_DB_NAME = TestDatabaseName.MYSQL_CATALOG_MYSQL_IT;
 
     if (mysqlImageName.equals("mysql:5.7")) {
@@ -138,6 +124,7 @@ public class CatalogMysqlIT extends AbstractIT {
   @AfterAll
   public void stop() {
     clearTableAndSchema();
+    metalake.dropCatalog(catalogName);
     client.dropMetalake(metalakeName);
     mysqlService.close();
   }
@@ -606,7 +593,8 @@ public class CatalogMysqlIT extends AbstractIT {
             + "  decimal_6_2_col decimal(6, 2),\n"
             + "  varchar20_col varchar(20),\n"
             + "  text_col text,\n"
-            + "  binary_col binary\n"
+            + "  binary_col binary,\n"
+            + "  blob_col blob\n"
             + ");\n";
 
     mysqlService.executeQuery(sql);
@@ -658,6 +646,9 @@ public class CatalogMysqlIT extends AbstractIT {
           break;
         case "binary_col":
           Assertions.assertEquals(Types.BinaryType.get(), column.dataType());
+          break;
+        case "blob_col":
+          Assertions.assertEquals(Types.ExternalType.of("BLOB"), column.dataType());
           break;
         default:
           Assertions.fail("Unexpected column name: " + column.name());
@@ -856,7 +847,11 @@ public class CatalogMysqlIT extends AbstractIT {
 
     // Try to drop a database, and cascade equals to false, it should not be
     // allowed.
-    catalog.asSchemas().dropSchema(schemaName, false);
+    Throwable excep =
+        Assertions.assertThrows(
+            RuntimeException.class, () -> catalog.asSchemas().dropSchema(schemaName, false));
+    Assertions.assertTrue(excep.getMessage().contains("the value of cascade should be true."));
+
     // Check the database still exists
     catalog.asSchemas().loadSchema(schemaName);
 
@@ -1438,7 +1433,7 @@ public class CatalogMysqlIT extends AbstractIT {
         catalog
             .asTableCatalog()
             .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
-    Assertions.assertEquals(Types.UnparsedType.of("BIT"), loadedTable.columns()[0].dataType());
+    Assertions.assertEquals(Types.ExternalType.of("BIT"), loadedTable.columns()[0].dataType());
   }
 
   @Test

@@ -103,15 +103,13 @@ public class UserMetaService {
                     }
                   }),
           () -> {
-            if (userRoleRelPOs.isEmpty()) {
-              return;
-            }
             SessionUtils.doWithoutCommit(
                 UserRoleRelMapper.class,
                 mapper -> {
                   if (overwritten) {
-                    mapper.batchInsertUserRoleRelOnDuplicateKeyUpdate(userRoleRelPOs);
-                  } else {
+                    mapper.softDeleteUserRoleRelByUserId(userEntity.id());
+                  }
+                  if (!userRoleRelPOs.isEmpty()) {
                     mapper.batchInsertUserRoleRel(userRoleRelPOs);
                   }
                 });

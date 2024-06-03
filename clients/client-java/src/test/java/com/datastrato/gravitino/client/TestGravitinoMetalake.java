@@ -367,13 +367,13 @@ public class TestGravitinoMetalake extends TestBase {
     DropResponse resp = new DropResponse(true);
     buildMockResource(Method.DELETE, path, null, resp, HttpStatus.SC_OK);
     boolean dropped = gravitinoClient.dropCatalog(catalogName);
-    Assertions.assertTrue(dropped);
+    Assertions.assertTrue(dropped, "catalog should be dropped");
 
     // Test return false
     DropResponse resp1 = new DropResponse(false);
     buildMockResource(Method.DELETE, path, null, resp1, HttpStatus.SC_OK);
     boolean dropped1 = gravitinoClient.dropCatalog(catalogName);
-    Assertions.assertFalse(dropped1);
+    Assertions.assertFalse(dropped1, "catalog should be non-existent");
   }
 
   static GravitinoMetalake createMetalake(GravitinoAdminClient client, String metalakeName)

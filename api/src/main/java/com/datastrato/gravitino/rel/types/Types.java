@@ -1070,6 +1070,67 @@ public class Types {
     public int hashCode() {
       return Objects.hash(unparsedType);
     }
+
+    @Override
+    public String toString() {
+      return unparsedType;
+    }
+  }
+
+  /** Represents a type that is defined in an external catalog. */
+  public static class ExternalType implements Type {
+    private final String catalogString;
+
+    /**
+     * Creates a new {@link ExternalType} with the given catalog string.
+     *
+     * @param catalogString The string representation of this type in the catalog.
+     * @return A new {@link ExternalType} with the given catalog string.
+     */
+    public static ExternalType of(String catalogString) {
+      return new ExternalType(catalogString);
+    }
+
+    private ExternalType(String catalogString) {
+      this.catalogString = catalogString;
+    }
+
+    /** @return The string representation of this type in external catalog. */
+    public String catalogString() {
+      return catalogString;
+    }
+
+    @Override
+    public Name name() {
+      return Name.EXTERNAL;
+    }
+
+    @Override
+    public String simpleString() {
+      return String.format("external(%s)", catalogString);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof ExternalType)) {
+        return false;
+      }
+      ExternalType that = (ExternalType) o;
+      return Objects.equals(catalogString, that.catalogString);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(catalogString);
+    }
+
+    @Override
+    public String toString() {
+      return simpleString();
+    }
   }
 
   /**

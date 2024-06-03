@@ -34,6 +34,9 @@ dependencies {
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
 
+  testImplementation(libs.minikdc)
+  testImplementation(libs.hadoop3.minicluster)
+
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mysql.driver)
@@ -99,7 +102,7 @@ tasks.test {
 
     doFirst {
       environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.12")
-      environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-kerberos-hive:0.1.0")
+      environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-kerberos-hive:0.1.2")
     }
 
     val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
