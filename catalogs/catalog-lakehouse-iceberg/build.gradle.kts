@@ -58,6 +58,7 @@ dependencies {
   implementation(libs.jackson.datatype.jdk8)
   implementation(libs.jackson.datatype.jsr310)
   implementation(libs.sqlite.jdbc)
+  implementation(libs.cglib)
 
   annotationProcessor(libs.lombok)
 
@@ -163,6 +164,7 @@ tasks.test {
 
     doFirst {
       environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.12")
+      environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-kerberos-hive:0.1.1")
     }
 
     val init = project.extra.get("initIntegrationTest") as (Test) -> Unit

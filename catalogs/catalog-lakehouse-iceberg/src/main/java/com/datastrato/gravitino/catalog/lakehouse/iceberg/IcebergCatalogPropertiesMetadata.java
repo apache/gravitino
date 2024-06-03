@@ -7,6 +7,7 @@ package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 import static com.datastrato.gravitino.connector.PropertyEntry.enumImmutablePropertyEntry;
 import static com.datastrato.gravitino.connector.PropertyEntry.stringRequiredPropertyEntry;
 
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.backend.KerberosConfig;
 import com.datastrato.gravitino.connector.BaseCatalogPropertiesMetadata;
 import com.datastrato.gravitino.connector.PropertyEntry;
 import com.google.common.collect.ImmutableList;
@@ -34,8 +35,7 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
 
   // Map that maintains the mapping of keys in Gravitino to that in Iceberg, for example, users
   // will only need to set the configuration 'catalog-backend' in Gravitino and Gravitino will
-  // change
-  // it to `catalogType` automatically and pass it to Iceberg.
+  // change it to `catalogType` automatically and pass it to Iceberg.
   public static final Map<String, String> GRAVITINO_CONFIG_TO_ICEBERG =
       ImmutableMap.of(
           CATALOG_BACKEND_NAME,
@@ -50,6 +50,19 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
           URI,
           WAREHOUSE,
           WAREHOUSE);
+
+  public static final Map<String, String> KERBEROS_CONFIGURATION_FOR_HIVE_BACKEND =
+      ImmutableMap.of(
+          KerberosConfig.PRINCIPAL_KEY,
+          KerberosConfig.PRINCIPAL_KEY,
+          KerberosConfig.KET_TAB_URI_KEY,
+          KerberosConfig.KET_TAB_URI_KEY,
+          KerberosConfig.CHECK_INTERVAL_SEC_KEY,
+          KerberosConfig.CHECK_INTERVAL_SEC_KEY,
+          KerberosConfig.FETCH_TIMEOUT_SEC_KEY,
+          KerberosConfig.FETCH_TIMEOUT_SEC_KEY,
+          KerberosConfig.IMPERSONATION_ENABLE_KEY,
+          KerberosConfig.IMPERSONATION_ENABLE_KEY);
 
   static {
     List<PropertyEntry<?>> propertyEntries =
@@ -67,6 +80,7 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 WAREHOUSE, "Iceberg catalog warehouse config", false, false));
     HashMap<String, PropertyEntry<?>> result = Maps.newHashMap(BASIC_CATALOG_PROPERTY_ENTRIES);
     result.putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName));
+    result.putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES);
     PROPERTIES_METADATA = ImmutableMap.copyOf(result);
   }
 
@@ -81,6 +95,10 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
         (key, value) -> {
           if (GRAVITINO_CONFIG_TO_ICEBERG.containsKey(key)) {
             gravitinoConfig.put(GRAVITINO_CONFIG_TO_ICEBERG.get(key), value);
+          }
+
+          if (KERBEROS_CONFIGURATION_FOR_HIVE_BACKEND.containsKey(key)) {
+            gravitinoConfig.put(KERBEROS_CONFIGURATION_FOR_HIVE_BACKEND.get(key), value);
           }
         });
     return gravitinoConfig;

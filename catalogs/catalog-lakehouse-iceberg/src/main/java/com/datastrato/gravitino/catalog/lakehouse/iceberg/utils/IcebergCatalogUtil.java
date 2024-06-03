@@ -5,13 +5,19 @@
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.utils;
 
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.ICEBERG_JDBC_INITIALIZE;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.backend.KerberosConfig.IMPERSONATION_ENABLE_KEY;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION;
 
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.backend.HiveBackendProxy;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
+import org.apache.hadoop.security.SecurityUtil;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.hive.HiveCatalog;
@@ -39,6 +45,18 @@ public class IcebergCatalogUtil {
     properties.forEach(hdfsConfiguration::set);
     hiveCatalog.setConf(hdfsConfiguration);
     hiveCatalog.initialize("hive", properties);
+
+    String enableAuth = hdfsConfiguration.get(HADOOP_SECURITY_AUTHORIZATION);
+    String enableImpersonation = properties.get(IMPERSONATION_ENABLE_KEY);
+    if (UserGroupInformation.AuthenticationMethod.KERBEROS
+            == SecurityUtil.getAuthenticationMethod(hdfsConfiguration)
+        && StringUtils.equalsIgnoreCase(enableAuth, "true")
+        && StringUtils.equalsIgnoreCase(enableImpersonation, "true")) {
+      LOG.info("Kerberos authentication is enabled");
+      HiveBackendProxy proxyHiveCatalog = new HiveBackendProxy(properties, hiveCatalog);
+      hiveCatalog = proxyHiveCatalog.getProxy();
+    }
+
     return hiveCatalog;
   }
 
