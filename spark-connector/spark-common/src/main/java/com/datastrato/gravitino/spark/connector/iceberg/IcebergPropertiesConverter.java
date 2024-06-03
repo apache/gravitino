@@ -52,6 +52,9 @@ public class IcebergPropertiesConverter implements PropertiesConverter {
         throw new IllegalArgumentException(
             "Unsupported Iceberg Catalog backend: " + catalogBackend);
     }
+
+    all.put(IcebergPropertiesConstants.ICEBERG_CATALOG_CACHE_ENABLED, "FALSE");
+
     return all;
   }
 

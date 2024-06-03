@@ -60,6 +60,7 @@ public class FilesetOperations {
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema) {
     try {
+      LOG.info("Received list filesets request for schema: {}.{}.{}", metalake, catalog, schema);
       return Utils.doAs(
           httpRequest,
           () -> {
@@ -69,7 +70,14 @@ public class FilesetOperations {
                     NameIdentifier.of(metalake, catalog, schema),
                     LockType.READ,
                     () -> dispatcher.listFilesets(filesetNS));
-            return Utils.ok(new EntityListResponse(idents));
+            Response response = Utils.ok(new EntityListResponse(idents));
+            LOG.info(
+                "List {} filesets under schema: {}.{}.{}",
+                idents.length,
+                metalake,
+                catalog,
+                schema);
+            return response;
           });
 
     } catch (Exception e) {
@@ -86,6 +94,12 @@ public class FilesetOperations {
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
       FilesetCreateRequest request) {
+    LOG.info(
+        "Received create fileset request: {}.{}.{}.{}",
+        metalake,
+        catalog,
+        schema,
+        request.getName());
     try {
       return Utils.doAs(
           httpRequest,
@@ -105,7 +119,9 @@ public class FilesetOperations {
                             Optional.ofNullable(request.getType()).orElse(Fileset.Type.MANAGED),
                             request.getStorageLocation(),
                             request.getProperties()));
-            return Utils.ok(new FilesetResponse(DTOConverters.toDTO(fileset)));
+            Response response = Utils.ok(new FilesetResponse(DTOConverters.toDTO(fileset)));
+            LOG.info("Fileset created: {}.{}.{}.{}", metalake, catalog, schema, request.getName());
+            return response;
           });
 
     } catch (Exception e) {
@@ -124,6 +140,7 @@ public class FilesetOperations {
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
       @PathParam("fileset") String fileset) {
+    LOG.info("Received load fileset request: {}.{}.{}.{}", metalake, catalog, schema, fileset);
     try {
       return Utils.doAs(
           httpRequest,
@@ -132,7 +149,9 @@ public class FilesetOperations {
             Fileset t =
                 TreeLockUtils.doWithTreeLock(
                     ident, LockType.READ, () -> dispatcher.loadFileset(ident));
-            return Utils.ok(new FilesetResponse(DTOConverters.toDTO(t)));
+            Response response = Utils.ok(new FilesetResponse(DTOConverters.toDTO(t)));
+            LOG.info("Fileset loaded: {}.{}.{}.{}", metalake, catalog, schema, fileset);
+            return response;
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleFilesetException(OperationType.LOAD, fileset, schema, e);
@@ -150,6 +169,7 @@ public class FilesetOperations {
       @PathParam("schema") String schema,
       @PathParam("fileset") String fileset,
       FilesetUpdatesRequest request) {
+    LOG.info("Received alter fileset request: {}.{}.{}.{}", metalake, catalog, schema, fileset);
     try {
       return Utils.doAs(
           httpRequest,
@@ -165,7 +185,9 @@ public class FilesetOperations {
                     NameIdentifier.ofSchema(metalake, catalog, schema),
                     LockType.WRITE,
                     () -> dispatcher.alterFileset(ident, changes));
-            return Utils.ok(new FilesetResponse(DTOConverters.toDTO(t)));
+            Response response = Utils.ok(new FilesetResponse(DTOConverters.toDTO(t)));
+            LOG.info("Fileset altered: {}.{}.{}.{}", metalake, catalog, schema, t.name());
+            return response;
           });
 
     } catch (Exception e) {
@@ -183,6 +205,7 @@ public class FilesetOperations {
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
       @PathParam("fileset") String fileset) {
+    LOG.info("Received drop fileset request: {}.{}.{}.{}", metalake, catalog, schema, fileset);
     try {
       return Utils.doAs(
           httpRequest,
@@ -197,7 +220,9 @@ public class FilesetOperations {
               LOG.warn("Failed to drop fileset {} under schema {}", fileset, schema);
             }
 
-            return Utils.ok(new DropResponse(dropped));
+            Response response = Utils.ok(new DropResponse(dropped));
+            LOG.info("Fileset dropped: {}.{}.{}.{}", metalake, catalog, schema, fileset);
+            return response;
           });
 
     } catch (Exception e) {

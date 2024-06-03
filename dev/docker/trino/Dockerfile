@@ -2,7 +2,7 @@
 # Copyright 2023 Datastrato Pvt Ltd.
 # This software is licensed under the Apache License version 2.
 #
-FROM trinodb/trino:426
+FROM trinodb/trino:435
 LABEL maintainer="support@datastrato.com"
 
 USER root
