@@ -1073,7 +1073,10 @@ public class TestRelationalCatalog extends TestBase {
     ErrorResponse errorResp = ErrorResponse.internalError("internal error");
     buildMockResource(Method.DELETE, tablePath, null, errorResp, SC_INTERNAL_SERVER_ERROR);
 
-    Assertions.assertFalse(catalog.asTableCatalog().dropTable(tableId));
+    Throwable excep =
+        Assertions.assertThrows(
+            RuntimeException.class, () -> catalog.asTableCatalog().dropTable(tableId));
+    Assertions.assertTrue(excep.getMessage().contains("internal error"));
   }
 
   @Test

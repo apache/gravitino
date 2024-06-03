@@ -218,10 +218,6 @@ nexusPublishing {
   packageGroup.set("com.datastrato.gravitino")
 }
 
-dependencies {
-  testImplementation(libs.testng)
-}
-
 subprojects {
   // Gravitino Python client project didn't need to apply the java plugin
   if (project.name == "client-python") {
@@ -411,13 +407,8 @@ subprojects {
     reports.html.outputLocation.set(file("${rootProject.projectDir}/build/reports/"))
     val skipTests = project.hasProperty("skipTests")
     if (!skipTests) {
-      if (project.name == "trino-connector") {
-        useTestNG()
-        maxHeapSize = "2G"
-      } else {
-        useJUnitPlatform()
-      }
-
+      jvmArgs = listOf("-Xmx2G")
+      useJUnitPlatform()
       jvmArgs(project.property("extraJvmArgs") as List<*>)
       finalizedBy(tasks.getByName("jacocoTestReport"))
     }
@@ -617,7 +608,7 @@ tasks {
   register("copySubprojectDependencies", Copy::class) {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
-        !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark-connector") && it.name != "trino-connector" &&
+        !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark") && it.name != "trino-connector" &&
         it.name != "integration-test" && it.name != "bundled-catalog" && it.name != "flink-connector"
       ) {
         from(it.configurations.runtimeClasspath)
@@ -631,7 +622,7 @@ tasks {
       if (!it.name.startsWith("catalog") &&
         !it.name.startsWith("client") &&
         !it.name.startsWith("filesystem") &&
-        !it.name.startsWith("spark-connector") &&
+        !it.name.startsWith("spark") &&
         it.name != "trino-connector" &&
         it.name != "integration-test" &&
         it.name != "bundled-catalog" &&

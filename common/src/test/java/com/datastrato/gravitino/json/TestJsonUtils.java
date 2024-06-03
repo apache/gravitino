@@ -160,6 +160,12 @@ public class TestJsonUtils {
     expected =
         "{\n" + "    \"type\": \"unparsed\",\n" + "    \"unparsedType\": \"user-defined\"\n" + "}";
     Assertions.assertEquals(objectMapper.readTree(expected), objectMapper.readTree(jsonValue));
+
+    type = Types.ExternalType.of("user-defined");
+    jsonValue = JsonUtils.objectMapper().writeValueAsString(type);
+    expected =
+        "{\n" + "    \"type\": \"external\",\n" + "    \"catalogString\": \"user-defined\"\n" + "}";
+    Assertions.assertEquals(objectMapper.readTree(expected), objectMapper.readTree(jsonValue));
   }
 
   @Test

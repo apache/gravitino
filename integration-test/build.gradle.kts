@@ -23,10 +23,6 @@ dependencies {
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
-  testImplementation(project(":spark-connector:spark-connector")) {
-    exclude("org.apache.hadoop", "hadoop-client-api")
-    exclude("org.apache.hadoop", "hadoop-client-runtime")
-  }
 
   testImplementation(libs.commons.cli)
   testImplementation(libs.commons.lang3)
@@ -133,6 +129,7 @@ tasks.test {
     dependsOn(":catalogs:catalog-jdbc-postgresql:jar", ":catalogs:catalog-jdbc-postgresql:runtimeJars")
     dependsOn(":catalogs:catalog-hadoop:jar", ":catalogs:catalog-hadoop:runtimeJars")
     dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars")
+    dependsOn(":catalogs:catalog-kafka:jar", ":catalogs:catalog-kafka:runtimeJars")
 
     doFirst {
       // Gravitino CI Docker image

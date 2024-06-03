@@ -120,6 +120,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
   @AfterAll
   public void stop() throws Exception {
     clearTableAndSchema();
+    metalake.dropCatalog(catalogName);
     client.dropMetalake(metalakeName);
     spark.close();
     AbstractIT.stopIntegrationTest();
@@ -159,12 +160,14 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
   }
 
   private void clearTableAndSchema() {
-    NameIdentifier[] nameIdentifiers =
-        catalog.asTableCatalog().listTables(Namespace.of(metalakeName, catalogName, schemaName));
-    for (NameIdentifier nameIdentifier : nameIdentifiers) {
-      catalog.asTableCatalog().dropTable(nameIdentifier);
+    if (catalog.asSchemas().schemaExists(schemaName)) {
+      NameIdentifier[] nameIdentifiers =
+          catalog.asTableCatalog().listTables(Namespace.of(metalakeName, catalogName, schemaName));
+      for (NameIdentifier nameIdentifier : nameIdentifiers) {
+        catalog.asTableCatalog().dropTable(nameIdentifier);
+      }
+      catalog.asSchemas().dropSchema(schemaName, false);
     }
-    catalog.asSchemas().dropSchema(schemaName, false);
   }
 
   private void createMetalake() {
@@ -324,7 +327,12 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
                 Distributions.NONE,
                 null));
     // drop schema failed check.
-    Assertions.assertFalse(schemas.dropSchema(schemaIdent.name(), true));
+    Throwable excep =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> schemas.dropSchema(schemaIdent.name(), true));
+    Assertions.assertTrue(
+        excep.getMessage().contains("Iceberg does not support cascading delete operations."));
+
     Assertions.assertFalse(schemas.dropSchema(schemaIdent.name(), false));
     Assertions.assertFalse(tableCatalog.dropTable(table));
     icebergNamespaces =
@@ -731,6 +739,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     Table delColTable = catalog.asTableCatalog().loadTable(tableIdentifier);
     Assertions.assertEquals(1, delColTable.columns().length);
     Assertions.assertEquals(col1.name(), delColTable.columns()[0].name());
+    catalog.asTableCatalog().dropTable(tableIdentifier);
   }
 
   @Test

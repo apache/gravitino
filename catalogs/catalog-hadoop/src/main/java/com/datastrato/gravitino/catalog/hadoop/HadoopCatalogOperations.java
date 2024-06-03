@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.catalog.hadoop;
 
 import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
@@ -14,9 +15,12 @@ import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.SchemaChange;
 import com.datastrato.gravitino.StringIdentifier;
+import com.datastrato.gravitino.catalog.hadoop.kerberos.AuthenticationConfig;
+import com.datastrato.gravitino.catalog.hadoop.kerberos.KerberosClient;
 import com.datastrato.gravitino.connector.CatalogInfo;
 import com.datastrato.gravitino.connector.CatalogOperations;
-import com.datastrato.gravitino.connector.PropertiesMetadata;
+import com.datastrato.gravitino.connector.HasPropertyMetadata;
+import com.datastrato.gravitino.connector.ProxyPlugin;
 import com.datastrato.gravitino.connector.SupportsSchemas;
 import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
@@ -36,10 +40,12 @@ import com.datastrato.gravitino.utils.PrincipalUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -47,6 +53,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,22 +65,23 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   private static final Logger LOG = LoggerFactory.getLogger(HadoopCatalogOperations.class);
 
-  private static final HadoopCatalogPropertiesMetadata CATALOG_PROPERTIES_METADATA =
-      new HadoopCatalogPropertiesMetadata();
-
-  private static final HadoopSchemaPropertiesMetadata SCHEMA_PROPERTIES_METADATA =
-      new HadoopSchemaPropertiesMetadata();
-
-  private static final HadoopFilesetPropertiesMetadata FILESET_PROPERTIES_METADATA =
-      new HadoopFilesetPropertiesMetadata();
-
   private final EntityStore store;
+
+  private HasPropertyMetadata propertiesMetadata;
 
   @VisibleForTesting Configuration hadoopConf;
 
   @VisibleForTesting Optional<Path> catalogStorageLocation;
 
-  // For testing only.
+  private Map<String, String> conf;
+
+  @SuppressWarnings("unused")
+  private ProxyPlugin proxyPlugin;
+
+  private String kerberosRealm;
+
+  private CatalogInfo catalogInfo;
+
   HadoopCatalogOperations(EntityStore store) {
     this.store = store;
   }
@@ -81,10 +90,19 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     this(GravitinoEnv.getInstance().entityStore());
   }
 
+  public String getKerberosRealm() {
+    return kerberosRealm;
+  }
+
   @Override
-  public void initialize(Map<String, String> config, CatalogInfo info) throws RuntimeException {
+  public void initialize(
+      Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
+      throws RuntimeException {
+    this.propertiesMetadata = propertiesMetadata;
     // Initialize Hadoop Configuration.
+    this.conf = config;
     this.hadoopConf = new Configuration();
+    this.catalogInfo = info;
     Map<String, String> bypassConfigs =
         config.entrySet().stream()
             .filter(e -> e.getKey().startsWith(CATALOG_BYPASS_PREFIX))
@@ -96,9 +114,32 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
     String catalogLocation =
         (String)
-            CATALOG_PROPERTIES_METADATA.getOrDefault(
-                config, HadoopCatalogPropertiesMetadata.LOCATION);
+            propertiesMetadata
+                .catalogPropertiesMetadata()
+                .getOrDefault(config, HadoopCatalogPropertiesMetadata.LOCATION);
+    conf.forEach(hadoopConf::set);
+
+    initAuthentication(conf, hadoopConf);
     this.catalogStorageLocation = Optional.ofNullable(catalogLocation).map(Path::new);
+  }
+
+  private void initAuthentication(Map<String, String> conf, Configuration hadoopConf) {
+    AuthenticationConfig config = new AuthenticationConfig(conf);
+    String authType = config.getAuthType();
+
+    if (StringUtils.equalsIgnoreCase(authType, AuthenticationMethod.KERBEROS.name())) {
+      hadoopConf.set(
+          HADOOP_SECURITY_AUTHENTICATION,
+          AuthenticationMethod.KERBEROS.name().toLowerCase(Locale.ROOT));
+      UserGroupInformation.setConfiguration(hadoopConf);
+      try {
+        KerberosClient kerberosClient = new KerberosClient(conf, hadoopConf);
+        File keytabFile = kerberosClient.saveKeyTabFileFromUri(catalogInfo.id());
+        this.kerberosRealm = kerberosClient.login(keytabFile.getAbsolutePath());
+      } catch (IOException e) {
+        throw new RuntimeException("Failed to login with Kerberos", e);
+      }
+    }
   }
 
   @Override
@@ -484,33 +525,6 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   }
 
   @Override
-  public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
-    throw new UnsupportedOperationException(
-        "Hadoop fileset catalog doesn't support table related operations");
-  }
-
-  @Override
-  public PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException {
-    throw new UnsupportedOperationException(
-        "Hadoop fileset catalog doesn't support topic related operations");
-  }
-
-  @Override
-  public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
-    return CATALOG_PROPERTIES_METADATA;
-  }
-
-  @Override
-  public PropertiesMetadata schemaPropertiesMetadata() throws UnsupportedOperationException {
-    return SCHEMA_PROPERTIES_METADATA;
-  }
-
-  @Override
-  public PropertiesMetadata filesetPropertiesMetadata() throws UnsupportedOperationException {
-    return FILESET_PROPERTIES_METADATA;
-  }
-
-  @Override
   public void close() throws IOException {}
 
   private SchemaEntity updateSchemaEntity(
@@ -596,8 +610,9 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   private Path getSchemaPath(String name, Map<String, String> properties) {
     String schemaLocation =
         (String)
-            SCHEMA_PROPERTIES_METADATA.getOrDefault(
-                properties, HadoopSchemaPropertiesMetadata.LOCATION);
+            propertiesMetadata
+                .schemaPropertiesMetadata()
+                .getOrDefault(properties, HadoopSchemaPropertiesMetadata.LOCATION);
 
     return Optional.ofNullable(schemaLocation)
         .map(Path::new)
@@ -608,5 +623,9 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   static Path formalizePath(Path path, Configuration configuration) throws IOException {
     FileSystem defaultFs = FileSystem.get(configuration);
     return path.makeQualified(defaultFs.getUri(), defaultFs.getWorkingDirectory());
+  }
+
+  void setProxyPlugin(HadoopProxyPlugin hadoopProxyPlugin) {
+    this.proxyPlugin = hadoopProxyPlugin;
   }
 }

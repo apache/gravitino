@@ -13,7 +13,7 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOps;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper;
 import com.datastrato.gravitino.connector.CatalogInfo;
 import com.datastrato.gravitino.connector.CatalogOperations;
-import com.datastrato.gravitino.connector.PropertiesMetadata;
+import com.datastrato.gravitino.connector.HasPropertyMetadata;
 import com.datastrato.gravitino.connector.SupportsSchemas;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
@@ -66,12 +66,6 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
 
   @VisibleForTesting IcebergTableOps icebergTableOps;
 
-  private IcebergCatalogPropertiesMetadata icebergCatalogPropertiesMetadata;
-
-  private IcebergTablePropertiesMetadata icebergTablePropertiesMetadata;
-
-  private IcebergSchemaPropertiesMetadata icebergSchemaPropertiesMetadata;
-
   private IcebergTableOpsHelper icebergTableOpsHelper;
 
   /**
@@ -82,14 +76,16 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
    * @throws RuntimeException if initialization fails.
    */
   @Override
-  public void initialize(Map<String, String> conf, CatalogInfo info) throws RuntimeException {
+  public void initialize(
+      Map<String, String> conf, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
+      throws RuntimeException {
     // Key format like gravitino.bypass.a.b
     Map<String, String> prefixMap = MapUtils.getPrefixMap(conf, CATALOG_BYPASS_PREFIX);
 
-    this.icebergCatalogPropertiesMetadata = new IcebergCatalogPropertiesMetadata();
     // Hold keys that lie in GRAVITINO_CONFIG_TO_ICEBERG
     Map<String, String> gravitinoConfig =
-        this.icebergCatalogPropertiesMetadata.transformProperties(conf);
+        ((IcebergCatalogPropertiesMetadata) propertiesMetadata.catalogPropertiesMetadata())
+            .transformProperties(conf);
 
     Map<String, String> resultConf = Maps.newHashMap(prefixMap);
     resultConf.putAll(gravitinoConfig);
@@ -99,8 +95,6 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
 
     this.icebergTableOps = new IcebergTableOps(icebergConfig);
     this.icebergTableOpsHelper = icebergTableOps.createIcebergTableOpsHelper();
-    this.icebergTablePropertiesMetadata = new IcebergTablePropertiesMetadata();
-    this.icebergSchemaPropertiesMetadata = new IcebergSchemaPropertiesMetadata();
   }
 
   /** Closes the Iceberg catalog and releases the associated client pool. */
@@ -285,7 +279,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
    *
    * @param ident The identifier of the schema to drop.
    * @param cascade If set to true, drops all the tables in the schema as well.
-   * @return true if the schema was dropped successfully, false otherwise.
+   * @return true if the schema was dropped successfully, false if the schema does not exist.
    * @throws NonEmptySchemaException If the schema is not empty and 'cascade' is set to false.
    */
   @Override
@@ -543,32 +537,5 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
   // TODO. We should figure out a better way to get the current user from servlet container.
   private static String currentUser() {
     return System.getProperty("user.name");
-  }
-
-  @Override
-  public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
-    return icebergTablePropertiesMetadata;
-  }
-
-  @Override
-  public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
-    return icebergCatalogPropertiesMetadata;
-  }
-
-  @Override
-  public PropertiesMetadata schemaPropertiesMetadata() throws UnsupportedOperationException {
-    return icebergSchemaPropertiesMetadata;
-  }
-
-  @Override
-  public PropertiesMetadata filesetPropertiesMetadata() throws UnsupportedOperationException {
-    throw new UnsupportedOperationException(
-        "Iceberg catalog doesn't support fileset related operations");
-  }
-
-  @Override
-  public PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException {
-    throw new UnsupportedOperationException(
-        "Iceberg catalog doesn't support topic related operations");
   }
 }
