@@ -17,8 +17,6 @@ import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.awaitility.Awaitility;
-import java.util.concurrent.TimeUnit;
 
 public class AuditIT extends AbstractIT {
 
@@ -37,14 +35,14 @@ public class AuditIT extends AbstractIT {
     String metalakeAuditName = RandomNameUtils.genRandomName("metalakeAudit");
     String newName = RandomNameUtils.genRandomName("newmetaname");
 
-    Awaitility.await().atMost(1, TimeUnit.MINUTES).until(() -> isGravitinoServerUp());
-
-    GravitinoMetalake metaLake = client.createMetalake(metalakeAuditName, "metalake A comment", Collections.emptyMap());
+    GravitinoMetalake metaLake =
+        client.createMetalake(metalakeAuditName, "metalake A comment", Collections.emptyMap());
     Assertions.assertEquals(expectUser, metaLake.auditInfo().creator());
     Assertions.assertNull(metaLake.auditInfo().lastModifier());
-    MetalakeChange[] changes = new MetalakeChange[] {
-        MetalakeChange.rename(newName), MetalakeChange.updateComment("new metalake comment")
-    };
+    MetalakeChange[] changes =
+        new MetalakeChange[] {
+          MetalakeChange.rename(newName), MetalakeChange.updateComment("new metalake comment")
+        };
     metaLake = client.alterMetalake(metalakeAuditName, changes);
     Assertions.assertEquals(expectUser, metaLake.auditInfo().creator());
     Assertions.assertEquals(expectUser, metaLake.auditInfo().lastModifier());
