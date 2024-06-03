@@ -24,8 +24,8 @@ SOFTWARE.
 
 var AxiosTransform = /** @class */ (function () {
   function AxiosTransform() {}
-  
-  return AxiosTransform;
-})();
 
-export { AxiosTransform };
+  return AxiosTransform
+})()
+
+export { AxiosTransform }

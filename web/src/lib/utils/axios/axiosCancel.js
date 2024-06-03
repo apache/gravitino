@@ -22,50 +22,50 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
 
-var pendingMap = new Map();
+var pendingMap = new Map()
 
 var getPendingUrl = function (config) {
-  return [config.method, config.url].join('&');
-};
+  return [config.method, config.url].join('&')
+}
 
 var AxiosCanceler = /** @class */ (function () {
   function AxiosCanceler() {}
 
   AxiosCanceler.prototype.addPending = function (config) {
-    this.removePending(config);
-    var url = getPendingUrl(config);
-    var controller = new AbortController();
-    config.signal = config.signal || controller.signal;
+    this.removePending(config)
+    var url = getPendingUrl(config)
+    var controller = new AbortController()
+    config.signal = config.signal || controller.signal
     if (!pendingMap.has(url)) {
-      pendingMap.set(url, controller);
+      pendingMap.set(url, controller)
     }
-  };
+  }
 
   AxiosCanceler.prototype.removeAllPending = function () {
     pendingMap.forEach(function (abortController) {
       if (abortController) {
-        abortController.abort();
+        abortController.abort()
       }
-    });
-    this.reset();
-  };
+    })
+    this.reset()
+  }
 
   AxiosCanceler.prototype.removePending = function (config) {
-    var url = getPendingUrl(config);
+    var url = getPendingUrl(config)
     if (pendingMap.has(url)) {
-      var abortController = pendingMap.get(url);
+      var abortController = pendingMap.get(url)
       if (abortController) {
-        abortController.abort(url);
+        abortController.abort(url)
       }
-      pendingMap.delete(url);
+      pendingMap.delete(url)
     }
-  };
+  }
 
   AxiosCanceler.prototype.reset = function () {
-    pendingMap.clear();
-  };
+    pendingMap.clear()
+  }
 
-  return AxiosCanceler;
-})();
+  return AxiosCanceler
+})()
 
-export { AxiosCanceler };
+export { AxiosCanceler }

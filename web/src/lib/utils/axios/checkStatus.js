@@ -22,71 +22,68 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
 
-import toast from 'react-hot-toast';
+import toast from 'react-hot-toast'
 
 export function checkStatus(status, msg, errorMessageMode) {
   if (errorMessageMode === void 0) {
-    errorMessageMode = 'message';
+    errorMessageMode = 'message'
   }
-  var errMessage = '';
+  var errMessage = ''
   switch (status) {
     case 400:
-      errMessage = ''.concat(msg);
-      break;
+      errMessage = ''.concat(msg)
+      break
     case 401:
       // ** reserve error message
       // errMessage = msg || 'The user does not have permission (token, user name, password error or expired)!'
-      break;
+      break
     case 403:
-      errMessage = 'The user is authorized, but access is forbidden!';
-      break;
+      errMessage = 'The user is authorized, but access is forbidden!'
+      break
     case 404:
-      errMessage = 'Network request error, the resource was not found!';
-      break;
+      errMessage = 'Network request error, the resource was not found!'
+      break
     case 405:
-      errMessage = 'Network request error, request method not allowed!';
-      break;
+      errMessage = 'Network request error, request method not allowed!'
+      break
     case 408:
-      errMessage = 'Network request timed out!';
-      break;
+      errMessage = 'Network request timed out!'
+      break
     case 409:
-      errMessage = msg || 'Conflict with the current resource state!';
-      break;
+      errMessage = msg || 'Conflict with the current resource state!'
+      break
     case 500:
-      errMessage = msg || 'Server error, unable to connect Gravitino!';
-      break;
+      errMessage = msg || 'Server error, unable to connect Gravitino!'
+      break
     case 501:
-      errMessage = 'The network is not implemented!';
-      break;
+      errMessage = 'The network is not implemented!'
+      break
     case 502:
-      errMessage = 'Network Error!';
-      break;
+      errMessage = 'Network Error!'
+      break
     case 503:
-      errMessage =
-        'The service is unavailable, the server is temporarily overloaded or maintained!';
-      break;
+      errMessage = 'The service is unavailable, the server is temporarily overloaded or maintained!'
+      break
     case 504:
-      errMessage = 'Network timeout!';
-      break;
+      errMessage = 'Network timeout!'
+      break
     case 505:
-      errMessage = 'The http version does not support the request!';
-      break;
+      errMessage = 'The http version does not support the request!'
+      break
     default:
   }
   if (errMessage) {
     if (errorMessageMode === 'modal') {
-      console.log({ title: 'Error Tip', text: errMessage, icon: 'error' });
+      console.log({ title: 'Error Tip', text: errMessage, icon: 'error' })
     } else if (errorMessageMode === 'message') {
-      var keyword = 'reason';
-      var idx = errMessage.indexOf(keyword);
+      var keyword = 'reason'
+      var idx = errMessage.indexOf(keyword)
       if (idx !== -1) {
-        errMessage = errMessage
-          .substring(idx + keyword.length + 1)
-          .replace(/^\[|\]$/g, '');
+        errMessage = errMessage.substring(idx + keyword.length + 1).replace(/^\[|\]$/g, '')
       }
       toast.error(errMessage, {
-        id: 'global_error_message_status_'.concat(status),
-      });
+        id: 'global_error_message_status_'.concat(status)
+      })
     }
   }
 }
