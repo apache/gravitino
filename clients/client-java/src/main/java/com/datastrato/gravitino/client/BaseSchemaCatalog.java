@@ -207,8 +207,8 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
    */
   static void checkNamespace(Namespace namespace) {
     Namespace.check(
-        namespace != null && namespace.length() == 1,
-        "Catalog namespace must be non-null and have 1 level, the input namespace is %s",
+        namespace != null && namespace.length() == 3,
+        "Table/fileset/topic namespace must be non-null and have 3 level, the input namespace is %s",
         namespace);
   }
 }
