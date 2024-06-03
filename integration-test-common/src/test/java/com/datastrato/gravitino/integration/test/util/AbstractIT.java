@@ -274,7 +274,6 @@ public class AbstractIT {
       connection.setConnectTimeout(1000);
       connection.connect();
       int responseCode = connection.getResponseCode();
-      System.out.println("/n/n/n" + responseCode + "/n/n/n");
       return responseCode == 200;
     } catch (IOException e) {
       return false;
