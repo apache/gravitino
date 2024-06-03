@@ -222,6 +222,12 @@ public class AbstractIT {
     } else {
       client = GravitinoAdminClient.builder(serverUri).build();
     }
+
+    if (isGravitinoServerUp()) {
+      LOG.info("Gravitino Server is up and running.");
+    } else {
+      LOG.warn("Gravitino Server is not accessible.");
+    }
   }
 
   @AfterAll
@@ -257,6 +263,21 @@ public class AbstractIT {
     } catch (IOException e) {
       LOG.warn("Can't get git commit id for:", e);
       return "";
+    }
+  }
+
+  private static boolean isGravitinoServerUp() {
+    try {
+      URL url = new URL("http://localhost:8090");
+      HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+      connection.setRequestMethod("GET");
+      connection.setConnectTimeout(1000);
+      connection.connect();
+      int responseCode = connection.getResponseCode();
+      System.out.println("/n/n/n" + responseCode + "/n/n/n");
+      return responseCode == 200;
+    } catch (IOException e) {
+      return false;
     }
   }
 }

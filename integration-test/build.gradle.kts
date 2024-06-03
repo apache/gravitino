@@ -36,6 +36,7 @@ dependencies {
     exclude("org.apache.hadoop", "hadoop-client-runtime")
   }
 
+  testImplementation(libs.awaitility)
   testImplementation(libs.commons.cli)
   testImplementation(libs.commons.lang3)
   testImplementation(libs.guava)
