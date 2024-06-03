@@ -39,9 +39,9 @@ public interface SupportsSchemas {
    *
    * <p>If an entity such as a table, view exists, its parent schemas must also exist and must be
    * returned by this discovery method. For example, if table a.b.t exists, this method invoked as
-   * listSchemas(a) must return [a.b] in the result array
+   * listSchemas(a) must return [b] in the result array
    *
-   * @return An array of schema identifier under the namespace.
+   * @return An array of schema names under the namespace.
    * @throws NoSuchCatalogException If the catalog does not exist.
    */
   String[] listSchemas() throws NoSuchCatalogException;

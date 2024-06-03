@@ -80,10 +80,8 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
             Collections.emptyMap(),
             ErrorHandlers.schemaErrorHandler());
     resp.validate();
-    String[] schemas =
-        Arrays.stream(resp.identifiers()).map(NameIdentifier::name).toArray(String[]::new);
 
-    return schemas;
+    return Arrays.stream(resp.identifiers()).map(NameIdentifier::name).toArray(String[]::new);
   }
 
   /**

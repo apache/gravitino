@@ -45,11 +45,11 @@ import com.datastrato.gravitino.rel.types.Decimal;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -245,7 +245,7 @@ public class CatalogMysqlIT extends AbstractIT {
     Namespace namespace = Namespace.of(metalakeName, catalogName);
     // list schema check.
     String[] nameIdentifiers = schemas.listSchemas();
-    Set<String> schemaNames = new HashSet<>(Arrays.asList(nameIdentifiers));
+    Set<String> schemaNames = Sets.newHashSet(nameIdentifiers);
     Assertions.assertTrue(schemaNames.contains(schemaName));
 
     NameIdentifier[] mysqlNamespaces = mysqlService.listSchemas(namespace);
@@ -258,7 +258,7 @@ public class CatalogMysqlIT extends AbstractIT {
     NameIdentifier schemaIdent = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
     schemas.createSchema(schemaIdent.name(), schema_comment, Collections.emptyMap());
     nameIdentifiers = schemas.listSchemas();
-    schemaNames = new HashSet<>(Arrays.asList(nameIdentifiers));
+    schemaNames = Sets.newHashSet(nameIdentifiers);
     Assertions.assertTrue(schemaNames.contains(testSchemaName));
 
     mysqlNamespaces = mysqlService.listSchemas(namespace);
@@ -281,7 +281,7 @@ public class CatalogMysqlIT extends AbstractIT {
         NoSuchSchemaException.class, () -> mysqlService.loadSchema(schemaIdent));
 
     nameIdentifiers = schemas.listSchemas();
-    schemaNames = new HashSet<>(Arrays.asList(nameIdentifiers));
+    schemaNames = Sets.newHashSet(nameIdentifiers);
     Assertions.assertFalse(schemaNames.contains(testSchemaName));
     Assertions.assertFalse(schemas.dropSchema("no-exits", false));
     TableCatalog tableCatalog = catalog.asTableCatalog();
@@ -1371,7 +1371,7 @@ public class CatalogMysqlIT extends AbstractIT {
       Assertions.assertNotNull(schemaSupport.loadSchema(schema));
     }
 
-    Set<String> schemaNames = new HashSet<>(Arrays.asList(schemaSupport.listSchemas()));
+    Set<String> schemaNames = Sets.newHashSet(schemaSupport.listSchemas());
 
     Assertions.assertTrue(schemaNames.containsAll(Arrays.asList(schemas)));
 

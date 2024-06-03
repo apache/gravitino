@@ -200,10 +200,10 @@ public class CatalogHiveIT extends AbstractIT {
   @AfterAll
   public static void stop() throws IOException {
     Arrays.stream(catalog.asSchemas().listSchemas())
-        .filter(ident -> !ident.equals("default"))
+        .filter(schema -> !schema.equals("default"))
         .forEach(
-            (ident -> {
-              catalog.asSchemas().dropSchema(ident, true);
+            (schema -> {
+              catalog.asSchemas().dropSchema(schema, true);
             }));
     Arrays.stream(metalake.listCatalogs())
         .forEach(
