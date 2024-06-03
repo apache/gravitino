@@ -44,16 +44,19 @@ public class IcebergCatalogUtil {
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
     properties.forEach(hdfsConfiguration::set);
     hiveCatalog.setConf(hdfsConfiguration);
-    hiveCatalog.initialize("hive", properties);
+
+    Map<String, String> resultProperties = new HashMap<>(properties);
+    resultProperties.put(CatalogProperties.CLIENT_POOL_CACHE_KEYS, "USER_NAME");
+    hiveCatalog.initialize("hive", resultProperties);
 
     String enableAuth = hdfsConfiguration.get(HADOOP_SECURITY_AUTHORIZATION);
-    String enableImpersonation = properties.get(IMPERSONATION_ENABLE_KEY);
+    String enableImpersonation = resultProperties.get(IMPERSONATION_ENABLE_KEY);
     if (UserGroupInformation.AuthenticationMethod.KERBEROS
             == SecurityUtil.getAuthenticationMethod(hdfsConfiguration)
         && StringUtils.equalsIgnoreCase(enableAuth, "true")
         && StringUtils.equalsIgnoreCase(enableImpersonation, "true")) {
       LOG.info("Kerberos authentication is enabled");
-      HiveBackendProxy proxyHiveCatalog = new HiveBackendProxy(properties, hiveCatalog);
+      HiveBackendProxy proxyHiveCatalog = new HiveBackendProxy(resultProperties, hiveCatalog);
       hiveCatalog = proxyHiveCatalog.getProxy();
     }
 

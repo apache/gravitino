@@ -240,7 +240,8 @@ public class CatalogIcebergKerberosHiveIT extends AbstractIT {
             () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
     String exceptionMessage = Throwables.getStackTraceAsString(exception);
     // Make sure real user is 'gravitino_client'
-    Assertions.assertTrue(exceptionMessage.contains("Permission denied: user=cli, access=WRITE"));
+    Assertions.assertTrue(
+        exceptionMessage.contains("Permission denied: user=gravitino_client, access=WRITE"));
 
     // Now try to give the user the permission to create schema again
     kerberosHiveContainer.executeInContainer(
@@ -278,7 +279,7 @@ public class CatalogIcebergKerberosHiveIT extends AbstractIT {
     Assertions.assertFalse(catalog.asTableCatalog().tableExists(newTableIdentifier));
 
     // Drop schema
-    catalog.asSchemas().dropSchema(SCHEMA_NAME, true);
+    catalog.asSchemas().dropSchema(SCHEMA_NAME, false);
     Assertions.assertFalse(catalog.asSchemas().schemaExists(SCHEMA_NAME));
 
     // Drop catalog

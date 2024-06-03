@@ -59,6 +59,7 @@ dependencies {
   implementation(libs.jackson.datatype.jsr310)
   implementation(libs.sqlite.jdbc)
   implementation(libs.cglib)
+  implementation(libs.caffeine)
 
   annotationProcessor(libs.lombok)
 
