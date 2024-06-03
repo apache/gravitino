@@ -84,14 +84,14 @@ while [[ ${retry_times} -lt 10 ]]; do
   hdfs_ready=$(hdfs dfsadmin -report | grep "Live datanodes" | awk '{print $3}')
   if [[ ${hdfs_ready} == "(1):" ]]; then
     echo "HDFS is ready, retry_times = ${retry_times}"
-    let "ready=0"
+    let "ready=1"
     break
   fi
   sleep 10
   retry_times=$((retry_times+1))
 done
 
-if [[ ${ready} -ne 0 ]]; then
+if [[ ${ready} -eq 0 ]]; then
   echo "HDFS is not ready"
   ehco "HDFS DataNode log start---------------------------"
   cat ${HADOOP_HOME}/bin/logs/hadoop-root-datanode-*.log
