@@ -113,12 +113,6 @@ public abstract class BaseCatalog extends AbstractCatalog {
       throws DatabaseNotExistException, DatabaseNotEmptyException, CatalogException {
     try {
       catalog().asSchemas().dropSchema(databaseName, cascade);
-    } catch (NoSuchSchemaException e) {
-      if (!ignoreIfNotExists) {
-        throw new DatabaseNotExistException(getName(), databaseName);
-      } else {
-        LOG.warn("Database {} does not exist.", databaseName);
-      }
     } catch (NonEmptySchemaException e) {
       throw new DatabaseNotEmptyException(getName(), databaseName);
     } catch (NoSuchCatalogException e) {
