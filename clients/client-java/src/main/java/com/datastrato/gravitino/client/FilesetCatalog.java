@@ -215,18 +215,6 @@ public class FilesetCatalog extends BaseSchemaCatalog
   }
 
   /**
-   * Check whether the NameIdentifier is valid
-   *
-   * @param ident The NameIdentifier to check
-   */
-  static void checkNameIdentifer(NameIdentifier ident) {
-    NameIdentifier.check(ident != null, "Fileset identifier must not be null");
-    NameIdentifier.check(
-        ident.name() != null && !ident.name().isEmpty(),
-        "Fileset identifier name must not be empty");
-  }
-
-  /**
    * Create a new builder for the fileset catalog.
    *
    * @return A new builder for the fileset catalog.

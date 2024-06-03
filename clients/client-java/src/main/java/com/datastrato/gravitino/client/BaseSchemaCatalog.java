@@ -201,7 +201,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
   }
 
   /**
-   * Check whether the namespace is valid
+   * Check whether the namespace of a table/fileset/topic is valid
    *
    * @param namespace The namespace to check
    */
@@ -210,5 +210,17 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
         namespace != null && namespace.length() == 3,
         "Table/fileset/topic namespace must be non-null and have 3 level, the input namespace is %s",
         namespace);
+  }
+
+  /**
+   * Check whether the NameIdentifier of a table/fileset/topic is valid
+   *
+   * @param ident The NameIdentifier to check
+   */
+  static void checkNameIdentifer(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "NameIdentifer must not be null");
+    NameIdentifier.check(
+        ident.name() != null && !ident.name().isEmpty(), "NameIdentifer name must not be empty");
+    checkNamespace(ident.namespace());
   }
 }

@@ -95,7 +95,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
    */
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
-    checkTableIdentifer(ident);
+    checkNameIdentifer(ident);
 
     TableResponse resp =
         restClient.get(
@@ -132,7 +132,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    checkTableIdentifer(ident);
+    checkNameIdentifer(ident);
 
     TableCreateRequest req =
         new TableCreateRequest(
@@ -170,7 +170,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
-    checkTableIdentifer(ident);
+    checkNameIdentifer(ident);
 
     List<TableUpdateRequest> reqs =
         Arrays.stream(changes)
@@ -199,7 +199,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
    */
   @Override
   public boolean dropTable(NameIdentifier ident) {
-    checkTableIdentifer(ident);
+    checkNameIdentifer(ident);
 
     DropResponse resp =
         restClient.delete(
@@ -219,7 +219,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
    */
   @Override
   public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
-    checkTableIdentifer(ident);
+    checkNameIdentifer(ident);
 
     Map<String, String> params = new HashMap<>();
     params.put("purge", "true");
@@ -251,18 +251,6 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
         .append(RESTUtils.encodeString(ns.level(2)))
         .append("/tables")
         .toString();
-  }
-
-  /**
-   * Check whether the NameIdentifier is valid
-   *
-   * @param ident The NameIdentifier to check
-   */
-  static void checkTableIdentifer(NameIdentifier ident) {
-    NameIdentifier.check(ident != null, "Table identifier must not be null");
-    NameIdentifier.check(
-        ident.name() != null && !ident.name().isEmpty(), "Table identifier name must not be empty");
-    // Namespace.checkTable(ident.namespace());
   }
 
   /**
