@@ -75,6 +75,7 @@ if [[ $? -ne 0 ]]; then
   echo "DataNode failed to start, please check the logs"
   ehco "HDFS DataNode log start----------------------------"
   cat ${HADOOP_HOME}/bin/logs/hadoop-root-datanode-*.log
+  ehco "HDFS DataNode log end---------------------------"
   exit 1
 fi
 
@@ -95,6 +96,7 @@ if [[ ${ready} -eq 0 ]]; then
   echo "HDFS is not ready"
   ehco "HDFS DataNode log start---------------------------"
   cat ${HADOOP_HOME}/bin/logs/hadoop-root-datanode-*.log
+  ehco "HDFS DataNode log end---------------------------"
   exit 1
 fi
 
