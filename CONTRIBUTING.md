@@ -1,3 +1,4 @@
+
 <!--
   Copyright 2023 Datastrato Pvt Ltd.
   This software is licensed under the Apache License version 2.
@@ -13,6 +14,11 @@ Before you get started, please read and follow these guidelines to ensure a smoo
 
 - [Getting Started](#getting-started)
   - [Fork the Repository](#fork-the-repository)
+  - [Development Setup](#development-setup)
+- [Project Overview and Policies](#project-overview-and-policies)
+  - [Project Overview](#project-overview)
+  - [Management Policies](#management-policies)
+  - [Future Development Directions](#future-development-directions)
 - [Contribution Guidelines](#contribution-guidelines)
   - [Code of Conduct](#code-of-conduct)
   - [Reporting Bugs](#reporting-bugs)
@@ -20,7 +26,7 @@ Before you get started, please read and follow these guidelines to ensure a smoo
   - [Good First Issues](#good-first-issues)
   - [Working on Issues](#working-on-issues)
   - [Creating Pull Requests](#creating-pull-requests)
-- [Development Setup](#development-setup)
+  - [The Review Process](#the-review-process)
 - [Testing](#testing)
 - [Coding Standards](#coding-standards)
 - [Community and Communication](#community-and-communication)
@@ -37,7 +43,25 @@ git clone https://github.com/datastrato/gravitino.git
 cd gravitino
 ```
 
-Now you are ready to start making contributions.
+### Development Setup
+
+Once you have cloned the [GitHub repository](https://github.com/datastrato/gravitino), see [how to build](/docs/how-to-build.md) for instructions on how to build, or you can use the provided docker images at [Datastrato's DockerHub repository](https://hub.docker.com/u/datastrato).
+
+To stop and start a local Gravitino server via `bin/gravitino.sh start` and `bin/gravitino.sh stop` in a Gravitino distribution, see [how to build](/docs/how-to-build.md) for more instructions.
+
+## Project Overview and Policies
+
+### Project Overview
+
+For an overview of the project, see [README.md](README.md).
+
+### Management Policies
+
+For project management policies, refer to [GOVERNANCE.md](GOVERNANCE.md).
+
+### Future Development Directions
+
+For future development directions, refer to the [ROADMAP.md](ROADMAP.md) document.
 
 ## Contribution guidelines
 
@@ -47,7 +71,7 @@ Please read and follow the [Code of Conduct](CODE_OF_CONDUCT.md). Gravitino prov
 
 ### Reporting bugs
 
-If you find a bug in Gravitino, please open an issue on GitHub. Be sure to include as much detail as possible, such as a clear description, steps to reproduce, and your environment. Please follow the template provided.
+If you find a bug in Gravitino, please open an issue on GitHub. Be sure to include as much detail as possible, such as a clear description, steps to reproduce, and your environment. Please follow the template provided. If you encounter a security issue, please refer to [SECURITY.md](SECURITY.md).
 
 ### Suggesting enhancements
 
@@ -63,7 +87,7 @@ Check out the list of open issues and find one that interests you. You can also 
 
 ## Creating pull requests
 
-Create a new branch from ``main`` for your changes:
+Create a new branch from `main` for your changes:
 
 ```bash
 git checkout -b your-branch-name
@@ -83,11 +107,9 @@ git push your-branch-name
 
 After you have pushed your changes, create a pull request (PR) in the Gravitino repository. Be sure to provide a detailed description of your changes, reference any related issues and please follow the template provided. Gravitino's maintainers evaluate pull requests, offer feedback, and assist in merging project changes.
 
-## Development setup
+### The Review Process
 
-Once you have cloned the [GitHub repository](https://github.com/datastrato/gravitino), see [how to build](/docs/how-to-build.md) for instructions on how to build, or you can use the provided docker images at [Datastrato's DockerHub repository](https://hub.docker.com/u/datastrato).
-
-To stop and start a local Gravitino server via ``bin/gravitino.sh start`` and ``bin/gravitino.sh stop`` in a Gravitino distribution, see [how to build](/docs/how-to-build.md) for more instructions.
+For details on the review process, please refer to [MAINTAINERS.md](MAINTAINERS.md).
 
 ## Testing
 
