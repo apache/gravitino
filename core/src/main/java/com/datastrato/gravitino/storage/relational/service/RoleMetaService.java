@@ -91,14 +91,14 @@ public class RoleMetaService {
           MetalakeMetaService.getInstance().getMetalakeIdByName(roleEntity.namespace().level(0));
       RolePO.Builder builder = RolePO.builder().withMetalakeId(metalakeId);
       RolePO rolePO = POConverters.initializeRolePOWithVersion(roleEntity, builder);
-      List<SecurableObjectPO> securableObjectPOS = Lists.newArrayList();
+      List<SecurableObjectPO> securableObjectPOs = Lists.newArrayList();
       for (SecurableObject object : roleEntity.securableObjects()) {
         SecurableObjectPO.Builder objectBuilder =
             POConverters.initializeSecurablePOBuilderWithVersion(
                 roleEntity.id(), object, getPOType(object));
         objectBuilder.withEntityId(
             getSecurableObjectEntityId(metalakeId, object.fullName(), object.type()));
-        securableObjectPOS.add(objectBuilder.build());
+        securableObjectPOs.add(objectBuilder.build());
       }
 
       SessionUtils.doMultipleWithCommit(
@@ -109,7 +109,9 @@ public class RoleMetaService {
                     if (overwritten) {
                       mapper.softDeleteSecurableObjectsByRoleId(rolePO.getRoleId());
                     }
-                    mapper.batchInsertSecurableObjects(securableObjectPOS);
+                    if (!securableObjectPOs.isEmpty()) {
+                      mapper.batchInsertSecurableObjects(securableObjectPOs);
+                    }
                   }),
           () ->
               SessionUtils.doWithoutCommit(
@@ -210,7 +212,10 @@ public class RoleMetaService {
                     mapper ->
                         mapper.deleteSecurableObjectsByLegacyTimeLine(legacyTimeLine, limit)));
 
-    return roleDeletedCount[0] + userRoleRelDeletedCount[0] + groupRoleRelDeletedCount[0];
+    return roleDeletedCount[0]
+        + userRoleRelDeletedCount[0]
+        + groupRoleRelDeletedCount[0]
+        + securableObjectsCount[0];
   }
 
   long getSecurableObjectEntityId(long metalakeId, String fullName, MetadataObject.Type type) {
@@ -329,8 +334,8 @@ public class RoleMetaService {
   private String getPOType(SecurableObject securableObject) {
     String type;
     if (securableObject.type() == MetadataObject.Type.METALAKE
-        && securableObject.name().equals("*")) {
-      type = "ROOT";
+        && securableObject.name().equals(ALL_METALAKES)) {
+      type = ROOT;
     } else {
       type = securableObject.type().name();
     }

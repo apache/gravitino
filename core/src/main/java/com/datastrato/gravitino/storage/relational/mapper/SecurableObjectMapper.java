@@ -23,6 +23,7 @@ import org.apache.ibatis.annotations.Update;
 public interface SecurableObjectMapper {
 
   String SECURABLE_OBJECT_TABLE_NAME = "role_meta_securable_object";
+  String ROLE_TABLE_NAME = "role_meta";
 
   @Insert({
     "<script>",
@@ -52,6 +53,15 @@ public interface SecurableObjectMapper {
           + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
           + " WHERE role_id = #{roleId} AND deleted_at = 0")
   void softDeleteSecurableObjectsByRoleId(@Param("roleId") Long roleId);
+
+  @Update(
+      "UPDATE "
+          + SECURABLE_OBJECT_TABLE_NAME
+          + " ob SET ob.deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
+          + " where exists ( select * from "
+          + ROLE_TABLE_NAME
+          + " ro WHERE ro.metalake_id = #{metalakeId} AND ro.role_id = ob.role_id AND ro.deleted_at = 0) AND ob.deleted_at = 0")
+  void softDeleteRoleMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
 
   @Select(
       "SELECT role_id as roleId, entity_id as entityId,"
