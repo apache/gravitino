@@ -20,6 +20,7 @@ val icebergVersion: String = libs.versions.iceberg4spark.get()
 val kyuubiVersion: String = libs.versions.kyuubi4spark34.get()
 val scalaJava8CompatVersion: String = libs.versions.scala.java.compat.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
+val artifactName = "spark-${sparkMajorVersion}_$scalaVersion"
 
 dependencies {
   implementation(project(":spark-connector:spark-common"))
@@ -136,13 +137,13 @@ tasks.test {
 }
 
 tasks.withType<Jar> {
-  archiveBaseName.set("spark-${sparkMajorVersion}_$scalaVersion")
+  archiveBaseName.set(artifactName)
 }
 
 publishing {
   publications {
     withType<MavenPublication>().configureEach {
-      artifactId = "spark-${sparkMajorVersion}_$scalaVersion"
+      artifactId = artifactName
     }
   }
 }
