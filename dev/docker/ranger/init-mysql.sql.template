@@ -1,0 +1,9 @@
+---
+-- Copyright 2023 Datastrato Pvt Ltd.
+-- This software is licensed under the Apache License version 2.
+---
+CREATE USER 'rangeradmin'@'localhost' IDENTIFIED BY 'PLACEHOLDER_RANGER_PASSWORD';
+CREATE DATABASE ranger;
+GRANT ALL PRIVILEGES ON ranger.* TO 'rangeradmin'@'localhost';
+UPDATE mysql.user SET plugin='mysql_native_password' WHERE User='root';
+FLUSH PRIVILEGES;
