@@ -51,8 +51,8 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
               .setType(securableObject.type().name())
               .addAllPrivilegeConditions(
                   securableObject.privileges().stream()
-                      .map(Privilege::condition)
-                      .map(Privilege.Condition::name)
+                      .map(Privilege::accessType)
+                      .map(Privilege.AccessType::name)
                       .collect(Collectors.toList()))
               .addAllPrivilegeNames(
                   securableObject.privileges().stream()
@@ -83,7 +83,7 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
       List<Privilege> privileges = Lists.newArrayList();
       com.datastrato.gravitino.proto.SecurableObject object = role.getSecurableObjects(index);
       for (int privIndex = 0; privIndex < object.getPrivilegeConditionsCount(); privIndex++) {
-        if (Privilege.Condition.ALLOW.name().equals(object.getPrivilegeConditions(privIndex))) {
+        if (Privilege.AccessType.ALLOW.name().equals(object.getPrivilegeConditions(privIndex))) {
           privileges.add(Privileges.allow(object.getPrivilegeNames(privIndex)));
         } else {
           privileges.add(Privileges.deny(object.getPrivilegeNames(privIndex)));

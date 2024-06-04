@@ -84,4 +84,38 @@ public class RangerIT {
     Assertions.assertEquals(services.get(0).getConfigs().get(jdbcKey), jdbcVal);
     Assertions.assertEquals(services.get(0).getConfigs().get(jdbcUrlKey), jdbcUrlVal);
   }
+
+  @Test
+  public void createHiveService() throws RangerServiceException {
+    String usernameKey = "username";
+    String usernameVal = "admin";
+    String passwordKey = "password";
+    String passwordVal = "admin";
+    String jdbcKey = "jdbc.driverClassName";
+    String jdbcVal = "org.apache.hive.jdbc.HiveDriver";
+    String jdbcUrlKey = "jdbc.url";
+    String jdbcUrlVal = "jdbc:hive2://172.17.0.2:10000";
+
+    RangerService service = new RangerService();
+    service.setType("hive");
+    service.setName(serviceName);
+    service.setConfigs(
+        ImmutableMap.<String, String>builder()
+            .put(usernameKey, usernameVal)
+            .put(passwordKey, passwordVal)
+            .put(jdbcKey, jdbcVal)
+            .put(jdbcUrlKey, jdbcUrlVal)
+            .build());
+
+    RangerService createdService = rangerClient.createService(service);
+    Assertions.assertNotNull(createdService);
+
+    Map<String, String> filter = Collections.emptyMap();
+    List<RangerService> services = rangerClient.findServices(filter);
+    Assertions.assertEquals(services.get(0).getName(), serviceName);
+    Assertions.assertEquals(services.get(0).getType(), "hive");
+    Assertions.assertEquals(services.get(0).getConfigs().get(usernameKey), usernameVal);
+    Assertions.assertEquals(services.get(0).getConfigs().get(jdbcKey), jdbcVal);
+    Assertions.assertEquals(services.get(0).getConfigs().get(jdbcUrlKey), jdbcUrlVal);
+  }
 }

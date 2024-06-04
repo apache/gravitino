@@ -900,7 +900,7 @@ public class POConverters {
 
       List<Privilege> privileges = Lists.newArrayList();
       for (int index = 0; index < privilegeNames.size(); index++) {
-        if (Privilege.Condition.ALLOW.name().equals(privilegeConditions.get(index))) {
+        if (Privilege.AccessType.ALLOW.name().equals(privilegeConditions.get(index))) {
           privileges.add(Privileges.allow(privilegeNames.get(index)));
         } else {
           privileges.add(Privileges.deny(privilegeNames.get(index)));
@@ -941,8 +941,8 @@ public class POConverters {
               JsonUtils.anyFieldMapper()
                   .writeValueAsString(
                       securableObject.privileges().stream()
-                          .map(Privilege::condition)
-                          .map(Privilege.Condition::name)
+                          .map(Privilege::accessType)
+                          .map(Privilege.AccessType::name)
                           .collect(Collectors.toList())))
           .withPrivilegeNames(
               JsonUtils.anyFieldMapper()

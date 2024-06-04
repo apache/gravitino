@@ -49,6 +49,9 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
   public static final Field SECURABLE_OBJECT =
       Field.required("securable_objects", List.class, "The securable objects of the role entity.");
 
+  public static final Field POLICIES =
+      Field.required("policies", List.class, "The policies of the role entity.");
+
   private Long id;
   private String name;
   private Map<String, String> properties;
@@ -156,7 +159,7 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, properties, auditInfo, securableObjects);
+    return Objects.hash(id, name, properties, auditInfo, securableObjects, namespace);
   }
 
   /**

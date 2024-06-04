@@ -34,10 +34,10 @@ public interface Privilege {
   String simpleString();
 
   /**
-   * @return The condition of the privilege. `ALLOW` means that you are allowed to use the
+   * @return The access type of the privilege. `ALLOW` means that you are allowed to use the
    *     privilege, `DENY` means that you are denied to use the privilege
    */
-  Condition condition();
+  AccessType accessType();
 
   /** The name of this privilege. */
   enum Name {
@@ -108,7 +108,24 @@ public interface Privilege {
     /** The privilege to revoke a role from the user or the group. */
     REVOKE_ROLE(0L, 1L << 32),
     /** The privilege to get a role */
-    GET_ROLE(0L, 1L << 33);
+    GET_ROLE(0L, 1L << 33),
+
+    TABULAR_SELECT(0L, 1L << 34),
+    TABULAR_UPDATE(0L, 1L << 35),
+    TABULAR_CREATE(0L, 1L << 36),
+    TABULAR_DROP(0L, 1L << 37),
+    TABULAR_ALTER(0L, 1L << 38),
+    TABULAR_INDEX(0L, 1L << 39),
+    TABULAR_LOCK(0L, 1L << 40),
+    TABULAR_READ(0L, 1L << 41),
+    TABULAR_WRITE(0L, 1L << 42),
+    TABULAR_REPL_ADMIN(0L, 1L << 43),
+    TABULAR_SERVICE_ADMIN(0L, 1L << 44),
+    /** Temporary UDF Admin */
+    TABULAR_TEMP_UDF_ADMIN(0L, 1L << 45),
+    TABULAR_REFRESH(0L, 1L << 46),
+    TABULAR_ALL(0L, 1L << 47),
+    ;
 
     private final long highBits;
     private final long lowBits;
@@ -138,11 +155,11 @@ public interface Privilege {
   }
 
   /**
-   * The condition of this privilege. `ALLOW` means that you are allowed to use the privilege,
+   * The access type of this privilege. `ALLOW` means that you are allowed to use the privilege,
    * `DENY` means that you are denied to use the privilege. If you have `ALLOW` and `DENY` for the
    * same privilege name of the same securable object, the `DENY` will take effect.
    */
-  enum Condition {
+  enum AccessType {
     /** Allow to use the privilege */
     ALLOW,
     /** Deny to use the privilege */
