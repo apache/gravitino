@@ -221,9 +221,9 @@ public class FilesetCatalog extends BaseSchemaCatalog
    */
   static void checkFilesetNamespace(Namespace namespace) {
     Namespace.check(
-            namespace != null && namespace.length() == 3,
-            "Fileset namespace must be non-null and have 3 level, the input namespace is %s",
-            namespace);
+        namespace != null && namespace.length() == 3,
+        "Fileset namespace must be non-null and have 3 level, the input namespace is %s",
+        namespace);
   }
 
   /**
@@ -234,7 +234,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
   static void checkFilesetNameIdentifer(NameIdentifier ident) {
     NameIdentifier.check(ident != null, "NameIdentifer must not be null");
     NameIdentifier.check(
-            ident.name() != null && !ident.name().isEmpty(), "NameIdentifer name must not be empty");
+        ident.name() != null && !ident.name().isEmpty(), "NameIdentifer name must not be empty");
     checkFilesetNamespace(ident.namespace());
   }
 

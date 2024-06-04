@@ -260,9 +260,9 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
    */
   static void checkTableNamespace(Namespace namespace) {
     Namespace.check(
-            namespace != null && namespace.length() == 3,
-            "Table namespace must be non-null and have 3 level, the input namespace is %s",
-            namespace);
+        namespace != null && namespace.length() == 3,
+        "Table namespace must be non-null and have 3 level, the input namespace is %s",
+        namespace);
   }
 
   /**
@@ -273,7 +273,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
   static void checkTableNameIdentifer(NameIdentifier ident) {
     NameIdentifier.check(ident != null, "NameIdentifer must not be null");
     NameIdentifier.check(
-            ident.name() != null && !ident.name().isEmpty(), "NameIdentifer name must not be empty");
+        ident.name() != null && !ident.name().isEmpty(), "NameIdentifer name must not be empty");
     checkTableNamespace(ident.namespace());
   }
 

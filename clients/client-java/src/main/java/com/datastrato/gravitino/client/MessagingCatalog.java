@@ -210,9 +210,9 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
    */
   static void checkTopicNamespace(Namespace namespace) {
     Namespace.check(
-            namespace != null && namespace.length() == 3,
-            "Topic namespace must be non-null and have 3 level, the input namespace is %s",
-            namespace);
+        namespace != null && namespace.length() == 3,
+        "Topic namespace must be non-null and have 3 level, the input namespace is %s",
+        namespace);
   }
 
   /**
@@ -223,7 +223,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
   static void checkTopicNameIdentifer(NameIdentifier ident) {
     NameIdentifier.check(ident != null, "NameIdentifer must not be null");
     NameIdentifier.check(
-            ident.name() != null && !ident.name().isEmpty(), "NameIdentifer name must not be empty");
+        ident.name() != null && !ident.name().isEmpty(), "NameIdentifer name must not be empty");
     checkTopicNamespace(ident.namespace());
   }
 
