@@ -99,10 +99,16 @@ it automatically.
 
 #### Start Gravitino server
 
-After configuring the Gravitino server, start the Gravitino server by running:
+After configuring the Gravitino server, start the Gravitino server on daemon by running:
 
 ```shell
 ./bin/gravitino.sh start
+```
+
+Alternatively, to run the Gravitino server in frontend, please run:
+
+```shell
+./bin/gravitino.sh run
 ```
 
 You can access the Gravitino Web UI by typing [http://localhost:8090](http://localhost:8090) in your browser. or you
