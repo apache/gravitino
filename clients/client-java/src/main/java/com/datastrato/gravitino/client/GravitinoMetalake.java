@@ -52,8 +52,8 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
   /**
    * List all the catalogs under this metalake.
    *
-   * @return A list of {@link NameIdentifier} of the catalogs under the specified namespace.
-   * @throws NoSuchMetalakeException if the metalake with specified namespace does not exist.
+   * @return A list of the catalog names under the current metalake.
+   * @throws NoSuchMetalakeException If the metalake does not exist.
    */
   @Override
   public String[] listCatalogs() throws NoSuchMetalakeException {
