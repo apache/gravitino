@@ -5,7 +5,7 @@
 #
 #set -ex
 USAGE="-e Usage: bin/gravitino.sh [--config <conf-dir>]\n\t
-        {start|stop|restart|status}"
+        {start|run|stop|restart|status}"
 
 if [[ "$1" == "--config" ]]; then
   shift
@@ -110,6 +110,10 @@ function start() {
   check_process_status
 }
 
+function run() {
+  ${JAVA_RUNNER} ${JAVA_OPTS} ${GRAVITINO_DEBUG_OPTS} -cp ${GRAVITINO_CLASSPATH} ${GRAVITINO_SERVER_NAME}
+}
+
 function stop() {
   local pid
 
@@ -163,6 +167,9 @@ addJarInDir "${GRAVITINO_HOME}/libs"
 case "${1}" in
   start)
     start
+    ;;
+  run)
+    run
     ;;
   stop)
     stop
