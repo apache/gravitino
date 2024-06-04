@@ -136,6 +136,18 @@ tasks.test {
   }
 }
 
+tasks.withType<Jar> {
+  archiveBaseName.set("spark-${sparkMajorVersion}_${scalaVersion}")
+}
+
+publishing {
+  publications {
+    withType<MavenPublication>().configureEach {
+      artifactId = "spark-${sparkMajorVersion}_$scalaVersion"
+    }
+  }
+}
+
 tasks.clean {
   delete("derby.log")
   delete("metastore_db")
