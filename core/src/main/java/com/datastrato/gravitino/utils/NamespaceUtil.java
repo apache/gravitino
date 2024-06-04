@@ -12,6 +12,8 @@ import com.google.errorprone.annotations.FormatString;
 /** Utility class for namespace. */
 public class NamespaceUtil {
 
+  private NamespaceUtil() {}
+
   /**
    * Create a namespace for metalake.
    *

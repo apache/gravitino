@@ -18,6 +18,8 @@ import com.google.errorprone.annotations.FormatString;
  */
 public class NameIdentifierUtil {
 
+  private NameIdentifierUtil() {}
+
   /**
    * Create the metalake {@link NameIdentifierUtil} with the given name.
    *
