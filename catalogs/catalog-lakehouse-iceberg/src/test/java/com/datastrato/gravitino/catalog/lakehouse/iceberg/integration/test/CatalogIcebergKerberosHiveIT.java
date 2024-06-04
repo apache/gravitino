@@ -121,7 +121,7 @@ public class CatalogIcebergKerberosHiveIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void stopTest() {
+  public static void stop() {
     // Reset the UGI
     UserGroupInformation.reset();
 
