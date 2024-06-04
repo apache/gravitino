@@ -54,9 +54,12 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
       RESTClient restClient) {
     super(name, type, provider, comment, properties, auditDTO);
     this.restClient = restClient;
-    Namespace.checkCatalog(namespace);
+    Namespace.check(
+        namespace != null && namespace.length() == 1,
+        "Catalog namespace must be non-null and have 1 level, the input namespace is %s",
+        namespace);
     this.namespace = namespace;
-    this.schemaNamespace = Namespace.ofSchema(namespace.level(0), name);
+    this.schemaNamespace = Namespace.of(namespace.level(0), name);
   }
 
   @Override

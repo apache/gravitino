@@ -13,7 +13,6 @@ import static com.datastrato.gravitino.integration.test.container.KafkaContainer
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.SchemaChange;
 import com.datastrato.gravitino.client.GravitinoMetalake;
@@ -23,6 +22,7 @@ import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.messaging.Topic;
 import com.datastrato.gravitino.messaging.TopicChange;
+import com.datastrato.gravitino.utils.NamespaceUtil;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -213,7 +213,7 @@ public class CatalogKafkaIT extends AbstractIT {
                 kafka
                     .asTopicCatalog()
                     .listTopics(
-                        Namespace.ofTopic(METALAKE_NAME, catalogName2, DEFAULT_SCHEMA_NAME)));
+                        NamespaceUtil.ofTopic(METALAKE_NAME, catalogName2, DEFAULT_SCHEMA_NAME)));
     Assertions.assertTrue(
         exception
             .getMessage()
@@ -293,7 +293,7 @@ public class CatalogKafkaIT extends AbstractIT {
     NameIdentifier[] topics =
         catalog
             .asTopicCatalog()
-            .listTopics(Namespace.ofTopic(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME));
+            .listTopics(NamespaceUtil.ofTopic(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME));
     Assertions.assertTrue(topics.length > 0);
     Assertions.assertTrue(
         ImmutableList.copyOf(topics).stream().anyMatch(topic -> topic.name().equals(topicName)));
@@ -414,7 +414,7 @@ public class CatalogKafkaIT extends AbstractIT {
     NameIdentifier[] topics =
         catalog
             .asTopicCatalog()
-            .listTopics(Namespace.ofTopic(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME));
+            .listTopics(NamespaceUtil.ofTopic(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME));
     Assertions.assertTrue(
         Arrays.stream(topics).anyMatch(topic -> topic.name().equals(illegalName)));
 
