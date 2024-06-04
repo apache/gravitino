@@ -18,7 +18,7 @@ The Gravitino Spark connector offers the capability to read and write Iceberg ta
 - `ALTER TABLE`
 - `INSERT INTO&OVERWRITE`
 - `SELECT`
-- `MERGE INOT`
+- `MERGE INTO`
 - `DELETE FROM`
 - `UPDATE`
 - `CALL`

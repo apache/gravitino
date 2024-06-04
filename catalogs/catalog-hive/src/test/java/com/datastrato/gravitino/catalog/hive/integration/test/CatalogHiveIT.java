@@ -201,10 +201,10 @@ public class CatalogHiveIT extends AbstractIT {
   public static void stop() throws IOException {
     if (client != null) {
       Arrays.stream(catalog.asSchemas().listSchemas())
-          .filter(ident -> !ident.name().equals("default"))
+          .filter(schema -> !schema.equals("default"))
           .forEach(
-              (ident -> {
-                catalog.asSchemas().dropSchema(ident.name(), true);
+              (schema -> {
+                catalog.asSchemas().dropSchema(schema, true);
               }));
       Arrays.stream(metalake.listCatalogs())
           .forEach(
