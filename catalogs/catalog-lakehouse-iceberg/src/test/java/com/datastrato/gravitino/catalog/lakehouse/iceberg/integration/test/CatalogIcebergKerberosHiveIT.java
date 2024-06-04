@@ -130,7 +130,6 @@ public class CatalogIcebergKerberosHiveIT extends AbstractIT {
     System.clearProperty("java.security.krb5.conf");
     System.clearProperty("sun.security.krb5.debug");
 
-    AbstractIT.customConfigs.clear();
     AbstractIT.client = null;
   }
 
