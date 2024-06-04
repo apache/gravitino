@@ -59,4 +59,44 @@ public class TestDistributionDTO {
                 JsonUtils.objectMapper().writeValueAsString(distributionDTO),
                 DistributionDTO.class));
   }
+
+  @Test
+  void testDistributionDTOEqualsReturnsTrue() {
+
+    DistributionDTO distributionDTO =
+        new DistributionDTO.Builder()
+            .withNumber(10)
+            .withStrategy(Strategy.HASH)
+            .withArgs(FieldReferenceDTO.of("a"))
+            .build();
+
+    DistributionDTO distributionDTOOther =
+        new DistributionDTO.Builder()
+            .withNumber(10)
+            .withStrategy(Strategy.HASH)
+            .withArgs(FieldReferenceDTO.of("a"))
+            .build();
+
+    Assertions.assertEquals(distributionDTO, distributionDTOOther);
+  }
+
+  @Test
+  void testDistributionDTOEqualsReturnsFalse() {
+
+    DistributionDTO distributionDTO =
+        new DistributionDTO.Builder()
+            .withNumber(10)
+            .withStrategy(Strategy.HASH)
+            .withArgs(FieldReferenceDTO.of("a"))
+            .build();
+
+    DistributionDTO distributionDTOOther =
+        new DistributionDTO.Builder()
+            .withNumber(10)
+            .withStrategy(Strategy.HASH)
+            .withArgs(FieldReferenceDTO.of("b"))
+            .build();
+
+    Assertions.assertNotEquals(distributionDTO, distributionDTOOther);
+  }
 }
