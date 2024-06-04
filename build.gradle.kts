@@ -728,8 +728,8 @@ fun printMacDockerTip() {
 }
 
 fun checkMacDockerConnector() {
-  if (OperatingSystem.current().isLinux()) {
-    // Linux does not require the use of `docker-connector`
+  if (!OperatingSystem.current().isMacOsX()) {
+    // Only MacOs requires the use of `docker-connector`
     return
   }
 
@@ -764,7 +764,7 @@ fun checkDockerStatus() {
 }
 
 fun checkOrbStackStatus() {
-  if (OperatingSystem.current().isLinux()) {
+  if (!OperatingSystem.current().isMacOsX()) {
     return
   }
 
