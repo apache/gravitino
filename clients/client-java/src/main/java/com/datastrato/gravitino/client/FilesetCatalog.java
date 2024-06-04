@@ -65,7 +65,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
    */
   @Override
   public NameIdentifier[] listFilesets(Namespace namespace) throws NoSuchSchemaException {
-    checkNamespace(namespace);
+    checkFilesetNamespace(namespace);
 
     EntityListResponse resp =
         restClient.get(
@@ -87,7 +87,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
    */
   @Override
   public Fileset loadFileset(NameIdentifier ident) throws NoSuchFilesetException {
-    checkNameIdentifer(ident);
+    checkFilesetNameIdentifer(ident);
     FilesetResponse resp =
         restClient.get(
             formatFilesetRequestPath(ident.namespace())
@@ -126,7 +126,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
       String storageLocation,
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
-    checkNameIdentifer(ident);
+    checkFilesetNameIdentifer(ident);
     FilesetCreateRequest req =
         FilesetCreateRequest.builder()
             .name(RESTUtils.encodeString(ident.name()))
@@ -160,7 +160,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
   @Override
   public Fileset alterFileset(NameIdentifier ident, FilesetChange... changes)
       throws NoSuchFilesetException, IllegalArgumentException {
-    checkNameIdentifer(ident);
+    checkFilesetNameIdentifer(ident);
     List<FilesetUpdateRequest> updates =
         Arrays.stream(changes)
             .map(DTOConverters::toFilesetUpdateRequest)
@@ -191,7 +191,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
    */
   @Override
   public boolean dropFileset(NameIdentifier ident) {
-    checkNameIdentifer(ident);
+    checkFilesetNameIdentifer(ident);
     DropResponse resp =
         restClient.delete(
             formatFilesetRequestPath(ident.namespace()) + "/" + ident.name(),
@@ -212,6 +212,30 @@ public class FilesetCatalog extends BaseSchemaCatalog
         .append(RESTUtils.encodeString(ns.level(2)))
         .append("/filesets")
         .toString();
+  }
+
+  /**
+   * Check whether the namespace of a fileset is valid
+   *
+   * @param namespace The namespace to check
+   */
+  static void checkFilesetNamespace(Namespace namespace) {
+    Namespace.check(
+            namespace != null && namespace.length() == 3,
+            "Fileset namespace must be non-null and have 3 level, the input namespace is %s",
+            namespace);
+  }
+
+  /**
+   * Check whether the NameIdentifier of a fileset is valid
+   *
+   * @param ident The NameIdentifier to check
+   */
+  static void checkFilesetNameIdentifer(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "NameIdentifer must not be null");
+    NameIdentifier.check(
+            ident.name() != null && !ident.name().isEmpty(), "NameIdentifer name must not be empty");
+    checkFilesetNamespace(ident.namespace());
   }
 
   /**

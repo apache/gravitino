@@ -69,7 +69,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
    */
   @Override
   public NameIdentifier[] listTopics(Namespace namespace) throws NoSuchSchemaException {
-    checkNamespace(namespace);
+    checkTopicNamespace(namespace);
 
     EntityListResponse resp =
         restClient.get(
@@ -92,7 +92,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
    */
   @Override
   public Topic loadTopic(NameIdentifier ident) throws NoSuchTopicException {
-    checkNameIdentifer(ident);
+    checkTopicNameIdentifer(ident);
 
     TopicResponse resp =
         restClient.get(
@@ -122,7 +122,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
   public Topic createTopic(
       NameIdentifier ident, String comment, DataLayout dataLayout, Map<String, String> properties)
       throws NoSuchSchemaException, TopicAlreadyExistsException {
-    checkNameIdentifer(ident);
+    checkTopicNameIdentifer(ident);
 
     TopicCreateRequest req =
         TopicCreateRequest.builder()
@@ -155,7 +155,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
   @Override
   public Topic alterTopic(NameIdentifier ident, TopicChange... changes)
       throws NoSuchTopicException, IllegalArgumentException {
-    checkNameIdentifer(ident);
+    checkTopicNameIdentifer(ident);
 
     List<TopicUpdateRequest> updates =
         Arrays.stream(changes)
@@ -184,7 +184,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
    */
   @Override
   public boolean dropTopic(NameIdentifier ident) {
-    checkNameIdentifer(ident);
+    checkTopicNameIdentifer(ident);
 
     DropResponse resp =
         restClient.delete(
@@ -201,6 +201,30 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
   static String formatTopicRequestPath(Namespace ns) {
     Namespace schemaNs = Namespace.of(ns.level(0), ns.level(1));
     return formatSchemaRequestPath(schemaNs) + "/" + ns.level(2) + "/topics";
+  }
+
+  /**
+   * Check whether the namespace of a topic is valid
+   *
+   * @param namespace The namespace to check
+   */
+  static void checkTopicNamespace(Namespace namespace) {
+    Namespace.check(
+            namespace != null && namespace.length() == 3,
+            "Topic namespace must be non-null and have 3 level, the input namespace is %s",
+            namespace);
+  }
+
+  /**
+   * Check whether the NameIdentifier of a topic is valid
+   *
+   * @param ident The NameIdentifier to check
+   */
+  static void checkTopicNameIdentifer(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "NameIdentifer must not be null");
+    NameIdentifier.check(
+            ident.name() != null && !ident.name().isEmpty(), "NameIdentifer name must not be empty");
+    checkTopicNamespace(ident.namespace());
   }
 
   static class Builder extends CatalogDTO.Builder<Builder> {
