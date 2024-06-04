@@ -47,7 +47,6 @@ publishing {
   }
 }
 
-
 tasks.jar {
   dependsOn(tasks.named("shadowJar"))
   archiveClassifier.set("empty")

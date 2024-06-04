@@ -137,7 +137,7 @@ tasks.test {
 }
 
 tasks.withType<Jar> {
-  archiveBaseName.set("spark-${sparkMajorVersion}_${scalaVersion}")
+  archiveBaseName.set("spark-${sparkMajorVersion}_$scalaVersion")
 }
 
 publishing {

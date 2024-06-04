@@ -136,13 +136,13 @@ tasks.test {
 }
 
 tasks.withType<Jar> {
-  archiveBaseName.set("spark-${sparkMajorVersion}_${scalaVersion}")
+  archiveBaseName.set("spark-${sparkMajorVersion}_$scalaVersion")
 }
 
 publishing {
   publications {
     withType<MavenPublication>().configureEach {
-      artifactId = "spark-${sparkMajorVersion}_${scalaVersion}"
+      artifactId = "spark-${sparkMajorVersion}_$scalaVersion"
     }
   }
 }
