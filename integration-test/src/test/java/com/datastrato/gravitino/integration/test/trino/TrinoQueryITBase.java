@@ -16,7 +16,6 @@ import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.TrinoITContainers;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.rel.TableCatalog;
-import com.datastrato.gravitino.utils.NamespaceUtil;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
