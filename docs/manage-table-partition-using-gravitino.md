@@ -255,7 +255,7 @@ GravitinoClient gravitinoClient = GravitinoClient
 // Assume that you have a partitioned table named "metalake.catalog.schema.table".
 Partition addedPartition = 
     gravitinoClient
-        .loadCatalog(NameIdentifier.of("metalake", "catalog"))
+        .loadCatalog("catalog")
         .asTableCatalog()
         .loadTable(NameIdentifier.of("metalake", "catalog", "schema", "table"))
         .supportPartitions()
@@ -300,7 +300,7 @@ GravitinoClient gravitinoClient = GravitinoClient
 // Assume that you have a partitioned table named "metalake.catalog.schema.table".
 Partition Partition = 
     gravitinoClient
-        .loadCatalog(NameIdentifier.of("metalake", "catalog"))
+        .loadCatalog("catalog")
         .asTableCatalog()
         .loadTable(NameIdentifier.of("metalake", "catalog", "schema", "table"))
         .supportPartitions()
@@ -336,7 +336,7 @@ GravitinoClient gravitinoClient = GravitinoClient
 // Assume that you have a partitioned table named "metalake.catalog.schema.table".
 String[] partitionNames = 
     gravitinoClient
-        .loadCatalog(NameIdentifier.of("metalake", "catalog"))
+        .loadCatalog("catalog")
         .asTableCatalog()
         .loadTable(NameIdentifier.of("metalake", "catalog", "schema", "table"))
         .supportPartitions()
@@ -367,7 +367,7 @@ http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tab
 // Assume that you have a partitioned table named "metalake.catalog.schema.table".
 Partition[] partitions =
         gravitinoClient
-            .loadCatalog(NameIdentifier.of("metalake", "catalog"))
+            .loadCatalog("catalog")
             .asTableCatalog()
             .loadTable(NameIdentifier.of("metalake", "catalog", "schema", "table"))
             .supportPartitions()
@@ -407,7 +407,7 @@ GravitinoClient gravitinoClient = GravitinoClient
 // Assume that you have a partitioned table named "metalake.catalog.schema.table".
 Partition Partition = 
     gravitinoClient
-        .loadCatalog(NameIdentifier.of("metalake", "catalog"))
+        .loadCatalog("catalog")
         .asTableCatalog()
         .loadTable(NameIdentifier.of("metalake", "catalog", "schema", "table"))
         .supportPartitions()

@@ -69,8 +69,7 @@ Map<String, String> properties = ImmutableMap.<String, String>builder()
     // a storage location will be stored under this location.
     .build();
 
-Catalog catalog = gravitinoClient.createCatalog(
-    NameIdentifier.of("metalake", "catalog"),
+Catalog catalog = gravitinoClient.createCatalog("catalog",
     Type.FILESET,
     "hadoop", // provider, Gravitino only supports "hadoop" for now.
     "This is a Hadoop fileset catalog",
@@ -167,7 +166,7 @@ GravitinoClient gravitinoClient = GravitinoClient
     .build();
 
 // Assuming you have just created a Hadoop catalog named `catalog`
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+Catalog catalog = gravitinoClient.loadCatalog("catalog");
 
 SupportsSchemas supportsSchemas = catalog.asSchemas();
 
@@ -176,8 +175,7 @@ Map<String, String> schemaProperties = ImmutableMap.<String, String>builder()
     // specifying storage location will be stored under this location.
     .put("location", "file:/tmp/root/schema")
     .build();
-Schema schema = supportsSchemas.createSchema(
-    NameIdentifier.of("metalake", "catalog", "schema"),
+Schema schema = supportsSchemas.createSchema("schema",
     "This is a schema",
     schemaProperties
 );
@@ -270,7 +268,7 @@ GravitinoClient gravitinoClient = GravitinoClient
     .withMetalake("metalake")
     .build();
 
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+Catalog catalog = gravitinoClient.loadCatalog("catalog");
 FilesetCatalog filesetCatalog = catalog.asFilesetCatalog();
 
 Map<String, String> propertiesMap = ImmutableMap.<String, String>builder()
@@ -362,7 +360,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 // ...
 // Assuming you have just created a Fileset catalog named `catalog`
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+Catalog catalog = gravitinoClient.loadCatalog("catalog");
 
 FilesetCatalog filesetCatalog = catalog.asFilesetCatalog();
 
@@ -419,7 +417,7 @@ http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/fil
 ```java
 // ...
 // Assuming you have just created a Fileset catalog named `catalog`
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+Catalog catalog = gravitinoClient.loadCatalog("catalog");
 
 FilesetCatalog filesetCatalog = catalog.asFilesetCatalog();
 
@@ -464,7 +462,7 @@ http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/fil
 
 ```java
 // ...
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+Catalog catalog = gravitinoClient.loadCatalog("catalog");
 
 FilesetCatalog filesetCatalog = catalog.asFilesetCatalog();
 NameIdentifier[] identifiers =

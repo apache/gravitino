@@ -59,8 +59,7 @@ Map<String, String> properties = ImmutableMap.<String, String>builder()
     .put("bootstrap.servers", "localhost:9092")
     .build();
 
-Catalog catalog = gravitinoClient.createCatalog(
-    NameIdentifier.of("metalake", "catalog"),
+Catalog catalog = gravitinoClient.createCatalog("catalog",
     Type.MESSAGING,
     "kafka", // provider, Gravitino only supports "kafka" for now.
     "This is a Kafka catalog",
@@ -172,7 +171,7 @@ GravitinoClient gravitinoClient = GravitinoClient
     .withMetalake("metalake")
     .build();
 
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+Catalog catalog = gravitinoClient.loadCatalog("catalog");
 TopicCatalog topicCatalog = catalog.asTopicCatalog();
 
 Map<String, String> propertiesMap = ImmutableMap.<String, String>builder()
@@ -222,7 +221,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 // ...
 // Assuming you have just created a Kafka catalog named `catalog`
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+Catalog catalog = gravitinoClient.loadCatalog("catalog");
 
 TopicCatalog topicCatalog = catalog.asTopicCatalog();
 
@@ -263,7 +262,7 @@ http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/default/to
 ```java
 // ...
 // Assuming you have just created a Kafka catalog named `catalog`
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+Catalog catalog = gravitinoClient.loadCatalog("catalog");
 
 TopicCatalog topicCatalog = catalog.asTopicCatalog();
 
@@ -295,7 +294,7 @@ http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/top
 
 ```java
 // ...
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+Catalog catalog = gravitinoClient.loadCatalog("catalog");
 
 TopicCatalog topicCatalog = catalog.asTopicCatalog();
 NameIdentifier[] identifiers =
