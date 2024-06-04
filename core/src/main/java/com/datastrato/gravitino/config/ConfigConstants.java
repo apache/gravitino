@@ -34,4 +34,6 @@ public final class ConfigConstants {
   public static final String VERSION_0_5_0 = "0.5.0";
   /** The version number for the 0.5.1 release. */
   public static final String VERSION_0_5_1 = "0.5.1";
+
+  public static final String VERSION_0_6_0 = "0.6.0";
 }
