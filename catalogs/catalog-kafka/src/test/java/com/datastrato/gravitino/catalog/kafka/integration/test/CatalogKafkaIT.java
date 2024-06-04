@@ -101,10 +101,10 @@ public class CatalogKafkaIT extends AbstractIT {
   public static void shutdown() {
     Catalog catalog = metalake.loadCatalog(CATALOG_NAME);
     Arrays.stream(catalog.asSchemas().listSchemas())
-        .filter(ident -> !ident.name().equals("default"))
+        .filter(ident -> !ident.equals("default"))
         .forEach(
             (ident -> {
-              catalog.asSchemas().dropSchema(ident.name(), true);
+              catalog.asSchemas().dropSchema(ident, true);
             }));
     Arrays.stream(metalake.listCatalogs())
         .forEach(
@@ -223,9 +223,9 @@ public class CatalogKafkaIT extends AbstractIT {
 
   @Test
   public void testDefaultSchema() {
-    NameIdentifier[] schemas = catalog.asSchemas().listSchemas();
+    String[] schemas = catalog.asSchemas().listSchemas();
     Assertions.assertEquals(1, schemas.length);
-    Assertions.assertEquals(DEFAULT_SCHEMA_NAME, schemas[0].name());
+    Assertions.assertEquals(DEFAULT_SCHEMA_NAME, schemas[0]);
 
     Schema loadSchema = catalog.asSchemas().loadSchema(DEFAULT_SCHEMA_NAME);
     Assertions.assertEquals(
@@ -262,9 +262,9 @@ public class CatalogKafkaIT extends AbstractIT {
 
   @Test
   public void testListSchema() {
-    NameIdentifier[] schemas = catalog.asSchemas().listSchemas();
+    String[] schemas = catalog.asSchemas().listSchemas();
     Assertions.assertEquals(1, schemas.length);
-    Assertions.assertEquals(DEFAULT_SCHEMA_NAME, schemas[0].name());
+    Assertions.assertEquals(DEFAULT_SCHEMA_NAME, schemas[0]);
   }
 
   @Test

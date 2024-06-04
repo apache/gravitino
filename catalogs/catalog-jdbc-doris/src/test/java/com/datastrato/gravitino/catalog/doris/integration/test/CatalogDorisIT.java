@@ -35,10 +35,9 @@ import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -185,20 +184,16 @@ public class CatalogDorisIT extends AbstractIT {
     SupportsSchemas schemas = catalog.asSchemas();
 
     // test list schemas
-    NameIdentifier[] nameIdentifiers = schemas.listSchemas();
-    Set<String> schemaNames =
-        Arrays.stream(nameIdentifiers).map(NameIdentifier::name).collect(Collectors.toSet());
-    Assertions.assertTrue(schemaNames.contains(schemaName));
+    String[] schemaNames = schemas.listSchemas();
+    Assertions.assertTrue(Arrays.asList(schemaNames).contains(schemaName));
 
     // test create schema already exists
     String testSchemaName = GravitinoITUtils.genRandomName("create_schema_test");
     NameIdentifier schemaIdent = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
     schemas.createSchema(schemaIdent.name(), schema_comment, Collections.emptyMap());
 
-    nameIdentifiers = schemas.listSchemas();
-    Map<String, NameIdentifier> schemaMap =
-        Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v -> v));
-    Assertions.assertTrue(schemaMap.containsKey(testSchemaName));
+    List<String> schemaNameList = Arrays.asList(schemas.listSchemas());
+    Assertions.assertTrue(schemaNameList.contains(testSchemaName));
 
     Assertions.assertThrows(
         SchemaAlreadyExistsException.class,
@@ -215,10 +210,8 @@ public class CatalogDorisIT extends AbstractIT {
         NoSuchSchemaException.class, () -> schemas.loadSchema(schemaIdent.name()));
 
     // 2. check by list schema
-    nameIdentifiers = schemas.listSchemas();
-    schemaMap =
-        Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v -> v));
-    Assertions.assertFalse(schemaMap.containsKey(testSchemaName));
+    schemaNameList = Arrays.asList(schemas.listSchemas());
+    Assertions.assertFalse(schemaNameList.contains(testSchemaName));
 
     // test drop schema not exists
     NameIdentifier notExistsSchemaIdent = NameIdentifier.of(metalakeName, catalogName, "no-exits");

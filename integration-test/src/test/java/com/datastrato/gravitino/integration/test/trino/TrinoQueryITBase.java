@@ -185,36 +185,36 @@ public class TrinoQueryITBase {
     Catalog catalog = metalake.loadCatalog(catalogName);
     SupportsSchemas schemas = catalog.asSchemas();
     Arrays.stream(schemas.listSchemas())
-        .filter(schema -> schema.name().startsWith("gt_"))
+        .filter(schema -> schema.startsWith("gt_"))
         .forEach(
             schema -> {
               try {
                 TableCatalog tableCatalog = catalog.asTableCatalog();
                 Arrays.stream(
                         tableCatalog.listTables(
-                            Namespace.ofTable(metalakeName, catalogName, schema.name())))
+                            Namespace.ofTable(metalakeName, catalogName, schema)))
                     .forEach(
                         table -> {
                           boolean dropped =
                               tableCatalog.dropTable(
                                   NameIdentifier.ofTable(
-                                      metalakeName, catalogName, schema.name(), table.name()));
+                                      metalakeName, catalogName, schema, table.name()));
                           LOG.info(
                               "Drop table \"{}.{}\".{}.{}",
                               metalakeName,
                               catalogName,
-                              schema.name(),
+                              schema,
                               table.name());
                           if (!dropped) {
                             LOG.error("Failed to drop table {}", table);
                           }
                         });
 
-                schemas.dropSchema(schema.name(), false);
+                schemas.dropSchema(schema, false);
               } catch (Exception e) {
                 LOG.error("Failed to drop schema {}", schema);
               }
-              LOG.info("Drop schema \"{}.{}\".{}", metalakeName, catalogName, schema.name());
+              LOG.info("Drop schema \"{}.{}\".{}", metalakeName, catalogName, schema);
             });
 
     metalake.dropCatalog(catalogName);

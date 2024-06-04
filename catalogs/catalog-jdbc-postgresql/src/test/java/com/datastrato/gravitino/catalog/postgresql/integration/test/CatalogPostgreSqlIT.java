@@ -44,6 +44,7 @@ import com.datastrato.gravitino.rel.types.Types;
 import com.datastrato.gravitino.rel.types.Types.IntegerType;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -108,9 +109,9 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   @AfterAll
   public void stop() {
     clearTableAndSchema();
-    NameIdentifier[] schemaIdentifiers = catalog.asSchemas().listSchemas();
-    for (NameIdentifier nameIdentifier : schemaIdentifiers) {
-      catalog.asSchemas().dropSchema(nameIdentifier.name(), true);
+    String[] schemaNames = catalog.asSchemas().listSchemas();
+    for (String schemaName : schemaNames) {
+      catalog.asSchemas().dropSchema(schemaName, true);
     }
     metalake.dropCatalog(catalogName);
     client.dropMetalake(metalakeName);
@@ -289,9 +290,8 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     SupportsSchemas schemas = catalog.asSchemas();
     Namespace namespace = Namespace.of(metalakeName, catalogName);
     // list schema check.
-    NameIdentifier[] nameIdentifiers = schemas.listSchemas();
-    Set<String> schemaNames =
-        Arrays.stream(nameIdentifiers).map(NameIdentifier::name).collect(Collectors.toSet());
+    String[] nameIdentifiers = schemas.listSchemas();
+    Set<String> schemaNames = Sets.newHashSet(nameIdentifiers);
     Assertions.assertTrue(schemaNames.contains(schemaName));
 
     NameIdentifier[] postgreSqlNamespaces = postgreSqlService.listSchemas(namespace);
@@ -304,9 +304,8 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     NameIdentifier schemaIdent = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
     schemas.createSchema(schemaIdent.name(), schema_comment, Collections.emptyMap());
     nameIdentifiers = schemas.listSchemas();
-    Map<String, NameIdentifier> schemaMap =
-        Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v -> v));
-    Assertions.assertTrue(schemaMap.containsKey(testSchemaName));
+    schemaNames = Sets.newHashSet(nameIdentifiers);
+    Assertions.assertTrue(schemaNames.contains(testSchemaName));
 
     postgreSqlNamespaces = postgreSqlService.listSchemas(namespace);
     schemaNames =
@@ -328,9 +327,8 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         NoSuchSchemaException.class, () -> postgreSqlService.loadSchema(schemaIdent));
 
     nameIdentifiers = schemas.listSchemas();
-    schemaMap =
-        Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v -> v));
-    Assertions.assertFalse(schemaMap.containsKey(testSchemaName));
+    schemaNames = Sets.newHashSet(nameIdentifiers);
+    Assertions.assertFalse(schemaNames.contains(testSchemaName));
     Assertions.assertFalse(schemas.dropSchema("no_exits", false));
     TableCatalog tableCatalog = catalog.asTableCatalog();
 
@@ -545,9 +543,8 @@ public class CatalogPostgreSqlIT extends AbstractIT {
 
   @Test
   void testListSchema() {
-    NameIdentifier[] nameIdentifiers = catalog.asSchemas().listSchemas();
-    Set<String> schemaNames =
-        Arrays.stream(nameIdentifiers).map(NameIdentifier::name).collect(Collectors.toSet());
+    String[] nameIdentifiers = catalog.asSchemas().listSchemas();
+    Set<String> schemaNames = Sets.newHashSet(nameIdentifiers);
     Assertions.assertTrue(schemaNames.contains("public"));
   }
 
@@ -1216,11 +1213,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
       Assertions.assertNotNull(schemaSupport.loadSchema(schema));
     }
 
-    Set<String> schemaNames =
-        Arrays.stream(schemaSupport.listSchemas())
-            .map(NameIdentifier::name)
-            .collect(Collectors.toSet());
-
+    Set<String> schemaNames = Sets.newHashSet(schemaSupport.listSchemas());
     Assertions.assertTrue(schemaNames.containsAll(Arrays.asList(schemas)));
 
     String tableName = "test1";

@@ -92,7 +92,7 @@ public class TestMultipleJDBCLoad extends AbstractIT {
             "comment",
             icebergMysqlConf);
 
-    NameIdentifier[] nameIdentifiers = mysqlCatalog.asSchemas().listSchemas();
+    String[] nameIdentifiers = mysqlCatalog.asSchemas().listSchemas();
     Assertions.assertEquals(0, nameIdentifiers.length);
     nameIdentifiers = postgreSqlCatalog.asSchemas().listSchemas();
     Assertions.assertEquals(0, nameIdentifiers.length);
