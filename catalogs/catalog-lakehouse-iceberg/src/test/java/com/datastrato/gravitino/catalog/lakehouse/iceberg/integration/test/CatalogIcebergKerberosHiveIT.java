@@ -8,7 +8,6 @@ import static com.datastrato.gravitino.catalog.lakehouse.iceberg.backend.Kerbero
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.backend.KerberosConfig.KET_TAB_URI_KEY;
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.backend.KerberosConfig.PRINCIPAL_KEY;
 import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
-import static com.datastrato.gravitino.integration.test.util.ITUtils.EMBEDDED_TEST_MODE;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION;
 
@@ -240,15 +239,6 @@ public class CatalogIcebergKerberosHiveIT extends AbstractIT {
             Exception.class,
             () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
     String exceptionMessage = Throwables.getStackTraceAsString(exception);
-
-    if (!AbstractIT.testMode.equals(EMBEDDED_TEST_MODE)) {
-      LOG.info("Start yuqi-xxx log");
-      LOG.info("Exception message: {}", exceptionMessage);
-      LOG.info("end yuqi-xxx log");
-      File f = new File(System.getenv("GRAVITINO_HOME") + "/conf/gravitino.conf");
-      String configContent = FileUtils.readFileToString(f, StandardCharsets.UTF_8);
-      LOG.info("configContent: {}", configContent);
-    }
 
     // Make sure real user is 'gravitino_client'
     Assertions.assertTrue(
