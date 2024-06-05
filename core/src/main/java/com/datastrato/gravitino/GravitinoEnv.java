@@ -122,6 +122,16 @@ public class GravitinoEnv {
   }
 
   /**
+   * This method is used for testing purposes only to set the metalake dispatcher for test.
+   *
+   * @param metalakeDispatcher The metalake dispatcher to be set.
+   */
+  @VisibleForTesting
+  public void setMetalakeDispatcher(MetalakeDispatcher metalakeDispatcher) {
+    this.metalakeDispatcher = metalakeDispatcher;
+  }
+
+  /**
    * This method is used for testing purposes only to set the access manager for test in package
    * `com.datastrato.gravitino.server.web.rest`.
    *
@@ -130,6 +140,46 @@ public class GravitinoEnv {
   @VisibleForTesting
   public void setCatalogDispatcher(CatalogDispatcher catalogDispatcher) {
     this.catalogDispatcher = catalogDispatcher;
+  }
+
+  /**
+   * This method is used for testing purposes only to set the schema dispatcher for test.
+   *
+   * @param schemaDispatcher The schema dispatcher to be set.
+   */
+  @VisibleForTesting
+  public void setSchemaDispatcher(SchemaDispatcher schemaDispatcher) {
+    this.schemaDispatcher = schemaDispatcher;
+  }
+
+  /**
+   * This method is used for testing purposes only to set the table dispatcher for test.
+   *
+   * @param tableDispatcher The table dispatcher to be set.
+   */
+  @VisibleForTesting
+  public void setTableDispatcher(TableDispatcher tableDispatcher) {
+    this.tableDispatcher = tableDispatcher;
+  }
+
+  /**
+   * This method is used for testing purposes only to set the topic dispatcher for test.
+   *
+   * @param topicDispatcher The topic dispatcher to be set.
+   */
+  @VisibleForTesting
+  public void setTopicDispatcher(TopicDispatcher topicDispatcher) {
+    this.topicDispatcher = topicDispatcher;
+  }
+
+  /**
+   * This method is used for testing purposes only to set the filset dispatcher for test.
+   *
+   * @param filesetDispatcher The fileset dispatcher to be set.
+   */
+  @VisibleForTesting
+  public void setFilesetDispatcher(FilesetDispatcher filesetDispatcher) {
+    this.filesetDispatcher = filesetDispatcher;
   }
 
   /**

@@ -9,6 +9,7 @@ import static com.datastrato.gravitino.StringIdentifier.fromProperties;
 import static com.datastrato.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 
 import com.datastrato.gravitino.EntityStore;
+import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
@@ -79,8 +80,12 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
       return topic;
     }
 
-    TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(ident.namespace().levels()), LockType.WRITE, () -> importTopic(ident));
+    if (GravitinoEnv.getInstance()
+        .schemaDispatcher()
+        .schemaExists(NameIdentifier.of(ident.namespace().levels()))) {
+      TreeLockUtils.doWithTreeLock(
+          NameIdentifier.of(ident.namespace().levels()), LockType.WRITE, () -> importTopic(ident));
+    }
     return topic;
   }
 
@@ -219,15 +224,12 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
             "UPDATE",
             getStringIdFromProperties(alteredTopic.properties()).id());
 
-    boolean imported = updatedTopicEntity != null;
-
     return EntityCombinedTopic.of(alteredTopic, updatedTopicEntity)
         .withHiddenPropertiesSet(
             getHiddenPropertyNames(
                 catalogIdent,
                 HasPropertyMetadata::topicPropertiesMetadata,
-                alteredTopic.properties()))
-        .withImported(imported);
+                alteredTopic.properties()));
   }
 
   /**

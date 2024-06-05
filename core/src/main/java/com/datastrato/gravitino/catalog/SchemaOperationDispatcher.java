@@ -214,8 +214,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
               getHiddenPropertyNames(
                   catalogIdent,
                   HasPropertyMetadata::schemaPropertiesMetadata,
-                  alteredSchema.properties()))
-          .withImported(true);
+                  alteredSchema.properties()));
     }
 
     StringIdentifier stringId = getStringIdFromProperties(alteredSchema.properties());
@@ -226,8 +225,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
               getHiddenPropertyNames(
                   catalogIdent,
                   HasPropertyMetadata::schemaPropertiesMetadata,
-                  alteredSchema.properties()))
-          .withImported(isEntityExist(ident));
+                  alteredSchema.properties()));
     }
 
     SchemaEntity updatedSchemaEntity =
@@ -255,15 +253,12 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             "UPDATE",
             stringId.id());
 
-    boolean imported = updatedSchemaEntity != null;
-
     return EntityCombinedSchema.of(alteredSchema, updatedSchemaEntity)
         .withHiddenPropertiesSet(
             getHiddenPropertyNames(
                 catalogIdent,
                 HasPropertyMetadata::schemaPropertiesMetadata,
-                alteredSchema.properties()))
-        .withImported(imported);
+                alteredSchema.properties()));
   }
 
   /**

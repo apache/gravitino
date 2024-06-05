@@ -14,9 +14,6 @@ import com.datastrato.gravitino.authorization.Privilege;
 import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.SecurableObjects;
-import com.datastrato.gravitino.catalog.SchemaDispatcher;
-import com.datastrato.gravitino.catalog.TableDispatcher;
-import com.datastrato.gravitino.catalog.TopicDispatcher;
 import com.datastrato.gravitino.dto.authorization.SecurableObjectDTO;
 import com.datastrato.gravitino.dto.requests.RoleCreateRequest;
 import com.datastrato.gravitino.dto.responses.DeleteResponse;
@@ -43,6 +40,7 @@ import org.slf4j.LoggerFactory;
 @Path("/metalakes/{metalake}/roles")
 public class RoleOperations {
   private static final Logger LOG = LoggerFactory.getLogger(RoleOperations.class);
+  private static final String ALL_METALAKES = "*";
 
   private final AccessControlManager accessControlManager;
 
@@ -86,7 +84,7 @@ public class RoleOperations {
           "The size of securable objects must be 1");
 
       for (SecurableObjectDTO object : request.getSecurableObjects()) {
-        checkSecurableObjects(metalake, object);
+        checkSecurableObject(metalake, object);
       }
 
       return Utils.doAs(
@@ -146,11 +144,15 @@ public class RoleOperations {
   }
 
   // Check every securable object whether exists and is imported.
-  private void checkSecurableObjects(String metalake, SecurableObjectDTO object) {
+  static void checkSecurableObject(String metalake, SecurableObjectDTO object) {
     NameIdentifier identifier;
 
     // Securable object ignores the metalake namespace, so we should add it back.
     if (object.type() == MetadataObject.Type.METALAKE) {
+      // All metalakes don't need to check the securable object whether exists.
+      if (object.name().equals(ALL_METALAKES)) {
+        return;
+      }
       identifier = NameIdentifier.parse(object.fullName());
     } else {
       identifier = NameIdentifier.parse(String.format("%s.%s", metalake, object.fullName()));
@@ -169,20 +171,21 @@ public class RoleOperations {
               }
 
               break;
+
             case CATALOG:
               if (!GravitinoEnv.getInstance().catalogDispatcher().catalogExists(identifier)) {
                 throw new IllegalArgumentException(String.format(existErrMsg, object.fullName()));
               }
 
               break;
+
             case SCHEMA:
-              {
-                SchemaDispatcher dispatcher = GravitinoEnv.getInstance().schemaDispatcher();
-                if (!dispatcher.schemaExists(identifier)) {
-                  throw new IllegalArgumentException(String.format(existErrMsg, object.fullName()));
-                }
-                break;
+              if (!GravitinoEnv.getInstance().schemaDispatcher().schemaExists(identifier)) {
+                throw new IllegalArgumentException(String.format(existErrMsg, object.fullName()));
               }
+
+              break;
+
             case FILESET:
               if (!GravitinoEnv.getInstance().filesetDispatcher().filesetExists(identifier)) {
                 throw new IllegalArgumentException(String.format(existErrMsg, object.fullName()));
@@ -190,23 +193,19 @@ public class RoleOperations {
 
               break;
             case TABLE:
-              {
-                TableDispatcher dispatcher = GravitinoEnv.getInstance().tableDispatcher();
-                if (!dispatcher.tableExists(identifier)) {
-                  throw new IllegalArgumentException(String.format(existErrMsg, object.fullName()));
-                }
-
-                break;
+              if (!GravitinoEnv.getInstance().tableDispatcher().tableExists(identifier)) {
+                throw new IllegalArgumentException(String.format(existErrMsg, object.fullName()));
               }
+
+              break;
+
             case TOPIC:
-              {
-                TopicDispatcher dispatcher = GravitinoEnv.getInstance().topicDispatcher();
-                if (!dispatcher.topicExists(identifier)) {
-                  throw new IllegalArgumentException(String.format(existErrMsg, object.fullName()));
-                }
-
-                break;
+              if (!GravitinoEnv.getInstance().topicDispatcher().topicExists(identifier)) {
+                throw new IllegalArgumentException(String.format(existErrMsg, object.fullName()));
               }
+
+              break;
+
             default:
               throw new IllegalArgumentException(
                   String.format("Doesn't support the type %s", object.type()));

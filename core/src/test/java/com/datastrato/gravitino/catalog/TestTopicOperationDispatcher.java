@@ -17,6 +17,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
@@ -52,6 +53,7 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
     doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
     doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     GravitinoEnv.getInstance().setLockManager(new LockManager(config));
+    GravitinoEnv.getInstance().setSchemaDispatcher(schemaOperationDispatcher);
   }
 
   @Test
@@ -103,15 +105,27 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
 
     // Case 2: Test if the topic entity is not found in the entity store
     reset(entityStore);
+    entityStore.delete(topicIdent1, Entity.EntityType.TOPIC);
+    entityStore.delete(NameIdentifier.of(topicNs.levels()), Entity.EntityType.SCHEMA);
     doThrow(new NoSuchEntityException("")).when(entityStore).get(any(), any(), any());
     Topic loadedTopic2 = topicOperationDispatcher.loadTopic(topicIdent1);
+    // Succeed to import the topic entity
+    Assertions.assertTrue(entityStore.exists(topicIdent1, Entity.EntityType.TOPIC));
+    Assertions.assertTrue(
+        entityStore.exists(NameIdentifier.of(topicNs.levels()), Entity.EntityType.SCHEMA));
     // Audit info is gotten from the catalog, not from the entity store
     Assertions.assertEquals("test", loadedTopic2.auditInfo().creator());
 
     // Case 3: Test if the entity store is failed to get the topic entity
     reset(entityStore);
+    entityStore.delete(topicIdent1, Entity.EntityType.TOPIC);
+    entityStore.delete(NameIdentifier.of(topicNs.levels()), Entity.EntityType.SCHEMA);
     doThrow(new IOException()).when(entityStore).get(any(), any(), any());
     Topic loadedTopic3 = topicOperationDispatcher.loadTopic(topicIdent1);
+    // Succeed to import the topic entity
+    Assertions.assertTrue(
+        entityStore.exists(NameIdentifier.of(topicNs.levels()), Entity.EntityType.SCHEMA));
+    Assertions.assertTrue(entityStore.exists(topicIdent1, Entity.EntityType.TOPIC));
     // Audit info is gotten from the catalog, not from the entity store
     Assertions.assertEquals("test", loadedTopic3.auditInfo().creator());
 
@@ -127,6 +141,11 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
             .build();
     doReturn(unmatchedEntity).when(entityStore).get(any(), any(), any());
     Topic loadedTopic4 = topicOperationDispatcher.loadTopic(topicIdent1);
+    // Succeed to import the topic entity
+    reset(entityStore);
+    TopicEntity topicEntity =
+        entityStore.get(topicIdent1, Entity.EntityType.TOPIC, TopicEntity.class);
+    Assertions.assertEquals("test", topicEntity.auditInfo().creator());
     // Audit info is gotten from the catalog, not from the entity store
     Assertions.assertEquals("test", loadedTopic4.auditInfo().creator());
   }

@@ -10,6 +10,7 @@ import static com.datastrato.gravitino.catalog.PropertiesMetadataHelpers.validat
 import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
 
 import com.datastrato.gravitino.EntityStore;
+import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
@@ -88,8 +89,12 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       return table;
     }
 
-    TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(ident.namespace().levels()), LockType.WRITE, () -> importTable(ident));
+    if (GravitinoEnv.getInstance()
+        .schemaDispatcher()
+        .schemaExists(NameIdentifier.of(ident.namespace().levels()))) {
+      TreeLockUtils.doWithTreeLock(
+          NameIdentifier.of(ident.namespace().levels()), LockType.WRITE, () -> importTable(ident));
+    }
 
     return table;
   }
@@ -231,8 +236,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
               getHiddenPropertyNames(
                   getCatalogIdentifier(ident),
                   HasPropertyMetadata::tablePropertiesMetadata,
-                  alteredTable.properties()))
-          .withImported(isEntityExist(ident));
+                  alteredTable.properties()));
     }
 
     TableEntity updatedTableEntity =
@@ -267,15 +271,12 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             "UPDATE",
             stringId.id());
 
-    boolean imported = updatedTableEntity != null;
-
     return EntityCombinedTable.of(alteredTable, updatedTableEntity)
         .withHiddenPropertiesSet(
             getHiddenPropertyNames(
                 getCatalogIdentifier(ident),
                 HasPropertyMetadata::tablePropertiesMetadata,
-                alteredTable.properties()))
-        .withImported(imported);
+                alteredTable.properties()));
   }
 
   /**
