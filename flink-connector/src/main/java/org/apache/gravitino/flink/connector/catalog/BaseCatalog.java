@@ -20,7 +20,6 @@
 package org.apache.gravitino.flink.connector.catalog;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.MapDifference;
 import com.google.common.collect.Maps;
 import java.util.Arrays;
@@ -68,16 +67,18 @@ import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.flink.connector.PropertiesConverter;
+import org.apache.gravitino.flink.connector.TransformConverter;
 import org.apache.gravitino.flink.connector.utils.TypeUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.transforms.Transform;
 
 /**
  * The BaseCatalog that provides a default implementation for all methods in the {@link
  * org.apache.flink.table.catalog.Catalog} interface.
  */
-public abstract class BaseCatalog extends AbstractCatalog {
+public abstract class BaseCatalog extends AbstractCatalog implements TransformConverter {
   private final PropertiesConverter propertiesConverter;
 
   protected BaseCatalog(String catalogName, String defaultDatabase) {
@@ -260,8 +261,9 @@ public abstract class BaseCatalog extends AbstractCatalog {
     String comment = table.getComment();
     Map<String, String> properties =
         propertiesConverter.toGravitinoTableProperties(table.getOptions());
+    Transform[] partitions = toGravitinoTransforms(((CatalogTable) table).getPartitionKeys());
     try {
-      catalog().asTableCatalog().createTable(identifier, columns, comment, properties);
+      catalog().asTableCatalog().createTable(identifier, columns, comment, properties, partitions);
     } catch (NoSuchSchemaException e) {
       throw new DatabaseNotExistException(catalogName(), tablePath.getDatabaseName(), e);
     } catch (TableAlreadyExistsException e) {
@@ -448,8 +450,8 @@ public abstract class BaseCatalog extends AbstractCatalog {
     }
     Map<String, String> flinkTableProperties =
         propertiesConverter.toFlinkTableProperties(table.properties());
-    return CatalogTable.of(
-        builder.build(), table.comment(), ImmutableList.of(), flinkTableProperties);
+    List<String> partitionKeys = toFlinkPartitionKeys(table.partitioning());
+    return CatalogTable.of(builder.build(), table.comment(), partitionKeys, flinkTableProperties);
   }
 
   private Column toGravitinoColumn(org.apache.flink.table.catalog.Column column) {
@@ -491,5 +493,9 @@ public abstract class BaseCatalog extends AbstractCatalog {
 
   private String catalogName() {
     return getName();
+  }
+
+  private String metalakeName() {
+    return GravitinoCatalogManager.get().getMetalakeName();
   }
 }
