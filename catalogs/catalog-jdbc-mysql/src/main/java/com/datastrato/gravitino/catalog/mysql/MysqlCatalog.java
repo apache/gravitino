@@ -33,7 +33,7 @@ public class MysqlCatalog extends JdbcCatalog {
 
   @Override
   protected CatalogOperations newOps(Map<String, String> config) {
-    JdbcTypeConverter<String> jdbcTypeConverter = createJdbcTypeConverter();
+    JdbcTypeConverter jdbcTypeConverter = createJdbcTypeConverter();
     return new MySQLProtocolCompatibleCatalogOperations(
         createExceptionConverter(),
         jdbcTypeConverter,
@@ -48,7 +48,7 @@ public class MysqlCatalog extends JdbcCatalog {
   }
 
   @Override
-  protected JdbcTypeConverter<String> createJdbcTypeConverter() {
+  protected JdbcTypeConverter createJdbcTypeConverter() {
     return new MysqlTypeConverter();
   }
 

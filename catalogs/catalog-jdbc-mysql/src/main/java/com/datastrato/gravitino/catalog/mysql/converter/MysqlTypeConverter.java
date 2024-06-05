@@ -9,7 +9,7 @@ import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
 
 /** Type converter for MySQL. */
-public class MysqlTypeConverter extends JdbcTypeConverter<String> {
+public class MysqlTypeConverter extends JdbcTypeConverter {
 
   static final String TINYINT = "tinyint";
   static final String SMALLINT = "smallint";
@@ -23,7 +23,7 @@ public class MysqlTypeConverter extends JdbcTypeConverter<String> {
   static final String DATETIME = "datetime";
 
   @Override
-  public Type toGravitinoType(JdbcTypeBean typeBean) {
+  public Type toGravitino(JdbcTypeBean typeBean) {
     switch (typeBean.getTypeName().toLowerCase()) {
       case TINYINT:
         return Types.ByteType.get();
@@ -66,7 +66,7 @@ public class MysqlTypeConverter extends JdbcTypeConverter<String> {
   }
 
   @Override
-  public String fromGravitinoType(Type type) {
+  public String fromGravitino(Type type) {
     if (type instanceof Types.ByteType) {
       return TINYINT;
     } else if (type instanceof Types.ShortType) {
