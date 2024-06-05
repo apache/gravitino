@@ -22,7 +22,6 @@ disable=missing-class-docstring,
         no-member,
         fixme,          
         unnecessary-pass,               
-        missing-timeout,                #TODO-fix
         broad-exception-caught,         #TODO-fix    
         duplicate-code,                 #TODO-fix
         no-name-in-module,              #TODO-fix

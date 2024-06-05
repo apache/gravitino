@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 def get_gravitino_server_version():
     try:
-        response = requests.get("http://localhost:8090/api/version")
+        response = requests.get("http://localhost:8090/api/version", timeout=10)
         response.raise_for_status()  # raise an exception for bad status codes
         response.close()
         return True
