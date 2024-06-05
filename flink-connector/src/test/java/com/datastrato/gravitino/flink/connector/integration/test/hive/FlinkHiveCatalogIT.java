@@ -6,8 +6,8 @@ package com.datastrato.gravitino.flink.connector.integration.test.hive;
 
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Schema;
+import com.datastrato.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
 import com.datastrato.gravitino.flink.connector.PropertiesConverter;
 import com.datastrato.gravitino.flink.connector.hive.GravitinoHiveCatalog;
 import com.datastrato.gravitino.flink.connector.hive.GravitinoHiveCatalogFactoryOptions;
@@ -262,16 +262,28 @@ public class FlinkHiveCatalogIT extends FlinkEnvIT {
     tableEnv.useCatalog(defaultHiveCatalog);
     com.datastrato.gravitino.Catalog catalog = metalake.loadCatalog(defaultHiveCatalog);
     String schema = "test_get_schema";
+    String comment = "test comment";
+    String propertyKey = "key1";
+    String propertyValue = "value1";
+    String location = "hdfs://tmp-location/db";
 
     try {
       TestUtils.assertTableResult(
-          tableEnv.executeSql(String.format("CREATE DATABASE IF NOT EXISTS %s", schema)),
+          tableEnv.executeSql(
+              String.format(
+                  "CREATE DATABASE IF NOT EXISTS %s COMMENT %s WITH ('%s'='%s', '%s'='%s')",
+                  schema, comment, propertyKey, propertyValue, "location", location)),
           ResultKind.SUCCESS);
       TestUtils.assertTableResult(tableEnv.executeSql("USE " + schema), ResultKind.SUCCESS);
 
       catalog.asSchemas().schemaExists(schema);
       Schema loadedSchema = catalog.asSchemas().loadSchema(schema);
       Assertions.assertEquals(schema, loadedSchema.name());
+      Assertions.assertEquals(comment, loadedSchema.comment());
+      Assertions.assertEquals(2, loadedSchema.properties().size());
+      Assertions.assertEquals(propertyValue, loadedSchema.properties().get(propertyKey));
+      Assertions.assertEquals(
+          location, loadedSchema.properties().get(HiveSchemaPropertiesMetadata.LOCATION));
     } finally {
       catalog.asSchemas().dropSchema(schema, true);
       Assertions.assertFalse(catalog.asSchemas().schemaExists(schema));
@@ -307,12 +319,12 @@ public class FlinkHiveCatalogIT extends FlinkEnvIT {
           Row.of(schema2),
           Row.of(schema3));
 
-      NameIdentifier[] nameIdentifiers = catalog.asSchemas().listSchemas();
-      Assertions.assertEquals(4, nameIdentifiers.length);
-      Assertions.assertEquals("default", nameIdentifiers[0].name());
-      Assertions.assertEquals(schema, nameIdentifiers[1].name());
-      Assertions.assertEquals(schema2, nameIdentifiers[2].name());
-      Assertions.assertEquals(schema3, nameIdentifiers[3].name());
+      String[] schemas = catalog.asSchemas().listSchemas();
+      Assertions.assertEquals(4, schemas.length);
+      Assertions.assertEquals("default", schemas[0]);
+      Assertions.assertEquals(schema, schemas[1]);
+      Assertions.assertEquals(schema2, schemas[2]);
+      Assertions.assertEquals(schema3, schemas[3]);
     } finally {
       catalog.asSchemas().dropSchema(schema, true);
       catalog.asSchemas().dropSchema(schema2, true);

@@ -6,20 +6,19 @@
 package com.datastrato.gravitino.flink.connector.catalog;
 
 import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.SchemaChange;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
+import com.datastrato.gravitino.flink.connector.PropertiesConverter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.MapDifference;
 import com.google.common.collect.Maps;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import org.apache.commons.compress.utils.Lists;
 import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.CatalogBaseTable;
@@ -45,18 +44,17 @@ import org.apache.flink.table.catalog.exceptions.TablePartitionedException;
 import org.apache.flink.table.catalog.stats.CatalogColumnStatistics;
 import org.apache.flink.table.catalog.stats.CatalogTableStatistics;
 import org.apache.flink.table.expressions.Expression;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * The BaseCatalog that provides a default implementation for all methods in the {@link
  * org.apache.flink.table.catalog.Catalog} interface.
  */
 public abstract class BaseCatalog extends AbstractCatalog {
-  private static final Logger LOG = LoggerFactory.getLogger(BaseCatalog.class);
+  private final PropertiesConverter propertiesConverter;
 
   protected BaseCatalog(String catalogName, String defaultDatabase) {
     super(catalogName, defaultDatabase);
+    this.propertiesConverter = getPropertiesConverter();
   }
 
   @Override
@@ -67,9 +65,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
 
   @Override
   public List<String> listDatabases() throws CatalogException {
-    return Arrays.stream(catalog().asSchemas().listSchemas())
-        .map(NameIdentifier::name)
-        .collect(Collectors.toList());
+    return Arrays.asList(catalog().asSchemas().listSchemas());
   }
 
   @Override
@@ -77,7 +73,9 @@ public abstract class BaseCatalog extends AbstractCatalog {
       throws DatabaseNotExistException, CatalogException {
     try {
       Schema schema = catalog().asSchemas().loadSchema(databaseName);
-      return new CatalogDatabaseImpl(schema.properties(), schema.comment());
+      Map<String, String> properties =
+          propertiesConverter.toFlinkSchemaProperties(schema.properties());
+      return new CatalogDatabaseImpl(properties, schema.comment());
     } catch (NoSuchSchemaException e) {
       throw new DatabaseNotExistException(getName(), databaseName);
     }
@@ -93,15 +91,12 @@ public abstract class BaseCatalog extends AbstractCatalog {
       String databaseName, CatalogDatabase catalogDatabase, boolean ignoreIfExists)
       throws DatabaseAlreadyExistException, CatalogException {
     try {
-      catalog()
-          .asSchemas()
-          .createSchema(
-              databaseName, catalogDatabase.getComment(), catalogDatabase.getProperties());
+      Map<String, String> properties =
+          propertiesConverter.toGravitinoSchemaProperties(catalogDatabase.getProperties());
+      catalog().asSchemas().createSchema(databaseName, catalogDatabase.getComment(), properties);
     } catch (SchemaAlreadyExistsException e) {
       if (!ignoreIfExists) {
         throw new DatabaseAlreadyExistException(getName(), databaseName);
-      } else {
-        LOG.warn("Database {} already exists.", databaseName);
       }
     } catch (NoSuchCatalogException e) {
       throw new CatalogException(e);
@@ -112,7 +107,10 @@ public abstract class BaseCatalog extends AbstractCatalog {
   public void dropDatabase(String databaseName, boolean ignoreIfNotExists, boolean cascade)
       throws DatabaseNotExistException, DatabaseNotEmptyException, CatalogException {
     try {
-      catalog().asSchemas().dropSchema(databaseName, cascade);
+      boolean dropped = catalog().asSchemas().dropSchema(databaseName, cascade);
+      if (!dropped && !ignoreIfNotExists) {
+        throw new DatabaseNotExistException(getName(), databaseName);
+      }
     } catch (NonEmptySchemaException e) {
       throw new DatabaseNotEmptyException(getName(), databaseName);
     } catch (NoSuchCatalogException e) {
@@ -130,8 +128,6 @@ public abstract class BaseCatalog extends AbstractCatalog {
     } catch (NoSuchSchemaException e) {
       if (!ignoreIfNotExists) {
         throw new DatabaseNotExistException(getName(), databaseName);
-      } else {
-        LOG.warn("Database {} does not exist.", databaseName);
       }
     } catch (NoSuchCatalogException e) {
       throw new CatalogException(e);
@@ -338,6 +334,8 @@ public abstract class BaseCatalog extends AbstractCatalog {
       throws PartitionNotExistException, CatalogException {
     throw new UnsupportedOperationException();
   }
+
+  protected abstract PropertiesConverter getPropertiesConverter();
 
   @VisibleForTesting
   static SchemaChange[] getSchemaChange(CatalogDatabase current, CatalogDatabase updated) {

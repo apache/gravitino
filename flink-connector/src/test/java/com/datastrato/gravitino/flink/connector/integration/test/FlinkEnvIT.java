@@ -94,7 +94,6 @@ public abstract class FlinkEnvIT extends AbstractIT {
 
   private static void initHdfsEnv() {
     org.apache.hadoop.conf.Configuration conf = new org.apache.hadoop.conf.Configuration();
-    conf.set("fs.hdfs.impl", org.apache.hadoop.hdfs.DistributedFileSystem.class.getName());
     conf.set(
         "fs.defaultFS",
         String.format(
