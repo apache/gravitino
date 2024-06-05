@@ -84,7 +84,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     EntityCombinedTable table =
         TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> loadCombinedTable(ident));
 
-    if (table.imported()) {
+    if (table == null || table.imported()) {
       return table;
     }
 
