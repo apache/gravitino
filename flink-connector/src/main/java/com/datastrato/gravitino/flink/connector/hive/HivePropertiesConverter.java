@@ -6,7 +6,6 @@
 package com.datastrato.gravitino.flink.connector.hive;
 
 import com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta;
-import com.datastrato.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
 import com.datastrato.gravitino.flink.connector.PropertiesConverter;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -27,10 +26,6 @@ public class HivePropertiesConverter implements PropertiesConverter {
   private static final Map<String, String> GRAVITINO_CONFIG_TO_HIVE =
       ImmutableMap.of(
           HiveCatalogPropertiesMeta.METASTORE_URIS, HiveConf.ConfVars.METASTOREURIS.varname);
-  private static final Map<String, String> HIVE_SCHEMA_CONFIG_TO_GRAVITINO =
-      ImmutableMap.of("location", HiveSchemaPropertiesMetadata.LOCATION);
-  private static final Map<String, String> GRAVITINO_SCHEMA_CONFIG_TO_HIVE =
-      ImmutableMap.of(HiveSchemaPropertiesMetadata.LOCATION, "location");
 
   @Override
   public Map<String, String> toGravitinoCatalogProperties(Configuration flinkConf) {
@@ -48,40 +43,6 @@ public class HivePropertiesConverter implements PropertiesConverter {
     }
 
     return gravitinoProperties;
-  }
-
-  @Override
-  public Map<String, String> toGravitinoSchemaProperties(Map<String, String> flinkProperties) {
-    Map<String, String> gravitinoProperties = Maps.newHashMap();
-
-    flinkProperties.forEach(
-        (key, value) -> {
-          String gravitinoKey = HIVE_SCHEMA_CONFIG_TO_GRAVITINO.get(key);
-          if (gravitinoKey != null) {
-            gravitinoProperties.put(gravitinoKey, value);
-          } else {
-            gravitinoProperties.put(key, value);
-          }
-        });
-
-    return gravitinoProperties;
-  }
-
-  @Override
-  public Map<String, String> toFlinkSchemaProperties(Map<String, String> gravitinoProperties) {
-    Map<String, String> flinkProperties = Maps.newHashMap();
-
-    gravitinoProperties.forEach(
-        (key, value) -> {
-          String flinkKey = GRAVITINO_SCHEMA_CONFIG_TO_HIVE.get(key);
-          if (flinkKey != null) {
-            flinkProperties.put(flinkKey, value);
-          } else {
-            flinkProperties.put(key, value);
-          }
-        });
-
-    return flinkProperties;
   }
 
   @Override

@@ -271,7 +271,7 @@ public class FlinkHiveCatalogIT extends FlinkEnvIT {
       TestUtils.assertTableResult(
           tableEnv.executeSql(
               String.format(
-                  "CREATE DATABASE IF NOT EXISTS %s COMMENT %s WITH ('%s'='%s', '%s'='%s')",
+                  "CREATE DATABASE IF NOT EXISTS %s COMMENT '%s' WITH ('%s'='%s', '%s'='%s')",
                   schema, comment, propertyKey, propertyValue, "location", location)),
           ResultKind.SUCCESS);
       TestUtils.assertTableResult(tableEnv.executeSql("USE " + schema), ResultKind.SUCCESS);
