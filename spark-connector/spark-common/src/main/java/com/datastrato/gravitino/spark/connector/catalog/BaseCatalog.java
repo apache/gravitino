@@ -308,10 +308,8 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
 
   @Override
   public String[][] listNamespaces() throws NoSuchNamespaceException {
-    NameIdentifier[] schemas = gravitinoCatalogClient.asSchemas().listSchemas();
-    return Arrays.stream(schemas)
-        .map(schema -> new String[] {schema.name()})
-        .toArray(String[][]::new);
+    String[] schemas = gravitinoCatalogClient.asSchemas().listSchemas();
+    return Arrays.stream(schemas).map(schema -> new String[] {schema}).toArray(String[][]::new);
   }
 
   @Override

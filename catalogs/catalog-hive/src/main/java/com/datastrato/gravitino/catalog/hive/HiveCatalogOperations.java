@@ -51,10 +51,12 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Method;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -160,19 +162,23 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     if (UserGroupInformation.AuthenticationMethod.KERBEROS
         == SecurityUtil.getAuthenticationMethod(hadoopConf)) {
       try {
-        File keytabsDir = new File("keytabs");
-        if (!keytabsDir.exists()) {
+        Path keytabsPath = Paths.get("keytabs");
+        if (!Files.exists(keytabsPath)) {
           // Ignore the return value, because there exists many Hive catalog operations making
           // this directory.
-          keytabsDir.mkdir();
+          Files.createDirectory(keytabsPath);
         }
 
         // The id of entity is a random unique id.
-        File keytabFile = new File(String.format(GRAVITINO_KEYTAB_FORMAT, info.id()));
-        keytabFile.deleteOnExit();
-        if (keytabFile.exists() && !keytabFile.delete()) {
-          throw new IllegalStateException(
-              String.format("Fail to delete keytab file %s", keytabFile.getAbsolutePath()));
+        Path keytabPath = Paths.get(String.format(GRAVITINO_KEYTAB_FORMAT, info.id()));
+        keytabPath.toFile().deleteOnExit();
+        if (Files.exists(keytabPath)) {
+          try {
+            Files.delete(keytabPath);
+          } catch (IOException e) {
+            throw new IllegalStateException(
+                String.format("Fail to delete keytab file %s", keytabPath.toAbsolutePath()), e);
+          }
         }
 
         String keytabUri =
@@ -191,9 +197,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                     .catalogPropertiesMetadata()
                     .getOrDefault(conf, HiveCatalogPropertiesMeta.FETCH_TIMEOUT_SEC);
 
-        FetchFileUtils.fetchFileFromUri(keytabUri, keytabFile, fetchKeytabFileTimeout, hadoopConf);
+        FetchFileUtils.fetchFileFromUri(
+            keytabUri, keytabPath.toFile(), fetchKeytabFileTimeout, hadoopConf);
 
-        hiveConf.setVar(ConfVars.METASTORE_KERBEROS_KEYTAB_FILE, keytabFile.getAbsolutePath());
+        hiveConf.setVar(
+            ConfVars.METASTORE_KERBEROS_KEYTAB_FILE, keytabPath.toAbsolutePath().toString());
 
         String catalogPrincipal =
             (String) propertiesMetadata.catalogPropertiesMetadata().getOrDefault(conf, PRINCIPAL);
@@ -213,7 +221,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         refreshKerberosConfig();
         KerberosName.resetDefaultRealm();
         UserGroupInformation.setConfiguration(hadoopConf);
-        UserGroupInformation.loginUserFromKeytab(catalogPrincipal, keytabFile.getAbsolutePath());
+        UserGroupInformation.loginUserFromKeytab(
+            catalogPrincipal, keytabPath.toAbsolutePath().toString());
 
         UserGroupInformation kerberosLoginUgi = UserGroupInformation.getCurrentUser();
 
@@ -289,9 +298,13 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       checkTgtExecutor = null;
     }
 
-    File keytabFile = new File(String.format(GRAVITINO_KEYTAB_FORMAT, info.id()));
-    if (keytabFile.exists() && !keytabFile.delete()) {
-      LOG.error("Fail to delete key tab file {}", keytabFile.getAbsolutePath());
+    Path keytabPath = Paths.get(String.format(GRAVITINO_KEYTAB_FORMAT, info.id()));
+    if (Files.exists(keytabPath)) {
+      try {
+        Files.delete(keytabPath);
+      } catch (IOException e) {
+        LOG.error("Fail to delete key tab file {}", keytabPath.toAbsolutePath(), e);
+      }
     }
   }
 

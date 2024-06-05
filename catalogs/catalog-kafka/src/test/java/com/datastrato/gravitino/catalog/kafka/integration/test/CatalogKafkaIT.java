@@ -13,7 +13,6 @@ import static com.datastrato.gravitino.integration.test.container.KafkaContainer
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.SchemaChange;
 import com.datastrato.gravitino.client.GravitinoMetalake;
@@ -23,6 +22,7 @@ import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.messaging.Topic;
 import com.datastrato.gravitino.messaging.TopicChange;
+import com.datastrato.gravitino.utils.NamespaceUtil;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -101,10 +101,10 @@ public class CatalogKafkaIT extends AbstractIT {
   public static void shutdown() {
     Catalog catalog = metalake.loadCatalog(CATALOG_NAME);
     Arrays.stream(catalog.asSchemas().listSchemas())
-        .filter(ident -> !ident.name().equals("default"))
+        .filter(ident -> !ident.equals("default"))
         .forEach(
             (ident -> {
-              catalog.asSchemas().dropSchema(ident.name(), true);
+              catalog.asSchemas().dropSchema(ident, true);
             }));
     Arrays.stream(metalake.listCatalogs())
         .forEach(
@@ -213,7 +213,7 @@ public class CatalogKafkaIT extends AbstractIT {
                 kafka
                     .asTopicCatalog()
                     .listTopics(
-                        Namespace.ofTopic(METALAKE_NAME, catalogName2, DEFAULT_SCHEMA_NAME)));
+                        NamespaceUtil.ofTopic(METALAKE_NAME, catalogName2, DEFAULT_SCHEMA_NAME)));
     Assertions.assertTrue(
         exception
             .getMessage()
@@ -223,9 +223,9 @@ public class CatalogKafkaIT extends AbstractIT {
 
   @Test
   public void testDefaultSchema() {
-    NameIdentifier[] schemas = catalog.asSchemas().listSchemas();
+    String[] schemas = catalog.asSchemas().listSchemas();
     Assertions.assertEquals(1, schemas.length);
-    Assertions.assertEquals(DEFAULT_SCHEMA_NAME, schemas[0].name());
+    Assertions.assertEquals(DEFAULT_SCHEMA_NAME, schemas[0]);
 
     Schema loadSchema = catalog.asSchemas().loadSchema(DEFAULT_SCHEMA_NAME);
     Assertions.assertEquals(
@@ -262,9 +262,9 @@ public class CatalogKafkaIT extends AbstractIT {
 
   @Test
   public void testListSchema() {
-    NameIdentifier[] schemas = catalog.asSchemas().listSchemas();
+    String[] schemas = catalog.asSchemas().listSchemas();
     Assertions.assertEquals(1, schemas.length);
-    Assertions.assertEquals(DEFAULT_SCHEMA_NAME, schemas[0].name());
+    Assertions.assertEquals(DEFAULT_SCHEMA_NAME, schemas[0]);
   }
 
   @Test
@@ -293,7 +293,7 @@ public class CatalogKafkaIT extends AbstractIT {
     NameIdentifier[] topics =
         catalog
             .asTopicCatalog()
-            .listTopics(Namespace.ofTopic(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME));
+            .listTopics(NamespaceUtil.ofTopic(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME));
     Assertions.assertTrue(topics.length > 0);
     Assertions.assertTrue(
         ImmutableList.copyOf(topics).stream().anyMatch(topic -> topic.name().equals(topicName)));
@@ -414,7 +414,7 @@ public class CatalogKafkaIT extends AbstractIT {
     NameIdentifier[] topics =
         catalog
             .asTopicCatalog()
-            .listTopics(Namespace.ofTopic(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME));
+            .listTopics(NamespaceUtil.ofTopic(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME));
     Assertions.assertTrue(
         Arrays.stream(topics).anyMatch(topic -> topic.name().equals(illegalName)));
 

@@ -133,7 +133,7 @@ public class GravitinoMockServer implements AutoCloseable {
               @Override
               public NameIdentifier[] answer(InvocationOnMock invocation) throws Throwable {
                 return metalakes.get(metalakeName).catalogs.keySet().stream()
-                    .map(catalogName -> NameIdentifier.ofCatalog(metalakeName, catalogName))
+                    .map(catalogName -> NameIdentifier.of(metalakeName, catalogName))
                     .toArray(NameIdentifier[]::new);
               };
             });
@@ -267,9 +267,9 @@ public class GravitinoMockServer implements AutoCloseable {
 
     when(schemas.listSchemas())
         .thenAnswer(
-            new Answer<NameIdentifier[]>() {
+            new Answer<String[]>() {
               @Override
-              public NameIdentifier[] answer(InvocationOnMock invocation) throws Throwable {
+              public String[] answer(InvocationOnMock invocation) throws Throwable {
                 MemoryConnector memoryConnector =
                     (MemoryConnector)
                         catalogConnectorManager
@@ -277,12 +277,7 @@ public class GravitinoMockServer implements AutoCloseable {
                                 catalogConnectorManager.getTrinoCatalogName(catalog))
                             .getInternalConnector();
                 ConnectorMetadata metadata = memoryConnector.getMetadata(null, null);
-                return metadata.listSchemaNames(null).stream()
-                    .map(
-                        schemaName ->
-                            NameIdentifier.ofSchema(
-                                catalog.getMetalake(), catalog.getName(), schemaName))
-                    .toArray(NameIdentifier[]::new);
+                return metadata.listSchemaNames(null).toArray(new String[0]);
               }
             });
 
@@ -413,7 +408,7 @@ public class GravitinoMockServer implements AutoCloseable {
                 ArrayList<NameIdentifier> tableNames = new ArrayList<>();
                 for (SchemaTableName tableName : metadata.listTables(null, Optional.empty())) {
                   tableNames.add(
-                      NameIdentifier.ofTable(
+                      NameIdentifier.of(
                           schemaName.level(0),
                           schemaName.level(1),
                           schemaName.level(2),
