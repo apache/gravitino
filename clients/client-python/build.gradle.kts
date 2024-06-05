@@ -163,7 +163,7 @@ tasks {
 
   val build by registering(VenvTask::class) {
     dependsOn(pylint)
-    venvExec = "Python3"
+    venvExec = "python"
     args = listOf("scripts/generate_version.py")
   }
 
@@ -175,7 +175,7 @@ tasks {
       delete("dist")
     }
 
-    venvExec = "Python3"
+    venvExec = "python"
     args = listOf("setup.py", "sdist")
 
     doLast {
