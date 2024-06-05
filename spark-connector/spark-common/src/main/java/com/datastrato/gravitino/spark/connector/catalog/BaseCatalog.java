@@ -409,7 +409,8 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
   }
 
   private NameIdentifier createGravitinoNameIdentifier(Identifier ident) {
-    List<String> gravitinoNameIdentifier = Arrays.asList(metalakeName, catalogName);
+    List<String> gravitinoNameIdentifier = new ArrayList<>();
+    gravitinoNameIdentifier.addAll(Arrays.asList(metalakeName, catalogName));
     gravitinoNameIdentifier.addAll(Arrays.asList(getDatabase(ident)));
     gravitinoNameIdentifier.add(ident.name());
     return NameIdentifier.of(gravitinoNameIdentifier.toArray(new String[0]));
