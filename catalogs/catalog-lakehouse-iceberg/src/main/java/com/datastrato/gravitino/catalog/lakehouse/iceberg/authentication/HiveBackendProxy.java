@@ -35,6 +35,7 @@ public class HiveBackendProxy implements MethodInterceptor {
   private String kerberosRealm;
   private final UserGroupInformation proxyUser;
   private final Map<String, String> properties;
+  private final ClientPool<IMetaStoreClient, TException> newClientPool;
 
   public HiveBackendProxy(Map<String, String> properties, HiveCatalog target) {
     this.target = target;
@@ -48,7 +49,7 @@ public class HiveBackendProxy implements MethodInterceptor {
       // client pool, and it will not work with kerberos authentication. We need to create a new
       // client pool with the current user. For more, please see CachedClientPool#clientPool and
       // notice the value of `key`
-      resetIcebergHiveClientPool();
+      this.newClientPool = resetIcebergHiveClientPool();
     } catch (IOException e) {
       throw new RuntimeException("Failed to get current user", e);
     } catch (IllegalAccessException | NoSuchFieldException e) {
@@ -80,7 +81,11 @@ public class HiveBackendProxy implements MethodInterceptor {
     UserGroupInformation realUser =
         UserGroupInformation.createProxyUser(proxyKerberosPrincipalName, proxyUser);
 
-    String token = getToken();
+    String token =
+        newClientPool.run(
+            client ->
+                client.getDelegationToken(
+                    PrincipalUtils.getCurrentPrincipal().getName(), proxyUser.getShortUserName()));
 
     Token<DelegationTokenIdentifier> delegationToken = new Token<>();
     delegationToken.decodeFromUrlString(token);
@@ -100,26 +105,17 @@ public class HiveBackendProxy implements MethodInterceptor {
             });
   }
 
-  private void resetIcebergHiveClientPool() throws IllegalAccessException, NoSuchFieldException {
+  private ClientPool<IMetaStoreClient, TException> resetIcebergHiveClientPool()
+      throws IllegalAccessException, NoSuchFieldException {
     final Field m = HiveCatalog.class.getDeclaredField("clients");
     m.setAccessible(true);
 
     // TODO: we need to close the original client pool and thread pool, or it will cause memory
     //  leak.
-    m.set(target, new IcebergHiveCachedClientPool(target.getConf(), properties));
-  }
-
-  private String getToken()
-      throws NoSuchFieldException, IllegalAccessException, TException, InterruptedException {
-    final Field m = HiveCatalog.class.getDeclaredField("clients");
-    m.setAccessible(true);
-    ClientPool<IMetaStoreClient, TException> clientPool =
-        (ClientPool<IMetaStoreClient, TException>) m.get(target);
-
-    return clientPool.run(
-        client ->
-            client.getDelegationToken(
-                PrincipalUtils.getCurrentPrincipal().getName(), proxyUser.getShortUserName()));
+    ClientPool<IMetaStoreClient, TException> newClientPool =
+        new IcebergHiveCachedClientPool(target.getConf(), properties);
+    m.set(target, newClientPool);
+    return newClientPool;
   }
 
   public HiveCatalog getProxy() {
