@@ -37,8 +37,18 @@ import java.util.stream.Collectors;
 abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, SupportsSchemas {
   /** The REST client to send the requests. */
   protected final RESTClient restClient;
+
+  /**
+   * Get the namespace of the current catalog.
+   *
+   * @return The namespace of the current catalog.
+   */
+  public Namespace namespace() {
+    return namespace;
+  }
+
   /** The namespace of current catalog, which is the metalake name. */
-  protected final Namespace namespace;
+  private final Namespace namespace;
 
   /** The namespace of the schemas, which is the metalake name with catalog name. */
   protected final Namespace schemaNamespace;

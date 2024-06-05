@@ -67,7 +67,8 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
   /**
    * List all the tables under the given Schema namespace.
    *
-   * @param namespace The namespace to list the tables under it.
+   * @param namespace The namespace to list the tables under it. This namespace should have 1 level,
+   *     which is the schema name;
    * @return A list of {@link NameIdentifier} of the tables under the given namespace.
    * @throws NoSuchSchemaException if the schema with specified namespace does not exist.
    */
@@ -75,15 +76,18 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
     checkTableNamespace(namespace);
 
+    Namespace fullNamespace = getTableFullNamespace(namespace);
     EntityListResponse resp =
         restClient.get(
-            formatTableRequestPath(namespace),
+            formatTableRequestPath(fullNamespace),
             EntityListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.tableErrorHandler());
     resp.validate();
 
-    return resp.identifiers();
+    return Arrays.stream(resp.identifiers())
+        .map(ident -> NameIdentifier.of(ident.namespace().level(2), ident.name()))
+        .toArray(NameIdentifier[]::new);
   }
 
   /**
@@ -97,9 +101,10 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
     checkTableNameIdentifer(ident);
 
+    Namespace fullNamespace = getTableFullNamespace(ident.namespace());
     TableResponse resp =
         restClient.get(
-            formatTableRequestPath(ident.namespace()) + "/" + RESTUtils.encodeString(ident.name()),
+            formatTableRequestPath(fullNamespace) + "/" + RESTUtils.encodeString(ident.name()),
             TableResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.tableErrorHandler());
@@ -146,9 +151,10 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
             toDTOs(indexes));
     req.validate();
 
+    Namespace fullNamespace = getTableFullNamespace(ident.namespace());
     TableResponse resp =
         restClient.post(
-            formatTableRequestPath(ident.namespace()),
+            formatTableRequestPath(fullNamespace),
             req,
             TableResponse.class,
             Collections.emptyMap(),
@@ -179,9 +185,10 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
     TableUpdatesRequest updatesRequest = new TableUpdatesRequest(reqs);
     updatesRequest.validate();
 
+    Namespace fullNamespace = getTableFullNamespace(ident.namespace());
     TableResponse resp =
         restClient.put(
-            formatTableRequestPath(ident.namespace()) + "/" + RESTUtils.encodeString(ident.name()),
+            formatTableRequestPath(fullNamespace) + "/" + RESTUtils.encodeString(ident.name()),
             updatesRequest,
             TableResponse.class,
             Collections.emptyMap(),
@@ -201,9 +208,10 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
   public boolean dropTable(NameIdentifier ident) {
     checkTableNameIdentifer(ident);
 
+    Namespace fullNamespace = getTableFullNamespace(ident.namespace());
     DropResponse resp =
         restClient.delete(
-            formatTableRequestPath(ident.namespace()) + "/" + RESTUtils.encodeString(ident.name()),
+            formatTableRequestPath(fullNamespace) + "/" + RESTUtils.encodeString(ident.name()),
             DropResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.tableErrorHandler());
@@ -221,14 +229,13 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
   public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
     checkTableNameIdentifer(ident);
 
+    Namespace fullNamespace = getTableFullNamespace(ident.namespace());
     Map<String, String> params = new HashMap<>();
     params.put("purge", "true");
     try {
       DropResponse resp =
           restClient.delete(
-              formatTableRequestPath(ident.namespace())
-                  + "/"
-                  + RESTUtils.encodeString(ident.name()),
+              formatTableRequestPath(fullNamespace) + "/" + RESTUtils.encodeString(ident.name()),
               params,
               DropResponse.class,
               Collections.emptyMap(),
@@ -260,8 +267,8 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
    */
   static void checkTableNamespace(Namespace namespace) {
     Namespace.check(
-        namespace != null && namespace.length() == 3,
-        "Table namespace must be non-null and have 3 level, the input namespace is %s",
+        namespace != null && namespace.length() == 1,
+        "Table namespace must be non-null and have 1 level, the input namespace is %s",
         namespace);
   }
 
@@ -277,6 +284,9 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
     checkTableNamespace(ident.namespace());
   }
 
+  Namespace getTableFullNamespace(Namespace tableNamespace) {
+    return Namespace.of(this.namespace().level(0), this.name(), tableNamespace.level(0));
+  }
   /**
    * Create a new builder for the relational catalog.
    *
