@@ -265,7 +265,7 @@ public class FlinkHiveCatalogIT extends FlinkEnvIT {
     String comment = "test comment";
     String propertyKey = "key1";
     String propertyValue = "value1";
-    String location = "hdfs://tmp-location/db";
+    String location = warehouse + "/" + schema;
 
     try {
       TestUtils.assertTableResult(
