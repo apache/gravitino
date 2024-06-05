@@ -31,6 +31,7 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -197,7 +198,7 @@ public class CatalogIcebergKerberosHiveIT extends AbstractIT {
   }
 
   @Test
-  void testIcebergWithKerberizedHiveBackend() {
+  void testIcebergWithKerberizedHiveBackend() throws IOException {
     KerberosTokenProvider provider =
         KerberosTokenProvider.builder()
             .withClientPrincipal(GRAVITINO_CLIENT_PRINCIPAL)
@@ -238,6 +239,15 @@ public class CatalogIcebergKerberosHiveIT extends AbstractIT {
             Exception.class,
             () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
     String exceptionMessage = Throwables.getStackTraceAsString(exception);
+
+    LOG.info("Start yuqi-xxx log");
+    LOG.info("Exception message: {}", exceptionMessage);
+    LOG.info("end yuqi-xxx log");
+
+    File f = new File(System.getenv("GRAVITINO_HOME") + "/conf/gravitino.conf");
+    String configContent = FileUtils.readFileToString(f, StandardCharsets.UTF_8);
+    LOG.info("configContent: {}", configContent);
+
     // Make sure real user is 'gravitino_client'
     Assertions.assertTrue(
         exceptionMessage.contains("Permission denied: user=gravitino_client, access=WRITE"));
