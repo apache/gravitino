@@ -268,8 +268,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
         : droppedFromCatalog;
   }
 
-  @Override
-  public boolean importTopic(NameIdentifier identifier) {
+  private boolean importTopic(NameIdentifier identifier) {
 
     EntityCombinedTopic combinedTopic = loadCombinedTopic(identifier);
 

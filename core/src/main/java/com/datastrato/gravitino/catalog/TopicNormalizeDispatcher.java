@@ -72,12 +72,6 @@ public class TopicNormalizeDispatcher implements TopicDispatcher {
     return dispatcher.dropTopic(applyCaseSensitive(ident, Capability.Scope.TOPIC, dispatcher));
   }
 
-  @Override
-  public boolean importTopic(NameIdentifier identifier) {
-    return dispatcher.importTopic(
-        applyCaseSensitive(identifier, Capability.Scope.TOPIC, dispatcher));
-  }
-
   private NameIdentifier normalizeNameIdentifier(NameIdentifier ident) {
     Capability capability = dispatcher.getCatalogCapability(ident);
     return applyCapabilities(ident, Capability.Scope.TOPIC, capability);

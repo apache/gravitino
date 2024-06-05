@@ -71,12 +71,6 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
         applyCaseSensitive(ident, Capability.Scope.SCHEMA, dispatcher), cascade);
   }
 
-  @Override
-  public boolean importSchema(NameIdentifier identifier) {
-    return dispatcher.importSchema(
-        applyCaseSensitive(identifier, Capability.Scope.SCHEMA, dispatcher));
-  }
-
   private NameIdentifier normalizeNameIdentifier(NameIdentifier ident) {
     Capability capability = dispatcher.getCatalogCapability(ident);
     return applyCapabilities(ident, Capability.Scope.SCHEMA, capability);

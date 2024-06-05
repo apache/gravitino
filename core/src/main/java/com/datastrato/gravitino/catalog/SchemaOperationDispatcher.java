@@ -309,8 +309,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
         : droppedFromCatalog;
   }
 
-  @Override
-  public boolean importSchema(NameIdentifier identifier) {
+  private boolean importSchema(NameIdentifier identifier) {
     EntityCombinedSchema combinedSchema = loadCombinedSchema(identifier);
     if (combinedSchema.imported()) {
       return false;

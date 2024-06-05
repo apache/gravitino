@@ -99,12 +99,6 @@ public class TableNormalizeDispatcher implements TableDispatcher {
     return dispatcher.tableExists(applyCaseSensitive(ident, Capability.Scope.TABLE, dispatcher));
   }
 
-  @Override
-  public boolean importTable(NameIdentifier identifier) {
-    return dispatcher.importTable(
-        applyCaseSensitive(identifier, Capability.Scope.TABLE, dispatcher));
-  }
-
   private NameIdentifier normalizeNameIdentifier(NameIdentifier ident) {
     Capability capability = dispatcher.getCatalogCapability(ident);
     return applyCapabilities(ident, Capability.Scope.TABLE, capability);

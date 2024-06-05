@@ -366,8 +366,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         : droppedFromCatalog;
   }
 
-  @Override
-  public boolean importTable(NameIdentifier identifier) {
+  private boolean importTable(NameIdentifier identifier) {
     EntityCombinedTable combinedTable = loadCombinedTable(identifier);
 
     if (combinedTable.imported()) {
