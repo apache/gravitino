@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from gravitino.dto.version_dto import VersionDTO
+from gravitino.exceptions.gravitino_runtime_exception import GravitinoRuntimeException
 
 
 class Version(Enum):
@@ -43,6 +44,10 @@ class GravitinoVersion(VersionDTO):
         self.patch = int(m.group(Version.PATCH.value))
 
     def __gt__(self, other) -> bool:
+        if not isinstance(other, GravitinoVersion):
+            raise GravitinoRuntimeException(
+                f"{GravitinoVersion.__name__} can't compare with {other.__class__.__name__}"
+            )
         if self.major > other.major:
             return True
         if self.minor > other.minor:
@@ -52,6 +57,10 @@ class GravitinoVersion(VersionDTO):
         return False
 
     def __eq__(self, other) -> bool:
+        if not isinstance(other, GravitinoVersion):
+            raise GravitinoRuntimeException(
+                f"{GravitinoVersion.__name__} can't compare with {other.__class__.__name__}"
+            )
         if self.major != other.major:
             return False
         if self.minor != other.minor:

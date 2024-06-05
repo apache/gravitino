@@ -7,6 +7,7 @@ import unittest
 
 from gravitino.client.gravitino_version import GravitinoVersion
 from gravitino.dto.version_dto import VersionDTO
+from gravitino.exceptions.gravitino_runtime_exception import GravitinoRuntimeException
 
 
 class TestGravitinoVersion(unittest.TestCase):
@@ -79,3 +80,11 @@ class TestGravitinoVersion(unittest.TestCase):
         version2 = GravitinoVersion(VersionDTO("0.6.0", "2023-01-01", "1234567"))
 
         self.assertEqual(version1, version2)
+
+        # test compare with other class
+
+        version1 = GravitinoVersion(VersionDTO("0.6.0", "2023-01-01", "1234567"))
+        version2 = "0.6.0"
+
+        self.assertRaises(GravitinoRuntimeException, version1.__eq__, version2)
+        self.assertRaises(GravitinoRuntimeException, version1.__gt__, version2)
