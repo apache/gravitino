@@ -966,7 +966,7 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
 
     sql(
         String.format(
-            "CREATE TABLE %s (id INT COMMENT 'id comment' NOT NULL, name STRING COMMENT '' NOT NULL, age INT)",
+            "CREATE TABLE %s (id INT NOT NULL COMMENT 'id comment', name STRING NOT NULL COMMENT '', age INT)",
             tableName));
     SparkTableInfo tableInfo = getTableInfo(tableName);
     SparkTableInfoChecker checker =
