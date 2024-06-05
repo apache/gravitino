@@ -39,9 +39,9 @@ public class GravitinoDriverPlugin implements DriverPlugin {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoDriverPlugin.class);
 
   private GravitinoCatalogManager catalogManager;
-  private List<String> toRegisteredDriverExtensions =
+  private final List<String> toRegisteredDriverExtensions =
       Arrays.asList(GravitinoIcebergSparkSessionExtensions.class.getName());
-  private List<String> gravitinoDriverExtensions = new ArrayList<>();
+  private final List<String> gravitinoDriverExtensions = new ArrayList<>();
   private boolean enableIcebergSupport = false;
 
   @VisibleForTesting
@@ -61,6 +61,8 @@ public class GravitinoDriverPlugin implements DriverPlugin {
         StringUtils.isNotBlank(metalake),
         String.format(
             "%s:%s, should not be empty", GravitinoSparkConfig.GRAVITINO_METALAKE, metalake));
+
+    gravitinoDriverExtensions.addAll(toRegisteredDriverExtensions);
 
     this.enableIcebergSupport =
         conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT, false);
