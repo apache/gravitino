@@ -20,6 +20,7 @@ import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter.DistributionAndSortOrdersInfo;
 import com.datastrato.gravitino.spark.connector.SparkTypeConverter;
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
