@@ -18,6 +18,8 @@ import org.slf4j.LoggerFactory;
 public class CloseContainerExtension implements BeforeAllCallback {
   @Override
   public void beforeAll(ExtensionContext extensionContext) {
+    // Ensure that the container suite is initialized before closing it
+    ContainerSuite.getInstance();
     synchronized (CloseContainerExtension.class) {
       extensionContext
           .getRoot()

@@ -17,6 +17,8 @@ import com.datastrato.gravitino.storage.relational.po.FilesetPO;
 import com.datastrato.gravitino.storage.relational.utils.ExceptionUtils;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
+import com.datastrato.gravitino.utils.NameIdentifierUtil;
+import com.datastrato.gravitino.utils.NamespaceUtil;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
@@ -71,7 +73,7 @@ public class FilesetMetaService {
   }
 
   public FilesetEntity getFilesetByIdentifier(NameIdentifier identifier) {
-    NameIdentifier.checkFileset(identifier);
+    NameIdentifierUtil.checkFileset(identifier);
 
     String filesetName = identifier.name();
 
@@ -84,7 +86,7 @@ public class FilesetMetaService {
   }
 
   public List<FilesetEntity> listFilesetsByNamespace(Namespace namespace) {
-    Namespace.checkFileset(namespace);
+    NamespaceUtil.checkFileset(namespace);
 
     Long schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(namespace);
 
@@ -97,7 +99,7 @@ public class FilesetMetaService {
 
   public void insertFileset(FilesetEntity filesetEntity, boolean overwrite) {
     try {
-      NameIdentifier.checkFileset(filesetEntity.nameIdentifier());
+      NameIdentifierUtil.checkFileset(filesetEntity.nameIdentifier());
 
       FilesetPO.Builder builder = FilesetPO.builder();
       fillFilesetPOBuilderParentEntityId(builder, filesetEntity.namespace());
@@ -135,7 +137,7 @@ public class FilesetMetaService {
 
   public <E extends Entity & HasIdentifier> FilesetEntity updateFileset(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
-    NameIdentifier.checkFileset(identifier);
+    NameIdentifierUtil.checkFileset(identifier);
 
     String filesetName = identifier.name();
 
@@ -195,7 +197,7 @@ public class FilesetMetaService {
   }
 
   public boolean deleteFileset(NameIdentifier identifier) {
-    NameIdentifier.checkFileset(identifier);
+    NameIdentifierUtil.checkFileset(identifier);
 
     String filesetName = identifier.name();
 
@@ -267,7 +269,7 @@ public class FilesetMetaService {
   }
 
   private void fillFilesetPOBuilderParentEntityId(FilesetPO.Builder builder, Namespace namespace) {
-    Namespace.checkFileset(namespace);
+    NamespaceUtil.checkFileset(namespace);
     Long parentEntityId = null;
     for (int level = 0; level < namespace.levels().length; level++) {
       String name = namespace.level(level);

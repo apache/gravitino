@@ -12,6 +12,9 @@ import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 import static com.datastrato.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static com.datastrato.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
 import static com.datastrato.gravitino.StringIdentifier.ID_KEY;
+import static com.datastrato.gravitino.catalog.kafka.KafkaCatalog.CATALOG_PROPERTIES_METADATA;
+import static com.datastrato.gravitino.catalog.kafka.KafkaCatalog.SCHEMA_PROPERTIES_METADATA;
+import static com.datastrato.gravitino.catalog.kafka.KafkaCatalog.TOPIC_PROPERTIES_METADATA;
 import static com.datastrato.gravitino.catalog.kafka.KafkaCatalogOperations.CLIENT_ID_TEMPLATE;
 import static com.datastrato.gravitino.catalog.kafka.KafkaCatalogPropertiesMetadata.BOOTSTRAP_SERVERS;
 import static com.datastrato.gravitino.catalog.kafka.KafkaTopicPropertiesMetadata.PARTITION_COUNT;
@@ -24,7 +27,11 @@ import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.EntityStoreFactory;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.Schema;
+import com.datastrato.gravitino.SchemaChange;
 import com.datastrato.gravitino.catalog.kafka.embedded.KafkaClusterEmbedded;
+import com.datastrato.gravitino.connector.HasPropertyMetadata;
+import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTopicException;
 import com.datastrato.gravitino.exceptions.TopicAlreadyExistsException;
@@ -32,8 +39,6 @@ import com.datastrato.gravitino.messaging.Topic;
 import com.datastrato.gravitino.messaging.TopicChange;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
-import com.datastrato.gravitino.rel.Schema;
-import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.google.common.collect.ImmutableMap;
@@ -57,6 +62,33 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
   private static final String DEFAULT_SCHEMA_NAME = "default";
   private static final Map<String, String> MOCK_CATALOG_PROPERTIES =
       ImmutableMap.of(BOOTSTRAP_SERVERS, brokerList(), ID_KEY, "gravitino.v1.uid33220758755757000");
+  private static final HasPropertyMetadata KAFKA_PROPERTIES_METADATA =
+      new HasPropertyMetadata() {
+        @Override
+        public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
+          throw new UnsupportedOperationException("Not supported");
+        }
+
+        @Override
+        public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
+          return CATALOG_PROPERTIES_METADATA;
+        }
+
+        @Override
+        public PropertiesMetadata schemaPropertiesMetadata() throws UnsupportedOperationException {
+          return SCHEMA_PROPERTIES_METADATA;
+        }
+
+        @Override
+        public PropertiesMetadata filesetPropertiesMetadata() throws UnsupportedOperationException {
+          throw new UnsupportedOperationException("Not supported");
+        }
+
+        @Override
+        public PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException {
+          return TOPIC_PROPERTIES_METADATA;
+        }
+      };
   private static EntityStore store;
   private static IdGenerator idGenerator;
   private static CatalogEntity kafkaCatalogEntity;
@@ -93,7 +125,8 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
             .build();
 
     kafkaCatalogOperations = new KafkaCatalogOperations(store, idGenerator);
-    kafkaCatalogOperations.initialize(MOCK_CATALOG_PROPERTIES, kafkaCatalogEntity.toCatalogInfo());
+    kafkaCatalogOperations.initialize(
+        MOCK_CATALOG_PROPERTIES, kafkaCatalogEntity.toCatalogInfo(), KAFKA_PROPERTIES_METADATA);
   }
 
   @AfterAll
@@ -123,7 +156,8 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
     KafkaCatalogOperations ops = new KafkaCatalogOperations(store, idGenerator);
     Assertions.assertNull(ops.adminClientConfig);
 
-    ops.initialize(MOCK_CATALOG_PROPERTIES, catalogEntity.toCatalogInfo());
+    ops.initialize(
+        MOCK_CATALOG_PROPERTIES, catalogEntity.toCatalogInfo(), KAFKA_PROPERTIES_METADATA);
     Assertions.assertNotNull(ops.adminClientConfig);
     Assertions.assertEquals(2, ops.adminClientConfig.size());
     Assertions.assertEquals(
@@ -155,7 +189,8 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
                     .build())
             .build();
     KafkaCatalogOperations ops = new KafkaCatalogOperations(store, idGenerator);
-    ops.initialize(MOCK_CATALOG_PROPERTIES, catalogEntity.toCatalogInfo());
+    ops.initialize(
+        MOCK_CATALOG_PROPERTIES, catalogEntity.toCatalogInfo(), KAFKA_PROPERTIES_METADATA);
 
     Assertions.assertNotNull(ops.defaultSchemaIdent);
     Assertions.assertEquals(DEFAULT_SCHEMA_NAME, ops.defaultSchemaIdent.name());

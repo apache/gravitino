@@ -16,12 +16,18 @@ import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.datastrato.gravitino.storage.relational.TestJDBCBackend;
 import com.datastrato.gravitino.storage.relational.mapper.RoleMetaMapper;
 import com.datastrato.gravitino.storage.relational.po.RolePO;
+import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.Instant;
 import java.util.List;
 import java.util.function.Function;
+import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -175,19 +181,62 @@ class TestGroupMetaService extends TestJDBCBackend {
     Assertions.assertThrows(
         AlreadyExistsException.class, () -> groupMetaService.insertGroup(group2Exist, false));
 
-    // insert overwrite group with roles
+    // insert overwrite group with 2 roles
     GroupEntity group2Overwrite =
         createGroupEntity(
             group1.id(),
             AuthorizationUtils.ofGroupNamespace(metalakeName),
             "group2Overwrite",
-            auditInfo);
+            auditInfo,
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
     Assertions.assertDoesNotThrow(() -> groupMetaService.insertGroup(group2Overwrite, true));
+
+    GroupEntity actualOverwriteGroup2 =
+        groupMetaService.getGroupByIdentifier(group2Overwrite.nameIdentifier());
+    Assertions.assertEquals("group2Overwrite", actualOverwriteGroup2.name());
+    Assertions.assertEquals(2, actualOverwriteGroup2.roleNames().size());
     Assertions.assertEquals(
-        "group2Overwrite",
-        groupMetaService.getGroupByIdentifier(group2Overwrite.nameIdentifier()).name());
-    Assertions.assertEquals(
-        group2Overwrite, groupMetaService.getGroupByIdentifier(group2Overwrite.nameIdentifier()));
+        Sets.newHashSet(role1.name(), role2.name()),
+        Sets.newHashSet(actualOverwriteGroup2.roleNames()));
+
+    // insert overwrite user with 1 roles
+    RoleEntity role3 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role3",
+            auditInfo);
+    roleMetaService.insertRole(role3, false);
+    GroupEntity group3Overwrite =
+        createGroupEntity(
+            group1.id(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "group3Overwrite",
+            auditInfo,
+            Lists.newArrayList(role3.name()),
+            Lists.newArrayList(role3.id()));
+    Assertions.assertDoesNotThrow(() -> groupMetaService.insertGroup(group3Overwrite, true));
+
+    GroupEntity actualOverwriteGroup3 =
+        groupMetaService.getGroupByIdentifier(group3Overwrite.nameIdentifier());
+    Assertions.assertEquals("group3Overwrite", actualOverwriteGroup3.name());
+    Assertions.assertEquals(1, actualOverwriteGroup3.roleNames().size());
+    Assertions.assertEquals("role3", actualOverwriteGroup3.roleNames().get(0));
+
+    // insert overwrite user with 0 roles
+    GroupEntity group4Overwrite =
+        createGroupEntity(
+            group1.id(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "group4Overwrite",
+            auditInfo);
+    Assertions.assertDoesNotThrow(() -> groupMetaService.insertGroup(group4Overwrite, true));
+
+    GroupEntity actualOverwriteGroup4 =
+        groupMetaService.getGroupByIdentifier(group4Overwrite.nameIdentifier());
+    Assertions.assertEquals("group4Overwrite", actualOverwriteGroup4.name());
+    Assertions.assertNull(actualOverwriteGroup4.roleNames());
   }
 
   @Test
@@ -610,5 +659,168 @@ class TestGroupMetaService extends TestJDBCBackend {
         () -> groupMetaService.getGroupByIdentifier(group2.nameIdentifier()));
     Assertions.assertEquals(0, roleMetaService.listRolesByGroupId(group1.id()).size());
     Assertions.assertEquals(0, roleMetaService.listRolesByGroupId(group2.id()).size());
+  }
+
+  @Test
+  void deleteGroupMetasByLegacyTimeLine() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    backend.insert(metalake, false);
+
+    GroupMetaService groupMetaService = GroupMetaService.getInstance();
+    RoleMetaService roleMetaService = RoleMetaService.getInstance();
+
+    RoleEntity role1 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role1",
+            auditInfo);
+    RoleEntity role2 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role2",
+            auditInfo);
+    roleMetaService.insertRole(role1, false);
+    roleMetaService.insertRole(role2, false);
+
+    GroupEntity group1 =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "group1",
+            auditInfo,
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
+    GroupEntity group2 =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "group2",
+            auditInfo,
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
+    GroupEntity group3 =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "group3",
+            auditInfo,
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
+    GroupEntity group4 =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "group4",
+            auditInfo,
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
+    groupMetaService.insertGroup(group1, false);
+    groupMetaService.insertGroup(group2, false);
+    groupMetaService.insertGroup(group3, false);
+    groupMetaService.insertGroup(group4, false);
+
+    // hard delete before soft delete
+    int deletedCount =
+        groupMetaService.deleteGroupMetasByLegacyTimeLine(Instant.now().toEpochMilli() + 1000, 4);
+    Assertions.assertEquals(0, deletedCount);
+    Assertions.assertEquals(
+        group1.name(), groupMetaService.getGroupByIdentifier(group1.nameIdentifier()).name());
+    Assertions.assertEquals(
+        group2.name(), groupMetaService.getGroupByIdentifier(group2.nameIdentifier()).name());
+    Assertions.assertEquals(
+        group3.name(), groupMetaService.getGroupByIdentifier(group3.nameIdentifier()).name());
+    Assertions.assertEquals(
+        group4.name(), groupMetaService.getGroupByIdentifier(group4.nameIdentifier()).name());
+    Assertions.assertEquals(2, roleMetaService.listRolesByGroupId(group1.id()).size());
+    Assertions.assertEquals(2, roleMetaService.listRolesByGroupId(group2.id()).size());
+    Assertions.assertEquals(2, roleMetaService.listRolesByGroupId(group3.id()).size());
+    Assertions.assertEquals(2, roleMetaService.listRolesByGroupId(group4.id()).size());
+    Assertions.assertEquals(4, countGroups(metalake.id()));
+    Assertions.assertEquals(8, countGroupRoleRels());
+
+    // delete metalake
+    Assertions.assertTrue(
+        MetalakeMetaService.getInstance().deleteMetalake(metalake.nameIdentifier(), true));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> groupMetaService.getGroupByIdentifier(group1.nameIdentifier()));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> groupMetaService.getGroupByIdentifier(group2.nameIdentifier()));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> groupMetaService.getGroupByIdentifier(group3.nameIdentifier()));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> groupMetaService.getGroupByIdentifier(group4.nameIdentifier()));
+    Assertions.assertEquals(0, roleMetaService.listRolesByGroupId(group1.id()).size());
+    Assertions.assertEquals(0, roleMetaService.listRolesByGroupId(group2.id()).size());
+    Assertions.assertEquals(0, roleMetaService.listRolesByGroupId(group3.id()).size());
+    Assertions.assertEquals(0, roleMetaService.listRolesByGroupId(group4.id()).size());
+    Assertions.assertEquals(4, countGroups(metalake.id()));
+    Assertions.assertEquals(8, countGroupRoleRels());
+
+    // hard delete after soft delete
+    deletedCount =
+        groupMetaService.deleteGroupMetasByLegacyTimeLine(Instant.now().toEpochMilli() + 1000, 3);
+    Assertions.assertEquals(6, deletedCount); // delete 3 group + 3 groupRoleRel
+    Assertions.assertEquals(1, countGroups(metalake.id())); // 4 - 3
+    Assertions.assertEquals(5, countGroupRoleRels()); // 8 - 3
+
+    deletedCount =
+        groupMetaService.deleteGroupMetasByLegacyTimeLine(Instant.now().toEpochMilli() + 1000, 3);
+    Assertions.assertEquals(4, deletedCount); // delete 1 group + 3 groupRoleRel
+    Assertions.assertEquals(0, countGroups(metalake.id()));
+    Assertions.assertEquals(2, countGroupRoleRels()); // 5 - 3
+
+    deletedCount =
+        groupMetaService.deleteGroupMetasByLegacyTimeLine(Instant.now().toEpochMilli() + 1000, 3);
+    Assertions.assertEquals(2, deletedCount);
+    Assertions.assertEquals(0, countGroups(metalake.id()));
+    Assertions.assertEquals(0, countGroupRoleRels());
+
+    deletedCount =
+        groupMetaService.deleteGroupMetasByLegacyTimeLine(Instant.now().toEpochMilli() + 1000, 3);
+    Assertions.assertEquals(0, deletedCount); // no more to delete
+  }
+
+  private Integer countGroups(Long metalakeId) {
+    int count = 0;
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM group_meta WHERE metalake_id = %d", metalakeId))) {
+      while (rs.next()) {
+        count = rs.getInt(1);
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("SQL execution failed", e);
+    }
+    return count;
+  }
+
+  private Integer countGroupRoleRels() {
+    int count = 0;
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs = statement.executeQuery("SELECT count(*) FROM group_role_rel")) {
+      while (rs.next()) {
+        count = rs.getInt(1);
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("SQL execution failed", e);
+    }
+    return count;
   }
 }

@@ -18,14 +18,12 @@ Maintainers may be added once approved by the existing maintainers (see [Governa
 | Hui Yu        | diqiu50             | Datastrato       |
 | Xiaojing Fang | FANNG1              | Datastrato       |
 | Qi Yu         | yuqi1129            | Datastrato       |
-| Clearvive     | Clearvive           | Datastrato       |
 | Decheng Liu   | ch3yne              | Datastrato       |
 | Saisai Shao   | jerryshao           | Datastrato       |
 | Shaofeng Shi  | shaofengshi         | Datastrato       |
 | Lisa Cao      | lisancao            | Datastrato       |
 | Qian Xia      | LauraXia123         | Datastrato       |
 | Danhua Wang   | danhuawang          | Datastrato       |
-| Hiren Sharma  | hiirrxnn            | Datastrato       |
 
 # Contributors
 
@@ -50,7 +48,13 @@ Contributors may be added by existing maintainers (see [Governance document](GOV
 | JieBao Xiao    | xloya               | Xiaomi           |
 | Can Cai        | caican00            | Xiaomi           |
 | Peidian Li     | coolderli           | Xiaomi           |
+| Brandon Lu     | Lanznx              | LINE             |
 | Lewis Jackson  | xnge                | opensource4you   |
+| Li-Hsing Liu   | austin362667        | opensource4you   |
+| Tianhang Li    | TEOTEO520           | Bilibili         |
+| Hiren Sharma   | hiirrxnn            | opensource4you   |
+| Chun-Hung Tseng| henrybear327        | opensource4you   |
+| Carl Chang     | ichuniq             | opensource4you   |
 
 ## Review process
 

@@ -4,8 +4,8 @@
  */
 package com.datastrato.gravitino.connector;
 
+import com.datastrato.gravitino.SupportsSchemas;
 import com.datastrato.gravitino.annotation.Evolving;
-import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
 import java.io.Closeable;
 import java.util.Map;
@@ -16,7 +16,7 @@ import java.util.Map;
  * operation, {@link TableCatalog} to support table operations, etc.
  */
 @Evolving
-public interface CatalogOperations extends Closeable, HasPropertyMetadata {
+public interface CatalogOperations extends Closeable {
 
   /**
    * Initialize the CatalogOperation with specified configuration. This method is called after
@@ -26,7 +26,10 @@ public interface CatalogOperations extends Closeable, HasPropertyMetadata {
    *
    * @param config The configuration of this Catalog.
    * @param info The information of this Catalog.
+   * @param propertiesMetadata The properties metadata of this Catalog.
    * @throws RuntimeException if the initialization failed.
    */
-  void initialize(Map<String, String> config, CatalogInfo info) throws RuntimeException;
+  void initialize(
+      Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
+      throws RuntimeException;
 }

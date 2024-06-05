@@ -11,10 +11,13 @@ on:
         options:
           - 'gravitino'
           - 'gravitino-ci-hive'
+          - 'gravitino-ci-kerberos-hive'
           - 'gravitino-ci-trino'
           - 'gravitino-ci-doris'
+          - 'gravitino-ci-ranger'
           - 'trino'
           - 'hive'
+          - 'ranger'
       tag:
         description: 'Docker tag to apply to this image'
         required: true
@@ -37,12 +40,18 @@ jobs:
           if [ "${{ github.event.inputs.image }}" == "gravitino-ci-hive" ]; then
             echo "image_type=hive" >> $GITHUB_ENV
             echo "image_name=datastrato/gravitino-ci-hive" >> $GITHUB_ENV
+          elif [ "${{ github.event.inputs.image }}" == "gravitino-ci-kerberos-hive" ]; then
+            echo "image_type=kerberos-hive" >> $GITHUB_ENV
+            echo "image_name=datastrato/gravitino-ci-kerberos-hive" >> $GITHUB_ENV
           elif [ "${{ github.event.inputs.image }}" == "gravitino-ci-trino" ]; then
             echo "image_type=trino" >> $GITHUB_ENV
             echo "image_name=datastrato/gravitino-ci-trino" >> $GITHUB_ENV
           elif [ "${{ github.event.inputs.image }}" == "gravitino-ci-doris" ]; then
             echo "image_type=doris" >> $GITHUB_ENV
             echo "image_name=datastrato/gravitino-ci-doris" >> $GITHUB_ENV
+          elif [ "${{ github.event.inputs.image }}" == "gravitino-ci-ranger" ]; then
+            echo "image_type=ranger" >> $GITHUB_ENV
+            echo "image_name=datastrato/gravitino-ci-ranger" >> $GITHUB_ENV
           elif [ "${{ github.event.inputs.image }}" == "gravitino" ]; then
             echo "image_type=gravitino" >> $GITHUB_ENV
             echo "image_name=datastrato/gravitino" >> $GITHUB_ENV
@@ -52,6 +61,9 @@ jobs:
           elif [ "${{ github.event.inputs.image }}" == "hive" ]; then
             echo "image_type=hive" >> $GITHUB_ENV
             echo "image_name=datastrato/hive" >> $GITHUB_ENV
+          elif [ "${{ github.event.inputs.image }}" == "ranger" ]; then
+            echo "image_type=ranger" >> $GITHUB_ENV
+            echo "image_name=datastrato/ranger" >> $GITHUB_ENV
           fi
 
       - name: Check publish Docker token
