@@ -30,7 +30,7 @@ import json as _json
 
 from gravitino.typing import JSONType
 from gravitino.utils.exceptions import handle_error
-from gravitino.constants import TIMEOUT
+from gravitino.constants.timeout import TIMEOUT
 
 logger = logging.getLogger(__name__)
 

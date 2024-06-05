@@ -4,9 +4,8 @@ This software is licensed under the Apache License version 2.
 """
 
 import logging
-import subprocess
-from datetime import datetime
-import pkg_resources
+import configparser
+import os.path
 
 from gravitino.client.gravitino_metalake import GravitinoMetalake
 from gravitino.client.gravitino_version import GravitinoVersion
@@ -16,6 +15,7 @@ from gravitino.dto.responses.version_response import VersionResponse
 from gravitino.name_identifier import NameIdentifier
 from gravitino.utils import HTTPClient
 from gravitino.exceptions.gravitino_runtime_exception import GravitinoRuntimeException
+from gravitino.constants.version import VERSION_INI, Version
 
 logger = logging.getLogger(__name__)
 
@@ -87,13 +87,17 @@ class GravitinoClientBase:
         Returns:
             A GravitinoVersion instance representing the version of the Gravitino Python Client.
         """
-        version = pkg_resources.require("gravitino")[0].version
-        git_commit = (
-            subprocess.check_output(["git", "rev-parse", "HEAD"])
-            .decode("ascii")
-            .strip()
-        )
-        compile_date = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        config = configparser.ConfigParser()
+
+        if not os.path.exists(VERSION_INI):
+            raise GravitinoRuntimeException(
+                f"Failed to get Gravitino version, version file '{VERSION_INI}' does not exist."
+            )
+        config.read(VERSION_INI)
+
+        version = config["metadata"][Version.VERSION.value]
+        compile_date = config["metadata"][Version.COMPILE_DATE.value]
+        git_commit = config["metadata"][Version.GIT_COMMIT.value]
 
         return GravitinoVersion(VersionDTO(version, compile_date, git_commit))
 
