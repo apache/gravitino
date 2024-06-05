@@ -42,8 +42,17 @@ public class HiveBackendProxy implements MethodInterceptor {
     try {
       initKerberos(properties, target.getConf());
       proxyUser = UserGroupInformation.getCurrentUser();
+
+      // Replace the original client pool with IcebergHiveCachedClientPool. Why do we need to do
+      // this? Because the original client pool in iceberg uses a fixed username to create the
+      // client pool, and it will not work with kerberos authentication. We need to create a new
+      // client pool with the current user. For more, please see CachedClientPool#clientPool and
+      // notice the value of `key`
+      resetIcebergHiveClientPool();
     } catch (IOException e) {
       throw new RuntimeException("Failed to get current user", e);
+    } catch (IllegalAccessException | NoSuchFieldException e) {
+      throw new RuntimeException("Failed to reset IcebergHiveClientPool", e);
     }
   }
 
@@ -91,6 +100,15 @@ public class HiveBackendProxy implements MethodInterceptor {
             });
   }
 
+  private void resetIcebergHiveClientPool() throws IllegalAccessException, NoSuchFieldException {
+    final Field m = HiveCatalog.class.getDeclaredField("clients");
+    m.setAccessible(true);
+
+    // TODO: we need to close the original client pool and thread pool, or it will cause memory
+    //  leak.
+    m.set(target, new IcebergHiveCachedClientPool(target.getConf(), properties));
+  }
+
   private String getToken()
       throws NoSuchFieldException, IllegalAccessException, TException, InterruptedException {
     final Field m = HiveCatalog.class.getDeclaredField("clients");
@@ -98,21 +116,10 @@ public class HiveBackendProxy implements MethodInterceptor {
     ClientPool<IMetaStoreClient, TException> clientPool =
         (ClientPool<IMetaStoreClient, TException>) m.get(target);
 
-    String token =
-        clientPool.run(
-            client ->
-                client.getDelegationToken(
-                    PrincipalUtils.getCurrentPrincipal().getName(), proxyUser.getShortUserName()));
-    if (clientPool instanceof IcebergHiveCachedClientPool) {
-      return token;
-    }
-
-    // Change the client pool to IcebergHiveCachedClientPool as client pool in iceberg
-    // has the username problem.
-    // TODO: we need to close the original client pool and thread pool, or it will cause memory
-    //  leak.
-    m.set(target, new IcebergHiveCachedClientPool(target.getConf(), properties));
-    return token;
+    return clientPool.run(
+        client ->
+            client.getDelegationToken(
+                PrincipalUtils.getCurrentPrincipal().getName(), proxyUser.getShortUserName()));
   }
 
   public HiveCatalog getProxy() {
