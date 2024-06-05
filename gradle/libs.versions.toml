@@ -60,7 +60,7 @@ awaitility = "4.2.1"
 servlet = "3.1.0"
 jodd = "3.5.2"
 flink = "1.18.0"
-cglib = "3.3.0"
+cglib = "2.2"
 ranger = "2.4.0"
 
 protobuf-plugin = "0.9.2"
