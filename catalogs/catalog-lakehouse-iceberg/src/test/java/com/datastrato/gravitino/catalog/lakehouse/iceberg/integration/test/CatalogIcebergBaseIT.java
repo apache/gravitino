@@ -309,8 +309,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     TableCatalog tableCatalog = catalog.asTableCatalog();
 
     // create failed check.
-    NameIdentifier table =
-        NameIdentifier.of(testSchemaName, "test_table");
+    NameIdentifier table = NameIdentifier.of(testSchemaName, "test_table");
     Assertions.assertThrows(
         NoSuchSchemaException.class,
         () ->
@@ -341,8 +340,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
   @Test
   void testCreateTableWithNullComment() {
     Column[] columns = createColumns();
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(schemaName, tableName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
 
     TableCatalog tableCatalog = catalog.asTableCatalog();
     Table createdTable =
@@ -358,8 +356,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     // Create table from Gravitino API
     Column[] columns = createColumns();
 
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(schemaName, tableName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
     Distribution distribution = Distributions.NONE;
 
     final SortOrder[] sortOrders =
@@ -461,8 +458,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
 
     String timestampTableName = "timestamp_table";
 
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(schemaName, timestampTableName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, timestampTableName);
 
     Map<String, String> properties = createProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
@@ -594,8 +590,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
         catalog
             .asTableCatalog()
             .alterTable(
-                NameIdentifier.of(schemaName, tableName),
-                TableChange.rename(alertTableName));
+                NameIdentifier.of(schemaName, tableName), TableChange.rename(alertTableName));
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, table.auditInfo().lastModifier());
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, table.auditInfo().creator());
 
@@ -612,10 +607,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
             TableChange.updateColumnType(
                 new String[] {ICEBERG_COL_NAME1}, Types.IntegerType.get()));
 
-    table =
-        catalog
-            .asTableCatalog()
-            .loadTable(NameIdentifier.of(schemaName, alertTableName));
+    table = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, alertTableName));
     Assertions.assertEquals(alertTableName, table.name());
     Assertions.assertEquals("val2_new", table.properties().get("key2"));
 
@@ -654,9 +646,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
             () ->
                 catalog
                     .asTableCatalog()
-                    .alterTable(
-                        NameIdentifier.of(schemaName, alertTableName),
-                        withDefaultValue));
+                    .alterTable(NameIdentifier.of(schemaName, alertTableName), withDefaultValue));
     Assertions.assertTrue(
         exception
             .getMessage()
@@ -669,9 +659,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
 
     Column[] newColumns = new Column[] {col1, col2, col3};
     NameIdentifier tableIdentifier =
-        NameIdentifier.of(
-            schemaName,
-            GravitinoITUtils.genRandomName("CatalogHiveIT_table"));
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("CatalogHiveIT_table"));
     catalog
         .asTableCatalog()
         .createTable(
@@ -931,8 +919,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
   public void testTableDistribution() {
     Column[] columns = createColumns();
 
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(schemaName, tableName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
     Distribution distribution = Distributions.NONE;
 
     final SortOrder[] sortOrders =
@@ -1076,8 +1063,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     // Create table from Gravitino API
     Column[] columns = createColumns();
 
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(schemaName, tableName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
     Distribution distribution = Distributions.NONE;
 
     final SortOrder[] sortOrders =
@@ -1164,8 +1150,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
   public void testTableSortOrder() {
     Column[] columns = createColumns();
 
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(schemaName, tableName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
     Distribution distribution = Distributions.NONE;
 
     final SortOrder[] sortOrders =

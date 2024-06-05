@@ -229,8 +229,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Column col = Column.of("array", Types.ListType.of(IntegerType.get(), false), "col_4_comment");
     Column[] columns = new Column[] {col};
 
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(schemaName, tableName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
 
     TableCatalog tableCatalog = catalog.asTableCatalog();
     Table createdTable =
@@ -255,8 +254,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     // Create table from Gravitino API
     Column[] columns = columnsWithSpecialNames();
 
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(schemaName, tableName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
     Distribution distribution = Distributions.NONE;
 
     SortOrder[] sortOrders = new SortOrder[0];
@@ -320,8 +318,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
 
     // drop schema check.
     schemas.dropSchema(testSchemaName, false);
-    Assertions.assertThrows(
-        NoSuchSchemaException.class, () -> schemas.loadSchema(testSchemaName));
+    Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(testSchemaName));
     Assertions.assertThrows(
         NoSuchSchemaException.class, () -> postgreSqlService.loadSchema(schemaIdent));
 
@@ -332,8 +329,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     TableCatalog tableCatalog = catalog.asTableCatalog();
 
     // create failed check.
-    NameIdentifier table =
-        NameIdentifier.of(testSchemaName, "test_table");
+    NameIdentifier table = NameIdentifier.of(testSchemaName, "test_table");
     Assertions.assertThrows(
         NoSuchSchemaException.class,
         () ->
@@ -360,8 +356,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     // Create table from Gravitino API
     Column[] columns = createColumns();
 
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(schemaName, tableName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
     Distribution distribution = Distributions.NONE;
 
     SortOrder[] sortOrders = new SortOrder[0];
@@ -433,8 +428,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         catalog
             .asTableCatalog()
             .alterTable(
-                NameIdentifier.of(schemaName, tableName),
-                TableChange.rename(alertTableName));
+                NameIdentifier.of(schemaName, tableName), TableChange.rename(alertTableName));
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, table.auditInfo().creator());
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, table.auditInfo().lastModifier());
 
@@ -449,10 +443,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
             TableChange.updateColumnType(
                 new String[] {POSTGRESQL_COL_NAME1}, Types.IntegerType.get()));
 
-    table =
-        catalog
-            .asTableCatalog()
-            .loadTable(NameIdentifier.of(schemaName, alertTableName));
+    table = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, alertTableName));
     Assertions.assertEquals(alertTableName, table.name());
 
     Assertions.assertEquals(POSTGRESQL_COL_NAME1, table.columns()[0].name());
@@ -554,8 +545,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Column col4 = Column.of("status", Types.VarCharType.of(255), "code", false, false, null);
     Column[] newColumns = new Column[] {col1, col2, col3, col4};
     TableCatalog tableCatalog = catalog.asTableCatalog();
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(schemaName, "abc");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, "abc");
     Assertions.assertDoesNotThrow(
         () ->
             tableCatalog.createTable(
@@ -607,8 +597,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
           Indexes.unique("u6_key", new String[][] {{"col_1"}, {"col_3"}, {"col_2"}, {"col_4"}}),
         };
 
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(schemaName, tableName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
 
     // Test create many indexes with name success.
     Map<String, String> properties = createProperties();
@@ -757,9 +746,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         catalog
             .asTableCatalog()
             .createTable(
-                NameIdentifier.of(
-                    schemaName,
-                    GravitinoITUtils.genRandomName("pg_it_table")),
+                NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("pg_it_table")),
                 newColumns,
                 null,
                 ImmutableMap.of());
@@ -805,10 +792,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
             TableChange.updateColumnDefaultValue(
                 new String[] {columns[4].name()}, FunctionExpression.of("current_timestamp")));
 
-    table =
-        catalog
-            .asTableCatalog()
-            .loadTable(NameIdentifier.of(schemaName, tableName));
+    table = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
 
     Assertions.assertEquals(
         Literals.of("1.234", Types.FloatType.get()), table.columns()[0].defaultValue());
@@ -852,9 +836,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     System.out.println(sql);
     postgreSqlService.executeQuery(sql);
     Table loadedTable =
-        catalog
-            .asTableCatalog()
-            .loadTable(NameIdentifier.of(schemaName, tableName));
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
 
     for (Column column : loadedTable.columns()) {
       switch (column.name()) {
@@ -933,8 +915,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
 
     Index[] t1_indexes = {Indexes.unique("u1_key", new String[][] {{t1_name}})};
 
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(schemaName, t1_name);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, t1_name);
     tableCatalog.createTable(
         tableIdentifier,
         columns,
@@ -990,26 +971,22 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         new SortOrder[0],
         t4_indexes);
 
-    Table t1 =
-        tableCatalog.loadTable(NameIdentifier.of(schemaName, t1_name));
+    Table t1 = tableCatalog.loadTable(NameIdentifier.of(schemaName, t1_name));
     Arrays.stream(t1.columns()).anyMatch(c -> Objects.equals(c.name(), "t112"));
     ITUtils.assertionsTableInfo(
         t1_name, table_comment, Arrays.asList(t1_col), properties, t1_indexes, t1);
 
-    Table t2 =
-        tableCatalog.loadTable(NameIdentifier.of(schemaName, t2_name));
+    Table t2 = tableCatalog.loadTable(NameIdentifier.of(schemaName, t2_name));
     Arrays.stream(t2.columns()).anyMatch(c -> Objects.equals(c.name(), "t212"));
     ITUtils.assertionsTableInfo(
         t2_name, table_comment, Arrays.asList(t2_col), properties, t2_indexes, t2);
 
-    Table t3 =
-        tableCatalog.loadTable(NameIdentifier.of(schemaName, t3_name));
+    Table t3 = tableCatalog.loadTable(NameIdentifier.of(schemaName, t3_name));
     Arrays.stream(t3.columns()).anyMatch(c -> Objects.equals(c.name(), "t_12"));
     ITUtils.assertionsTableInfo(
         t3_name, table_comment, Arrays.asList(t3_col), properties, t3_indexes, t3);
 
-    Table t4 =
-        tableCatalog.loadTable(NameIdentifier.of(schemaName, t4_name));
+    Table t4 = tableCatalog.loadTable(NameIdentifier.of(schemaName, t4_name));
     Arrays.stream(t4.columns()).anyMatch(c -> Objects.equals(c.name(), "_1__"));
     ITUtils.assertionsTableInfo(
         t4_name, table_comment, Arrays.asList(t4_col), properties, t4_indexes, t4);
@@ -1025,8 +1002,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Column[] newColumns = new Column[] {col1, col2, col3, col4, col5};
 
     Index[] indexes = new Index[0];
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(schemaName, "tablename");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, "tablename");
     Map<String, String> properties = createProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
     Table createdTable =
@@ -1051,8 +1027,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         "tablename", "low case table name", Arrays.asList(newColumns), properties, indexes, table);
 
     // Test create table with same name but different case
-    NameIdentifier tableIdentifier2 =
-        NameIdentifier.of(schemaName, "TABLENAME");
+    NameIdentifier tableIdentifier2 = NameIdentifier.of(schemaName, "TABLENAME");
 
     Column[] upperTableColumns = new Column[] {col1, col4, col5};
     Table tableAgain =
@@ -1178,10 +1153,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
       for (String n : realNames) {
         Table t =
             Assertions.assertDoesNotThrow(
-                () ->
-                    catalog
-                        .asTableCatalog()
-                        .loadTable(NameIdentifier.of(dbs[idx], n)));
+                () -> catalog.asTableCatalog().loadTable(NameIdentifier.of(dbs[idx], n)));
         Assertions.assertEquals(n, t.name());
 
         // Test the table1 is the `1a`.`table1` not `_a`.`table1` or `__`.`table1`
@@ -1253,9 +1225,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     postgreSqlService.executeQuery(
         String.format("CREATE TABLE %s.%s (bit_col bit);", schemaName, tableName));
     Table loadedTable =
-        catalog
-            .asTableCatalog()
-            .loadTable(NameIdentifier.of(schemaName, tableName));
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
     Assertions.assertEquals(Types.ExternalType.of("bit"), loadedTable.columns()[0].dataType());
   }
 
@@ -1284,8 +1254,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
             Index.IndexType.UNIQUE_KEY, "u1_key", new String[][] {{"col_2"}, {"col_3"}}),
         TableChange.addIndex(Index.IndexType.PRIMARY_KEY, "pk1_key", new String[][] {{"col_1"}}));
 
-    Table table =
-        tableCatalog.loadTable(NameIdentifier.of(schemaName, tableName));
+    Table table = tableCatalog.loadTable(NameIdentifier.of(schemaName, tableName));
     Index[] indexes =
         new Index[] {
           Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}),
@@ -1309,8 +1278,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
           Indexes.primary("pk1_key", new String[][] {{"col_1"}}),
           Indexes.unique("u2_key", new String[][] {{"col_4"}})
         };
-    table =
-        tableCatalog.loadTable(NameIdentifier.of(schemaName, tableName));
+    table = tableCatalog.loadTable(NameIdentifier.of(schemaName, tableName));
     Column col4 = Column.of("col_4", Types.VarCharType.of(255), null, true, false, null);
     newColumns = new Column[] {col1, col2, col3, col4};
     ITUtils.assertionsTableInfo(
@@ -1331,8 +1299,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
           Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}),
           Indexes.unique("u3_key", new String[][] {{"col_1"}, {"col_4"}})
         };
-    table =
-        tableCatalog.loadTable(NameIdentifier.of(schemaName, tableName));
+    table = tableCatalog.loadTable(NameIdentifier.of(schemaName, tableName));
     ITUtils.assertionsTableInfo(
         tableName, table_comment, Arrays.asList(newColumns), createProperties(), indexes, table);
   }
@@ -1346,8 +1313,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Column[] newColumns = new Column[] {col1, col2, col3, col4};
     String tableName = "auto_increment_table";
 
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(schemaName, tableName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
     Map<String, String> properties = createProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
     tableCatalog.createTable(
@@ -1419,8 +1385,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
 
     Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, newColumns[0].defaultValue());
 
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(schemaName, tableName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
     Map<String, String> properties = createProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
     tableCatalog.createTable(
