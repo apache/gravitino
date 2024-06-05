@@ -76,16 +76,16 @@ public class TestGravitinoMetalake extends TestBase {
 
     EntityListResponse resp = new EntityListResponse(new NameIdentifier[] {ident1, ident2});
     buildMockResource(Method.GET, path, null, resp, HttpStatus.SC_OK);
-    NameIdentifier[] catalogs = gravitinoClient.listCatalogs();
+    String[] catalogs = gravitinoClient.listCatalogs();
 
     Assertions.assertEquals(2, catalogs.length);
-    Assertions.assertEquals(ident1, catalogs[0]);
-    Assertions.assertEquals(ident2, catalogs[1]);
+    Assertions.assertEquals(ident1.name(), catalogs[0]);
+    Assertions.assertEquals(ident2.name(), catalogs[1]);
 
     // Test return empty catalog list
     EntityListResponse resp1 = new EntityListResponse(new NameIdentifier[] {});
     buildMockResource(Method.GET, path, null, resp1, HttpStatus.SC_OK);
-    NameIdentifier[] catalogs1 = gravitinoClient.listCatalogs();
+    String[] catalogs1 = gravitinoClient.listCatalogs();
     Assertions.assertEquals(0, catalogs1.length);
 
     // Test return internal error
