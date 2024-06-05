@@ -39,6 +39,14 @@ tasks.withType<ShadowJar>(ShadowJar::class.java) {
   relocate("org.apache.hc", "com.datastrato.gravitino.shaded.org.apache.hc")
 }
 
+publishing {
+  publications {
+    withType<MavenPublication>().configureEach {
+      artifactId = baseName
+    }
+  }
+}
+
 tasks.jar {
   dependsOn(tasks.named("shadowJar"))
   archiveClassifier.set("empty")

@@ -15,6 +15,18 @@ Please refer to the [Deploying Trino documentation](https://trino.io/docs/curren
 2. Copy the connector directory to the Trino's plugin directory.
    Normally, the directory location is `Trino-server-<version>/plugin`, and the directory contains other catalogs used by Trino.
 3. Add Trino JVM arguments `-Dlog4j.configurationFile=file:////etc/trino/log4j2.properties` to enable logging for the Gravitino connector.
+4. Update Trino coordinator configuration. 
+   You need to set `catalog.management=dynamic` and `catalog.store=file`
+   The config location is `Trino-server-<version>/etc/config.properteis`,  and the contents like:
+
+```text
+coordinator=true
+node-scheduler.include-coordinator=true
+http-server.http.port=8080
+catalog.management=dynamic
+catalog.store=file
+discovery.uri=http://0.0.0.0:8080
+```
 
 Alternatively,
 you can build the Gravitino connector package from the sources
@@ -31,7 +43,7 @@ Use the docker command to create a container from the `trinodb/trino` image. Ass
 Run it in the background, and map the default Trino port, which is 8080, from inside the container to port 8080 on your machine.
 
 ```shell
-docker run --name trino-gravitino -d -p 8080:8080 trinodb/trino:426
+docker run --name trino-gravitino -d -p 8080:8080 trinodb/trino:435
 ```
 
 Run `docker ps` to check whether the container is running.
@@ -63,6 +75,20 @@ cd /lib/trino/plugin
 ```
 
 Now you can see the Gravitino connector directory in the plugin directory.
+
+### Configuring the Trino
+
+You can find the Trino configuration file `config.properties` in the directory `/etc/trino`. You need changed the file like this:
+
+```text
+#single node install config
+coordinator=true
+node-scheduler.include-coordinator=true
+http-server.http.port=8080
+discovery.uri=http://localhost:8080
+catalog.management=dynamic
+catalog.store=file
+```
 
 ### Configuring the Gravitino connector
 

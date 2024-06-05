@@ -15,7 +15,6 @@ plugins {
 dependencies {
   implementation(project(":api"))
 
-  implementation(libs.bundles.log4j)
   implementation(libs.commons.collections4)
   implementation(libs.commons.lang3)
   implementation(libs.guava)

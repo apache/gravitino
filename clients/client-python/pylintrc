@@ -25,7 +25,6 @@ disable=missing-class-docstring,
         missing-timeout,                #TODO-fix
         broad-exception-caught,         #TODO-fix    
         duplicate-code,                 #TODO-fix
-        method-hidden,                  #TODO-fix
         no-name-in-module,              #TODO-fix
         invalid-field-call,             #TODO-fix
         protected-access,               #TODO-fix

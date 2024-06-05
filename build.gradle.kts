@@ -218,10 +218,6 @@ nexusPublishing {
   packageGroup.set("com.datastrato.gravitino")
 }
 
-dependencies {
-  testImplementation(libs.testng)
-}
-
 subprojects {
   // Gravitino Python client project didn't need to apply the java plugin
   if (project.name == "client-python") {
@@ -411,13 +407,8 @@ subprojects {
     reports.html.outputLocation.set(file("${rootProject.projectDir}/build/reports/"))
     val skipTests = project.hasProperty("skipTests")
     if (!skipTests) {
-      if (project.name == "trino-connector") {
-        useTestNG()
-        maxHeapSize = "2G"
-      } else {
-        useJUnitPlatform()
-      }
-
+      jvmArgs = listOf("-Xmx2G")
+      useJUnitPlatform()
       jvmArgs(project.property("extraJvmArgs") as List<*>)
       finalizedBy(tasks.getByName("jacocoTestReport"))
     }
@@ -737,8 +728,8 @@ fun printMacDockerTip() {
 }
 
 fun checkMacDockerConnector() {
-  if (OperatingSystem.current().isLinux()) {
-    // Linux does not require the use of `docker-connector`
+  if (!OperatingSystem.current().isMacOsX()) {
+    // Only MacOs requires the use of `docker-connector`
     return
   }
 
@@ -773,7 +764,7 @@ fun checkDockerStatus() {
 }
 
 fun checkOrbStackStatus() {
-  if (OperatingSystem.current().isLinux()) {
+  if (!OperatingSystem.current().isMacOsX()) {
     return
   }
 

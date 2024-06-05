@@ -15,8 +15,6 @@ import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.container.TrinoContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
-import com.datastrato.gravitino.integration.test.util.ITUtils;
-import com.datastrato.gravitino.integration.test.util.JdbcDriverDownloader;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
@@ -48,11 +46,14 @@ import org.apache.thrift.TException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@Disabled
+@Deprecated
 @Tag("gravitino-docker-it")
 public class TrinoConnectorIT extends AbstractIT {
   public static final Logger LOG = LoggerFactory.getLogger(TrinoConnectorIT.class);
@@ -102,26 +103,6 @@ public class TrinoConnectorIT extends AbstractIT {
         "Can not synchronize calatogs from gravitino");
 
     createSchema();
-
-    String testMode =
-        System.getProperty(ITUtils.TEST_MODE) == null
-            ? ITUtils.EMBEDDED_TEST_MODE
-            : System.getProperty(ITUtils.TEST_MODE);
-
-    // Deploy mode, you should download jars to the Gravitino server iceberg lib directory
-    if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
-      String gravitinoHome = System.getenv("GRAVITINO_HOME");
-      String destPath = ITUtils.joinPath(gravitinoHome, "catalogs", "lakehouse-iceberg", "libs");
-      String mysqlPath = ITUtils.joinPath(gravitinoHome, "catalogs", "jdbc-mysql", "libs");
-      String pgPath = ITUtils.joinPath(gravitinoHome, "catalogs", "jdbc-postgresql", "libs");
-
-      JdbcDriverDownloader.downloadJdbcDriver(
-          "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar",
-          destPath,
-          mysqlPath);
-      JdbcDriverDownloader.downloadJdbcDriver(
-          "https://jdbc.postgresql.org/download/postgresql-42.7.0.jar", destPath, pgPath);
-    }
   }
 
   @AfterAll

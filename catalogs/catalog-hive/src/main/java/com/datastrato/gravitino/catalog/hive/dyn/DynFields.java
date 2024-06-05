@@ -21,7 +21,6 @@ package com.datastrato.gravitino.catalog.hive.dyn;
 import com.google.common.base.Joiner;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Throwables;
 import com.google.common.collect.Sets;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -57,16 +56,15 @@ public class DynFields {
       try {
         return (T) field.get(target);
       } catch (IllegalAccessException e) {
-        Throwables.throwIfUnchecked(e);
         throw new RuntimeException(e);
       }
     }
 
+    @SuppressWarnings("unchecked")
     public void set(Object target, T value) {
       try {
         field.set(target, value);
       } catch (IllegalAccessException e) {
-        Throwables.throwIfUnchecked(e);
         throw new RuntimeException(e);
       }
     }

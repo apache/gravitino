@@ -73,6 +73,15 @@ dependencies {
   testImplementation(libs.hadoop2.common) {
     exclude("*")
   }
+  testImplementation(libs.hadoop2.hdfs) {
+    exclude("com.sun.jersey")
+    exclude("commons-cli", "commons-cli")
+    exclude("commons-io", "commons-io")
+    exclude("commons-codec", "commons-codec")
+    exclude("commons-logging", "commons-logging")
+    exclude("javax.servlet", "servlet-api")
+    exclude("org.mortbay.jetty")
+  }
   testImplementation(libs.hadoop2.mapreduce.client.core) {
     exclude("*")
   }
@@ -124,6 +133,10 @@ tasks.test {
     exclude("**/integration/**")
   } else {
     dependsOn(tasks.jar)
+
+    doFirst {
+      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.12")
+    }
 
     val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
     init(this)

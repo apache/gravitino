@@ -38,6 +38,7 @@ import com.datastrato.gravitino.messaging.TopicChange;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.storage.IdGenerator;
+import com.datastrato.gravitino.utils.NamespaceUtil;
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -552,7 +553,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
         SchemaEntity.builder()
             .withName(defaultSchemaIdent.name())
             .withId(uid)
-            .withNamespace(Namespace.ofSchema(info.namespace().level(0), info.name()))
+            .withNamespace(NamespaceUtil.ofSchema(info.namespace().level(0), info.name()))
             .withComment("The default schema of Kafka catalog including all topics")
             .withProperties(properties)
             .withAuditInfo(

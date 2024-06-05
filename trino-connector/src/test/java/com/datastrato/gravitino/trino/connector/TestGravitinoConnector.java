@@ -7,8 +7,7 @@ package com.datastrato.gravitino.trino.connector;
 import static io.trino.testing.TestingSession.testSessionBuilder;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
@@ -21,13 +20,13 @@ import io.trino.testing.MaterializedRow;
 import io.trino.testing.QueryRunner;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.awaitility.Awaitility;
+import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.com.google.common.base.Preconditions;
-import org.testng.annotations.Parameters;
-import org.testng.annotations.Test;
 
-@Parameters({"-Xmx4G"})
 public class TestGravitinoConnector extends AbstractTestQueryFramework {
 
   GravitinoMockServer server;
@@ -38,31 +37,41 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
     GravitinoAdminClient gravitinoClient = server.createGravitinoClient();
 
     Session session = testSessionBuilder().setCatalog("gravitino").build();
-    QueryRunner queryRunner = null;
     try {
-      // queryRunner = LocalQueryRunner.builder(session).build();
-      queryRunner = DistributedQueryRunner.builder(session).setNodeCount(1).build();
+
+      DistributedQueryRunner queryRunner =
+          DistributedQueryRunner.builder(session).setNodeCount(1).build();
 
       TestGravitinoPlugin gravitinoPlugin = new TestGravitinoPlugin(gravitinoClient);
       queryRunner.installPlugin(gravitinoPlugin);
-      queryRunner.installPlugin(new MemoryPlugin());
 
       // create a gravitino connector named gravitino using metalake test
       HashMap<String, String> properties = new HashMap<>();
       properties.put("gravitino.metalake", "test");
       properties.put("gravitino.uri", "http://127.0.0.1:8090");
+      properties.put(
+          "trino.catalog.store", queryRunner.getCoordinator().getBaseDataDir().toString());
+      properties.put(
+          "trino.jdbc.uri",
+          queryRunner.getCoordinator().getBaseUrl().toString().replace("http", "jdbc:trino"));
       queryRunner.createCatalog("gravitino", "gravitino", properties);
 
+      GravitinoConnectorPluginManager.instance(this.getClass().getClassLoader())
+          .installPlugin("memory", new MemoryPlugin());
       CatalogConnectorManager catalogConnectorManager =
           gravitinoPlugin.getCatalogConnectorManager();
       server.setCatalogConnectorManager(catalogConnectorManager);
 
-      // test the catalog has loaded
-      assertFalse(catalogConnectorManager.getCatalogs().isEmpty());
+      // Wait for the catalog to be created. Wait for at least 30 seconds.
+      Awaitility.await()
+          .atMost(30, TimeUnit.SECONDS)
+          .pollInterval(1, TimeUnit.SECONDS)
+          .until(() -> !catalogConnectorManager.getCatalogs().isEmpty());
+
+      return queryRunner;
     } catch (Exception e) {
       throw new RuntimeException("Create query runner failed", e);
     }
-    return queryRunner;
   }
 
   @Test

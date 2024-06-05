@@ -2,15 +2,13 @@
  * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.catalog.postgresql.integration.test;
+package com.datastrato.gravitino.catalog.postgresql.operation;
 
+import com.datastrato.gravitino.catalog.jdbc.TestJdbc;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
-import com.datastrato.gravitino.catalog.jdbc.integration.test.TestJdbcAbstractIT;
 import com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlExceptionConverter;
 import com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter;
-import com.datastrato.gravitino.catalog.postgresql.operation.PostgreSqlSchemaOperations;
-import com.datastrato.gravitino.catalog.postgresql.operation.PostgreSqlTableOperations;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.HashMap;
@@ -18,7 +16,7 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeAll;
 import org.testcontainers.containers.PostgreSQLContainer;
 
-public class TestPostgreSqlAbstractIT extends TestJdbcAbstractIT {
+public class TestPostgreSql extends TestJdbc {
 
   public static final String DEFAULT_POSTGRES_IMAGE = "postgres:13";
 
@@ -31,7 +29,7 @@ public class TestPostgreSqlAbstractIT extends TestJdbcAbstractIT {
             .withPassword("root");
     DATABASE_OPERATIONS = new PostgreSqlSchemaOperations();
     JDBC_EXCEPTION_CONVERTER = new PostgreSqlExceptionConverter();
-    TestJdbcAbstractIT.startup();
+    TestJdbc.startup();
     String jdbcUrl = CONTAINER.getJdbcUrl();
     try {
       String database =

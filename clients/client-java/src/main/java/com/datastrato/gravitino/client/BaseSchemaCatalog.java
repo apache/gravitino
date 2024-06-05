@@ -54,9 +54,12 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
       RESTClient restClient) {
     super(name, type, provider, comment, properties, auditDTO);
     this.restClient = restClient;
-    Namespace.checkCatalog(namespace);
+    Namespace.check(
+        namespace != null && namespace.length() == 1,
+        "Catalog namespace must be non-null and have 1 level, the input namespace is %s",
+        namespace);
     this.namespace = namespace;
-    this.schemaNamespace = Namespace.ofSchema(namespace.level(0), name);
+    this.schemaNamespace = Namespace.of(namespace.level(0), name);
   }
 
   @Override
@@ -67,11 +70,11 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
   /**
    * List all the schemas under the given catalog namespace.
    *
-   * @return A list of {@link NameIdentifier} of the schemas under the given catalog namespace.
+   * @return A list of the schema names under the given catalog namespace.
    * @throws NoSuchCatalogException if the catalog with specified namespace does not exist.
    */
   @Override
-  public NameIdentifier[] listSchemas() throws NoSuchCatalogException {
+  public String[] listSchemas() throws NoSuchCatalogException {
 
     EntityListResponse resp =
         restClient.get(
@@ -81,7 +84,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
             ErrorHandlers.schemaErrorHandler());
     resp.validate();
 
-    return resp.identifiers();
+    return Arrays.stream(resp.identifiers()).map(NameIdentifier::name).toArray(String[]::new);
   }
 
   /**

@@ -14,6 +14,7 @@ dependencies {
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
   implementation(libs.caffeine)
 
+  testImplementation(project(":core"))
   testImplementation(project(":server-common"))
   testImplementation(libs.awaitility)
   testImplementation(libs.bundles.jwt)

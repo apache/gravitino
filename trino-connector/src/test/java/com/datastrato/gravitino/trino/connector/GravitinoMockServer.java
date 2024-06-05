@@ -42,6 +42,7 @@ import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ConnectorMetadata;
 import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.ConnectorTableMetadata;
+import io.trino.spi.connector.SaveMode;
 import io.trino.spi.connector.SchemaTableName;
 import io.trino.testing.ResourcePresence;
 import java.time.Instant;
@@ -128,12 +129,10 @@ public class GravitinoMockServer implements AutoCloseable {
     when(metaLake.name()).thenReturn(metalakeName);
     when(metaLake.listCatalogs())
         .thenAnswer(
-            new Answer<NameIdentifier[]>() {
+            new Answer<String[]>() {
               @Override
-              public NameIdentifier[] answer(InvocationOnMock invocation) throws Throwable {
-                return metalakes.get(metalakeName).catalogs.keySet().stream()
-                    .map(catalogName -> NameIdentifier.ofCatalog(metalakeName, catalogName))
-                    .toArray(NameIdentifier[]::new);
+              public String[] answer(InvocationOnMock invocation) throws Throwable {
+                return metalakes.get(metalakeName).catalogs.keySet().toArray(String[]::new);
               };
             });
 
@@ -190,14 +189,6 @@ public class GravitinoMockServer implements AutoCloseable {
             });
     metalakes.put(metalakeName, new Metalake(metaLake));
     return metaLake;
-  }
-
-  void reloadCatalogs() {
-    GravitinoMetalake metaLake = mock(GravitinoMetalake.class);
-    when(metaLake.name()).thenReturn(testMetalake);
-    when(metaLake.listCatalogs())
-        .thenReturn(new NameIdentifier[] {NameIdentifier.ofCatalog(testMetalake, testCatalog)});
-    catalogConnectorManager.loadCatalogs(metaLake);
   }
 
   private Catalog createCatalog(String metalakeName, String catalogName) {
@@ -274,9 +265,9 @@ public class GravitinoMockServer implements AutoCloseable {
 
     when(schemas.listSchemas())
         .thenAnswer(
-            new Answer<NameIdentifier[]>() {
+            new Answer<String[]>() {
               @Override
-              public NameIdentifier[] answer(InvocationOnMock invocation) throws Throwable {
+              public String[] answer(InvocationOnMock invocation) throws Throwable {
                 MemoryConnector memoryConnector =
                     (MemoryConnector)
                         catalogConnectorManager
@@ -284,12 +275,7 @@ public class GravitinoMockServer implements AutoCloseable {
                                 catalogConnectorManager.getTrinoCatalogName(catalog))
                             .getInternalConnector();
                 ConnectorMetadata metadata = memoryConnector.getMetadata(null, null);
-                return metadata.listSchemaNames(null).stream()
-                    .map(
-                        schemaName ->
-                            NameIdentifier.ofSchema(
-                                catalog.getMetalake(), catalog.getName(), schemaName))
-                    .toArray(NameIdentifier[]::new);
+                return metadata.listSchemaNames(null).toArray(new String[0]);
               }
             });
 
@@ -369,7 +355,7 @@ public class GravitinoMockServer implements AutoCloseable {
                                 catalogConnectorManager.getTrinoCatalogName(catalog))
                             .getInternalConnector();
                 ConnectorMetadata metadata = memoryConnector.getMetadata(null, null);
-                metadata.createTable(null, tableMetadata, false);
+                metadata.createTable(null, tableMetadata, SaveMode.FAIL);
                 return null;
               }
             });
@@ -420,7 +406,7 @@ public class GravitinoMockServer implements AutoCloseable {
                 ArrayList<NameIdentifier> tableNames = new ArrayList<>();
                 for (SchemaTableName tableName : metadata.listTables(null, Optional.empty())) {
                   tableNames.add(
-                      NameIdentifier.ofTable(
+                      NameIdentifier.of(
                           schemaName.level(0),
                           schemaName.level(1),
                           schemaName.level(2),

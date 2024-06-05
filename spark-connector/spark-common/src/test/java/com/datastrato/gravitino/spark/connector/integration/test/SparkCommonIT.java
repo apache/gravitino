@@ -420,12 +420,12 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     createSimpleTable(tableName);
     checkTableColumns(tableName, simpleTableColumns, getTableInfo(tableName));
 
-    sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 string)", tableName));
+    sql(String.format("ALTER TABLE %s ADD COLUMNS (col1 string)", tableName));
     ArrayList<SparkColumnInfo> addColumns = new ArrayList<>(simpleTableColumns);
     addColumns.add(SparkColumnInfo.of("col1", DataTypes.StringType, null));
     checkTableColumns(tableName, addColumns, getTableInfo(tableName));
 
-    sql(String.format("ALTER TABLE %S DROP COLUMNS (col1)", tableName));
+    sql(String.format("ALTER TABLE %s DROP COLUMNS (col1)", tableName));
     checkTableColumns(tableName, simpleTableColumns, getTableInfo(tableName));
   }
 
@@ -439,8 +439,8 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     createSimpleTable(tableName);
     checkTableColumns(tableName, simpleTableColumns, getTableInfo(tableName));
 
-    sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 int)", tableName));
-    sql(String.format("ALTER TABLE %S CHANGE COLUMN col1 col1 bigint", tableName));
+    sql(String.format("ALTER TABLE %s ADD COLUMNS (col1 int)", tableName));
+    sql(String.format("ALTER TABLE %s CHANGE COLUMN col1 col1 bigint", tableName));
     ArrayList<SparkColumnInfo> updateColumns = new ArrayList<>(simpleTableColumns);
     updateColumns.add(SparkColumnInfo.of("col1", DataTypes.LongType, null));
     checkTableColumns(tableName, updateColumns, getTableInfo(tableName));
@@ -457,7 +457,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     String oldColumnName = "col1";
     String newColumnName = "col2";
 
-    sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 int)", tableName));
+    sql(String.format("ALTER TABLE %s ADD COLUMNS (col1 int)", tableName));
     sql(
         String.format(
             "ALTER TABLE %s RENAME COLUMN %s TO %s", tableName, oldColumnName, newColumnName));
@@ -483,25 +483,25 @@ public abstract class SparkCommonIT extends SparkEnvIT {
             tableName));
     checkTableColumns(tableName, simpleTableColumns, getTableInfo(tableName));
 
-    sql(String.format("ALTER TABLE %S ADD COLUMNS (col1 STRING COMMENT '')", tableName));
+    sql(String.format("ALTER TABLE %s ADD COLUMNS (col1 STRING COMMENT '')", tableName));
     List<SparkColumnInfo> updateColumnPositionCol1 = new ArrayList<>(simpleTableColumns);
     updateColumnPositionCol1.add(SparkColumnInfo.of("col1", DataTypes.StringType, ""));
     checkTableColumns(tableName, updateColumnPositionCol1, getTableInfo(tableName));
 
-    sql(String.format("ALTER TABLE %S CHANGE COLUMN col1 col1 STRING FIRST", tableName));
+    sql(String.format("ALTER TABLE %s CHANGE COLUMN col1 col1 STRING FIRST", tableName));
     List<SparkColumnInfo> updateColumnPositionFirst = new ArrayList<>();
     updateColumnPositionFirst.add(SparkColumnInfo.of("col1", DataTypes.StringType, ""));
     updateColumnPositionFirst.addAll(simpleTableColumns);
     checkTableColumns(tableName, updateColumnPositionFirst, getTableInfo(tableName));
 
-    sql(String.format("ALTER TABLE %S ADD COLUMNS (col2 STRING COMMENT '')", tableName));
+    sql(String.format("ALTER TABLE %s ADD COLUMNS (col2 STRING COMMENT '')", tableName));
     List<SparkColumnInfo> updateColumnPositionCol2 = new ArrayList<>();
     updateColumnPositionCol2.add(SparkColumnInfo.of("col1", DataTypes.StringType, ""));
     updateColumnPositionCol2.addAll(simpleTableColumns);
     updateColumnPositionCol2.add(SparkColumnInfo.of("col2", DataTypes.StringType, ""));
     checkTableColumns(tableName, updateColumnPositionCol2, getTableInfo(tableName));
 
-    sql(String.format("ALTER TABLE %S CHANGE COLUMN col2 col2 STRING AFTER col1", tableName));
+    sql(String.format("ALTER TABLE %s CHANGE COLUMN col2 col2 STRING AFTER col1", tableName));
     List<SparkColumnInfo> updateColumnPositionAfter = new ArrayList<>();
     updateColumnPositionAfter.add(SparkColumnInfo.of("col1", DataTypes.StringType, ""));
     updateColumnPositionAfter.add(SparkColumnInfo.of("col2", DataTypes.StringType, ""));
@@ -522,10 +522,10 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
     sql(
         String.format(
-            "ALTER TABLE %S ADD COLUMNS (col1 int comment '%s')", tableName, oldColumnComment));
+            "ALTER TABLE %s ADD COLUMNS (col1 int comment '%s')", tableName, oldColumnComment));
     sql(
         String.format(
-            "ALTER TABLE %S CHANGE COLUMN col1 col1 int comment '%s'",
+            "ALTER TABLE %s CHANGE COLUMN col1 col1 int comment '%s'",
             tableName, newColumnComment));
     ArrayList<SparkColumnInfo> updateCommentColumns = new ArrayList<>(simpleTableColumns);
     updateCommentColumns.add(SparkColumnInfo.of("col1", DataTypes.IntegerType, newColumnComment));
@@ -751,6 +751,19 @@ public abstract class SparkCommonIT extends SparkEnvIT {
             .withTableProperties(ImmutableMap.of(TableCatalog.OPTION_PREFIX + "a", "b"));
     checker.check(tableInfo);
     checkTableReadWrite(tableInfo);
+  }
+
+  @Test
+  void testDropAndWriteTable() {
+    String tableName = "drop_then_create_write_table";
+
+    createSimpleTable(tableName);
+    checkTableReadWrite(getTableInfo(tableName));
+
+    dropTableIfExists(tableName);
+
+    createSimpleTable(tableName);
+    checkTableReadWrite(getTableInfo(tableName));
   }
 
   @Test

@@ -162,7 +162,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         classLoader.withClassLoader(
             cl -> {
               if (catalog != null) {
-                catalog.ops().close();
+                catalog.close();
               }
               catalog = null;
               return null;
@@ -506,7 +506,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         // Kafka catalog needs to cascade drop the default schema
         List<SchemaEntity> schemas =
             store.list(
-                Namespace.ofSchema(ident.namespace().level(0), ident.name()),
+                Namespace.of(ident.namespace().level(0), ident.name()),
                 SchemaEntity.class,
                 EntityType.SCHEMA);
         // If there is only one schema, it must be the default schema, because we don't allow to

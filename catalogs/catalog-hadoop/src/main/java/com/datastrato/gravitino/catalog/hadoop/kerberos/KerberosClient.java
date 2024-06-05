@@ -23,10 +23,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class KerberosClient {
+  private static final Logger LOG = LoggerFactory.getLogger(KerberosClient.class);
 
   public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-%s-keytab";
-
-  private static final Logger LOG = LoggerFactory.getLogger(KerberosClient.class);
 
   private final ScheduledThreadPoolExecutor checkTgtExecutor;
   private final Map<String, String> conf;
