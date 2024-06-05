@@ -20,7 +20,7 @@
 
 # Initial Ranger database in MySQL
 sed "s/PLACEHOLDER_RANGER_PASSWORD/${RANGER_PASSWORD}/g" "/tmp/init-mysql.sql.template" > "/tmp/init-mysql.sql"
-service mysql start && mysql -uroot < /tmp/init-mysql.sql
+service mariadb start && mysql -uroot < /tmp/init-mysql.sql
 
 # Update Ranger Admin password and setup Ranger Admin
 sed -i 's/audit_store=solr/audit_store=DB/g' /opt/ranger-admin/install.properties

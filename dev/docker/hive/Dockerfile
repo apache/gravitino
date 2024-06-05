@@ -22,7 +22,8 @@ LABEL maintainer="dev@gravitino.apache.org"
 
 ARG HADOOP_VERSION
 ARG HIVE_VERSION
-ARG JDBC_DIVER_PACKAGE_NAME
+ARG ZOOKEEPER_VERSION
+ARG RANGER_VERSION
 ARG MYSQL_JDBC_DRIVER_VERSION
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -65,14 +66,16 @@ RUN cat /dev/zero | ssh-keygen -q -N "" > /dev/null && cat /root/.ssh/id_rsa.pub
 ENV JAVA_HOME=/usr/local/jdk
 ENV HIVE_HOME=/usr/local/hive
 ENV HADOOP_HOME=/usr/local/hadoop
-ENV HADOOP_HEAPSIZE=128
+ENV HADOOP_HEAPSIZE=512
 ENV HADOOP_INSTALL=${HADOOP_HOME}
 ENV HADOOP_MAPRED_HOME=${HADOOP_INSTALL}
 ENV HADOOP_COMMON_HOME=${HADOOP_INSTALL}
 ENV HADOOP_HDFS_HOME=${HADOOP_INSTALL}
 ENV HADOOP_CONF_DIR=${HADOOP_HOME}/etc/hadoop
 ENV YARN_HOME=${HADOOP_INSTALL}
-
+ENV ZK_HOME=/usr/local/zookeeper
+ENV RANGER_HDFS_PLUGIN_HOME=/usr/local/ranger-hdfs-plugin
+ENV RANGER_HIVE_PLUGIN_HOME=/usr/local/ranger-hive-plugin
 ENV PATH=${JAVA_HOME}/bin:${HADOOP_HOME}/bin:${HADOOP_INSTALL}/sbin:${HIVE_HOME}/bin:${PATH}
 ENV CLASSPATH=${HADOOP_HOME}/lib/*:HIVE_HOME/lib/*:.
 ENV LD_LIBRARY_PATH=${HADOOP_HOME}/lib/native
@@ -97,15 +100,31 @@ RUN echo "HADOOP_CONF_DIR=${HADOOP_CONF_DIR}" >> /etc/environment
 RUN echo "HADOOP_CLASSPATH=${JAVA_HOME}/lib/tools.jar" >> /etc/environment
 RUN echo "YARN_HOME=${YARN_HOME}" >> /etc/environment
 RUN echo "HIVE_HOME=${HIVE_HOME}" >> /etc/environment
+RUN echo "ZK_HOME=${ZK_HOME}" >> /etc/environment
 RUN echo "PATH=${PATH}" >> /etc/environment
 RUN echo "CLASSPATH=${CLASSPATH}" >> /etc/environment
 RUN echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}" >> /etc/environment
 
 ################################################################################
+# install zoofkeeper
+ADD packages/zookeeper-${ZOOKEEPER_VERSION}.tar.gz /opt/
+RUN ln -s /opt/zookeeper-${ZOOKEEPER_VERSION} ${ZK_HOME}
+RUN mkdir $ZK_HOME/data
+
+################################################################################
+# install ranger hadoop plugin
+ADD packages/ranger-distro-${RANGER_VERSION}-hdfs-plugin.tar.gz /opt/
+RUN ln -s /opt/ranger-${RANGER_VERSION}-hdfs-plugin ${RANGER_HDFS_PLUGIN_HOME}
+
+################################################################################
+# install ranger hive plugin
+ADD packages/ranger-distro-${RANGER_VERSION}-hive-plugin.tar.gz /opt/
+RUN ln -s /opt/ranger-${RANGER_VERSION}-hive-plugin ${RANGER_HIVE_PLUGIN_HOME}
+
+################################################################################
 # install hadoop
-RUN mkdir ${HADOOP_HOME}
 ADD packages/hadoop-${HADOOP_VERSION}.tar.gz /opt/
-RUN ln -s /opt/hadoop-${HADOOP_VERSION}/* ${HADOOP_HOME}
+RUN ln -s /opt/hadoop-${HADOOP_VERSION} ${HADOOP_HOME}
 
 # replace configuration templates
 RUN rm -f ${HADOOP_CONF_DIR}/core-site.xml
@@ -119,14 +138,10 @@ ADD hdfs-site.xml ${HADOOP_CONF_DIR}/hdfs-site.xml
 ADD mapred-site.xml ${HADOOP_CONF_DIR}/mapred-site.xml
 ADD check-status.sh /tmp/check-status.sh
 
-# format HFS
-RUN ${HADOOP_HOME}/bin/hdfs namenode -format -nonInteractive
-
 ################################################################################
 # install hive
-RUN mkdir ${HIVE_HOME}
 ADD packages/apache-hive-${HIVE_VERSION}-bin.tar.gz /opt/
-RUN ln -s /opt/apache-hive-${HIVE_VERSION}-bin/* ${HIVE_HOME}
+RUN ln -s /opt/apache-hive-${HIVE_VERSION}-bin ${HIVE_HOME}
 
 ADD hive-site.xml ${HIVE_HOME}/conf/hive-site.xml
 
@@ -168,7 +183,7 @@ RUN rm -rf /var/lib/apt/lists/*
 
 ################################################################################
 # expose port
-EXPOSE 3306 9000 9083 10000 10002 50070 50075 50010
+EXPOSE 2181 3306 9000 9083 10000 10002 50070 50075 50010
 
 ################################################################################
 # create startup script and set ENTRYPOINT
