@@ -22,6 +22,10 @@ docker run --rm -d -p 8090:8090 -p 9001:9001 datastrato/gravitino
 
 Changelog
 
+- gravitino:0.5.1
+  - Based on Gravitino 0.5.1, you can know more information from 0.5.1 release notes.
+
+
 - gravitino:0.5.0
   - Based on Gravitino 0.5.0, you can know more information from 0.5.0 release notes.
 
@@ -63,6 +67,10 @@ Changelog
 
 Changelog
 
+- trino:435-gravitino-0.5.1
+  - Based on Gravitino 0.5.1, you can know more information from 0.5.1 release notes.
+
+
 - trino:426-gravitino-0.5.0
   - Based on Gravitino 0.5.0, you can know more information from 0.5.0 release notes.
 
@@ -89,6 +97,13 @@ You can use these kinds of Docker images to facilitate integration testing of al
 You can use this kind of image to test the catalog of Apache Hive with kerberos enable
 
 Changelog
+- gravitino-ci-kerberos-hive:0.1.2
+  - Add `${HOSTNAME} >> /root/.ssh/known_hosts` to the startup script.
+  - Add check for the status of DataNode, if the DataNode is not running or ready within 100s, the container will exit.
+
+- gravitino-ci-kerberos-hive:0.1.1
+  - Add a principal for Gravitino web server named 'HTTP/localhost@HADOOPKRB'.
+  - Fix bugs about the configuration of proxy users. 
 
 - gravitino-ci-kerberos-hive:0.1.0
     - Set up a Hive cluster with kerberos enabled.
@@ -99,6 +114,13 @@ Changelog
 You can use this kind of image to test the catalog of Apache Hive.
 
 Changelog
+
+- gravitino-ci-hive:0.1.12
+  - Shrink hive Docker image size by 420MB
+
+- gravitino-ci-hive:0.1.11
+  - Remove `yarn` from the startup script; Remove `yarn-site.xml` and `yarn-env.sh` files;
+  - Change the value of `mapreduce.framework.name` from `yarn` to `local` in the `mapred-site.xml` file. 
 
 - gravitino-ci-hive:0.1.10
   - Remove SSH service from the startup script.
@@ -164,6 +186,9 @@ You can use this image to test Trino.
 
 Changelog
 
+- gravitino-ci-trino:0.1.6
+  - Upgrade trino:426 to trino:435
+
 - gravitino-ci-trino:0.1.5
   - Add check for the version of gravitino-trino-connector
 
@@ -206,3 +231,16 @@ Changelog
   - Expose ports:
     - `8030` Doris FE HTTP port
     - `9030` Doris FE MySQL server port
+
+## Gravitino CI Apache Ranger image
+
+You can use this image to control Trino's permissions.
+
+Changelog
+
+- gravitino-ci-ranger:0.1.0
+  - Docker image `datastrato/gravitino-ci-ranger:0.1.0`
+  - Support Apache Ranger 2.4.0
+  - Use environment variable `RANGER_PASSWORD` to set up Apache Ranger admin password, Please notice Apache Ranger Password should be minimum 8 characters with min one alphabet and one numeric.
+  - Expose ports:
+    - `6080` Apache Ranger admin port

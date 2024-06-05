@@ -53,6 +53,8 @@ Contributors may be added by existing maintainers (see [Governance document](GOV
 | Li-Hsing Liu   | austin362667        | opensource4you   |
 | Tianhang Li    | TEOTEO520           | Bilibili         |
 | Hiren Sharma   | hiirrxnn            | opensource4you   |
+| Chun-Hung Tseng| henrybear327        | opensource4you   |
+| Carl Chang     | ichuniq             | opensource4you   |
 
 ## Review process
 

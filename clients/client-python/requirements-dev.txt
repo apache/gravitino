@@ -1,7 +1,8 @@
 # Copyright 2024 Datastrato Pvt Ltd.
 # This software is licensed under the Apache License version 2.
-requests
-dataclasses-json
-pylint
-black
-twine
+requests==2.32.2
+dataclasses-json==0.6.6
+pylint==3.2.2
+black==24.4.2
+twine==5.1.0
+coverage==7.5.1

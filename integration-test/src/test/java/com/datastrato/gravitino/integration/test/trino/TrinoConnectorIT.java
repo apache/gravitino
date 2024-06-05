@@ -8,16 +8,14 @@ import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.container.TrinoContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
-import com.datastrato.gravitino.integration.test.util.ITUtils;
-import com.datastrato.gravitino.integration.test.util.JdbcDriverDownloader;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
@@ -48,11 +46,14 @@ import org.apache.thrift.TException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@Disabled
+@Deprecated
 @Tag("gravitino-docker-it")
 public class TrinoConnectorIT extends AbstractIT {
   public static final Logger LOG = LoggerFactory.getLogger(TrinoConnectorIT.class);
@@ -102,26 +103,6 @@ public class TrinoConnectorIT extends AbstractIT {
         "Can not synchronize calatogs from gravitino");
 
     createSchema();
-
-    String testMode =
-        System.getProperty(ITUtils.TEST_MODE) == null
-            ? ITUtils.EMBEDDED_TEST_MODE
-            : System.getProperty(ITUtils.TEST_MODE);
-
-    // Deploy mode, you should download jars to the Gravitino server iceberg lib directory
-    if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
-      String gravitinoHome = System.getenv("GRAVITINO_HOME");
-      String destPath = ITUtils.joinPath(gravitinoHome, "catalogs", "lakehouse-iceberg", "libs");
-      String mysqlPath = ITUtils.joinPath(gravitinoHome, "catalogs", "jdbc-mysql", "libs");
-      String pgPath = ITUtils.joinPath(gravitinoHome, "catalogs", "jdbc-postgresql", "libs");
-
-      JdbcDriverDownloader.downloadJdbcDriver(
-          "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar",
-          destPath,
-          mysqlPath);
-      JdbcDriverDownloader.downloadJdbcDriver(
-          "https://jdbc.postgresql.org/download/postgresql-42.7.0.jar", destPath, pgPath);
-    }
   }
 
   @AfterAll
@@ -145,8 +126,7 @@ public class TrinoConnectorIT extends AbstractIT {
             HiveContainer.HDFS_DEFAULTFS_PORT,
             databaseName);
     containerSuite.getTrinoContainer().executeUpdateSQL(sql1);
-    NameIdentifier idSchema = NameIdentifier.of(metalakeName, catalogName, databaseName);
-    Schema schema = catalog.asSchemas().loadSchema(idSchema);
+    Schema schema = catalog.asSchemas().loadSchema(databaseName);
     Assertions.assertEquals(schema.name(), databaseName);
 
     ArrayList<ArrayList<String>> r =
@@ -377,8 +357,7 @@ public class TrinoConnectorIT extends AbstractIT {
             catalogName, schemaName);
     containerSuite.getTrinoContainer().executeUpdateSQL(createSchemaSql);
 
-    Schema schema =
-        catalog.asSchemas().loadSchema(NameIdentifier.of(metalakeName, catalogName, schemaName));
+    Schema schema = catalog.asSchemas().loadSchema(schemaName);
     Assertions.assertEquals(
         "hdfs://localhost:9000/user/hive/warehouse/hive_schema_1123123",
         schema.properties().get("location"));
@@ -460,7 +439,7 @@ public class TrinoConnectorIT extends AbstractIT {
     catalog
         .asSchemas()
         .createSchema(
-            NameIdentifier.of(metalakeName, catalogName, schemaName),
+            schemaName,
             "Created by gravitino client",
             ImmutableMap.<String, String>builder()
                 .put("location", "hdfs://localhost:9000/user/hive/warehouse/hive_schema_1223445.db")
@@ -703,7 +682,7 @@ public class TrinoConnectorIT extends AbstractIT {
         catalog
             .asSchemas()
             .createSchema(
-                NameIdentifier.of(metalakeName, catalogName, schemaName),
+                schemaName,
                 "Created by gravitino client",
                 ImmutableMap.<String, String>builder().build());
 
@@ -925,7 +904,7 @@ public class TrinoConnectorIT extends AbstractIT {
         catalog
             .asSchemas()
             .createSchema(
-                NameIdentifier.of(metalakeName, catalogName, schemaName),
+                schemaName,
                 "Created by gravitino client",
                 ImmutableMap.<String, String>builder().build());
 
@@ -1060,7 +1039,7 @@ public class TrinoConnectorIT extends AbstractIT {
     catalog
         .asSchemas()
         .createSchema(
-            NameIdentifier.of(metalakeName, catalogName, schemaName),
+            schemaName,
             "Created by gravitino client",
             ImmutableMap.<String, String>builder().build());
 
@@ -1083,11 +1062,11 @@ public class TrinoConnectorIT extends AbstractIT {
     }
 
     // Do not support the cascade drop
-    success =
-        catalog
-            .asSchemas()
-            .dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), true);
-    Assertions.assertFalse(success);
+    Throwable excep =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> catalog.asSchemas().dropSchema(schemaName, true));
+    Assertions.assertTrue(
+        excep.getMessage().contains("Iceberg does not support cascading delete operations."));
     final String sql3 = String.format("show schemas in %s like '%s'", catalogName, schemaName);
     success = checkTrinoHasLoaded(sql3, 30);
     if (!success) {
@@ -1181,10 +1160,7 @@ public class TrinoConnectorIT extends AbstractIT {
     Schema schema =
         catalog
             .asSchemas()
-            .createSchema(
-                NameIdentifier.of(metalakeName, catalogName, schemaName),
-                null,
-                ImmutableMap.<String, String>builder().build());
+            .createSchema(schemaName, null, ImmutableMap.<String, String>builder().build());
 
     Assertions.assertNotNull(schema);
 

@@ -103,15 +103,13 @@ public class GroupMetaService {
                     }
                   }),
           () -> {
-            if (groupRoleRelPOS.isEmpty()) {
-              return;
-            }
             SessionUtils.doWithoutCommit(
                 GroupRoleRelMapper.class,
                 mapper -> {
                   if (overwritten) {
-                    mapper.batchInsertGroupRoleRelOnDuplicateKeyUpdate(groupRoleRelPOS);
-                  } else {
+                    mapper.softDeleteGroupRoleRelByGroupId(groupEntity.id());
+                  }
+                  if (!groupRoleRelPOS.isEmpty()) {
                     mapper.batchInsertGroupRoleRel(groupRoleRelPOS);
                   }
                 });
@@ -209,5 +207,25 @@ public class GroupMetaService {
       throw re;
     }
     return newEntity;
+  }
+
+  public int deleteGroupMetasByLegacyTimeLine(long legacyTimeLine, int limit) {
+    int[] groupDeletedCount = new int[] {0};
+    int[] groupRoleRelDeletedCount = new int[] {0};
+
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            groupDeletedCount[0] =
+                SessionUtils.doWithoutCommitAndFetchResult(
+                    GroupMetaMapper.class,
+                    mapper -> mapper.deleteGroupMetasByLegacyTimeLine(legacyTimeLine, limit)),
+        () ->
+            groupRoleRelDeletedCount[0] =
+                SessionUtils.doWithoutCommitAndFetchResult(
+                    GroupRoleRelMapper.class,
+                    mapper ->
+                        mapper.deleteGroupRoleRelMetasByLegacyTimeLine(legacyTimeLine, limit)));
+
+    return groupDeletedCount[0] + groupRoleRelDeletedCount[0];
   }
 }

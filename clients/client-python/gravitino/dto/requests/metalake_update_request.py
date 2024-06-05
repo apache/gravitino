@@ -16,8 +16,8 @@ from gravitino.rest.rest_message import RESTRequest
 class MetalakeUpdateRequestBase(RESTRequest):
     _type: str = field(metadata=config(field_name="@type"))
 
-    def __init__(self, type: str):
-        self._type = type
+    def __init__(self, action_type: str):
+        self._type = action_type
 
     @abstractmethod
     def metalake_change(self):
@@ -83,19 +83,21 @@ class MetalakeUpdateRequest:
         _value: str = field(metadata=config(field_name="value"))
         """The value of the property."""
 
-        def __init__(self, property: str, value: str):
+        def __init__(self, metalake_property: str, value: str):
             super().__init__("setProperty")
-            self._property = property
+            self._property = metalake_property
             self._value = value
 
         def validate(self):
             """Validates the fields of the request.
 
             Raises:
-                 IllegalArgumentException if property or value are not set.
+                 IllegalArgumentException if metalake_property or value are not set.
             """
             if not self._property:
-                raise ValueError('"property" field is required and cannot be empty')
+                raise ValueError(
+                    '"metalake_property" field is required and cannot be empty'
+                )
             if not self._value:
                 raise ValueError('"value" field is required and cannot be empty')
 
@@ -109,18 +111,20 @@ class MetalakeUpdateRequest:
         _property: str = field(metadata=config(field_name="property"))
         """The property to remove."""
 
-        def __init__(self, property: str):
+        def __init__(self, metalake_property: str):
             super().__init__("removeProperty")
-            self._property = property
+            self._property = metalake_property
 
         def validate(self):
             """Validates the fields of the request.
 
             Raises:
-                 IllegalArgumentException if property is not set.
+                 IllegalArgumentException if metalake_property is not set.
             """
             if not self._property:
-                raise ValueError('"property" field is required and cannot be empty')
+                raise ValueError(
+                    '"metalake_property" field is required and cannot be empty'
+                )
 
         def metalake_change(self):
             return MetalakeChange.remove_property(self._property)

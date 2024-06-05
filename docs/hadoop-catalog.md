@@ -24,9 +24,15 @@ Hadoop 3. If there's any compatibility issue, please create an [issue](https://g
 
 ### Catalog properties
 
-| Property Name | Description                                     | Default Value | Required | Since Version |
-|---------------|-------------------------------------------------|---------------|----------|---------------|
-| `location`    | The storage location managed by Hadoop catalog. | (none)        | No       | 0.5.0         |
+| Property Name                                      | Description                                                                                    | Default Value | Required                                                    | Since Version |
+|----------------------------------------------------|------------------------------------------------------------------------------------------------|---------------|-------------------------------------------------------------|---------------|
+| `location`                                         | The storage location managed by Hadoop catalog.                                                | (none)        | No                                                          | 0.5.0         |
+| `authentication.type`                              | The type of authentication for Hadoop catalog, currently we only support `kerberos`, `simple`. | `simple`      | No                                                          | 0.5.1         |
+| `authentication.impersonation-enable`              | Whether to enable impersonation for the Hadoop catalog.                                        | `false`       | No                                                          | 0.5.1         |
+| `authentication.kerberos.principal`                | The principal of the Kerberos authentication                                                   | (none)        | required if the value of `authentication.type` is Kerberos. | 0.5.1         |
+| `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                         | (none)        | required if the value of `authentication.type` is Kerberos. | 0.5.1         |
+| `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Hadoop catalog.                                  | 60            | No                                                          | 0.5.1         |
+| `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.     | 60            | No                                                          | 0.5.1         |
 
 ### Catalog operations
 

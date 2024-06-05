@@ -22,6 +22,7 @@ import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableTy
 import com.datastrato.gravitino.catalog.hive.converter.FromHiveType;
 import com.datastrato.gravitino.catalog.hive.converter.ToHiveType;
 import com.datastrato.gravitino.connector.BaseTable;
+import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.connector.TableOperations;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
@@ -61,6 +62,8 @@ public class HiveTable extends BaseTable {
   // A set of supported Hive table types.
   public static final Set<String> SUPPORT_TABLE_TYPES =
       Sets.newHashSet(MANAGED_TABLE.name(), EXTERNAL_TABLE.name());
+  public static final String ICEBERG_TABLE_TYPE_VALUE = "ICEBERG";
+  public static final String TABLE_TYPE_PROP = "table_type";
   private String schemaName;
   private CachedClientPool clientPool;
   private StorageDescriptor sd;
@@ -184,7 +187,7 @@ public class HiveTable extends BaseTable {
    *
    * @return The converted Table.
    */
-  public Table toHiveTable(HiveTablePropertiesMetadata tablePropertiesMetadata) {
+  public Table toHiveTable(PropertiesMetadata tablePropertiesMetadata) {
     Table hiveTable = new Table();
 
     hiveTable.setTableName(name);
@@ -243,7 +246,7 @@ public class HiveTable extends BaseTable {
   }
 
   private StorageDescriptor buildStorageDescriptor(
-      HiveTablePropertiesMetadata tablePropertiesMetadata, List<FieldSchema> partitionFields) {
+      PropertiesMetadata tablePropertiesMetadata, List<FieldSchema> partitionFields) {
     StorageDescriptor sd = new StorageDescriptor();
     List<String> partitionKeys =
         partitionFields.stream().map(FieldSchema::getName).collect(Collectors.toList());
@@ -291,7 +294,7 @@ public class HiveTable extends BaseTable {
     return sd;
   }
 
-  private SerDeInfo buildSerDeInfo(HiveTablePropertiesMetadata tablePropertiesMetadata) {
+  private SerDeInfo buildSerDeInfo(PropertiesMetadata tablePropertiesMetadata) {
     SerDeInfo serDeInfo = new SerDeInfo();
     serDeInfo.setName(properties().getOrDefault(SERDE_NAME, name()));
 

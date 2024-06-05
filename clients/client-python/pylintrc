@@ -23,10 +23,8 @@ disable=missing-class-docstring,
         fixme,          
         unnecessary-pass,               
         missing-timeout,                #TODO-fix
-        redefined-builtin,              #TODO-fix
         broad-exception-caught,         #TODO-fix    
         duplicate-code,                 #TODO-fix
-        method-hidden,                  #TODO-fix
         no-name-in-module,              #TODO-fix
         invalid-field-call,             #TODO-fix
         protected-access,               #TODO-fix

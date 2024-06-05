@@ -103,15 +103,13 @@ public class UserMetaService {
                     }
                   }),
           () -> {
-            if (userRoleRelPOs.isEmpty()) {
-              return;
-            }
             SessionUtils.doWithoutCommit(
                 UserRoleRelMapper.class,
                 mapper -> {
                   if (overwritten) {
-                    mapper.batchInsertUserRoleRelOnDuplicateKeyUpdate(userRoleRelPOs);
-                  } else {
+                    mapper.softDeleteUserRoleRelByUserId(userEntity.id());
+                  }
+                  if (!userRoleRelPOs.isEmpty()) {
                     mapper.batchInsertUserRoleRel(userRoleRelPOs);
                   }
                 });
@@ -206,5 +204,25 @@ public class UserMetaService {
       throw re;
     }
     return newEntity;
+  }
+
+  public int deleteUserMetasByLegacyTimeLine(long legacyTimeLine, int limit) {
+    int[] userDeletedCount = new int[] {0};
+    int[] userRoleRelDeletedCount = new int[] {0};
+
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            userDeletedCount[0] =
+                SessionUtils.doWithoutCommitAndFetchResult(
+                    UserMetaMapper.class,
+                    mapper -> mapper.deleteUserMetasByLegacyTimeLine(legacyTimeLine, limit)),
+        () ->
+            userRoleRelDeletedCount[0] =
+                SessionUtils.doWithoutCommitAndFetchResult(
+                    UserRoleRelMapper.class,
+                    mapper ->
+                        mapper.deleteUserRoleRelMetasByLegacyTimeLine(legacyTimeLine, limit)));
+
+    return userDeletedCount[0] + userRoleRelDeletedCount[0];
   }
 }

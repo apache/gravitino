@@ -160,6 +160,24 @@ public class TestJsonUtils {
     expected =
         "{\n" + "    \"type\": \"unparsed\",\n" + "    \"unparsedType\": \"user-defined\"\n" + "}";
     Assertions.assertEquals(objectMapper.readTree(expected), objectMapper.readTree(jsonValue));
+
+    type = Types.ExternalType.of("user-defined");
+    jsonValue = JsonUtils.objectMapper().writeValueAsString(type);
+    expected =
+        "{\n" + "    \"type\": \"external\",\n" + "    \"catalogString\": \"user-defined\"\n" + "}";
+    Assertions.assertEquals(objectMapper.readTree(expected), objectMapper.readTree(jsonValue));
+  }
+
+  @Test
+  public void testTypeSerdeCompatibility() throws JsonProcessingException {
+    String newPrimitiveType = "\"new_primitive_type\"";
+    Type type = objectMapper.readValue(newPrimitiveType, Type.class);
+    Assertions.assertEquals(Types.UnparsedType.of("new_primitive_type"), type);
+
+    String newComplexType = "{\"type\": \"new_complex_type\", \"field\": \"value\"}";
+    type = objectMapper.readValue(newComplexType, Type.class);
+    Assertions.assertEquals(
+        Types.UnparsedType.of("{\"type\":\"new_complex_type\",\"field\":\"value\"}"), type);
   }
 
   @Test

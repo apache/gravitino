@@ -22,7 +22,7 @@ import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.authorization.Privilege;
+import com.datastrato.gravitino.authorization.AuthorizationUtils;
 import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.SecurableObjects;
@@ -40,7 +40,12 @@ import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.meta.TopicEntity;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
+import com.datastrato.gravitino.storage.relational.mapper.GroupMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.UserMetaMapper;
+import com.datastrato.gravitino.storage.relational.service.RoleMetaService;
 import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
+import com.datastrato.gravitino.utils.NamespaceUtil;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.File;
@@ -198,13 +203,13 @@ public class TestJDBCBackend {
     CatalogEntity catalog =
         createCatalog(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofCatalog("metalake"),
+            NamespaceUtil.ofCatalog("metalake"),
             "catalog",
             auditInfo);
     CatalogEntity catalogCopy =
         createCatalog(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofCatalog("metalake"),
+            NamespaceUtil.ofCatalog("metalake"),
             "catalog",
             auditInfo);
     backend.insert(catalog, false);
@@ -213,13 +218,13 @@ public class TestJDBCBackend {
     SchemaEntity schema =
         createSchemaEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofSchema("metalake", "catalog"),
+            NamespaceUtil.ofSchema("metalake", "catalog"),
             "schema",
             auditInfo);
     SchemaEntity schemaCopy =
         createSchemaEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofSchema("metalake", "catalog"),
+            NamespaceUtil.ofSchema("metalake", "catalog"),
             "schema",
             auditInfo);
     backend.insert(schema, false);
@@ -228,13 +233,13 @@ public class TestJDBCBackend {
     TableEntity table =
         createTableEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofTable("metalake", "catalog", "schema"),
+            NamespaceUtil.ofTable("metalake", "catalog", "schema"),
             "table",
             auditInfo);
     TableEntity tableCopy =
         createTableEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofTable("metalake", "catalog", "schema"),
+            NamespaceUtil.ofTable("metalake", "catalog", "schema"),
             "table",
             auditInfo);
     backend.insert(table, false);
@@ -243,13 +248,13 @@ public class TestJDBCBackend {
     FilesetEntity fileset =
         createFilesetEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofFileset("metalake", "catalog", "schema"),
+            NamespaceUtil.ofFileset("metalake", "catalog", "schema"),
             "fileset",
             auditInfo);
     FilesetEntity filesetCopy =
         createFilesetEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofFileset("metalake", "catalog", "schema"),
+            NamespaceUtil.ofFileset("metalake", "catalog", "schema"),
             "fileset",
             auditInfo);
     backend.insert(fileset, false);
@@ -258,13 +263,13 @@ public class TestJDBCBackend {
     TopicEntity topic =
         createTopicEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofFileset("metalake", "catalog", "schema"),
+            NamespaceUtil.ofFileset("metalake", "catalog", "schema"),
             "topic",
             auditInfo);
     TopicEntity topicCopy =
         createTopicEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofFileset("metalake", "catalog", "schema"),
+            NamespaceUtil.ofFileset("metalake", "catalog", "schema"),
             "topic",
             auditInfo);
     backend.insert(topic, false);
@@ -293,13 +298,13 @@ public class TestJDBCBackend {
     CatalogEntity catalog =
         createCatalog(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofCatalog("metalake"),
+            NamespaceUtil.ofCatalog("metalake"),
             "catalog",
             auditInfo);
     CatalogEntity catalogCopy =
         createCatalog(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofCatalog("metalake"),
+            NamespaceUtil.ofCatalog("metalake"),
             "catalog1",
             auditInfo);
     backend.insert(catalog, false);
@@ -317,13 +322,13 @@ public class TestJDBCBackend {
     SchemaEntity schema =
         createSchemaEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofSchema("metalake", "catalog"),
+            NamespaceUtil.ofSchema("metalake", "catalog"),
             "schema",
             auditInfo);
     SchemaEntity schemaCopy =
         createSchemaEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofSchema("metalake", "catalog"),
+            NamespaceUtil.ofSchema("metalake", "catalog"),
             "schema1",
             auditInfo);
     backend.insert(schema, false);
@@ -341,13 +346,13 @@ public class TestJDBCBackend {
     TableEntity table =
         createTableEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofTable("metalake", "catalog", "schema"),
+            NamespaceUtil.ofTable("metalake", "catalog", "schema"),
             "table",
             auditInfo);
     TableEntity tableCopy =
         createTableEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofTable("metalake", "catalog", "schema"),
+            NamespaceUtil.ofTable("metalake", "catalog", "schema"),
             "table1",
             auditInfo);
     backend.insert(table, false);
@@ -363,13 +368,13 @@ public class TestJDBCBackend {
     FilesetEntity fileset =
         createFilesetEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofFileset("metalake", "catalog", "schema"),
+            NamespaceUtil.ofFileset("metalake", "catalog", "schema"),
             "fileset",
             auditInfo);
     FilesetEntity filesetCopy =
         createFilesetEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofFileset("metalake", "catalog", "schema"),
+            NamespaceUtil.ofFileset("metalake", "catalog", "schema"),
             "fileset1",
             auditInfo);
     backend.insert(fileset, false);
@@ -387,13 +392,13 @@ public class TestJDBCBackend {
     TopicEntity topic =
         createTopicEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofFileset("metalake", "catalog", "schema"),
+            NamespaceUtil.ofFileset("metalake", "catalog", "schema"),
             "topic",
             auditInfo);
     TopicEntity topicCopy =
         createTopicEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofFileset("metalake", "catalog", "schema"),
+            NamespaceUtil.ofFileset("metalake", "catalog", "schema"),
             "topic1",
             auditInfo);
     backend.insert(topic, false);
@@ -420,7 +425,7 @@ public class TestJDBCBackend {
     CatalogEntity catalog =
         createCatalog(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofCatalog("metalake"),
+            NamespaceUtil.ofCatalog("metalake"),
             "catalog",
             auditInfo);
     backend.insert(catalog, false);
@@ -428,7 +433,7 @@ public class TestJDBCBackend {
     SchemaEntity schema =
         createSchemaEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofSchema("metalake", "catalog"),
+            NamespaceUtil.ofSchema("metalake", "catalog"),
             "schema",
             auditInfo);
     backend.insert(schema, false);
@@ -436,7 +441,7 @@ public class TestJDBCBackend {
     TableEntity table =
         createTableEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofTable("metalake", "catalog", "schema"),
+            NamespaceUtil.ofTable("metalake", "catalog", "schema"),
             "table",
             auditInfo);
     backend.insert(table, false);
@@ -444,7 +449,7 @@ public class TestJDBCBackend {
     FilesetEntity fileset =
         createFilesetEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofFileset("metalake", "catalog", "schema"),
+            NamespaceUtil.ofFileset("metalake", "catalog", "schema"),
             "fileset",
             auditInfo);
     backend.insert(fileset, false);
@@ -452,7 +457,7 @@ public class TestJDBCBackend {
     TopicEntity topic =
         createTopicEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofFileset("metalake", "catalog", "schema"),
+            NamespaceUtil.ofFileset("metalake", "catalog", "schema"),
             "topic",
             auditInfo);
     backend.insert(topic, false);
@@ -461,11 +466,39 @@ public class TestJDBCBackend {
     FilesetEntity filesetV2 =
         createFilesetEntity(
             fileset.id(),
-            Namespace.ofFileset("metalake", "catalog", "schema"),
+            NamespaceUtil.ofFileset("metalake", "catalog", "schema"),
             "fileset",
             auditInfo);
     filesetV2.properties().put("version", "2");
     backend.update(fileset.nameIdentifier(), Entity.EntityType.FILESET, e -> filesetV2);
+
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace("metalake"),
+            "role",
+            auditInfo);
+    backend.insert(role, false);
+
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace("metalake"),
+            "user",
+            auditInfo,
+            Lists.newArrayList(role.name()),
+            Lists.newArrayList(role.id()));
+    backend.insert(user, false);
+
+    GroupEntity group =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace("metalake"),
+            "group",
+            auditInfo,
+            Lists.newArrayList(role.name()),
+            Lists.newArrayList(role.id()));
+    backend.insert(group, false);
 
     // another meta data creation
     BaseMetalake anotherMetaLake =
@@ -475,7 +508,7 @@ public class TestJDBCBackend {
     CatalogEntity anotherCatalog =
         createCatalog(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofCatalog("another-metalake"),
+            NamespaceUtil.ofCatalog("another-metalake"),
             "another-catalog",
             auditInfo);
     backend.insert(anotherCatalog, false);
@@ -483,7 +516,7 @@ public class TestJDBCBackend {
     SchemaEntity anotherSchema =
         createSchemaEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofSchema("another-metalake", "another-catalog"),
+            NamespaceUtil.ofSchema("another-metalake", "another-catalog"),
             "another-schema",
             auditInfo);
     backend.insert(anotherSchema, false);
@@ -491,7 +524,7 @@ public class TestJDBCBackend {
     FilesetEntity anotherFileset =
         createFilesetEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofFileset("another-metalake", "another-catalog", "another-schema"),
+            NamespaceUtil.ofFileset("another-metalake", "another-catalog", "another-schema"),
             "anotherFileset",
             auditInfo);
     backend.insert(anotherFileset, false);
@@ -499,7 +532,7 @@ public class TestJDBCBackend {
     FilesetEntity anotherFilesetV2 =
         createFilesetEntity(
             anotherFileset.id(),
-            Namespace.ofFileset("another-metalake", "another-catalog", "another-schema"),
+            NamespaceUtil.ofFileset("another-metalake", "another-catalog", "another-schema"),
             "anotherFileset",
             auditInfo);
     anotherFilesetV2.properties().put("version", "2");
@@ -509,12 +542,40 @@ public class TestJDBCBackend {
     FilesetEntity anotherFilesetV3 =
         createFilesetEntity(
             anotherFileset.id(),
-            Namespace.ofFileset("another-metalake", "another-catalog", "another-schema"),
+            NamespaceUtil.ofFileset("another-metalake", "another-catalog", "another-schema"),
             "anotherFileset",
             auditInfo);
     anotherFilesetV3.properties().put("version", "3");
     backend.update(
         anotherFileset.nameIdentifier(), Entity.EntityType.FILESET, e -> anotherFilesetV3);
+
+    RoleEntity anotherRole =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace("another-metalake"),
+            "another-role",
+            auditInfo);
+    backend.insert(anotherRole, false);
+
+    UserEntity anotherUser =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace("another-metalake"),
+            "another-user",
+            auditInfo,
+            Lists.newArrayList(anotherRole.name()),
+            Lists.newArrayList(anotherRole.id()));
+    backend.insert(anotherUser, false);
+
+    GroupEntity anotherGroup =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace("another-metalake"),
+            "another-group",
+            auditInfo,
+            Lists.newArrayList(anotherRole.name()),
+            Lists.newArrayList(anotherRole.id()));
+    backend.insert(anotherGroup, false);
 
     // meta data list
     List<BaseMetalake> metaLakes = backend.list(metalake.namespace(), Entity.EntityType.METALAKE);
@@ -537,6 +598,27 @@ public class TestJDBCBackend {
     List<TopicEntity> topics = backend.list(topic.namespace(), Entity.EntityType.TOPIC);
     assertTrue(topics.contains(topic));
 
+    RoleEntity roleEntity = backend.get(role.nameIdentifier(), Entity.EntityType.ROLE);
+    assertEquals(role, roleEntity);
+    assertEquals(1, RoleMetaService.getInstance().listRolesByUserId(user.id()).size());
+    assertEquals(1, RoleMetaService.getInstance().listRolesByGroupId(group.id()).size());
+
+    UserEntity userEntity = backend.get(user.nameIdentifier(), Entity.EntityType.USER);
+    assertEquals(user, userEntity);
+    assertEquals(
+        1,
+        SessionUtils.doWithCommitAndFetchResult(
+                UserMetaMapper.class, mapper -> mapper.listUsersByRoleId(role.id()))
+            .size());
+
+    GroupEntity groupEntity = backend.get(group.nameIdentifier(), Entity.EntityType.GROUP);
+    assertEquals(group, groupEntity);
+    assertEquals(
+        1,
+        SessionUtils.doWithCommitAndFetchResult(
+                GroupMetaMapper.class, mapper -> mapper.listGroupsByRoleId(role.id()))
+            .size());
+
     // meta data soft delete
     backend.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE, true);
 
@@ -556,6 +638,27 @@ public class TestJDBCBackend {
     assertFalse(backend.exists(table.nameIdentifier(), Entity.EntityType.TABLE));
     assertFalse(backend.exists(topic.nameIdentifier(), Entity.EntityType.TOPIC));
 
+    assertFalse(backend.exists(role.nameIdentifier(), Entity.EntityType.ROLE));
+    assertEquals(0, RoleMetaService.getInstance().listRolesByUserId(user.id()).size());
+    assertEquals(0, RoleMetaService.getInstance().listRolesByGroupId(group.id()).size());
+    assertTrue(backend.exists(anotherRole.nameIdentifier(), Entity.EntityType.ROLE));
+
+    assertFalse(backend.exists(user.nameIdentifier(), Entity.EntityType.USER));
+    assertEquals(
+        0,
+        SessionUtils.doWithCommitAndFetchResult(
+                UserMetaMapper.class, mapper -> mapper.listUsersByRoleId(role.id()))
+            .size());
+    assertTrue(backend.exists(anotherUser.nameIdentifier(), Entity.EntityType.USER));
+
+    assertFalse(backend.exists(group.nameIdentifier(), Entity.EntityType.GROUP));
+    assertEquals(
+        0,
+        SessionUtils.doWithCommitAndFetchResult(
+                GroupMetaMapper.class, mapper -> mapper.listGroupsByRoleId(role.id()))
+            .size());
+    assertTrue(backend.exists(anotherGroup.nameIdentifier(), Entity.EntityType.GROUP));
+
     // check legacy record after soft delete
     assertTrue(legacyRecordExistsInDB(metalake.id(), Entity.EntityType.METALAKE));
     assertTrue(legacyRecordExistsInDB(catalog.id(), Entity.EntityType.CATALOG));
@@ -563,6 +666,11 @@ public class TestJDBCBackend {
     assertTrue(legacyRecordExistsInDB(table.id(), Entity.EntityType.TABLE));
     assertTrue(legacyRecordExistsInDB(topic.id(), Entity.EntityType.TOPIC));
     assertTrue(legacyRecordExistsInDB(fileset.id(), Entity.EntityType.FILESET));
+    assertTrue(legacyRecordExistsInDB(role.id(), Entity.EntityType.ROLE));
+    assertTrue(legacyRecordExistsInDB(user.id(), Entity.EntityType.USER));
+    assertTrue(legacyRecordExistsInDB(group.id(), Entity.EntityType.GROUP));
+    assertEquals(2, countRoleRels(role.id()));
+    assertEquals(2, countRoleRels(anotherRole.id()));
     assertEquals(2, listFilesetVersions(fileset.id()).size());
     assertEquals(3, listFilesetVersions(anotherFileset.id()).size());
 
@@ -576,6 +684,11 @@ public class TestJDBCBackend {
     assertFalse(legacyRecordExistsInDB(table.id(), Entity.EntityType.TABLE));
     assertFalse(legacyRecordExistsInDB(fileset.id(), Entity.EntityType.FILESET));
     assertFalse(legacyRecordExistsInDB(topic.id(), Entity.EntityType.TOPIC));
+    assertFalse(legacyRecordExistsInDB(role.id(), Entity.EntityType.ROLE));
+    assertFalse(legacyRecordExistsInDB(user.id(), Entity.EntityType.USER));
+    assertFalse(legacyRecordExistsInDB(group.id(), Entity.EntityType.GROUP));
+    assertEquals(0, countRoleRels(role.id()));
+    assertEquals(2, countRoleRels(anotherRole.id()));
     assertEquals(0, listFilesetVersions(fileset.id()).size());
 
     // soft delete for old version fileset
@@ -622,6 +735,18 @@ public class TestJDBCBackend {
         tableName = "topic_meta";
         idColumnName = "topic_id";
         break;
+      case ROLE:
+        tableName = "role_meta";
+        idColumnName = "role_id";
+        break;
+      case USER:
+        tableName = "user_meta";
+        idColumnName = "user_id";
+        break;
+      case GROUP:
+        tableName = "group_meta";
+        idColumnName = "group_id";
+        break;
       default:
         throw new IllegalArgumentException("Unsupported entity type: " + entityType);
     }
@@ -659,6 +784,31 @@ public class TestJDBCBackend {
       throw new RuntimeException("SQL execution failed", e);
     }
     return versionDeletedTime;
+  }
+
+  private Integer countRoleRels(Long roleId) {
+    int count = 0;
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement1 = connection.createStatement();
+        ResultSet rs1 =
+            statement1.executeQuery(
+                String.format("SELECT count(*) FROM user_role_rel WHERE role_id = %d", roleId));
+        Statement statement2 = connection.createStatement();
+        ResultSet rs2 =
+            statement2.executeQuery(
+                String.format("SELECT count(*) FROM group_role_rel WHERE role_id = %d", roleId))) {
+      while (rs1.next()) {
+        count += rs1.getInt(1);
+      }
+      while (rs2.next()) {
+        count += rs2.getInt(1);
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("SQL execution failed", e);
+    }
+    return count;
   }
 
   public static BaseMetalake createBaseMakeLake(Long id, String name, AuditInfo auditInfo) {
@@ -765,14 +915,16 @@ public class TestJDBCBackend {
 
   public static RoleEntity createRoleEntity(
       Long id, Namespace namespace, String name, AuditInfo auditInfo) {
+    SecurableObject securableObject =
+        SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
+
     return RoleEntity.builder()
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
         .withProperties(null)
         .withAuditInfo(auditInfo)
-        .withSecurableObject(SecurableObjects.ofCatalog("catalog"))
-        .withPrivileges(Lists.newArrayList(Privileges.fromName(Privilege.Name.USE_CATALOG)))
+        .withSecurableObject(securableObject)
         .build();
   }
 
@@ -811,8 +963,8 @@ public class TestJDBCBackend {
       String name,
       AuditInfo auditInfo,
       SecurableObject securableObject,
-      List<Privilege> privileges,
       Map<String, String> properties) {
+
     return RoleEntity.builder()
         .withId(id)
         .withName(name)
@@ -820,7 +972,6 @@ public class TestJDBCBackend {
         .withNamespace(namespace)
         .withAuditInfo(auditInfo)
         .withSecurableObject(securableObject)
-        .withPrivileges(privileges)
         .build();
   }
 }

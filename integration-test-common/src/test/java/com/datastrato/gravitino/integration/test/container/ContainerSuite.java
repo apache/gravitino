@@ -40,8 +40,10 @@ public class ContainerSuite implements Closeable {
   private static volatile HiveContainer hiveContainer;
   private static volatile TrinoContainer trinoContainer;
   private static volatile TrinoITContainers trinoITContainers;
+  private static volatile RangerContainer rangerContainer;
   private static volatile KafkaContainer kafkaContainer;
   private static volatile DorisContainer dorisContainer;
+  private static volatile HiveContainer kerberosHiveContainer;
 
   private static volatile MySQLContainer mySQLContainer;
   private static volatile MySQLContainer mySQLVersion5Container;
@@ -50,9 +52,9 @@ public class ContainerSuite implements Closeable {
 
   protected static final CloseableGroup closer = CloseableGroup.create();
 
-  private ContainerSuite() {
+  private static void init() {
     try {
-      // Check if docker is available
+      // Check if docker is available and you should never close the global DockerClient!
       DockerClient dockerClient = DockerClientFactory.instance().client();
       Info info = dockerClient.infoCmd().exec();
       LOG.info("Docker info: {}", info);
@@ -69,6 +71,7 @@ public class ContainerSuite implements Closeable {
     if (instance == null) {
       synchronized (ContainerSuite.class) {
         if (instance == null) {
+          init();
           instance = new ContainerSuite();
         }
       }
@@ -96,6 +99,24 @@ public class ContainerSuite implements Closeable {
           HiveContainer container = closer.register(hiveBuilder.build());
           container.start();
           hiveContainer = container;
+        }
+      }
+    }
+  }
+
+  public void startKerberosHiveContainer() {
+    if (kerberosHiveContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (kerberosHiveContainer == null) {
+          // Start Hive container
+          HiveContainer.Builder hiveBuilder =
+              HiveContainer.builder()
+                  .withHostName("gravitino-ci-kerberos-hive")
+                  .withKerberosEnabled(true)
+                  .withNetwork(network);
+          HiveContainer container = closer.register(hiveBuilder.build());
+          container.start();
+          kerberosHiveContainer = container;
         }
       }
     }
@@ -282,6 +303,33 @@ public class ContainerSuite implements Closeable {
 
   public HiveContainer getHiveContainer() {
     return hiveContainer;
+  }
+
+  public void startRangerContainer() {
+    if (rangerContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (rangerContainer == null) {
+          // Start Ranger container
+          RangerContainer.Builder rangerBuilder = RangerContainer.builder().withNetwork(network);
+          RangerContainer container = closer.register(rangerBuilder.build());
+          try {
+            container.start();
+          } catch (Exception e) {
+            LOG.error("Failed to start Ranger container", e);
+            throw new RuntimeException("Failed to start Ranger container", e);
+          }
+          rangerContainer = container;
+        }
+      }
+    }
+  }
+
+  public RangerContainer getRangerContainer() {
+    return rangerContainer;
+  }
+
+  public HiveContainer getKerberosHiveContainer() {
+    return kerberosHiveContainer;
   }
 
   public DorisContainer getDorisContainer() {

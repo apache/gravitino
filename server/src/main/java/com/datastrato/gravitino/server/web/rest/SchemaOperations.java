@@ -8,6 +8,8 @@ import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.Schema;
+import com.datastrato.gravitino.SchemaChange;
 import com.datastrato.gravitino.catalog.SchemaDispatcher;
 import com.datastrato.gravitino.dto.requests.SchemaCreateRequest;
 import com.datastrato.gravitino.dto.requests.SchemaUpdateRequest;
@@ -19,9 +21,9 @@ import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.lock.LockType;
 import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.metrics.MetricNames;
-import com.datastrato.gravitino.rel.Schema;
-import com.datastrato.gravitino.rel.SchemaChange;
 import com.datastrato.gravitino.server.web.Utils;
+import com.datastrato.gravitino.utils.NameIdentifierUtil;
+import com.datastrato.gravitino.utils.NamespaceUtil;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -62,17 +64,20 @@ public class SchemaOperations {
   @ResponseMetered(name = "list-schema", absolute = true)
   public Response listSchemas(
       @PathParam("metalake") String metalake, @PathParam("catalog") String catalog) {
+    LOG.info("Received list schema request for catalog: {}.{}", metalake, catalog);
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            Namespace schemaNS = Namespace.ofSchema(metalake, catalog);
+            Namespace schemaNS = NamespaceUtil.ofSchema(metalake, catalog);
             NameIdentifier[] idents =
                 TreeLockUtils.doWithTreeLock(
                     NameIdentifier.of(metalake, catalog),
                     LockType.READ,
                     () -> dispatcher.listSchemas(schemaNS));
-            return Utils.ok(new EntityListResponse(idents));
+            Response response = Utils.ok(new EntityListResponse(idents));
+            LOG.info("List {} schemas in catalog {}.{}", idents.length, metalake, catalog);
+            return response;
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleSchemaException(OperationType.LIST, "", catalog, e);
@@ -87,20 +92,24 @@ public class SchemaOperations {
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
       SchemaCreateRequest request) {
+    LOG.info("Received create schema request: {}.{}.{}", metalake, catalog, request.getName());
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
             request.validate();
-            NameIdentifier ident = NameIdentifier.ofSchema(metalake, catalog, request.getName());
+            NameIdentifier ident =
+                NameIdentifierUtil.ofSchema(metalake, catalog, request.getName());
             Schema schema =
                 TreeLockUtils.doWithTreeLock(
-                    NameIdentifier.ofCatalog(metalake, catalog),
+                    NameIdentifierUtil.ofCatalog(metalake, catalog),
                     LockType.WRITE,
                     () ->
                         dispatcher.createSchema(
                             ident, request.getComment(), request.getProperties()));
-            return Utils.ok(new SchemaResponse(DTOConverters.toDTO(schema)));
+            Response response = Utils.ok(new SchemaResponse(DTOConverters.toDTO(schema)));
+            LOG.info("Schema created: {}.{}.{}", metalake, catalog, schema.name());
+            return response;
           });
 
     } catch (Exception e) {
@@ -118,15 +127,18 @@ public class SchemaOperations {
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema) {
+    LOG.info("Received load schema request for schema: {}.{}.{}", metalake, catalog, schema);
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            NameIdentifier ident = NameIdentifier.ofSchema(metalake, catalog, schema);
+            NameIdentifier ident = NameIdentifierUtil.ofSchema(metalake, catalog, schema);
             Schema s =
                 TreeLockUtils.doWithTreeLock(
                     ident, LockType.READ, () -> dispatcher.loadSchema(ident));
-            return Utils.ok(new SchemaResponse(DTOConverters.toDTO(s)));
+            Response response = Utils.ok(new SchemaResponse(DTOConverters.toDTO(s)));
+            LOG.info("Schema loaded: {}.{}.{}", metalake, catalog, s.name());
+            return response;
           });
 
     } catch (Exception e) {
@@ -144,22 +156,25 @@ public class SchemaOperations {
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
       SchemaUpdatesRequest request) {
+    LOG.info("Received alter schema request: {}.{}.{}", metalake, catalog, schema);
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
             request.validate();
-            NameIdentifier ident = NameIdentifier.ofSchema(metalake, catalog, schema);
+            NameIdentifier ident = NameIdentifierUtil.ofSchema(metalake, catalog, schema);
             SchemaChange[] changes =
                 request.getUpdates().stream()
                     .map(SchemaUpdateRequest::schemaChange)
                     .toArray(SchemaChange[]::new);
             Schema s =
                 TreeLockUtils.doWithTreeLock(
-                    NameIdentifier.ofCatalog(metalake, catalog),
+                    NameIdentifierUtil.ofCatalog(metalake, catalog),
                     LockType.WRITE,
                     () -> dispatcher.alterSchema(ident, changes));
-            return Utils.ok(new SchemaResponse(DTOConverters.toDTO(s)));
+            Response response = Utils.ok(new SchemaResponse(DTOConverters.toDTO(s)));
+            LOG.info("Schema altered: {}.{}.{}", metalake, catalog, s.name());
+            return response;
           });
 
     } catch (Exception e) {
@@ -177,21 +192,24 @@ public class SchemaOperations {
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
       @DefaultValue("false") @QueryParam("cascade") boolean cascade) {
+    LOG.info("Received drop schema request: {}.{}.{}", metalake, catalog, schema);
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            NameIdentifier ident = NameIdentifier.ofSchema(metalake, catalog, schema);
+            NameIdentifier ident = NameIdentifierUtil.ofSchema(metalake, catalog, schema);
             boolean dropped =
                 TreeLockUtils.doWithTreeLock(
-                    NameIdentifier.ofCatalog(metalake, catalog),
+                    NameIdentifierUtil.ofCatalog(metalake, catalog),
                     LockType.WRITE,
                     () -> dispatcher.dropSchema(ident, cascade));
             if (!dropped) {
               LOG.warn("Fail to drop schema {} under namespace {}", schema, ident.namespace());
             }
 
-            return Utils.ok(new DropResponse(dropped));
+            Response response = Utils.ok(new DropResponse(dropped));
+            LOG.info("Schema dropped: {}.{}.{}", metalake, catalog, schema);
+            return response;
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleSchemaException(OperationType.DROP, schema, catalog, e);

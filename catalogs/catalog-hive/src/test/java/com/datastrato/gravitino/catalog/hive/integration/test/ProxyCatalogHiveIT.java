@@ -11,6 +11,7 @@ import static com.datastrato.gravitino.server.GravitinoServer.WEBSERVER_CONF_PRE
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.SupportsSchemas;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.catalog.hive.HiveClientPool;
 import com.datastrato.gravitino.client.GravitinoAdminClient;
@@ -21,7 +22,6 @@ import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
@@ -115,9 +115,12 @@ public class ProxyCatalogHiveIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void stop() throws Exception {
+  public static void stop() {
     setEnv(HADOOP_USER_NAME, originHadoopUser);
     anotherClient.close();
+
+    AbstractIT.customConfigs.clear();
+    AbstractIT.client = null;
   }
 
   @Test
@@ -127,7 +130,6 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     String anotherSchemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
 
     NameIdentifier ident = NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaName);
-    NameIdentifier anotherIdent = NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, anotherSchemaName);
 
     String comment = "comment";
     createSchema(schemaName, ident, comment);
@@ -149,7 +151,8 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     SupportsSchemas schemas = anotherCatalog.asSchemas();
     Exception e =
         Assertions.assertThrows(
-            RuntimeException.class, () -> schemas.createSchema(anotherIdent, comment, properties));
+            RuntimeException.class,
+            () -> schemas.createSchema(anotherSchemaName, comment, properties));
     Assertions.assertTrue(e.getMessage().contains("AccessControlException Permission denied"));
   }
 
@@ -209,7 +212,7 @@ public class ProxyCatalogHiveIT extends AbstractIT {
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HDFS_DEFAULTFS_PORT,
             schemaName.toLowerCase()));
-    catalog.asSchemas().createSchema(ident, comment, properties);
+    catalog.asSchemas().createSchema(ident.name(), comment, properties);
   }
 
   @Test

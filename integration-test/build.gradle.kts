@@ -2,7 +2,6 @@
  * Copyright 2023 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-import java.util.*
 
 plugins {
   `maven-publish`
@@ -10,13 +9,6 @@ plugins {
   id("java")
   id("idea")
 }
-
-val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
-val sparkVersion: String = libs.versions.spark.get()
-val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
-val kyuubiVersion: String = libs.versions.kyuubi.get()
-val icebergVersion: String = libs.versions.iceberg.get()
-val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
 dependencies {
   testAnnotationProcessor(libs.lombok)
@@ -31,10 +23,6 @@ dependencies {
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
-  testImplementation(project(":spark-connector:spark-connector")) {
-    exclude("org.apache.hadoop", "hadoop-client-api")
-    exclude("org.apache.hadoop", "hadoop-client-runtime")
-  }
 
   testImplementation(libs.commons.cli)
   testImplementation(libs.commons.lang3)
@@ -95,6 +83,7 @@ dependencies {
   }
   testImplementation(libs.httpclient5)
   testImplementation(libs.jline.terminal)
+  testImplementation(libs.jodd.core)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.minikdc) {
@@ -103,23 +92,6 @@ dependencies {
   testImplementation(libs.mockito.core)
   testImplementation(libs.mybatis)
   testImplementation(libs.mysql.driver)
-
-  testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion") {
-    exclude("org.apache.hadoop", "hadoop-client-api")
-    exclude("org.apache.hadoop", "hadoop-client-runtime")
-  }
-  testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
-  testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion") {
-    exclude("org.apache.avro")
-    exclude("org.apache.hadoop")
-    exclude("org.apache.zookeeper")
-    exclude("io.dropwizard.metrics")
-    exclude("org.rocksdb")
-  }
-  testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
-  testImplementation("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
-  testImplementation("org.apache.iceberg:iceberg-core:$icebergVersion")
-  testImplementation("org.apache.iceberg:iceberg-hive-metastore:$icebergVersion")
 
   testImplementation(libs.okhttp3.loginterceptor)
   testImplementation(libs.postgresql.driver)
@@ -136,7 +108,16 @@ dependencies {
     exclude("jakarta.annotation")
   }
   testImplementation(libs.trino.jdbc)
-
+  testImplementation(libs.ranger.intg) {
+    exclude("org.apache.hadoop", "hadoop-common")
+    exclude("org.apache.hive", "hive-storage-api")
+    exclude("org.apache.lucene")
+    exclude("org.apache.solr")
+    exclude("org.apache.kafka")
+    exclude("org.elasticsearch")
+    exclude("org.elasticsearch.client")
+    exclude("org.elasticsearch.plugin")
+  }
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
@@ -157,13 +138,15 @@ tasks.test {
     dependsOn(":catalogs:catalog-jdbc-postgresql:jar", ":catalogs:catalog-jdbc-postgresql:runtimeJars")
     dependsOn(":catalogs:catalog-hadoop:jar", ":catalogs:catalog-hadoop:runtimeJars")
     dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars")
+    dependsOn(":catalogs:catalog-kafka:jar", ":catalogs:catalog-kafka:runtimeJars")
 
     doFirst {
       // Gravitino CI Docker image
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.10")
+      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.12")
       environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "datastrato/gravitino-ci-trino:0.1.5")
       environment("GRAVITINO_CI_KAFKA_DOCKER_IMAGE", "apache/kafka:3.7.0")
       environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "datastrato/gravitino-ci-doris:0.1.3")
+      environment("GRAVITINO_CI_RANGER_DOCKER_IMAGE", "datastrato/gravitino-ci-ranger:0.1.0")
 
       copy {
         from("${project.rootDir}/dev/docker/trino/conf")

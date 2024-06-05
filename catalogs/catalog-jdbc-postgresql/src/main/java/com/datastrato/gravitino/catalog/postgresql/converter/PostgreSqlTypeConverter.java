@@ -66,7 +66,7 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter<String> {
       case BYTEA:
         return Types.BinaryType.get();
       default:
-        return Types.UnparsedType.of(typeBean.getTypeName());
+        return Types.ExternalType.of(typeBean.getTypeName());
     }
   }
 
@@ -109,6 +109,8 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter<String> {
       return BYTEA;
     } else if (type instanceof Types.ListType) {
       return fromGravitinoArrayType((ListType) type);
+    } else if (type instanceof Types.ExternalType) {
+      return ((Types.ExternalType) type).catalogString();
     }
     throw new IllegalArgumentException(
         String.format(

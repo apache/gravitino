@@ -7,16 +7,16 @@ package com.datastrato.gravitino.integration.test.trino;
 import static java.lang.Thread.sleep;
 
 import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.SupportsSchemas;
 import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.exceptions.RESTException;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.TrinoITContainers;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
-import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.TableCatalog;
+import com.datastrato.gravitino.utils.NameIdentifierUtil;
+import com.datastrato.gravitino.utils.NamespaceUtil;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -184,38 +184,37 @@ public class TrinoQueryITBase {
     }
     Catalog catalog = metalake.loadCatalog(catalogName);
     SupportsSchemas schemas = catalog.asSchemas();
-    Arrays.stream(schemas.listSchemas(Namespace.ofSchema(metalakeName, catalogName)))
-        .filter(schema -> schema.name().startsWith("gt_"))
+    Arrays.stream(schemas.listSchemas())
+        .filter(schema -> schema.startsWith("gt_"))
         .forEach(
             schema -> {
               try {
                 TableCatalog tableCatalog = catalog.asTableCatalog();
                 Arrays.stream(
                         tableCatalog.listTables(
-                            Namespace.ofTable(metalakeName, catalogName, schema.name())))
+                            NamespaceUtil.ofTable(metalakeName, catalogName, schema)))
                     .forEach(
                         table -> {
                           boolean dropped =
                               tableCatalog.dropTable(
-                                  NameIdentifier.ofTable(
-                                      metalakeName, catalogName, schema.name(), table.name()));
+                                  NameIdentifierUtil.ofTable(
+                                      metalakeName, catalogName, schema, table.name()));
                           LOG.info(
                               "Drop table \"{}.{}\".{}.{}",
                               metalakeName,
                               catalogName,
-                              schema.name(),
+                              schema,
                               table.name());
                           if (!dropped) {
                             LOG.error("Failed to drop table {}", table);
                           }
                         });
 
-                schemas.dropSchema(
-                    NameIdentifier.ofSchema(metalakeName, catalogName, schema.name()), false);
+                schemas.dropSchema(schema, false);
               } catch (Exception e) {
                 LOG.error("Failed to drop schema {}", schema);
               }
-              LOG.info("Drop schema \"{}.{}\".{}", metalakeName, catalogName, schema.name());
+              LOG.info("Drop schema \"{}.{}\".{}", metalakeName, catalogName, schema);
             });
 
     metalake.dropCatalog(catalogName);

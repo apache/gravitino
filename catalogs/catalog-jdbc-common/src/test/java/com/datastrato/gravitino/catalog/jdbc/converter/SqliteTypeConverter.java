@@ -28,7 +28,7 @@ public class SqliteTypeConverter extends JdbcTypeConverter<String> {
         .filter(entry -> StringUtils.equalsIgnoreCase(type.getTypeName(), entry.getValue()))
         .map(Map.Entry::getKey)
         .findFirst()
-        .orElse(null);
+        .orElse(Types.ExternalType.of(type.getTypeName()));
   }
 
   @Override
