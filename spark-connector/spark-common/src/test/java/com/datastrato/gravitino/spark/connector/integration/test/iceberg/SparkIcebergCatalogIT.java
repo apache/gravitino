@@ -390,66 +390,65 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
         "id ASC NULLS FIRST", tableProperties.get(IcebergPropertiesConstants.ICEBERG_SORT_ORDER));
   }
 
-    @Test
-    void testIcebergMetadataTables() {
-        String tableName = "test_iceberg_metadata_tables";
-        String fullTableName = String.format("%s.%s", getDefaultDatabase(), tableName);
-        dropTableIfExists(tableName);
-        createSimpleTable(tableName);
-        SparkTableInfo tableInfo = getTableInfo(tableName);
-        checkTableColumns(tableName, getSimpleTableColumn(), tableInfo);
+  @Test
+  void testIcebergMetadataTables() {
+    String tableName = "test_iceberg_metadata_tables";
+    String fullTableName = String.format("%s.%s", getDefaultDatabase(), tableName);
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+    checkTableColumns(tableName, getSimpleTableColumn(), tableInfo);
 
-        sql(String.format("INSERT INTO %s VALUES(1, '1', 1)", tableName));
-        List<String> tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
-        Assertions.assertEquals(1, tableData.size());
-        Assertions.assertEquals("1,1,1", tableData.get(0));
+    sql(String.format("INSERT INTO %s VALUES(1, '1', 1)", tableName));
+    List<String> tableData = getQueryData(getSelectAllSqlWithOrder(tableName, "id"));
+    Assertions.assertEquals(1, tableData.size());
+    Assertions.assertEquals("1,1,1", tableData.get(0));
 
-        List<Object[]> snapshots = sql(String.format("SELECT * FROM %s.snapshots", fullTableName));
-        Assertions.assertEquals(1, snapshots.size());
+    List<Object[]> snapshots = sql(String.format("SELECT * FROM %s.snapshots", fullTableName));
+    Assertions.assertEquals(1, snapshots.size());
 
-        List<Object[]> entries = sql(String.format("SELECT * FROM %s.entries", fullTableName));
-        Assertions.assertEquals(1, entries.size());
+    List<Object[]> entries = sql(String.format("SELECT * FROM %s.entries", fullTableName));
+    Assertions.assertEquals(1, entries.size());
 
-        List<Object[]> files = sql(String.format("SELECT * FROM %s.files", fullTableName));
-        Assertions.assertEquals(1, files.size());
+    List<Object[]> files = sql(String.format("SELECT * FROM %s.files", fullTableName));
+    Assertions.assertEquals(1, files.size());
 
-        List<Object[]> dataFiles = sql(String.format("SELECT * FROM %s.data_files", fullTableName));
-        Assertions.assertEquals(1, dataFiles.size());
+    List<Object[]> dataFiles = sql(String.format("SELECT * FROM %s.data_files", fullTableName));
+    Assertions.assertEquals(1, dataFiles.size());
 
-        List<Object[]> history = sql(String.format("SELECT * FROM %s.history", fullTableName));
-        Assertions.assertEquals(1, history.size());
+    List<Object[]> history = sql(String.format("SELECT * FROM %s.history", fullTableName));
+    Assertions.assertEquals(1, history.size());
 
-        List<Object[]> manifests = sql(String.format("SELECT * FROM %s.manifests", fullTableName));
-        Assertions.assertEquals(1, manifests.size());
+    List<Object[]> manifests = sql(String.format("SELECT * FROM %s.manifests", fullTableName));
+    Assertions.assertEquals(1, manifests.size());
 
-        List<Object[]> all_data_files =
-                sql(String.format("SELECT * FROM %s.all_data_files", fullTableName));
-        Assertions.assertEquals(1, all_data_files.size());
+    List<Object[]> all_data_files =
+        sql(String.format("SELECT * FROM %s.all_data_files", fullTableName));
+    Assertions.assertEquals(1, all_data_files.size());
 
-        List<Object[]> all_entries = sql(String.format("SELECT * FROM %s.all_entries", fullTableName));
-        Assertions.assertEquals(1, all_entries.size());
+    List<Object[]> all_entries = sql(String.format("SELECT * FROM %s.all_entries", fullTableName));
+    Assertions.assertEquals(1, all_entries.size());
 
-        List<Object[]> all_files = sql(String.format("SELECT * FROM %s.all_files", fullTableName));
-        Assertions.assertEquals(1, all_files.size());
+    List<Object[]> all_files = sql(String.format("SELECT * FROM %s.all_files", fullTableName));
+    Assertions.assertEquals(1, all_files.size());
 
-        List<Object[]> all_manifests =
-                sql(String.format("SELECT * FROM %s.all_manifests", fullTableName));
-        Assertions.assertEquals(1, all_manifests.size());
+    List<Object[]> all_manifests =
+        sql(String.format("SELECT * FROM %s.all_manifests", fullTableName));
+    Assertions.assertEquals(1, all_manifests.size());
 
-        List<Object[]> deleteFiles = sql(String.format("SELECT * FROM %s.delete_files", fullTableName));
-        Assertions.assertEquals(0, deleteFiles.size());
+    List<Object[]> deleteFiles = sql(String.format("SELECT * FROM %s.delete_files", fullTableName));
+    Assertions.assertEquals(0, deleteFiles.size());
 
-        List<Object[]> all_delete_files =
-                sql(String.format("SELECT * FROM %s.all_delete_files", fullTableName));
-        Assertions.assertEquals(0, all_delete_files.size());
+    List<Object[]> all_delete_files =
+        sql(String.format("SELECT * FROM %s.all_delete_files", fullTableName));
+    Assertions.assertEquals(0, all_delete_files.size());
 
-        List<Object[]> position_deletes =
-                sql(String.format("SELECT * FROM %s.position_deletes", fullTableName));
-        Assertions.assertEquals(0, position_deletes.size());
-    }
+    List<Object[]> position_deletes =
+        sql(String.format("SELECT * FROM %s.position_deletes", fullTableName));
+    Assertions.assertEquals(0, position_deletes.size());
+  }
 
-
-    private void testMetadataColumns() {
+  private void testMetadataColumns() {
     String tableName = "test_metadata_columns";
     dropTableIfExists(tableName);
     String createTableSQL = getCreateSimpleTableString(tableName);

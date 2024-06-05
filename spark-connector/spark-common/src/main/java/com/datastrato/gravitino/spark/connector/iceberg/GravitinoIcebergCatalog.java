@@ -5,8 +5,6 @@
 
 package com.datastrato.gravitino.spark.connector.iceberg;
 
-import static com.datastrato.gravitino.spark.connector.ConnectorConstants.DOT;
-
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
@@ -193,10 +191,7 @@ public class GravitinoIcebergCatalog extends BaseCatalog
       return sparkCatalog.loadTable(ident, version);
     } catch (NoSuchTableException e) {
       throw new RuntimeException(
-          String.format(
-              "Failed to load the real sparkTable: %s",
-              ident.toString()),
-          e);
+          String.format("Failed to load the real sparkTable: %s", ident.toString()), e);
     }
   }
 
@@ -206,10 +201,7 @@ public class GravitinoIcebergCatalog extends BaseCatalog
       return sparkCatalog.loadTable(ident, timestamp);
     } catch (NoSuchTableException e) {
       throw new RuntimeException(
-          String.format(
-              "Failed to load the real sparkTable: %s",
-              ident.toString()),
-          e);
+          String.format("Failed to load the real sparkTable: %s", ident.toString()), e);
     }
   }
 }
