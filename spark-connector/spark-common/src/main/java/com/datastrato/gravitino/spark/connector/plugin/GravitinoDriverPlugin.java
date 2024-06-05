@@ -11,11 +11,9 @@ import static com.datastrato.gravitino.spark.connector.utils.ConnectorUtil.remov
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.spark.connector.GravitinoSparkConfig;
 import com.datastrato.gravitino.spark.connector.catalog.GravitinoCatalogManager;
+import com.datastrato.gravitino.spark.connector.iceberg.extensions.GravitinoIcebergSparkSessionExtensions;
 import com.datastrato.gravitino.spark.connector.version.CatalogNameAdaptor;
 import com.google.common.annotations.VisibleForTesting;
-import com.datastrato.gravitino.spark.connector.hive.GravitinoHiveCatalog;
-import com.datastrato.gravitino.spark.connector.iceberg.GravitinoIcebergCatalog;
-import com.datastrato.gravitino.spark.connector.iceberg.extensions.GravitinoIcebergSparkSessionExtensions;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -41,7 +39,8 @@ public class GravitinoDriverPlugin implements DriverPlugin {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoDriverPlugin.class);
 
   private GravitinoCatalogManager catalogManager;
-  private List<String> toRegisteredDriverExtensions = Arrays.asList(GravitinoIcebergSparkSessionExtensions.class.getName());
+  private List<String> toRegisteredDriverExtensions =
+      Arrays.asList(GravitinoIcebergSparkSessionExtensions.class.getName());
   private List<String> gravitinoDriverExtensions = new ArrayList<>();
   private boolean enableIcebergSupport = false;
 

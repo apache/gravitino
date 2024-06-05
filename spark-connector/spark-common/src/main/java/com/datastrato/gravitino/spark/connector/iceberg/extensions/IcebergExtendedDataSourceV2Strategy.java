@@ -76,6 +76,7 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
                         catalogAndIdentifier.identifier,
                         createOrReplaceBranch.branch(),
                         createOrReplaceBranch.branchOptions(),
+                        createOrReplaceBranch.create(),
                         createOrReplaceBranch.replace(),
                         createOrReplaceBranch.ifNotExists());
                 return toSeq(createOrReplaceBranchExec);
@@ -93,6 +94,7 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
                         catalogAndIdentifier.identifier,
                         createOrReplaceTag.tag(),
                         createOrReplaceTag.tagOptions(),
+                        createOrReplaceTag.create(),
                         createOrReplaceTag.replace(),
                         createOrReplaceTag.ifNotExists());
                 return toSeq(createOrReplaceTagExec);
