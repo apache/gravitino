@@ -5,12 +5,12 @@
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.utils;
 
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.ICEBERG_JDBC_INITIALIZE;
-import static com.datastrato.gravitino.catalog.lakehouse.iceberg.backend.KerberosConfig.IMPERSONATION_ENABLE_KEY;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.authentication.KerberosConfig.IMPERSONATION_ENABLE_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION;
 
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
-import com.datastrato.gravitino.catalog.lakehouse.iceberg.backend.HiveBackendProxy;
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.authentication.HiveBackendProxy;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;

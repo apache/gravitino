@@ -4,9 +4,9 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.integration.test;
 
-import static com.datastrato.gravitino.catalog.lakehouse.iceberg.backend.KerberosConfig.IMPERSONATION_ENABLE_KEY;
-import static com.datastrato.gravitino.catalog.lakehouse.iceberg.backend.KerberosConfig.KET_TAB_URI_KEY;
-import static com.datastrato.gravitino.catalog.lakehouse.iceberg.backend.KerberosConfig.PRINCIPAL_KEY;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.authentication.KerberosConfig.IMPERSONATION_ENABLE_KEY;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.authentication.KerberosConfig.KET_TAB_URI_KEY;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.authentication.KerberosConfig.PRINCIPAL_KEY;
 import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION;

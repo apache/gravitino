@@ -7,7 +7,7 @@ package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 import static com.datastrato.gravitino.connector.PropertyEntry.enumImmutablePropertyEntry;
 import static com.datastrato.gravitino.connector.PropertyEntry.stringRequiredPropertyEntry;
 
-import com.datastrato.gravitino.catalog.lakehouse.iceberg.backend.KerberosConfig;
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.authentication.KerberosConfig;
 import com.datastrato.gravitino.connector.BaseCatalogPropertiesMetadata;
 import com.datastrato.gravitino.connector.PropertyEntry;
 import com.google.common.collect.ImmutableList;

@@ -3,9 +3,9 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.catalog.lakehouse.iceberg.backend;
+package com.datastrato.gravitino.catalog.lakehouse.iceberg.authentication;
 
-import com.datastrato.gravitino.catalog.lakehouse.IcebergHiveCachedClientPool;
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergHiveCachedClientPool;
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import java.io.File;
 import java.io.IOException;
@@ -110,7 +110,7 @@ public class HiveBackendProxy implements MethodInterceptor {
     // Change the client pool to IcebergHiveCachedClientPool as client pool in iceberg
     // has the username problem.
     // TODO: we need to close the original client pool and thread pool, or it will cause memory
-    // leak.
+    //  leak.
     m.set(target, new IcebergHiveCachedClientPool(target.getConf(), properties));
     return token;
   }

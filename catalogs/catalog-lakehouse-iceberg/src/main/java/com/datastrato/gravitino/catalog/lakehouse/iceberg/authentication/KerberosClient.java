@@ -3,9 +3,7 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.catalog.lakehouse.iceberg.backend;
-
-import static com.datastrato.gravitino.catalog.lakehouse.iceberg.backend.KerberosConfig.GRAVITINO_KEYTAB_FORMAT;
+package com.datastrato.gravitino.catalog.lakehouse.iceberg.authentication;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
@@ -89,7 +87,7 @@ public class KerberosClient {
       keytabsDir.mkdir();
     }
 
-    File keytabFile = new File(String.format(GRAVITINO_KEYTAB_FORMAT, catalogId));
+    File keytabFile = new File(String.format(KerberosConfig.GRAVITINO_KEYTAB_FORMAT, catalogId));
     keytabFile.deleteOnExit();
     if (keytabFile.exists() && !keytabFile.delete()) {
       throw new IllegalStateException(
