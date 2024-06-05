@@ -7,8 +7,6 @@ package com.datastrato.gravitino.integration.test.trino;
 import static java.lang.Thread.sleep;
 
 import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.SupportsSchemas;
 import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.client.GravitinoMetalake;
@@ -17,6 +15,8 @@ import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.TrinoITContainers;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.rel.TableCatalog;
+import com.datastrato.gravitino.utils.NameIdentifierUtil;
+import com.datastrato.gravitino.utils.NamespaceUtil;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -192,12 +192,12 @@ public class TrinoQueryITBase {
                 TableCatalog tableCatalog = catalog.asTableCatalog();
                 Arrays.stream(
                         tableCatalog.listTables(
-                            Namespace.ofTable(metalakeName, catalogName, schema)))
+                            NamespaceUtil.ofTable(metalakeName, catalogName, schema)))
                     .forEach(
                         table -> {
                           boolean dropped =
                               tableCatalog.dropTable(
-                                  NameIdentifier.ofTable(
+                                  NameIdentifierUtil.ofTable(
                                       metalakeName, catalogName, schema, table.name()));
                           LOG.info(
                               "Drop table \"{}.{}\".{}.{}",

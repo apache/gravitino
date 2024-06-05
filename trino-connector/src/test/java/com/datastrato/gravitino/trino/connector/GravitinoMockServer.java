@@ -406,7 +406,7 @@ public class GravitinoMockServer implements AutoCloseable {
                 ArrayList<NameIdentifier> tableNames = new ArrayList<>();
                 for (SchemaTableName tableName : metadata.listTables(null, Optional.empty())) {
                   tableNames.add(
-                      NameIdentifier.ofTable(
+                      NameIdentifier.of(
                           schemaName.level(0),
                           schemaName.level(1),
                           schemaName.level(2),
