@@ -96,7 +96,7 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
               LIST_ALL_TABLES,
               PropertyEntry.booleanPropertyEntry(
                   LIST_ALL_TABLES,
-                  "Lists all tables in a database, including the Iceberg tables",
+                  "Lists all tables in a database, including non-Hive tables, such as Iceberg, etc.",
                   false,
                   false,
                   DEFAULT_LIST_ALL_TABLES,
