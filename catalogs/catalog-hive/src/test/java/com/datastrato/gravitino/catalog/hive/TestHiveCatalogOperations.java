@@ -11,6 +11,7 @@ import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CL
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.FETCH_TIMEOUT_SEC;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.IMPERSONATION_ENABLE;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.KEY_TAB_URI;
+import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.LIST_ALL_TABLES;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.PRINCIPAL;
 import static com.datastrato.gravitino.catalog.hive.TestHiveCatalog.HIVE_PROPERTIES_METADATA;
@@ -67,12 +68,13 @@ class TestHiveCatalogOperations {
     Map<String, PropertyEntry<?>> propertyEntryMap =
         HIVE_PROPERTIES_METADATA.catalogPropertiesMetadata().propertyEntries();
 
-    Assertions.assertEquals(11, propertyEntryMap.size());
+    Assertions.assertEquals(12, propertyEntryMap.size());
     Assertions.assertTrue(propertyEntryMap.containsKey(METASTORE_URIS));
     Assertions.assertTrue(propertyEntryMap.containsKey(Catalog.PROPERTY_PACKAGE));
     Assertions.assertTrue(propertyEntryMap.containsKey(BaseCatalog.CATALOG_OPERATION_IMPL));
     Assertions.assertTrue(propertyEntryMap.containsKey(CLIENT_POOL_SIZE));
     Assertions.assertTrue(propertyEntryMap.containsKey(IMPERSONATION_ENABLE));
+    Assertions.assertTrue(propertyEntryMap.containsKey(LIST_ALL_TABLES));
 
     Assertions.assertTrue(propertyEntryMap.get(METASTORE_URIS).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(Catalog.PROPERTY_PACKAGE).isRequired());
