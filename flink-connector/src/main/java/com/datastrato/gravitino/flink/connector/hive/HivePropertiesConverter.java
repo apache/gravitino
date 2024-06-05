@@ -20,10 +20,12 @@
 package com.datastrato.gravitino.flink.connector.hive;
 
 import com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta;
+import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
 import com.datastrato.gravitino.flink.connector.PropertiesConverter;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.catalog.CommonCatalogOptions;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -75,5 +77,23 @@ public class HivePropertiesConverter implements PropertiesConverter {
               GRAVITINO_CONFIG_TO_HIVE.getOrDefault(flinkConfigKey, flinkConfigKey), value);
         });
     return flinkCatalogProperties;
+  }
+
+  @Override
+  public Map<String, String> toFlinkTableProperties(Map<String, String> gravitinoProperties) {
+    return gravitinoProperties.entrySet().stream()
+        .collect(
+            Collectors.toMap(
+                entry -> {
+                  String key = entry.getKey();
+                  if (key.startsWith(HiveTablePropertiesMetadata.SERDE_PARAMETER_PREFIX)) {
+                    return key.substring(
+                        HiveTablePropertiesMetadata.SERDE_PARAMETER_PREFIX.length());
+                  } else {
+                    return key;
+                  }
+                },
+                Map.Entry::getValue,
+                (existingValue, newValue) -> newValue));
   }
 }
