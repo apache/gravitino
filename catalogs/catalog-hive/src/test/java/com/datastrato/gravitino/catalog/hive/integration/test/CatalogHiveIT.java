@@ -199,18 +199,18 @@ public class CatalogHiveIT extends AbstractIT {
 
   @AfterAll
   public static void stop() throws IOException {
-    Arrays.stream(catalog.asSchemas().listSchemas())
-        .filter(schema -> !schema.equals("default"))
-        .forEach(
-            (schema -> {
-              catalog.asSchemas().dropSchema(schema, true);
-            }));
-    Arrays.stream(metalake.listCatalogs())
-        .forEach(
-            (catalogName -> {
-              metalake.dropCatalog(catalogName);
-            }));
     if (client != null) {
+      Arrays.stream(catalog.asSchemas().listSchemas())
+          .filter(schema -> !schema.equals("default"))
+          .forEach(
+              (schema -> {
+                catalog.asSchemas().dropSchema(schema, true);
+              }));
+      Arrays.stream(metalake.listCatalogs())
+          .forEach(
+              (catalogName -> {
+                metalake.dropCatalog(catalogName);
+              }));
       client.dropMetalake(metalakeName);
     }
     if (hiveClientPool != null) {
@@ -230,7 +230,6 @@ public class CatalogHiveIT extends AbstractIT {
       LOG.error("Failed to close CloseableGroup", e);
     }
 
-    AbstractIT.customConfigs.clear();
     AbstractIT.client = null;
   }
 

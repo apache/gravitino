@@ -5,10 +5,10 @@
 
 package com.datastrato.gravitino.catalog.hadoop.integration.test;
 
-import static com.datastrato.gravitino.catalog.hadoop.kerberos.AuthenticationConfig.AUTH_TYPE_KEY;
-import static com.datastrato.gravitino.catalog.hadoop.kerberos.KerberosConfig.IMPERSONATION_ENABLE_KEY;
-import static com.datastrato.gravitino.catalog.hadoop.kerberos.KerberosConfig.KEY_TAB_URI_KEY;
-import static com.datastrato.gravitino.catalog.hadoop.kerberos.KerberosConfig.PRINCIPAL_KEY;
+import static com.datastrato.gravitino.catalog.hadoop.authentication.AuthenticationConfig.AUTH_TYPE_KEY;
+import static com.datastrato.gravitino.catalog.hadoop.authentication.kerberos.KerberosConfig.IMPERSONATION_ENABLE_KEY;
+import static com.datastrato.gravitino.catalog.hadoop.authentication.kerberos.KerberosConfig.KEY_TAB_URI_KEY;
+import static com.datastrato.gravitino.catalog.hadoop.authentication.kerberos.KerberosConfig.PRINCIPAL_KEY;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
