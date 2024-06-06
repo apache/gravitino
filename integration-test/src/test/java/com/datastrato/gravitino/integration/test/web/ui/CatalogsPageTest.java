@@ -214,7 +214,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     catalog_fileset
         .asFilesetCatalog()
         .createFileset(
-            NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName),
+            NameIdentifier.of(schemaName, filesetName),
             "comment",
             Fileset.Type.MANAGED,
             storageLocation,
