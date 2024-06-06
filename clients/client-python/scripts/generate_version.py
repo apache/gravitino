@@ -8,14 +8,14 @@ import configparser
 import subprocess
 from datetime import datetime
 
-from gravitino.constants.version import Version, VERSION_INI
+from gravitino.constants.version import Version, VERSION_INI, SETUP_FILE
 from gravitino.exceptions.gravitino_runtime_exception import GravitinoRuntimeException
 
 VERSION_PATTERN = r"version\s*=\s*['\"]([^'\"]+)['\"]"
 
 
 def main():
-    with open("setup.py", "r", encoding="utf-8") as f:
+    with open(SETUP_FILE, "r", encoding="utf-8") as f:
         setup_content = f.read()
         m = re.search(VERSION_PATTERN, setup_content)
         if m is not None:

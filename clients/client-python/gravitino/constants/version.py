@@ -6,7 +6,9 @@ This software is licensed under the Apache License version 2.
 from enum import Enum
 from pathlib import Path
 
-VERSION_INI = Path(__file__).parent.parent.parent / "version.ini"
+PROJECT_HOME = Path(__file__).parent.parent.parent
+VERSION_INI = PROJECT_HOME / "version.ini"
+SETUP_FILE = PROJECT_HOME / "setup.py"
 
 
 class Version(Enum):
