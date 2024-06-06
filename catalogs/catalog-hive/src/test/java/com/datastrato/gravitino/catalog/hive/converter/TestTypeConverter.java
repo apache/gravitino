@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.hive.converter;
 
+import static com.datastrato.gravitino.catalog.hive.converter.HiveDataTypeConverter.CONVERTER;
 import static org.apache.hadoop.hive.serde.serdeConstants.BIGINT_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.BINARY_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.BOOLEAN_TYPE_NAME;
@@ -29,7 +30,6 @@ import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils.getTypeInfoFr
 
 import com.datastrato.gravitino.rel.types.Types;
 import java.util.Arrays;
-import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -72,24 +72,14 @@ public class TestTypeConverter {
                 Arrays.asList(
                     getPrimitiveTypeInfo(STRING_TYPE_NAME), getPrimitiveTypeInfo(INT_TYPE_NAME)))
             .getTypeName());
-    Assertions.assertEquals(
-        Types.ExternalType.of(USER_DEFINED_TYPE),
-        FromHiveType.toGravitinoType(new UserDefinedTypeInfo()));
     Assertions.assertThrows(
         UnsupportedOperationException.class,
-        () -> ToHiveType.convert(Types.ExternalType.of(USER_DEFINED_TYPE)));
+        () -> CONVERTER.fromGravitino(Types.ExternalType.of(USER_DEFINED_TYPE)));
   }
 
   private void testConverter(String typeName) {
     TypeInfo hiveType = getTypeInfoFromTypeString(typeName);
-    TypeInfo convertedType = ToHiveType.convert(FromHiveType.convert(hiveType.getTypeName()));
+    TypeInfo convertedType = CONVERTER.fromGravitino(CONVERTER.toGravitino(hiveType.getTypeName()));
     Assertions.assertEquals(hiveType, convertedType);
-  }
-
-  static class UserDefinedTypeInfo extends PrimitiveTypeInfo {
-    @Override
-    public String getTypeName() {
-      return USER_DEFINED_TYPE;
-    }
   }
 }

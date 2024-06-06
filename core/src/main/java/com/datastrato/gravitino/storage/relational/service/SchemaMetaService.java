@@ -22,6 +22,8 @@ import com.datastrato.gravitino.storage.relational.po.SchemaPO;
 import com.datastrato.gravitino.storage.relational.utils.ExceptionUtils;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
+import com.datastrato.gravitino.utils.NameIdentifierUtil;
+import com.datastrato.gravitino.utils.NamespaceUtil;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
@@ -69,7 +71,7 @@ public class SchemaMetaService {
   }
 
   public SchemaEntity getSchemaByIdentifier(NameIdentifier identifier) {
-    NameIdentifier.checkSchema(identifier);
+    NameIdentifierUtil.checkSchema(identifier);
     String schemaName = identifier.name();
 
     Long catalogId =
@@ -81,7 +83,7 @@ public class SchemaMetaService {
   }
 
   public List<SchemaEntity> listSchemasByNamespace(Namespace namespace) {
-    Namespace.checkSchema(namespace);
+    NamespaceUtil.checkSchema(namespace);
 
     Long catalogId = CommonMetaService.getInstance().getParentEntityIdByNamespace(namespace);
 
@@ -93,7 +95,7 @@ public class SchemaMetaService {
 
   public void insertSchema(SchemaEntity schemaEntity, boolean overwrite) {
     try {
-      NameIdentifier.checkSchema(schemaEntity.nameIdentifier());
+      NameIdentifierUtil.checkSchema(schemaEntity.nameIdentifier());
 
       SchemaPO.Builder builder = SchemaPO.builder();
       fillSchemaPOBuilderParentEntityId(builder, schemaEntity.namespace());
@@ -117,7 +119,7 @@ public class SchemaMetaService {
 
   public <E extends Entity & HasIdentifier> SchemaEntity updateSchema(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
-    NameIdentifier.checkSchema(identifier);
+    NameIdentifierUtil.checkSchema(identifier);
 
     String schemaName = identifier.name();
     Long catalogId =
@@ -155,7 +157,7 @@ public class SchemaMetaService {
   }
 
   public boolean deleteSchema(NameIdentifier identifier, boolean cascade) {
-    NameIdentifier.checkSchema(identifier);
+    NameIdentifierUtil.checkSchema(identifier);
 
     String schemaName = identifier.name();
     Long catalogId =
@@ -189,7 +191,7 @@ public class SchemaMetaService {
         List<TableEntity> tableEntities =
             TableMetaService.getInstance()
                 .listTablesByNamespace(
-                    Namespace.ofTable(
+                    NamespaceUtil.ofTable(
                         identifier.namespace().level(0),
                         identifier.namespace().level(1),
                         schemaName));
@@ -200,7 +202,7 @@ public class SchemaMetaService {
         List<FilesetEntity> filesetEntities =
             FilesetMetaService.getInstance()
                 .listFilesetsByNamespace(
-                    Namespace.ofFileset(
+                    NamespaceUtil.ofFileset(
                         identifier.namespace().level(0),
                         identifier.namespace().level(1),
                         schemaName));
@@ -224,7 +226,7 @@ public class SchemaMetaService {
   }
 
   private void fillSchemaPOBuilderParentEntityId(SchemaPO.Builder builder, Namespace namespace) {
-    Namespace.checkSchema(namespace);
+    NamespaceUtil.checkSchema(namespace);
     Long parentEntityId = null;
     for (int level = 0; level < namespace.levels().length; level++) {
       String name = namespace.level(level);

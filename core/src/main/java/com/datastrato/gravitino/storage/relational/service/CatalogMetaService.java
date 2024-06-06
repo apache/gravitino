@@ -22,6 +22,8 @@ import com.datastrato.gravitino.storage.relational.po.CatalogPO;
 import com.datastrato.gravitino.storage.relational.utils.ExceptionUtils;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
+import com.datastrato.gravitino.utils.NameIdentifierUtil;
+import com.datastrato.gravitino.utils.NamespaceUtil;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
@@ -71,7 +73,7 @@ public class CatalogMetaService {
   }
 
   public CatalogEntity getCatalogByIdentifier(NameIdentifier identifier) {
-    NameIdentifier.checkCatalog(identifier);
+    NameIdentifierUtil.checkCatalog(identifier);
     String catalogName = identifier.name();
 
     Long metalakeId =
@@ -83,7 +85,7 @@ public class CatalogMetaService {
   }
 
   public List<CatalogEntity> listCatalogsByNamespace(Namespace namespace) {
-    Namespace.checkCatalog(namespace);
+    NamespaceUtil.checkCatalog(namespace);
 
     Long metalakeId = CommonMetaService.getInstance().getParentEntityIdByNamespace(namespace);
 
@@ -96,7 +98,7 @@ public class CatalogMetaService {
 
   public void insertCatalog(CatalogEntity catalogEntity, boolean overwrite) {
     try {
-      NameIdentifier.checkCatalog(catalogEntity.nameIdentifier());
+      NameIdentifierUtil.checkCatalog(catalogEntity.nameIdentifier());
 
       Long metalakeId =
           CommonMetaService.getInstance().getParentEntityIdByNamespace(catalogEntity.namespace());
@@ -120,7 +122,7 @@ public class CatalogMetaService {
 
   public <E extends Entity & HasIdentifier> CatalogEntity updateCatalog(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
-    NameIdentifier.checkCatalog(identifier);
+    NameIdentifierUtil.checkCatalog(identifier);
 
     String catalogName = identifier.name();
     Long metalakeId =
@@ -160,7 +162,7 @@ public class CatalogMetaService {
   }
 
   public boolean deleteCatalog(NameIdentifier identifier, boolean cascade) {
-    NameIdentifier.checkCatalog(identifier);
+    NameIdentifierUtil.checkCatalog(identifier);
 
     String catalogName = identifier.name();
     Long metalakeId =
@@ -198,7 +200,7 @@ public class CatalogMetaService {
       List<SchemaEntity> schemaEntities =
           SchemaMetaService.getInstance()
               .listSchemasByNamespace(
-                  Namespace.ofSchema(identifier.namespace().level(0), catalogName));
+                  NamespaceUtil.ofSchema(identifier.namespace().level(0), catalogName));
       if (!schemaEntities.isEmpty()) {
         throw new NonEmptyEntityException(
             "Entity %s has sub-entities, you should remove sub-entities first", identifier);

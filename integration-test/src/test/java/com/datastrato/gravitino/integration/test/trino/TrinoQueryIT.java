@@ -79,8 +79,8 @@ public class TrinoQueryIT extends TrinoQueryITBase {
   private static void cleanupTestEnv() throws Exception {
     try {
       Arrays.stream(TrinoQueryITBase.metalake.listCatalogs())
-          .filter(catalog -> catalog.name().startsWith("gt_"))
-          .forEach(catalog -> TrinoQueryITBase.dropCatalog(catalog.name()));
+          .filter(catalog -> catalog.startsWith("gt_"))
+          .forEach(TrinoQueryITBase::dropCatalog);
 
       await()
           .atMost(30, TimeUnit.SECONDS)

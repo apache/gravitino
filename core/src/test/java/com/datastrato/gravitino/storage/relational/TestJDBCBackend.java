@@ -45,6 +45,7 @@ import com.datastrato.gravitino.storage.relational.mapper.UserMetaMapper;
 import com.datastrato.gravitino.storage.relational.service.RoleMetaService;
 import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
+import com.datastrato.gravitino.utils.NamespaceUtil;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.File;
@@ -202,13 +203,13 @@ public class TestJDBCBackend {
     CatalogEntity catalog =
         createCatalog(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofCatalog("metalake"),
+            NamespaceUtil.ofCatalog("metalake"),
             "catalog",
             auditInfo);
     CatalogEntity catalogCopy =
         createCatalog(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofCatalog("metalake"),
+            NamespaceUtil.ofCatalog("metalake"),
             "catalog",
             auditInfo);
     backend.insert(catalog, false);
@@ -217,13 +218,13 @@ public class TestJDBCBackend {
     SchemaEntity schema =
         createSchemaEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofSchema("metalake", "catalog"),
+            NamespaceUtil.ofSchema("metalake", "catalog"),
             "schema",
             auditInfo);
     SchemaEntity schemaCopy =
         createSchemaEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofSchema("metalake", "catalog"),
+            NamespaceUtil.ofSchema("metalake", "catalog"),
             "schema",
             auditInfo);
     backend.insert(schema, false);
@@ -232,13 +233,13 @@ public class TestJDBCBackend {
     TableEntity table =
         createTableEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofTable("metalake", "catalog", "schema"),
+            NamespaceUtil.ofTable("metalake", "catalog", "schema"),
             "table",
             auditInfo);
     TableEntity tableCopy =
         createTableEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofTable("metalake", "catalog", "schema"),
+            NamespaceUtil.ofTable("metalake", "catalog", "schema"),
             "table",
             auditInfo);
     backend.insert(table, false);
@@ -247,13 +248,13 @@ public class TestJDBCBackend {
     FilesetEntity fileset =
         createFilesetEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofFileset("metalake", "catalog", "schema"),
+            NamespaceUtil.ofFileset("metalake", "catalog", "schema"),
             "fileset",
             auditInfo);
     FilesetEntity filesetCopy =
         createFilesetEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofFileset("metalake", "catalog", "schema"),
+            NamespaceUtil.ofFileset("metalake", "catalog", "schema"),
             "fileset",
             auditInfo);
     backend.insert(fileset, false);
@@ -262,13 +263,13 @@ public class TestJDBCBackend {
     TopicEntity topic =
         createTopicEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofFileset("metalake", "catalog", "schema"),
+            NamespaceUtil.ofFileset("metalake", "catalog", "schema"),
             "topic",
             auditInfo);
     TopicEntity topicCopy =
         createTopicEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofFileset("metalake", "catalog", "schema"),
+            NamespaceUtil.ofFileset("metalake", "catalog", "schema"),
             "topic",
             auditInfo);
     backend.insert(topic, false);
@@ -297,13 +298,13 @@ public class TestJDBCBackend {
     CatalogEntity catalog =
         createCatalog(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofCatalog("metalake"),
+            NamespaceUtil.ofCatalog("metalake"),
             "catalog",
             auditInfo);
     CatalogEntity catalogCopy =
         createCatalog(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofCatalog("metalake"),
+            NamespaceUtil.ofCatalog("metalake"),
             "catalog1",
             auditInfo);
     backend.insert(catalog, false);
@@ -321,13 +322,13 @@ public class TestJDBCBackend {
     SchemaEntity schema =
         createSchemaEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofSchema("metalake", "catalog"),
+            NamespaceUtil.ofSchema("metalake", "catalog"),
             "schema",
             auditInfo);
     SchemaEntity schemaCopy =
         createSchemaEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofSchema("metalake", "catalog"),
+            NamespaceUtil.ofSchema("metalake", "catalog"),
             "schema1",
             auditInfo);
     backend.insert(schema, false);
@@ -345,13 +346,13 @@ public class TestJDBCBackend {
     TableEntity table =
         createTableEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofTable("metalake", "catalog", "schema"),
+            NamespaceUtil.ofTable("metalake", "catalog", "schema"),
             "table",
             auditInfo);
     TableEntity tableCopy =
         createTableEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofTable("metalake", "catalog", "schema"),
+            NamespaceUtil.ofTable("metalake", "catalog", "schema"),
             "table1",
             auditInfo);
     backend.insert(table, false);
@@ -367,13 +368,13 @@ public class TestJDBCBackend {
     FilesetEntity fileset =
         createFilesetEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofFileset("metalake", "catalog", "schema"),
+            NamespaceUtil.ofFileset("metalake", "catalog", "schema"),
             "fileset",
             auditInfo);
     FilesetEntity filesetCopy =
         createFilesetEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofFileset("metalake", "catalog", "schema"),
+            NamespaceUtil.ofFileset("metalake", "catalog", "schema"),
             "fileset1",
             auditInfo);
     backend.insert(fileset, false);
@@ -391,13 +392,13 @@ public class TestJDBCBackend {
     TopicEntity topic =
         createTopicEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofFileset("metalake", "catalog", "schema"),
+            NamespaceUtil.ofFileset("metalake", "catalog", "schema"),
             "topic",
             auditInfo);
     TopicEntity topicCopy =
         createTopicEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofFileset("metalake", "catalog", "schema"),
+            NamespaceUtil.ofFileset("metalake", "catalog", "schema"),
             "topic1",
             auditInfo);
     backend.insert(topic, false);
@@ -424,7 +425,7 @@ public class TestJDBCBackend {
     CatalogEntity catalog =
         createCatalog(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofCatalog("metalake"),
+            NamespaceUtil.ofCatalog("metalake"),
             "catalog",
             auditInfo);
     backend.insert(catalog, false);
@@ -432,7 +433,7 @@ public class TestJDBCBackend {
     SchemaEntity schema =
         createSchemaEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofSchema("metalake", "catalog"),
+            NamespaceUtil.ofSchema("metalake", "catalog"),
             "schema",
             auditInfo);
     backend.insert(schema, false);
@@ -440,7 +441,7 @@ public class TestJDBCBackend {
     TableEntity table =
         createTableEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofTable("metalake", "catalog", "schema"),
+            NamespaceUtil.ofTable("metalake", "catalog", "schema"),
             "table",
             auditInfo);
     backend.insert(table, false);
@@ -448,7 +449,7 @@ public class TestJDBCBackend {
     FilesetEntity fileset =
         createFilesetEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofFileset("metalake", "catalog", "schema"),
+            NamespaceUtil.ofFileset("metalake", "catalog", "schema"),
             "fileset",
             auditInfo);
     backend.insert(fileset, false);
@@ -456,7 +457,7 @@ public class TestJDBCBackend {
     TopicEntity topic =
         createTopicEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofFileset("metalake", "catalog", "schema"),
+            NamespaceUtil.ofFileset("metalake", "catalog", "schema"),
             "topic",
             auditInfo);
     backend.insert(topic, false);
@@ -465,7 +466,7 @@ public class TestJDBCBackend {
     FilesetEntity filesetV2 =
         createFilesetEntity(
             fileset.id(),
-            Namespace.ofFileset("metalake", "catalog", "schema"),
+            NamespaceUtil.ofFileset("metalake", "catalog", "schema"),
             "fileset",
             auditInfo);
     filesetV2.properties().put("version", "2");
@@ -507,7 +508,7 @@ public class TestJDBCBackend {
     CatalogEntity anotherCatalog =
         createCatalog(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofCatalog("another-metalake"),
+            NamespaceUtil.ofCatalog("another-metalake"),
             "another-catalog",
             auditInfo);
     backend.insert(anotherCatalog, false);
@@ -515,7 +516,7 @@ public class TestJDBCBackend {
     SchemaEntity anotherSchema =
         createSchemaEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofSchema("another-metalake", "another-catalog"),
+            NamespaceUtil.ofSchema("another-metalake", "another-catalog"),
             "another-schema",
             auditInfo);
     backend.insert(anotherSchema, false);
@@ -523,7 +524,7 @@ public class TestJDBCBackend {
     FilesetEntity anotherFileset =
         createFilesetEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.ofFileset("another-metalake", "another-catalog", "another-schema"),
+            NamespaceUtil.ofFileset("another-metalake", "another-catalog", "another-schema"),
             "anotherFileset",
             auditInfo);
     backend.insert(anotherFileset, false);
@@ -531,7 +532,7 @@ public class TestJDBCBackend {
     FilesetEntity anotherFilesetV2 =
         createFilesetEntity(
             anotherFileset.id(),
-            Namespace.ofFileset("another-metalake", "another-catalog", "another-schema"),
+            NamespaceUtil.ofFileset("another-metalake", "another-catalog", "another-schema"),
             "anotherFileset",
             auditInfo);
     anotherFilesetV2.properties().put("version", "2");
@@ -541,7 +542,7 @@ public class TestJDBCBackend {
     FilesetEntity anotherFilesetV3 =
         createFilesetEntity(
             anotherFileset.id(),
-            Namespace.ofFileset("another-metalake", "another-catalog", "another-schema"),
+            NamespaceUtil.ofFileset("another-metalake", "another-catalog", "another-schema"),
             "anotherFileset",
             auditInfo);
     anotherFilesetV3.properties().put("version", "3");
