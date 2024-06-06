@@ -30,7 +30,7 @@ import org.apache.thrift.TException;
 public class HiveBackendProxy implements MethodInterceptor {
 
   private final HiveCatalog target;
-  private String kerberosRealm;
+  private final String kerberosRealm;
   private final UserGroupInformation proxyUser;
   private final Map<String, String> properties;
   private final ClientPool<IMetaStoreClient, TException> newClientPool;

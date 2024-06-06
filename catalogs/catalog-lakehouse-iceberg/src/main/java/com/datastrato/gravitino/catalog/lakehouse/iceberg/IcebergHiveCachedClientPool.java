@@ -53,16 +53,33 @@ import org.apache.thrift.TException;
  * Referred from Apache Iceberg's CachedClientPool implementation
  * hive-metastore/src/main/java/org/apache/iceberg/hive/CachedClientPool.java
  *
- * <p>ClientPoolCache is used for every HiveCatalog, I changed the type of `clientPoolCache` from
- * static variable to variable. I change cache key from user and configuration options to the
- * username.
+ * <p>IcebergHiveCachedClientPool is used for every Iceberg catalog with Hive backend, I changed the
+ * method clientPool() from
  *
- * <p>A ClientPool that caches the underlying HiveClientPool instances.
+ * <pre>{@code
+ * HiveClientPool clientPool() {
+ *    return clientPoolCache.get(key, k -> new HiveClientPool(clientPoolSize, conf));
+ *  }
+ * }</pre>
+ *
+ * to
+ *
+ * <pre>{@code
+ * HiveClientPool clientPool() {
+ *   Key key = extractKey(properties.get(CatalogProperties.CLIENT_POOL_CACHE_KEYS), conf);
+ *   return clientPoolCache.get(key, k -> new HiveClientPool(clientPoolSize, conf));
+ * }
+ * }</pre>
+ *
+ * Why do we need to do this? Because the original client pool in iceberg uses a fixed username to
+ * create the client pool (please see the key in the method clientPool()). Assuming the original
+ * name is A and when a new user B tries to call the clientPool() method, it will use the connection
+ * that belongs to A. This will not work with kerberos authentication as it will change the user
+ * name.
  */
 public class IcebergHiveCachedClientPool
     implements ClientPool<IMetaStoreClient, TException>, Closeable {
   private static final String CONF_ELEMENT_PREFIX = "conf:";
-  static final String HIVE_CONF_CATALOG = "metastore.catalog.default";
 
   private static Cache<Key, HiveClientPool> clientPoolCache;
 
@@ -91,7 +108,6 @@ public class IcebergHiveCachedClientPool
   @VisibleForTesting
   HiveClientPool clientPool() {
     Key key = extractKey(properties.get(CatalogProperties.CLIENT_POOL_CACHE_KEYS), conf);
-    clientPoolCache.cleanUp();
     return clientPoolCache.get(key, k -> new HiveClientPool(clientPoolSize, conf));
   }
 
