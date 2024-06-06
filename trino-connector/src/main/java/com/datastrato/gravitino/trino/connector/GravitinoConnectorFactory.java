@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
 public class GravitinoConnectorFactory implements ConnectorFactory {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoConnectorFactory.class);
-  private static final String DEFAULT_CONNECTOR_NAME = "gravitino";
+  public static final String DEFAULT_CONNECTOR_NAME = "gravitino";
 
   @SuppressWarnings("UnusedVariable")
   private GravitinoSystemTableFactory gravitinoSystemTableFactory;

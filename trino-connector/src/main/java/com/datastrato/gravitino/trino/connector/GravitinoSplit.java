@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.trino.connector;
 
+import static com.datastrato.gravitino.trino.connector.GravitinoConnectorFactory.DEFAULT_CONNECTOR_NAME;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.trino.spi.HostAddress;
@@ -62,5 +64,10 @@ public class GravitinoSplit implements ConnectorSplit, GravitinoHandle<Connector
   @Override
   public long getRetainedSizeInBytes() {
     return handleWrapper.getHandle().getRetainedSizeInBytes();
+  }
+
+  @Override
+  public String toString() {
+    return DEFAULT_CONNECTOR_NAME + "->" + getInternalHandle().toString();
   }
 }

@@ -13,20 +13,16 @@ import static io.trino.spi.type.BooleanType.BOOLEAN;
 import static io.trino.spi.type.VarcharType.VARCHAR;
 
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import io.trino.spi.TrinoException;
 import io.trino.spi.procedure.Procedure;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.util.List;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class DropCatalogStoredProcedure extends GravitinoStoredProcedure {
   private static final Logger LOG = LoggerFactory.getLogger(DropCatalogStoredProcedure.class);
@@ -58,7 +54,8 @@ public class DropCatalogStoredProcedure extends GravitinoStoredProcedure {
 
   public void dropCatalog(String catalogName, boolean ignoreNotExist) {
     try {
-      CatalogConnectorContext catalogConnector = catalogConnectorManager.getCatalogConnector(
+      CatalogConnectorContext catalogConnector =
+          catalogConnectorManager.getCatalogConnector(
               catalogConnectorManager.getTrinoCatalogName(metalake, catalogName));
       if (catalogConnector == null) {
         if (ignoreNotExist) {
@@ -77,7 +74,8 @@ public class DropCatalogStoredProcedure extends GravitinoStoredProcedure {
 
       catalogConnectorManager.loadMetalakeSync();
 
-      if (catalogConnectorManager.catalogConnectorExist(catalogConnectorManager.getTrinoCatalogName(metalake, catalogName))) {
+      if (catalogConnectorManager.catalogConnectorExist(
+          catalogConnectorManager.getTrinoCatalogName(metalake, catalogName))) {
         throw new TrinoException(
             GRAVITINO_OPERATION_FAILED, "Drop catalog failed due to the reloading process fails");
       }

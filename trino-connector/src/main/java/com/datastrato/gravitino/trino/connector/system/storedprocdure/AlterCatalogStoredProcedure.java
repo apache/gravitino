@@ -13,7 +13,6 @@ import static io.trino.spi.type.VarcharType.VARCHAR;
 
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorContext;
@@ -25,17 +24,14 @@ import io.trino.spi.procedure.Procedure;
 import io.trino.spi.type.ArrayType;
 import io.trino.spi.type.MapType;
 import io.trino.spi.type.TypeOperators;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class AlterCatalogStoredProcedure extends GravitinoStoredProcedure {
   private static final Logger LOG = LoggerFactory.getLogger(AlterCatalogStoredProcedure.class);
@@ -77,23 +73,21 @@ public class AlterCatalogStoredProcedure extends GravitinoStoredProcedure {
       String catalogName, Map<String, String> setProperties, List<String> removeProperties) {
     try {
       CatalogConnectorContext catalogConnectorContext =
-          catalogConnectorManager.getCatalogConnector(catalogConnectorManager.getTrinoCatalogName(metalake, catalogName));
+          catalogConnectorManager.getCatalogConnector(
+              catalogConnectorManager.getTrinoCatalogName(metalake, catalogName));
       GravitinoCatalog oldCatalog = catalogConnectorContext.getCatalog();
 
       List<CatalogChange> changes = new ArrayList<>();
-      setProperties
-              .forEach((key, value) -> {
-                  // Skip the no changed attributes
-                  boolean matched =
-                          oldCatalog.getProperties().entrySet().stream()
-                                  .anyMatch(
-                                          oe ->
-                                                  oe.getKey().equals(key)
-                                                          && oe.getValue().equals(value));
-                  if (!matched) {
-                      changes.add(CatalogChange.setProperty(key, value));
-                  }
-              });
+      setProperties.forEach(
+          (key, value) -> {
+            // Skip the no changed attributes
+            boolean matched =
+                oldCatalog.getProperties().entrySet().stream()
+                    .anyMatch(oe -> oe.getKey().equals(key) && oe.getValue().equals(value));
+            if (!matched) {
+              changes.add(CatalogChange.setProperty(key, value));
+            }
+          });
 
       removeProperties.forEach(
           key -> {
@@ -106,11 +100,14 @@ public class AlterCatalogStoredProcedure extends GravitinoStoredProcedure {
         return;
       }
 
-      catalogConnectorContext.getMetalake().alterCatalog(catalogName, changes.toArray(changes.toArray(new CatalogChange[0])));
+      catalogConnectorContext
+          .getMetalake()
+          .alterCatalog(catalogName, changes.toArray(changes.toArray(new CatalogChange[0])));
 
       catalogConnectorManager.loadMetalakeSync();
       catalogConnectorContext =
-              catalogConnectorManager.getCatalogConnector(catalogConnectorManager.getTrinoCatalogName(metalake, catalogName));
+          catalogConnectorManager.getCatalogConnector(
+              catalogConnectorManager.getTrinoCatalogName(metalake, catalogName));
       if (catalogConnectorContext == null
           || catalogConnectorContext.getCatalog().getLastModifiedTime()
               == oldCatalog.getLastModifiedTime()) {
@@ -123,11 +120,12 @@ public class AlterCatalogStoredProcedure extends GravitinoStoredProcedure {
       throw new TrinoException(
           GRAVITINO_METALAKE_NOT_EXISTS, "Metalake " + metalake + " not exists.");
     } catch (NoSuchCatalogException e) {
-      throw new TrinoException(GRAVITINO_CATALOG_NOT_EXISTS, "Catalog " + NameIdentifier.of(metalake, catalogName) + " not exists.");
+      throw new TrinoException(
+          GRAVITINO_CATALOG_NOT_EXISTS,
+          "Catalog " + NameIdentifier.of(metalake, catalogName) + " not exists.");
     } catch (Exception e) {
       throw new TrinoException(
           GRAVITINO_UNSUPPORTED_OPERATION, "alter catalog failed. " + e.getMessage(), e);
     }
   }
-
 }

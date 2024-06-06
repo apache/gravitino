@@ -16,7 +16,6 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
-import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import io.trino.spi.TrinoException;
 import io.trino.spi.procedure.Procedure;
@@ -64,7 +63,8 @@ public class CreateCatalogStoredProcedure extends GravitinoStoredProcedure {
 
   public void createCatalog(
       String catalogName, String provider, Map<String, String> properties, boolean ignoreExist) {
-        boolean exists = catalogConnectorManager.catalogConnectorExist(
+    boolean exists =
+        catalogConnectorManager.catalogConnectorExist(
             catalogConnectorManager.getTrinoCatalogName(metalake, catalogName));
     if (exists) {
       if (!ignoreExist) {
@@ -76,7 +76,7 @@ public class CreateCatalogStoredProcedure extends GravitinoStoredProcedure {
     }
 
     try {
-        catalogConnectorManager
+      catalogConnectorManager
           .getMetalake(metalake)
           .createCatalog(
               catalogName, Catalog.Type.RELATIONAL, provider, "Trino created", properties);

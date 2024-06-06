@@ -298,10 +298,12 @@ public class CatalogConnectorManager {
     future.get(LOAD_METALAKE_TIMEOUT, TimeUnit.SECONDS);
   }
 
-    public GravitinoMetalake getMetalake(String metalake) {
-      if (!usedMetalakes.contains(metalake)) {
-          throw new TrinoException(GRAVITINO_OPERATION_FAILED, "This connector does not allowed to access metalake " + metalake);
-      }
-      return metalakes.computeIfAbsent(metalake, this::retrieveMetalake);
+  public GravitinoMetalake getMetalake(String metalake) {
+    if (!usedMetalakes.contains(metalake)) {
+      throw new TrinoException(
+          GRAVITINO_OPERATION_FAILED,
+          "This connector does not allowed to access metalake " + metalake);
     }
+    return metalakes.computeIfAbsent(metalake, this::retrieveMetalake);
+  }
 }

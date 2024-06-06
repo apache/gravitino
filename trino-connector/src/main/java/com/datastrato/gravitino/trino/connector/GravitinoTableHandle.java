@@ -95,6 +95,6 @@ public final class GravitinoTableHandle
 
   @Override
   public String toString() {
-    return schemaName + ":" + tableName;
+    return String.format("%s.%s->%s", schemaName, tableName, getInternalHandle().toString());
   }
 }
