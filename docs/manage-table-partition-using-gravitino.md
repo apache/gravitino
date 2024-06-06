@@ -257,7 +257,7 @@ Partition addedPartition =
     gravitinoClient
         .loadCatalog("catalog")
         .asTableCatalog()
-        .loadTable(NameIdentifier.of("metalake", "catalog", "schema", "table"))
+        .loadTable(NameIdentifier.of("schema", "table"))
         .supportPartitions()
         .addPartition(
             Partitions.identity(
@@ -302,7 +302,7 @@ Partition Partition =
     gravitinoClient
         .loadCatalog("catalog")
         .asTableCatalog()
-        .loadTable(NameIdentifier.of("metalake", "catalog", "schema", "table"))
+        .loadTable(NameIdentifier.of("schema", "table"))
         .supportPartitions()
         .getPartition("partition_name");
 ```
@@ -338,7 +338,7 @@ String[] partitionNames =
     gravitinoClient
         .loadCatalog("catalog")
         .asTableCatalog()
-        .loadTable(NameIdentifier.of("metalake", "catalog", "schema", "table"))
+        .loadTable(NameIdentifier.of("schema", "table"))
         .supportPartitions()
         .listPartitionNames();
 ```
@@ -369,7 +369,7 @@ Partition[] partitions =
         gravitinoClient
             .loadCatalog("catalog")
             .asTableCatalog()
-            .loadTable(NameIdentifier.of("metalake", "catalog", "schema", "table"))
+            .loadTable(NameIdentifier.of("schema", "table"))
             .supportPartitions()
             .listPartitions();
 ```
@@ -409,7 +409,7 @@ Partition Partition =
     gravitinoClient
         .loadCatalog("catalog")
         .asTableCatalog()
-        .loadTable(NameIdentifier.of("metalake", "catalog", "schema", "table"))
+        .loadTable(NameIdentifier.of("schema", "table"))
         .supportPartitions()
         .dropPartition("partition_name");
 ```

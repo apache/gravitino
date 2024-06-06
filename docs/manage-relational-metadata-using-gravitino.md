@@ -655,7 +655,7 @@ Map<String, String> tablePropertiesMap = ImmutableMap.<String, String>builder()
         .build();
 
 tableCatalog.createTable(
-  NameIdentifier.of("metalake", "hive_catalog", "schema", "example_table"),
+  NameIdentifier.of("schema", "example_table"),
   new Column[] {
     Column.of("id", Types.IntegerType.get(), "id column comment", false, true, Literals.integerLiteral(-1)),
     Column.of("name", Types.VarCharType.of(500), "name column comment", true, false, Literals.NULL),
@@ -859,7 +859,7 @@ http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tab
 Catalog catalog = gravitinoClient.loadCatalog("hive_catalog");
 
 TableCatalog tableCatalog = catalog.asTableCatalog();
-tableCatalog.loadTable(NameIdentifier.of("metalake", "hive_catalog", "schema", "table"));
+tableCatalog.loadTable(NameIdentifier.of("schema", "table"));
 // ...
 ```
 
@@ -904,7 +904,7 @@ Catalog catalog = gravitinoClient.loadCatalog("hive_catalog");
 
 TableCatalog tableCatalog = catalog.asTableCatalog();
 
-Table t = tableCatalog.alterTable(NameIdentifier.of("metalake", "hive_catalog", "schema", "table"),
+Table t = tableCatalog.alterTable(NameIdentifier.of("schema", "table"),
     TableChange.rename("table_renamed"), TableChange.updateComment("xxx"));
 // ...
 ```
@@ -955,10 +955,10 @@ Catalog catalog = gravitinoClient.loadCatalog("hive_catalog");
 TableCatalog tableCatalog = catalog.asTableCatalog();
 
 // Drop a table
-tableCatalog.dropTable(NameIdentifier.of("metalake", "hive_catalog", "schema", "table"));
+tableCatalog.dropTable(NameIdentifier.of("schema", "table"));
 
 // Purge a table
-tableCatalog.purgeTable(NameIdentifier.of("metalake", "hive_catalog", "schema", "table"));
+tableCatalog.purgeTable(NameIdentifier.of("schema", "table"));
 // ...
 ```
 
@@ -995,7 +995,7 @@ Catalog catalog = gravitinoClient.loadCatalog("hive_catalog");
 
 TableCatalog tableCatalog = catalog.asTableCatalog();
 NameIdentifier[] identifiers =
-    tableCatalog.listTables(Namespace.ofTable("metalake", "hive_catalog", "schema"));
+    tableCatalog.listTables(Namespace.of("schema"));
 // ...
 ```
 
