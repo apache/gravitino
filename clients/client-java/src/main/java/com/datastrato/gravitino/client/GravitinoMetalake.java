@@ -52,11 +52,11 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
   /**
    * List all the catalogs under this metalake.
    *
-   * @return A list of {@link NameIdentifier} of the catalogs under the specified namespace.
-   * @throws NoSuchMetalakeException if the metalake with specified namespace does not exist.
+   * @return A list of the catalog names under the current metalake.
+   * @throws NoSuchMetalakeException If the metalake does not exist.
    */
   @Override
-  public NameIdentifier[] listCatalogs() throws NoSuchMetalakeException {
+  public String[] listCatalogs() throws NoSuchMetalakeException {
 
     EntityListResponse resp =
         restClient.get(
@@ -66,7 +66,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
             ErrorHandlers.catalogErrorHandler());
     resp.validate();
 
-    return resp.identifiers();
+    return Arrays.stream(resp.identifiers()).map(NameIdentifier::name).toArray(String[]::new);
   }
 
   /**

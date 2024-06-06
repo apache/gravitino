@@ -207,8 +207,8 @@ public class CatalogHiveIT extends AbstractIT {
             }));
     Arrays.stream(metalake.listCatalogs())
         .forEach(
-            (ident -> {
-              metalake.dropCatalog(ident.name());
+            (catalogName -> {
+              metalake.dropCatalog(catalogName);
             }));
     if (client != null) {
       client.dropMetalake(metalakeName);
