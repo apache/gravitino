@@ -100,14 +100,14 @@ tasks {
   val black by registering(VenvTask::class) {
     dependsOn(pipInstall)
     venvExec = "black"
-    args = listOf("./gravitino", "./tests")
+    args = listOf("./gravitino", "./tests", "./scripts")
   }
 
   val pylint by registering(VenvTask::class) {
     dependsOn(pipInstall)
     mustRunAfter(black)
     venvExec = "pylint"
-    args = listOf("./gravitino", "./tests")
+    args = listOf("./gravitino", "./tests", "./scripts")
   }
 
   val integrationCoverageReport by registering(VenvTask::class){
@@ -162,16 +162,20 @@ tasks {
   }
 
   val build by registering(VenvTask::class) {
+    dependsOn(pylint)
+    venvExec = "python"
+    args = listOf("scripts/generate_version.py")
   }
 
   val distribution by registering(VenvTask::class) {
+    dependsOn(build)
     doFirst {
       delete("README.md")
       generatePypiProjectHomePage()
       delete("dist")
     }
 
-    venvExec = "Python3"
+    venvExec = "python"
     args = listOf("setup.py", "sdist")
 
     doLast {
@@ -206,6 +210,6 @@ tasks {
     it.name.endsWith("envSetup")
   }.all {
     // add install package and code formatting before any tasks
-    finalizedBy(pipInstall, black, pylint)
+    finalizedBy(pipInstall, black, pylint, build)
   }
 }

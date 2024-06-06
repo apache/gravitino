@@ -64,6 +64,6 @@ class DTOConverters:
                 change.property(), change.value()
             )
         if isinstance(change, CatalogChange.RemoveProperty):
-            return CatalogUpdateRequest.RemoveCatalogPropertyRequest(change._property)
+            return CatalogUpdateRequest.RemoveCatalogPropertyRequest(change.property())
 
         raise ValueError(f"Unknown change type: {type(change).__name__}")

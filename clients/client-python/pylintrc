@@ -26,7 +26,6 @@ disable=missing-class-docstring,
         broad-exception-caught,         #TODO-fix    
         duplicate-code,                 #TODO-fix
         invalid-field-call,             #TODO-fix
-        protected-access,               #TODO-fix
         too-many-arguments,             #TODO-fix
 
 [LOGGING]
