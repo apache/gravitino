@@ -146,6 +146,7 @@ class TestRoleMetaService extends TestJDBCBackend {
 
     RoleMetaService roleMetaService = RoleMetaService.getInstance();
 
+    // Test for securable object meta
     SecurableObject catalogObject =
         SecurableObjects.ofCatalog(
             "catalog",
