@@ -25,10 +25,14 @@ public class GravitinoSplitSource implements ConnectorSplitSource {
 
   @Override
   public CompletableFuture<ConnectorSplitBatch> getNextBatch(int maxSize) {
-    ConnectorSplitBatch batch = connectorSplitSource.getNextBatch(maxSize).join();
-    List<ConnectorSplit> list =
-        batch.getSplits().stream().map(GravitinoSplit::new).collect(Collectors.toList());
-    return CompletableFuture.completedFuture(new ConnectorSplitBatch(list, batch.isNoMoreSplits()));
+    return connectorSplitSource
+        .getNextBatch(maxSize)
+        .thenApply(
+            batch -> {
+              List<ConnectorSplit> list =
+                  batch.getSplits().stream().map(GravitinoSplit::new).collect(Collectors.toList());
+              return new ConnectorSplitBatch(list, batch.isNoMoreSplits());
+            });
   }
 
   @Override

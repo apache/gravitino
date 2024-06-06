@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.flink.connector.hive;
 
+import com.datastrato.gravitino.flink.connector.PropertiesConverter;
 import com.datastrato.gravitino.flink.connector.catalog.BaseCatalog;
 import java.util.Optional;
 import javax.annotation.Nullable;
@@ -35,5 +36,10 @@ public class GravitinoHiveCatalog extends BaseCatalog {
   @Override
   public Optional<Factory> getFactory() {
     return hiveCatalog.getFactory();
+  }
+
+  @Override
+  protected PropertiesConverter getPropertiesConverter() {
+    return HivePropertiesConverter.INSTANCE;
   }
 }
