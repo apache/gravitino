@@ -3,8 +3,9 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.catalog.hadoop.kerberos;
+package com.datastrato.gravitino.catalog.hadoop.authentication.kerberos;
 
+import com.datastrato.gravitino.catalog.hadoop.authentication.AuthenticationConfig;
 import com.datastrato.gravitino.config.ConfigBuilder;
 import com.datastrato.gravitino.config.ConfigConstants;
 import com.datastrato.gravitino.config.ConfigEntry;

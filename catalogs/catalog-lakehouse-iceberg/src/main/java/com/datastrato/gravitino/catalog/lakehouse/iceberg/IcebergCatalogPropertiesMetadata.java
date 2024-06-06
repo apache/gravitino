@@ -7,7 +7,8 @@ package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 import static com.datastrato.gravitino.connector.PropertyEntry.enumImmutablePropertyEntry;
 import static com.datastrato.gravitino.connector.PropertyEntry.stringRequiredPropertyEntry;
 
-import com.datastrato.gravitino.catalog.lakehouse.iceberg.authentication.KerberosConfig;
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.authentication.AuthenticationConfig;
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.authentication.kerberos.KerberosConfig;
 import com.datastrato.gravitino.connector.BaseCatalogPropertiesMetadata;
 import com.datastrato.gravitino.connector.PropertyEntry;
 import com.google.common.collect.ImmutableList;
@@ -61,8 +62,10 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
           KerberosConfig.CHECK_INTERVAL_SEC_KEY,
           KerberosConfig.FETCH_TIMEOUT_SEC_KEY,
           KerberosConfig.FETCH_TIMEOUT_SEC_KEY,
-          KerberosConfig.IMPERSONATION_ENABLE_KEY,
-          KerberosConfig.IMPERSONATION_ENABLE_KEY);
+          AuthenticationConfig.IMPERSONATION_ENABLE_KEY,
+          AuthenticationConfig.IMPERSONATION_ENABLE_KEY,
+          AuthenticationConfig.AUTH_TYPE_KEY,
+          AuthenticationConfig.AUTH_TYPE_KEY);
 
   static {
     List<PropertyEntry<?>> propertyEntries =
@@ -81,6 +84,7 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
     HashMap<String, PropertyEntry<?>> result = Maps.newHashMap(BASIC_CATALOG_PROPERTY_ENTRIES);
     result.putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName));
     result.putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES);
+    result.putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES);
     PROPERTIES_METADATA = ImmutableMap.copyOf(result);
   }
 

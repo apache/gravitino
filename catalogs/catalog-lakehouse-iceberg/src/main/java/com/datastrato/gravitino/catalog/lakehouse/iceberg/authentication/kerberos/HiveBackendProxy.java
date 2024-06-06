@@ -3,11 +3,10 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.catalog.lakehouse.iceberg.authentication;
+package com.datastrato.gravitino.catalog.lakehouse.iceberg.authentication.kerberos;
 
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergHiveCachedClientPool;
 import com.datastrato.gravitino.utils.PrincipalUtils;
-import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -16,7 +15,6 @@ import java.util.Map;
 import net.sf.cglib.proxy.Enhancer;
 import net.sf.cglib.proxy.MethodInterceptor;
 import net.sf.cglib.proxy.MethodProxy;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.thrift.DelegationTokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -37,11 +35,12 @@ public class HiveBackendProxy implements MethodInterceptor {
   private final Map<String, String> properties;
   private final ClientPool<IMetaStoreClient, TException> newClientPool;
 
-  public HiveBackendProxy(Map<String, String> properties, HiveCatalog target) {
+  public HiveBackendProxy(
+      Map<String, String> properties, HiveCatalog target, String kerberosRealm) {
     this.target = target;
     this.properties = properties;
+    this.kerberosRealm = kerberosRealm;
     try {
-      initKerberos(properties, target.getConf());
       proxyUser = UserGroupInformation.getCurrentUser();
 
       // Replace the original client pool with IcebergHiveCachedClientPool. Why do we need to do
@@ -54,17 +53,6 @@ public class HiveBackendProxy implements MethodInterceptor {
       throw new RuntimeException("Failed to get current user", e);
     } catch (IllegalAccessException | NoSuchFieldException e) {
       throw new RuntimeException("Failed to reset IcebergHiveClientPool", e);
-    }
-  }
-
-  private void initKerberos(Map<String, String> properties, Configuration conf) {
-    try {
-      KerberosClient kerberosClient = new KerberosClient(properties, conf);
-      File keytabFile =
-          kerberosClient.saveKeyTabFileFromUri(Long.valueOf(properties.get("catalog_uuid")));
-      this.kerberosRealm = kerberosClient.login(keytabFile.getAbsolutePath());
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to login with kerberos", e);
     }
   }
 

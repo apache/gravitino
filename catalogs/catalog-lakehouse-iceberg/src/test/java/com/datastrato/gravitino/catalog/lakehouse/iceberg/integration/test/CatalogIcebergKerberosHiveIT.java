@@ -4,12 +4,11 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.integration.test;
 
-import static com.datastrato.gravitino.catalog.lakehouse.iceberg.authentication.KerberosConfig.IMPERSONATION_ENABLE_KEY;
-import static com.datastrato.gravitino.catalog.lakehouse.iceberg.authentication.KerberosConfig.KET_TAB_URI_KEY;
-import static com.datastrato.gravitino.catalog.lakehouse.iceberg.authentication.KerberosConfig.PRINCIPAL_KEY;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.authentication.AuthenticationConfig.AUTH_TYPE_KEY;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.authentication.kerberos.KerberosConfig.IMPERSONATION_ENABLE_KEY;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.authentication.kerberos.KerberosConfig.KET_TAB_URI_KEY;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.authentication.kerberos.KerberosConfig.PRINCIPAL_KEY;
 import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
@@ -198,7 +197,7 @@ public class CatalogIcebergKerberosHiveIT extends AbstractIT {
   }
 
   @Test
-  void testIcebergWithKerberizedHiveBackend() throws IOException {
+  void testIcebergWithKerberosAndUserImpersonation() throws IOException {
     KerberosTokenProvider provider =
         KerberosTokenProvider.builder()
             .withClientPrincipal(GRAVITINO_CLIENT_PRINCIPAL)
@@ -206,24 +205,22 @@ public class CatalogIcebergKerberosHiveIT extends AbstractIT {
             .build();
     adminClient = GravitinoAdminClient.builder(serverUri).withKerberosAuth(provider).build();
 
-    GravitinoMetalake[] metalakes = adminClient.listMetalakes();
-    Assertions.assertEquals(0, metalakes.length);
-
     GravitinoMetalake gravitinoMetalake =
         adminClient.createMetalake(METALAKE_NAME, null, ImmutableMap.of());
 
     // Create a catalog
     Map<String, String> properties = Maps.newHashMap();
     properties.put(IMPERSONATION_ENABLE_KEY, "true");
-    properties.put(CATALOG_BYPASS_PREFIX + HADOOP_SECURITY_AUTHORIZATION, "true");
+    properties.put(AUTH_TYPE_KEY, "kerberos");
+
     properties.put(KET_TAB_URI_KEY, TMP_DIR + HIVE_METASTORE_CLIENT_KEYTAB);
     properties.put(PRINCIPAL_KEY, HIVE_METASTORE_CLIENT_PRINCIPAL);
-    properties.put(CATALOG_BYPASS_PREFIX + HADOOP_SECURITY_AUTHENTICATION, "kerberos");
     properties.put(
         CATALOG_BYPASS_PREFIX + "hive.metastore.kerberos.principal",
         "hive/_HOST@HADOOPKRB"
             .replace("_HOST", containerSuite.getKerberosHiveContainer().getHostName()));
     properties.put(CATALOG_BYPASS_PREFIX + "hive.metastore.sasl.enabled", "true");
+
     properties.put(IcebergConfig.CATALOG_BACKEND.getKey(), TYPE);
     properties.put(IcebergConfig.CATALOG_URI.getKey(), URIS);
     properties.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), WAREHOUSE);
@@ -240,11 +237,11 @@ public class CatalogIcebergKerberosHiveIT extends AbstractIT {
             () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
     String exceptionMessage = Throwables.getStackTraceAsString(exception);
 
-    // Make sure real user is 'gravitino_client'
+    // Make sure the real user is 'gravitino_client'
     Assertions.assertTrue(
         exceptionMessage.contains("Permission denied: user=gravitino_client, access=WRITE"));
 
-    // Now try to give the user the permission to create schema again
+    // Now try to permit the user to create the schema again
     kerberosHiveContainer.executeInContainer(
         "hadoop", "fs", "-mkdir", "/user/hive/warehouse-catalog-iceberg");
     kerberosHiveContainer.executeInContainer(
@@ -285,6 +282,52 @@ public class CatalogIcebergKerberosHiveIT extends AbstractIT {
 
     // Drop catalog
     Assertions.assertTrue(gravitinoMetalake.dropCatalog(CATALOG_NAME));
+  }
+
+  @Test
+  void testIcebergWithKerberos() {
+    KerberosTokenProvider provider =
+        KerberosTokenProvider.builder()
+            .withClientPrincipal(GRAVITINO_CLIENT_PRINCIPAL)
+            .withKeyTabFile(new File(TMP_DIR + GRAVITINO_CLIENT_KEYTAB))
+            .build();
+    adminClient = GravitinoAdminClient.builder(serverUri).withKerberosAuth(provider).build();
+
+    String metalakeName = GravitinoITUtils.genRandomName("test_metalake");
+    GravitinoMetalake gravitinoMetalake =
+        adminClient.createMetalake(metalakeName, null, ImmutableMap.of());
+
+    // Create a catalog
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(AUTH_TYPE_KEY, "kerberos");
+    // Not user impersonation here
+
+    properties.put(KET_TAB_URI_KEY, TMP_DIR + HIVE_METASTORE_CLIENT_KEYTAB);
+    properties.put(PRINCIPAL_KEY, HIVE_METASTORE_CLIENT_PRINCIPAL);
+    properties.put(
+        CATALOG_BYPASS_PREFIX + "hive.metastore.kerberos.principal",
+        "hive/_HOST@HADOOPKRB"
+            .replace("_HOST", containerSuite.getKerberosHiveContainer().getHostName()));
+    properties.put(CATALOG_BYPASS_PREFIX + "hive.metastore.sasl.enabled", "true");
+
+    properties.put(IcebergConfig.CATALOG_BACKEND.getKey(), TYPE);
+    properties.put(IcebergConfig.CATALOG_URI.getKey(), URIS);
+    properties.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), WAREHOUSE);
+    properties.put("location", "hdfs://localhost:9000/user/hive/warehouse-catalog-iceberg");
+
+    Catalog catalog =
+        gravitinoMetalake.createCatalog(
+            CATALOG_NAME, Catalog.Type.RELATIONAL, "lakehouse-iceberg", "comment", properties);
+
+    // Test create schema
+    Exception exception =
+        Assertions.assertThrows(
+            Exception.class,
+            () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
+    String exceptionMessage = Throwables.getStackTraceAsString(exception);
+
+    // Make sure the real user is 'cli' because no impersonation here.
+    Assertions.assertTrue(exceptionMessage.contains("Permission denied: user=cli, access=WRITE"));
   }
 
   private static Column[] createColumns() {
