@@ -36,6 +36,7 @@ public class RoleMetaService {
   private static final Splitter DOT_SPLITTER = Splitter.on('.');
   private static final String ROOT = "ROOT";
   private static final String ALL_METALAKES = "*";
+  private static final long ALL_METALAKES_ENTITY_ID = 0;
 
   public static RoleMetaService getInstance() {
     return INSTANCE;
@@ -95,7 +96,7 @@ public class RoleMetaService {
       for (SecurableObject object : roleEntity.securableObjects()) {
         SecurableObjectPO.Builder objectBuilder =
             POConverters.initializeSecurablePOBuilderWithVersion(
-                roleEntity.id(), object, getPOType(object));
+                roleEntity.id(), object, getEntityType(object));
         objectBuilder.withEntityId(
             getSecurableObjectEntityId(metalakeId, object.fullName(), object.type()));
         securableObjectPOs.add(objectBuilder.build());
@@ -220,7 +221,7 @@ public class RoleMetaService {
 
   long getSecurableObjectEntityId(long metalakeId, String fullName, MetadataObject.Type type) {
     if (fullName.equals(ALL_METALAKES) && type == MetadataObject.Type.METALAKE) {
-      return 0;
+      return ALL_METALAKES_ENTITY_ID;
     }
 
     if (type == MetadataObject.Type.METALAKE) {
@@ -331,7 +332,7 @@ public class RoleMetaService {
     return MetadataObject.Type.valueOf(type);
   }
 
-  private String getPOType(SecurableObject securableObject) {
+  private String getEntityType(SecurableObject securableObject) {
     if (securableObject.type() == MetadataObject.Type.METALAKE
         && securableObject.name().equals(ALL_METALAKES)) {
       return ROOT;

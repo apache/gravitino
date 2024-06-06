@@ -163,6 +163,8 @@ class TestRoleMetaService extends TestJDBCBackend {
     SecurableObject topicObject =
         SecurableObjects.ofTopic(
             schemaObject, "topic", Lists.newArrayList(Privileges.ReadTopic.deny()));
+    SecurableObject allMetalakesObject =
+        SecurableObjects.ofAllMetalakes(Lists.newArrayList(Privileges.UseMetalake.allow()));
 
     // insert role
     RoleEntity role1 =
@@ -178,7 +180,8 @@ class TestRoleMetaService extends TestJDBCBackend {
                 schemaObject,
                 tableObject,
                 filesetObject,
-                topicObject),
+                topicObject,
+                allMetalakesObject),
             ImmutableMap.of("k1", "v1"));
     Assertions.assertThrows(
         NoSuchEntityException.class,
