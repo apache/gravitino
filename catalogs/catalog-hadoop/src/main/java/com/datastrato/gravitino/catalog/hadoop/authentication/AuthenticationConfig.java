@@ -3,11 +3,10 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.catalog.hadoop.kerberos;
-
-import static com.datastrato.gravitino.catalog.hadoop.kerberos.KerberosConfig.DEFAULT_IMPERSONATION_ENABLE;
+package com.datastrato.gravitino.catalog.hadoop.authentication;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.catalog.hadoop.authentication.kerberos.KerberosConfig;
 import com.datastrato.gravitino.config.ConfigBuilder;
 import com.datastrato.gravitino.config.ConfigConstants;
 import com.datastrato.gravitino.config.ConfigEntry;
@@ -29,17 +28,18 @@ public class AuthenticationConfig extends Config {
 
   public static final ConfigEntry<String> AUTH_TYPE_ENTRY =
       new ConfigBuilder(AUTH_TYPE_KEY)
-          .doc("The type of authentication for Hadoop catalog, currently we only support Kerberos")
+          .doc(
+              "The type of authentication for Hadoop catalog, currently we only support simple and Kerberos")
           .version(ConfigConstants.VERSION_0_5_1)
           .stringConf()
-          .create();
+          .createWithDefault("simple");
 
   public static final ConfigEntry<Boolean> ENABLE_IMPERSONATION_ENTRY =
       new ConfigBuilder(IMPERSONATION_ENABLE_KEY)
           .doc("Whether to enable impersonation for the Hadoop catalog")
           .version(ConfigConstants.VERSION_0_5_1)
           .booleanConf()
-          .createWithDefault(DEFAULT_IMPERSONATION_ENABLE);
+          .createWithDefault(KerberosConfig.DEFAULT_IMPERSONATION_ENABLE);
 
   public String getAuthType() {
     return get(AUTH_TYPE_ENTRY);
@@ -58,7 +58,7 @@ public class AuthenticationConfig extends Config {
                   "Whether to enable impersonation for the Hadoop catalog",
                   false,
                   true,
-                  DEFAULT_IMPERSONATION_ENABLE,
+                  KerberosConfig.DEFAULT_IMPERSONATION_ENABLE,
                   false,
                   false))
           .put(
