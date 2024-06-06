@@ -129,10 +129,8 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
     String anotherSchemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
 
-    NameIdentifier ident = NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaName);
-
     String comment = "comment";
-    createSchema(schemaName, ident, comment);
+    createSchema(schemaName, comment);
 
     Database db = hiveClientPool.run(client -> client.getDatabase(schemaName));
     Assertions.assertEquals(EXPECT_USER, db.getOwnerName());
@@ -164,14 +162,11 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     String tableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
     String anotherTableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
 
-    NameIdentifier ident = NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaName);
-    NameIdentifier nameIdentifier =
-        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaName, tableName);
-    NameIdentifier anotherNameIdentifier =
-        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaName, anotherTableName);
+    NameIdentifier nameIdentifier = NameIdentifier.of(schemaName, tableName);
+    NameIdentifier anotherNameIdentifier = NameIdentifier.of(schemaName, anotherTableName);
 
     String comment = "comment";
-    createSchema(schemaName, ident, comment);
+    createSchema(schemaName, comment);
 
     Table createdTable =
         catalog
@@ -201,7 +196,7 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     Assertions.assertTrue(e.getMessage().contains("AccessControlException Permission denied"));
   }
 
-  private static void createSchema(String schemaName, NameIdentifier ident, String comment) {
+  private static void createSchema(String schemaName, String comment) {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");
@@ -212,7 +207,7 @@ public class ProxyCatalogHiveIT extends AbstractIT {
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HDFS_DEFAULTFS_PORT,
             schemaName.toLowerCase()));
-    catalog.asSchemas().createSchema(ident.name(), comment, properties);
+    catalog.asSchemas().createSchema(schemaName, comment, properties);
   }
 
   @Test
@@ -222,12 +217,10 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
     String tableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
 
-    NameIdentifier ident = NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaName);
-    NameIdentifier nameIdentifier =
-        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaName, tableName);
+    NameIdentifier nameIdentifier = NameIdentifier.of(schemaName, tableName);
 
     String comment = "comment";
-    createSchema(schemaName, ident, comment);
+    createSchema(schemaName, comment);
 
     // create a partitioned table
     Column[] columns = createColumns();

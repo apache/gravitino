@@ -65,11 +65,7 @@ public class CatalogMysqlVersion5IT extends CatalogMysqlIT {
         catalog
             .asTableCatalog()
             .createTable(
-                NameIdentifier.of(
-                    metalakeName,
-                    catalogName,
-                    schemaName,
-                    GravitinoITUtils.genRandomName("mysql_it_table")),
+                NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("mysql_it_table")),
                 newColumns,
                 null,
                 ImmutableMap.of());
