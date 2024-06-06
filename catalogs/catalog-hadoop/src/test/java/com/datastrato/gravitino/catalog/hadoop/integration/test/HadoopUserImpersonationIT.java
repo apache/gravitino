@@ -291,11 +291,7 @@ public class HadoopUserImpersonationIT extends AbstractIT {
     return catalog
         .asFilesetCatalog()
         .createFileset(
-            NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName),
-            comment,
-            type,
-            storageLocation,
-            properties);
+            NameIdentifier.of(schemaName, filesetName), comment, type, storageLocation, properties);
   }
 
   private boolean checkFilePathExists(String pathString) throws Exception {

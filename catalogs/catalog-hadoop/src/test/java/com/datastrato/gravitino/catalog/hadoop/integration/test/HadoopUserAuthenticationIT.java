@@ -197,15 +197,13 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
     catalog
         .asFilesetCatalog()
         .createFileset(
-            NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, TABLE_NAME),
+            NameIdentifier.of(SCHEMA_NAME, TABLE_NAME),
             "comment",
             Fileset.Type.MANAGED,
             null,
             ImmutableMap.of());
 
-    catalog
-        .asFilesetCatalog()
-        .dropFileset(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, TABLE_NAME));
+    catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(SCHEMA_NAME, TABLE_NAME));
 
     catalog.asSchemas().alterSchema(SCHEMA_NAME, SchemaChange.setProperty("k1", "value1"));
 

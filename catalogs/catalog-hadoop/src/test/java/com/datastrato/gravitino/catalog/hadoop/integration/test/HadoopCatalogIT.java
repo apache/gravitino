@@ -6,6 +6,7 @@ package com.datastrato.gravitino.catalog.hadoop.integration.test;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
@@ -16,7 +17,6 @@ import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
-import com.datastrato.gravitino.utils.NamespaceUtil;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -258,8 +258,7 @@ public class HadoopCatalogIT extends AbstractIT {
   void testNameSpec() {
     String illegalName = "/%~?*";
 
-    NameIdentifier nameIdentifier =
-        NameIdentifier.of(metalakeName, catalogName, schemaName, illegalName);
+    NameIdentifier nameIdentifier = NameIdentifier.of(schemaName, illegalName);
 
     Assertions.assertThrows(
         NoSuchFilesetException.class, () -> catalog.asFilesetCatalog().loadFileset(nameIdentifier));
@@ -282,9 +281,7 @@ public class HadoopCatalogIT extends AbstractIT {
 
     // test load fileset
     Fileset loadFileset =
-        catalog
-            .asFilesetCatalog()
-            .loadFileset(NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName));
+        catalog.asFilesetCatalog().loadFileset(NameIdentifier.of(schemaName, filesetName));
     Assertions.assertEquals(fileset.name(), loadFileset.name(), "fileset should be loaded");
     Assertions.assertEquals(fileset.comment(), loadFileset.comment(), "comment should be loaded");
     Assertions.assertEquals(fileset.type(), loadFileset.type(), "type should be loaded");
@@ -298,10 +295,7 @@ public class HadoopCatalogIT extends AbstractIT {
     // test load a fileset that not exist
     Assertions.assertThrows(
         NoSuchFilesetException.class,
-        () ->
-            catalog
-                .asFilesetCatalog()
-                .loadFileset(NameIdentifier.of(metalakeName, catalogName, schemaName, "not_exist")),
+        () -> catalog.asFilesetCatalog().loadFileset(NameIdentifier.of(schemaName, "not_exist")),
         "Should throw NoSuchFilesetException when fileset does not exist");
   }
 
@@ -320,16 +314,12 @@ public class HadoopCatalogIT extends AbstractIT {
 
     // drop fileset
     boolean dropped =
-        catalog
-            .asFilesetCatalog()
-            .dropFileset(NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName));
+        catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(schemaName, filesetName));
     Assertions.assertTrue(dropped, "fileset should be dropped");
 
     // verify fileset is dropped
     Assertions.assertFalse(
-        catalog
-            .asFilesetCatalog()
-            .filesetExists(NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName)),
+        catalog.asFilesetCatalog().filesetExists(NameIdentifier.of(schemaName, filesetName)),
         "fileset should not be exists");
     Assertions.assertFalse(
         hdfs.exists(new Path(storageLocation)), "storage location should be dropped");
@@ -351,16 +341,12 @@ public class HadoopCatalogIT extends AbstractIT {
 
     // drop fileset
     boolean dropped =
-        catalog
-            .asFilesetCatalog()
-            .dropFileset(NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName));
+        catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(schemaName, filesetName));
     Assertions.assertTrue(dropped, "fileset should be dropped");
 
     // verify fileset is dropped
     Assertions.assertFalse(
-        catalog
-            .asFilesetCatalog()
-            .filesetExists(NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName)),
+        catalog.asFilesetCatalog().filesetExists(NameIdentifier.of(schemaName, filesetName)),
         "fileset should not be exists");
     Assertions.assertTrue(
         hdfs.exists(new Path(storageLocation)), "storage location should not be dropped");
@@ -374,9 +360,7 @@ public class HadoopCatalogIT extends AbstractIT {
 
     // test no fileset exists
     NameIdentifier[] nameIdentifiers =
-        catalog
-            .asFilesetCatalog()
-            .listFilesets(NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName));
+        catalog.asFilesetCatalog().listFilesets(Namespace.of(schemaName));
     Assertions.assertEquals(0, nameIdentifiers.length, "should have no fileset");
 
     // create fileset1
@@ -407,9 +391,7 @@ public class HadoopCatalogIT extends AbstractIT {
 
     // list filesets
     NameIdentifier[] nameIdentifiers1 =
-        catalog
-            .asFilesetCatalog()
-            .listFilesets(NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName));
+        catalog.asFilesetCatalog().listFilesets(Namespace.of(schemaName));
     Arrays.sort(nameIdentifiers1, Comparator.comparing(NameIdentifier::name));
     Assertions.assertEquals(2, nameIdentifiers1.length, "should have 2 filesets");
     Assertions.assertEquals(fileset1.name(), nameIdentifiers1[0].name());
@@ -432,8 +414,7 @@ public class HadoopCatalogIT extends AbstractIT {
         catalog
             .asFilesetCatalog()
             .alterFileset(
-                NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName),
-                FilesetChange.rename(newFilesetName));
+                NameIdentifier.of(schemaName, filesetName), FilesetChange.rename(newFilesetName));
 
     // verify fileset is updated
     Assertions.assertNotNull(newFileset, "fileset should be created");
@@ -463,7 +444,7 @@ public class HadoopCatalogIT extends AbstractIT {
         catalog
             .asFilesetCatalog()
             .alterFileset(
-                NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName),
+                NameIdentifier.of(schemaName, filesetName),
                 FilesetChange.updateComment(newComment));
     assertFilesetExists(filesetName);
 
@@ -493,8 +474,7 @@ public class HadoopCatalogIT extends AbstractIT {
         catalog
             .asFilesetCatalog()
             .alterFileset(
-                NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName),
-                FilesetChange.setProperty("k1", "v2"));
+                NameIdentifier.of(schemaName, filesetName), FilesetChange.setProperty("k1", "v2"));
     assertFilesetExists(filesetName);
 
     // verify fileset is updated
@@ -523,8 +503,7 @@ public class HadoopCatalogIT extends AbstractIT {
         catalog
             .asFilesetCatalog()
             .alterFileset(
-                NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName),
-                FilesetChange.removeProperty("k1"));
+                NameIdentifier.of(schemaName, filesetName), FilesetChange.removeProperty("k1"));
     assertFilesetExists(filesetName);
 
     // verify fileset is updated
@@ -580,18 +559,12 @@ public class HadoopCatalogIT extends AbstractIT {
     return catalog
         .asFilesetCatalog()
         .createFileset(
-            NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName),
-            comment,
-            type,
-            storageLocation,
-            properties);
+            NameIdentifier.of(schemaName, filesetName), comment, type, storageLocation, properties);
   }
 
   private void assertFilesetExists(String filesetName) throws IOException {
     Assertions.assertTrue(
-        catalog
-            .asFilesetCatalog()
-            .filesetExists(NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName)),
+        catalog.asFilesetCatalog().filesetExists(NameIdentifier.of(schemaName, filesetName)),
         "fileset should be exists");
     Assertions.assertTrue(
         hdfs.exists(new Path(storageLocation(filesetName))), "storage location should be exists");
