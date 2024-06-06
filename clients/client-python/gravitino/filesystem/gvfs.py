@@ -137,13 +137,9 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         :return A file or directory exists, a boolean
         """
         context: FilesetContext = self._get_fileset_context(path)
-        try:
-            context.fs.info(
-                self._strip_storage_protocol(context.storage_type, context.actual_path)
-            )
-        except FileNotFoundError:
-            return False
-        return True
+        return context.fs.exists(
+            self._strip_storage_protocol(context.storage_type, context.actual_path)
+        )
 
     def cp_file(self, path1, path2, **kwargs):
         """Copy a file.
