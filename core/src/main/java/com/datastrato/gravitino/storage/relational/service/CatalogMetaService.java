@@ -55,6 +55,9 @@ public class CatalogMetaService {
     return catalogPO;
   }
 
+  // Catalog may be deleted, so the CatalogPO may be null.
+  // We don't choose to delete the securable object when we delete the catalog,
+  // Because they will bring conflicts if we are updating securable object
   public CatalogPO getCatalogPOById(Long catalogId) {
     CatalogPO catalogPO =
         SessionUtils.getWithoutCommit(

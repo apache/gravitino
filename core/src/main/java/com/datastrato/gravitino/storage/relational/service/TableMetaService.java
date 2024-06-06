@@ -46,6 +46,9 @@ public class TableMetaService {
     return tablePO;
   }
 
+  // Table may be deleted, so the TablePO may be null.
+  // We don't choose to delete the securable object when we delete the table,
+  // Because they will bring conflicts if we are updating securable object
   public TablePO getTablePOById(Long tableId) {
     TablePO tablePO =
         SessionUtils.getWithoutCommit(
