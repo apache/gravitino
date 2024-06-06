@@ -33,7 +33,7 @@ import java.util.List;
 /** The service class for role metadata. It provides the basic database operations for role. */
 public class RoleMetaService {
   private static final RoleMetaService INSTANCE = new RoleMetaService();
-  private static final Splitter DOT = Splitter.on('.');
+  private static final Splitter DOT_SPLITTER = Splitter.on('.');
   private static final String ROOT = "ROOT";
   private static final String ALL_METALAKES = "*";
 
@@ -227,7 +227,7 @@ public class RoleMetaService {
       return MetalakeMetaService.getInstance().getMetalakeIdByName(fullName);
     }
 
-    List<String> names = DOT.splitToList(fullName);
+    List<String> names = DOT_SPLITTER.splitToList(fullName);
     long catalogId =
         CatalogMetaService.getInstance().getCatalogIdByMetalakeIdAndName(metalakeId, names.get(0));
     if (type == MetadataObject.Type.CATALOG) {
@@ -302,7 +302,7 @@ public class RoleMetaService {
       return getSchemaFullName(filesetPO.getSchemaId()) + "." + filesetPO.getFilesetName();
     }
 
-    return null;
+    throw new IllegalArgumentException(String.format("Doesn't support the type %s", type));
   }
 
   private String getCatalogFullName(Long entityId) {
@@ -332,13 +332,10 @@ public class RoleMetaService {
   }
 
   private String getPOType(SecurableObject securableObject) {
-    String type;
     if (securableObject.type() == MetadataObject.Type.METALAKE
         && securableObject.name().equals(ALL_METALAKES)) {
-      type = ROOT;
-    } else {
-      type = securableObject.type().name();
+      return ROOT;
     }
-    return type;
+    return securableObject.type().name();
   }
 }

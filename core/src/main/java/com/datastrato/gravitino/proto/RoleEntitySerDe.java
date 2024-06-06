@@ -70,14 +70,11 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
       for (int privIndex = 0;
           privIndex < role.getSecurableObjects(index).getPrivilegeConditionsCount();
           privIndex++) {
-        if (Privilege.Condition.ALLOW
-            .name()
-            .equals(role.getSecurableObjects(index).getPrivilegeConditions(privIndex))) {
-          privileges.add(
-              Privileges.allow(role.getSecurableObjects(index).getPrivilegeNames(privIndex)));
+        com.datastrato.gravitino.proto.SecurableObject object = role.getSecurableObjects(index);
+        if (Privilege.Condition.ALLOW.name().equals(object.getPrivilegeConditions(privIndex))) {
+          privileges.add(Privileges.allow(object.getPrivilegeNames(privIndex)));
         } else {
-          privileges.add(
-              Privileges.deny(role.getSecurableObjects(index).getPrivilegeNames(privIndex)));
+          privileges.add(Privileges.deny(object.getPrivilegeNames(privIndex)));
         }
       }
 
