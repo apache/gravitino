@@ -62,6 +62,8 @@ public class HiveTable extends BaseTable {
   // A set of supported Hive table types.
   public static final Set<String> SUPPORT_TABLE_TYPES =
       Sets.newHashSet(MANAGED_TABLE.name(), EXTERNAL_TABLE.name());
+  public static final String ICEBERG_TABLE_TYPE_VALUE = "ICEBERG";
+  public static final String TABLE_TYPE_PROP = "table_type";
   private String schemaName;
   private CachedClientPool clientPool;
   private StorageDescriptor sd;
