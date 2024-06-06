@@ -456,7 +456,7 @@ public abstract class JdbcTableOperations implements TableOperation {
 
     return JdbcColumn.builder()
         .withName(column.getString("COLUMN_NAME"))
-        .withType(typeConverter.toGravitinoType(typeBean))
+        .withType(typeConverter.toGravitino(typeBean))
         .withComment(StringUtils.isEmpty(comment) ? null : comment)
         .withNullable(nullable)
         .withDefaultValue(defaultValue);
