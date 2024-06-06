@@ -23,13 +23,22 @@ final class SimpleTokenProvider implements AuthDataProvider {
     if (gravitinoUser == null) {
       gravitinoUser = System.getProperty("user.name");
     }
+    this.token = buildToken(gravitinoUser);
+  }
+
+  public SimpleTokenProvider(String gravitinoUser) {
+    this.token = buildToken(gravitinoUser);
+  }
+
+  private byte[] buildToken(String gravitinoUser){
     String userInformation = gravitinoUser + ":dummy";
-    this.token =
-        (AuthConstants.AUTHORIZATION_BASIC_HEADER
-                + new String(
-                    Base64.getEncoder().encode(userInformation.getBytes(StandardCharsets.UTF_8)),
-                    StandardCharsets.UTF_8))
+    byte[] token = (AuthConstants.AUTHORIZATION_BASIC_HEADER
+            + new String(
+            Base64.getEncoder().encode(userInformation.getBytes(StandardCharsets.UTF_8)),
+            StandardCharsets.UTF_8))
             .getBytes(StandardCharsets.UTF_8);
+    return token;
+
   }
 
   @Override
