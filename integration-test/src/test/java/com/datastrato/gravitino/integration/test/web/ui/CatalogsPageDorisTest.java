@@ -113,7 +113,7 @@ public class CatalogsPageDorisTest extends AbstractWebIT {
     catalog_doris
         .asTableCatalog()
         .createTable(
-            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            NameIdentifier.of(schemaName, tableName),
             new Column[] {column},
             "comment",
             properties,

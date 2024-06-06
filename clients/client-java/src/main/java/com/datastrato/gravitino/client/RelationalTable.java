@@ -40,7 +40,7 @@ public class RelationalTable implements Table, SupportsPartitions {
   /**
    * Creates a new RelationalTable.
    *
-   * @param namespace The namespace of the table.
+   * @param namespace The full namespace of the table, including metalake, catalog and schema.
    * @param tableDTO The table data transfer object.
    * @param restClient The REST client.
    * @return A new RelationalTable.
@@ -57,7 +57,7 @@ public class RelationalTable implements Table, SupportsPartitions {
   /**
    * Creates a new RelationalTable.
    *
-   * @param namespace The namespace of the table.
+   * @param namespace The full namespace of the table, including metalake, catalog and schema
    * @param tableDTO The table data transfer object.
    * @param restClient The REST client.
    */

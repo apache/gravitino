@@ -113,7 +113,7 @@ public class AuditCatalogMysqlIT extends AbstractIT {
         catalog
             .asTableCatalog()
             .createTable(
-                NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+                NameIdentifier.of(schemaName, tableName),
                 new Column[] {col1},
                 "comment",
                 properties);
@@ -123,14 +123,12 @@ public class AuditCatalogMysqlIT extends AbstractIT {
         catalog
             .asTableCatalog()
             .alterTable(
-                NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+                NameIdentifier.of(schemaName, tableName),
                 TableChange.addColumn(new String[] {"col_4"}, Types.StringType.get()));
     Assertions.assertEquals(expectUser, table.auditInfo().creator());
     Assertions.assertEquals(expectUser, table.auditInfo().lastModifier());
 
-    catalog
-        .asTableCatalog()
-        .dropTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+    catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, tableName));
     catalog.asSchemas().dropSchema(schemaName, true);
     metalake.dropCatalog(catalogName);
   }

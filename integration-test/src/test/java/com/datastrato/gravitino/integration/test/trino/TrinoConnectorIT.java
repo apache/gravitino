@@ -216,8 +216,7 @@ public class TrinoConnectorIT extends AbstractIT {
     containerSuite.getTrinoContainer().executeUpdateSQL(sql3);
 
     // Verify in Gravitino Server
-    NameIdentifier idTable1 =
-        NameIdentifier.of(metalakeName, catalogName, databaseName, scenarioTab1Name);
+    NameIdentifier idTable1 = NameIdentifier.of(databaseName, scenarioTab1Name);
     Table table1 = catalog.asTableCatalog().loadTable(idTable1);
     Assertions.assertEquals(table1.name(), scenarioTab1Name);
 
@@ -275,8 +274,7 @@ public class TrinoConnectorIT extends AbstractIT {
     containerSuite.getTrinoContainer().executeUpdateSQL(sql4);
 
     // Verify in Gravitino Server
-    NameIdentifier idTable2 =
-        NameIdentifier.of(metalakeName, catalogName, databaseName, scenarioTab2Name);
+    NameIdentifier idTable2 = NameIdentifier.of(databaseName, scenarioTab2Name);
     Table table2 = catalog.asTableCatalog().loadTable(idTable2);
     Assertions.assertEquals(table2.name(), scenarioTab2Name);
 
@@ -380,10 +378,7 @@ public class TrinoConnectorIT extends AbstractIT {
             catalogName, schemaName, tableName);
     containerSuite.getTrinoContainer().executeUpdateSQL(createTableSql);
 
-    Table table =
-        catalog
-            .asTableCatalog()
-            .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+    Table table = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
     Assertions.assertEquals("123455", table.properties().get("serde-name"));
     Assertions.assertEquals(
         "hdfs://localhost:9000/user/hive/warehouse/hive_schema.db/hive_table",
@@ -651,9 +646,7 @@ public class TrinoConnectorIT extends AbstractIT {
                         "insert into %s.%s.%s values(null, null)",
                         catalogName, schemaName, tableName)));
 
-    catalog
-        .asTableCatalog()
-        .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+    catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
   }
 
   @Test
@@ -691,7 +684,7 @@ public class TrinoConnectorIT extends AbstractIT {
     catalog
         .asTableCatalog()
         .createTable(
-            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            NameIdentifier.of(schemaName, tableName),
             createHiveFullTypeColumns(),
             "Created by gravitino client",
             ImmutableMap.<String, String>builder()
@@ -712,10 +705,7 @@ public class TrinoConnectorIT extends AbstractIT {
             });
     LOG.info("create table \"{}.{}\".{}.{}", metalakeName, catalogName, schemaName, tableName);
 
-    Table table =
-        catalog
-            .asTableCatalog()
-            .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+    Table table = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
     Assertions.assertNotNull(table);
 
     String sql = String.format("show create table %s.%s.%s", catalogName, schemaName, tableName);
@@ -913,7 +903,7 @@ public class TrinoConnectorIT extends AbstractIT {
     catalog
         .asTableCatalog()
         .createTable(
-            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            NameIdentifier.of(schemaName, tableName),
             createIcebergFullTypeColumns(),
             "Created by gravitino client",
             ImmutableMap.<String, String>builder()
@@ -930,10 +920,7 @@ public class TrinoConnectorIT extends AbstractIT {
             });
     LOG.info("create table \"{}.{}\".{}.{}", metalakeName, catalogName, schemaName, tableName);
 
-    Table table =
-        catalog
-            .asTableCatalog()
-            .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+    Table table = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
     Assertions.assertNotNull(table);
 
     String sql = String.format("show create table %s.%s.%s", catalogName, schemaName, tableName);
@@ -957,11 +944,7 @@ public class TrinoConnectorIT extends AbstractIT {
             catalogName, schemaName, tableCreatedByTrino);
     containerSuite.getTrinoContainer().executeUpdateSQL(createTableSql);
 
-    table =
-        catalog
-            .asTableCatalog()
-            .loadTable(
-                NameIdentifier.of(metalakeName, catalogName, schemaName, tableCreatedByTrino));
+    table = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableCreatedByTrino));
 
     Arrays.stream(table.partitioning())
         .anyMatch(p -> ((Transform.SingleFieldTransform) p).fieldName()[0].equals("name"));
@@ -983,10 +966,7 @@ public class TrinoConnectorIT extends AbstractIT {
             "CREATE TABLE %s.%s.%s (id int, name varchar)", catalogName, schemaName, tableName);
     containerSuite.getTrinoContainer().executeUpdateSQL(createTableSql);
 
-    Table table =
-        catalog
-            .asTableCatalog()
-            .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+    Table table = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
     Assertions.assertNotNull(table);
   }
 
@@ -1167,16 +1147,13 @@ public class TrinoConnectorIT extends AbstractIT {
     catalog
         .asTableCatalog()
         .createTable(
-            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            NameIdentifier.of(schemaName, tableName),
             createMySQLFullTypeColumns(),
             "Created by gravitino client",
             ImmutableMap.<String, String>builder().build());
     LOG.info("create table \"{}.{}\".{}.{}", metalakeName, catalogName, schemaName, tableName);
 
-    Table table =
-        catalog
-            .asTableCatalog()
-            .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+    Table table = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
     Assertions.assertNotNull(table);
 
     sql = String.format("show create table %s.%s.%s", catalogName, schemaName, tableName);
@@ -1203,7 +1180,7 @@ public class TrinoConnectorIT extends AbstractIT {
     catalog
         .asTableCatalog()
         .createTable(
-            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            NameIdentifier.of(schemaName, tableName),
             columns,
             "Created by gravitino client",
             ImmutableMap.<String, String>builder().build(),
@@ -1291,9 +1268,7 @@ public class TrinoConnectorIT extends AbstractIT {
             catalogName, schemaName, tableName);
     containerSuite.getTrinoContainer().executeUpdateSQL(sql);
 
-    catalog
-        .asTableCatalog()
-        .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+    catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
 
     sql = String.format("show create table %s.%s.%s", catalogName, schemaName, tableName);
 

@@ -407,12 +407,7 @@ public class GravitinoMockServer implements AutoCloseable {
                 ConnectorMetadata metadata = memoryConnector.getMetadata(null, null);
                 ArrayList<NameIdentifier> tableNames = new ArrayList<>();
                 for (SchemaTableName tableName : metadata.listTables(null, Optional.empty())) {
-                  tableNames.add(
-                      NameIdentifier.of(
-                          schemaName.level(0),
-                          schemaName.level(1),
-                          schemaName.level(2),
-                          tableName.getTableName()));
+                  tableNames.add(NameIdentifier.of(schemaName.level(0), tableName.getTableName()));
                 }
                 return tableNames.toArray(new NameIdentifier[tableNames.size()]);
               }
@@ -595,13 +590,13 @@ public class GravitinoMockServer implements AutoCloseable {
 
     TableName(NameIdentifier nameIdentifier) {
       Preconditions.checkArgument(
-          nameIdentifier.namespace().length() == 3,
+          nameIdentifier.namespace().length() == 1,
           "Not a table nameIdentifier: " + nameIdentifier);
       this.nameIdentifier = nameIdentifier;
     }
 
     String schema() {
-      return nameIdentifier.namespace().level(2);
+      return nameIdentifier.namespace().level(0);
     }
 
     String table() {

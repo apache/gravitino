@@ -12,6 +12,7 @@ import static org.apache.http.HttpStatus.SC_NOT_FOUND;
 import static org.apache.http.HttpStatus.SC_NOT_IMPLEMENTED;
 
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.dto.SchemaDTO;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.DistributionDTO;
@@ -63,8 +64,9 @@ public class TestRelationalTable extends TestRelationalCatalog {
     TestRelationalCatalog.setUp();
 
     // setup schema
-    NameIdentifier schemaId = NameIdentifier.of(metalakeName, catalogName, schemaName);
-    String schemaPath = withSlash(RelationalCatalog.formatSchemaRequestPath(schemaId.namespace()));
+    String schemaPath =
+        withSlash(
+            RelationalCatalog.formatSchemaRequestPath(Namespace.of(metalakeName, catalogName)));
     SchemaDTO mockedSchema = createMockSchema(schemaName, "comment", Collections.emptyMap());
 
     SchemaCreateRequest req =
@@ -72,11 +74,10 @@ public class TestRelationalTable extends TestRelationalCatalog {
     SchemaResponse resp = new SchemaResponse(mockedSchema);
     buildMockResource(Method.POST, schemaPath, req, resp, SC_OK);
 
-    catalog.asSchemas().createSchema(schemaId.name(), "comment", Collections.emptyMap());
+    catalog.asSchemas().createSchema(schemaName, "comment", Collections.emptyMap());
 
     // setup partitioned table
-    NameIdentifier tableId =
-        NameIdentifier.of(metalakeName, catalogName, schemaName, partitionedTableName);
+    NameIdentifier tableId = NameIdentifier.of(schemaName, partitionedTableName);
     String tablePath = withSlash(RelationalCatalog.formatTableRequestPath(tableId.namespace()));
 
     ColumnDTO[] columns =

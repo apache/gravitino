@@ -110,7 +110,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
             ErrorHandlers.tableErrorHandler());
     resp.validate();
 
-    return RelationalTable.from(ident.namespace(), resp.getTable(), restClient);
+    return RelationalTable.from(fullNamespace, resp.getTable(), restClient);
   }
 
   /**
@@ -161,7 +161,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
             ErrorHandlers.tableErrorHandler());
     resp.validate();
 
-    return RelationalTable.from(ident.namespace(), resp.getTable(), restClient);
+    return RelationalTable.from(fullNamespace, resp.getTable(), restClient);
   }
 
   /**
@@ -195,7 +195,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
             ErrorHandlers.tableErrorHandler());
     resp.validate();
 
-    return RelationalTable.from(ident.namespace(), resp.getTable(), restClient);
+    return RelationalTable.from(fullNamespace, resp.getTable(), restClient);
   }
 
   /**

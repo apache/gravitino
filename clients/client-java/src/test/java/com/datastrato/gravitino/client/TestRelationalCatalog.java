@@ -176,17 +176,20 @@ public class TestRelationalCatalog extends TestBase {
 
   @Test
   public void testCreateSchema() throws JsonProcessingException {
-    NameIdentifier schemaId = NameIdentifier.of(metalakeName, catalogName, "schema1");
-    String schemaPath = withSlash(RelationalCatalog.formatSchemaRequestPath(schemaId.namespace()));
-    SchemaDTO schema = createMockSchema("schema1", "comment", Collections.emptyMap());
+    String schemaName = "schema1";
+    String schemaPath =
+        withSlash(
+            RelationalCatalog.formatSchemaRequestPath(Namespace.of(metalakeName, catalogName)));
+    SchemaDTO schema = createMockSchema(schemaName, "comment", Collections.emptyMap());
 
-    SchemaCreateRequest req = new SchemaCreateRequest("schema1", "comment", Collections.emptyMap());
+    SchemaCreateRequest req =
+        new SchemaCreateRequest(schemaName, "comment", Collections.emptyMap());
     SchemaResponse resp = new SchemaResponse(schema);
     buildMockResource(Method.POST, schemaPath, req, resp, SC_OK);
 
     Schema createdSchema =
-        catalog.asSchemas().createSchema(schemaId.name(), "comment", Collections.emptyMap());
-    Assertions.assertEquals("schema1", createdSchema.name());
+        catalog.asSchemas().createSchema(schemaName, "comment", Collections.emptyMap());
+    Assertions.assertEquals(schemaName, createdSchema.name());
     Assertions.assertEquals("comment", createdSchema.comment());
     Assertions.assertEquals(Collections.emptyMap(), createdSchema.properties());
 
@@ -200,7 +203,7 @@ public class TestRelationalCatalog extends TestBase {
     Throwable ex =
         Assertions.assertThrows(
             NoSuchCatalogException.class,
-            () -> schemas.createSchema(schemaId.name(), "comment", emptyMap));
+            () -> schemas.createSchema(schemaName, "comment", emptyMap));
     Assertions.assertTrue(ex.getMessage().contains("catalog not found"));
 
     // Test throw SchemaAlreadyExistsException
@@ -212,16 +215,16 @@ public class TestRelationalCatalog extends TestBase {
     Throwable ex1 =
         Assertions.assertThrows(
             SchemaAlreadyExistsException.class,
-            () -> schemas.createSchema(schemaId.name(), "comment", emptyMap));
+            () -> schemas.createSchema(schemaName, "comment", emptyMap));
     Assertions.assertTrue(ex1.getMessage().contains("schema already exists"));
   }
 
   @Test
   public void testLoadSchema() throws JsonProcessingException {
-    NameIdentifier schemaId = NameIdentifier.of(metalakeName, catalogName, "schema1");
+    NameIdentifier schemaId = NameIdentifier.of("schema1");
     String schemaPath =
         withSlash(
-            RelationalCatalog.formatSchemaRequestPath(schemaId.namespace())
+            RelationalCatalog.formatSchemaRequestPath(Namespace.of(metalakeName, catalogName))
                 + "/"
                 + schemaId.name());
     SchemaDTO schema = createMockSchema("schema1", "comment", Collections.emptyMap());

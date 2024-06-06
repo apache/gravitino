@@ -149,7 +149,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     catalog
         .asTableCatalog()
         .createTable(
-            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            NameIdentifier.of(schemaName, tableName),
             columns,
             "comment",
             properties,
