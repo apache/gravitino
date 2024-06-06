@@ -4,11 +4,21 @@
  */
 package com.datastrato.gravitino.trino.connector.system.storedprocdure;
 
+import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_CATALOG_ALREADY_EXISTS;
+import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_METALAKE_NOT_EXISTS;
+import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_OPERATION_FAILED;
+import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION;
 import static com.datastrato.gravitino.trino.connector.system.table.GravitinoSystemTable.SYSTEM_TABLE_SCHEMA_NAME;
 import static io.trino.spi.type.BooleanType.BOOLEAN;
 import static io.trino.spi.type.VarcharType.VARCHAR;
 
+import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
+import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
+import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
+import io.trino.spi.TrinoException;
 import io.trino.spi.procedure.Procedure;
 import io.trino.spi.type.MapType;
 import io.trino.spi.type.TypeOperators;
@@ -16,8 +26,11 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class CreateCatalogStoredProcedure extends GravitinoStoredProcedure {
+  private static final Logger LOG = LoggerFactory.getLogger(CreateCatalogStoredProcedure.class);
 
   private final CatalogConnectorManager catalogConnectorManager;
   private final String metalake;
@@ -51,6 +64,42 @@ public class CreateCatalogStoredProcedure extends GravitinoStoredProcedure {
 
   public void createCatalog(
       String catalogName, String provider, Map<String, String> properties, boolean ignoreExist) {
-    catalogConnectorManager.createCatalog(metalake, catalogName, provider, properties, ignoreExist);
+        boolean exists = catalogConnectorManager.catalogConnectorExist(
+            catalogConnectorManager.getTrinoCatalogName(metalake, catalogName));
+    if (exists) {
+      if (!ignoreExist) {
+        throw new TrinoException(
+            GRAVITINO_CATALOG_ALREADY_EXISTS,
+            String.format("Catalog %s already exists.", NameIdentifier.of(metalake, catalogName)));
+      }
+      return;
+    }
+
+    try {
+        catalogConnectorManager
+          .getMetalake(metalake)
+          .createCatalog(
+              catalogName, Catalog.Type.RELATIONAL, provider, "Trino created", properties);
+
+      catalogConnectorManager.loadMetalakeSync();
+      if (!catalogConnectorManager.catalogConnectorExist(
+          catalogConnectorManager.getTrinoCatalogName(metalake, catalogName))) {
+        throw new TrinoException(
+            GRAVITINO_OPERATION_FAILED, "Create catalog failed due to the loading process fails");
+      }
+
+      LOG.info("Create catalog {} in metalake {} successfully.", catalogName, metalake);
+
+    } catch (NoSuchMetalakeException e) {
+      throw new TrinoException(
+          GRAVITINO_METALAKE_NOT_EXISTS, "Metalake " + metalake + " not exists.");
+    } catch (CatalogAlreadyExistsException e) {
+      throw new TrinoException(
+          GRAVITINO_CATALOG_ALREADY_EXISTS,
+          "Catalog " + NameIdentifier.of(metalake, catalogName) + " already exists in the server.");
+    } catch (Exception e) {
+      throw new TrinoException(
+          GRAVITINO_UNSUPPORTED_OPERATION, "Create catalog failed. " + e.getMessage(), e);
+    }
   }
 }

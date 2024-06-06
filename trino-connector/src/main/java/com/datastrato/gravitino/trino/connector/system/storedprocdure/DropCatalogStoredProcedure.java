@@ -4,17 +4,32 @@
  */
 package com.datastrato.gravitino.trino.connector.system.storedprocdure;
 
+import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS;
+import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_METALAKE_NOT_EXISTS;
+import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_OPERATION_FAILED;
+import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION;
 import static com.datastrato.gravitino.trino.connector.system.table.GravitinoSystemTable.SYSTEM_TABLE_SCHEMA_NAME;
 import static io.trino.spi.type.BooleanType.BOOLEAN;
 import static io.trino.spi.type.VarcharType.VARCHAR;
 
+import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.client.GravitinoMetalake;
+import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
+import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
+import io.trino.spi.TrinoException;
 import io.trino.spi.procedure.Procedure;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.util.List;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 public class DropCatalogStoredProcedure extends GravitinoStoredProcedure {
+  private static final Logger LOG = LoggerFactory.getLogger(DropCatalogStoredProcedure.class);
 
   private final CatalogConnectorManager catalogConnectorManager;
   private final String metalake;
@@ -42,6 +57,39 @@ public class DropCatalogStoredProcedure extends GravitinoStoredProcedure {
   }
 
   public void dropCatalog(String catalogName, boolean ignoreNotExist) {
-    catalogConnectorManager.dropCatalog(metalake, catalogName, ignoreNotExist);
+    try {
+      CatalogConnectorContext catalogConnector = catalogConnectorManager.getCatalogConnector(
+              catalogConnectorManager.getTrinoCatalogName(metalake, catalogName));
+      if (catalogConnector == null) {
+        if (ignoreNotExist) {
+          return;
+        }
+
+        throw new TrinoException(
+            GRAVITINO_CATALOG_NOT_EXISTS,
+            "Catalog " + NameIdentifier.of(metalake, catalogName) + " not exists.");
+      }
+      boolean dropped = catalogConnector.getMetalake().dropCatalog(catalogName);
+      if (!dropped) {
+        throw new TrinoException(
+            GRAVITINO_UNSUPPORTED_OPERATION, "Failed to drop no empty catalog " + catalogName);
+      }
+
+      catalogConnectorManager.loadMetalakeSync();
+
+      if (catalogConnectorManager.catalogConnectorExist(catalogConnectorManager.getTrinoCatalogName(metalake, catalogName))) {
+        throw new TrinoException(
+            GRAVITINO_OPERATION_FAILED, "Drop catalog failed due to the reloading process fails");
+      }
+
+      LOG.info("Drop catalog {} in metalake {} successfully.", catalogName, metalake);
+
+    } catch (NoSuchMetalakeException e) {
+      throw new TrinoException(
+          GRAVITINO_METALAKE_NOT_EXISTS, "Metalake " + metalake + " not exists.");
+    } catch (Exception e) {
+      throw new TrinoException(
+          GRAVITINO_UNSUPPORTED_OPERATION, "Drop catalog failed. " + e.getMessage(), e);
+    }
   }
 }
