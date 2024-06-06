@@ -56,16 +56,16 @@ jobs:
     strategy:
       matrix:
         architecture: [linux/amd64]
-        java-version: [ 8, 11, 17 ]
     env:
       PLATFORM: ${{ matrix.architecture }}
     steps:
       - uses: actions/checkout@v3
 
-      - uses: actions/setup-java@v3
+      - uses: actions/setup-java@v4
         with:
-          java-version: ${{ matrix.java-version }}
+          java-version: '8'
           distribution: 'temurin'
+          cache: 'gradle'
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -76,8 +76,7 @@ jobs:
 
       - name: Package Gravitino
         run: |
-          ./gradlew build -x test -PjdkVersion=${{ matrix.java-version }}
-          ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
+          ./gradlew compileDistribution -x test -PjdkVersion=8
 
       - name: Setup debug Github Action
         if: ${{ contains(github.event.pull_request.labels.*.name, 'debug action') }}
@@ -87,15 +86,43 @@ jobs:
         run: |
           dev/ci/util_free_space.sh
 
-      - name: Flink Integration Test
-        id: integrationTest
+      - name: Flink Integration Test Java8
+        id: integrationTestJava8
         run: |
-          ./gradlew --rerun-tasks -PskipTests -PtestMode=embedded -PjdkVersion=${{ matrix.java-version }} :flink-connector:test --tests "com.datastrato.gravitino.flink.connector.integration.test.**"
-          ./gradlew --rerun-tasks -PskipTests -PtestMode=deploy -PjdkVersion=${{ matrix.java-version }} :flink-connector:test --tests "com.datastrato.gravitino.flink.connector.integration.test.**"
+          ./gradlew -PskipTests -PtestMode=embedded -PjdkVersion=8 :flink-connector:test --tests "com.datastrato.gravitino.flink.connector.integration.test.**"
+          ./gradlew -PskipTests -PtestMode=deploy -PjdkVersion=8 :flink-connector:test --tests "com.datastrato.gravitino.flink.connector.integration.test.**"
+
+      - uses: actions/setup-java@v4
+        if: ${{ steps.integrationTestJava8.outcome == 'success' }}
+        with:
+          java-version: '11'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Flink Integration Test Java11
+        if: ${{ steps.integrationTestJava8.outcome == 'success' }}
+        id: integrationTestJava11
+        run: |
+          ./gradlew -PskipTests -PtestMode=embedded -PjdkVersion=11 :flink-connector:test --tests "com.datastrato.gravitino.flink.connector.integration.test.**"
+          ./gradlew -PskipTests -PtestMode=deploy -PjdkVersion=11 :flink-connector:test --tests "com.datastrato.gravitino.flink.connector.integration.test.**"
+
+      - uses: actions/setup-java@v4
+        if: ${{ steps.integrationTestJava11.outcome == 'success' }}
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Flink Integration Test Java17
+        if: ${{ steps.integrationTestJava11.outcome == 'success' }}
+        id: integrationTestJava17
+        run: |
+          ./gradlew -PskipTests -PtestMode=embedded -PjdkVersion=17 :flink-connector:test --tests "com.datastrato.gravitino.flink.connector.integration.test.**"
+          ./gradlew -PskipTests -PtestMode=deploy -PjdkVersion=17 :flink-connector:test --tests "com.datastrato.gravitino.flink.connector.integration.test.**"
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
-        if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
+        if: ${{ (failure() && steps.integrationTestJava17.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
         with:
           name: flink-connector-integrate-test-reports-${{ matrix.java-version }}
           path: |

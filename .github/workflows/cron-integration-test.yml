@@ -1,4 +1,4 @@
-name: Cron Integration Test
+name: Cron All Test
 
 # Controls when the workflow will run
 on:
@@ -72,7 +72,6 @@ jobs:
 
       - name: Package Gravitino
         run: |
-          ./gradlew build -x test -PjdkVersion=${{ matrix.java-version }}
           ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
 
       - name: Setup debug Github Action
@@ -83,16 +82,16 @@ jobs:
         run: |
           dev/ci/util_free_space.sh
 
-      - name: Integration Test
-        id: integrationTest
+      - name: All Test
+        id: allTest
         run: |
-          ./gradlew test --rerun-tasks -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }}
+          ./gradlew test -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }}
 
-      - name: Upload integrate tests reports
+      - name: Upload tests reports
         uses: actions/upload-artifact@v3
-        if: ${{ failure() && steps.integrationTest.outcome == 'failure' }}
+        if: ${{ failure() && steps.allTest.outcome == 'failure' }}
         with:
-          name: integrate test reports
+          name: all test reports
           path: |
             build/reports
             integration-test/build/integration-test.log

@@ -50,8 +50,7 @@ jobs:
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
 
-  # Integration test for AMD64 architecture
-  test-amd64-arch:
+  catalog-it:
     needs: changes
     if: needs.changes.outputs.source_changes == 'true'
     runs-on: ubuntu-latest
@@ -59,18 +58,18 @@ jobs:
     strategy:
       matrix:
         architecture: [linux/amd64]
-        java-version: [ 8, 11, 17 ]
-        test-mode: [ embedded, deploy ]
-        backend: [ jdbcBackend, kvBackend]
+        java-version: [ 8 ]
+        catalog: [ lakehouse-iceberg, hive, jdbc-doris, jdbc-mysql, jdbc-postgresql, hadoop, kafka ]
     env:
       PLATFORM: ${{ matrix.architecture }}
     steps:
       - uses: actions/checkout@v3
 
-      - uses: actions/setup-java@v3
+      - uses: actions/setup-java@v4
         with:
           java-version: ${{ matrix.java-version }}
           distribution: 'temurin'
+          cache: 'gradle'
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -80,7 +79,6 @@ jobs:
           dev/ci/check_commands.sh
 
       - name: Package Gravitino
-        if : ${{ matrix.test-mode == 'deploy' }}
         run: |
           ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
 
@@ -89,22 +87,94 @@ jobs:
         uses: csexton/debugger-action@master
 
       - name: Free up disk space
+        if : ${{ matrix.catalog == 'jdbc-doris' }}
         run: |
           dev/ci/util_free_space.sh
 
-      - name: Backend Integration Test
-        id: integrationTest
-        run: >
-          ./gradlew test --rerun-tasks -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -P${{ matrix.backend }} -PskipWebITs 
-          -x :web:test -x :clients:client-python:test -x :flink-connector:test -x :spark-connector:test -x :spark-connector:spark-common:test 
-          -x :spark-connector:spark-3.3:test -x :spark-connector:spark-3.4:test -x :spark-connector:spark-3.5:test 
-          -x :spark-connector:spark-runtime-3.3:test -x :spark-connector:spark-runtime-3.4:test -x :spark-connector:spark-runtime-3.5:test
+      - name: Test catalog
+        id: catalogTest
+        run: |
+          for testMode in "embedded" "deploy"
+          do
+            echo "Run catalog it in ${testMode} mode with kvBackend"
+            ./gradlew :catalogs:catalog-${{ matrix.catalog }}:test -PskipTests -PtestMode=${testMode} -PjdkVersion=${{ matrix.java-version }} -PkvBackend
+            echo "Run catalog it in ${testMode} mode with jdbcBackend"
+            ./gradlew :catalogs:catalog-${{ matrix.catalog }}:test -PskipTests -PtestMode=${testMode} -PjdkVersion=${{ matrix.java-version }} -PjdbcBackend
+          done
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
-        if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
+        if: ${{ (failure() && steps.catalogTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
         with:
-          name: integrate-test-reports-${{ matrix.java-version }}-${{ matrix.test-mode }}-${{ matrix.backend }}
+          name: catalog-test-reports-${{ matrix.java-version }}-${{ matrix.catalog }}
+          path: |
+            build/reports
+            integration-test/build/*.log
+            integration-test/build/*.tar
+            integration-test/build/trino-ci-container-log/hive/*.*
+            integration-test/build/trino-ci-container-log/hdfs/*.*
+            distribution/package/logs/gravitino-server.out
+            distribution/package/logs/gravitino-server.log
+            catalogs/**/*.log
+            catalogs/**/*.tar
+            distribution/**/*.log
+
+  integration-test:
+    needs: changes
+    if: needs.changes.outputs.source_changes == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        architecture: [ linux/amd64 ]
+        java-version: [ 8 ]
+    env:
+      PLATFORM: ${{ matrix.architecture }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Check required command
+        run: |
+          dev/ci/check_commands.sh
+
+      - name: Package Gravitino
+        run: |
+          ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
+
+      - name: Setup debug Github Action
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'debug action') }}
+        uses: csexton/debugger-action@master
+
+      - name: Free up disk space
+        if: ${{ matrix.catalog == 'jdbc-doris' }}
+        run: |
+          dev/ci/util_free_space.sh
+
+      - name: Integration test
+        id: integrationTest
+        run: |
+          for testMode in "embedded" "deploy"
+          do
+            echo "Run integration test in ${testMode} mode with kvBackend"
+            ./gradlew :integration-test:test -PskipTrinoITs -PskipWebITs -PtestMode=${testMode} -PjdkVersion=${{ matrix.java-version }} -PkvBackend
+            echo "Run integration test in ${testMode} mode with jdbcBackend"
+            ./gradlew :integration-test:test -PskipTrinoITs -PskipWebITs -PtestMode=${testMode} -PjdkVersion=${{ matrix.java-version }} -PjdbcBackend
+          done
+
+      - name: Upload integrate tests reports
+        uses: actions/upload-artifact@v3
+        if: ${{ (failure() && steps.catalogTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
+        with:
+          name: integrate-test-reports-${{ matrix.java-version }}-${{ matrix.catalog }}
           path: |
             build/reports
             integration-test/build/*.log

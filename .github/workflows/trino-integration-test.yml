@@ -1,4 +1,4 @@
-name: Frontend Integration Test
+name: Trino Integration Test
 
 # Controls when the workflow will run
 on:
@@ -36,10 +36,10 @@ jobs:
               - dev/**
               - gradle/**
               - integration-test/**
+              - integration-test-common/**
               - meta/**
               - server/**
               - server-common/**
-              - spark-connector/**
               - trino-connector/**
               - web/**
               - docs/open-api/**
@@ -50,12 +50,11 @@ jobs:
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
 
-  # Integration test for AMD64 architecture
-  test-amd64-arch:
+  trino-it:
     needs: changes
     if: needs.changes.outputs.source_changes == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     strategy:
       matrix:
         architecture: [linux/amd64]
@@ -87,25 +86,34 @@ jobs:
         uses: csexton/debugger-action@master
 
       - name: Free up disk space
+        if : ${{ matrix.catalog == 'jdbc-doris' }}
         run: |
           dev/ci/util_free_space.sh
 
-      - name: Frontend Integration Test
-        id: integrationTest
+      - name: Test catalog
+        id: catalogTest
         run: |
-          ./gradlew -PskipTests -PtestMode=embedded -PjdkVersion=${{ matrix.java-version }} :integration-test:test --tests "com.datastrato.gravitino.integration.test.web.ui.**"
-          ./gradlew -PskipTests -PtestMode=deploy -PjdkVersion=${{ matrix.java-version }} :integration-test:test --tests "com.datastrato.gravitino.integration.test.web.ui.**"
+          for testMode in "embedded" "deploy"
+          do
+            echo "Run Trino it in ${testMode} mode with kvBackend"
+            ./gradlew -PskipTests -PtestMode=${testMode} -PjdkVersion=${{ matrix.java-version }} -PkvBackend :integration-test:test --tests "com.datastrato.gravitino.integration.test.trino.**"
+            echo "Run Trino it in ${testMode} mode with jdbcBackend"
+            ./gradlew -PskipTests -PtestMode=${testMode} -PjdkVersion=${{ matrix.java-version }} -PjdbcBackend :integration-test:test --tests "com.datastrato.gravitino.integration.test.trino.**"
+          done
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
-        if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
+        if: ${{ (failure() && steps.catalogTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
         with:
-          name: integrate-test-reports-${{ matrix.java-version }}
+          name: integrate-test-reports-${{ matrix.java-version }}-${{ matrix.catalog }}
           path: |
             build/reports
-            integration-test/build/integration-test-integration-test.log
+            integration-test/build/*.log
             integration-test/build/*.tar
+            integration-test/build/trino-ci-container-log/hive/*.*
+            integration-test/build/trino-ci-container-log/hdfs/*.*
             distribution/package/logs/gravitino-server.out
             distribution/package/logs/gravitino-server.log
             catalogs/**/*.log
             catalogs/**/*.tar
+            distribution/**/*.log
