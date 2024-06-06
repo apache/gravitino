@@ -78,7 +78,10 @@ public class TestRelationalTable extends TestRelationalCatalog {
 
     // setup partitioned table
     NameIdentifier tableId = NameIdentifier.of(schemaName, partitionedTableName);
-    String tablePath = withSlash(RelationalCatalog.formatTableRequestPath(tableId.namespace()));
+    String tablePath =
+        withSlash(
+            RelationalCatalog.formatTableRequestPath(
+                Namespace.of(metalakeName, catalogName, schemaName)));
 
     ColumnDTO[] columns =
         new ColumnDTO[] {
