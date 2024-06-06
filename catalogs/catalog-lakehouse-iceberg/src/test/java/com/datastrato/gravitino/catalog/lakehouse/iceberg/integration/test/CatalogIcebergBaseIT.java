@@ -56,6 +56,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -251,9 +252,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
   void testOperationIcebergSchema() {
     SupportsSchemas schemas = catalog.asSchemas();
     // list schema check.
-    NameIdentifier[] nameIdentifiers = schemas.listSchemas();
-    Set<String> schemaNames =
-        Arrays.stream(nameIdentifiers).map(NameIdentifier::name).collect(Collectors.toSet());
+    Set<String> schemaNames = new HashSet<>(Arrays.asList(schemas.listSchemas()));
     Assertions.assertTrue(schemaNames.contains(schemaName));
 
     List<org.apache.iceberg.catalog.Namespace> icebergNamespaces =
@@ -266,10 +265,9 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     String testSchemaName = GravitinoITUtils.genRandomName("test_schema_1");
     NameIdentifier schemaIdent = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
     schemas.createSchema(schemaIdent.name(), schema_comment, Collections.emptyMap());
-    nameIdentifiers = schemas.listSchemas();
-    Map<String, NameIdentifier> schemaMap =
-        Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v -> v));
-    Assertions.assertTrue(schemaMap.containsKey(testSchemaName));
+
+    schemaNames = new HashSet<>(Arrays.asList(schemas.listSchemas()));
+    Assertions.assertTrue(schemaNames.contains(testSchemaName));
 
     icebergNamespaces =
         icebergSupportsNamespaces.listNamespaces(IcebergTableOpsHelper.getIcebergNamespace());
@@ -305,10 +303,8 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
           icebergSupportsNamespaces.loadNamespaceMetadata(icebergNamespace);
         });
 
-    nameIdentifiers = schemas.listSchemas();
-    schemaMap =
-        Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v -> v));
-    Assertions.assertFalse(schemaMap.containsKey(testSchemaName));
+    schemaNames = new HashSet<>(Arrays.asList(schemas.listSchemas()));
+    Assertions.assertFalse(schemaNames.contains(testSchemaName));
     Assertions.assertFalse(schemas.dropSchema("no-exits", false));
     TableCatalog tableCatalog = catalog.asTableCatalog();
 

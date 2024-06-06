@@ -15,6 +15,8 @@ import com.datastrato.gravitino.storage.relational.po.TablePO;
 import com.datastrato.gravitino.storage.relational.utils.ExceptionUtils;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
+import com.datastrato.gravitino.utils.NameIdentifierUtil;
+import com.datastrato.gravitino.utils.NamespaceUtil;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
@@ -69,7 +71,7 @@ public class TableMetaService {
   }
 
   public TableEntity getTableByIdentifier(NameIdentifier identifier) {
-    NameIdentifier.checkTable(identifier);
+    NameIdentifierUtil.checkTable(identifier);
 
     Long schemaId =
         CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
@@ -80,7 +82,7 @@ public class TableMetaService {
   }
 
   public List<TableEntity> listTablesByNamespace(Namespace namespace) {
-    Namespace.checkTable(namespace);
+    NamespaceUtil.checkTable(namespace);
 
     Long schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(namespace);
 
@@ -93,7 +95,7 @@ public class TableMetaService {
 
   public void insertTable(TableEntity tableEntity, boolean overwrite) {
     try {
-      NameIdentifier.checkTable(tableEntity.nameIdentifier());
+      NameIdentifierUtil.checkTable(tableEntity.nameIdentifier());
 
       TablePO.Builder builder = TablePO.builder();
       fillTablePOBuilderParentEntityId(builder, tableEntity.namespace());
@@ -117,7 +119,7 @@ public class TableMetaService {
 
   public <E extends Entity & HasIdentifier> TableEntity updateTable(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
-    NameIdentifier.checkTable(identifier);
+    NameIdentifierUtil.checkTable(identifier);
 
     String tableName = identifier.name();
 
@@ -155,7 +157,7 @@ public class TableMetaService {
   }
 
   public boolean deleteTable(NameIdentifier identifier) {
-    NameIdentifier.checkTable(identifier);
+    NameIdentifierUtil.checkTable(identifier);
 
     String tableName = identifier.name();
 
@@ -179,7 +181,7 @@ public class TableMetaService {
   }
 
   private void fillTablePOBuilderParentEntityId(TablePO.Builder builder, Namespace namespace) {
-    Namespace.checkTable(namespace);
+    NamespaceUtil.checkTable(namespace);
     Long parentEntityId = null;
     for (int level = 0; level < namespace.levels().length; level++) {
       String name = namespace.level(level);

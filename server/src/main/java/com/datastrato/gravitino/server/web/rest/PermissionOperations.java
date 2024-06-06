@@ -55,7 +55,7 @@ public class PermissionOperations {
       RoleGrantRequest request) {
     try {
       TreeLockUtils.doWithTreeLock(
-          NameIdentifier.ofMetalake(metalake),
+          NameIdentifier.of(metalake),
           LockType.READ,
           () -> AuthorizationUtils.checkMetalakeExists(metalake));
 
@@ -84,7 +84,7 @@ public class PermissionOperations {
       RoleGrantRequest request) {
     try {
       TreeLockUtils.doWithTreeLock(
-          NameIdentifier.ofMetalake(metalake),
+          NameIdentifier.of(metalake),
           LockType.READ,
           () -> AuthorizationUtils.checkMetalakeExists(metalake));
 
@@ -113,7 +113,7 @@ public class PermissionOperations {
       RoleRevokeRequest request) {
     try {
       TreeLockUtils.doWithTreeLock(
-          NameIdentifier.ofMetalake(metalake),
+          NameIdentifier.of(metalake),
           LockType.READ,
           () -> AuthorizationUtils.checkMetalakeExists(metalake));
 
@@ -142,7 +142,7 @@ public class PermissionOperations {
       RoleRevokeRequest request) {
     try {
       TreeLockUtils.doWithTreeLock(
-          NameIdentifier.ofMetalake(metalake),
+          NameIdentifier.of(metalake),
           LockType.READ,
           () -> AuthorizationUtils.checkMetalakeExists(metalake));
 

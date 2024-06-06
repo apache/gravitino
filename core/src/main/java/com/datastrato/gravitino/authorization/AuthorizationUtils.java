@@ -156,7 +156,7 @@ public class AuthorizationUtils {
     try {
       EntityStore store = GravitinoEnv.getInstance().entityStore();
 
-      NameIdentifier metalakeIdent = NameIdentifier.ofMetalake(metalake);
+      NameIdentifier metalakeIdent = NameIdentifier.of(metalake);
       if (!store.exists(metalakeIdent, Entity.EntityType.METALAKE)) {
         LOG.warn("Metalake {} does not exist", metalakeIdent);
         throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalakeIdent);

@@ -62,7 +62,7 @@ public class RoleOperations {
   public Response getRole(@PathParam("metalake") String metalake, @PathParam("role") String role) {
     try {
       TreeLockUtils.doWithTreeLock(
-          NameIdentifier.ofMetalake(metalake),
+          NameIdentifier.of(metalake),
           LockType.READ,
           () -> AuthorizationUtils.checkMetalakeExists(metalake));
 
@@ -84,7 +84,7 @@ public class RoleOperations {
   public Response createRole(@PathParam("metalake") String metalake, RoleCreateRequest request) {
     try {
       TreeLockUtils.doWithTreeLock(
-          NameIdentifier.ofMetalake(metalake),
+          NameIdentifier.of(metalake),
           LockType.READ,
           () -> AuthorizationUtils.checkMetalakeExists(metalake));
 
@@ -137,7 +137,7 @@ public class RoleOperations {
       @PathParam("metalake") String metalake, @PathParam("role") String role) {
     try {
       TreeLockUtils.doWithTreeLock(
-          NameIdentifier.ofMetalake(metalake),
+          NameIdentifier.of(metalake),
           LockType.READ,
           () -> AuthorizationUtils.checkMetalakeExists(metalake));
 

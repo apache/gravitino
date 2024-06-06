@@ -57,7 +57,7 @@ public class GroupOperations {
       @PathParam("metalake") String metalake, @PathParam("group") String group) {
     try {
       TreeLockUtils.doWithTreeLock(
-          NameIdentifier.ofMetalake(metalake),
+          NameIdentifier.of(metalake),
           LockType.READ,
           () -> AuthorizationUtils.checkMetalakeExists(metalake));
 
@@ -79,7 +79,7 @@ public class GroupOperations {
   public Response addGroup(@PathParam("metalake") String metalake, GroupAddRequest request) {
     try {
       TreeLockUtils.doWithTreeLock(
-          NameIdentifier.ofMetalake(metalake),
+          NameIdentifier.of(metalake),
           LockType.READ,
           () -> AuthorizationUtils.checkMetalakeExists(metalake));
 
@@ -106,7 +106,7 @@ public class GroupOperations {
       @PathParam("metalake") String metalake, @PathParam("group") String group) {
     try {
       TreeLockUtils.doWithTreeLock(
-          NameIdentifier.ofMetalake(metalake),
+          NameIdentifier.of(metalake),
           LockType.READ,
           () -> AuthorizationUtils.checkMetalakeExists(metalake));
 

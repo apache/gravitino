@@ -13,7 +13,7 @@ usage() {
   cat << EOF
 Usage:
 
-./build-docker.sh --platform [all|linux/amd64|linux/arm64] --type [gravitino|hive|trino|doris|kerberos-hive] --image {image_name} --tag {tag_name} --latest
+./build-docker.sh --platform [all|linux/amd64|linux/arm64] --type [gravitino|hive|kerberos-hive|trino|doris|ranger] --image {image_name} --tag {tag_name} --latest
 
 Notice: You shouldn't use 'all' for the platform if you don't use the Github action to publish the Docker image.
 EOF
@@ -84,6 +84,9 @@ elif [ "${component_type}" == "gravitino" ]; then
 elif [ "${component_type}" == "doris" ]; then
   . ${script_dir}/doris/doris-dependency.sh --platform ${platform_type}
   build_args="--build-arg DORIS_VERSION=${DORIS_VERSION}"
+elif [ "${component_type}" == "ranger" ]; then
+  # Multiple plugins can be passed using commas, e.g. `plugin-trino,plugin-hive`
+  build_args="--build-arg RANGER_VERSION=2.4.0 --build-arg RANGER_PLUGINS=plugin-trino,plugin-hive"
 else
   echo "ERROR : ${component_type} is not a valid component type"
   usage
@@ -99,7 +102,7 @@ if echo "${builders}" | grep -q "${BUILDER_NAME}"; then
   echo "BuildKit builder '${BUILDER_NAME}' already exists."
 else
   echo "BuildKit builder '${BUILDER_NAME}' does not exist."
-  docker buildx create --platform linux/amd64,linux/arm64 --use --name ${BUILDER_NAME}
+  docker buildx create --driver-opt env.BUILDKIT_STEP_LOG_MAX_SIZE=10000000 --platform linux/amd64,linux/arm64 --use --name ${BUILDER_NAME}
 fi
 
 cd ${script_dir}/${component_type}

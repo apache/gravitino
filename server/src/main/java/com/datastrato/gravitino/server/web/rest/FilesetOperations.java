@@ -22,6 +22,8 @@ import com.datastrato.gravitino.lock.LockType;
 import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.server.web.Utils;
+import com.datastrato.gravitino.utils.NameIdentifierUtil;
+import com.datastrato.gravitino.utils.NamespaceUtil;
 import java.util.Optional;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
@@ -64,7 +66,7 @@ public class FilesetOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            Namespace filesetNS = Namespace.ofFileset(metalake, catalog, schema);
+            Namespace filesetNS = NamespaceUtil.ofFileset(metalake, catalog, schema);
             NameIdentifier[] idents =
                 TreeLockUtils.doWithTreeLock(
                     NameIdentifier.of(metalake, catalog, schema),
@@ -106,11 +108,11 @@ public class FilesetOperations {
           () -> {
             request.validate();
             NameIdentifier ident =
-                NameIdentifier.ofFileset(metalake, catalog, schema, request.getName());
+                NameIdentifierUtil.ofFileset(metalake, catalog, schema, request.getName());
 
             Fileset fileset =
                 TreeLockUtils.doWithTreeLock(
-                    NameIdentifier.ofSchema(metalake, catalog, schema),
+                    NameIdentifierUtil.ofSchema(metalake, catalog, schema),
                     LockType.WRITE,
                     () ->
                         dispatcher.createFileset(
@@ -145,7 +147,7 @@ public class FilesetOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            NameIdentifier ident = NameIdentifier.ofFileset(metalake, catalog, schema, fileset);
+            NameIdentifier ident = NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset);
             Fileset t =
                 TreeLockUtils.doWithTreeLock(
                     ident, LockType.READ, () -> dispatcher.loadFileset(ident));
@@ -175,14 +177,14 @@ public class FilesetOperations {
           httpRequest,
           () -> {
             request.validate();
-            NameIdentifier ident = NameIdentifier.ofFileset(metalake, catalog, schema, fileset);
+            NameIdentifier ident = NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset);
             FilesetChange[] changes =
                 request.getUpdates().stream()
                     .map(FilesetUpdateRequest::filesetChange)
                     .toArray(FilesetChange[]::new);
             Fileset t =
                 TreeLockUtils.doWithTreeLock(
-                    NameIdentifier.ofSchema(metalake, catalog, schema),
+                    NameIdentifierUtil.ofSchema(metalake, catalog, schema),
                     LockType.WRITE,
                     () -> dispatcher.alterFileset(ident, changes));
             Response response = Utils.ok(new FilesetResponse(DTOConverters.toDTO(t)));
@@ -210,10 +212,10 @@ public class FilesetOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            NameIdentifier ident = NameIdentifier.ofFileset(metalake, catalog, schema, fileset);
+            NameIdentifier ident = NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset);
             boolean dropped =
                 TreeLockUtils.doWithTreeLock(
-                    NameIdentifier.ofSchema(metalake, catalog, schema),
+                    NameIdentifierUtil.ofSchema(metalake, catalog, schema),
                     LockType.WRITE,
                     () -> dispatcher.dropFileset(ident));
             if (!dropped) {

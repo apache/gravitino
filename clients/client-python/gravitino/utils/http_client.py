@@ -66,6 +66,7 @@ class Response:
     def json(self):
         if self.body:
             return _json.loads(self.body.decode("utf-8"))
+        return None
 
 
 class HTTPClient:
