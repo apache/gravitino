@@ -109,11 +109,14 @@ For an overview of the project, see [README.md](README.md).
 For project management policies, refer to [GOVERNANCE.md](GOVERNANCE.md).
 ### Future Development Directions
 For future development directions, refer to the [ROADMAP.md](ROADMAP.md) document.
+
 ## Contribution guidelines
 ### Code of conduct
 Please read and follow the [Code of Conduct](CODE_OF_CONDUCT.md). Gravitino provides a welcoming and inclusive environment for all contributors.
 ### Reporting bugs
+
 If you find a bug in Gravitino, please open an issue on GitHub. Be sure to include as much detail as possible, such as a clear description, steps to reproduce, and your environment. Please follow the template provided. If you encounter a security issue, please refer to [SECURITY.md](SECURITY.md).
+
 ### Suggesting enhancements
 If you have ideas for enhancements or new features, feel free to create an issue to discuss them. Gravitino welcomes suggestions and provides prompt feedback on their feasibility and relevance.
 ### Good first issues
