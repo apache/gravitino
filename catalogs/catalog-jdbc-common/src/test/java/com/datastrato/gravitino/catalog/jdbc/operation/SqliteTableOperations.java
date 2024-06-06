@@ -42,7 +42,7 @@ public class SqliteTableOperations extends JdbcTableOperations {
       sqlBuilder
           .append(column.name())
           .append(" ")
-          .append(typeConverter.fromGravitinoType(column.dataType()));
+          .append(typeConverter.fromGravitino(column.dataType()));
       if (!column.nullable()) {
         sqlBuilder.append(" NOT NULL");
       }

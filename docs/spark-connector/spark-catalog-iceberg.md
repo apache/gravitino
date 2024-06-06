@@ -18,7 +18,7 @@ The Gravitino Spark connector offers the capability to read and write Iceberg ta
 - `ALTER TABLE`
 - `INSERT INTO&OVERWRITE`
 - `SELECT`
-- `MERGE INOT`
+- `MERGE INTO`
 - `DELETE FROM`
 - `UPDATE`
 - `CALL`
@@ -94,7 +94,7 @@ SELECT * FROM employee FOR SYSTEM_TIME AS OF '2024-05-27 01:01:00';
 DESC EXTENDED employee;
 ```
 
-For more details about `CALL`, please refer to the [Spark Procedures description](https://iceberg.apache.org/docs/latest/spark-procedures/#spark-procedures) in Iceberg official document. \
+For more details about `CALL`, please refer to the [Spark Procedures description](https://iceberg.apache.org/docs/latest/spark-procedures/#spark-procedures) in Iceberg official document. 
 
 ## Iceberg backend-catalog support
 - HiveCatalog
@@ -109,7 +109,7 @@ Gravitino spark connector will transform below property names which are defined 
 
 | Gravitino catalog property name | Spark Iceberg connector configuration | Default Value | Required | Description               | Since Version |
 |---------------------------------|---------------------------------------|---------------|----------|---------------------------|---------------|
-| `catalog-backend`               | `type`                                | `hive`        | Yes      | Catalog backend type      | 0.5.0         |
+| `catalog-backend`               | `type`                                | `memory`      | Yes      | Catalog backend type      | 0.5.0         |
 | `uri`                           | `uri`                                 | (none)        | Yes      | Catalog backend uri       | 0.5.0         |
 | `warehouse`                     | `warehouse`                           | (none)        | Yes      | Catalog backend warehouse | 0.5.0         |
 
@@ -117,7 +117,7 @@ Gravitino spark connector will transform below property names which are defined 
 
 | Gravitino catalog property name | Spark Iceberg connector configuration | Default Value | Required | Description               | Since Version |
 |---------------------------------|---------------------------------------|---------------|----------|---------------------------|---------------|
-| `catalog-backend`               | `type`                                | `jdbc`        | Yes      | Catalog backend type      | 0.5.0         |
+| `catalog-backend`               | `type`                                | `memory`      | Yes      | Catalog backend type      | 0.5.0         |
 | `uri`                           | `uri`                                 | (none)        | Yes      | Catalog backend uri       | 0.5.0         |
 | `warehouse`                     | `warehouse`                           | (none)        | Yes      | Catalog backend warehouse | 0.5.0         |
 | `jdbc-user`                     | `jdbc.user`                           | (none)        | Yes      | JDBC user name            | 0.5.0         |
@@ -127,7 +127,7 @@ Gravitino spark connector will transform below property names which are defined 
 
 | Gravitino catalog property name | Spark Iceberg connector configuration | Default Value | Required | Description               | Since Version |
 |---------------------------------|---------------------------------------|---------------|----------|---------------------------|---------------|
-| `catalog-backend`               | `type`                                | `rest`        | Yes      | Catalog backend type      | 0.5.1         |
+| `catalog-backend`               | `type`                                | `memory`      | Yes      | Catalog backend type      | 0.5.1         |
 | `uri`                           | `uri`                                 | (none)        | Yes      | Catalog backend uri       | 0.5.1         |
 | `warehouse`                     | `warehouse`                           | (none)        | No       | Catalog backend warehouse | 0.5.1         |
 

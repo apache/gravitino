@@ -6,11 +6,15 @@ package com.datastrato.gravitino.catalog.hive;
 
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE;
+import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.LIST_ALL_TABLES;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.PRINCIPAL;
+import static com.datastrato.gravitino.catalog.hive.HiveTable.ICEBERG_TABLE_TYPE_VALUE;
 import static com.datastrato.gravitino.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
+import static com.datastrato.gravitino.catalog.hive.HiveTable.TABLE_TYPE_PROP;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
+import static com.datastrato.gravitino.catalog.hive.converter.HiveDataTypeConverter.CONVERTER;
 import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
 
@@ -18,7 +22,6 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.SchemaChange;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType;
-import com.datastrato.gravitino.catalog.hive.converter.ToHiveType;
 import com.datastrato.gravitino.connector.CatalogInfo;
 import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;
@@ -48,10 +51,12 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Method;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -97,6 +102,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   private ScheduledThreadPoolExecutor checkTgtExecutor;
   private String kerberosRealm;
   private ProxyPlugin proxyPlugin;
+  boolean listAllTables = true;
 
   // Map that maintains the mapping of keys in Gravitino to that in Hive, for example, users
   // will only need to set the configuration 'METASTORE_URL' in Gravitino and Gravitino will change
@@ -148,25 +154,31 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
     this.clientPool =
         new CachedClientPool(getClientPoolSize(conf), hiveConf, getCacheEvictionInterval(conf));
+
+    this.listAllTables = enableListAllTables(conf);
   }
 
   private void initKerberosIfNecessary(Map<String, String> conf, Configuration hadoopConf) {
     if (UserGroupInformation.AuthenticationMethod.KERBEROS
         == SecurityUtil.getAuthenticationMethod(hadoopConf)) {
       try {
-        File keytabsDir = new File("keytabs");
-        if (!keytabsDir.exists()) {
+        Path keytabsPath = Paths.get("keytabs");
+        if (!Files.exists(keytabsPath)) {
           // Ignore the return value, because there exists many Hive catalog operations making
           // this directory.
-          keytabsDir.mkdir();
+          Files.createDirectory(keytabsPath);
         }
 
         // The id of entity is a random unique id.
-        File keytabFile = new File(String.format(GRAVITINO_KEYTAB_FORMAT, info.id()));
-        keytabFile.deleteOnExit();
-        if (keytabFile.exists() && !keytabFile.delete()) {
-          throw new IllegalStateException(
-              String.format("Fail to delete keytab file %s", keytabFile.getAbsolutePath()));
+        Path keytabPath = Paths.get(String.format(GRAVITINO_KEYTAB_FORMAT, info.id()));
+        keytabPath.toFile().deleteOnExit();
+        if (Files.exists(keytabPath)) {
+          try {
+            Files.delete(keytabPath);
+          } catch (IOException e) {
+            throw new IllegalStateException(
+                String.format("Fail to delete keytab file %s", keytabPath.toAbsolutePath()), e);
+          }
         }
 
         String keytabUri =
@@ -185,9 +197,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                     .catalogPropertiesMetadata()
                     .getOrDefault(conf, HiveCatalogPropertiesMeta.FETCH_TIMEOUT_SEC);
 
-        FetchFileUtils.fetchFileFromUri(keytabUri, keytabFile, fetchKeytabFileTimeout, hadoopConf);
+        FetchFileUtils.fetchFileFromUri(
+            keytabUri, keytabPath.toFile(), fetchKeytabFileTimeout, hadoopConf);
 
-        hiveConf.setVar(ConfVars.METASTORE_KERBEROS_KEYTAB_FILE, keytabFile.getAbsolutePath());
+        hiveConf.setVar(
+            ConfVars.METASTORE_KERBEROS_KEYTAB_FILE, keytabPath.toAbsolutePath().toString());
 
         String catalogPrincipal =
             (String) propertiesMetadata.catalogPropertiesMetadata().getOrDefault(conf, PRINCIPAL);
@@ -207,7 +221,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         refreshKerberosConfig();
         KerberosName.resetDefaultRealm();
         UserGroupInformation.setConfiguration(hadoopConf);
-        UserGroupInformation.loginUserFromKeytab(catalogPrincipal, keytabFile.getAbsolutePath());
+        UserGroupInformation.loginUserFromKeytab(
+            catalogPrincipal, keytabPath.toAbsolutePath().toString());
 
         UserGroupInformation kerberosLoginUgi = UserGroupInformation.getCurrentUser();
 
@@ -266,6 +281,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             .getOrDefault(conf, CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS);
   }
 
+  boolean enableListAllTables(Map<String, String> conf) {
+    return (boolean)
+        propertiesMetadata.catalogPropertiesMetadata().getOrDefault(conf, LIST_ALL_TABLES);
+  }
   /** Closes the Hive catalog and releases the associated client pool. */
   @Override
   public void close() {
@@ -279,9 +298,13 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       checkTgtExecutor = null;
     }
 
-    File keytabFile = new File(String.format(GRAVITINO_KEYTAB_FORMAT, info.id()));
-    if (keytabFile.exists() && !keytabFile.delete()) {
-      LOG.error("Fail to delete key tab file {}", keytabFile.getAbsolutePath());
+    Path keytabPath = Paths.get(String.format(GRAVITINO_KEYTAB_FORMAT, info.id()));
+    if (Files.exists(keytabPath)) {
+      try {
+        Files.delete(keytabPath);
+      } catch (IOException e) {
+        LOG.error("Fail to delete key tab file {}", keytabPath.toAbsolutePath(), e);
+      }
     }
   }
 
@@ -521,7 +544,18 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       return clientPool.run(
           c ->
               c.getTableObjectsByName(schemaIdent.name(), allTables).stream()
-                  .filter(tb -> SUPPORT_TABLE_TYPES.contains(tb.getTableType()))
+                  .filter(
+                      tb -> {
+                        boolean isSupportTable = SUPPORT_TABLE_TYPES.contains(tb.getTableType());
+                        if (!isSupportTable) {
+                          return false;
+                        }
+                        if (!listAllTables) {
+                          Map<String, String> parameters = tb.getParameters();
+                          return isHiveTable(parameters);
+                        }
+                        return true;
+                      })
                   .map(tb -> NameIdentifier.of(namespace, tb.getTableName()))
                   .toArray(NameIdentifier[]::new));
     } catch (UnknownDBException e) {
@@ -535,6 +569,22 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  boolean isHiveTable(Map<String, String> tableParameters) {
+    if (isIcebergTable(tableParameters)) return false;
+    return true;
+  }
+
+  boolean isIcebergTable(Map<String, String> tableParameters) {
+    if (tableParameters != null) {
+      boolean isIcebergTable =
+          ICEBERG_TABLE_TYPE_VALUE.equalsIgnoreCase(tableParameters.get(TABLE_TYPE_PROP));
+      if (isIcebergTable) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -933,7 +983,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         targetPosition,
         new FieldSchema(
             change.fieldName()[0],
-            ToHiveType.convert(change.getDataType()).getQualifiedName(),
+            CONVERTER.fromGravitino(change.getDataType()).getQualifiedName(),
             change.getComment()));
   }
 
@@ -981,7 +1031,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     if (indexOfColumn == -1) {
       throw new IllegalArgumentException("UpdateColumnType does not exist: " + columnName);
     }
-    cols.get(indexOfColumn).setType(ToHiveType.convert(change.getNewDataType()).getQualifiedName());
+    cols.get(indexOfColumn)
+        .setType(CONVERTER.fromGravitino(change.getNewDataType()).getQualifiedName());
   }
 
   /**

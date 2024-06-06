@@ -100,17 +100,16 @@ public class DynMethods {
       } catch (InvocationTargetException e) {
         Throwables.throwIfInstanceOf(e.getCause(), Exception.class);
         Throwables.throwIfInstanceOf(e.getCause(), RuntimeException.class);
-        Throwables.throwIfUnchecked(e.getCause());
         throw new RuntimeException(e.getCause());
       }
     }
 
+    @SuppressWarnings("unchecked")
     public <R> R invoke(Object target, Object... args) {
       try {
         return this.invokeChecked(target, args);
       } catch (Exception e) {
         Throwables.throwIfInstanceOf(e, RuntimeException.class);
-        Throwables.throwIfUnchecked(e);
         throw new RuntimeException(e);
       }
     }

@@ -6,7 +6,6 @@ package com.datastrato.gravitino.catalog.hadoop.integration.test;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
@@ -17,6 +16,7 @@ import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
+import com.datastrato.gravitino.utils.NamespaceUtil;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -376,7 +376,7 @@ public class HadoopCatalogIT extends AbstractIT {
     NameIdentifier[] nameIdentifiers =
         catalog
             .asFilesetCatalog()
-            .listFilesets(Namespace.ofFileset(metalakeName, catalogName, schemaName));
+            .listFilesets(NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName));
     Assertions.assertEquals(0, nameIdentifiers.length, "should have no fileset");
 
     // create fileset1
@@ -409,7 +409,7 @@ public class HadoopCatalogIT extends AbstractIT {
     NameIdentifier[] nameIdentifiers1 =
         catalog
             .asFilesetCatalog()
-            .listFilesets(Namespace.ofFileset(metalakeName, catalogName, schemaName));
+            .listFilesets(NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName));
     Arrays.sort(nameIdentifiers1, Comparator.comparing(NameIdentifier::name));
     Assertions.assertEquals(2, nameIdentifiers1.length, "should have 2 filesets");
     Assertions.assertEquals(fileset1.name(), nameIdentifiers1[0].name());

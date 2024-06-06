@@ -12,6 +12,7 @@ import com.datastrato.gravitino.rel.partitions.Partition;
 import com.datastrato.gravitino.rel.partitions.Partitions;
 import com.datastrato.gravitino.rel.types.Types;
 import com.datastrato.gravitino.utils.IsolatedClassLoader;
+import com.datastrato.gravitino.utils.NameIdentifierUtil;
 import com.google.common.collect.Maps;
 import java.util.Arrays;
 import org.junit.jupiter.api.Assertions;
@@ -26,7 +27,7 @@ public class TestPartitionOperationDispatcher extends TestOperationDispatcher {
   private static final String SCHEMA = "test_partition_schema";
   private static final String TABLE = "test_partition_table";
   private static final NameIdentifier TABLE_IDENT =
-      NameIdentifier.ofTable(metalake, catalog, SCHEMA, TABLE);
+      NameIdentifierUtil.ofTable(metalake, catalog, SCHEMA, TABLE);
   private static final Partition PARTITION =
       Partitions.identity(
           "p1",
@@ -59,7 +60,7 @@ public class TestPartitionOperationDispatcher extends TestOperationDispatcher {
     partitionOperationDispatcher =
         new PartitionOperationDispatcher(catalogManager, entityStore, idGenerator);
 
-    NameIdentifier schemaIdent = NameIdentifier.ofSchema(metalake, catalog, SCHEMA);
+    NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema(metalake, catalog, SCHEMA);
     schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);
     Column[] columns =
         new Column[] {

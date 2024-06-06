@@ -22,6 +22,8 @@ import com.datastrato.gravitino.messaging.Topic;
 import com.datastrato.gravitino.messaging.TopicChange;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.server.web.Utils;
+import com.datastrato.gravitino.utils.NameIdentifierUtil;
+import com.datastrato.gravitino.utils.NamespaceUtil;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
@@ -62,7 +64,7 @@ public class TopicOperations {
           httpRequest,
           () -> {
             LOG.info("Listing topics under schema: {}.{}.{}", metalake, catalog, schema);
-            Namespace topicNS = Namespace.ofTopic(metalake, catalog, schema);
+            Namespace topicNS = NamespaceUtil.ofTopic(metalake, catalog, schema);
             NameIdentifier[] topics =
                 TreeLockUtils.doWithTreeLock(
                     NameIdentifier.of(metalake, catalog, schema),
@@ -100,11 +102,11 @@ public class TopicOperations {
                 request.getName());
             request.validate();
             NameIdentifier ident =
-                NameIdentifier.ofTopic(metalake, catalog, schema, request.getName());
+                NameIdentifierUtil.ofTopic(metalake, catalog, schema, request.getName());
 
             Topic topic =
                 TreeLockUtils.doWithTreeLock(
-                    NameIdentifier.ofSchema(metalake, catalog, schema),
+                    NameIdentifierUtil.ofSchema(metalake, catalog, schema),
                     LockType.WRITE,
                     () ->
                         dispatcher.createTopic(
@@ -139,7 +141,7 @@ public class TopicOperations {
           httpRequest,
           () -> {
             LOG.info("Loading topic: {}.{}.{}.{}", metalake, catalog, schema, topic);
-            NameIdentifier ident = NameIdentifier.ofTopic(metalake, catalog, schema, topic);
+            NameIdentifier ident = NameIdentifierUtil.ofTopic(metalake, catalog, schema, topic);
             Topic t =
                 TreeLockUtils.doWithTreeLock(
                     ident, LockType.READ, () -> dispatcher.loadTopic(ident));
@@ -170,7 +172,7 @@ public class TopicOperations {
           () -> {
             LOG.info("Altering topic: {}.{}.{}.{}", metalake, catalog, schema, topic);
             request.validate();
-            NameIdentifier ident = NameIdentifier.ofTopic(metalake, catalog, schema, topic);
+            NameIdentifier ident = NameIdentifierUtil.ofTopic(metalake, catalog, schema, topic);
             TopicChange[] changes =
                 request.getUpdates().stream()
                     .map(TopicUpdateRequest::topicChange)
@@ -178,7 +180,7 @@ public class TopicOperations {
 
             Topic t =
                 TreeLockUtils.doWithTreeLock(
-                    NameIdentifier.ofSchema(metalake, catalog, schema),
+                    NameIdentifierUtil.ofSchema(metalake, catalog, schema),
                     LockType.WRITE,
                     () -> dispatcher.alterTopic(ident, changes));
             Response response = Utils.ok(new TopicResponse(DTOConverters.toDTO(t)));
@@ -206,10 +208,10 @@ public class TopicOperations {
           httpRequest,
           () -> {
             LOG.info("Dropping topic under schema: {}.{}.{}", metalake, catalog, schema);
-            NameIdentifier ident = NameIdentifier.ofTopic(metalake, catalog, schema, topic);
+            NameIdentifier ident = NameIdentifierUtil.ofTopic(metalake, catalog, schema, topic);
             boolean dropped =
                 TreeLockUtils.doWithTreeLock(
-                    NameIdentifier.ofSchema(metalake, catalog, schema),
+                    NameIdentifierUtil.ofSchema(metalake, catalog, schema),
                     LockType.WRITE,
                     () -> dispatcher.dropTopic(ident));
 

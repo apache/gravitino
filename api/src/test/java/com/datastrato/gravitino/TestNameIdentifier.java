@@ -10,8 +10,6 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.datastrato.gravitino.exceptions.IllegalNameIdentifierException;
-import com.datastrato.gravitino.exceptions.IllegalNamespaceException;
 import org.junit.jupiter.api.Test;
 
 public class TestNameIdentifier {
@@ -91,35 +89,5 @@ public class TestNameIdentifier {
 
     assertEquals("a", id1.toString());
     assertEquals("a.b.c", id2.toString());
-  }
-
-  @Test
-  public void testCheckNameIdentifier() {
-    NameIdentifier abc = NameIdentifier.of("a", "b", "c");
-    NameIdentifier abcd = NameIdentifier.of("a", "b", "c", "d");
-
-    // Test metalake
-    assertThrows(IllegalNameIdentifierException.class, () -> NameIdentifier.checkMetalake(null));
-    Throwable excep =
-        assertThrows(IllegalNamespaceException.class, () -> NameIdentifier.checkMetalake(abc));
-    assertTrue(excep.getMessage().contains("Metalake namespace must be non-null and empty"));
-
-    // test catalog
-    assertThrows(IllegalNameIdentifierException.class, () -> NameIdentifier.checkCatalog(null));
-    Throwable excep1 =
-        assertThrows(IllegalNamespaceException.class, () -> NameIdentifier.checkCatalog(abc));
-    assertTrue(excep1.getMessage().contains("Catalog namespace must be non-null and have 1 level"));
-
-    // test schema
-    assertThrows(IllegalNameIdentifierException.class, () -> NameIdentifier.checkSchema(null));
-    Throwable excep2 =
-        assertThrows(IllegalNamespaceException.class, () -> NameIdentifier.checkSchema(abcd));
-    assertTrue(excep2.getMessage().contains("Schema namespace must be non-null and have 2 levels"));
-
-    // test table
-    assertThrows(IllegalNameIdentifierException.class, () -> NameIdentifier.checkTable(null));
-    Throwable excep3 =
-        assertThrows(IllegalNamespaceException.class, () -> NameIdentifier.checkTable(abc));
-    assertTrue(excep3.getMessage().contains("Table namespace must be non-null and have 3 levels"));
   }
 }
