@@ -1,9 +1,4 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
- */
-
-/*
 MIT License
 
 Copyright (c) 2020-present, Vben
@@ -28,30 +23,32 @@ SOFTWARE.
  */
 
 /**
- * Referred from src/enums/httpEnum.ts
+ * @enum {string}
  */
-export var ContentTypeEnum
+const ContentTypeEnum = Object.freeze({
+  JSON: 'application/json;charset=UTF-8',
+  FORM_URLENCODED: 'application/x-www-form-urlencoded;charset=UTF-8',
+  FORM_DATA: 'multipart/form-data;charset=UTF-8'
+})
 
-;(function (ContentTypeEnum) {
-  ContentTypeEnum['JSON'] = 'application/json;charset=UTF-8'
-  ContentTypeEnum['FORM_URLENCODED'] = 'application/x-www-form-urlencoded;charset=UTF-8'
-  ContentTypeEnum['FORM_DATA'] = 'multipart/form-data;charset=UTF-8'
-})(ContentTypeEnum || (ContentTypeEnum = {}))
+/**
+ * @enum {string}
+ */
+const RequestEnum = Object.freeze({
+  GET: 'GET',
+  POST: 'POST',
+  PUT: 'PUT',
+  DELETE: 'DELETE'
+})
 
-export var RequestEnum
+/**
+ * @enum {number|string}
+ */
+const ResultEnum = Object.freeze({
+  SUCCESS: 0,
+  ERROR: -1,
+  TIMEOUT: 401,
+  TYPE: 'success'
+})
 
-;(function (RequestEnum) {
-  RequestEnum['GET'] = 'GET'
-  RequestEnum['POST'] = 'POST'
-  RequestEnum['PUT'] = 'PUT'
-  RequestEnum['DELETE'] = 'DELETE'
-})(RequestEnum || (RequestEnum = {}))
-
-export var ResultEnum
-
-;(function (ResultEnum) {
-  ResultEnum[(ResultEnum['SUCCESS'] = 0)] = 'SUCCESS'
-  ResultEnum[(ResultEnum['ERROR'] = -1)] = 'ERROR'
-  ResultEnum[(ResultEnum['TIMEOUT'] = 401)] = 'TIMEOUT'
-  ResultEnum['TYPE'] = 'success'
-})(ResultEnum || (ResultEnum = {}))
+export { ContentTypeEnum, RequestEnum, ResultEnum }

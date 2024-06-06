@@ -3,29 +3,33 @@
  * This software is licensed under the Apache License version 2.
  */
 
-export var ColumnTypeColorEnum
+/**
+ * @enum {string}
+ */
+const ColumnTypeColorEnum = Object.freeze({
+  boolean: 'primary',
+  short: 'primary',
+  integer: 'primary',
+  long: 'primary',
+  float: 'primary',
+  double: 'primary',
+  decimal: 'primary',
+  fixed: 'primary',
 
-;(function (ColumnTypeColorEnum) {
-  ColumnTypeColorEnum['boolean'] = 'primary'
-  ColumnTypeColorEnum['short'] = 'primary'
-  ColumnTypeColorEnum['integer'] = 'primary'
-  ColumnTypeColorEnum['long'] = 'primary'
-  ColumnTypeColorEnum['float'] = 'primary'
-  ColumnTypeColorEnum['double'] = 'primary'
-  ColumnTypeColorEnum['decimal'] = 'primary'
-  ColumnTypeColorEnum['fixed'] = 'primary'
-  ColumnTypeColorEnum['date'] = 'info'
-  ColumnTypeColorEnum['time'] = 'info'
-  ColumnTypeColorEnum['timestamp'] = 'info'
-  ColumnTypeColorEnum['timestamp_tz'] = 'info'
-  ColumnTypeColorEnum['interval_day'] = 'info'
-  ColumnTypeColorEnum['interval_year'] = 'info'
-  ColumnTypeColorEnum['string'] = 'warning'
-  ColumnTypeColorEnum['char'] = 'warning'
-  ColumnTypeColorEnum['varchar'] = 'warning'
-  ColumnTypeColorEnum['byte'] = 'success'
-  ColumnTypeColorEnum['uuid'] = 'success'
-  ColumnTypeColorEnum['binary'] = 'success'
-})(ColumnTypeColorEnum || (ColumnTypeColorEnum = {}))
+  date: 'info',
+  time: 'info',
+  timestamp: 'info',
+  timestamp_tz: 'info',
+  interval_day: 'info',
+  interval_year: 'info',
+
+  string: 'warning',
+  char: 'warning',
+  varchar: 'warning',
+
+  byte: 'success',
+  uuid: 'success',
+  binary: 'success'
+})
 
 export default ColumnTypeColorEnum

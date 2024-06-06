@@ -20,21 +20,52 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+*/
+
+/**
+ * Referred from src/utils/http/axios/Axios.ts
  */
 
 import axios from 'axios'
 import qs from 'qs'
 import { AxiosCanceler } from './axiosCancel'
-import { isFunction } from '../../../../jsdist/src/lib/utils/is'
+import { isFunction } from '../is'
 import { cloneDeep } from 'lodash-es'
 import { ContentTypeEnum, RequestEnum } from '../../enums/httpEnum'
 
 export * from './axiosTransform'
 
 /**
+ * @typedef {import('axios').AxiosRequestConfig} AxiosRequestConfig
+ * @typedef {import('axios').AxiosInstance} AxiosInstance
+ * @typedef {import('axios').AxiosResponse} AxiosResponse
+ * @typedef {import('axios').AxiosError} AxiosError
+ * @typedef {import('axios').InternalAxiosRequestConfig} InternalAxiosRequestConfig
+ * @typedef {import('@/types/axios').RequestOptions} RequestOptions
+ * @typedef {import('@/types/axios').Result} Result
+ * @typedef {import('@/types/axios').UploadFileParams} UploadFileParams
+ * @typedef {import('./axiosTransform').CreateAxiosOptions} CreateAxiosOptions
+ */
+
+/**
  * @description: axios module
  */
 class NextAxios {
+  /**
+   * @type {AxiosInstance}
+   * @private
+   */
+  axiosInstance
+
+  /**
+   * @type {CreateAxiosOptions}
+   * @readonly
+   */
+  options
+
+  /**
+   * @param {CreateAxiosOptions} options
+   */
   constructor(options) {
     this.options = options
     this.axiosInstance = axios.create(options)
@@ -43,59 +74,71 @@ class NextAxios {
 
   /**
    * @description: Create axios instance
+   * @private
+   * @param {CreateAxiosOptions} config
    */
   createAxios(config) {
     this.axiosInstance = axios.create(config)
   }
 
   getTransform() {
-    const transform = this.options.transform
+    const { transform } = this.options
 
     return transform
   }
 
+  /**
+   * @returns {AxiosInstance}
+   */
   getAxios() {
     return this.axiosInstance
   }
 
   /**
    * @description: Reconfigure axios
+   * @param {CreateAxiosOptions} config
    */
   configAxios(config) {
     if (!this.axiosInstance) {
       return
     }
-
     this.createAxios(config)
   }
 
   /**
    * @description: Set general header
+   * @param {Object} headers
    */
   setHeader(headers) {
     if (!this.axiosInstance) {
       return
     }
-
     Object.assign(this.axiosInstance.defaults.headers, headers)
   }
 
   /**
    * @description: Interceptor configuration
+   * @private
    */
   setupInterceptors() {
-    const { axiosInstance, transform } = this
+    const {
+      axiosInstance,
+      options: { transform }
+    } = this
     if (!transform) {
       return
     }
 
     const { requestInterceptors, requestInterceptorsCatch, responseInterceptors, responseInterceptorsCatch } = transform
+
     const axiosCanceler = new AxiosCanceler()
 
     // ** Request interceptor configuration processing
     this.axiosInstance.interceptors.request.use(config => {
-      const requestOptions = config.requestOptions || this.options.requestOptions
+      // ** If cancel repeat request is turned on, then cancel repeat request is prohibited
+      const requestOptions = config.requestOptions ?? this.options.requestOptions
       const ignoreCancelToken = requestOptions?.ignoreCancelToken ?? true
+
       !ignoreCancelToken && axiosCanceler.addPending(config)
 
       if (requestInterceptors && isFunction(requestInterceptors)) {
@@ -113,7 +156,6 @@ class NextAxios {
     // ** Response result interceptor processing
     this.axiosInstance.interceptors.response.use(res => {
       res && axiosCanceler.removePending(res.config)
-
       if (responseInterceptors && isFunction(responseInterceptors)) {
         res = responseInterceptors(res)
       }
@@ -131,10 +173,15 @@ class NextAxios {
 
   /**
    * @description: File Upload
+   * @template T
+   * @param {AxiosRequestConfig} config
+   * @param {UploadFileParams} params
+   * @returns {Promise<T>}
    */
   uploadFile(config, params) {
     const formData = new window.FormData()
     const customFilename = params.name || 'file'
+
     if (params.filename) {
       formData.append(customFilename, params.file, params.filename)
     } else {
@@ -151,6 +198,7 @@ class NextAxios {
 
           return
         }
+
         formData.append(key, params.data[key])
       })
     }
@@ -185,25 +233,54 @@ class NextAxios {
     }
   }
 
+  /**
+   * @template T
+   * @param {AxiosRequestConfig} config
+   * @param {RequestOptions} [options]
+   * @returns {Promise<T>}
+   */
   get(config, options) {
     return this.request({ ...config, method: 'GET' }, options)
   }
 
+  /**
+   * @template T
+   * @param {AxiosRequestConfig} config
+   * @param {RequestOptions} [options]
+   * @returns {Promise<T>}
+   */
   post(config, options) {
     return this.request({ ...config, method: 'POST' }, options)
   }
 
+  /**
+   * @template T
+   * @param {AxiosRequestConfig} config
+   * @param {RequestOptions} [options]
+   * @returns {Promise<T>}
+   */
   put(config, options) {
     return this.request({ ...config, method: 'PUT' }, options)
   }
 
+  /**
+   * @template T
+   * @param {AxiosRequestConfig} config
+   * @param {RequestOptions} [options]
+   * @returns {Promise<T>}
+   */
   delete(config, options) {
     return this.request({ ...config, method: 'DELETE' }, options)
   }
 
+  /**
+   * @template T
+   * @param {AxiosRequestConfig} config
+   * @param {RequestOptions} [options]
+   * @returns {Promise<T>}
+   */
   request(config, options) {
     let conf = cloneDeep(config)
-
     if (config.cancelToken) {
       conf.cancelToken = config.cancelToken
     }
@@ -213,16 +290,17 @@ class NextAxios {
     }
 
     const transform = this.getTransform()
-    const requestOptions = this.options.requestOptions
+
+    const { requestOptions } = this.options
+
     const opt = Object.assign({}, requestOptions, options)
 
     const { beforeRequestHook, requestCatchHook, transformResponseHook } = transform || {}
-
     if (beforeRequestHook && isFunction(beforeRequestHook)) {
       conf = beforeRequestHook(conf, opt)
     }
-
     conf.requestOptions = opt
+
     conf = this.supportFormData(conf)
 
     return new Promise((resolve, reject) => {
@@ -232,7 +310,6 @@ class NextAxios {
           if (transformResponseHook && isFunction(transformResponseHook)) {
             try {
               const ret = transformResponseHook(res, opt)
-
               resolve(ret)
             } catch (err) {
               reject(err || new Error('request error!'))
@@ -240,7 +317,6 @@ class NextAxios {
 
             return
           }
-
           resolve(res)
         })
         .catch(e => {
@@ -249,15 +325,13 @@ class NextAxios {
 
             return
           }
-
           if (axios.isAxiosError(e)) {
             // ** rewrite error message from axios in here
           }
-
           reject(e)
         })
     })
   }
 }
 
-export { NextAxios }
+export default NextAxios

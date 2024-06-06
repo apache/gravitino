@@ -22,27 +22,35 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
 
-var pendingMap = new Map()
+import axios from 'axios'
 
-var getPendingUrl = function (config) {
+/**
+ * @typedef {import('axios').AxiosRequestConfig} AxiosRequestConfig
+ */
+
+const pendingMap = new Map()
+
+/**
+ * @param {AxiosRequestConfig} config
+ * @returns {string}
+ */
+const getPendingUrl = config => {
   return [config.method, config.url].join('&')
 }
 
-var AxiosCanceler = /** @class */ (function () {
-  function AxiosCanceler() {}
-
-  AxiosCanceler.prototype.addPending = function (config) {
+class AxiosCanceler {
+  addPending(config) {
     this.removePending(config)
-    var url = getPendingUrl(config)
-    var controller = new AbortController()
+    const url = getPendingUrl(config)
+    const controller = new AbortController()
     config.signal = config.signal || controller.signal
     if (!pendingMap.has(url)) {
       pendingMap.set(url, controller)
     }
   }
 
-  AxiosCanceler.prototype.removeAllPending = function () {
-    pendingMap.forEach(function (abortController) {
+  removeAllPending() {
+    pendingMap.forEach(abortController => {
       if (abortController) {
         abortController.abort()
       }
@@ -50,10 +58,10 @@ var AxiosCanceler = /** @class */ (function () {
     this.reset()
   }
 
-  AxiosCanceler.prototype.removePending = function (config) {
-    var url = getPendingUrl(config)
+  removePending(config) {
+    const url = getPendingUrl(config)
     if (pendingMap.has(url)) {
-      var abortController = pendingMap.get(url)
+      const abortController = pendingMap.get(url)
       if (abortController) {
         abortController.abort(url)
       }
@@ -61,11 +69,9 @@ var AxiosCanceler = /** @class */ (function () {
     }
   }
 
-  AxiosCanceler.prototype.reset = function () {
+  reset() {
     pendingMap.clear()
   }
-
-  return AxiosCanceler
-})()
+}
 
 export { AxiosCanceler }

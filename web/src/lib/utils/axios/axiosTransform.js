@@ -22,10 +22,81 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
 
-var AxiosTransform = /** @class */ (function () {
-  function AxiosTransform() {}
+/**
+ * Referred from src/utils/http/axios/axiosTransform.ts
+ */
 
-  return AxiosTransform
-})()
+/**
+ * @typedef {import('axios').AxiosInstance} AxiosInstance
+ * @typedef {import('axios').AxiosRequestConfig} AxiosRequestConfig
+ * @typedef {import('axios').AxiosResponse} AxiosResponse
+ * @typedef {import('axios').InternalAxiosRequestConfig} InternalAxiosRequestConfig
+ * @typedef {import('@/types/axios').RequestOptions} RequestOptions
+ * @typedef {import('@/types/axios').Result} Result
+ */
+
+/**
+ * @typedef {AxiosRequestConfig} CreateAxiosOptions
+ * @property {string} [authenticationScheme]
+ * @property {AxiosTransform} [transform]
+ * @property {RequestOptions} [requestOptions]
+ */
+
+/**
+ * Data processing class, can be configured according to the project
+ */
+class AxiosTransform {
+  /**
+   * A function that is called before a request is sent. It can modify the request configuration as needed.
+   * @param {AxiosRequestConfig} config
+   * @param {RequestOptions} options
+   * @returns {AxiosRequestConfig}
+   */
+  beforeRequestHook(config, options) {}
+
+  /**
+   * Processing response data
+   * @param {AxiosResponse<Result>} res
+   * @param {RequestOptions} options
+   * @returns {any}
+   */
+  transformResponseHook(res, options) {}
+
+  /**
+   * Handling of failed requests
+   * @param {Error} e
+   * @param {RequestOptions} options
+   * @returns {Promise<any>}
+   */
+  requestCatchHook(e, options) {}
+
+  /**
+   * Interceptor before request
+   * @param {InternalAxiosRequestConfig} config
+   * @param {CreateAxiosOptions} options
+   * @returns {InternalAxiosRequestConfig}
+   */
+  requestInterceptors(config, options) {}
+
+  /**
+   * Interceptor after request
+   * @param {AxiosResponse<any>} res
+   * @returns {AxiosResponse<any>}
+   */
+  responseInterceptors(res) {}
+
+  /**
+   * Interceptors error handing before request
+   * @param {Error} error
+   */
+  requestInterceptorsCatch(error) {}
+
+  /**
+   * Interceptors error handing after request
+   * @param {AxiosInstance} axiosInstance
+   * @param {Error} error
+   */
+  responseInterceptorsCatch(axiosInstance, error) {}
+}
 
 export { AxiosTransform }

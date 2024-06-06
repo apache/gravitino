@@ -22,22 +22,26 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
 
-var AxiosRetry = /** @class */ (function () {
-  function AxiosRetry() {}
+/**
+ * Referred from src/utils/http/axios/axiosRetry.ts
+ */
 
-  AxiosRetry.prototype.retry = function (axiosInstance, error) {
-    var _a, _b
-    var config = error.response.config
+import axios from 'axios'
 
-    var _c =
-        (_b =
-          (_a = config === null || config === void 0 ? void 0 : config.requestOptions) === null || _a === void 0
-            ? void 0
-            : _a.retryRequest) !== null && _b !== void 0
-          ? _b
-          : {},
-      waitTime = _c.waitTime,
-      count = _c.count
+/**
+ * @typedef {import('axios').AxiosError} AxiosError
+ * @typedef {import('axios').AxiosInstance} AxiosInstance
+ */
+
+class AxiosRetry {
+  /**
+   * @param {AxiosInstance} axiosInstance
+   * @param {AxiosError} error
+   * @returns {Promise}
+   */
+  retry(axiosInstance, error) {
+    const { config } = error.response
+    const { waitTime, count } = config?.requestOptions?.retryRequest ?? {}
     config.__retryCount = config.__retryCount || 0
     if (config.__retryCount >= count) {
       return Promise.reject(error)
@@ -46,18 +50,16 @@ var AxiosRetry = /** @class */ (function () {
 
     delete config.headers
 
-    return this.delay(waitTime).then(function () {
-      return axiosInstance(config)
-    })
+    return this.delay(waitTime).then(() => axiosInstance(config))
   }
 
-  AxiosRetry.prototype.delay = function (waitTime) {
-    return new Promise(function (resolve) {
-      return setTimeout(resolve, waitTime)
-    })
+  /**
+   * @param {number} waitTime
+   * @returns {Promise}
+   */
+  delay(waitTime) {
+    return new Promise(resolve => setTimeout(resolve, waitTime))
   }
-
-  return AxiosRetry
-})()
+}
 
 export { AxiosRetry }

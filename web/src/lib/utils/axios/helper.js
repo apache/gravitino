@@ -25,41 +25,49 @@ SOFTWARE.
 /**
  * Referred from src/utils/http/axios/helper.ts
  */
+
 import { isObject, isString } from '@/lib/utils/is'
 
-var DATE_TIME_FORMAT = 'YYYY-MM-DD HH:mm:ss'
+const DATE_TIME_FORMAT = 'YYYY-MM-DD HH:mm:ss'
 
-export function joinTimestamp(join, restful) {
-  if (restful === void 0) {
-    restful = false
-  }
+/**
+ * @template T
+ * @param {boolean} join
+ * @param {T} restful
+ * @returns {T extends true ? string : object}
+ */
+export function joinTimestamp(join, restful = false) {
   if (!join) {
     return restful ? '' : {}
   }
-  var now = new Date().getTime()
+  const now = new Date().getTime()
   if (restful) {
-    return '?_t='.concat(now)
+    return `?_t=${now}`
   }
 
   return { _t: now }
 }
 
 /**
+ * @typedef {Object.<string, any>} Recordable
+ */
+
+/**
  * @description: Format request parameter time
+ * @param {Recordable} params
  */
 export function formatRequestDate(params) {
-  var _a, _b
   if (Object.prototype.toString.call(params) !== '[object Object]') {
     return
   }
-  for (var key in params) {
-    var format =
-      (_b = (_a = params[key]) === null || _a === void 0 ? void 0 : _a.format) !== null && _b !== void 0 ? _b : null
+
+  for (const key in params) {
+    const format = params[key]?.format ?? null
     if (format && typeof format === 'function') {
       params[key] = params[key].format(DATE_TIME_FORMAT)
     }
     if (isString(key)) {
-      var value = params[key]
+      const value = params[key]
       if (value) {
         try {
           params[key] = isString(value) ? value.trim() : value
