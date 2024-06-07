@@ -112,10 +112,12 @@ public class MetadataObjectUtils {
       if (topicPO == null) {
         return null;
       }
+
       String schemaName = getSchemaFullName(topicPO.getSchemaId());
       if (schemaName == null) {
         return null;
       }
+
       return String.join(DOT, schemaName, topicPO.getTopicName());
     }
 
@@ -124,10 +126,12 @@ public class MetadataObjectUtils {
       if (filesetPO == null) {
         return null;
       }
+
       String schemaName = getSchemaFullName(filesetPO.getSchemaId());
       if (schemaName == null) {
         return null;
       }
+
       return String.join(DOT, schemaName, filesetPO.getFilesetName());
     }
 
