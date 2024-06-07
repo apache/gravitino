@@ -135,7 +135,7 @@ public class CatalogConnectorManager {
   }
 
   private void loadCatalogs(GravitinoMetalake metalake) {
-    NameIdentifier[] catalogNames;
+    String[] catalogNames;
     try {
       catalogNames = metalake.listCatalogs();
     } catch (Exception e) {
@@ -152,10 +152,7 @@ public class CatalogConnectorManager {
     Set<String> catalogNameStrings =
         Arrays.stream(catalogNames)
             .map(
-                id ->
-                    config.simplifyCatalogNames()
-                        ? id.name()
-                        : getTrinoCatalogName(metalake.name(), id.name()))
+                id -> config.simplifyCatalogNames() ? id : getTrinoCatalogName(metalake.name(), id))
             .collect(Collectors.toSet());
 
     for (Map.Entry<String, CatalogConnectorContext> entry : catalogConnectors.entrySet()) {
@@ -174,9 +171,9 @@ public class CatalogConnectorManager {
     // Load new catalogs belows to the metalake.
     Arrays.stream(catalogNames)
         .forEach(
-            (NameIdentifier nameIdentifier) -> {
+            (String catalogName) -> {
               try {
-                Catalog catalog = metalake.loadCatalog(nameIdentifier.name());
+                Catalog catalog = metalake.loadCatalog(catalogName);
                 GravitinoCatalog gravitinoCatalog = new GravitinoCatalog(metalake.name(), catalog);
                 if (catalogConnectors.containsKey(getTrinoCatalogName(gravitinoCatalog))) {
                   // Reload catalogs that have been updated in Gravitino server.
@@ -188,7 +185,7 @@ public class CatalogConnectorManager {
                 }
               } catch (Exception e) {
                 LOG.error(
-                    "Failed to load metalake {}'s catalog {}.", metalake.name(), nameIdentifier, e);
+                    "Failed to load metalake {}'s catalog {}.", metalake.name(), catalogName, e);
               }
             });
   }

@@ -210,10 +210,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
 
   private void appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {
     // Add data type
-    sqlBuilder
-        .append(SPACE)
-        .append(typeConverter.fromGravitinoType(column.dataType()))
-        .append(SPACE);
+    sqlBuilder.append(SPACE).append(typeConverter.fromGravitino(column.dataType())).append(SPACE);
 
     if (column.autoIncrement()) {
       if (!Types.allowAutoIncrement(column.dataType())) {
@@ -532,7 +529,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
         .append(col)
         .append(PG_QUOTE)
         .append(" SET DATA TYPE ")
-        .append(typeConverter.fromGravitinoType(updateColumnType.getNewDataType()));
+        .append(typeConverter.fromGravitino(updateColumnType.getNewDataType()));
     if (!column.nullable()) {
       sqlBuilder
           .append(",\n")
@@ -591,7 +588,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
         .append(col)
         .append(PG_QUOTE)
         .append(SPACE)
-        .append(typeConverter.fromGravitinoType(addColumn.getDataType()))
+        .append(typeConverter.fromGravitino(addColumn.getDataType()))
         .append(SPACE);
 
     if (addColumn.isAutoIncrement()) {

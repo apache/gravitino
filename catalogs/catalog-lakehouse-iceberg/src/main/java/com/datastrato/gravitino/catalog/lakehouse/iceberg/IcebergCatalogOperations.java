@@ -89,6 +89,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
 
     Map<String, String> resultConf = Maps.newHashMap(prefixMap);
     resultConf.putAll(gravitinoConfig);
+    resultConf.put("catalog_uuid", info.id().toString());
 
     IcebergConfig icebergConfig = new IcebergConfig(resultConf);
 

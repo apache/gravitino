@@ -99,3 +99,4 @@ jobs:
             distribution/package/logs/gravitino-server.out
             distribution/package/logs/gravitino-server.log
             catalogs/**/*.log
+            catalogs/**/*.tar

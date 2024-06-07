@@ -523,7 +523,7 @@ public class DorisTableOperations extends JdbcTableOperations {
   }
 
   private String addColumnFieldDefinition(TableChange.AddColumn addColumn) {
-    String dataType = (String) typeConverter.fromGravitinoType(addColumn.getDataType());
+    String dataType = typeConverter.fromGravitino(addColumn.getDataType());
     if (addColumn.fieldName().length > 1) {
       throw new UnsupportedOperationException("Doris does not support nested column names.");
     }
@@ -637,10 +637,7 @@ public class DorisTableOperations extends JdbcTableOperations {
 
   private StringBuilder appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {
     // Add data type
-    sqlBuilder
-        .append(SPACE)
-        .append(typeConverter.fromGravitinoType(column.dataType()))
-        .append(SPACE);
+    sqlBuilder.append(SPACE).append(typeConverter.fromGravitino(column.dataType())).append(SPACE);
 
     // Add NOT NULL if the column is marked as such
     if (column.nullable()) {

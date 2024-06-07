@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
+ * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
 package com.datastrato.gravitino.catalog.hive.converter;
@@ -17,12 +17,23 @@ import static org.apache.hadoop.hive.serde.serdeConstants.SMALLINT_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.STRING_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.TIMESTAMP_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.TINYINT_TYPE_NAME;
+import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getCharTypeInfo;
+import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getDecimalTypeInfo;
+import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getListTypeInfo;
+import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getMapTypeInfo;
+import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getPrimitiveTypeInfo;
+import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getStructTypeInfo;
+import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getUnionTypeInfo;
+import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getVarcharTypeInfo;
 import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils.getTypeInfoFromTypeString;
 
+import com.datastrato.gravitino.connector.DataTypeConverter;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
-import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.hadoop.hive.serde2.typeinfo.CharTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
@@ -33,28 +44,77 @@ import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.UnionTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeInfo;
 
-/** Converts Hive data types to corresponding Gravitino data types. */
-public class FromHiveType {
+public class HiveDataTypeConverter implements DataTypeConverter<TypeInfo, String> {
+  public static final HiveDataTypeConverter CONVERTER = new HiveDataTypeConverter();
 
-  /**
-   * Converts a Hive data type string to the corresponding Gravitino data type.
-   *
-   * @param hiveType The Hive data type string to convert.
-   * @return The equivalent Gravitino data type.
-   */
-  public static Type convert(String hiveType) {
-    TypeInfo hiveTypeInfo = getTypeInfoFromTypeString(hiveType);
-    return toGravitinoType(hiveTypeInfo);
+  @Override
+  public TypeInfo fromGravitino(Type type) {
+    switch (type.name()) {
+      case BOOLEAN:
+        return getPrimitiveTypeInfo(BOOLEAN_TYPE_NAME);
+      case BYTE:
+        return getPrimitiveTypeInfo(TINYINT_TYPE_NAME);
+      case SHORT:
+        return getPrimitiveTypeInfo(SMALLINT_TYPE_NAME);
+      case INTEGER:
+        return getPrimitiveTypeInfo(INT_TYPE_NAME);
+      case LONG:
+        return getPrimitiveTypeInfo(BIGINT_TYPE_NAME);
+      case FLOAT:
+        return getPrimitiveTypeInfo(FLOAT_TYPE_NAME);
+      case DOUBLE:
+        return getPrimitiveTypeInfo(DOUBLE_TYPE_NAME);
+      case STRING:
+        return getPrimitiveTypeInfo(STRING_TYPE_NAME);
+      case VARCHAR:
+        return getVarcharTypeInfo(((Types.VarCharType) type).length());
+      case FIXEDCHAR:
+        return getCharTypeInfo(((Types.FixedCharType) type).length());
+      case DATE:
+        return getPrimitiveTypeInfo(DATE_TYPE_NAME);
+      case TIMESTAMP:
+        return getPrimitiveTypeInfo(TIMESTAMP_TYPE_NAME);
+      case DECIMAL:
+        Types.DecimalType decimalType = (Types.DecimalType) type;
+        return getDecimalTypeInfo(decimalType.precision(), decimalType.scale());
+      case BINARY:
+        return getPrimitiveTypeInfo(BINARY_TYPE_NAME);
+      case INTERVAL_YEAR:
+        return getPrimitiveTypeInfo(INTERVAL_YEAR_MONTH_TYPE_NAME);
+      case INTERVAL_DAY:
+        return getPrimitiveTypeInfo(INTERVAL_DAY_TIME_TYPE_NAME);
+      case LIST:
+        return getListTypeInfo(fromGravitino(((Types.ListType) type).elementType()));
+      case MAP:
+        Types.MapType mapType = (Types.MapType) type;
+        return getMapTypeInfo(fromGravitino(mapType.keyType()), fromGravitino(mapType.valueType()));
+      case STRUCT:
+        Types.StructType structType = (Types.StructType) type;
+        List<TypeInfo> typeInfos =
+            Arrays.stream(structType.fields())
+                .map(t -> fromGravitino(t.type()))
+                .collect(Collectors.toList());
+        List<String> names =
+            Arrays.stream(structType.fields())
+                .map(Types.StructType.Field::name)
+                .collect(Collectors.toList());
+        return getStructTypeInfo(names, typeInfos);
+      case UNION:
+        return getUnionTypeInfo(
+            Arrays.stream(((Types.UnionType) type).types())
+                .map(this::fromGravitino)
+                .collect(Collectors.toList()));
+      default:
+        throw new UnsupportedOperationException("Unsupported conversion to Hive type: " + type);
+    }
   }
 
-  /**
-   * Converts a Hive TypeInfo object to the corresponding Gravitino Type.
-   *
-   * @param hiveTypeInfo The Hive TypeInfo object to convert.
-   * @return The equivalent Gravitino Type.
-   */
-  @VisibleForTesting
-  public static Type toGravitinoType(TypeInfo hiveTypeInfo) {
+  @Override
+  public Type toGravitino(String hiveType) {
+    return toGravitino(getTypeInfoFromTypeString(hiveType));
+  }
+
+  private Type toGravitino(TypeInfo hiveTypeInfo) {
     switch (hiveTypeInfo.getCategory()) {
       case PRIMITIVE:
         switch (hiveTypeInfo.getTypeName()) {
@@ -102,12 +162,12 @@ public class FromHiveType {
         }
       case LIST:
         return Types.ListType.nullable(
-            toGravitinoType(((ListTypeInfo) hiveTypeInfo).getListElementTypeInfo()));
+            toGravitino(((ListTypeInfo) hiveTypeInfo).getListElementTypeInfo()));
       case MAP:
         MapTypeInfo mapTypeInfo = (MapTypeInfo) hiveTypeInfo;
         return Types.MapType.valueNullable(
-            toGravitinoType(mapTypeInfo.getMapKeyTypeInfo()),
-            toGravitinoType(mapTypeInfo.getMapValueTypeInfo()));
+            toGravitino(mapTypeInfo.getMapKeyTypeInfo()),
+            toGravitino(mapTypeInfo.getMapValueTypeInfo()));
       case STRUCT:
         StructTypeInfo structTypeInfo = (StructTypeInfo) hiveTypeInfo;
         ArrayList<String> fieldNames = structTypeInfo.getAllStructFieldNames();
@@ -117,19 +177,17 @@ public class FromHiveType {
                 .mapToObj(
                     i ->
                         Types.StructType.Field.nullableField(
-                            fieldNames.get(i), toGravitinoType(typeInfos.get(i))))
+                            fieldNames.get(i), toGravitino(typeInfos.get(i))))
                 .toArray(Types.StructType.Field[]::new);
         return Types.StructType.of(fields);
       case UNION:
         UnionTypeInfo unionTypeInfo = (UnionTypeInfo) hiveTypeInfo;
         return Types.UnionType.of(
             unionTypeInfo.getAllUnionObjectTypeInfos().stream()
-                .map(FromHiveType::toGravitinoType)
+                .map(this::toGravitino)
                 .toArray(Type[]::new));
       default:
         return Types.ExternalType.of(hiveTypeInfo.getQualifiedName());
     }
   }
-
-  private FromHiveType() {}
 }

@@ -108,8 +108,8 @@ public class CatalogKafkaIT extends AbstractIT {
             }));
     Arrays.stream(metalake.listCatalogs())
         .forEach(
-            (ident -> {
-              metalake.dropCatalog(ident.name());
+            (catalogName -> {
+              metalake.dropCatalog(catalogName);
             }));
     client.dropMetalake(METALAKE_NAME);
     if (adminClient != null) {
