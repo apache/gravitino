@@ -63,7 +63,8 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
   /**
    * List all the topics under the given namespace.
    *
-   * @param namespace The namespace to list the topics under it.
+   * @param namespace A schema namespace. This namespace should have 1 level, which is the schema
+   *     name;
    * @return An array of {@link NameIdentifier} of the topics under the specified namespace.
    * @throws NoSuchSchemaException if the schema with specified namespace does not exist.
    */
@@ -71,16 +72,19 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
   public NameIdentifier[] listTopics(Namespace namespace) throws NoSuchSchemaException {
     checkTopicNamespace(namespace);
 
+    Namespace fullNamespace = getTopicFullNamespace(namespace);
     EntityListResponse resp =
         restClient.get(
-            formatTopicRequestPath(namespace),
+            formatTopicRequestPath(fullNamespace),
             EntityListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.topicErrorHandler());
 
     resp.validate();
 
-    return resp.identifiers();
+    return Arrays.stream(resp.identifiers())
+        .map(ident -> NameIdentifier.of(ident.namespace().level(2), ident.name()))
+        .toArray(NameIdentifier[]::new);
   }
 
   /**
@@ -94,9 +98,10 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
   public Topic loadTopic(NameIdentifier ident) throws NoSuchTopicException {
     checkTopicNameIdentifer(ident);
 
+    Namespace fullNamespace = getTopicFullNamespace(ident.namespace());
     TopicResponse resp =
         restClient.get(
-            formatTopicRequestPath(ident.namespace()) + "/" + ident.name(),
+            formatTopicRequestPath(fullNamespace) + "/" + ident.name(),
             TopicResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.topicErrorHandler());
@@ -124,6 +129,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
       throws NoSuchSchemaException, TopicAlreadyExistsException {
     checkTopicNameIdentifer(ident);
 
+    Namespace fullNamespace = getTopicFullNamespace(ident.namespace());
     TopicCreateRequest req =
         TopicCreateRequest.builder()
             .name(ident.name())
@@ -133,7 +139,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
 
     TopicResponse resp =
         restClient.post(
-            formatTopicRequestPath(ident.namespace()),
+            formatTopicRequestPath(fullNamespace),
             req,
             TopicResponse.class,
             Collections.emptyMap(),
@@ -157,6 +163,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
       throws NoSuchTopicException, IllegalArgumentException {
     checkTopicNameIdentifer(ident);
 
+    Namespace fullNamespace = getTopicFullNamespace(ident.namespace());
     List<TopicUpdateRequest> updates =
         Arrays.stream(changes)
             .map(DTOConverters::toTopicUpdateRequest)
@@ -166,7 +173,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
 
     TopicResponse resp =
         restClient.put(
-            formatTopicRequestPath(ident.namespace()) + "/" + ident.name(),
+            formatTopicRequestPath(fullNamespace) + "/" + ident.name(),
             updatesRequest,
             TopicResponse.class,
             Collections.emptyMap(),
@@ -186,9 +193,10 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
   public boolean dropTopic(NameIdentifier ident) {
     checkTopicNameIdentifer(ident);
 
+    Namespace fullNamespace = getTopicFullNamespace(ident.namespace());
     DropResponse resp =
         restClient.delete(
-            formatTopicRequestPath(ident.namespace()) + "/" + ident.name(),
+            formatTopicRequestPath(fullNamespace) + "/" + ident.name(),
             DropResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.topicErrorHandler());
@@ -210,8 +218,8 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
    */
   static void checkTopicNamespace(Namespace namespace) {
     Namespace.check(
-        namespace != null && namespace.length() == 3,
-        "Topic namespace must be non-null and have 3 level, the input namespace is %s",
+        namespace != null && namespace.length() == 1,
+        "Topic namespace must be non-null and have 1 level, the input namespace is %s",
         namespace);
   }
 
@@ -225,6 +233,10 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
     NameIdentifier.check(
         ident.name() != null && !ident.name().isEmpty(), "NameIdentifer name must not be empty");
     checkTopicNamespace(ident.namespace());
+  }
+
+  Namespace getTopicFullNamespace(Namespace tableNamespace) {
+    return Namespace.of(this.namespace().level(0), this.name(), tableNamespace.level(0));
   }
 
   static class Builder extends CatalogDTO.Builder<Builder> {
