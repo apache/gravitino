@@ -40,6 +40,18 @@ public interface Entity extends Serializable {
   /** The admin schema name in the authorization catalog of the system metalake. */
   String ADMIN_SCHEMA_NAME = "admin";
 
+  /**
+   * All metalakes are a virtual entity. It represents all the metalakes. We don't store it. We use
+   * a specific type to represent its entity id.
+   */
+  String ALL_METALAKES_ENTITY_TYPE = "ROOT";
+
+  /**
+   * All metalakes are a virtual entity. It represents all the metalakes. We don't store it. We use
+   * a specific id to represent its entity id.
+   */
+  long ALL_METALAKES_ENTITY_ID = 0;
+
   /** Enumeration defining the types of entities in the Gravitino framework. */
   @Getter
   enum EntityType {

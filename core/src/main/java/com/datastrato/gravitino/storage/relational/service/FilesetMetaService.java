@@ -56,8 +56,6 @@ public class FilesetMetaService {
   }
 
   // Filset may be deleted, so the FilesetPO may be null.
-  // We don't choose to delete the securable object when we delete the fileset,
-  // Because they will bring conflicts if we are updating securable object
   public FilesetPO getFilesetPOById(Long filesetId) {
     FilesetPO filesetPO =
         SessionUtils.getWithoutCommit(

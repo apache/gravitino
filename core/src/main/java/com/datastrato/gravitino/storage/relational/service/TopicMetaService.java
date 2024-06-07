@@ -125,8 +125,6 @@ public class TopicMetaService {
   }
 
   // Topic may be deleted, so the TopicPO may be null.
-  // We don't choose to delete the securable object when we delete the topic,
-  // Because they will bring conflicts if we are updating securable object
   public TopicPO getTopicPOById(Long topicId) {
     TopicPO topicPO =
         SessionUtils.getWithoutCommit(

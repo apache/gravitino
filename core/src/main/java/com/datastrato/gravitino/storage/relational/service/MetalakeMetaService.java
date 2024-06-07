@@ -83,8 +83,6 @@ public class MetalakeMetaService {
   }
 
   // Metalake may be deleted, so the MetalakePO may be null.
-  // We don't choose to delete the securable object when we delete the metalake,
-  // Because they will bring conflicts if we are updating securable object
   public MetalakePO getMetalakePOById(Long id) {
     MetalakePO metalakePO =
         SessionUtils.getWithoutCommit(

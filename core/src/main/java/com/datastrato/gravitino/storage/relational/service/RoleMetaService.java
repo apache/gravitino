@@ -15,28 +15,22 @@ import com.datastrato.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import com.datastrato.gravitino.storage.relational.mapper.RoleMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import com.datastrato.gravitino.storage.relational.mapper.UserRoleRelMapper;
-import com.datastrato.gravitino.storage.relational.po.CatalogPO;
-import com.datastrato.gravitino.storage.relational.po.FilesetPO;
-import com.datastrato.gravitino.storage.relational.po.MetalakePO;
 import com.datastrato.gravitino.storage.relational.po.RolePO;
-import com.datastrato.gravitino.storage.relational.po.SchemaPO;
 import com.datastrato.gravitino.storage.relational.po.SecurableObjectPO;
-import com.datastrato.gravitino.storage.relational.po.TablePO;
-import com.datastrato.gravitino.storage.relational.po.TopicPO;
 import com.datastrato.gravitino.storage.relational.utils.ExceptionUtils;
+import com.datastrato.gravitino.storage.relational.utils.MetadataObjectUtils;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
-import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** The service class for role metadata. It provides the basic database operations for role. */
 public class RoleMetaService {
+
+  private static final Logger LOG = LoggerFactory.getLogger(RoleMetaService.class);
   private static final RoleMetaService INSTANCE = new RoleMetaService();
-  private static final Splitter DOT_SPLITTER = Splitter.on('.');
-  private static final String ROOT = "ROOT";
-  private static final String ALL_METALAKES = "*";
-  private static final long ALL_METALAKES_ENTITY_ID = 0;
 
   public static RoleMetaService getInstance() {
     return INSTANCE;
@@ -98,7 +92,8 @@ public class RoleMetaService {
             POConverters.initializeSecurablePOBuilderWithVersion(
                 roleEntity.id(), object, getEntityType(object));
         objectBuilder.withEntityId(
-            getSecurableObjectEntityId(metalakeId, object.fullName(), object.type()));
+            MetadataObjectUtils.getSecurableObjectEntityId(
+                metalakeId, object.fullName(), object.type()));
         securableObjectPOs.add(objectBuilder.build());
       }
 
@@ -143,11 +138,18 @@ public class RoleMetaService {
     List<SecurableObject> securableObjects = Lists.newArrayList();
 
     for (SecurableObjectPO securableObjectPO : securableObjectPOs) {
-      String fullName = getSecurableObjectFullName(securableObjectPO);
+      String fullName =
+          MetadataObjectUtils.getSecurableObjectFullName(
+              securableObjectPO.getType(), securableObjectPO.getEntityId());
       if (fullName != null) {
         securableObjects.add(
             POConverters.fromSecurableObjectPO(
                 fullName, securableObjectPO, getType(securableObjectPO.getType())));
+      } else {
+        LOG.info(
+            "The securable object {} {} may be deleted",
+            securableObjectPO.getEntityId(),
+            securableObjectPO.getType());
       }
     }
 
@@ -219,114 +221,8 @@ public class RoleMetaService {
         + securableObjectsCount[0];
   }
 
-  long getSecurableObjectEntityId(long metalakeId, String fullName, MetadataObject.Type type) {
-    if (fullName.equals(ALL_METALAKES) && type == MetadataObject.Type.METALAKE) {
-      return ALL_METALAKES_ENTITY_ID;
-    }
-
-    if (type == MetadataObject.Type.METALAKE) {
-      return MetalakeMetaService.getInstance().getMetalakeIdByName(fullName);
-    }
-
-    List<String> names = DOT_SPLITTER.splitToList(fullName);
-    long catalogId =
-        CatalogMetaService.getInstance().getCatalogIdByMetalakeIdAndName(metalakeId, names.get(0));
-    if (type == MetadataObject.Type.CATALOG) {
-      return catalogId;
-    }
-
-    long schemaId =
-        SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(catalogId, names.get(1));
-    if (type == MetadataObject.Type.SCHEMA) {
-      return schemaId;
-    }
-
-    if (type == MetadataObject.Type.FILESET) {
-      return FilesetMetaService.getInstance().getFilesetIdBySchemaIdAndName(schemaId, names.get(2));
-    } else if (type == MetadataObject.Type.TOPIC) {
-      return TopicMetaService.getInstance().getTopicIdBySchemaIdAndName(schemaId, names.get(2));
-    } else if (type == MetadataObject.Type.TABLE) {
-      return TableMetaService.getInstance().getTableIdBySchemaIdAndName(schemaId, names.get(2));
-    }
-
-    throw new IllegalArgumentException(String.format("Doesn't support the type %s", type));
-  }
-
-  String getSecurableObjectFullName(SecurableObjectPO securableObjectPO) {
-    if (securableObjectPO.getType().equals(ROOT)) {
-      return ALL_METALAKES;
-    }
-
-    MetadataObject.Type type = MetadataObject.Type.valueOf(securableObjectPO.getType());
-    if (type == MetadataObject.Type.METALAKE) {
-      MetalakePO metalakePO =
-          MetalakeMetaService.getInstance().getMetalakePOById(securableObjectPO.getEntityId());
-      if (metalakePO == null) {
-        return null;
-      }
-
-      return metalakePO.getMetalakeName();
-    }
-
-    if (type == MetadataObject.Type.CATALOG) {
-      return getCatalogFullName(securableObjectPO.getEntityId());
-    }
-
-    if (type == MetadataObject.Type.SCHEMA) {
-      return getSchemaFullName(securableObjectPO.getEntityId());
-    }
-
-    if (type == MetadataObject.Type.TABLE) {
-      TablePO tablePO =
-          TableMetaService.getInstance().getTablePOById(securableObjectPO.getEntityId());
-      if (tablePO == null) {
-        return null;
-      }
-      return getSchemaFullName(tablePO.getSchemaId()) + "." + tablePO.getTableName();
-    }
-
-    if (type == MetadataObject.Type.TOPIC) {
-      TopicPO topicPO =
-          TopicMetaService.getInstance().getTopicPOById(securableObjectPO.getEntityId());
-      if (topicPO == null) {
-        return null;
-      }
-      return getSchemaFullName(topicPO.getSchemaId()) + "." + topicPO.getTopicName();
-    }
-
-    if (type == MetadataObject.Type.FILESET) {
-      FilesetPO filesetPO =
-          FilesetMetaService.getInstance().getFilesetPOById(securableObjectPO.getEntityId());
-      if (filesetPO == null) {
-        return null;
-      }
-      return getSchemaFullName(filesetPO.getSchemaId()) + "." + filesetPO.getFilesetName();
-    }
-
-    throw new IllegalArgumentException(String.format("Doesn't support the type %s", type));
-  }
-
-  private String getCatalogFullName(Long entityId) {
-    CatalogPO catalogPO = CatalogMetaService.getInstance().getCatalogPOById(entityId);
-    if (catalogPO == null) {
-      return null;
-    }
-    return catalogPO.getCatalogName();
-  }
-
-  private String getSchemaFullName(Long entityId) {
-    SchemaPO schemaPO = SchemaMetaService.getInstance().getSchemaPOById(entityId);
-
-    if (schemaPO == null) {
-      return null;
-    }
-
-    String catalogName = getCatalogFullName(schemaPO.getCatalogId());
-    return catalogName + "." + schemaPO.getSchemaName();
-  }
-
   private MetadataObject.Type getType(String type) {
-    if (ROOT.equals(type)) {
+    if (Entity.ALL_METALAKES_ENTITY_TYPE.equals(type)) {
       return MetadataObject.Type.METALAKE;
     }
     return MetadataObject.Type.valueOf(type);
@@ -334,8 +230,8 @@ public class RoleMetaService {
 
   private String getEntityType(SecurableObject securableObject) {
     if (securableObject.type() == MetadataObject.Type.METALAKE
-        && securableObject.name().equals(ALL_METALAKES)) {
-      return ROOT;
+        && securableObject.name().equals(Entity.SECURABLE_ENTITY_RESERVED_NAME)) {
+      return Entity.ALL_METALAKES_ENTITY_TYPE;
     }
     return securableObject.type().name();
   }

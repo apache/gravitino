@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 
 /**
  * The service class for catalog metadata. It provides the basic database operations for catalog.
@@ -56,8 +57,7 @@ public class CatalogMetaService {
   }
 
   // Catalog may be deleted, so the CatalogPO may be null.
-  // We don't choose to delete the securable object when we delete the catalog,
-  // Because they will bring conflicts if we are updating securable object
+  @Nullable
   public CatalogPO getCatalogPOById(Long catalogId) {
     CatalogPO catalogPO =
         SessionUtils.getWithoutCommit(
