@@ -68,7 +68,7 @@ public class MetadataObjectUtils {
     throw new IllegalArgumentException(String.format("Doesn't support the type %s", type));
   }
 
-  // Securable object may be  null because the securable object may be deleted.
+  // Securable object may be null because the securable object may be deleted.
   @Nullable
   public static String getSecurableObjectFullName(String type, long entityId) {
     if (type.equals(Entity.ALL_METALAKES_ENTITY_TYPE)) {
