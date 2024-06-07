@@ -51,6 +51,16 @@ public class Literals {
   }
 
   /**
+   * Creates an unsigned byte type literal with the given value.
+   *
+   * @param value the unsigned byte literal value
+   * @return a new {@link Literal} instance
+   */
+  public static LiteralImpl<Short> unsignedByteLiteral(Short value) {
+    return of(value, Types.ByteType.unsigned());
+  }
+
+  /**
    * Creates a short type literal with the given value.
    *
    * @param value the short literal value
@@ -58,6 +68,16 @@ public class Literals {
    */
   public static LiteralImpl<Short> shortLiteral(Short value) {
     return of(value, Types.ShortType.get());
+  }
+
+  /**
+   * Creates an unsigned short type literal with the given value.
+   *
+   * @param value the unsigned short literal value
+   * @return a new {@link Literal} instance
+   */
+  public static LiteralImpl<Integer> unsignedShortLiteral(Integer value) {
+    return of(value, Types.ShortType.unsigned());
   }
 
   /**
@@ -71,6 +91,16 @@ public class Literals {
   }
 
   /**
+   * Creates an unsigned integer type literal with the given value.
+   *
+   * @param value the unsigned integer literal value
+   * @return a new {@link Literal} instance
+   */
+  public static LiteralImpl<Long> unsignedIntegerLiteral(Long value) {
+    return of(value, Types.IntegerType.unsigned());
+  }
+
+  /**
    * Creates a long type literal with the given value.
    *
    * @param value the long literal value
@@ -78,6 +108,16 @@ public class Literals {
    */
   public static LiteralImpl<Long> longLiteral(Long value) {
     return of(value, Types.LongType.get());
+  }
+
+  /**
+   * Creates an unsigned long type literal with the given value.
+   *
+   * @param value the unsigned long literal value
+   * @return a new {@link Literal} instance
+   */
+  public static LiteralImpl<Decimal> unsignedLongLiteral(Decimal value) {
+    return of(value, Types.LongType.unsigned());
   }
 
   /**

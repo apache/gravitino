@@ -21,9 +21,13 @@ components:
       example:
         - "boolean"
         - "byte"
+        - "byte unsigned"
         - "short"
+        - "short unsigned"
         - "integer"
+        - "integer unsigned"
         - "long"
+        - "long unsigned"
         - "float"
         - "double"
         - "decimal(10,2)"
