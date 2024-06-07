@@ -89,6 +89,10 @@ jobs:
       - name: Test publish to local
         run: ./gradlew publishToMavenLocal -x test -PjdkVersion=${{ matrix.java-version }}
 
+      - name: Free up disk space
+        run: |
+          dev/ci/util_free_space.sh
+
       - name: Build with Gradle
         run: ./gradlew build -PskipITs -PjdkVersion=${{ matrix.java-version }}
 
@@ -97,8 +101,10 @@ jobs:
         if: failure()
         with:
           name: unit test report
-          path:
+          path: |
             build/reports
+            catalogs/**/*.log
+            catalogs/**/*.tar
 
       - name: Jacoco Report to PR
         id: jacoco
