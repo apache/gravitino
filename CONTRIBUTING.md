@@ -14,6 +14,9 @@ Before you get started, please read and follow these guidelines to ensure a smoo
 - [Getting Started](#getting-started)
   - [Fork the Repository](#fork-the-repository)
   - [Development Setup](#development-setup)
+  - [Using IntelliJ (Optional)](#using-intellij-optional)
+  - [Using VS Code (Optional)](#using-vs-code-optional)
+  - [Handling Memory Issues in WSL](#handling-memory-issues-in-wsl)
 - [Project Overview and Policies](#project-overview-and-policies)
   - [Project Overview](#project-overview)
   - [Management Policies](#management-policies)
@@ -48,6 +51,136 @@ Once you have cloned the [GitHub repository](https://github.com/datastrato/gravi
 
 To stop and start a local Gravitino server via `bin/gravitino.sh start` and `bin/gravitino.sh stop` in a Gravitino distribution, see [how to build](/docs/how-to-build.md) for more instructions.
 
+### Using IntelliJ (Optional)
+
+**On Windows:**
+
+1. Open the Gravitino project that was just downloaded.
+
+2. Go to `File > Project Structure > Project` and change to the SDK you downloaded in WSL.
+
+3. If the SDK does not appear, manually add the SDK.
+
+4. To find the SDK location, run this command in WSL:
+
+    **On Ubuntu (WSL):**
+    ```sh
+    which java
+    ```
+
+IntelliJ IDEA is an integrated development environment (IDE) for Java development. Setting the project SDK ensures that IntelliJ uses the correct Java version for building and running the project.
+
+You can open up WSL in the IntelliJ terminal. Find the down arrow and select ubuntu.
+
+### Using VS Code (Optional)
+
+#### Set up WSL Extension in VSCode
+
+**On Windows:**
+
+1. Open VSCode extension marketplace, search for and install **WSL**.
+
+2. On Windows, press `Ctrl+Shift+P` to open the command palette, and run `Shell Command: Install 'code' command in PATH`.
+
+Installing the WSL extension in VSCode allows you to open and edit files in your WSL environment directly from VSCode. Adding the `code` command to your PATH enables you to open VSCode from the WSL terminal.
+
+#### Verify and Configure Environment Variables
+
+**On Windows:**
+
+1. Add VSCode path to the environment variables. The default installation path for VSCode is usually:
+
+    ```plaintext
+    C:\Users\<Your-Username>\AppData\Local\Programs\Microsoft VS Code\bin
+    ```
+
+    Replace `<Your-Username>` with your actual Windows username.
+
+    Example:
+
+    ```plaintext
+    C:\Users\epic\AppData\Local\Programs\Microsoft VS Code\bin
+    ```
+
+Adding VSCode to the environment variables ensures that you can open VSCode from any command prompt or terminal window.
+
+**On Ubuntu (WSL):**
+
+```sh
+code --version
+cd gravitino
+code .
+```
+
+Running `code --version` verifies that the `code` command is available. Using `code .` opens the current directory in VSCode.
+
+#### Open a WSL Project in Windows VSCode
+
+**On Ubuntu (WSL):**
+
+1. **Navigate to Your Project Directory**
+
+   Use the terminal to navigate to the directory of your project. For example:
+
+   ```sh
+   cd gravitino
+   ```
+
+2. **Open the Project in VSCode**
+
+   In the WSL terminal, type the following command to open the current directory in VSCode:
+
+   ```sh
+   code .
+   ```
+
+  This command will open the current WSL directory in VSCode on Windows. If you haven't added `code` to your path, follow these steps:
+
+- Open VSCode on Windows.
+
+- Press `Ctrl+Shift+P` to open the command palette.
+
+- Type and select `Shell Command: Install 'code' command in PATH`.
+
+3. **Ensure Remote - WSL is Active**
+
+   When VSCode opens, you should see a green bottom-left corner indicating that VSCode is connected to WSL. If it isn't, click on the green area and select `Remote-WSL: New Window` or `Remote-WSL: Reopen Folder in WSL`.
+
+4. **Edit and Develop Your Project**
+
+   You can now edit and develop your project files in VSCode as if they were local files. The Remote - WSL extension seamlessly bridges the file system between Windows and WSL.
+
+### Handling Memory Issues in WSL
+
+If you ran into a memory issue when using WSL, here are some solutions to resolve it.
+
+1. **Shut down WSL**  
+   If your WSL is open, you can shut it down in Windows PowerShell using the following command:  
+
+   ```powershell
+   wsl --shutdown
+   ```
+
+2. **Navigate to user folder**  
+
+   Open up File Explorer and navigate to `C:\Users\<your-username>`.
+
+3. **Create the `.wslconfig` file**  
+
+   Open up Notepad or another text editor and input the following:  
+
+   ```plaintext
+   [wsl2]
+   memory=4GB   # Limits VM memory in WSL 2 up to 4GB
+   processors=4 # Makes the WSL 2 VM use four virtual processors
+   ```
+
+   *The memory and processor usage can be changed depending on your system's hardware.*
+
+4. **Save the file**  
+
+   Save the file as `".wslconfig"`. Be sure to include the quotes to let Windows know that this isn't a text file.
+
 ## Project Overview and Policies
 
 ### Project Overview
@@ -64,7 +197,7 @@ For future development directions, refer to the [ROADMAP.md](ROADMAP.md) documen
 
 ## Contribution guidelines
 
-### Code of conduct
+### Code of Conduct
 
 Please read and follow the [Code of Conduct](CODE_OF_CONDUCT.md). Gravitino provides a welcoming and inclusive environment for all contributors.
 
@@ -76,15 +209,15 @@ If you find a bug in Gravitino, please open an issue on GitHub. Be sure to inclu
 
 If you have ideas for enhancements or new features, feel free to create an issue to discuss them. Gravitino welcomes suggestions and provides prompt feedback on their feasibility and relevance.
 
-### Good first issues
+### Good First Issues
 
-If you are new to open source or can't find something to work on check out the [Good First Issues list](https://github.com/datastrato/gravitino/contribute).
+If you are new to open source or can't find something to work on, check out the [Good First Issues list](https://github.com/datastrato/gravitino/contribute).
 
-### Working on issues
+### Working on Issues
 
 Check out the list of open issues and find one that interests you. You can also comment on an issue to indicate that you're working on it. Please keep the issue updated with your progress.
 
-## Creating pull requests
+## Creating Pull Requests
 
 Create a new branch from `main` for your changes:
 
@@ -104,7 +237,7 @@ Push your changes to your fork on GitHub:
 git push your-branch-name
 ```
 
-After you have pushed your changes, create a pull request (PR) in the Gravitino repository. Be sure to provide a detailed description of your changes, reference any related issues and please follow the template provided. Gravitino's maintainers evaluate pull requests, offer feedback, and assist in merging project changes.
+After you have pushed your changes, create a pull request (PR) in the Gravitino repository. Be sure to provide a detailed description of your changes, reference any related issues, and please follow the template provided. Gravitino's maintainers evaluate pull requests, offer feedback, and assist in merging project changes.
 
 ### The Review Process
 
