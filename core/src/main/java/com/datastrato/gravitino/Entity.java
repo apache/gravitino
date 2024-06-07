@@ -42,7 +42,7 @@ public interface Entity extends Serializable {
 
   /**
    * All metalakes are a virtual entity. It represents all the metalakes. We don't store it. We use
-   * a specific type to represent its entity id.
+   * a specific type to represent its entity type.
    */
   String ALL_METALAKES_ENTITY_TYPE = "ROOT";
 
