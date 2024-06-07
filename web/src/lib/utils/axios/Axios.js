@@ -334,4 +334,4 @@ class NextAxios {
   }
 }
 
-export default NextAxios
+export { NextAxios }

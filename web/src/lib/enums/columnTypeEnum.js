@@ -32,4 +32,4 @@ const ColumnTypeColorEnum = Object.freeze({
   binary: 'success'
 })
 
-export default ColumnTypeColorEnum
+export { ColumnTypeColorEnum }
