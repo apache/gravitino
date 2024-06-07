@@ -12,6 +12,7 @@ import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.meta.RoleEntity;
+import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.datastrato.gravitino.storage.memory.TestMemoryEntityStore;
 import com.google.common.collect.Lists;
@@ -50,7 +51,21 @@ public class TestAdminManager {
             AuthorizationUtils.ofUser(Entity.SYSTEM_METALAKE_RESERVED_NAME, "admin2"),
             Entity.EntityType.USER));
 
-    // case 2:
+    // case 2: init the store with  the user is metalake admin
+    UserEntity admin2 = UserEntity.builder().build();
+    UserEntity admin3 = UserEntity.builder().build();
+    entityStore.put(admin2);
+    entityStore.put(admin3);
+    config.set(SERVICE_ADMINS, Lists.newArrayList("admin2", "admin3"));
+    new AdminManager(entityStore, new RandomIdGenerator(), config, roleManager);
+    Assertions.assertFalse(entityStore.exists(AuthorizationUtils.ofUser(Entity.SYSTEM_METALAKE_RESERVED_NAME, "admin1") , Entity.EntityType.USER));
+    UserEntity admin2New = entityStore.get(AuthorizationUtils.ofUser(Entity.SYSTEM_METALAKE_RESERVED_NAME, "admin2"), Entity.EntityType.USER, UserEntity.class);
+    Assertions.assertEquals(admin2, admin2New);
+    UserEntity admin3New = entityStore.get(AuthorizationUtils.ofUser(Entity.SYSTEM_METALAKE_RESERVED_NAME, "admin3"), Entity.EntityType.USER, UserEntity.class);
+    Assertions.assertNotEquals(admin3, admin3New);
+    Assertions.assertEquals(2, admin2New.roles().size());
+    Assertions.assertTrue(admin2New.roles().contains(Entity.SYSTEM_METALAKE_MANAGE_USER_ROLE));
+    Assertions.assertTrue(admin2New.roles().contains(Entity.METALAKE_CREATE_ROLE));
 
     entityStore.close();
   }
