@@ -180,7 +180,7 @@ Map<String, String> propertiesMap = ImmutableMap.<String, String>builder()
         .build();
 
 topicCatalog.createTopic(
-  NameIdentifier.of("metalake", "catalog", "default", "example_topic"),
+  NameIdentifier.of("default", "example_topic"),
   "This is an example topic",
   null, // The message schema of the topic object. Always null because it's not supported yet.
   propertiesMap,
@@ -225,7 +225,7 @@ Catalog catalog = gravitinoClient.loadCatalog("catalog");
 
 TopicCatalog topicCatalog = catalog.asTopicCatalog();
 
-Topic t = topicCatalog.alterTopic(NameIdentifier.of("metalake", "catalog", "default", "topic"),
+Topic t = topicCatalog.alterTopic(NameIdentifier.of("default", "topic"),
     TopicChange.removeProperty("key2"), TopicChange.setProperty("key3", "value3"));
 // ...
 ```
@@ -267,7 +267,7 @@ Catalog catalog = gravitinoClient.loadCatalog("catalog");
 TopicCatalog topicCatalog = catalog.asTopicCatalog();
 
 // Drop a topic
-topicCatalog.dropTopic(NameIdentifier.of("metalake", "catalog", "default", "topic"));
+topicCatalog.dropTopic(NameIdentifier.of("default", "topic"));
 // ...
 ```
 
@@ -298,7 +298,7 @@ Catalog catalog = gravitinoClient.loadCatalog("catalog");
 
 TopicCatalog topicCatalog = catalog.asTopicCatalog();
 NameIdentifier[] identifiers =
-    topicCatalog.listTopics(Namespace.ofTopic("metalake", "catalog", "default"));
+    topicCatalog.listTopics(Namespace.of("default"));
 // ...
 ```
 
