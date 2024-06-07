@@ -23,7 +23,6 @@ import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.messaging.Topic;
 import com.datastrato.gravitino.messaging.TopicChange;
-import com.datastrato.gravitino.utils.NamespaceUtil;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -285,9 +284,7 @@ public class CatalogKafkaIT extends AbstractIT {
 
     // test list topics
     NameIdentifier[] topics =
-        catalog
-            .asTopicCatalog()
-            .listTopics(NamespaceUtil.ofTopic(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME));
+        catalog.asTopicCatalog().listTopics(Namespace.of(DEFAULT_SCHEMA_NAME));
     Assertions.assertTrue(topics.length > 0);
     Assertions.assertTrue(
         ImmutableList.copyOf(topics).stream().anyMatch(topic -> topic.name().equals(topicName)));
@@ -393,9 +390,7 @@ public class CatalogKafkaIT extends AbstractIT {
     Assertions.assertEquals(illegalName, loadedTopic.name());
 
     NameIdentifier[] topics =
-        catalog
-            .asTopicCatalog()
-            .listTopics(NamespaceUtil.ofTopic(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME));
+        catalog.asTopicCatalog().listTopics(Namespace.of(DEFAULT_SCHEMA_NAME));
     Assertions.assertTrue(
         Arrays.stream(topics).anyMatch(topic -> topic.name().equals(illegalName)));
 
