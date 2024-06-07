@@ -104,7 +104,7 @@ public class MetadataObjectUtils {
         return null;
       }
 
-      return String.join(schemaName, tablePO.getTableName());
+      return String.join(DOT, schemaName, tablePO.getTableName());
     }
 
     if (metadatatype == MetadataObject.Type.TOPIC) {
