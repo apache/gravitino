@@ -54,9 +54,11 @@ class DTOConverters:
     @staticmethod
     def to_catalog_update_request(change: CatalogChange):
         if isinstance(change, CatalogChange.RenameCatalog):
-            return CatalogUpdateRequest.RenameCatalogRequest(change.new_name)
+            return CatalogUpdateRequest.RenameCatalogRequest(change.new_name())
         if isinstance(change, CatalogChange.UpdateCatalogComment):
-            return CatalogUpdateRequest.UpdateCatalogCommentRequest(change.new_comment)
+            return CatalogUpdateRequest.UpdateCatalogCommentRequest(
+                change.new_comment()
+            )
         if isinstance(change, CatalogChange.SetProperty):
             # TODO
             # pylint: disable=too-many-function-args
