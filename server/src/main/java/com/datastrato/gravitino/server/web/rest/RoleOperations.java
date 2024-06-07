@@ -18,7 +18,8 @@ import com.datastrato.gravitino.dto.responses.RoleResponse;
 import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.server.web.Utils;
-import com.google.common.base.Preconditions;
+import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
@@ -68,32 +69,29 @@ public class RoleOperations {
   @ResponseMetered(name = "create-role", absolute = true)
   public Response createRole(@PathParam("metalake") String metalake, RoleCreateRequest request) {
     try {
-      // TODO: Supports multiple securable objects. There will be some limited support for multiple
-      //  securable objects in the future.
-      //  The securable objects in the same role should under the same catalog.
-      //  If a role contains a metalake securable object, the role can't contain any other securable
-      //  object.
-      Preconditions.checkArgument(
-          request.getSecurableObjects() != null && request.getSecurableObjects().length == 1,
-          "The size of securable objects must be 1");
-
       return Utils.doAs(
           httpRequest,
           () -> {
-            SecurableObject securableObject =
-                SecurableObjects.parse(
-                    request.getSecurableObjects()[0].fullName(),
-                    request.getSecurableObjects()[0].type(),
-                    request.getSecurableObjects()[0].privileges().stream()
-                        .map(
-                            privilege -> {
-                              if (privilege.condition().equals(Privilege.Condition.ALLOW)) {
-                                return Privileges.allow(privilege.name());
-                              } else {
-                                return Privileges.deny(privilege.name());
-                              }
-                            })
-                        .collect(Collectors.toList()));
+            List<SecurableObject> securableObjects =
+                Arrays.stream(request.getSecurableObjects())
+                    .map(
+                        securableObjectDTO ->
+                            SecurableObjects.parse(
+                                securableObjectDTO.fullName(),
+                                securableObjectDTO.type(),
+                                securableObjectDTO.privileges().stream()
+                                    .map(
+                                        privilege -> {
+                                          if (privilege
+                                              .condition()
+                                              .equals(Privilege.Condition.ALLOW)) {
+                                            return Privileges.allow(privilege.name());
+                                          } else {
+                                            return Privileges.deny(privilege.name());
+                                          }
+                                        })
+                                    .collect(Collectors.toList())))
+                    .collect(Collectors.toList());
 
             return Utils.ok(
                 new RoleResponse(
@@ -102,7 +100,7 @@ public class RoleOperations {
                             metalake,
                             request.getName(),
                             request.getProperties(),
-                            securableObject))));
+                            securableObjects))));
           });
 
     } catch (Exception e) {
