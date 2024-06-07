@@ -43,8 +43,8 @@ ${GRAVITINO_HOME}/scripts/mysql/
 ```
 
 The script name is like `schema-{version}-mysql.sql`, and the `version` depends on your Gravitino version.
-For example, if your Gravitino version is `0.6.0`, then you can choose the **latest version** script
-file that is equal or smaller than `0.6.0`, you can choose the `schema-0.5.0-mysql.sql` script.
+For example, if your Gravitino version is `0.6.0`, then you can choose the **latest version** script.
+If you used a legacy script, you can use `upgrade-{old version}-to-{new version}-mysql.sql` to upgrade the schema.
 
 ### Step 2: Initialize the database
 

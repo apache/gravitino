@@ -91,6 +91,17 @@ public interface TopicMetaMapper {
   TopicPO selectTopicMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("topicName") String topicName);
 
+  @Select(
+      "SELECT topic_id as topicId, topic_name as topicName,"
+          + " metalake_id as metalakeId, catalog_id as catalogId, schema_id as schemaId,"
+          + " comment as comment, properties as properties, audit_info as auditInfo,"
+          + " current_version as currentVersion, last_version as lastVersion,"
+          + " deleted_at as deletedAt"
+          + " FROM "
+          + TABLE_NAME
+          + " WHERE topic_id = #{topicId} AND deleted_at = 0")
+  TopicPO selectTopicMetaById(@Param("topicId") Long topicId);
+
   @Update(
       "UPDATE "
           + TABLE_NAME

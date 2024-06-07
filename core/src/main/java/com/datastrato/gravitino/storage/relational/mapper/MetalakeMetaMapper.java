@@ -47,6 +47,17 @@ public interface MetalakeMetaMapper {
   MetalakePO selectMetalakeMetaByName(@Param("metalakeName") String name);
 
   @Select(
+      "SELECT metalake_id as metalakeId, metalake_name as metalakeName,"
+          + " metalake_comment as metalakeComment, properties,"
+          + " audit_info as auditInfo, schema_version as schemaVersion,"
+          + " current_version as currentVersion, last_version as lastVersion,"
+          + " deleted_at as deletedAt"
+          + " FROM "
+          + TABLE_NAME
+          + " WHERE metalake_id = #{metalaId} and deleted_at = 0")
+  MetalakePO selectMetalakeMetaById(@Param("metalakeId") Long metalakeId);
+
+  @Select(
       "SELECT metalake_id FROM "
           + TABLE_NAME
           + " WHERE metalake_name = #{metalakeName} and deleted_at = 0")

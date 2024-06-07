@@ -6,6 +6,7 @@
 package com.datastrato.gravitino.storage.relational.utils;
 
 import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.MetadataObject;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.authorization.Privilege;
 import com.datastrato.gravitino.authorization.Privileges;
@@ -32,12 +33,12 @@ import com.datastrato.gravitino.storage.relational.po.GroupRoleRelPO;
 import com.datastrato.gravitino.storage.relational.po.MetalakePO;
 import com.datastrato.gravitino.storage.relational.po.RolePO;
 import com.datastrato.gravitino.storage.relational.po.SchemaPO;
+import com.datastrato.gravitino.storage.relational.po.SecurableObjectPO;
 import com.datastrato.gravitino.storage.relational.po.TablePO;
 import com.datastrato.gravitino.storage.relational.po.TopicPO;
 import com.datastrato.gravitino.storage.relational.po.UserPO;
 import com.datastrato.gravitino.storage.relational.po.UserRoleRelPO;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.Map;
@@ -783,20 +784,6 @@ public class POConverters {
           .withRoleId(roleEntity.id())
           .withRoleName(roleEntity.name())
           .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(roleEntity.properties()))
-          .withSecurableObjectFullName(roleEntity.securableObjects().get(0).fullName())
-          .withSecurableObjectType(roleEntity.securableObjects().get(0).type().name())
-          .withPrivileges(
-              JsonUtils.anyFieldMapper()
-                  .writeValueAsString(
-                      roleEntity.securableObjects().get(0).privileges().stream()
-                          .map(privilege -> privilege.name().toString())
-                          .collect(Collectors.toList())))
-          .withPrivilegeConditions(
-              JsonUtils.anyFieldMapper()
-                  .writeValueAsString(
-                      roleEntity.securableObjects().get(0).privileges().stream()
-                          .map(privilege -> privilege.condition().toString())
-                          .collect(Collectors.toList())))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(roleEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
@@ -886,42 +873,75 @@ public class POConverters {
     }
   }
 
-  public static RoleEntity fromRolePO(RolePO rolePO, Namespace namespace) {
+  public static SecurableObject fromSecurableObjectPO(
+      String fullName, SecurableObjectPO securableObjectPO, MetadataObject.Type type) {
     try {
-
       List<String> privilegeNames =
-          JsonUtils.anyFieldMapper()
-              .readValue(rolePO.getPrivileges(), new TypeReference<List<String>>() {});
+          JsonUtils.anyFieldMapper().readValue(securableObjectPO.getPrivilegeNames(), List.class);
       List<String> privilegeConditions =
           JsonUtils.anyFieldMapper()
-              .readValue(rolePO.getPrivilegeConditions(), new TypeReference<List<String>>() {});
+              .readValue(securableObjectPO.getPrivilegeConditions(), List.class);
 
       List<Privilege> privileges = Lists.newArrayList();
       for (int index = 0; index < privilegeNames.size(); index++) {
         if (Privilege.Condition.ALLOW.name().equals(privilegeConditions.get(index))) {
           privileges.add(Privileges.allow(privilegeNames.get(index)));
         } else {
-          privileges.add(Privileges.allow(privilegeNames.get(index)));
+          privileges.add(Privileges.deny(privilegeNames.get(index)));
         }
       }
 
-      SecurableObject securableObject =
-          SecurableObjects.parse(
-              rolePO.getSecurableObjectFullName(),
-              SecurableObject.Type.valueOf(rolePO.getSecurableObjectType()),
-              privileges);
+      return SecurableObjects.parse(fullName, type, privileges);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
 
+  public static RoleEntity fromRolePO(
+      RolePO rolePO, List<SecurableObject> securableObjects, Namespace namespace) {
+    try {
       return RoleEntity.builder()
           .withId(rolePO.getRoleId())
           .withName(rolePO.getRoleName())
           .withNamespace(namespace)
           .withProperties(JsonUtils.anyFieldMapper().readValue(rolePO.getProperties(), Map.class))
-          .withSecurableObject(securableObject)
+          .withSecurableObjects(securableObjects)
           .withAuditInfo(
               JsonUtils.anyFieldMapper().readValue(rolePO.getAuditInfo(), AuditInfo.class))
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
+
+  public static SecurableObjectPO.Builder initializeSecurablePOBuilderWithVersion(
+      long roleId, SecurableObject securableObject, String type) {
+    try {
+      SecurableObjectPO.Builder builder = SecurableObjectPO.builder();
+      builder
+          .withRoleId(roleId)
+          .withType(type)
+          .withPrivilegeConditions(
+              JsonUtils.anyFieldMapper()
+                  .writeValueAsString(
+                      securableObject.privileges().stream()
+                          .map(Privilege::condition)
+                          .map(Privilege.Condition::name)
+                          .collect(Collectors.toList())))
+          .withPrivilegeNames(
+              JsonUtils.anyFieldMapper()
+                  .writeValueAsString(
+                      securableObject.privileges().stream()
+                          .map(Privilege::name)
+                          .map(Privilege.Name::name)
+                          .collect(Collectors.toList())))
+          .withCurrentVersion(INIT_VERSION)
+          .withLastVersion(INIT_VERSION)
+          .withDeletedAt(DEFAULT_DELETED_AT);
+
+      return builder;
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
     }
   }
 }

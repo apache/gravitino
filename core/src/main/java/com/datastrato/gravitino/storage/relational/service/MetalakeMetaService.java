@@ -20,6 +20,7 @@ import com.datastrato.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import com.datastrato.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.RoleMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import com.datastrato.gravitino.storage.relational.mapper.TableMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.TopicMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.UserMetaMapper;
@@ -80,6 +81,14 @@ public class MetalakeMetaService {
           ident.toString());
     }
     return POConverters.fromMetalakePO(metalakePO);
+  }
+
+  // Metalake may be deleted, so the MetalakePO may be null.
+  public MetalakePO getMetalakePOById(Long id) {
+    MetalakePO metalakePO =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaById(id));
+    return metalakePO;
   }
 
   public void insertMetalake(BaseMetalake baseMetalake, boolean overwrite) {
@@ -196,6 +205,10 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     RoleMetaMapper.class,
+                    mapper -> mapper.softDeleteRoleMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    SecurableObjectMapper.class,
                     mapper -> mapper.softDeleteRoleMetasByMetalakeId(metalakeId)));
       } else {
         List<CatalogEntity> catalogEntities =
@@ -229,6 +242,10 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     RoleMetaMapper.class,
+                    mapper -> mapper.softDeleteRoleMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    SecurableObjectMapper.class,
                     mapper -> mapper.softDeleteRoleMetasByMetalakeId(metalakeId)));
       }
     }

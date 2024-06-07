@@ -112,6 +112,44 @@ public interface FilesetMetaMapper {
   FilesetPO selectFilesetMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("filesetName") String name);
 
+  @Select(
+      "SELECT fm.fileset_id, fm.fileset_name, fm.metalake_id, fm.catalog_id, fm.schema_id,"
+          + " fm.type, fm.audit_info, fm.current_version, fm.last_version, fm.deleted_at,"
+          + " vi.id, vi.metalake_id as version_metalake_id, vi.catalog_id as version_catalog_id,"
+          + " vi.schema_id as version_schema_id, vi.fileset_id as version_fileset_id,"
+          + " vi.version, vi.fileset_comment, vi.properties, vi.storage_location,"
+          + " vi.deleted_at as version_deleted_at"
+          + " FROM "
+          + META_TABLE_NAME
+          + " fm INNER JOIN "
+          + VERSION_TABLE_NAME
+          + " vi ON fm.fileset_id = vi.fileset_id AND fm.current_version = vi.version"
+          + " WHERE fm.fileset_id = #{filesetId}"
+          + " AND fm.deleted_at = 0 AND vi.deleted_at = 0")
+  @Results({
+    @Result(property = "filesetId", column = "fileset_id"),
+    @Result(property = "filesetName", column = "fileset_name"),
+    @Result(property = "metalakeId", column = "metalake_id"),
+    @Result(property = "catalogId", column = "catalog_id"),
+    @Result(property = "schemaId", column = "schema_id"),
+    @Result(property = "type", column = "type"),
+    @Result(property = "auditInfo", column = "audit_info"),
+    @Result(property = "currentVersion", column = "current_version"),
+    @Result(property = "lastVersion", column = "last_version"),
+    @Result(property = "deletedAt", column = "deleted_at"),
+    @Result(property = "filesetVersionPO.id", column = "id"),
+    @Result(property = "filesetVersionPO.metalakeId", column = "version_metalake_id"),
+    @Result(property = "filesetVersionPO.catalogId", column = "version_catalog_id"),
+    @Result(property = "filesetVersionPO.schemaId", column = "version_schema_id"),
+    @Result(property = "filesetVersionPO.filesetId", column = "version_fileset_id"),
+    @Result(property = "filesetVersionPO.version", column = "version"),
+    @Result(property = "filesetVersionPO.filesetComment", column = "fileset_comment"),
+    @Result(property = "filesetVersionPO.properties", column = "properties"),
+    @Result(property = "filesetVersionPO.storageLocation", column = "storage_location"),
+    @Result(property = "filesetVersionPO.deletedAt", column = "version_deleted_at")
+  })
+  FilesetPO selectFilesetMetaById(@Param("filesetId") Long filesetId);
+
   @Insert(
       "INSERT INTO "
           + META_TABLE_NAME
