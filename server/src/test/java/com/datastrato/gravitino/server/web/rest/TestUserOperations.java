@@ -260,6 +260,22 @@ public class TestUserOperations extends JerseyTest {
     Assertions.assertEquals(0, removeResponse2.getCode());
     Assertions.assertFalse(removeResponse2.removed());
 
+    // Test to throw NoSuchMetalakeException
+    doThrow(new NoSuchMetalakeException("mock error")).when(manager).removeUser(any(), any());
+    Response resp1 =
+        target("/metalakes/metalake1/users/user1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .delete();
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp1.getMediaType());
+
+    ErrorResponse errorResponse = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
+    Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
+
+    // Test to throw RuntimeException
     doThrow(new RuntimeException("mock error")).when(manager).removeUser(any(), any());
     Response resp3 =
         target("/metalakes/metalake1/users/user1")
@@ -270,7 +286,7 @@ public class TestUserOperations extends JerseyTest {
     Assertions.assertEquals(
         Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp3.getStatus());
 
-    ErrorResponse errorResponse = resp3.readEntity(ErrorResponse.class);
+    errorResponse = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
   }

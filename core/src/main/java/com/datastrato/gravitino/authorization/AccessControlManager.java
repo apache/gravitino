@@ -236,16 +236,6 @@ public class AccessControlManager {
   }
 
   /**
-   * Judges whether the user is the metalake admin.
-   *
-   * @param user the name of the user
-   * @return True if the user is metalake admin, otherwise false.
-   */
-  public boolean isMetalakeAdmin(String user) {
-    return doWithAdminLock(() -> adminManager.isMetalakeAdmin(user));
-  }
-
-  /**
    * Creates a new Role.
    *
    * @param metalake The Metalake of the Role.

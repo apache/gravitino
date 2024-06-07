@@ -11,10 +11,8 @@ import com.datastrato.gravitino.authorization.User;
 import com.datastrato.gravitino.exceptions.ForbiddenException;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.google.common.collect.Maps;
-
 import java.io.IOException;
 import java.util.Map;
-
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;

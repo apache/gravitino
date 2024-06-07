@@ -10,6 +10,7 @@ import static com.datastrato.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 
 import com.datastrato.gravitino.Config;
@@ -320,7 +321,23 @@ public class TestRoleOperations extends JerseyTest {
     Assertions.assertEquals(0, deleteResponse.getCode());
     Assertions.assertTrue(deleteResponse.deleted());
 
+    // Test to throw NoSuchMetalakeException
+    doThrow(new NoSuchMetalakeException("mock error")).when(manager).deleteRole(any(), any());
+    Response resp1 =
+        target("/metalakes/metalake1/roles/role1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .delete();
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp1.getMediaType());
+
+    ErrorResponse errorResponse = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
+    Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
+
     // Test when failed to delete role
+    reset(manager);
     when(manager.deleteRole(any(), any())).thenReturn(false);
     Response resp2 =
         target("/metalakes/metalake1/roles/role1")
@@ -343,7 +360,7 @@ public class TestRoleOperations extends JerseyTest {
     Assertions.assertEquals(
         Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp3.getStatus());
 
-    ErrorResponse errorResponse = resp3.readEntity(ErrorResponse.class);
+    errorResponse = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
   }

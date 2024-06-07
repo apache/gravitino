@@ -114,16 +114,6 @@ class AdminManager {
     return serviceAdmins.contains(user);
   }
 
-  boolean isMetalakeAdmin(String user) {
-    try {
-      return store.exists(ofMetalakeAdmin(user), Entity.EntityType.USER);
-    } catch (IOException ioe) {
-      LOG.error(
-          "Fail to check whether {} is the metalake admin {} due to storage issues", user, ioe);
-      throw new RuntimeException(ioe);
-    }
-  }
-
   private NameIdentifier ofMetalakeAdmin(String user) {
     return AuthorizationUtils.ofUser(Entity.SYSTEM_METALAKE_RESERVED_NAME, user);
   }

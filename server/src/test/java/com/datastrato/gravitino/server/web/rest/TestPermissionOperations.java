@@ -324,6 +324,58 @@ public class TestPermissionOperations extends JerseyTest {
     Assertions.assertEquals(userEntity.roles(), user.roles());
     Assertions.assertEquals(userEntity.name(), user.name());
 
+    // Test to throw NoSuchMetalakeException
+    doThrow(new NoSuchMetalakeException("mock error"))
+        .when(manager)
+        .revokeRolesFromUser(any(), any(), any());
+    Response resp1 =
+        target("/metalakes/metalake1/permissions/users/user1/revoke")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp1.getMediaType());
+
+    ErrorResponse errorResponse = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
+    Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
+
+    // Test to throw NoSuchUserException
+    doThrow(new NoSuchUserException("mock error"))
+        .when(manager)
+        .revokeRolesFromUser(any(), any(), any());
+    resp1 =
+        target("/metalakes/metalake1/permissions/users/user1/revoke")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp1.getMediaType());
+
+    errorResponse = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
+    Assertions.assertEquals(NoSuchUserException.class.getSimpleName(), errorResponse.getType());
+
+    // Test to throw NoSuchRoleException
+    doThrow(new NoSuchRoleException("mock error"))
+        .when(manager)
+        .revokeRolesFromUser(any(), any(), any());
+    resp1 =
+        target("/metalakes/metalake1/permissions/users/user1/revoke")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp1.getMediaType());
+
+    errorResponse = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
+    Assertions.assertEquals(NoSuchRoleException.class.getSimpleName(), errorResponse.getType());
+
+    // Test to throw internal RuntimeException
     doThrow(new RuntimeException("mock error"))
         .when(manager)
         .revokeRolesFromUser(any(), any(), any());
@@ -336,7 +388,7 @@ public class TestPermissionOperations extends JerseyTest {
     Assertions.assertEquals(
         Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp3.getStatus());
 
-    ErrorResponse errorResponse = resp3.readEntity(ErrorResponse.class);
+    errorResponse = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
   }
@@ -370,6 +422,58 @@ public class TestPermissionOperations extends JerseyTest {
     Assertions.assertEquals(groupEntity.roles(), group.roles());
     Assertions.assertEquals(groupEntity.name(), group.name());
 
+    // Test to throw NoSuchMetalakeException
+    doThrow(new NoSuchMetalakeException("mock error"))
+        .when(manager)
+        .revokeRolesFromGroup(any(), any(), any());
+    Response resp1 =
+        target("/metalakes/metalake1/permissions/groups/group1/revoke")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp1.getMediaType());
+
+    ErrorResponse errorResponse = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
+    Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
+
+    // Test to throw NoSuchUserException
+    doThrow(new NoSuchUserException("mock error"))
+        .when(manager)
+        .revokeRolesFromGroup(any(), any(), any());
+    resp1 =
+        target("/metalakes/metalake1/permissions/groups/group/revoke")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp1.getMediaType());
+
+    errorResponse = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
+    Assertions.assertEquals(NoSuchUserException.class.getSimpleName(), errorResponse.getType());
+
+    // Test to throw NoSuchRoleException
+    doThrow(new NoSuchRoleException("mock error"))
+        .when(manager)
+        .revokeRolesFromGroup(any(), any(), any());
+    resp1 =
+        target("/metalakes/metalake1/permissions/groups/group1/revoke")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp1.getMediaType());
+
+    errorResponse = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
+    Assertions.assertEquals(NoSuchRoleException.class.getSimpleName(), errorResponse.getType());
+
+    // Test to throw internal RuntimeException
     doThrow(new RuntimeException("mock error"))
         .when(manager)
         .revokeRolesFromGroup(any(), any(), any());
@@ -382,7 +486,7 @@ public class TestPermissionOperations extends JerseyTest {
     Assertions.assertEquals(
         Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp3.getStatus());
 
-    ErrorResponse errorResponse = resp3.readEntity(ErrorResponse.class);
+    errorResponse = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
   }
