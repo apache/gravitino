@@ -174,7 +174,7 @@ jobs:
         uses: actions/upload-artifact@v3
         if: ${{ (failure() && steps.catalogTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
         with:
-          name: integrate-test-reports-${{ matrix.java-version }}-${{ matrix.catalog }}
+          name: integrate-test-reports-${{ matrix.java-version }}
           path: |
             build/reports
             integration-test/build/*.log
