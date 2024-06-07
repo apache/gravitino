@@ -55,6 +55,7 @@ public class SchemaMetaService {
     return schemaPO;
   }
 
+  // Schema may be deleted, so the SchemaPO may be null.
   public SchemaPO getSchemaPOById(Long schemaId) {
     return SessionUtils.getWithoutCommit(
         SchemaMetaMapper.class, mapper -> mapper.selectSchemaMetaById(schemaId));

@@ -45,7 +45,7 @@ public interface SecurableObjectMapper {
     "</script>"
   })
   void batchInsertSecurableObjects(
-      @Param("securableObjects") List<SecurableObjectPO> securableObjectPOS);
+      @Param("securableObjects") List<SecurableObjectPO> securableObjectPOs);
 
   @Update(
       "UPDATE "
@@ -60,7 +60,8 @@ public interface SecurableObjectMapper {
           + " ob SET ob.deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
           + " where exists ( select * from "
           + ROLE_TABLE_NAME
-          + " ro WHERE ro.metalake_id = #{metalakeId} AND ro.role_id = ob.role_id AND ro.deleted_at = 0) AND ob.deleted_at = 0")
+          + " ro WHERE ro.metalake_id = #{metalakeId} AND ro.role_id = ob.role_id"
+          + " AND ro.deleted_at = 0) AND ob.deleted_at = 0")
   void softDeleteRoleMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
 
   @Select(

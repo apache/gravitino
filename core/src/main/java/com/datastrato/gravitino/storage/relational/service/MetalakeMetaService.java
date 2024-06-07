@@ -83,6 +83,7 @@ public class MetalakeMetaService {
     return POConverters.fromMetalakePO(metalakePO);
   }
 
+  // Metalake may be deleted, so the MetalakePO may be null.
   public MetalakePO getMetalakePOById(Long id) {
     MetalakePO metalakePO =
         SessionUtils.getWithoutCommit(

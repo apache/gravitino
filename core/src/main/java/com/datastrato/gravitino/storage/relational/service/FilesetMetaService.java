@@ -57,6 +57,7 @@ public class FilesetMetaService {
     return filesetPO;
   }
 
+  // Filset may be deleted, so the FilesetPO may be null.
   public FilesetPO getFilesetPOById(Long filesetId) {
     FilesetPO filesetPO =
         SessionUtils.getWithoutCommit(

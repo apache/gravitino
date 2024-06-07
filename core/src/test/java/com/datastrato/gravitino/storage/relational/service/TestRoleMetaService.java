@@ -15,12 +15,8 @@ import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
-import com.datastrato.gravitino.meta.FilesetEntity;
 import com.datastrato.gravitino.meta.GroupEntity;
 import com.datastrato.gravitino.meta.RoleEntity;
-import com.datastrato.gravitino.meta.SchemaEntity;
-import com.datastrato.gravitino.meta.TableEntity;
-import com.datastrato.gravitino.meta.TopicEntity;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.datastrato.gravitino.storage.relational.TestJDBCBackend;
@@ -115,34 +111,6 @@ class TestRoleMetaService extends TestJDBCBackend {
             "catalogOverwrite",
             auditInfo);
     backend.insert(overwriteCatalog, false);
-    SchemaEntity schema =
-        createSchemaEntity(
-            RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of("metalake", "catalog"),
-            "schema",
-            auditInfo);
-    backend.insert(schema, false);
-    FilesetEntity fileset =
-        createFilesetEntity(
-            RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of("metalake", "catalog", "schema"),
-            "fileset",
-            auditInfo);
-    backend.insert(fileset, false);
-    TableEntity table =
-        createTableEntity(
-            RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of("metalake", "catalog", "schema"),
-            "table",
-            auditInfo);
-    backend.insert(table, false);
-    TopicEntity topic =
-        createTopicEntity(
-            RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of("metalake", "catalog", "schema"),
-            "topic",
-            auditInfo);
-    backend.insert(topic, false);
 
     RoleMetaService roleMetaService = RoleMetaService.getInstance();
 
@@ -150,19 +118,6 @@ class TestRoleMetaService extends TestJDBCBackend {
         SecurableObjects.ofCatalog(
             "catalog",
             Lists.newArrayList(Privileges.UseCatalog.allow(), Privileges.DropCatalog.deny()));
-
-    SecurableObject schemaObject =
-        SecurableObjects.ofSchema(
-            catalogObject, "schema", Lists.newArrayList(Privileges.UseSchema.allow()));
-    SecurableObject tableObject =
-        SecurableObjects.ofTable(
-            schemaObject, "table", Lists.newArrayList(Privileges.ReadTable.allow()));
-    SecurableObject filesetObject =
-        SecurableObjects.ofFileset(
-            schemaObject, "fileset", Lists.newArrayList(Privileges.ReadFileset.allow()));
-    SecurableObject topicObject =
-        SecurableObjects.ofTopic(
-            schemaObject, "topic", Lists.newArrayList(Privileges.ReadTopic.deny()));
 
     // insert role
     RoleEntity role1 =
@@ -174,11 +129,7 @@ class TestRoleMetaService extends TestJDBCBackend {
             Lists.newArrayList(
                 catalogObject,
                 SecurableObjects.ofCatalog(
-                    "anotherCatalog", Lists.newArrayList(Privileges.UseCatalog.allow())),
-                schemaObject,
-                tableObject,
-                filesetObject,
-                topicObject),
+                    "anotherCatalog", Lists.newArrayList(Privileges.UseCatalog.allow()))),
             ImmutableMap.of("k1", "v1"));
     Assertions.assertThrows(
         NoSuchEntityException.class,

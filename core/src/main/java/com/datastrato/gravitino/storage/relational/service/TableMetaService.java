@@ -48,6 +48,7 @@ public class TableMetaService {
     return tablePO;
   }
 
+  // Table may be deleted, so the TablePO may be null.
   public TablePO getTablePOById(Long tableId) {
     TablePO tablePO =
         SessionUtils.getWithoutCommit(

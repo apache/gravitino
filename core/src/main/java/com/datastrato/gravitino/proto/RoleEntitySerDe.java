@@ -67,25 +67,18 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
 
     for (int index = 0; index < role.getSecurableObjectsCount(); index++) {
       List<Privilege> privileges = Lists.newArrayList();
-      for (int privIndex = 0;
-          privIndex < role.getSecurableObjects(index).getPrivilegeConditionsCount();
-          privIndex++) {
-        if (Privilege.Condition.ALLOW
-            .name()
-            .equals(role.getSecurableObjects(index).getPrivilegeConditions(privIndex))) {
-          privileges.add(
-              Privileges.allow(role.getSecurableObjects(index).getPrivilegeNames(privIndex)));
+      com.datastrato.gravitino.proto.SecurableObject object = role.getSecurableObjects(index);
+      for (int privIndex = 0; privIndex < object.getPrivilegeConditionsCount(); privIndex++) {
+        if (Privilege.Condition.ALLOW.name().equals(object.getPrivilegeConditions(privIndex))) {
+          privileges.add(Privileges.allow(object.getPrivilegeNames(privIndex)));
         } else {
-          privileges.add(
-              Privileges.deny(role.getSecurableObjects(index).getPrivilegeNames(privIndex)));
+          privileges.add(Privileges.deny(object.getPrivilegeNames(privIndex)));
         }
       }
 
       SecurableObject securableObject =
           SecurableObjects.parse(
-              role.getSecurableObjects(index).getFullName(),
-              SecurableObject.Type.valueOf(role.getSecurableObjects(index).getType()),
-              privileges);
+              object.getFullName(), SecurableObject.Type.valueOf(object.getType()), privileges);
 
       securableObjects.add(securableObject);
     }

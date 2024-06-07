@@ -126,6 +126,7 @@ public class TopicMetaService {
     return topicPO;
   }
 
+  // Topic may be deleted, so the TopicPO may be null.
   public TopicPO getTopicPOById(Long topicId) {
     TopicPO topicPO =
         SessionUtils.getWithoutCommit(
