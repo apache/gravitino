@@ -844,6 +844,13 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
             .withBucketPartition(16, Collections.singletonList("id"))
             .withMonthPartition("ts");
     checker.check(tableInfo);
+    sql(
+        String.format(
+            "INSERT INTO %s VALUES(2,'a',cast('2024-01-01 12:00:00' as timestamp));", tableName));
+    queryResult = getTableData(tableName);
+    Assertions.assertEquals(2, queryResult.size());
+    Assertions.assertEquals(
+        "2,a,2024-01-01 12:00:00;2,a,2024-01-01 12:00:00", String.join(";", queryResult));
 
     // drop partition fields
     sql(String.format("ALTER TABLE %s DROP PARTITION FIELD months(ts)", tableName));
@@ -856,6 +863,14 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
             .withTruncatePartition(1, "name")
             .withBucketPartition(16, Collections.singletonList("id"));
     checker.check(tableInfo);
+    sql(
+        String.format(
+            "INSERT INTO %s VALUES(2,'a',cast('2024-01-01 12:00:00' as timestamp));", tableName));
+    queryResult = getTableData(tableName);
+    Assertions.assertEquals(3, queryResult.size());
+    Assertions.assertEquals(
+        "2,a,2024-01-01 12:00:00;2,a,2024-01-01 12:00:00;2,a,2024-01-01 12:00:00",
+        String.join(";", queryResult));
   }
 
   private void testIcebergBranchOperations() throws NoSuchTableException {
@@ -864,7 +879,7 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     dropTableIfExists(tableName);
     createSimpleTable(tableName);
 
-    // create branch and query data using branch
+    // create a branch and query data using branch
     sql(String.format("INSERT INTO %s VALUES(1, '1', 1);", tableName));
     List<String> tableData = getTableData(tableName);
     Assertions.assertEquals(1, tableData.size());
@@ -969,6 +984,9 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
             "CREATE TABLE %s (id INT NOT NULL COMMENT 'id comment', name STRING NOT NULL COMMENT '', age INT)",
             tableName));
     SparkTableInfo tableInfo = getTableInfo(tableName);
+    Map<String, String> tableProperties = tableInfo.getTableProperties();
+    Assertions.assertFalse(
+        tableProperties.containsKey(IcebergPropertiesConstants.ICEBERG_IDENTIFIER_FIELDS));
     SparkTableInfoChecker checker =
         SparkTableInfoChecker.create().withName(tableName).withColumns(columnInfos);
     checker.check(tableInfo);
@@ -984,6 +1002,15 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     identifierFieldNames = icebergTable.schema().identifierFieldNames();
     Assertions.assertTrue(identifierFieldNames.contains("id"));
     Assertions.assertTrue(identifierFieldNames.contains("name"));
+    tableInfo = getTableInfo(tableName);
+    tableProperties = tableInfo.getTableProperties();
+    Assertions.assertEquals(
+        "[name,id]", tableProperties.get(IcebergPropertiesConstants.ICEBERG_IDENTIFIER_FIELDS));
+
+    sql(String.format("INSERT INTO %s VALUES(1, '1', 1);", tableName));
+    List<String> queryResult = getTableData(tableName);
+    Assertions.assertEquals(1, queryResult.size());
+    Assertions.assertEquals("1,1,1", queryResult.get(0));
 
     // drop identifier fields
     sql(String.format("ALTER TABLE %s DROP IDENTIFIER FIELDS name", tableName));
@@ -991,6 +1018,15 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     identifierFieldNames = icebergTable.schema().identifierFieldNames();
     Assertions.assertTrue(identifierFieldNames.contains("id"));
     Assertions.assertFalse(identifierFieldNames.contains("name"));
+    tableInfo = getTableInfo(tableName);
+    tableProperties = tableInfo.getTableProperties();
+    Assertions.assertEquals(
+        "[id]", tableProperties.get(IcebergPropertiesConstants.ICEBERG_IDENTIFIER_FIELDS));
+
+    sql(String.format("INSERT INTO %s VALUES(1, '1', 1);", tableName));
+    queryResult = getTableData(tableName);
+    Assertions.assertEquals(2, queryResult.size());
+    Assertions.assertEquals("1,1,1;1,1,1", String.join(";", queryResult));
   }
 
   private void testIcebergDistributionAndOrderingOperations() throws NoSuchTableException {
@@ -1012,6 +1048,8 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     tableInfo = getTableInfo(tableName);
     tableProperties = tableInfo.getTableProperties();
     Assertions.assertEquals("range", tableProperties.get(ICEBERG_WRITE_DISTRIBUTION_MODE));
+    Assertions.assertEquals(
+        "id DESC NULLS LAST", tableProperties.get(IcebergPropertiesConstants.ICEBERG_SORT_ORDER));
     SortOrder sortOrder =
         SortOrder.builderFor(icebergTable.schema())
             .withOrderId(1)
@@ -1019,18 +1057,30 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
             .build();
     Assertions.assertEquals(sortOrder, icebergTable.sortOrder());
 
+    sql(String.format("INSERT INTO %s VALUES(1, '1', 1);", tableName));
+    List<String> queryResult = getTableData(tableName);
+    Assertions.assertEquals(1, queryResult.size());
+    Assertions.assertEquals("1,1,1", queryResult.get(0));
+
     // set locally ordering
     sql(String.format("ALTER TABLE %s WRITE LOCALLY ORDERED BY id DESC", tableName));
     icebergTable.refresh();
     tableInfo = getTableInfo(tableName);
     tableProperties = tableInfo.getTableProperties();
     Assertions.assertEquals("none", tableProperties.get(ICEBERG_WRITE_DISTRIBUTION_MODE));
+    Assertions.assertEquals(
+        "id DESC NULLS LAST", tableProperties.get(IcebergPropertiesConstants.ICEBERG_SORT_ORDER));
     sortOrder =
         SortOrder.builderFor(icebergTable.schema())
             .withOrderId(1)
             .desc("id", NullOrder.NULLS_LAST)
             .build();
     Assertions.assertEquals(sortOrder, icebergTable.sortOrder());
+
+    sql(String.format("INSERT INTO %s VALUES(1, '1', 1);", tableName));
+    queryResult = getTableData(tableName);
+    Assertions.assertEquals(2, queryResult.size());
+    Assertions.assertEquals("1,1,1;1,1,1", String.join(";", queryResult));
 
     // set distribution
     sql(
@@ -1040,6 +1090,8 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     tableInfo = getTableInfo(tableName);
     tableProperties = tableInfo.getTableProperties();
     Assertions.assertEquals("hash", tableProperties.get(ICEBERG_WRITE_DISTRIBUTION_MODE));
+    Assertions.assertEquals(
+        "id DESC NULLS LAST", tableProperties.get(IcebergPropertiesConstants.ICEBERG_SORT_ORDER));
     sortOrder =
         SortOrder.builderFor(icebergTable.schema())
             .withOrderId(1)
@@ -1047,20 +1099,32 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
             .build();
     Assertions.assertEquals(sortOrder, icebergTable.sortOrder());
 
+    sql(String.format("INSERT INTO %s VALUES(1, '1', 1);", tableName));
+    queryResult = getTableData(tableName);
+    Assertions.assertEquals(3, queryResult.size());
+    Assertions.assertEquals("1,1,1;1,1,1;1,1,1", String.join(";", queryResult));
+
     // set distribution with locally ordering
     sql(
         String.format(
-            "ALTER TABLE %s WRITE DISTRIBUTED BY PARTITION LOCALLY ORDERED BY id desc", tableName));
+            "ALTER TABLE %s WRITE DISTRIBUTED BY PARTITION LOCALLY ORDERED BY id DESC", tableName));
     icebergTable.refresh();
     tableInfo = getTableInfo(tableName);
     tableProperties = tableInfo.getTableProperties();
     Assertions.assertEquals("hash", tableProperties.get(ICEBERG_WRITE_DISTRIBUTION_MODE));
+    Assertions.assertEquals(
+        "id DESC NULLS LAST", tableProperties.get(IcebergPropertiesConstants.ICEBERG_SORT_ORDER));
     sortOrder =
         SortOrder.builderFor(icebergTable.schema())
             .withOrderId(1)
             .desc("id", NullOrder.NULLS_LAST)
             .build();
     Assertions.assertEquals(sortOrder, icebergTable.sortOrder());
+
+    sql(String.format("INSERT INTO %s VALUES(1, '1', 1);", tableName));
+    queryResult = getTableData(tableName);
+    Assertions.assertEquals(4, queryResult.size());
+    Assertions.assertEquals("1,1,1;1,1,1;1,1,1;1,1,1", String.join(";", queryResult));
   }
 
   private List<SparkTableInfo.SparkColumnInfo> getIcebergSimpleTableColumn() {
