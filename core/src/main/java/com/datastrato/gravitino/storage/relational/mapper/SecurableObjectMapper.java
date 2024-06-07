@@ -45,7 +45,7 @@ public interface SecurableObjectMapper {
     "</script>"
   })
   void batchInsertSecurableObjects(
-      @Param("securableObjects") List<SecurableObjectPO> securableObjectPOS);
+      @Param("securableObjects") List<SecurableObjectPO> securableObjectPOs);
 
   @Update(
       "UPDATE "

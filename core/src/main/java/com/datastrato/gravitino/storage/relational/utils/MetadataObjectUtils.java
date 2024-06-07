@@ -27,7 +27,9 @@ import javax.annotation.Nullable;
  * full name.
  */
 public class MetadataObjectUtils {
-  private static final Splitter DOT_SPLITTER = Splitter.on('.');
+
+  private static final String DOT = ".";
+  private static final Splitter DOT_SPLITTER = Splitter.on(DOT);
 
   private MetadataObjectUtils() {}
 
@@ -96,7 +98,13 @@ public class MetadataObjectUtils {
       if (tablePO == null) {
         return null;
       }
-      return getSchemaFullName(tablePO.getSchemaId()) + "." + tablePO.getTableName();
+
+      String schemaName = getSchemaFullName(tablePO.getSchemaId());
+      if (schemaName == null) {
+        return null;
+      }
+
+      return String.join(schemaName, tablePO.getTableName());
     }
 
     if (metadatatype == MetadataObject.Type.TOPIC) {
@@ -104,7 +112,11 @@ public class MetadataObjectUtils {
       if (topicPO == null) {
         return null;
       }
-      return getSchemaFullName(topicPO.getSchemaId()) + "." + topicPO.getTopicName();
+      String schemaName = getSchemaFullName(topicPO.getSchemaId());
+      if (schemaName == null) {
+        return null;
+      }
+      return String.join(DOT, schemaName, topicPO.getTopicName());
     }
 
     if (metadatatype == MetadataObject.Type.FILESET) {
@@ -112,7 +124,11 @@ public class MetadataObjectUtils {
       if (filesetPO == null) {
         return null;
       }
-      return getSchemaFullName(filesetPO.getSchemaId()) + "." + filesetPO.getFilesetName();
+      String schemaName = getSchemaFullName(filesetPO.getSchemaId());
+      if (schemaName == null) {
+        return null;
+      }
+      return String.join(DOT, schemaName, filesetPO.getFilesetName());
     }
 
     throw new IllegalArgumentException(String.format("Doesn't support the type %s", metadatatype));
@@ -136,6 +152,9 @@ public class MetadataObjectUtils {
     }
 
     String catalogName = getCatalogFullName(schemaPO.getCatalogId());
-    return catalogName + "." + schemaPO.getSchemaName();
+    if (catalogName == null) {
+      return null;
+    }
+    return String.join(DOT, catalogName, schemaPO.getSchemaName());
   }
 }
