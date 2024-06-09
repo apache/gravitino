@@ -496,7 +496,7 @@ NameIdentifier[] schemas = supportsSchemas.listSchemas(Namespace.ofSchema("metal
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
 catalog: Catalog = gravitino_client.load_catalog(ident=NameIdentifier.of("metalake", "hive_catalog"))
 
-schema_list: List[NameIdentifier] = catalog.as_schemas().list_schemas(Namespace.of_schema("metalake", "hive_catalog"))
+schema_list: List[str] = catalog.as_schemas().list_schemas(Namespace.of_schema("metalake", "hive_catalog"))
 ```
 
 </TabItem>
