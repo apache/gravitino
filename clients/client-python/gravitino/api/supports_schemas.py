@@ -25,7 +25,7 @@ class SupportsSchemas(ABC):
     """
 
     @abstractmethod
-    def list_schemas(self, namespace: Namespace) -> List[NameIdentifier]:
+    def list_schemas(self, namespace: Namespace) -> List[str]:
         """List schemas under a namespace.
 
         If an entity such as a table, view exists, its parent schemas must also exist and must be
@@ -39,7 +39,7 @@ class SupportsSchemas(ABC):
             NoSuchCatalogException: If the catalog does not exist.
 
         Returns:
-            A list of schema identifiers under the namespace.
+            A list of schema names (as strings) under the namespace.
         """
         pass
 

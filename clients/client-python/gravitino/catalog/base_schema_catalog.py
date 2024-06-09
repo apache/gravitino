@@ -58,7 +58,7 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
     def as_schemas(self):
         return self
 
-    def list_schemas(self, namespace: Namespace) -> [NameIdentifier]:
+    def list_schemas(self, namespace: Namespace) -> List[str]:
         """List all the schemas under the given catalog namespace.
 
         Args:
@@ -68,7 +68,7 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
             NoSuchCatalogException if the catalog with specified namespace does not exist.
 
         Returns:
-             A list of {@link NameIdentifier} of the schemas under the given catalog namespace.
+             A list of schema names (as strings) under the given catalog namespace.
         """
         Namespace.check_schema(namespace)
         resp = self.rest_client.get(
@@ -78,7 +78,7 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
             resp.body, infer_missing=True
         )
         entity_list_response.validate()
-        return entity_list_response.identifiers()
+        return [str(identifier) for identifier in entity_list_response.identifiers()]
 
     def create_schema(
         self,

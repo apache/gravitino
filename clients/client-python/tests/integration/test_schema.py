@@ -132,7 +132,7 @@ class TestSchema(IntegrationTestEnv):
     def test_list_schema(self):
         self.create_schema()
         catalog = self.gravitino_client.load_catalog(ident=self.catalog_ident)
-        schema_list: List[NameIdentifier] = catalog.as_schemas().list_schemas(
+        schema_list: List[str] = catalog.as_schemas().list_schemas(
             namespace=self.schema_ident.namespace()
         )
         self.assertTrue(any(item.name() == self.schema_name for item in schema_list))
