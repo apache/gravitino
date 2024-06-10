@@ -248,7 +248,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
     checkFilesetNamespace(ident.namespace());
   }
 
-  Namespace getFilesetFullNamespace(Namespace tableNamespace) {
+  private Namespace getFilesetFullNamespace(Namespace tableNamespace) {
     return Namespace.of(this.namespace().level(0), this.name(), tableNamespace.level(0));
   }
   /**
