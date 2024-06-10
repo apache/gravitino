@@ -4,7 +4,7 @@ This software is licensed under the Apache License version 2.
 """
 
 from abc import ABC
-from dataclasses import field
+from dataclasses import dataclass, field
 
 from dataclasses_json import config
 
@@ -63,13 +63,11 @@ class FilesetChange(ABC):
         """
         return FilesetChange.RemoveProperty(fileset_property)
 
+    @dataclass
     class RenameFileset:
         """A fileset change to rename the fileset."""
 
         _new_name: str = field(metadata=config(field_name="new_name"))
-
-        def __init__(self, new_name):
-            self._new_name = new_name
 
         def new_name(self):
             """Retrieves the new name set for the fileset.
@@ -111,13 +109,11 @@ class FilesetChange(ABC):
             """
             return f"RENAMEFILESET {self._new_name}"
 
+    @dataclass
     class UpdateFilesetComment:
         """A fileset change to update the fileset comment."""
 
         _new_comment: str = field(metadata=config(field_name="new_comment"))
-
-        def __init__(self, new_comment):
-            self._new_comment = new_comment
 
         def new_comment(self):
             """Retrieves the new comment intended for the fileset.
@@ -159,15 +155,12 @@ class FilesetChange(ABC):
             """
             return f"UPDATEFILESETCOMMENT {self._new_comment}"
 
+    @dataclass
     class SetProperty:
         """A fileset change to set the property and value for the fileset."""
 
         _property: str = field(metadata=config(field_name="property"))
         _value: str = field(metadata=config(field_name="value"))
-
-        def __init__(self, fileset_property: str, value: str):
-            self._property = fileset_property
-            self._value = value
 
         def property(self):
             """Retrieves the name of the property being set in the fileset.
@@ -217,13 +210,11 @@ class FilesetChange(ABC):
             """
             return f"SETPROPERTY {self._property} {self._value}"
 
+    @dataclass
     class RemoveProperty:
         """A fileset change to remove a property from the fileset."""
 
         _property: str = field(metadata=config(field_name="property"))
-
-        def __init__(self, fileset_property: str):
-            self._property = fileset_property
 
         def property(self):
             """Retrieves the name of the property to be removed from the fileset.
