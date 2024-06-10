@@ -264,7 +264,6 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   private static void createSchema() throws TException, InterruptedException {
-    NameIdentifier ident = NameIdentifier.of(schemaName);
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");
@@ -277,8 +276,8 @@ public class CatalogHiveIT extends AbstractIT {
             schemaName.toLowerCase()));
     String comment = "comment";
 
-    catalog.asSchemas().createSchema(ident.name(), comment, properties);
-    Schema loadSchema = catalog.asSchemas().loadSchema(ident.name());
+    catalog.asSchemas().createSchema(schemaName, comment, properties);
+    Schema loadSchema = catalog.asSchemas().loadSchema(schemaName);
     Assertions.assertEquals(schemaName.toLowerCase(), loadSchema.name());
     Assertions.assertEquals(comment, loadSchema.comment());
     Assertions.assertEquals("val1", loadSchema.properties().get("key1"));
@@ -618,7 +617,7 @@ public class CatalogHiveIT extends AbstractIT {
   @Test
   public void testHiveSchemaProperties() throws TException, InterruptedException {
     // test LOCATION property
-    NameIdentifier schemaIdent = NameIdentifier.of(GravitinoITUtils.genRandomName(SCHEMA_PREFIX));
+    String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
     Map<String, String> properties = Maps.newHashMap();
     String expectedSchemaLocation =
         String.format(
@@ -627,14 +626,14 @@ public class CatalogHiveIT extends AbstractIT {
             HiveContainer.HDFS_DEFAULTFS_PORT);
 
     properties.put(HiveSchemaPropertiesMetadata.LOCATION, expectedSchemaLocation);
-    catalog.asSchemas().createSchema(schemaIdent.name(), "comment", properties);
+    catalog.asSchemas().createSchema(schemaName, "comment", properties);
 
-    Database actualSchema = hiveClientPool.run(client -> client.getDatabase(schemaIdent.name()));
+    Database actualSchema = hiveClientPool.run(client -> client.getDatabase(schemaName));
     String actualSchemaLocation = actualSchema.getLocationUri();
     Assertions.assertTrue(actualSchemaLocation.endsWith(expectedSchemaLocation));
 
     NameIdentifier tableIdent =
-        NameIdentifier.of(schemaIdent.name(), GravitinoITUtils.genRandomName(TABLE_PREFIX));
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName(TABLE_PREFIX));
     catalog
         .asTableCatalog()
         .createTable(
@@ -644,7 +643,7 @@ public class CatalogHiveIT extends AbstractIT {
             ImmutableMap.of(),
             Transforms.EMPTY_TRANSFORM);
     org.apache.hadoop.hive.metastore.api.Table actualTable =
-        hiveClientPool.run(client -> client.getTable(schemaIdent.name(), tableIdent.name()));
+        hiveClientPool.run(client -> client.getTable(schemaName, tableIdent.name()));
     String actualTableLocation = actualTable.getSd().getLocation();
     // use `tableIdent.name().toLowerCase()` because HMS will convert table name to lower
     String expectedTableLocation = expectedSchemaLocation + "/" + tableIdent.name().toLowerCase();
@@ -1247,25 +1246,23 @@ public class CatalogHiveIT extends AbstractIT {
 
   @Test
   public void testAlterSchema() throws TException, InterruptedException {
-    NameIdentifier ident = NameIdentifier.of(schemaName);
-
     GravitinoMetalake metalake = client.loadMetalake(metalakeName);
     Catalog catalog = metalake.loadCatalog(catalogName);
-    Schema schema = catalog.asSchemas().loadSchema(ident.name());
+    Schema schema = catalog.asSchemas().loadSchema(schemaName);
     Assertions.assertNull(schema.auditInfo().lastModifier());
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, schema.auditInfo().creator());
     schema =
         catalog
             .asSchemas()
             .alterSchema(
-                ident.name(),
+                schemaName,
                 SchemaChange.removeProperty("key1"),
                 SchemaChange.setProperty("key2", "val2-alter"));
 
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, schema.auditInfo().lastModifier());
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, schema.auditInfo().creator());
 
-    Map<String, String> properties2 = catalog.asSchemas().loadSchema(ident.name()).properties();
+    Map<String, String> properties2 = catalog.asSchemas().loadSchema(schemaName).properties();
     Assertions.assertFalse(properties2.containsKey("key1"));
     Assertions.assertEquals("val2-alter", properties2.get("key2"));
 

@@ -284,7 +284,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
     checkTableNamespace(ident.namespace());
   }
 
-  Namespace getTableFullNamespace(Namespace tableNamespace) {
+  private Namespace getTableFullNamespace(Namespace tableNamespace) {
     return Namespace.of(this.namespace().level(0), this.name(), tableNamespace.level(0));
   }
   /**
