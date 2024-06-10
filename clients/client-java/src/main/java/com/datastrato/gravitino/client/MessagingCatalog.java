@@ -235,7 +235,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
     checkTopicNamespace(ident.namespace());
   }
 
-  Namespace getTopicFullNamespace(Namespace tableNamespace) {
+  private Namespace getTopicFullNamespace(Namespace tableNamespace) {
     return Namespace.of(this.namespace().level(0), this.name(), tableNamespace.level(0));
   }
 
