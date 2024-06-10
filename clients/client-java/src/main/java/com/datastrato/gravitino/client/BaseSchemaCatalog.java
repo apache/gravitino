@@ -38,15 +38,6 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
   /** The REST client to send the requests. */
   protected final RESTClient restClient;
 
-  /**
-   * Get the namespace of the current catalog.
-   *
-   * @return The namespace of the current catalog.
-   */
-  public Namespace namespace() {
-    return namespace;
-  }
-
   /** The namespace of current catalog, which is the metalake name. */
   private final Namespace namespace;
 
@@ -198,6 +189,15 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
             ErrorHandlers.schemaErrorHandler());
     resp.validate();
     return resp.dropped();
+  }
+
+  /**
+   * Get the namespace of the current catalog.
+   *
+   * @return The namespace of the current catalog.
+   */
+  public Namespace namespace() {
+    return namespace;
   }
 
   static String formatSchemaRequestPath(Namespace ns) {
