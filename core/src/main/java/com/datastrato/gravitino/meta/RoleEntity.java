@@ -267,7 +267,7 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
   private static InnerSecurableObject convertInnerObject(
       String metalake, MetadataObject securableObject) {
     if (MetadataObject.Type.METALAKE.equals(securableObject.type())) {
-      if ("*".equals(securableObject.name())) {
+      if (Entity.SECURABLE_ENTITY_RESERVED_NAME.equals(securableObject.name())) {
         return ROOT;
       } else {
         return new InnerSecurableObject(ROOT, securableObject.name());
