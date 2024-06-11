@@ -12,13 +12,12 @@ import com.datastrato.gravitino.utils.IsolatedClassLoader;
 import com.google.common.base.Preconditions;
 import java.sql.Driver;
 import java.sql.DriverManager;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javax.ws.rs.NotSupportedException;
-import org.apache.iceberg.PartitionsTableExt;
+import org.apache.iceberg.PartitionsUtils;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.Catalog;
@@ -155,11 +154,8 @@ public class IcebergTableOps implements AutoCloseable {
   public ListPartitionsResponse listPartitions(TableIdentifier tableIdentifier) {
     // get all partitions for given table
     Table table = catalog.loadTable(tableIdentifier);
-    PartitionsTableExt partitionsTable = new PartitionsTableExt(table);
-    Collection<String> partitions = PartitionsTableExt.partitions(
-        table, partitionsTable.newScan().select("partition", "lower_bounds", "upper_bounds"), executorService);
-
-    return ListPartitionsResponse.builder().addAll(partitions).build();
+    return ListPartitionsResponse.builder().addAll(
+        PartitionsUtils.partitions(table, executorService)).build();
   }
 
   @Override

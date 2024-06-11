@@ -18,18 +18,14 @@ import org.apache.iceberg.util.Tasks;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class PartitionsTableExt extends PartitionsTable {
-  private static final Logger LOG = LoggerFactory.getLogger(PartitionsTableExt.class);
-
-  public PartitionsTableExt(Table table) {
-    super(table);
-  }
+public class PartitionsUtils {
+  private static final Logger LOG = LoggerFactory.getLogger(PartitionsUtils.class);
 
   /**
    * Get all partitions in the table.
    * @return a collection of partition paths
    */
-  public static Collection<String> partitions(Table table, TableScan scan, ExecutorService executorService) {
+  public static Collection<String> partitions(Table table, ExecutorService executorService) {
     List<ManifestFile> manifestFiles = table.currentSnapshot().allManifests(table.io());
     LOG.info("Scanning {} manifest files", manifestFiles.size());
     Set<String> partitionPaths = Collections.synchronizedSet(Sets.newLinkedHashSet());
@@ -49,7 +45,7 @@ public class PartitionsTableExt extends PartitionsTable {
           } else {
             try (ManifestReader<?> reader =
                 ManifestFiles.open(manifest, table.io())
-                    .caseSensitive(scan.isCaseSensitive())
+                    .caseSensitive(false)
                     .select(ImmutableList.of("partition", "lower_bounds", "upper_bounds"))) {
               for (ManifestEntry<?> entry : reader.entries()) {
                 ContentFile<?> file = entry.file();
