@@ -111,17 +111,6 @@ public class GravitinoEnv {
   }
 
   /**
-   * This method is used for testing purposes only to set the access manager for test in package
-   * `com.datastrato.gravitino.server.web.rest` and `com.datastrato.gravitino.authorization`.
-   *
-   * @param accessControlManager The access control manager to be set.
-   */
-  @VisibleForTesting
-  public void setAccessControlManager(AccessControlManager accessControlManager) {
-    this.accessControlManager = accessControlManager;
-  }
-
-  /**
    * Initialize the Gravitino environment.
    *
    * @param config The configuration object to initialize the environment.

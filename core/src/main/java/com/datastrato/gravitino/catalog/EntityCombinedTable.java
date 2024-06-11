@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.catalog;
 
 import com.datastrato.gravitino.Audit;
+import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.rel.Column;
@@ -14,7 +15,6 @@ import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
-import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -31,6 +31,8 @@ public final class EntityCombinedTable implements Table {
 
   // Sets of properties that should be hidden from the user.
   private Set<String> hiddenProperties;
+  // If imported is true, it means that storage backend have stored the correct entity.
+  // Otherwise, we should import the external entity to the storage backend.
   private boolean imported;
 
   private EntityCombinedTable(Table table, TableEntity tableEntity) {
@@ -122,7 +124,7 @@ public final class EntityCombinedTable implements Table {
         : mergedAudit.merge(tableEntity.auditInfo(), true /* overwrite */);
   }
 
-  Map<String, String> tableProperties() {
-    return Collections.unmodifiableMap(table.properties());
+  StringIdentifier stringIdentifier() {
+    return StringIdentifier.fromProperties(table.properties());
   }
 }

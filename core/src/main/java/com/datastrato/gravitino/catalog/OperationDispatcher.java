@@ -6,6 +6,7 @@ package com.datastrato.gravitino.catalog;
 
 import static com.datastrato.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForAlter;
 
+import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
@@ -270,6 +271,15 @@ public abstract class OperationDispatcher {
         catalogIdent,
         c -> c.capabilities().managedStorage(scope).supported(),
         IllegalArgumentException.class);
+  }
+
+  boolean isEntityExist(NameIdentifier ident, Entity.EntityType type) {
+    try {
+      return store.exists(ident, type);
+    } catch (Exception e) {
+      LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "exists", ident, e);
+      throw new RuntimeException("Fail to access underlying storage", e);
+    }
   }
 
   static final class FormattedErrorMessages {

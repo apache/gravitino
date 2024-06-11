@@ -5,10 +5,10 @@
 package com.datastrato.gravitino.catalog;
 
 import com.datastrato.gravitino.Audit;
+import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.messaging.Topic;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.TopicEntity;
-import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -24,6 +24,8 @@ public class EntityCombinedTopic implements Topic {
 
   // Sets of properties that should be hidden from the user.
   private Set<String> hiddenProperties;
+  // If imported is true, it means that storage backend have stored the correct entity.
+  // Otherwise, we should import the external entity to the storage backend.
   private boolean imported;
 
   private EntityCombinedTopic(Topic topic, TopicEntity topicEntity) {
@@ -85,7 +87,7 @@ public class EntityCombinedTopic implements Topic {
     return imported;
   }
 
-  Map<String, String> topicProperties() {
-    return Collections.unmodifiableMap(topic.properties());
+  StringIdentifier stringIdentifier() {
+    return StringIdentifier.fromProperties(topic.properties());
   }
 }

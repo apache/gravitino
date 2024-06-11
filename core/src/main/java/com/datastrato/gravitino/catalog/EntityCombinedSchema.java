@@ -6,9 +6,9 @@ package com.datastrato.gravitino.catalog;
 
 import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Schema;
+import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.SchemaEntity;
-import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -24,6 +24,8 @@ public final class EntityCombinedSchema implements Schema {
 
   // Sets of properties that should be hidden from the user.
   private Set<String> hiddenProperties;
+  // If imported is true, it means that storage backend have stored the correct entity.
+  // Otherwise, we should import the external entity to the storage backend.
   private boolean imported;
 
   private EntityCombinedSchema(Schema schema, SchemaEntity schemaEntity) {
@@ -85,7 +87,7 @@ public final class EntityCombinedSchema implements Schema {
     return imported;
   }
 
-  Map<String, String> schemaProperties() {
-    return Collections.unmodifiableMap(schema.properties());
+  StringIdentifier stringIdentifier() {
+    return StringIdentifier.fromProperties(schema.properties());
   }
 }

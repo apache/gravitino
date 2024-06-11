@@ -278,7 +278,12 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
       return false;
     }
 
-    StringIdentifier stringId = getStringIdFromProperties(combinedTopic.topicProperties());
+    StringIdentifier stringId = null;
+    try {
+      stringId = combinedTopic.stringIdentifier();
+    } catch (IllegalArgumentException ie) {
+      LOG.warn(FormattedErrorMessages.STRING_ID_PARSE_ERROR, ie.getMessage());
+    }
 
     long uid;
     if (stringId != null) {
@@ -286,7 +291,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
       // of external system to correct it.
       uid = stringId.id();
     } else {
-      // If store doesn't exist entity, we sync the entity from the external system.
+      // If entity doesn't exist, we import the entity from the external system.
       uid = idGenerator.nextId();
     }
 
@@ -315,15 +320,6 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
     return true;
   }
 
-  private boolean isEntityExist(NameIdentifier ident) {
-    try {
-      return store.exists(ident, TOPIC);
-    } catch (Exception e) {
-      LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "exists", ident, e);
-      throw new RuntimeException("Fail to access underlying storage");
-    }
-  }
-
   private EntityCombinedTopic loadCombinedTopic(NameIdentifier ident) {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
     Topic topic =
@@ -342,7 +338,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
           .withHiddenPropertiesSet(
               getHiddenPropertyNames(
                   catalogIdent, HasPropertyMetadata::topicPropertiesMetadata, topic.properties()))
-          .withImported(isEntityExist(ident));
+          .withImported(isEntityExist(ident, TOPIC));
     }
 
     TopicEntity topicEntity =

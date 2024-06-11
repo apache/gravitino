@@ -374,14 +374,20 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       return false;
     }
 
-    StringIdentifier stringId = getStringIdFromProperties(combinedTable.tableProperties());
+    StringIdentifier stringId = null;
+    try {
+      stringId = combinedTable.stringIdentifier();
+    } catch (IllegalArgumentException ie) {
+      LOG.warn(FormattedErrorMessages.STRING_ID_PARSE_ERROR, ie.getMessage());
+    }
+
     long uid;
     if (stringId != null) {
       // If the entity in the store doesn't match the external system, we use the data
       // of external system to correct it.
       uid = stringId.id();
     } else {
-      // If store doesn't exist entity, we sync the entity from the external system.
+      // If entity doesn't exist, we import the entity from the external system.
       uid = idGenerator.nextId();
     }
 
@@ -407,15 +413,6 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     return true;
   }
 
-  private boolean isEntityExist(NameIdentifier ident) {
-    try {
-      return store.exists(ident, TABLE);
-    } catch (Exception e) {
-      LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "exists", ident, e);
-      throw new RuntimeException("Fail to access underlying storage");
-    }
-  }
-
   private EntityCombinedTable loadCombinedTable(NameIdentifier ident) {
     NameIdentifier catalogIdentifier = getCatalogIdentifier(ident);
     Table table =
@@ -425,7 +422,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             NoSuchTableException.class);
 
     StringIdentifier stringId = getStringIdFromProperties(table.properties());
-    // Case 1: The table is not created by Gravitino.
+    // Case 1: The table is not created by Gravitino or the backend storage does not support storing
+    // string identifier.
     if (stringId == null) {
       return EntityCombinedTable.of(table)
           .withHiddenPropertiesSet(
@@ -433,7 +431,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                   catalogIdentifier,
                   HasPropertyMetadata::tablePropertiesMetadata,
                   table.properties()))
-          .withImported(isEntityExist(ident));
+          // Some tables don't have properties or are not created by Gravitino,
+          // we can't use stringIdentifier to judge whether schema is ever imported or not.
+          // We need to check whether the entity exists.
+          .withImported(isEntityExist(ident, TABLE));
     }
 
     TableEntity tableEntity =
@@ -443,6 +444,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             "GET",
             stringId.id());
 
+    // If the entity is inconsistent from the one of the external system,
+    // we should import it.
     boolean imported = tableEntity != null;
 
     return EntityCombinedTable.of(table, tableEntity)

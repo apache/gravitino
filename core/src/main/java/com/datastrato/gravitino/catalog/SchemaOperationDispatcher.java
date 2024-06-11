@@ -310,14 +310,20 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
       return false;
     }
 
-    StringIdentifier stringId = getStringIdFromProperties(combinedSchema.schemaProperties());
+    StringIdentifier stringId = null;
+    try {
+      stringId = combinedSchema.stringIdentifier();
+    } catch (IllegalArgumentException ie) {
+      LOG.warn(FormattedErrorMessages.STRING_ID_PARSE_ERROR, ie.getMessage());
+    }
+
     long uid;
     if (stringId != null) {
-      // If the entity in the store doesn't match the external system, we use the data
+      // If the entity in the store doesn't match the one in the external system, we use the data
       // of external system to correct it.
       uid = stringId.id();
     } else {
-      // If store doesn't exist entity, we sync the entity from the external system.
+      // If entity doesn't exist, we import the entity from the external system.
       uid = idGenerator.nextId();
     }
 
@@ -361,6 +367,8 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                   catalogIdentifier,
                   HasPropertyMetadata::schemaPropertiesMetadata,
                   schema.properties()))
+          // The meta of managed schema is stored by Gravitino,
+          // We don't need to import it again.
           .withImported(true);
     }
 
@@ -373,7 +381,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                   catalogIdentifier,
                   HasPropertyMetadata::schemaPropertiesMetadata,
                   schema.properties()))
-          .withImported(isEntityExist(ident));
+          .withImported(isEntityExist(ident, SCHEMA));
     }
 
     SchemaEntity schemaEntity =
@@ -392,14 +400,5 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                 HasPropertyMetadata::schemaPropertiesMetadata,
                 schema.properties()))
         .withImported(imported);
-  }
-
-  private boolean isEntityExist(NameIdentifier ident) {
-    try {
-      return store.exists(ident, SCHEMA);
-    } catch (Exception e) {
-      LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "exists", ident, e);
-      throw new RuntimeException("Fail to access underlying storage");
-    }
   }
 }
