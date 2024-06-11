@@ -12,6 +12,7 @@ venv
 dist
 build
 README.md
+version.ini
 
 # Unit test / coverage reports
 htmlcov/

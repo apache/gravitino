@@ -2,7 +2,7 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.catalog.hadoop.kerberos;
+package com.datastrato.gravitino.catalog.hadoop.authentication.kerberos;
 
 import java.io.File;
 import java.io.IOException;

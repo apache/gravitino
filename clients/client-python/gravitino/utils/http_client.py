@@ -30,7 +30,7 @@ import json as _json
 
 from gravitino.typing import JSONType
 from gravitino.utils.exceptions import handle_error
-from gravitino.constants import TIMEOUT
+from gravitino.constants.timeout import TIMEOUT
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +66,7 @@ class Response:
     def json(self):
         if self.body:
             return _json.loads(self.body.decode("utf-8"))
+        return None
 
 
 class HTTPClient:

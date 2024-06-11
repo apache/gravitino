@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 
 /**
  * The service class for catalog metadata. It provides the basic database operations for catalog.
@@ -54,6 +55,16 @@ public class CatalogMetaService {
           Entity.EntityType.CATALOG.name().toLowerCase(),
           catalogName);
     }
+    return catalogPO;
+  }
+
+  // Catalog may be deleted, so the CatalogPO may be null.
+  @Nullable
+  public CatalogPO getCatalogPOById(Long catalogId) {
+    CatalogPO catalogPO =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class, mapper -> mapper.selectCatalogMetaById(catalogId));
+
     return catalogPO;
   }
 

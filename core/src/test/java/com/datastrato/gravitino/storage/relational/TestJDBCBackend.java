@@ -477,7 +477,8 @@ public class TestJDBCBackend {
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofRoleNamespace("metalake"),
             "role",
-            auditInfo);
+            auditInfo,
+            "catalog");
     backend.insert(role, false);
 
     UserEntity user =
@@ -554,7 +555,8 @@ public class TestJDBCBackend {
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofRoleNamespace("another-metalake"),
             "another-role",
-            auditInfo);
+            auditInfo,
+            "another-catalog");
     backend.insert(anotherRole, false);
 
     UserEntity anotherUser =
@@ -914,9 +916,9 @@ public class TestJDBCBackend {
   }
 
   public static RoleEntity createRoleEntity(
-      Long id, Namespace namespace, String name, AuditInfo auditInfo) {
+      Long id, Namespace namespace, String name, AuditInfo auditInfo, String catalogName) {
     SecurableObject securableObject =
-        SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
+        SecurableObjects.ofCatalog(catalogName, Lists.newArrayList(Privileges.UseCatalog.allow()));
 
     return RoleEntity.builder()
         .withId(id)
@@ -924,7 +926,7 @@ public class TestJDBCBackend {
         .withNamespace(namespace)
         .withProperties(null)
         .withAuditInfo(auditInfo)
-        .withSecurableObject(securableObject)
+        .withSecurableObjects(Lists.newArrayList(securableObject))
         .build();
   }
 
@@ -965,13 +967,24 @@ public class TestJDBCBackend {
       SecurableObject securableObject,
       Map<String, String> properties) {
 
+    return createRoleEntity(
+        id, namespace, name, auditInfo, Lists.newArrayList(securableObject), properties);
+  }
+
+  public static RoleEntity createRoleEntity(
+      Long id,
+      Namespace namespace,
+      String name,
+      AuditInfo auditInfo,
+      List<SecurableObject> securableObjects,
+      Map<String, String> properties) {
     return RoleEntity.builder()
         .withId(id)
         .withName(name)
         .withProperties(properties)
         .withNamespace(namespace)
         .withAuditInfo(auditInfo)
-        .withSecurableObject(securableObject)
+        .withSecurableObjects(securableObjects)
         .build();
   }
 }
