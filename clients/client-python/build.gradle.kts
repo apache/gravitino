@@ -167,6 +167,11 @@ tasks {
     args = listOf("scripts/generate_version.py")
   }
 
+  val doc by registering(VenvTask::class) {
+    venvExec = "python"
+    args = listOf("scripts/generate_doc.py")
+  }
+
   val distribution by registering(VenvTask::class) {
     dependsOn(build)
     doFirst {
@@ -194,6 +199,8 @@ tasks {
   val clean by registering(Delete::class) {
     delete("build")
     delete("dist")
+    delete("docs")
+    delete("version.ini")
     delete("gravitino.egg-info")
     delete("tests/unittests/htmlcov")
     delete("tests/unittests/.coverage")
