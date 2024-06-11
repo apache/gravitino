@@ -23,7 +23,7 @@ CREATE TABLE
 COMMENT ''
 WITH (
    input_format = 'org.apache.hadoop.mapred.TextInputFormat',
-   location = 'hdfs://%/user/hive/warehouse/gt_db1.db/tb01',
+   location = 'hdfs://%:9000/user/hive/warehouse/gt_db1.db/tb01',
    output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
    serde_lib = 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe',
    serde_name = 'tb01',
