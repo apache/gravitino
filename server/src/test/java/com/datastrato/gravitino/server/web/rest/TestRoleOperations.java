@@ -49,6 +49,7 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
@@ -78,19 +79,22 @@ public class TestRoleOperations extends JerseyTest {
   }
 
   @BeforeAll
-  public static void setup() {
+  public static void setup() throws IllegalAccessException {
     Config config = mock(Config.class);
     Mockito.doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
     Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
-    GravitinoEnv.getInstance().setLockManager(new LockManager(config));
-    GravitinoEnv.getInstance().setAccessControlManager(manager);
-    GravitinoEnv.getInstance().setMetalakeDispatcher(metalakeDispatcher);
-    GravitinoEnv.getInstance().setCatalogDispatcher(catalogDispatcher);
-    GravitinoEnv.getInstance().setSchemaDispatcher(schemaDispatcher);
-    GravitinoEnv.getInstance().setTableDispatcher(tableDispatcher);
-    GravitinoEnv.getInstance().setTopicDispatcher(topicDispatcher);
-    GravitinoEnv.getInstance().setFilesetDispatcher(filesetDispatcher);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "accessControlManager", manager, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "metalakeDispatcher", metalakeDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "metalakeDispatcher", metalakeDispatcher, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogDispatcher", catalogDispatcher, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "schemaDispatcher", schemaDispatcher, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", tableDispatcher, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "topicDispatcher", topicDispatcher, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "filesetDispatcher", filesetDispatcher, true);
   }
 
   @Override

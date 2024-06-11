@@ -32,6 +32,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -42,7 +43,7 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
   static TopicOperationDispatcher topicOperationDispatcher;
 
   @BeforeAll
-  public static void initialize() throws IOException {
+  public static void initialize() throws IOException, IllegalAccessException {
     schemaOperationDispatcher =
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
     topicOperationDispatcher =
@@ -52,8 +53,9 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
     doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
     doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
     doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
-    GravitinoEnv.getInstance().setLockManager(new LockManager(config));
-    GravitinoEnv.getInstance().setSchemaDispatcher(schemaOperationDispatcher);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "schemaDispatcher", schemaOperationDispatcher, true);
   }
 
   @Test

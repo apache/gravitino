@@ -40,6 +40,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -49,7 +50,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   static SchemaOperationDispatcher schemaOperationDispatcher;
 
   @BeforeAll
-  public static void initialize() throws IOException {
+  public static void initialize() throws IOException, IllegalAccessException {
     schemaOperationDispatcher =
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
     tableOperationDispatcher =
@@ -59,8 +60,9 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
     doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
     doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
-    GravitinoEnv.getInstance().setLockManager(new LockManager(config));
-    GravitinoEnv.getInstance().setSchemaDispatcher(schemaOperationDispatcher);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "schemaDispatcher", schemaOperationDispatcher, true);
   }
 
   @Test

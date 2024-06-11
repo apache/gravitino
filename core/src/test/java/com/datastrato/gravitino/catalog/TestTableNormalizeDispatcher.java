@@ -37,7 +37,7 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
   private static SchemaNormalizeDispatcher schemaNormalizeDispatcher;
 
   @BeforeAll
-  public static void initialize() throws IOException {
+  public static void initialize() throws IOException, IllegalAccessException {
     TestTableOperationDispatcher.initialize();
     tableNormalizeDispatcher =
         new TableNormalizeDispatcher(TestTableOperationDispatcher.tableOperationDispatcher);

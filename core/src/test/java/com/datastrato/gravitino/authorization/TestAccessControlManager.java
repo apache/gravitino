@@ -27,6 +27,7 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -63,8 +64,9 @@ public class TestAccessControlManager {
     entityStore.put(metalakeEntity, true);
 
     accessControlManager = new AccessControlManager(entityStore, new RandomIdGenerator(), config);
-    GravitinoEnv.getInstance().setEntityStore(entityStore);
-    GravitinoEnv.getInstance().setAccessControlManager(accessControlManager);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "accessControlManager", accessControlManager, true);
   }
 
   @AfterAll
