@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.metalake;
 
+import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Entity.EntityType;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.EntityStore;
@@ -23,6 +24,7 @@ import com.datastrato.gravitino.utils.PrincipalUtils;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,6 +49,15 @@ public class MetalakeManager implements MetalakeDispatcher {
   public MetalakeManager(EntityStore store, IdGenerator idGenerator) {
     this.store = store;
     this.idGenerator = idGenerator;
+
+    try {
+      NameIdentifier systemMetalake = NameIdentifier.of(Entity.SYSTEM_METALAKE_RESERVED_NAME);
+      if (store.exists(systemMetalake, EntityType.METALAKE)) {
+        createMetalake(systemMetalake, "", Collections.emptyMap());
+      }
+    } catch (IOException ioe) {
+      throw new RuntimeException("Fail to create system metalake", ioe);
+    }
   }
 
   /**
@@ -59,6 +70,7 @@ public class MetalakeManager implements MetalakeDispatcher {
   public BaseMetalake[] listMetalakes() {
     try {
       return store.list(Namespace.empty(), BaseMetalake.class, EntityType.METALAKE).stream()
+          .filter(baseMetalake -> !baseMetalake.name().equals(Entity.SYSTEM_METALAKE_RESERVED_NAME))
           .toArray(BaseMetalake[]::new);
     } catch (IOException ioe) {
       LOG.error("Listing Metalakes failed due to storage issues.", ioe);
