@@ -705,7 +705,7 @@ class TestUserMetaService extends TestJDBCBackend {
   }
 
   @Test
-  void deleteUserMetasByLegacyTimeLine() {
+  void deleteUserMetasByLegacyTimeline() {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     BaseMetalake metalake =
@@ -775,7 +775,7 @@ class TestUserMetaService extends TestJDBCBackend {
 
     // hard delete before soft delete
     int deletedCount =
-        userMetaService.deleteUserMetasByLegacyTimeLine(Instant.now().toEpochMilli() + 1000, 4);
+        userMetaService.deleteUserMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 4);
     Assertions.assertEquals(0, deletedCount);
     Assertions.assertEquals(
         user1.name(), userMetaService.getUserByIdentifier(user1.nameIdentifier()).name());
@@ -816,25 +816,25 @@ class TestUserMetaService extends TestJDBCBackend {
 
     // hard delete after soft delete
     deletedCount =
-        userMetaService.deleteUserMetasByLegacyTimeLine(Instant.now().toEpochMilli() + 1000, 3);
+        userMetaService.deleteUserMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 3);
     Assertions.assertEquals(6, deletedCount); // delete 3 user + 3 userRoleRel
     Assertions.assertEquals(1, countUsers(metalake.id())); // 4 - 3
     Assertions.assertEquals(5, countUserRoleRels()); // 8 - 3
 
     deletedCount =
-        userMetaService.deleteUserMetasByLegacyTimeLine(Instant.now().toEpochMilli() + 1000, 3);
+        userMetaService.deleteUserMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 3);
     Assertions.assertEquals(4, deletedCount); // delete 1 user + 3 userRoleRel
     Assertions.assertEquals(0, countUsers(metalake.id()));
     Assertions.assertEquals(2, countUserRoleRels()); // 5 - 3
 
     deletedCount =
-        userMetaService.deleteUserMetasByLegacyTimeLine(Instant.now().toEpochMilli() + 1000, 3);
+        userMetaService.deleteUserMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 3);
     Assertions.assertEquals(2, deletedCount);
     Assertions.assertEquals(0, countUsers(metalake.id()));
     Assertions.assertEquals(0, countUserRoleRels());
 
     deletedCount =
-        userMetaService.deleteUserMetasByLegacyTimeLine(Instant.now().toEpochMilli() + 1000, 3);
+        userMetaService.deleteUserMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 3);
     Assertions.assertEquals(0, deletedCount); // no more to delete
   }
 

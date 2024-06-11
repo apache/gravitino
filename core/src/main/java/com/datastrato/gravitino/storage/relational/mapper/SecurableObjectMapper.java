@@ -77,7 +77,7 @@ public interface SecurableObjectMapper {
   @Delete(
       "DELETE FROM "
           + SECURABLE_OBJECT_TABLE_NAME
-          + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeLine} LIMIT #{limit}")
-  Integer deleteSecurableObjectsByLegacyTimeLine(
-      @Param("legacyTimeLine") Long legacyTimeLine, @Param("limit") int limit);
+          + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}")
+  Integer deleteSecurableObjectsByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 }

@@ -168,7 +168,7 @@ public interface TopicMetaMapper {
   @Delete(
       "DELETE FROM "
           + TABLE_NAME
-          + " WHERE deleted_at != 0 AND deleted_at < #{legacyTimeLine} LIMIT #{limit}")
-  Integer deleteTopicMetasByLegacyTimeLine(
-      @Param("legacyTimeLine") Long legacyTimeLine, @Param("limit") int limit);
+          + " WHERE deleted_at != 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}")
+  Integer deleteTopicMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 }

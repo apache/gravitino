@@ -198,44 +198,44 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
-  public int hardDeleteLegacyData(Entity.EntityType entityType, long legacyTimeLine) {
+  public int hardDeleteLegacyData(Entity.EntityType entityType, long legacyTimeline) {
     switch (entityType) {
       case METALAKE:
         return MetalakeMetaService.getInstance()
-            .deleteMetalakeMetasByLegacyTimeLine(
-                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+            .deleteMetalakeMetasByLegacyTimeline(
+                legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case CATALOG:
         return CatalogMetaService.getInstance()
-            .deleteCatalogMetasByLegacyTimeLine(
-                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+            .deleteCatalogMetasByLegacyTimeline(
+                legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case SCHEMA:
         return SchemaMetaService.getInstance()
-            .deleteSchemaMetasByLegacyTimeLine(
-                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+            .deleteSchemaMetasByLegacyTimeline(
+                legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case TABLE:
         return TableMetaService.getInstance()
-            .deleteTableMetasByLegacyTimeLine(
-                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+            .deleteTableMetasByLegacyTimeline(
+                legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case FILESET:
         return FilesetMetaService.getInstance()
-            .deleteFilesetAndVersionMetasByLegacyTimeLine(
-                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+            .deleteFilesetAndVersionMetasByLegacyTimeline(
+                legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case TOPIC:
         return TopicMetaService.getInstance()
-            .deleteTopicMetasByLegacyTimeLine(
-                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+            .deleteTopicMetasByLegacyTimeline(
+                legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case USER:
         return UserMetaService.getInstance()
-            .deleteUserMetasByLegacyTimeLine(
-                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+            .deleteUserMetasByLegacyTimeline(
+                legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case GROUP:
         return GroupMetaService.getInstance()
-            .deleteGroupMetasByLegacyTimeLine(
-                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+            .deleteGroupMetasByLegacyTimeline(
+                legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case ROLE:
         return RoleMetaService.getInstance()
-            .deleteRoleMetasByLegacyTimeLine(
-                legacyTimeLine, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+            .deleteRoleMetasByLegacyTimeline(
+                legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case COLUMN:
       case AUDIT:
         return 0;
