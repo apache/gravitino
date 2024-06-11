@@ -185,7 +185,7 @@ public class RoleMetaService {
         SecurableObjectMapper.class, mapper -> mapper.listSecurableObjectsByRoleId(roleId));
   }
 
-  public int deleteRoleMetasByLegacyTimeLine(long legacyTimeLine, int limit) {
+  public int deleteRoleMetasByLegacyTimeline(long legacyTimeline, int limit) {
     int[] roleDeletedCount = new int[] {0};
     int[] userRoleRelDeletedCount = new int[] {0};
     int[] groupRoleRelDeletedCount = new int[] {0};
@@ -196,24 +196,24 @@ public class RoleMetaService {
             roleDeletedCount[0] =
                 SessionUtils.doWithoutCommitAndFetchResult(
                     RoleMetaMapper.class,
-                    mapper -> mapper.deleteRoleMetasByLegacyTimeLine(legacyTimeLine, limit)),
+                    mapper -> mapper.deleteRoleMetasByLegacyTimeline(legacyTimeline, limit)),
         () ->
             userRoleRelDeletedCount[0] =
                 SessionUtils.doWithoutCommitAndFetchResult(
                     UserRoleRelMapper.class,
-                    mapper -> mapper.deleteUserRoleRelMetasByLegacyTimeLine(legacyTimeLine, limit)),
+                    mapper -> mapper.deleteUserRoleRelMetasByLegacyTimeline(legacyTimeline, limit)),
         () ->
             groupRoleRelDeletedCount[0] =
                 SessionUtils.doWithoutCommitAndFetchResult(
                     GroupRoleRelMapper.class,
                     mapper ->
-                        mapper.deleteGroupRoleRelMetasByLegacyTimeLine(legacyTimeLine, limit)),
+                        mapper.deleteGroupRoleRelMetasByLegacyTimeline(legacyTimeline, limit)),
         () ->
             securableObjectsCount[0] =
                 SessionUtils.doWithoutCommitAndFetchResult(
                     SecurableObjectMapper.class,
                     mapper ->
-                        mapper.deleteSecurableObjectsByLegacyTimeLine(legacyTimeLine, limit)));
+                        mapper.deleteSecurableObjectsByLegacyTimeline(legacyTimeline, limit)));
 
     return roleDeletedCount[0]
         + userRoleRelDeletedCount[0]

@@ -505,7 +505,7 @@ class TestRoleMetaService extends TestJDBCBackend {
   }
 
   @Test
-  void deleteRoleMetasByLegacyTimeLine() {
+  void deleteRoleMetasByLegacyTimeline() {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     BaseMetalake metalake =
@@ -559,7 +559,7 @@ class TestRoleMetaService extends TestJDBCBackend {
 
     // hard delete before soft delete
     int deletedCount =
-        roleMetaService.deleteRoleMetasByLegacyTimeLine(Instant.now().toEpochMilli() + 1000, 4);
+        roleMetaService.deleteRoleMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 4);
     Assertions.assertEquals(0, deletedCount);
 
     Assertions.assertEquals(role1, roleMetaService.getRoleByIdentifier(role1.nameIdentifier()));
@@ -598,21 +598,21 @@ class TestRoleMetaService extends TestJDBCBackend {
 
     // hard delete after soft delete
     deletedCount =
-        roleMetaService.deleteRoleMetasByLegacyTimeLine(Instant.now().toEpochMilli() + 1000, 1);
+        roleMetaService.deleteRoleMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 1);
     Assertions.assertEquals(3, deletedCount); // delete 1 role + 1 userRoleRel + 1 groupRoleRel
     Assertions.assertEquals(1, countRoles(metalake.id())); // 2 - 1
     Assertions.assertEquals(1, countUserRoleRels()); // 2 - 1
     Assertions.assertEquals(1, countGroupRoleRels()); // 2 - 1
 
     deletedCount =
-        roleMetaService.deleteRoleMetasByLegacyTimeLine(Instant.now().toEpochMilli() + 1000, 1);
+        roleMetaService.deleteRoleMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 1);
     Assertions.assertEquals(3, deletedCount);
     Assertions.assertEquals(0, countRoles(metalake.id()));
     Assertions.assertEquals(0, countUserRoleRels());
     Assertions.assertEquals(0, countGroupRoleRels());
 
     deletedCount =
-        roleMetaService.deleteRoleMetasByLegacyTimeLine(Instant.now().toEpochMilli() + 1000, 1);
+        roleMetaService.deleteRoleMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 1);
     Assertions.assertEquals(0, deletedCount); // no more to delete
   }
 
