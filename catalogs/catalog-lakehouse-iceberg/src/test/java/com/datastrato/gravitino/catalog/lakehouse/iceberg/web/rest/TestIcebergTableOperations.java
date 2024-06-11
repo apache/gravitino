@@ -17,6 +17,7 @@ import javax.ws.rs.core.Response.Status;
 import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.MetadataUpdate.AddSchema;
 import org.apache.iceberg.MetadataUpdate.SetCurrentSchema;
+import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
@@ -25,9 +26,11 @@ import org.apache.iceberg.metrics.CommitReport;
 import org.apache.iceberg.metrics.ImmutableCommitMetricsResult;
 import org.apache.iceberg.metrics.ImmutableCommitReport;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.CreateTableRequest.Builder;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.ReportMetricsRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.ListPartitionsResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.types.Types.NestedField;
@@ -58,10 +61,21 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
       new Schema(NestedField.of(2, false, "foo_string1", StringType.get()));
 
   private Response doCreateTable(String name) {
-    CreateTableRequest createTableRequest =
-        CreateTableRequest.builder().withName(name).withSchema(tableSchema).build();
-    return getTableClientBuilder()
+    return doCreateTable(name, false);
+  }
+
+  private Response doCreateTable(String name, boolean isPartitioned) {
+    Builder createTableRequestBuilder =
+        CreateTableRequest.builder().withName(name).withSchema(tableSchema);
+    if (isPartitioned) {
+      createTableRequestBuilder.withPartitionSpec(PartitionSpec.builderFor(tableSchema)
+          .truncate("foo_string", 2).build());
+    }
+    CreateTableRequest createTableRequest = createTableRequestBuilder.build();
+    Response response = getTableClientBuilder()
         .post(Entity.entity(createTableRequest, MediaType.APPLICATION_JSON_TYPE));
+
+    return response;
   }
 
   private Response doRenameTable(String source, String dest) {
@@ -99,6 +113,10 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
         UpdateTableRequest.builderFor(base).update(addSchema).update(setCurrentSchema).build();
     return getTableClientBuilder(Optional.of(name))
         .post(Entity.entity(updateTableRequest, MediaType.APPLICATION_JSON_TYPE));
+  }
+
+  private Response doListPartitions(String name) {
+    return getPartitionsClientBuilder(Optional.of(name)).get();
   }
 
   private void verifyUpdateTableFail(String name, int status, TableMetadata base) {
@@ -150,7 +168,11 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
   }
 
   private void verifyCreateTableSucc(String name) {
-    Response response = doCreateTable(name);
+    verifyCreateTableSucc(name, false);
+  }
+
+  private void verifyCreateTableSucc(String name, Boolean isPartitioned) {
+    Response response = doCreateTable(name, isPartitioned);
     Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
     LoadTableResponse loadTableResponse = response.readEntity(LoadTableResponse.class);
     Schema schema = loadTableResponse.tableMetadata().schema();
@@ -188,6 +210,11 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
   private void verifyCreateTableFail(String name, int status) {
     Response response = doCreateTable(name);
     Assertions.assertEquals(status, response.getStatus());
+  }
+
+  private void verifyListPartitionsSucc(String name) {
+    Response response = doListPartitions(name);
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
   }
 
   @Test
@@ -311,4 +338,12 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
 
     Assertions.assertEquals(Status.NO_CONTENT.getStatusCode(), response.getStatus());
   }
+
+  @Test
+  void testListPartitions() {
+    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
+    verifyCreateTableSucc("list_foo1", true);
+    verifyListPartitionsSucc("list_foo1");
+  }
+
 }

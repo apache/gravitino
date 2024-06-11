@@ -7,6 +7,7 @@ package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.CATALOG_BACKEND_NAME;
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.GRAVITINO_JDBC_DRIVER;
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.ICEBERG_EXECUTOR_POOL_SIZE_KEY;
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.ICEBERG_JDBC_INITIALIZE;
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.ICEBERG_JDBC_PASSWORD;
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.ICEBERG_JDBC_USER;
@@ -124,4 +125,12 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
         JettyServerConfig.WEBSERVER_HTTPS_PORT.getKey(),
         String.valueOf(JettyServerConfig.DEFAULT_ICEBERG_REST_SERVICE_HTTPS_PORT));
   }
+
+  public static final ConfigEntry<Integer> ICEBERG_EXECUTOR_POOL_SIZE =
+      new ConfigBuilder(ICEBERG_EXECUTOR_POOL_SIZE_KEY)
+          .doc("Number of threads to use to plan files and tasks in Iceberg catalog")
+          .version(ConfigConstants.VERSION_0_4_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(2);
 }

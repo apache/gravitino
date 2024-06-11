@@ -33,6 +33,7 @@ import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.ReportMetricsRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.ListPartitionsResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -156,6 +157,23 @@ public class IcebergTableOperations {
     } else {
       return IcebergRestUtils.notExists();
     }
+  }
+
+  @GET
+  @Path("{table}/partitions")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Timed(name = "load-table-partitions." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "load-table-partitions", absolute = true)
+  public Response loadTablePartitions(
+      @PathParam("namespace") String namespace,
+      @PathParam("table") String table,
+      @DefaultValue("all") @QueryParam("partitions-filter") String partitionsFilter,
+      @DefaultValue("all") @QueryParam("snapshots") String snapshots) {
+    // todo support snapshots
+    TableIdentifier tableIdentifier =
+        TableIdentifier.of(RESTUtil.decodeNamespace(namespace), table);
+    ListPartitionsResponse listPartitionsResponse = icebergTableOps.listPartitions(tableIdentifier);
+    return IcebergRestUtils.ok(listPartitionsResponse);
   }
 
   @POST

@@ -32,6 +32,8 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
   public static final String WAREHOUSE = "warehouse";
   public static final String URI = "uri";
 
+  public static final String ICEBERG_EXECUTOR_POOL_SIZE_KEY = "executor-pool-size";
+
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
   // Map that maintains the mapping of keys in Gravitino to that in Iceberg, for example, users

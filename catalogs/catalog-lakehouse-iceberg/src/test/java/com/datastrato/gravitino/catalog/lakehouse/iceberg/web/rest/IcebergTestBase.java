@@ -76,6 +76,12 @@ public class IcebergTestBase extends JerseyTest {
     return getIcebergClientBuilder(path, queryParams);
   }
 
+  public Invocation.Builder getPartitionsClientBuilder(Optional<String> name) {
+    String path =
+        Joiner.on("/").skipNulls().join(IcebergRestTestUtil.TABLE_PATH, name.orElseGet(() -> null), "partitions");
+    return getIcebergClientBuilder(path, Optional.empty());
+  }
+
   public Invocation.Builder getUpdateNamespaceClientBuilder(String namespace) {
     String path =
         Joiner.on("/")
