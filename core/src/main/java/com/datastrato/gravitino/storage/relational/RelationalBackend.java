@@ -98,10 +98,10 @@ public interface RelationalBackend extends Closeable {
    * timeline.
    *
    * @param entityType The type of the entity.
-   * @param legacyTimeLine The time before which the data has been marked as deleted.
+   * @param legacyTimeline The time before which the data has been marked as deleted.
    * @return The count of the deleted data.
    */
-  int hardDeleteLegacyData(Entity.EntityType entityType, long legacyTimeLine);
+  int hardDeleteLegacyData(Entity.EntityType entityType, long legacyTimeline);
 
   /**
    * Soft deletes the old version data that is older than or equal to the given version retention
