@@ -466,7 +466,7 @@ tasks.rat {
     "web/dist/**/*",
     "web/node_modules/**/*",
     "web/src/lib/utils/axios/**/*",
-    "web/src/lib/enums/httpEnum.ts",
+    "web/src/lib/enums/httpEnum.js",
     "web/src/types/axios.d.ts",
     "web/yarn.lock",
     "web/package-lock.json",
