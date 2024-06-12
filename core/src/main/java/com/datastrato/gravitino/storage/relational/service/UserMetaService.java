@@ -7,6 +7,7 @@ package com.datastrato.gravitino.storage.relational.service;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.authorization.AuthorizationUtils;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.UserEntity;
@@ -76,6 +77,22 @@ public class UserMetaService {
     List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(userPO.getUserId());
 
     return POConverters.fromUserPO(userPO, rolePOs, identifier.namespace());
+  }
+
+  public List<UserEntity> listUsersByNamespace(Namespace namespace) {
+    AuthorizationUtils.checkUserNamespace(namespace);
+
+    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(namespace.level(0));
+
+    List<UserEntity> userEntities = Lists.newArrayList();
+    List<UserPO> userPOs =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class, mapper -> mapper.listUserPOsByMetalakeId(metalakeId));
+    for (UserPO userPO : userPOs) {
+      List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(userPO.getUserId());
+      userEntities.add(POConverters.fromUserPO(userPO, rolePOs, namespace));
+    }
+    return userEntities;
   }
 
   public void insertUser(UserEntity userEntity, boolean overwritten) {

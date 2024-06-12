@@ -42,6 +42,7 @@ import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.Collections;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -200,6 +201,10 @@ public class GravitinoEnv {
     // Create and initialize access control related modules
     boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);
     if (enableAuthorization) {
+      NameIdentifier systemMetalake = NameIdentifier.of(Entity.SYSTEM_METALAKE_RESERVED_NAME);
+      if (!metalakeManager.metalakeExists(systemMetalake)) {
+        metalakeManager.createMetalake(systemMetalake, null, Collections.emptyMap());
+      }
       this.accessControlManager = new AccessControlManager(entityStore, idGenerator, config);
     } else {
       this.accessControlManager = null;

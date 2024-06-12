@@ -24,7 +24,6 @@ import com.datastrato.gravitino.utils.PrincipalUtils;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
-import java.util.Collections;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,15 +48,6 @@ public class MetalakeManager implements MetalakeDispatcher {
   public MetalakeManager(EntityStore store, IdGenerator idGenerator) {
     this.store = store;
     this.idGenerator = idGenerator;
-
-    try {
-      NameIdentifier systemMetalake = NameIdentifier.of(Entity.SYSTEM_METALAKE_RESERVED_NAME);
-      if (store.exists(systemMetalake, EntityType.METALAKE)) {
-        createMetalake(systemMetalake, "", Collections.emptyMap());
-      }
-    } catch (IOException ioe) {
-      throw new RuntimeException("Fail to create system metalake", ioe);
-    }
   }
 
   /**
