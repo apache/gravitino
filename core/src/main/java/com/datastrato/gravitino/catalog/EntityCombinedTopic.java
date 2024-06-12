@@ -24,6 +24,7 @@ public class EntityCombinedTopic implements Topic {
 
   // Sets of properties that should be hidden from the user.
   private Set<String> hiddenProperties;
+
   // If imported is true, it means that storage backend have stored the correct entity.
   // Otherwise, we should import the external entity to the storage backend.
   private boolean imported;

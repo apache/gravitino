@@ -76,7 +76,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
     EntityCombinedTopic topic =
         TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> loadCombinedTopic(ident));
 
-    if (topic == null || topic.imported()) {
+    if (topic.imported()) {
       return topic;
     }
 
