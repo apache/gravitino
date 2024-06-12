@@ -213,5 +213,5 @@
    Vben
    ./src/lib/utils/axios
    ./src/types/axios.d.ts
-   ./src/lib/enums/httpEnum.ts
+   ./src/lib/enums/httpEnum.js
    ./src/lib/utils/index.js (parts of)
