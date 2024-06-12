@@ -339,7 +339,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
         completedTask.get();
       } catch (InterruptedException | ExecutionException e) {
         executor.shutdownNow();
-        throw new RuntimeException("Failed to execute test " + e.getMessage(), e);
+        throw new RuntimeException("Failed to execute the test", e);
       }
     }
     executor.shutdownNow();
@@ -375,7 +375,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
                           "Failed to run the test %s's catalog %s: %s",
                           simpleTesterName(testSetDirName), testCatalogs[finalI], e.getMessage());
                   LOG.error(msg);
-                  throw new RuntimeException(msg, e);
+                  throw e;
                 }
               }));
     }

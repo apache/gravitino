@@ -9,6 +9,7 @@ trino_conf_dir="$(cd "${trino_conf_dir}">/dev/null; pwd)"
 
 cp "$trino_conf_dir/config/config.properties" /etc/trino/config.properties
 cp "$trino_conf_dir/config/catalog/gravitino.properties" /etc/trino/catalog/gravitino.properties
+cp "$trino_conf_dir/config/catalog/mysql.properties" /etc/trino/catalog/mysql.properties
 #
 # Update `gravitino.uri = http://GRAVITINO_HOST_IP:GRAVITINO_HOST_PORT` in the `conf/catalog/gravitino.properties`
 sed -i "s/GRAVITINO_HOST_IP:GRAVITINO_HOST_PORT/${GRAVITINO_HOST_IP}:${GRAVITINO_HOST_PORT}/g" /etc/trino/catalog/gravitino.properties

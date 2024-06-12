@@ -12,6 +12,7 @@ import com.datastrato.gravitino.trino.connector.GravitinoErrorCode;
 import com.datastrato.gravitino.trino.connector.util.GeneralDataTypeTransformer;
 import io.trino.spi.TrinoException;
 import io.trino.spi.type.CharType;
+import io.trino.spi.type.TimeType;
 
 /** Type transformer between MySQL and Trino */
 public class MySQLDataTypeTransformer extends GeneralDataTypeTransformer {
@@ -26,6 +27,14 @@ public class MySQLDataTypeTransformer extends GeneralDataTypeTransformer {
   public io.trino.spi.type.Type getTrinoType(Type type) {
     if (type.name() == Name.STRING) {
       return io.trino.spi.type.VarcharType.createUnboundedVarcharType();
+    } else if (type.name() == Name.TIMESTAMP) {
+      if (((Types.TimestampType) type).hasTimeZone())
+        return io.trino.spi.type.TimestampWithTimeZoneType.createTimestampWithTimeZoneType(0);
+      else {
+        return io.trino.spi.type.TimestampType.createTimestampType(0);
+      }
+    } else if (type.name() == Name.TIME) {
+      return TimeType.TIME_SECONDS;
     }
 
     return super.getTrinoType(type);

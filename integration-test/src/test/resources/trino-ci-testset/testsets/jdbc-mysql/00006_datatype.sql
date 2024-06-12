@@ -30,6 +30,9 @@ VALUES (NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 
 
 select * from tb01 order by f1;
 
+-- check values of original mysql connector
+select * from mysql.gt_db1.tb01 order by f1;
+
 CREATE TABLE tb02 (
     f1 VARCHAR(200) not null ,
     f2 CHAR(20) not null ,
