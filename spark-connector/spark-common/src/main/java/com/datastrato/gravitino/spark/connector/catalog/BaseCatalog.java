@@ -20,8 +20,10 @@ import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter.DistributionAndSortOrdersInfo;
 import com.datastrato.gravitino.spark.connector.SparkTypeConverter;
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
@@ -157,7 +159,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
   public Identifier[] listTables(String[] namespace) throws NoSuchNamespaceException {
     String gravitinoNamespace;
     if (namespace.length == 0) {
-      gravitinoNamespace = getCatalogDefaultNamespace();
+      gravitinoNamespace = getCatalogDefaultNamespace()[0];
     } else {
       validateNamespace(namespace);
       gravitinoNamespace = namespace[0];
@@ -181,8 +183,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
   public Table createTable(
       Identifier ident, StructType schema, Transform[] transforms, Map<String, String> properties)
       throws TableAlreadyExistsException, NoSuchNamespaceException {
-    NameIdentifier gravitinoIdentifier =
-        NameIdentifier.of(metalakeName, catalogName, getDatabase(ident), ident.name());
+    NameIdentifier gravitinoIdentifier = createGravitinoNameIdentifier(ident);
     com.datastrato.gravitino.rel.Column[] gravitinoColumns =
         Arrays.stream(schema.fields())
             .map(structField -> createGravitinoColumn(structField))
@@ -255,9 +256,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
       com.datastrato.gravitino.rel.Table gravitinoTable =
           gravitinoCatalogClient
               .asTableCatalog()
-              .alterTable(
-                  NameIdentifier.of(metalakeName, catalogName, getDatabase(ident), ident.name()),
-                  gravitinoTableChanges);
+              .alterTable(createGravitinoNameIdentifier(ident), gravitinoTableChanges);
       org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident);
       return createSparkTable(
           ident,
@@ -274,33 +273,28 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
 
   @Override
   public boolean dropTable(Identifier ident) {
-    return gravitinoCatalogClient
-        .asTableCatalog()
-        .dropTable(NameIdentifier.of(metalakeName, catalogName, getDatabase(ident), ident.name()));
+    return gravitinoCatalogClient.asTableCatalog().dropTable(createGravitinoNameIdentifier(ident));
   }
 
   @Override
   public boolean purgeTable(Identifier ident) {
-    return gravitinoCatalogClient
-        .asTableCatalog()
-        .purgeTable(NameIdentifier.of(metalakeName, catalogName, getDatabase(ident), ident.name()));
+    return gravitinoCatalogClient.asTableCatalog().purgeTable(createGravitinoNameIdentifier(ident));
   }
 
   @Override
   public void renameTable(Identifier oldIdent, Identifier newIdent)
       throws NoSuchTableException, TableAlreadyExistsException {
-    String oldDatabase = getDatabase(oldIdent);
-    String newDatabase = getDatabase(newIdent);
+    String[] oldDatabase = getDatabase(oldIdent);
+    String[] newDatabase = getDatabase(newIdent);
     Preconditions.checkArgument(
-        newDatabase.equals(oldDatabase), "Doesn't support rename table to different database");
+        Arrays.equals(newDatabase, oldDatabase),
+        "Doesn't support rename table to different database");
     com.datastrato.gravitino.rel.TableChange rename =
         com.datastrato.gravitino.rel.TableChange.rename(newIdent.name());
     try {
       gravitinoCatalogClient
           .asTableCatalog()
-          .alterTable(
-              NameIdentifier.of(metalakeName, catalogName, getDatabase(oldIdent), oldIdent.name()),
-              rename);
+          .alterTable(createGravitinoNameIdentifier(oldIdent), rename);
     } catch (com.datastrato.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(oldIdent);
     }
@@ -392,34 +386,41 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
   protected com.datastrato.gravitino.rel.Table loadGravitinoTable(Identifier ident)
       throws NoSuchTableException {
     try {
-      String database = getDatabase(ident);
       return gravitinoCatalogClient
           .asTableCatalog()
-          .loadTable(NameIdentifier.of(metalakeName, catalogName, database, ident.name()));
+          .loadTable(createGravitinoNameIdentifier(ident));
     } catch (com.datastrato.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(ident);
     }
   }
 
-  protected String getDatabase(Identifier sparkIdentifier) {
+  protected String[] getCatalogDefaultNamespace() {
+    String[] catalogDefaultNamespace = sparkCatalog.defaultNamespace();
+    Preconditions.checkArgument(
+        catalogDefaultNamespace != null && catalogDefaultNamespace.length == 1,
+        "Catalog default namespace is not valid");
+    return new String[] {catalogDefaultNamespace[0]};
+  }
+
+  protected String[] getDatabase(Identifier sparkIdentifier) {
     if (sparkIdentifier.namespace().length > 0) {
-      return sparkIdentifier.namespace()[0];
+      return new String[] {sparkIdentifier.namespace()[0]};
     }
     return getCatalogDefaultNamespace();
+  }
+
+  private NameIdentifier createGravitinoNameIdentifier(Identifier ident) {
+    List<String> gravitinoNameIdentifier = new ArrayList<>();
+    gravitinoNameIdentifier.addAll(Arrays.asList(metalakeName, catalogName));
+    gravitinoNameIdentifier.addAll(Arrays.asList(getDatabase(ident)));
+    gravitinoNameIdentifier.add(ident.name());
+    return NameIdentifier.of(gravitinoNameIdentifier.toArray(new String[0]));
   }
 
   private void validateNamespace(String[] namespace) {
     Preconditions.checkArgument(
         namespace.length == 1,
         "Doesn't support multi level namespaces: " + String.join(".", namespace));
-  }
-
-  private String getCatalogDefaultNamespace() {
-    String[] catalogDefaultNamespace = sparkCatalog.defaultNamespace();
-    Preconditions.checkArgument(
-        catalogDefaultNamespace != null && catalogDefaultNamespace.length == 1,
-        "Catalog default namespace is not valid");
-    return catalogDefaultNamespace[0];
   }
 
   private com.datastrato.gravitino.rel.Column createGravitinoColumn(StructField structField) {
@@ -446,10 +447,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
       return sparkCatalog.loadTable(ident);
     } catch (NoSuchTableException e) {
       throw new RuntimeException(
-          String.format(
-              "Failed to load the real sparkTable: %s",
-              String.join(".", getDatabase(ident), ident.name())),
-          e);
+          String.format("Failed to load the real sparkTable: %s", ident.toString()), e);
     }
   }
 }
