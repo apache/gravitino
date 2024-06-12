@@ -283,6 +283,7 @@
 
    Apache Arrow
    ./dev/ci/util_free_space.sh
+   ./clients/client-python/gravitino/filesystem/gvfs.py
 
    This product bundles a third-party component under the
    MIT License.
@@ -290,3 +291,12 @@
    Kyligence/kylinpy
    ./clients/client-python/gravitino/utils/exceptions.py
    ./clients/client-python/gravitino/utils/http_client.py
+
+   elarivie/pyReaderWriterLock
+   ./clients/client-python/gravitino/filesystem/gvfs.py
+
+   This product bundles a third-party component under the
+   BSD License.
+
+   fsspec
+   .clients/client-python/gravitino/filesystem/gvfs.py

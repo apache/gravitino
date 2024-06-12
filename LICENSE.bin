@@ -355,6 +355,7 @@
    XNIO API
    WildFly
    Confluent Kafka Streams Examples
+   Apache Arrow
 
    This product bundles various third-party components also under the
    Apache Software Foundation License 1.1
@@ -382,6 +383,7 @@
    ParaNamer
    RE2/J
    ZSTD JNI
+   fsspec
 
    This product bundles various third-party components also under the
    MIT license
@@ -393,6 +395,7 @@
    Protocol Buffers
    Treelayout
    Kyligence/kylinpy
+   elarivie/pyReaderWriterLock
 
    This product bundles various third-party components also under the
    Common Development and Distribution License 1.0
