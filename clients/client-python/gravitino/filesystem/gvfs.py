@@ -277,6 +277,8 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
 
     def rmdir(self, path):
         """Remove a directory.
+        It will delete a directory and all its contents recursively for PyArrow.HadoopFileSystem.
+        And it will throw an exception if delete a directory which is non-empty for LocalFileSystem.
         :param path: Virtual fileset path
         """
         context: FilesetContext = self._get_fileset_context(path)
