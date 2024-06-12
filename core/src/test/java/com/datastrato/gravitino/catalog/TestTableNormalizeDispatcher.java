@@ -17,12 +17,15 @@ import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
+import com.datastrato.gravitino.rel.partitions.Partitions;
+import com.datastrato.gravitino.rel.partitions.RangePartition;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -58,7 +61,18 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
           TestColumn.builder().withName("colNAME1").withType(Types.StringType.get()).build(),
           TestColumn.builder().withName("colNAME2").withType(Types.StringType.get()).build()
         };
-    Transform[] transforms = new Transform[] {Transforms.identity(columns[0].name())};
+    RangePartition assignedPartition =
+        (RangePartition)
+            Partitions.range(
+                "partition_V1",
+                Literals.stringLiteral("value1"),
+                Literals.stringLiteral("value2"),
+                null);
+    Transform[] transforms =
+        new Transform[] {
+          Transforms.range(
+              new String[] {columns[0].name()}, new RangePartition[] {assignedPartition})
+        };
     Distribution distribution =
         Distributions.fields(Strategy.HASH, 5, new String[] {columns[0].name()});
     SortOrder[] sortOrders =
@@ -68,10 +82,12 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
         tableNormalizeDispatcher.createTable(
             tableIdent, columns, "comment", props, transforms, distribution, sortOrders, indexes);
     assertTableCaseInsensitive(tableIdent, columns, createdTable);
-
     // test case-insensitive in loading
     Table loadedTable = tableNormalizeDispatcher.loadTable(tableIdent);
     assertTableCaseInsensitive(tableIdent, columns, loadedTable);
+    Assertions.assertEquals(
+        assignedPartition.name().toLowerCase(),
+        loadedTable.partitioning()[0].assignments()[0].name());
 
     // test case-insensitive in listing
     NameIdentifier[] tableIdents = tableNormalizeDispatcher.listTables(tableNs);
