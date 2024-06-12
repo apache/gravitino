@@ -13,11 +13,11 @@ RANGER_PACKAGE_NAME="ranger-${RANGER_VERSION}-admin.tar.gz" # Must export this v
 RANGER_DOWNLOAD_URL=https://github.com/datastrato/apache-ranger/releases/download/release-ranger-${RANGER_VERSION}/ranger-${RANGER_VERSION}-admin.tar.gz
 
 MYSQL_CONNECTOR_VERSION=8.0.28
-MYSQL_CONNECTOR_PACKAGE_NAME="mysql-connector-java-${MYSQL_CONNECTOR_VERSION}.jar" # Must export this variable for Dockerfile
+MYSQL_CONNECTOR_PACKAGE_NAME="mysql-connector-java-${MYSQL_CONNECTOR_VERSION}.jar"
 MYSQL_CONNECTOR_DOWNLOAD_URL=https://search.maven.org/remotecontent?filepath=mysql/mysql-connector-java/${MYSQL_CONNECTOR_VERSION}/mysql-connector-java-${MYSQL_CONNECTOR_VERSION}.jar
 
 LOG4JDBC_VERSION=8.0.28
-LOG4JDBC_PACKAGE_NAME="log4jdbc-${LOG4JDBC_VERSION}.jar" # Must export this variable for Dockerfile
+LOG4JDBC_PACKAGE_NAME="log4jdbc-${LOG4JDBC_VERSION}.jar"
 LOG4JDBC_DOWNLOAD_URL=https://repo1.maven.org/maven2/com/googlecode/log4jdbc/log4jdbc/${LOG4JDBC_VERSION}/log4jdbc-${LOG4JDBC_VERSION}.jar
 
 # Prepare download packages
