@@ -1,3 +1,7 @@
+#
+# Copyright 2023 Datastrato Pvt Ltd.
+# This software is licensed under the Apache License version 2.
+#
 # Apache Ranger Admin runtime Docker image
 FROM debian:buster
 LABEL maintainer="support@datastrato.com"
@@ -32,9 +36,10 @@ ADD packages/ranger-${RANGER_VERSION}-admin.tar.gz /opt/
 RUN ln -s /opt/ranger-${RANGER_VERSION}-admin/* ${RANGER_HOME}
 
 # Initialize Ranger envirioment
+# We download these packages because ranger-admin required thiese packages
+# but it seems not included in tar file.
 COPY packages/${MYSQL_CONNECTOR_PACKAGE_NAME} ${RANGER_HOME}/ews/webapp/WEB-INF/lib/
 COPY packages/${MYSQL_CONNECTOR_PACKAGE_NAME} ${RANGER_HOME}/jisql/lib/
-COPY packages/${LOG4JDBC_PACKAGE_NAME} ${RANGER_HOME}/ews/webapp/WEB-INF/lib/
 RUN cp -r ${RANGER_HOME}/ews/webapp/WEB-INF/classes/conf.dist/ ${RANGER_HOME}/ews/webapp/WEB-INF/classes/conf && \
     mkdir ${RANGER_HOME}/ews/logs
 
