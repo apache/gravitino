@@ -104,7 +104,8 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
         req.validate()
 
         resp = self.rest_client.post(
-            BaseSchemaCatalog.format_schema_request_path(self.schema_namespace), json=req
+            BaseSchemaCatalog.format_schema_request_path(self.schema_namespace),
+            json=req,
         )
         schema_response = SchemaResponse.from_json(resp.body, infer_missing=True)
         schema_response.validate()
@@ -137,7 +138,7 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
         """Alter the schema with specified identifier by applying the changes.
 
         Args:
-            schema_name: The name of the schema.  
+            schema_name: The name of the schema.
             changes: The metadata changes to apply.
 
         Raises:
@@ -174,7 +175,7 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
         Returns:
              true if the schema is dropped successfully, false otherwise.
         """
-        NameIdentifier.check_schema(ident)
+        NameIdentifier.check_schema(NameIdentifier.of(self.namespace, schema_name))
         try:
             params = {"cascade": str(cascade)}
             resp = self.rest_client.delete(
@@ -187,7 +188,7 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
             drop_resp.validate()
             return drop_resp.dropped()
         except Exception:
-            logger.warning("Failed to drop schema %s", ident)
+            logger.warning("Failed to drop schema %s", schema_name)
             return False
 
     @staticmethod
