@@ -19,11 +19,11 @@ import javax.ws.rs.container.ContainerRequestContext;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-public class TestAdminFilter {
+public class TestMetalakeAdminFilter {
 
   @Test
   void testAdminFilterAllow() throws IOException {
-    AdminFilter filter = new AdminFilter();
+    MetalakeAdminFilter filter = new MetalakeAdminFilter();
     ContainerRequestContext requestContext = Mockito.mock(ContainerRequestContext.class);
 
     // Add metalake admin
@@ -79,7 +79,7 @@ public class TestAdminFilter {
 
   @Test
   void testAdminFilterForbidden() throws IOException {
-    AdminFilter filter = new AdminFilter();
+    MetalakeAdminFilter filter = new MetalakeAdminFilter();
     ContainerRequestContext requestContext = Mockito.mock(ContainerRequestContext.class);
     Mockito.when(requestContext.getMethod()).thenReturn(BasedRoleFilter.POST);
     AccessControlManager accessControlManager = Mockito.mock(AccessControlManager.class);

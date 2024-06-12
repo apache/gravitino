@@ -21,8 +21,8 @@ import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.ext.Provider;
 
 @Provider
-@NameBindings.AdminInterface
-public class AdminFilter implements BasedRoleFilter {
+@NameBindings.MetalakeAdminInterface
+public class MetalakeAdminFilter implements BasedRoleFilter {
   @Override
   public void filter(ContainerRequestContext requestContext) throws IOException {
     try {
