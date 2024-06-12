@@ -1,25 +1,21 @@
-#
-# Copyright 2023 Datastrato Pvt Ltd.
-# This software is licensed under the Apache License version 2.
-#
 # Apache Ranger Admin runtime Docker image
 FROM debian:buster
 LABEL maintainer="support@datastrato.com"
 
-ARG RANGER_VERSION=2.4.0
-# Multiple plugins can be passed using commas, e.g. `plugin-trino,plugin-hive`
-ARG RANGER_PLUGINS=plugin-trino
-ENV RANGER_PASSWORD=rangerR0cks!
-
 WORKDIR /root
-
-COPY init-mysql.sql.template /tmp/
-COPY start-ranger-services.sh /tmp/
-RUN chmod +x /tmp/start-ranger-services.sh
 
 RUN apt-get -q update && \
     apt-get install -y -q python python3 gcc mariadb-server vim curl wget openjdk-11-jdk git procps && \
     rm -rf /var/lib/apt/lists/*
+
+ARG RANGER_VERSION=2.4.0
+ENV RANGER_PASSWORD=rangerR0cks!
+ARG MYSQL_CONNECTOR_PACKAGE_NAME
+ARG LOG4JDBC_PACKAGE_NAME
+
+COPY init-mysql.sql.template /tmp/
+COPY start-ranger-services.sh /tmp/
+RUN chmod +x /tmp/start-ranger-services.sh
 
 ENV JAVA_HOME=/usr/local/jdk
 RUN ARCH=$(uname -m) && \
@@ -30,16 +26,17 @@ RUN ARCH=$(uname -m) && \
     fi
 
 # install ranger
-RUN mkdir ${RANGER_HOME}
-ADD packages/ranger-distro-2.4.0-admin.tar.gz /opt/
+ENV RANGER_HOME=/opt/ranger-admin
+RUN mkdir -p ${RANGER_HOME}
+ADD packages/ranger-${RANGER_VERSION}-admin.tar.gz /opt/
 RUN ln -s /opt/ranger-${RANGER_VERSION}-admin/* ${RANGER_HOME}
 
 # Initialize Ranger envirioment
-RUN curl -L https://search.maven.org/remotecontent?filepath=mysql/mysql-connector-java/8.0.28/mysql-connector-java-8.0.28.jar --output /opt/ranger-admin/ews/webapp/WEB-INF/lib/mysql-connector-java-8.0.28.jar && \
-    cp /opt/ranger-admin/ews/webapp/WEB-INF/lib/mysql-connector-java-8.0.28.jar /opt/ranger-admin/jisql/lib/ && \
-    curl -L https://repo1.maven.org/maven2/com/googlecode/log4jdbc/log4jdbc/1.2/log4jdbc-1.2.jar --output /opt/ranger-admin/ews/webapp/WEB-INF/lib/log4jdbc-1.2.jar && \
-    cp -r /opt/ranger-admin/ews/webapp/WEB-INF/classes/conf.dist/ /opt/ranger-admin/ews/webapp/WEB-INF/classes/conf && \
-    mkdir /opt/ranger-admin/ews/logs
+COPY packages/${MYSQL_CONNECTOR_PACKAGE_NAME} ${RANGER_HOME}/ews/webapp/WEB-INF/lib/
+COPY packages/${MYSQL_CONNECTOR_PACKAGE_NAME} ${RANGER_HOME}/jisql/lib/
+COPY packages/${LOG4JDBC_PACKAGE_NAME} ${RANGER_HOME}/ews/webapp/WEB-INF/lib/
+RUN cp -r ${RANGER_HOME}/ews/webapp/WEB-INF/classes/conf.dist/ ${RANGER_HOME}/ews/webapp/WEB-INF/classes/conf && \
+    mkdir ${RANGER_HOME}/ews/logs
 
 EXPOSE 6080
 

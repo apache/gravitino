@@ -86,9 +86,7 @@ elif [ "${component_type}" == "doris" ]; then
   build_args="--build-arg DORIS_VERSION=${DORIS_VERSION}"
 elif [ "${component_type}" == "ranger" ]; then
   . ${script_dir}/ranger/ranger-dependency.sh
-  echo "package name: ${RANGER_PACKAGE_NAME}"
-  # Multiple plugins can be passed using commas, e.g. `plugin-trino,plugin-hive`
-  build_args="--build-arg RANGER_PACKAGE_NAME=${RANGER_PACKAGE_NAME} --build-arg RANGER_VERSION=${RANGER_VERSION} --build-arg RANGER_PLUGINS=plugin-trino,plugin-hive"
+  build_args="--build-arg RANGER_PACKAGE_NAME=${RANGER_PACKAGE_NAME} --build-arg MYSQL_CONNECTOR_PACKAGE_NAME=${MYSQL_CONNECTOR_PACKAGE_NAME} --build-arg LOG4JDBC_PACKAGE_NAME=${LOG4JDBC_PACKAGE_NAME} --build-arg RANGER_VERSION=${RANGER_VERSION}"
 else
   echo "ERROR : ${component_type} is not a valid component type"
   usage
@@ -116,8 +114,8 @@ if [[ "${platform_type}" == "all" ]]; then
   fi
 else
   if [ ${build_latest} -eq 1 ]; then
-    docker buildx build --no-cache --pull --platform=${platform_type} ${build_args} --output type=docker --progress plain -f Dockerfile -t ${image_name}:latest -t ${image_name}:${tag_name} .
+    docker buildx build --pull --platform=${platform_type} ${build_args} --output type=docker --progress plain -f Dockerfile -t ${image_name}:latest -t ${image_name}:${tag_name} .
   else
-    docker buildx build --no-cache --pull --platform=${platform_type} ${build_args} --output type=docker --progress plain -f Dockerfile -t ${image_name}:${tag_name} .
+    docker buildx build --pull --platform=${platform_type} ${build_args} --output type=docker --progress plain -f Dockerfile -t ${image_name}:${tag_name} .
   fi
 fi
