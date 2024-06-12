@@ -5,8 +5,6 @@
 
 package com.datastrato.gravitino.catalog;
 
-import com.datastrato.gravitino.SupportsCatalogs;
-
 /**
  * {@code CatalogDispatcher} interface acts as a specialization of the {@link SupportsCatalogs}
  * interface. This interface is designed to potentially add custom behaviors or operations related

@@ -9,3 +9,22 @@ venv
 .vevn
 .venv
 .idea
+dist
+build
+README.md
+version.ini
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/

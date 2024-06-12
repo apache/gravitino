@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.trino.connector.catalog.hive;
 
+import static com.datastrato.gravitino.trino.connector.GravitinoConnectorPluginManager.CONNECTOR_HIVE;
+
 import com.datastrato.gravitino.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
@@ -14,12 +16,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /** Transforming Hive connector configuration and components into Gravitino connector. */
 public class HiveConnectorAdapter implements CatalogConnectorAdapter {
-
-  private static final AtomicInteger VERSION = new AtomicInteger(0);
 
   private final HasPropertyMeta propertyMetadata;
   private final PropertyConverter catalogConverter;
@@ -30,23 +29,20 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
   }
 
   @Override
-  public Map<String, Object> buildInternalConnectorConfig(GravitinoCatalog catalog)
+  public Map<String, String> buildInternalConnectorConfig(GravitinoCatalog catalog)
       throws Exception {
-    Map<String, Object> config = new HashMap<>();
-    config.put(
-        "catalogHandle",
-        String.format("%s_v%d:normal:default", catalog.getName(), VERSION.getAndIncrement()));
-    config.put("connectorName", "hive");
-
-    Map<String, Object> properties = new HashMap<>();
-    properties.put("hive.metastore.uri", catalog.getRequiredProperty("metastore.uris"));
-    properties.put("hive.security", "allow-all");
+    Map<String, String> config = new HashMap<>();
+    config.put("hive.metastore.uri", catalog.getRequiredProperty("metastore.uris"));
+    config.put("hive.security", "allow-all");
     Map<String, String> trinoProperty =
         catalogConverter.gravitinoToEngineProperties(catalog.getProperties());
-    properties.putAll(trinoProperty);
-
-    config.put("properties", properties);
+    config.putAll(trinoProperty);
     return config;
+  }
+
+  @Override
+  public String internalConnectorName() {
+    return CONNECTOR_HIVE;
   }
 
   @Override

@@ -25,7 +25,7 @@ Assuming Gravitino has just started, and the host and port is [http://localhost:
 You can create a metalake by sending a `POST` request to the `/api/metalakes` endpoint or just use the Gravitino Admin Java client.
 The following is an example of creating a metalake:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -39,7 +39,7 @@ http://localhost:8090/api/metalakes
 
 ```java
 GravitinoAdminClient gravitinoAdminClient = GravitinoAdminClient
-    .builder("http://127.0.0.1:8090")
+    .builder("http://localhost:8090")
     .build();
 
 GravitinoMetaLake newMetalake = gravitinoAdminClient.createMetalake(
@@ -50,13 +50,23 @@ GravitinoMetaLake newMetalake = gravitinoAdminClient.createMetalake(
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_admin_client: GravitinoAdminClient = GravitinoAdminClient(uri="http://localhost:8090")
+gravitino_admin_client.create_metalake(ident=NameIdentifier.of("metalake"), 
+                                       comment="This is a new metalake", 
+                                       properties={})
+```
+
+</TabItem>
 </Tabs>
 
 ### Load a metalake
 
 You can create a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a metalake:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -75,13 +85,20 @@ GravitinoMetaLake loaded = gravitinoAdminClient.loadMetalake(
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_admin_client.load_metalake(NameIdentifier.of("metalake"))
+```
+
+</TabItem>
 </Tabs>
 
 ### Alter a metalake
 
 You can modify a metalake by sending a `PUT` request to the `/api/metalakes/{metalake_name}` endpoint or just use the Gravitino Java client. The following is an example of altering a metalake:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -114,6 +131,20 @@ GravitinoMetaLake renamed = gravitinoAdminClient.alterMetalake(
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+changes = (
+    MetalakeChange.rename("metalake_new_name"),
+    MetalakeChange.update_comment("metalake_new_comment"),
+    MetalakeChange.remove_property("metalake_properties_key1"),
+    MetalakeChange.set_property("metalake_properties_key2", "metalake_propertie_new_value"),
+)
+
+metalake = gravitino_admin_client.alter_metalake(NameIdentifier.of("metalake_name"), *changes)
+```
+
+</TabItem>
 </Tabs>
 
 
@@ -131,7 +162,7 @@ Currently, Gravitino supports the following changes to a metalake:
 
 You can remove a metalake by sending a `DELETE` request to the `/api/metalakes/{metalake_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a metalake:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -151,6 +182,13 @@ boolean success = gravitinoAdminClient.dropMetalake(
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_admin_client.drop_metalake(NameIdentifier.of("metalake"))
+```
+
+</TabItem>
 </Tabs>
 
 :::note
@@ -162,7 +200,7 @@ catalogs, schemas and tables under the metalake need to be removed before droppi
 
 You can list metalakes by sending a `GET` request to the `/api/metalakes` endpoint or just use the Gravitino Java client. The following is an example of listing all metalake names:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -177,6 +215,13 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 // ...
 GravitinoMetaLake[] allMetalakes = gravitinoAdminClient.listMetalakes();
 // ...
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+metalake_list: List[GravitinoMetalake] = gravitino_admin_client.list_metalakes()
 ```
 
 </TabItem>

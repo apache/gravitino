@@ -16,12 +16,12 @@ import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType.EXTERNAL_TABLE;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType.MANAGED_TABLE;
+import static com.datastrato.gravitino.catalog.hive.converter.HiveDataTypeConverter.CONVERTER;
 import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.identity;
 
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType;
-import com.datastrato.gravitino.catalog.hive.converter.FromHiveType;
-import com.datastrato.gravitino.catalog.hive.converter.ToHiveType;
 import com.datastrato.gravitino.connector.BaseTable;
+import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.connector.TableOperations;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
@@ -61,6 +61,8 @@ public class HiveTable extends BaseTable {
   // A set of supported Hive table types.
   public static final Set<String> SUPPORT_TABLE_TYPES =
       Sets.newHashSet(MANAGED_TABLE.name(), EXTERNAL_TABLE.name());
+  public static final String ICEBERG_TABLE_TYPE_VALUE = "ICEBERG";
+  public static final String TABLE_TYPE_PROP = "table_type";
   private String schemaName;
   private CachedClientPool clientPool;
   private StorageDescriptor sd;
@@ -100,7 +102,7 @@ public class HiveTable extends BaseTable {
                   f ->
                       SortOrders.of(
                           NamedReference.field(f.getCol()),
-                          f.getOrder() == 0 ? SortDirection.ASCENDING : SortDirection.DESCENDING))
+                          f.getOrder() == 1 ? SortDirection.ASCENDING : SortDirection.DESCENDING))
               .toArray(SortOrder[]::new);
     }
 
@@ -111,7 +113,7 @@ public class HiveTable extends BaseTable {
                         f ->
                             HiveColumn.builder()
                                 .withName(f.getName())
-                                .withType(FromHiveType.convert(f.getType()))
+                                .withType(CONVERTER.toGravitino(f.getType()))
                                 .withComment(f.getComment())
                                 .build()),
                 table.getPartitionKeys().stream()
@@ -119,7 +121,7 @@ public class HiveTable extends BaseTable {
                         p ->
                             HiveColumn.builder()
                                 .withName(p.getName())
-                                .withType(FromHiveType.convert(p.getType()))
+                                .withType(CONVERTER.toGravitino(p.getType()))
                                 .withComment(p.getComment())
                                 .build()))
             .toArray(Column[]::new);
@@ -184,7 +186,7 @@ public class HiveTable extends BaseTable {
    *
    * @return The converted Table.
    */
-  public Table toHiveTable(HiveTablePropertiesMetadata tablePropertiesMetadata) {
+  public Table toHiveTable(PropertiesMetadata tablePropertiesMetadata) {
     Table hiveTable = new Table();
 
     hiveTable.setTableName(name);
@@ -238,12 +240,12 @@ public class HiveTable extends BaseTable {
             .collect(Collectors.toList());
     return new FieldSchema(
         partitionColumns.get(0).name(),
-        ToHiveType.convert(partitionColumns.get(0).dataType()).getQualifiedName(),
+        CONVERTER.fromGravitino(partitionColumns.get(0).dataType()).getQualifiedName(),
         partitionColumns.get(0).comment());
   }
 
   private StorageDescriptor buildStorageDescriptor(
-      HiveTablePropertiesMetadata tablePropertiesMetadata, List<FieldSchema> partitionFields) {
+      PropertiesMetadata tablePropertiesMetadata, List<FieldSchema> partitionFields) {
     StorageDescriptor sd = new StorageDescriptor();
     List<String> partitionKeys =
         partitionFields.stream().map(FieldSchema::getName).collect(Collectors.toList());
@@ -253,7 +255,9 @@ public class HiveTable extends BaseTable {
             .map(
                 c ->
                     new FieldSchema(
-                        c.name(), ToHiveType.convert(c.dataType()).getQualifiedName(), c.comment()))
+                        c.name(),
+                        CONVERTER.fromGravitino(c.dataType()).getQualifiedName(),
+                        c.comment()))
             .collect(Collectors.toList()));
 
     // `location` must not be null, otherwise it will result in an NPE when calling HMS `alterTable`
@@ -276,7 +280,7 @@ public class HiveTable extends BaseTable {
       for (SortOrder sortOrder : sortOrders) {
         String columnName = ((NamedReference.FieldReference) sortOrder.expression()).fieldName()[0];
         sd.addToSortCols(
-            new Order(columnName, sortOrder.direction() == SortDirection.ASCENDING ? 0 : 1));
+            new Order(columnName, sortOrder.direction() == SortDirection.ASCENDING ? 1 : 0));
       }
     }
 
@@ -291,7 +295,7 @@ public class HiveTable extends BaseTable {
     return sd;
   }
 
-  private SerDeInfo buildSerDeInfo(HiveTablePropertiesMetadata tablePropertiesMetadata) {
+  private SerDeInfo buildSerDeInfo(PropertiesMetadata tablePropertiesMetadata) {
     SerDeInfo serDeInfo = new SerDeInfo();
     serDeInfo.setName(properties().getOrDefault(SERDE_NAME, name()));
 

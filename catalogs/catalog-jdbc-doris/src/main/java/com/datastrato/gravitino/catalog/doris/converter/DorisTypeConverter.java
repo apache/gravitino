@@ -9,7 +9,7 @@ import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
 
 /** Type converter for Doris. */
-public class DorisTypeConverter extends JdbcTypeConverter<String> {
+public class DorisTypeConverter extends JdbcTypeConverter {
   static final String BOOLEAN = "boolean";
   static final String TINYINT = "tinyint";
   static final String SMALLINT = "smallint";
@@ -23,7 +23,7 @@ public class DorisTypeConverter extends JdbcTypeConverter<String> {
   static final String STRING = "string";
 
   @Override
-  public Type toGravitinoType(JdbcTypeBean typeBean) {
+  public Type toGravitino(JdbcTypeBean typeBean) {
     switch (typeBean.getTypeName().toLowerCase()) {
       case BOOLEAN:
         return Types.BooleanType.get();
@@ -54,12 +54,12 @@ public class DorisTypeConverter extends JdbcTypeConverter<String> {
       case TEXT:
         return Types.StringType.get();
       default:
-        throw new IllegalArgumentException("Not a supported type: " + typeBean);
+        return Types.ExternalType.of(typeBean.getTypeName());
     }
   }
 
   @Override
-  public String fromGravitinoType(Type type) {
+  public String fromGravitino(Type type) {
     if (type instanceof Types.BooleanType) {
       return BOOLEAN;
     } else if (type instanceof Types.ByteType) {

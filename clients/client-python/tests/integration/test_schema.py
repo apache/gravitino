@@ -7,19 +7,22 @@ import logging
 from random import randint
 from typing import Dict, List
 
-from gravitino.api.catalog import Catalog
-from gravitino.api.schema import Schema
-from gravitino.api.schema_change import SchemaChange
-from gravitino.client.gravitino_admin_client import GravitinoAdminClient
-from gravitino.client.gravitino_client import GravitinoClient
-from gravitino.name_identifier import NameIdentifier
+from gravitino import (
+    NameIdentifier,
+    GravitinoAdminClient,
+    GravitinoClient,
+    Catalog,
+    SchemaChange,
+    Schema,
+)
+
 from tests.integration.integration_test_env import IntegrationTestEnv
 
 logger = logging.getLogger(__name__)
 
 
 class TestSchema(IntegrationTestEnv):
-    metalake_name: str = "TestSchema-metalake" + str(randint(1, 10000))
+    metalake_name: str = "TestSchema_metalake" + str(randint(1, 10000))
 
     catalog_name: str = "testCatalog"
     catalog_location_prop: str = "location"  # Fileset Catalog must set `location`
@@ -69,7 +72,7 @@ class TestSchema(IntegrationTestEnv):
         )
         self.gravitino_client.create_catalog(
             ident=self.catalog_ident,
-            type=Catalog.Type.FILESET,
+            catalog_type=Catalog.Type.FILESET,
             provider=self.catalog_provider,
             comment="",
             properties={self.catalog_location_prop: "/tmp/test_schema"},

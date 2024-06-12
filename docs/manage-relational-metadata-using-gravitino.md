@@ -172,7 +172,7 @@ Currently, Gravitino supports the following changes to a catalog:
 
 You can remove a catalog by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a catalog:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -204,7 +204,7 @@ Dropping a catalog only removes metadata about the catalog, schemas, and tables 
 You can list all catalogs under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs` endpoint or just use the Gravitino Java client. The following is an example of listing all catalogs in
 a metalake:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -230,7 +230,7 @@ NameIdentifier[] catalogsIdents = gravitinoClient.listCatalogs(Namespace.ofCatal
 
 You can list all catalogs' information under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs?details=true` endpoint or just use the Gravitino Java client. The following is an example of listing all catalogs' information in a metalake:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -263,7 +263,7 @@ Users should create a metalake and a catalog before creating a schema.
 
 You can create a schema by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint or just use the Gravitino Java client. The following is an example of creating a schema:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -297,6 +297,17 @@ Schema schema = supportsSchemas.createSchema(
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
+catalog: Catalog = gravitino_client.load_catalog(ident=NameIdentifier.of("metalake", "hive_catalog"))
+catalog.as_schemas().create_schema(ident=NameIdentifier.of("metalake", "hive_catalog", "schema"),
+                                   comment="This is a schema",
+                                   properties={})
+```
+
+</TabItem>
 </Tabs>
 
 Currently, Gravitino supports the following schema property:
@@ -313,7 +324,7 @@ Currently, Gravitino supports the following schema property:
 
 You can create a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a schema:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -335,13 +346,22 @@ Schema schema = supportsSchemas.loadSchema(NameIdentifier.of("metalake", "hive_c
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
+catalog: Catalog = gravitino_client.load_catalog(ident=NameIdentifier.of("metalake", "hive_catalog"))
+schema: Schema = catalog.as_schemas().load_schema(ident=NameIdentifier.of("metalake", "hive_catalog", "schema"))
+```
+
+</TabItem>
 </Tabs>
 
 ### Alter a schema
 
 You can change a schema by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of modifying a schema:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -377,6 +397,21 @@ Schema schema = supportsSchemas.alterSchema(NameIdentifier.of("metalake", "hive_
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
+catalog: Catalog = gravitino_client.load_catalog(ident=NameIdentifier.of("metalake", "hive_catalog"))
+
+changes = (
+    SchemaChange.remove_property("schema_properties_key1"),
+    SchemaChange.set_property("schema_properties_key2", "schema_propertie_new_value"),
+)
+schema_new: Schema = catalog.as_schemas().alter_schema(NameIdentifier.of("metalake", "hive_catalog", "schema"), 
+                                                       *changes)
+```
+
+</TabItem>
 </Tabs>
 
 Currently, Gravitino supports the following changes to a schema:
@@ -389,7 +424,7 @@ Currently, Gravitino supports the following changes to a schema:
 ### Drop a schema
 You can remove a schema by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a schema:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -413,6 +448,16 @@ supportsSchemas.dropSchema(NameIdentifier.of("metalake", "hive_catalog", "schema
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
+catalog: Catalog = gravitino_client.load_catalog(ident=NameIdentifier.of("metalake", "hive_catalog"))
+
+catalog.as_schemas().drop_schema(NameIdentifier.of("metalake", "hive_catalog", "schema"), cascade=True)
+```
+
+</TabItem>
 </Tabs>
 
 If `cascade` is true, Gravitino will drop all tables under the schema. Otherwise, Gravitino will throw an exception if there are tables under the schema. 
@@ -424,7 +469,7 @@ You can alter all schemas under a catalog by sending a `GET` request to the `/ap
     in a catalog:
 
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -442,6 +487,16 @@ Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "hiv
 
 SupportsSchemas supportsSchemas = catalog.asSchemas();
 NameIdentifier[] schemas = supportsSchemas.listSchemas(Namespace.ofSchema("metalake", "hive_catalog"));
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
+catalog: Catalog = gravitino_client.load_catalog(ident=NameIdentifier.of("metalake", "hive_catalog"))
+
+schema_list: List[NameIdentifier] = catalog.as_schemas().list_schemas(Namespace.of_schema("metalake", "hive_catalog"))
 ```
 
 </TabItem>
@@ -667,20 +722,23 @@ The following types that Gravitino supports:
 | Struct                    | `Types.StructType.of([Types.StructType.Field.of(name, type, nullable)])` | `{"type": "struct", "fields": [JSON StructField, {"name": string, "type": type JSON, "nullable": JSON Boolean, "comment": string}]}` | Struct type, indicate a struct of fields                                                         |
 | Union                     | `Types.UnionType.of([type1, type2, ...])`                                | `{"type": "union", "types": [type JSON, ...]}`                                                                                       | Union type, indicates a union of types                                                           |
 
-The related java doc is [here](pathname:///docs/0.5.0/api/java/com/datastrato/gravitino/rel/types/Type.html).
+The related java doc is [here](pathname:///docs/0.5.1/api/java/com/datastrato/gravitino/rel/types/Type.html).
 
-##### Unparsed type
+##### External type
 
-Unparsed type is a special type of column type, currently serves exclusively for presenting the data type of a column when it's unsolvable.
-The following shows the data structure of an unparsed type in JSON and Java, enabling easy retrieval of its value.
+External type is a special type of column type, when you need to use a data type that is not in the Gravitino type
+system, and you explicitly know its string representation in an external catalog (usually used in JDBC catalogs), then
+you can use the ExternalType to represent the type. Similarly, if the original type is unsolvable, it will be
+represented by ExternalType.
+The following shows the data structure of an external type in JSON and Java, enabling easy retrieval of its string value.
 
 <Tabs>
   <TabItem value="Json" label="Json">
 
 ```json
 {
-  "type": "unparsed",
-  "unparsedType": "user-defined"
+  "type": "external",
+  "catalogString": "user-defined"
 }
 ```
 
@@ -689,6 +747,34 @@ The following shows the data structure of an unparsed type in JSON and Java, ena
 
 ```java
 // The result of the following type is a string "user-defined"
+String typeString = ((ExternalType) type).catalogString();
+```
+
+  </TabItem>
+</Tabs>
+
+##### Unparsed type
+
+Unparsed type is a special type of column type, it used to address compatibility issues in type serialization and
+deserialization between the server and client. For instance, if a new column type is introduced on the Gravitino server
+that the client does not recognize, it will be treated as an unparsed type on the client side.
+The following shows the data structure of an unparsed type in JSON and Java, enabling easy retrieval of its value.
+
+<Tabs>
+  <TabItem value="Json" label="Json">
+
+```json
+{
+  "type": "unparsed",
+  "unparsedType": "unknown-type"
+}
+```
+
+  </TabItem>
+  <TabItem value="java" label="Java">
+
+```java
+// The result of the following type is a string "unknown-type"
 String unparsedValue = ((UnparsedType) type).unparsedType();
 ```
 
@@ -738,10 +824,10 @@ In addition to the basic settings, Gravitino supports the following features:
 
 | Feature             | Description                                                                                                                                                                                                                                                                                    | Java doc                                                                                                                 |
 |---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------|
-| Table partitioning  | Equal to `PARTITION BY` in Apache Hive, It is a partitioning strategy that is used to split a table into parts based on partition keys. Some table engine may not support this feature                                                                                                         | [Partition](pathname:///docs/0.5.0/api/java/com/datastrato/gravitino/dto/rel/partitioning/Partitioning.html)             |
-| Table bucketing     | Equal to `CLUSTERED BY` in Apache Hive, Bucketing a.k.a (Clustering) is a technique to split the data into more manageable files/parts, (By specifying the number of buckets to create). The value of the bucketing column will be hashed by a user-defined number into buckets.               | [Distribution](pathname:///docs/0.5.0/api/java/com/datastrato/gravitino/rel/expressions/distributions/Distribution.html) |
-| Table sort ordering | Equal to `SORTED BY` in Apache Hive, sort ordering is a method to sort the data in specific ways such as by a column or a function, and then store table data. it will highly improve the query performance under certain scenarios.                                                           | [SortOrder](pathname:///docs/0.5.0/api/java/com/datastrato/gravitino/rel/expressions/sorts/SortOrder.html)               |
-| Table indexes       | Equal to `KEY/INDEX` in MySQL , unique key enforces uniqueness of values in one or more columns within a table. It ensures that no two rows have identical values in specified columns, thereby facilitating data integrity and enabling efficient data retrieval and manipulation operations. | [Index](pathname:///docs/0.5.0/api/java/com/datastrato/gravitino/rel/indexes/Index.html)                                 |
+| Table partitioning  | Equal to `PARTITION BY` in Apache Hive, It is a partitioning strategy that is used to split a table into parts based on partition keys. Some table engine may not support this feature                                                                                                         | [Partition](pathname:///docs/0.5.1/api/java/com/datastrato/gravitino/dto/rel/partitioning/Partitioning.html)             |
+| Table bucketing     | Equal to `CLUSTERED BY` in Apache Hive, Bucketing a.k.a (Clustering) is a technique to split the data into more manageable files/parts, (By specifying the number of buckets to create). The value of the bucketing column will be hashed by a user-defined number into buckets.               | [Distribution](pathname:///docs/0.5.1/api/java/com/datastrato/gravitino/rel/expressions/distributions/Distribution.html) |
+| Table sort ordering | Equal to `SORTED BY` in Apache Hive, sort ordering is a method to sort the data in specific ways such as by a column or a function, and then store table data. it will highly improve the query performance under certain scenarios.                                                           | [SortOrder](pathname:///docs/0.5.1/api/java/com/datastrato/gravitino/rel/expressions/sorts/SortOrder.html)               |
+| Table indexes       | Equal to `KEY/INDEX` in MySQL , unique key enforces uniqueness of values in one or more columns within a table. It ensures that no two rows have identical values in specified columns, thereby facilitating data integrity and enabling efficient data retrieval and manipulation operations. | [Index](pathname:///docs/0.5.1/api/java/com/datastrato/gravitino/rel/indexes/Index.html)                                 |
 
 For more information, please see the related document on [partitioning, bucketing, sorting, and indexes](table-partitioning-bucketing-sort-order-indexes.md).
 
@@ -779,7 +865,7 @@ tableCatalog.loadTable(NameIdentifier.of("metalake", "hive_catalog", "schema", "
 </Tabs>
 
 :::note
-- When Gravitino loads a table from a catalog with various data types, if Gravitino is unable to parse the data type, it will use an **[Unparsed Type](#unparsed-type)** to preserve the original data type, ensuring that the table can be loaded successfully.
+- When Gravitino loads a table from a catalog with various data types, if Gravitino is unable to parse the data type, it will use an **[External Type](#external-type)** to preserve the original data type, ensuring that the table can be loaded successfully.
 - When Gravitino loads a table from a catalog that supports default value, if Gravitino is unable to parse the default value, it will use an **[Unparsed Expression](./expression.md#unparsed-expression)** to preserve the original default value, ensuring that the table can be loaded successfully.
 :::
 

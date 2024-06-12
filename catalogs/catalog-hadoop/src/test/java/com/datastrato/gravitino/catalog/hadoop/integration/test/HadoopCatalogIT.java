@@ -6,7 +6,7 @@ package com.datastrato.gravitino.catalog.hadoop.integration.test;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
@@ -16,7 +16,7 @@ import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
-import com.datastrato.gravitino.rel.Schema;
+import com.datastrato.gravitino.utils.NamespaceUtil;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -67,8 +67,10 @@ public class HadoopCatalogIT extends AbstractIT {
 
   @AfterAll
   public static void stop() throws IOException {
-    client.dropMetalake(NameIdentifier.of(metalakeName));
-
+    Catalog catalog = metalake.loadCatalog(catalogName);
+    catalog.asSchemas().dropSchema(schemaName, true);
+    metalake.dropCatalog(catalogName);
+    client.dropMetalake(metalakeName);
     if (hdfs != null) {
       hdfs.close();
     }
@@ -85,8 +87,8 @@ public class HadoopCatalogIT extends AbstractIT {
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
     GravitinoMetalake createdMetalake =
-        client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
-    GravitinoMetalake loadMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
     Assertions.assertEquals(createdMetalake, loadMetalake);
 
     metalake = loadMetalake;
@@ -94,25 +96,20 @@ public class HadoopCatalogIT extends AbstractIT {
 
   private static void createCatalog() {
     metalake.createCatalog(
-        NameIdentifier.of(metalakeName, catalogName),
-        Catalog.Type.FILESET,
-        provider,
-        "comment",
-        ImmutableMap.of());
+        catalogName, Catalog.Type.FILESET, provider, "comment", ImmutableMap.of());
 
-    catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    catalog = metalake.loadCatalog(catalogName);
   }
 
   private static void createSchema() {
-    NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");
     properties.put("location", defaultBaseLocation());
     String comment = "comment";
 
-    catalog.asSchemas().createSchema(ident, comment, properties);
-    Schema loadSchema = catalog.asSchemas().loadSchema(ident);
+    catalog.asSchemas().createSchema(schemaName, comment, properties);
+    Schema loadSchema = catalog.asSchemas().loadSchema(schemaName);
     Assertions.assertEquals(schemaName, loadSchema.name());
     Assertions.assertEquals(comment, loadSchema.comment());
     Assertions.assertEquals("val1", loadSchema.properties().get("key1"));
@@ -121,9 +118,8 @@ public class HadoopCatalogIT extends AbstractIT {
   }
 
   private static void dropSchema() {
-    NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
-    catalog.asSchemas().dropSchema(ident, true);
-    Assertions.assertFalse(catalog.asSchemas().schemaExists(ident));
+    catalog.asSchemas().dropSchema(schemaName, true);
+    Assertions.assertFalse(catalog.asSchemas().schemaExists(schemaName));
   }
 
   @Test
@@ -380,7 +376,7 @@ public class HadoopCatalogIT extends AbstractIT {
     NameIdentifier[] nameIdentifiers =
         catalog
             .asFilesetCatalog()
-            .listFilesets(Namespace.ofFileset(metalakeName, catalogName, schemaName));
+            .listFilesets(NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName));
     Assertions.assertEquals(0, nameIdentifiers.length, "should have no fileset");
 
     // create fileset1
@@ -413,7 +409,7 @@ public class HadoopCatalogIT extends AbstractIT {
     NameIdentifier[] nameIdentifiers1 =
         catalog
             .asFilesetCatalog()
-            .listFilesets(Namespace.ofFileset(metalakeName, catalogName, schemaName));
+            .listFilesets(NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName));
     Arrays.sort(nameIdentifiers1, Comparator.comparing(NameIdentifier::name));
     Assertions.assertEquals(2, nameIdentifiers1.length, "should have 2 filesets");
     Assertions.assertEquals(fileset1.name(), nameIdentifiers1[0].name());
@@ -547,38 +543,23 @@ public class HadoopCatalogIT extends AbstractIT {
     // Create a catalog without specifying location.
     Catalog filesetCatalog =
         metalake.createCatalog(
-            NameIdentifier.of(metalakeName, catalogName),
-            Catalog.Type.FILESET,
-            provider,
-            "comment",
-            ImmutableMap.of());
+            catalogName, Catalog.Type.FILESET, provider, "comment", ImmutableMap.of());
 
     // Create a schema without specifying location.
     String schemaName =
         GravitinoITUtils.genRandomName("test_drop_catalog_with_empty_schema_schema");
-    filesetCatalog
-        .asSchemas()
-        .createSchema(
-            NameIdentifier.of(metalakeName, catalogName, schemaName), "comment", ImmutableMap.of());
+    filesetCatalog.asSchemas().createSchema(schemaName, "comment", ImmutableMap.of());
 
     // Drop the empty schema.
-    boolean dropped =
-        filesetCatalog
-            .asSchemas()
-            .dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), true);
+    boolean dropped = filesetCatalog.asSchemas().dropSchema(schemaName, true);
     Assertions.assertTrue(dropped, "schema should be dropped");
     Assertions.assertFalse(
-        filesetCatalog
-            .asSchemas()
-            .schemaExists(NameIdentifier.of(metalakeName, catalogName, schemaName)),
-        "schema should not be exists");
+        filesetCatalog.asSchemas().schemaExists(schemaName), "schema should not be exists");
 
     // Drop the catalog.
-    dropped = metalake.dropCatalog(NameIdentifier.of(metalakeName, catalogName));
+    dropped = metalake.dropCatalog(catalogName);
     Assertions.assertTrue(dropped, "catalog should be dropped");
-    Assertions.assertFalse(
-        metalake.catalogExists(NameIdentifier.of(metalakeName, catalogName)),
-        "catalog should not be exists");
+    Assertions.assertFalse(metalake.catalogExists(catalogName), "catalog should not be exists");
   }
 
   private Fileset createFileset(

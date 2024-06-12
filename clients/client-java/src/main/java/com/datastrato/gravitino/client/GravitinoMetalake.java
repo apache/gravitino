@@ -7,7 +7,6 @@ package com.datastrato.gravitino.client;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.SupportsCatalogs;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
@@ -29,8 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Gravitino Metalake is the top-level metadata repository for users. It contains a list of catalogs
@@ -38,9 +35,6 @@ import org.slf4j.LoggerFactory;
  * alter and drop a catalog with specified identifier.
  */
 public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
-
-  private static final Logger LOG = LoggerFactory.getLogger(GravitinoMetalake.class);
-
   private static final String API_METALAKES_CATALOGS_PATH = "api/metalakes/%s/catalogs/%s";
 
   private final RESTClient restClient;
@@ -56,79 +50,74 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
   }
 
   /**
-   * List all the catalogs under this metalake with specified namespace.
+   * List all the catalogs under this metalake.
    *
-   * @param namespace The namespace to list the catalogs under it.
-   * @return A list of {@link NameIdentifier} of the catalogs under the specified namespace.
-   * @throws NoSuchMetalakeException if the metalake with specified namespace does not exist.
+   * @return A list of the catalog names under the current metalake.
+   * @throws NoSuchMetalakeException If the metalake does not exist.
    */
   @Override
-  public NameIdentifier[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException {
-    Namespace.checkCatalog(namespace);
+  public String[] listCatalogs() throws NoSuchMetalakeException {
 
     EntityListResponse resp =
         restClient.get(
-            String.format("api/metalakes/%s/catalogs", namespace.level(0)),
+            String.format("api/metalakes/%s/catalogs", this.name()),
             EntityListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.catalogErrorHandler());
     resp.validate();
 
-    return resp.identifiers();
+    return Arrays.stream(resp.identifiers()).map(NameIdentifier::name).toArray(String[]::new);
   }
 
   /**
-   * List all the catalogs with their information under this metalake with specified namespace.
+   * List all the catalogs with their information under this metalake.
    *
-   * @param namespace The namespace to list the catalogs under it.
    * @return A list of {@link Catalog} under the specified namespace.
    * @throws NoSuchMetalakeException if the metalake with specified namespace does not exist.
    */
   @Override
-  public Catalog[] listCatalogsInfo(Namespace namespace) throws NoSuchMetalakeException {
-    Namespace.checkCatalog(namespace);
+  public Catalog[] listCatalogsInfo() throws NoSuchMetalakeException {
 
     Map<String, String> params = new HashMap<>();
     params.put("details", "true");
     CatalogListResponse resp =
         restClient.get(
-            String.format("api/metalakes/%s/catalogs", namespace.level(0)),
+            String.format("api/metalakes/%s/catalogs", this.name()),
             params,
             CatalogListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.catalogErrorHandler());
 
     return Arrays.stream(resp.getCatalogs())
-        .map(c -> DTOConverters.toCatalog(c, restClient))
+        .map(c -> DTOConverters.toCatalog(this.name(), c, restClient))
         .toArray(Catalog[]::new);
   }
 
   /**
    * Load the catalog with specified identifier.
    *
-   * @param ident The identifier of the catalog to load.
+   * @param catalogName The identifier of the catalog to load.
    * @return The {@link Catalog} with specified identifier.
    * @throws NoSuchCatalogException if the catalog with specified identifier does not exist.
    */
   @Override
-  public Catalog loadCatalog(NameIdentifier ident) throws NoSuchCatalogException {
-    NameIdentifier.checkCatalog(ident);
+  public Catalog loadCatalog(String catalogName) throws NoSuchCatalogException {
 
     CatalogResponse resp =
         restClient.get(
-            String.format(API_METALAKES_CATALOGS_PATH, ident.namespace().level(0), ident.name()),
+            String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName),
             CatalogResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.catalogErrorHandler());
     resp.validate();
 
-    return DTOConverters.toCatalog(resp.getCatalog(), restClient);
+    return DTOConverters.toCatalog(this.name(), resp.getCatalog(), restClient);
   }
 
   /**
    * Create a new catalog with specified identifier, type, comment and properties.
    *
-   * @param ident The identifier of the catalog.
+   * @param catalogName The identifier of the catalog.
    * @param type The type of the catalog.
    * @param provider The provider of the catalog.
    * @param comment The comment of the catalog.
@@ -139,43 +128,41 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
    */
   @Override
   public Catalog createCatalog(
-      NameIdentifier ident,
+      String catalogName,
       Catalog.Type type,
       String provider,
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
-    NameIdentifier.checkCatalog(ident);
 
     CatalogCreateRequest req =
-        new CatalogCreateRequest(ident.name(), type, provider, comment, properties);
+        new CatalogCreateRequest(catalogName, type, provider, comment, properties);
     req.validate();
 
     CatalogResponse resp =
         restClient.post(
-            String.format("api/metalakes/%s/catalogs", ident.namespace().level(0)),
+            String.format("api/metalakes/%s/catalogs", this.name()),
             req,
             CatalogResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.catalogErrorHandler());
     resp.validate();
 
-    return DTOConverters.toCatalog(resp.getCatalog(), restClient);
+    return DTOConverters.toCatalog(this.name(), resp.getCatalog(), restClient);
   }
 
   /**
    * Alter the catalog with specified identifier by applying the changes.
    *
-   * @param ident the identifier of the catalog.
+   * @param catalogName the identifier of the catalog.
    * @param changes the changes to apply to the catalog.
    * @return the altered {@link Catalog}.
    * @throws NoSuchCatalogException if the catalog with specified identifier does not exist.
    * @throws IllegalArgumentException if the changes are invalid.
    */
   @Override
-  public Catalog alterCatalog(NameIdentifier ident, CatalogChange... changes)
+  public Catalog alterCatalog(String catalogName, CatalogChange... changes)
       throws NoSuchCatalogException, IllegalArgumentException {
-    NameIdentifier.checkCatalog(ident);
 
     List<CatalogUpdateRequest> reqs =
         Arrays.stream(changes)
@@ -186,40 +173,33 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
 
     CatalogResponse resp =
         restClient.put(
-            String.format(API_METALAKES_CATALOGS_PATH, ident.namespace().level(0), ident.name()),
+            String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName),
             updatesRequest,
             CatalogResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.catalogErrorHandler());
     resp.validate();
 
-    return DTOConverters.toCatalog(resp.getCatalog(), restClient);
+    return DTOConverters.toCatalog(this.name(), resp.getCatalog(), restClient);
   }
 
   /**
    * Drop the catalog with specified identifier.
    *
-   * @param ident the identifier of the catalog.
-   * @return true if the catalog is dropped successfully, false otherwise.
+   * @param catalogName the name of the catalog.
+   * @return true if the catalog is dropped successfully, false if the catalog does not exist.
    */
   @Override
-  public boolean dropCatalog(NameIdentifier ident) {
-    NameIdentifier.checkCatalog(ident);
+  public boolean dropCatalog(String catalogName) {
 
-    try {
-      DropResponse resp =
-          restClient.delete(
-              String.format(API_METALAKES_CATALOGS_PATH, ident.namespace().level(0), ident.name()),
-              DropResponse.class,
-              Collections.emptyMap(),
-              ErrorHandlers.catalogErrorHandler());
-      resp.validate();
-      return resp.dropped();
-
-    } catch (Exception e) {
-      LOG.warn("Failed to drop catalog {}", ident, e);
-      return false;
-    }
+    DropResponse resp =
+        restClient.delete(
+            String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName),
+            DropResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.catalogErrorHandler());
+    resp.validate();
+    return resp.dropped();
   }
 
   static class Builder extends MetalakeDTO.Builder<Builder> {

@@ -22,7 +22,6 @@ package com.datastrato.gravitino.client;
 import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
 import com.datastrato.gravitino.exceptions.RESTException;
-import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.rest.RESTRequest;
 import com.datastrato.gravitino.rest.RESTResponse;
 import com.datastrato.gravitino.rest.RESTUtils;
@@ -56,8 +55,6 @@ import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.hc.core5.io.CloseMode;
 import org.apache.hc.core5.net.URIBuilder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * An HttpClient for usage with the REST catalog.
@@ -69,8 +66,6 @@ import org.slf4j.LoggerFactory;
  * <p>Referred from core/src/main/java/org/apache/iceberg/rest/HTTPClient.java
  */
 public class HTTPClient implements RESTClient {
-
-  private static final Logger LOG = LoggerFactory.getLogger(HTTPClient.class);
 
   private static final String VERSION_HEADER = "application/vnd.gravitino.v1+json";
 
@@ -206,9 +201,6 @@ public class HTTPClient implements RESTClient {
           errorResponse =
               ((ErrorHandler) errorHandler).parseResponse(response.getCode(), responseBody, mapper);
         } else {
-          LOG.warn(
-              "Unknown error handler {}, response body won't be parsed",
-              errorHandler.getClass().getName());
           errorResponse =
               ErrorResponse.unknownError(
                   String.format(
@@ -223,7 +215,6 @@ public class HTTPClient implements RESTClient {
         // In such cases, we handle the situation by building an error response for the user.
         // Examples of such scenarios include network timeouts or load balancers returning default
         // 5xx responses.
-        LOG.error("Failed to parse an error response. Will create one instead.", e);
       }
     }
 
@@ -695,7 +686,7 @@ public class HTTPClient implements RESTClient {
 
     private final Map<String, String> baseHeaders = Maps.newHashMap();
     private String uri;
-    private ObjectMapper mapper = JsonUtils.objectMapper();
+    private ObjectMapper mapper = ObjectMapperProvider.objectMapper();
     private AuthDataProvider authDataProvider;
     private Runnable beforeConnectHandler;
 

@@ -38,7 +38,7 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
     def __init__(
         self,
         name: str = None,
-        type: Catalog.Type = Catalog.Type.UNSUPPORTED,
+        catalog_type: Catalog.Type = Catalog.Type.UNSUPPORTED,
         provider: str = None,
         comment: str = None,
         properties: Dict[str, str] = None,
@@ -47,7 +47,7 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
     ):
         super().__init__(
             _name=name,
-            _type=type,
+            _type=catalog_type,
             _provider=provider,
             _comment=comment,
             _properties=properties,
@@ -152,13 +152,13 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
         reqs = [
             BaseSchemaCatalog.to_schema_update_request(change) for change in changes
         ]
-        updatesRequest = SchemaUpdatesRequest(reqs)
-        updatesRequest.validate()
+        updates_request = SchemaUpdatesRequest(reqs)
+        updates_request.validate()
         resp = self.rest_client.put(
             BaseSchemaCatalog.format_schema_request_path(ident.namespace())
             + "/"
             + ident.name(),
-            updatesRequest,
+            updates_request,
         )
         schema_response = SchemaResponse.from_json(resp.body, infer_missing=True)
         schema_response.validate()
@@ -189,8 +189,8 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
             drop_resp = DropResponse.from_json(resp.body, infer_missing=True)
             drop_resp.validate()
             return drop_resp.dropped()
-        except Exception as e:
-            logger.warning(f"Failed to drop schema {ident}")
+        except Exception:
+            logger.warning("Failed to drop schema %s", ident)
             return False
 
     @staticmethod
@@ -203,7 +203,6 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
             return SchemaUpdateRequest.SetSchemaPropertyRequest(
                 change.property(), change.value()
             )
-        elif isinstance(change, SchemaChange.RemoveProperty):
+        if isinstance(change, SchemaChange.RemoveProperty):
             return SchemaUpdateRequest.RemoveSchemaPropertyRequest(change.property())
-        else:
-            raise ValueError(f"Unknown change type: {type(change).__name__}")
+        raise ValueError(f"Unknown change type: {type(change).__name__}")

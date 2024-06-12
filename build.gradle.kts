@@ -218,10 +218,6 @@ nexusPublishing {
   packageGroup.set("com.datastrato.gravitino")
 }
 
-dependencies {
-  testImplementation(libs.testng)
-}
-
 subprojects {
   // Gravitino Python client project didn't need to apply the java plugin
   if (project.name == "client-python") {
@@ -411,13 +407,8 @@ subprojects {
     reports.html.outputLocation.set(file("${rootProject.projectDir}/build/reports/"))
     val skipTests = project.hasProperty("skipTests")
     if (!skipTests) {
-      if (project.name == "trino-connector") {
-        useTestNG()
-        maxHeapSize = "2G"
-      } else {
-        useJUnitPlatform()
-      }
-
+      jvmArgs = listOf("-Xmx2G")
+      useJUnitPlatform()
       jvmArgs(project.property("extraJvmArgs") as List<*>)
       finalizedBy(tasks.getByName("jacocoTestReport"))
     }
@@ -464,6 +455,8 @@ tasks.rat {
     // Ignore files we track but do not need headers
     "**/.github/**/*",
     "dev/docker/**/*.xml",
+    "dev/docker/**/*.conf",
+    "dev/docker/kerberos-hive/kadm5.acl",
     "**/*.log",
     "**/licenses/*.txt",
     "**/licenses/*.md",
@@ -615,8 +608,8 @@ tasks {
   register("copySubprojectDependencies", Copy::class) {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
-        !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark-connector") && it.name != "trino-connector" &&
-        it.name != "integration-test" && it.name != "bundled-catalog"
+        !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark") && it.name != "trino-connector" &&
+        it.name != "integration-test" && it.name != "bundled-catalog" && it.name != "flink-connector"
       ) {
         from(it.configurations.runtimeClasspath)
         into("distribution/package/libs")
@@ -629,10 +622,11 @@ tasks {
       if (!it.name.startsWith("catalog") &&
         !it.name.startsWith("client") &&
         !it.name.startsWith("filesystem") &&
-        !it.name.startsWith("spark-connector") &&
+        !it.name.startsWith("spark") &&
         it.name != "trino-connector" &&
         it.name != "integration-test" &&
-        it.name != "bundled-catalog"
+        it.name != "bundled-catalog" &&
+        it.name != "flink-connector"
       ) {
         dependsOn("${it.name}:build")
         from("${it.name}/build/libs")
@@ -694,7 +688,7 @@ fun printDockerCheckInfo() {
   println("Docker server status ............................................ [${if (dockerRunning) "running" else "stop"}]")
   if (OperatingSystem.current().isMacOsX()) {
     println("mac-docker-connector status ..................................... [${if (macDockerConnector) "running" else "stop"}]")
-    println("OrbStack status ................................................. [${if (isOrbStack) "yes" else "no"}]")
+    println("OrbStack status ................................................. [${if (dockerRunning && isOrbStack) "yes" else "no"}]")
   }
 
   val docker_it_test = project.extra["docker_it_test"] as? Boolean ?: false
@@ -734,8 +728,8 @@ fun printMacDockerTip() {
 }
 
 fun checkMacDockerConnector() {
-  if (OperatingSystem.current().isLinux()) {
-    // Linux does not require the use of `docker-connector`
+  if (!OperatingSystem.current().isMacOsX()) {
+    // Only MacOs requires the use of `docker-connector`
     return
   }
 
@@ -770,7 +764,7 @@ fun checkDockerStatus() {
 }
 
 fun checkOrbStackStatus() {
-  if (OperatingSystem.current().isLinux()) {
+  if (!OperatingSystem.current().isMacOsX()) {
     return
   }
 

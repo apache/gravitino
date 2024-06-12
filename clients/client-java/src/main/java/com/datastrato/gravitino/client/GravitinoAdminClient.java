@@ -6,13 +6,12 @@
 package com.datastrato.gravitino.client;
 
 import com.datastrato.gravitino.MetalakeChange;
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.SupportsMetalakes;
 import com.datastrato.gravitino.authorization.Group;
-import com.datastrato.gravitino.authorization.Privilege;
 import com.datastrato.gravitino.authorization.Role;
 import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.User;
+import com.datastrato.gravitino.dto.authorization.SecurableObjectDTO;
 import com.datastrato.gravitino.dto.requests.GroupAddRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeCreateRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeUpdateRequest;
@@ -42,10 +41,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Collectors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Gravitino Client for the administrator to interact with the Gravitino API, allowing the client to
@@ -54,8 +50,6 @@ import org.slf4j.LoggerFactory;
  * <p>Normal users should use {@link GravitinoClient} to connect with the Gravitino server.
  */
 public class GravitinoAdminClient extends GravitinoClientBase implements SupportsMetalakes {
-
-  private static final Logger LOG = LoggerFactory.getLogger(GravitinoAdminClient.class);
   private static final String API_METALAKES_USERS_PATH = "api/metalakes/%s/users/%s";
   private static final String API_METALAKES_GROUPS_PATH = "api/metalakes/%s/groups/%s";
   private static final String API_METALAKES_ROLES_PATH = "api/metalakes/%s/roles/%s";
@@ -103,7 +97,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
   /**
    * Creates a new Metalake using the Gravitino API.
    *
-   * @param ident The identifier of the new Metalake.
+   * @param name The name of the new Metalake.
    * @param comment The comment for the new Metalake.
    * @param properties The properties of the new Metalake.
    * @return A GravitinoMetalake instance representing the newly created Metalake.
@@ -112,11 +106,11 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
    */
   @Override
   public GravitinoMetalake createMetalake(
-      NameIdentifier ident, String comment, Map<String, String> properties)
+      String name, String comment, Map<String, String> properties)
       throws MetalakeAlreadyExistsException {
-    NameIdentifier.checkMetalake(ident);
+    checkMetalakeName(name);
 
-    MetalakeCreateRequest req = new MetalakeCreateRequest(ident.name(), comment, properties);
+    MetalakeCreateRequest req = new MetalakeCreateRequest(name, comment, properties);
     req.validate();
 
     MetalakeResponse resp =
@@ -134,17 +128,16 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
   /**
    * Alters a specific Metalake using the Gravitino API.
    *
-   * @param ident The identifier of the Metalake to be altered.
+   * @param name The name of the Metalake to be altered.
    * @param changes The changes to be applied to the Metalake.
    * @return A GravitinoMetalake instance representing the updated Metalake.
    * @throws NoSuchMetalakeException If the specified Metalake does not exist.
    * @throws IllegalArgumentException If the provided changes are invalid or not applicable.
    */
   @Override
-  public GravitinoMetalake alterMetalake(NameIdentifier ident, MetalakeChange... changes)
+  public GravitinoMetalake alterMetalake(String name, MetalakeChange... changes)
       throws NoSuchMetalakeException, IllegalArgumentException {
-    NameIdentifier.checkMetalake(ident);
-
+    checkMetalakeName(name);
     List<MetalakeUpdateRequest> reqs =
         Arrays.stream(changes)
             .map(DTOConverters::toMetalakeUpdateRequest)
@@ -154,7 +147,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
 
     MetalakeResponse resp =
         restClient.put(
-            API_METALAKES_IDENTIFIER_PATH + ident.name(),
+            API_METALAKES_IDENTIFIER_PATH + name,
             updatesRequest,
             MetalakeResponse.class,
             Collections.emptyMap(),
@@ -167,27 +160,20 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
   /**
    * Drops a specific Metalake using the Gravitino API.
    *
-   * @param ident The identifier of the Metalake to be dropped.
-   * @return True if the Metalake was successfully dropped, false otherwise.
+   * @param name The name of the Metalake to be dropped.
+   * @return True if the Metalake was successfully dropped, false if the Metalake does not exist.
    */
   @Override
-  public boolean dropMetalake(NameIdentifier ident) {
-    NameIdentifier.checkMetalake(ident);
-
-    try {
-      DropResponse resp =
-          restClient.delete(
-              API_METALAKES_IDENTIFIER_PATH + ident.name(),
-              DropResponse.class,
-              Collections.emptyMap(),
-              ErrorHandlers.metalakeErrorHandler());
-      resp.validate();
-      return resp.dropped();
-
-    } catch (Exception e) {
-      LOG.warn("Failed to drop metadata {}", ident, e);
-      return false;
-    }
+  public boolean dropMetalake(String name) {
+    checkMetalakeName(name);
+    DropResponse resp =
+        restClient.delete(
+            API_METALAKES_IDENTIFIER_PATH + name,
+            DropResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.metalakeErrorHandler());
+    resp.validate();
+    return resp.dropped();
   }
 
   /**
@@ -429,8 +415,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
    * @param metalake The Metalake of the Role.
    * @param role The name of the Role.
    * @param properties The properties of the Role.
-   * @param securableObject The securable object of the Role.
-   * @param privileges The privileges of the Role.
+   * @param securableObjects The securable objects of the Role.
    * @return The created Role instance.
    * @throws RoleAlreadyExistsException If a Role with the same name already exists.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
@@ -440,18 +425,15 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
       String metalake,
       String role,
       Map<String, String> properties,
-      SecurableObject securableObject,
-      List<Privilege> privileges)
+      List<SecurableObject> securableObjects)
       throws RoleAlreadyExistsException, NoSuchMetalakeException {
     RoleCreateRequest req =
         new RoleCreateRequest(
             role,
             properties,
-            privileges.stream()
-                .map(Privilege::name)
-                .map(Objects::toString)
-                .collect(Collectors.toList()),
-            DTOConverters.toSecurableObject(securableObject));
+            securableObjects.stream()
+                .map(DTOConverters::toSecurableObject)
+                .toArray(SecurableObjectDTO[]::new));
     req.validate();
 
     RoleResponse resp =

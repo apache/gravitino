@@ -80,7 +80,7 @@ public class TestMessagingCatalog extends TestBase {
 
     catalog =
         metalake.createCatalog(
-            NameIdentifier.of(metalakeName, catalogName),
+            catalogName,
             CatalogDTO.Type.MESSAGING,
             provider,
             "comment",

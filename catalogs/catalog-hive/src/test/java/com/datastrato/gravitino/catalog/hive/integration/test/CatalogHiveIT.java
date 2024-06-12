@@ -31,6 +31,9 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Schema;
+import com.datastrato.gravitino.SchemaChange;
+import com.datastrato.gravitino.SupportsSchemas;
 import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.catalog.hive.HiveCatalogOperations;
 import com.datastrato.gravitino.catalog.hive.HiveClientPool;
@@ -48,9 +51,6 @@ import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Schema;
-import com.datastrato.gravitino.rel.SchemaChange;
-import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
@@ -199,7 +199,20 @@ public class CatalogHiveIT extends AbstractIT {
 
   @AfterAll
   public static void stop() throws IOException {
-    client.dropMetalake(NameIdentifier.of(metalakeName));
+    if (client != null) {
+      Arrays.stream(catalog.asSchemas().listSchemas())
+          .filter(schema -> !schema.equals("default"))
+          .forEach(
+              (schema -> {
+                catalog.asSchemas().dropSchema(schema, true);
+              }));
+      Arrays.stream(metalake.listCatalogs())
+          .forEach(
+              (catalogName -> {
+                metalake.dropCatalog(catalogName);
+              }));
+      client.dropMetalake(metalakeName);
+    }
     if (hiveClientPool != null) {
       hiveClientPool.close();
     }
@@ -216,11 +229,13 @@ public class CatalogHiveIT extends AbstractIT {
     } catch (Exception e) {
       LOG.error("Failed to close CloseableGroup", e);
     }
+
+    AbstractIT.client = null;
   }
 
   @AfterEach
   public void resetSchema() throws TException, InterruptedException {
-    catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), true);
+    catalog.asSchemas().dropSchema(schemaName, true);
     assertThrows(
         NoSuchObjectException.class,
         () -> hiveClientPool.run(client -> client.getDatabase(schemaName)));
@@ -232,8 +247,8 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
     GravitinoMetalake createdMetalake =
-        client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
-    GravitinoMetalake loadMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
     Assertions.assertEquals(createdMetalake, loadMetalake);
 
     metalake = loadMetalake;
@@ -243,14 +258,9 @@ public class CatalogHiveIT extends AbstractIT {
     Map<String, String> properties = Maps.newHashMap();
     properties.put(METASTORE_URIS, HIVE_METASTORE_URIS);
 
-    metalake.createCatalog(
-        NameIdentifier.of(metalakeName, catalogName),
-        Catalog.Type.RELATIONAL,
-        provider,
-        "comment",
-        properties);
+    metalake.createCatalog(catalogName, Catalog.Type.RELATIONAL, provider, "comment", properties);
 
-    catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    catalog = metalake.loadCatalog(catalogName);
   }
 
   private static void createSchema() throws TException, InterruptedException {
@@ -267,8 +277,8 @@ public class CatalogHiveIT extends AbstractIT {
             schemaName.toLowerCase()));
     String comment = "comment";
 
-    catalog.asSchemas().createSchema(ident, comment, properties);
-    Schema loadSchema = catalog.asSchemas().loadSchema(ident);
+    catalog.asSchemas().createSchema(ident.name(), comment, properties);
+    Schema loadSchema = catalog.asSchemas().loadSchema(ident.name());
     Assertions.assertEquals(schemaName.toLowerCase(), loadSchema.name());
     Assertions.assertEquals(comment, loadSchema.comment());
     Assertions.assertEquals("val1", loadSchema.properties().get("key1"));
@@ -621,7 +631,7 @@ public class CatalogHiveIT extends AbstractIT {
             HiveContainer.HDFS_DEFAULTFS_PORT);
 
     properties.put(HiveSchemaPropertiesMetadata.LOCATION, expectedSchemaLocation);
-    catalog.asSchemas().createSchema(schemaIdent, "comment", properties);
+    catalog.asSchemas().createSchema(schemaIdent.name(), "comment", properties);
 
     Database actualSchema = hiveClientPool.run(client -> client.getDatabase(schemaIdent.name()));
     String actualSchemaLocation = actualSchema.getLocationUri();
@@ -1029,7 +1039,7 @@ public class CatalogHiveIT extends AbstractIT {
 
     for (int i = 0; i < sortOrders.length; i++) {
       Assertions.assertEquals(
-          sortOrders[i].direction() == SortDirection.ASCENDING ? 0 : 1,
+          sortOrders[i].direction() == SortDirection.ASCENDING ? 1 : 0,
           hiveTab.getSd().getSortCols().get(i).getOrder());
       Assertions.assertEquals(
           ((NamedReference.FieldReference) sortOrders[i].expression()).fieldName()[0],
@@ -1257,23 +1267,23 @@ public class CatalogHiveIT extends AbstractIT {
   public void testAlterSchema() throws TException, InterruptedException {
     NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
 
-    GravitinoMetalake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
-    Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
-    Schema schema = catalog.asSchemas().loadSchema(ident);
+    GravitinoMetalake metalake = client.loadMetalake(metalakeName);
+    Catalog catalog = metalake.loadCatalog(catalogName);
+    Schema schema = catalog.asSchemas().loadSchema(ident.name());
     Assertions.assertNull(schema.auditInfo().lastModifier());
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, schema.auditInfo().creator());
     schema =
         catalog
             .asSchemas()
             .alterSchema(
-                ident,
+                ident.name(),
                 SchemaChange.removeProperty("key1"),
                 SchemaChange.setProperty("key2", "val2-alter"));
 
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, schema.auditInfo().lastModifier());
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, schema.auditInfo().creator());
 
-    Map<String, String> properties2 = catalog.asSchemas().loadSchema(ident).properties();
+    Map<String, String> properties2 = catalog.asSchemas().loadSchema(ident.name()).properties();
     Assertions.assertFalse(properties2.containsKey("key1"));
     Assertions.assertEquals("val2-alter", properties2.get("key2"));
 
@@ -1285,29 +1295,29 @@ public class CatalogHiveIT extends AbstractIT {
 
   @Test
   void testLoadEntityWithSamePrefix() {
-    GravitinoMetalake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
-    Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    GravitinoMetalake metalake = client.loadMetalake(metalakeName);
+    Catalog catalog = metalake.loadCatalog(catalogName);
     Assertions.assertNotNull(catalog);
 
     for (int i = 1; i < metalakeName.length(); i++) {
       // We can't get the metalake by prefix
       final int length = i;
       final NameIdentifier id = NameIdentifier.of(metalakeName.substring(0, length));
-      Assertions.assertThrows(NoSuchMetalakeException.class, () -> client.loadMetalake(id));
+      Assertions.assertThrows(NoSuchMetalakeException.class, () -> client.loadMetalake(id.name()));
     }
     final NameIdentifier idA = NameIdentifier.of(metalakeName + "a");
-    Assertions.assertThrows(NoSuchMetalakeException.class, () -> client.loadMetalake(idA));
+    Assertions.assertThrows(NoSuchMetalakeException.class, () -> client.loadMetalake(idA.name()));
 
     for (int i = 1; i < catalogName.length(); i++) {
       // We can't get the catalog by prefix
       final int length = i;
       final NameIdentifier id = NameIdentifier.of(metalakeName, catalogName.substring(0, length));
-      Assertions.assertThrows(NoSuchCatalogException.class, () -> metalake.loadCatalog(id));
+      Assertions.assertThrows(NoSuchCatalogException.class, () -> metalake.loadCatalog(id.name()));
     }
 
     // We can't load the catalog.
     final NameIdentifier idB = NameIdentifier.of(metalakeName, catalogName + "a");
-    Assertions.assertThrows(NoSuchCatalogException.class, () -> metalake.loadCatalog(idB));
+    Assertions.assertThrows(NoSuchCatalogException.class, () -> metalake.loadCatalog(idB.name()));
 
     SupportsSchemas schemas = catalog.asSchemas();
 
@@ -1316,11 +1326,11 @@ public class CatalogHiveIT extends AbstractIT {
       final int length = i;
       final NameIdentifier id =
           NameIdentifier.of(metalakeName, catalogName, schemaName.substring(0, length));
-      Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(id));
+      Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(id.name()));
     }
 
     NameIdentifier idC = NameIdentifier.of(metalakeName, catalogName, schemaName + "a");
-    Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(idC));
+    Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(idC.name()));
 
     TableCatalog tableCatalog = catalog.asTableCatalog();
 
@@ -1339,56 +1349,56 @@ public class CatalogHiveIT extends AbstractIT {
   @Test
   void testAlterEntityName() {
     String metalakeName = GravitinoITUtils.genRandomName("CatalogHiveIT_metalake");
-    client.createMetalake(NameIdentifier.of(metalakeName), "", ImmutableMap.of());
-    final GravitinoMetalake metalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    client.createMetalake(metalakeName, "", ImmutableMap.of());
+    final GravitinoMetalake metalake = client.loadMetalake(metalakeName);
     String newMetalakeName = GravitinoITUtils.genRandomName("CatalogHiveIT_metalake_new");
 
     // Test rename metalake
     NameIdentifier id = NameIdentifier.of(metalakeName);
     NameIdentifier newId = NameIdentifier.of(newMetalakeName);
     for (int i = 0; i < 2; i++) {
-      Assertions.assertThrows(NoSuchMetalakeException.class, () -> client.loadMetalake(newId));
-      client.alterMetalake(id, MetalakeChange.rename(newMetalakeName));
-      client.loadMetalake(newId);
-      Assertions.assertThrows(NoSuchMetalakeException.class, () -> client.loadMetalake(id));
+      Assertions.assertThrows(
+          NoSuchMetalakeException.class, () -> client.loadMetalake(newId.name()));
+      client.alterMetalake(id.name(), MetalakeChange.rename(newMetalakeName));
+      client.loadMetalake(newId.name());
+      Assertions.assertThrows(NoSuchMetalakeException.class, () -> client.loadMetalake(id.name()));
 
-      client.alterMetalake(newId, MetalakeChange.rename(metalakeName));
-      client.loadMetalake(id);
-      Assertions.assertThrows(NoSuchMetalakeException.class, () -> client.loadMetalake(newId));
+      client.alterMetalake(newId.name(), MetalakeChange.rename(metalakeName));
+      client.loadMetalake(id.name());
+      Assertions.assertThrows(
+          NoSuchMetalakeException.class, () -> client.loadMetalake(newId.name()));
     }
 
     String catalogName = GravitinoITUtils.genRandomName("CatalogHiveIT_catalog");
     metalake.createCatalog(
-        NameIdentifier.of(metalakeName, catalogName),
+        catalogName,
         Catalog.Type.RELATIONAL,
         provider,
         "comment",
         ImmutableMap.of(METASTORE_URIS, HIVE_METASTORE_URIS));
 
-    Catalog catalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Catalog catalog = metalake.loadCatalog(catalogName);
     // Test rename catalog
     String newCatalogName = GravitinoITUtils.genRandomName("CatalogHiveIT_catalog_new");
     NameIdentifier newId2 = NameIdentifier.of(metalakeName, newMetalakeName);
     NameIdentifier oldId = NameIdentifier.of(metalakeName, catalogName);
     for (int i = 0; i < 2; i++) {
-      Assertions.assertThrows(NoSuchCatalogException.class, () -> metalake.loadCatalog(newId2));
-      metalake.alterCatalog(
-          NameIdentifier.of(metalakeName, catalogName), CatalogChange.rename(newCatalogName));
-      metalake.loadCatalog(NameIdentifier.of(metalakeName, newCatalogName));
-      Assertions.assertThrows(NoSuchCatalogException.class, () -> metalake.loadCatalog(oldId));
+      Assertions.assertThrows(
+          NoSuchCatalogException.class, () -> metalake.loadCatalog(newId2.name()));
+      metalake.alterCatalog(catalogName, CatalogChange.rename(newCatalogName));
+      metalake.loadCatalog(newCatalogName);
+      Assertions.assertThrows(
+          NoSuchCatalogException.class, () -> metalake.loadCatalog(oldId.name()));
 
-      metalake.alterCatalog(
-          NameIdentifier.of(metalakeName, newCatalogName), CatalogChange.rename(catalogName));
-      catalog = metalake.loadCatalog(oldId);
-      Assertions.assertThrows(NoSuchCatalogException.class, () -> metalake.loadCatalog(newId2));
+      metalake.alterCatalog(newCatalogName, CatalogChange.rename(catalogName));
+      catalog = metalake.loadCatalog(oldId.name());
+      Assertions.assertThrows(
+          NoSuchCatalogException.class, () -> metalake.loadCatalog(newId2.name()));
     }
 
     // Schema does not have the rename operation.
     final String schemaName = GravitinoITUtils.genRandomName("CatalogHiveIT_schema");
-    catalog
-        .asSchemas()
-        .createSchema(
-            NameIdentifier.of(metalakeName, catalogName, schemaName), "", ImmutableMap.of());
+    catalog.asSchemas().createSchema(schemaName, "", ImmutableMap.of());
 
     final Catalog cata = catalog;
     // Now try to rename table
@@ -1432,23 +1442,22 @@ public class CatalogHiveIT extends AbstractIT {
     String metalakeName1 = GravitinoITUtils.genRandomName("CatalogHiveIT_metalake1");
     String metalakeName2 = GravitinoITUtils.genRandomName("CatalogHiveIT_metalake2");
 
-    client.createMetalake(NameIdentifier.of(metalakeName1), "comment", Collections.emptyMap());
-    client.createMetalake(NameIdentifier.of(metalakeName2), "comment", Collections.emptyMap());
+    client.createMetalake(metalakeName1, "comment", Collections.emptyMap());
+    client.createMetalake(metalakeName2, "comment", Collections.emptyMap());
 
-    client.dropMetalake(NameIdentifier.of(metalakeName1));
-    client.dropMetalake(NameIdentifier.of(metalakeName2));
+    client.dropMetalake(metalakeName1);
+    client.dropMetalake(metalakeName2);
 
-    client.createMetalake(NameIdentifier.of(metalakeName1), "comment", Collections.emptyMap());
+    client.createMetalake(metalakeName1, "comment", Collections.emptyMap());
 
-    client.alterMetalake(NameIdentifier.of(metalakeName1), MetalakeChange.rename(metalakeName2));
+    client.alterMetalake(metalakeName1, MetalakeChange.rename(metalakeName2));
 
-    client.loadMetalake(NameIdentifier.of(metalakeName2));
+    client.loadMetalake(metalakeName2);
 
-    NameIdentifier of = NameIdentifier.of(metalakeName1);
     Assertions.assertThrows(
         NoSuchMetalakeException.class,
         () -> {
-          client.loadMetalake(of);
+          client.loadMetalake(metalakeName1);
         });
   }
 
@@ -1646,11 +1655,9 @@ public class CatalogHiveIT extends AbstractIT {
     properties.put(METASTORE_URIS, HIVE_METASTORE_URIS);
     properties.put(BaseCatalog.CATALOG_OPERATION_IMPL, customImpl);
 
-    metalake.createCatalog(
-        NameIdentifier.of(metalakeName, catalogName),
-        Catalog.Type.RELATIONAL,
-        provider,
-        "comment",
-        properties);
+    Catalog catalog =
+        metalake.createCatalog(
+            catalogName, Catalog.Type.RELATIONAL, provider, "comment", properties);
+    catalog.asSchemas().listSchemas();
   }
 }

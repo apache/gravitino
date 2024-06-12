@@ -82,11 +82,7 @@ public class TestFilesetCatalog extends TestBase {
 
     catalog =
         metalake.createCatalog(
-            NameIdentifier.of(metalakeName, catalogName),
-            CatalogDTO.Type.FILESET,
-            provider,
-            "comment",
-            ImmutableMap.of("k1", "k2"));
+            catalogName, CatalogDTO.Type.FILESET, provider, "comment", ImmutableMap.of("k1", "k2"));
   }
 
   @Test

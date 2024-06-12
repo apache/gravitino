@@ -56,6 +56,7 @@ import com.fasterxml.jackson.databind.cfg.EnumFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -104,6 +105,8 @@ public class JsonUtils {
   private static final String UNION = "union";
   private static final String UNPARSED = "unparsed";
   private static final String UNPARSED_TYPE = "unparsedType";
+  private static final String EXTERNAL = "external";
+  private static final String CATALOG_STRING = "catalogString";
   private static final String FIELDS = "fields";
   private static final String UNION_TYPES = "types";
   private static final String STRUCT_FIELD_NAME = "name";
@@ -235,10 +238,19 @@ public class JsonUtils {
   }
 
   /**
-   * Get the shared ObjectMapper instance for JSON serialization/deserialization.
+   * Returns a shared {@link ObjectMapper} instance for JSON serialization/deserialization test.
    *
-   * @return The ObjectMapper instance.
+   * <p>Note: This instance is intended for testing purposes only. For production use, obtain an
+   * {@link ObjectMapper} from the following providers:
+   *
+   * <ul>
+   *   <li>Client side: {@code com.datastrato.gravitino.client.ObjectMapperProvider}
+   *   <li>Server side: {@code com.datastrato.gravitino.server.web.ObjectMapperProvider}
+   * </ul>
+   *
+   * @return the shared {@link ObjectMapper} instance for testing.
    */
+  @VisibleForTesting
   public static ObjectMapper objectMapper() {
     return ObjectMapperHolder.INSTANCE;
   }
@@ -644,6 +656,9 @@ public class JsonUtils {
       case UNPARSED:
         writeUnparsedType((Types.UnparsedType) dataType, gen);
         break;
+      case EXTERNAL:
+        writeExternalType((Types.ExternalType) dataType, gen);
+        break;
       default:
         writeUnparsedType(dataType.simpleString(), gen);
     }
@@ -688,9 +703,13 @@ public class JsonUtils {
       if (UNPARSED.equals(type)) {
         return readUnparsedType(node);
       }
+
+      if (EXTERNAL.equals(type)) {
+        return readExternalType(node);
+      }
     }
 
-    throw new IllegalArgumentException("Cannot parse type from JSON: " + node);
+    return Types.UnparsedType.of(node.toString());
   }
 
   private static void writeUnionType(Types.UnionType unionType, JsonGenerator gen)
@@ -770,7 +789,15 @@ public class JsonUtils {
     gen.writeEndObject();
   }
 
-  private static Type.PrimitiveType fromPrimitiveTypeString(String typeString) {
+  private static void writeExternalType(Types.ExternalType externalType, JsonGenerator gen)
+      throws IOException {
+    gen.writeStartObject();
+    gen.writeStringField(TYPE, EXTERNAL);
+    gen.writeStringField(CATALOG_STRING, externalType.catalogString());
+    gen.writeEndObject();
+  }
+
+  private static Type fromPrimitiveTypeString(String typeString) {
     Type.PrimitiveType primitiveType = TYPES.get(typeString);
     if (primitiveType != null) {
       return primitiveType;
@@ -797,7 +824,7 @@ public class JsonUtils {
           Integer.parseInt(decimal.group(1)), Integer.parseInt(decimal.group(2)));
     }
 
-    throw new IllegalArgumentException("Cannot parse type string to primitiveType: " + typeString);
+    return Types.UnparsedType.of(typeString);
   }
 
   private static Types.StructType readStructType(JsonNode node) {
@@ -877,6 +904,15 @@ public class JsonUtils {
         node.has(UNPARSED_TYPE), "Cannot parse unparsed type from missing unparsed type: %s", node);
 
     return Types.UnparsedType.of(node.get(UNPARSED_TYPE).asText());
+  }
+
+  private static Types.ExternalType readExternalType(JsonNode node) {
+    Preconditions.checkArgument(
+        node.has(CATALOG_STRING),
+        "Cannot parse external type from missing catalogString: %s",
+        node);
+
+    return Types.ExternalType.of(node.get(CATALOG_STRING).asText());
   }
 
   // Nested classes for custom serialization and deserialization

@@ -127,8 +127,6 @@ public class ScriptRunner {
           println(trimmedLine);
         } else if (trimmedLine.length() < 1 || trimmedLine.startsWith("//")) {
           // Do nothing
-        } else if (trimmedLine.length() < 1 || trimmedLine.startsWith("--")) {
-          // Do nothing
         } else if (!fullLineDelimiter && trimmedLine.endsWith(getDelimiter())
             || fullLineDelimiter && trimmedLine.equals(getDelimiter())) {
           command.append(line, 0, line.lastIndexOf(getDelimiter()));

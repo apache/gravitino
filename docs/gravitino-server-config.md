@@ -131,6 +131,12 @@ For more details, please refer to the definition of the plugin.
 
 Refer to [security](security.md) for HTTPS and authentication configurations.
 
+### Metrics configuration
+
+| Property name                             | Description                                          | Default value | Required | Since Version |
+|-------------------------------------------|------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.metrics.timeSlidingWindowSecs` | The seconds of Gravitino metrics time sliding window | 60            | No       | 0.5.1         |
+
 ## Gravitino catalog properties configuration
 
 There are three types of catalog properties:

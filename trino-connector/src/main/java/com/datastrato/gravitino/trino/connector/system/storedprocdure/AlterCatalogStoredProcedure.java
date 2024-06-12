@@ -50,7 +50,7 @@ public class AlterCatalogStoredProcedure extends GravitinoStoredProcedure {
                 new ArrayType(VARCHAR),
                 false,
                 ArrayBlock.fromElementBlock(
-                    0, Optional.empty(), new int[1], VARCHAR.createBlockBuilder(null, 1))));
+                    0, Optional.empty(), new int[1], VARCHAR.createBlockBuilder(null, 1).build())));
     return new Procedure(SYSTEM_TABLE_SCHEMA_NAME, "alter_catalog", arguments, dropCatalog);
   }
 

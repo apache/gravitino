@@ -5,8 +5,6 @@
 
 package com.datastrato.gravitino.metalake;
 
-import com.datastrato.gravitino.SupportsMetalakes;
-
 /**
  * {@code MetalakeDispatcher} interface acts as a specialization of the {@link SupportsMetalakes}
  * interface. This interface is designed to potentially add custom behaviors or operations related

@@ -37,7 +37,7 @@ import { yupResolver } from '@hookform/resolvers/yup'
 import { groupBy } from 'lodash-es'
 import { genUpdates } from '@/lib/utils'
 import { providers, filesetProviders, messagingProviders } from '@/lib/utils/initial'
-import { nameRegex, keyRegex } from '@/lib/utils/regex'
+import { nameRegex, nameRegexDesc, keyRegex } from '@/lib/utils/regex'
 import { useSearchParams } from 'next/navigation'
 
 const defaultValues = {
@@ -49,13 +49,7 @@ const defaultValues = {
 }
 
 const schema = yup.object().shape({
-  name: yup
-    .string()
-    .required()
-    .matches(
-      nameRegex,
-      'This field must start with a letter or underscore, and can only contain letters, numbers, dashes, and underscores'
-    ),
+  name: yup.string().required().matches(nameRegex, nameRegexDesc),
   type: yup.mixed().oneOf(['relational', 'fileset', 'messaging']).required(),
   provider: yup.string().when('type', (type, schema) => {
     switch (type) {
@@ -236,7 +230,7 @@ const CreateCatalogDialog = props => {
         let properties = {}
 
         const prevProperties = innerProps
-          .filter(i => i.key.trim() !== '')
+          .filter(i => (typeSelect === 'fileset' && i.key === 'location' ? i.value.trim() !== '' : i.key.trim() !== ''))
           .reduce((acc, item) => {
             acc[item.key] = item.value
 
@@ -363,7 +357,7 @@ const CreateCatalogDialog = props => {
       setProviderTypes(providersItems)
 
       const providerItem = providersItems.find(i => i.value === data.provider)
-      let propsItems = [...providerItem.defaultProps]
+      let propsItems = [...providerItem.defaultProps].filter(i => i.required)
 
       propsItems = propsItems.map((it, idx) => {
         let propItem = {

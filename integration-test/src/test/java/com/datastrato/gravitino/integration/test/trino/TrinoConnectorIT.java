@@ -8,16 +8,14 @@ import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.container.TrinoContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
-import com.datastrato.gravitino.integration.test.util.ITUtils;
-import com.datastrato.gravitino.integration.test.util.JdbcDriverDownloader;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Schema;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
@@ -48,11 +46,14 @@ import org.apache.thrift.TException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@Disabled
+@Deprecated
 @Tag("gravitino-docker-it")
 public class TrinoConnectorIT extends AbstractIT {
   public static final Logger LOG = LoggerFactory.getLogger(TrinoConnectorIT.class);
@@ -102,26 +103,6 @@ public class TrinoConnectorIT extends AbstractIT {
         "Can not synchronize calatogs from gravitino");
 
     createSchema();
-
-    String testMode =
-        System.getProperty(ITUtils.TEST_MODE) == null
-            ? ITUtils.EMBEDDED_TEST_MODE
-            : System.getProperty(ITUtils.TEST_MODE);
-
-    // Deploy mode, you should download jars to the Gravitino server iceberg lib directory
-    if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
-      String gravitinoHome = System.getenv("GRAVITINO_HOME");
-      String destPath = ITUtils.joinPath(gravitinoHome, "catalogs", "lakehouse-iceberg", "libs");
-      String mysqlPath = ITUtils.joinPath(gravitinoHome, "catalogs", "jdbc-mysql", "libs");
-      String pgPath = ITUtils.joinPath(gravitinoHome, "catalogs", "jdbc-postgresql", "libs");
-
-      JdbcDriverDownloader.downloadJdbcDriver(
-          "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar",
-          destPath,
-          mysqlPath);
-      JdbcDriverDownloader.downloadJdbcDriver(
-          "https://jdbc.postgresql.org/download/postgresql-42.7.0.jar", destPath, pgPath);
-    }
   }
 
   @AfterAll
@@ -145,8 +126,7 @@ public class TrinoConnectorIT extends AbstractIT {
             HiveContainer.HDFS_DEFAULTFS_PORT,
             databaseName);
     containerSuite.getTrinoContainer().executeUpdateSQL(sql1);
-    NameIdentifier idSchema = NameIdentifier.of(metalakeName, catalogName, databaseName);
-    Schema schema = catalog.asSchemas().loadSchema(idSchema);
+    Schema schema = catalog.asSchemas().loadSchema(databaseName);
     Assertions.assertEquals(schema.name(), databaseName);
 
     ArrayList<ArrayList<String>> r =
@@ -377,8 +357,7 @@ public class TrinoConnectorIT extends AbstractIT {
             catalogName, schemaName);
     containerSuite.getTrinoContainer().executeUpdateSQL(createSchemaSql);
 
-    Schema schema =
-        catalog.asSchemas().loadSchema(NameIdentifier.of(metalakeName, catalogName, schemaName));
+    Schema schema = catalog.asSchemas().loadSchema(schemaName);
     Assertions.assertEquals(
         "hdfs://localhost:9000/user/hive/warehouse/hive_schema_1123123",
         schema.properties().get("location"));
@@ -441,10 +420,10 @@ public class TrinoConnectorIT extends AbstractIT {
     String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
 
-    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
     Catalog catalog =
         createdMetalake.createCatalog(
-            NameIdentifier.of(metalakeName, catalogName),
+            catalogName,
             Catalog.Type.RELATIONAL,
             "hive",
             "comment",
@@ -460,7 +439,7 @@ public class TrinoConnectorIT extends AbstractIT {
     catalog
         .asSchemas()
         .createSchema(
-            NameIdentifier.of(metalakeName, catalogName, schemaName),
+            schemaName,
             "Created by gravitino client",
             ImmutableMap.<String, String>builder()
                 .put("location", "hdfs://localhost:9000/user/hive/warehouse/hive_schema_1223445.db")
@@ -590,7 +569,7 @@ public class TrinoConnectorIT extends AbstractIT {
   @Test
   void testColumnTypeNotNullByTrino() {
     String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
-    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
     String[] command = {
       "mysql",
       "-h127.0.0.1",
@@ -605,7 +584,7 @@ public class TrinoConnectorIT extends AbstractIT {
     String hiveHost = containerSuite.getHiveContainer().getContainerIpAddress();
 
     createdMetalake.createCatalog(
-        NameIdentifier.of(metalakeName, catalogName),
+        catalogName,
         Catalog.Type.RELATIONAL,
         "jdbc-mysql",
         "comment",
@@ -683,10 +662,10 @@ public class TrinoConnectorIT extends AbstractIT {
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
     String tableName = GravitinoITUtils.genRandomName("table").toLowerCase();
 
-    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
     Catalog catalog =
         createdMetalake.createCatalog(
-            NameIdentifier.of(metalakeName, catalogName),
+            catalogName,
             Catalog.Type.RELATIONAL,
             "hive",
             "comment",
@@ -703,7 +682,7 @@ public class TrinoConnectorIT extends AbstractIT {
         catalog
             .asSchemas()
             .createSchema(
-                NameIdentifier.of(metalakeName, catalogName, schemaName),
+                schemaName,
                 "Created by gravitino client",
                 ImmutableMap.<String, String>builder().build());
 
@@ -818,9 +797,9 @@ public class TrinoConnectorIT extends AbstractIT {
   @Test
   void testHiveCatalogCreatedByGravitino() {
     String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
-    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
     createdMetalake.createCatalog(
-        NameIdentifier.of(metalakeName, catalogName),
+        catalogName,
         Catalog.Type.RELATIONAL,
         "hive",
         "comment",
@@ -836,7 +815,7 @@ public class TrinoConnectorIT extends AbstractIT {
             .put("trino.bypass.hive.create-empty-bucket-files", "true")
             .put("trino.bypass.hive.validate-bucketing", "true")
             .build());
-    Catalog catalog = createdMetalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Catalog catalog = createdMetalake.loadCatalog(catalogName);
     Assertions.assertEquals(
         "true", catalog.properties().get("trino.bypass.hive.immutable-partitions"));
     Assertions.assertEquals(
@@ -860,9 +839,9 @@ public class TrinoConnectorIT extends AbstractIT {
   @Test
   void testWrongHiveCatalogProperty() {
     String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
-    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
     createdMetalake.createCatalog(
-        NameIdentifier.of(metalakeName, catalogName),
+        catalogName,
         Catalog.Type.RELATIONAL,
         "hive",
         "comment",
@@ -879,7 +858,7 @@ public class TrinoConnectorIT extends AbstractIT {
             .put("trino.bypass.hive.create-empty-bucket-files", "true")
             .put("trino.bypass.hive.validate-bucketing", "true")
             .build());
-    Catalog catalog = createdMetalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Catalog catalog = createdMetalake.loadCatalog(catalogName);
     Assertions.assertEquals(
         "true", catalog.properties().get("trino.bypass.hive.immutable-partitions"));
     Assertions.assertEquals(
@@ -902,11 +881,11 @@ public class TrinoConnectorIT extends AbstractIT {
     String schemaName = GravitinoITUtils.genRandomName("schema").toLowerCase();
     String tableName = GravitinoITUtils.genRandomName("table").toLowerCase();
 
-    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
     String hiveContainerIp = containerSuite.getHiveContainer().getContainerIpAddress();
     Catalog catalog =
         createdMetalake.createCatalog(
-            NameIdentifier.of(metalakeName, catalogName),
+            catalogName,
             Catalog.Type.RELATIONAL,
             "lakehouse-iceberg",
             "comment",
@@ -925,7 +904,7 @@ public class TrinoConnectorIT extends AbstractIT {
         catalog
             .asSchemas()
             .createSchema(
-                NameIdentifier.of(metalakeName, catalogName, schemaName),
+                schemaName,
                 "Created by gravitino client",
                 ImmutableMap.<String, String>builder().build());
 
@@ -1015,7 +994,7 @@ public class TrinoConnectorIT extends AbstractIT {
   void testIcebergCatalogCreatedByGravitino() {
     String catalogName = GravitinoITUtils.genRandomName("iceberg_catalog").toLowerCase();
     String schemaName = GravitinoITUtils.genRandomName("iceberg_catalog").toLowerCase();
-    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
     String[] command = {
       "mysql",
       "-h127.0.0.1",
@@ -1030,7 +1009,7 @@ public class TrinoConnectorIT extends AbstractIT {
     String hiveHost = containerSuite.getHiveContainer().getContainerIpAddress();
 
     createdMetalake.createCatalog(
-        NameIdentifier.of(metalakeName, catalogName),
+        catalogName,
         Catalog.Type.RELATIONAL,
         "lakehouse-iceberg",
         "comment",
@@ -1045,7 +1024,7 @@ public class TrinoConnectorIT extends AbstractIT {
             .put("jdbc-password", "ds123")
             .put("jdbc-driver", "com.mysql.cj.jdbc.Driver")
             .build());
-    Catalog catalog = createdMetalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Catalog catalog = createdMetalake.loadCatalog(catalogName);
     Assertions.assertEquals("root", catalog.properties().get("jdbc-user"));
 
     String sql = String.format("show catalogs like '%s'", catalogName);
@@ -1060,7 +1039,7 @@ public class TrinoConnectorIT extends AbstractIT {
     catalog
         .asSchemas()
         .createSchema(
-            NameIdentifier.of(metalakeName, catalogName, schemaName),
+            schemaName,
             "Created by gravitino client",
             ImmutableMap.<String, String>builder().build());
 
@@ -1083,11 +1062,11 @@ public class TrinoConnectorIT extends AbstractIT {
     }
 
     // Do not support the cascade drop
-    success =
-        catalog
-            .asSchemas()
-            .dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), true);
-    Assertions.assertFalse(success);
+    Throwable excep =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> catalog.asSchemas().dropSchema(schemaName, true));
+    Assertions.assertTrue(
+        excep.getMessage().contains("Iceberg does not support cascading delete operations."));
     final String sql3 = String.format("show schemas in %s like '%s'", catalogName, schemaName);
     success = checkTrinoHasLoaded(sql3, 30);
     if (!success) {
@@ -1098,7 +1077,7 @@ public class TrinoConnectorIT extends AbstractIT {
   @Test
   void testMySQLCatalogCreatedByGravitino() {
     String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
-    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
     String[] command = {
       "mysql",
       "-h127.0.0.1",
@@ -1113,7 +1092,7 @@ public class TrinoConnectorIT extends AbstractIT {
     String hiveHost = containerSuite.getHiveContainer().getContainerIpAddress();
 
     createdMetalake.createCatalog(
-        NameIdentifier.of(metalakeName, catalogName),
+        catalogName,
         Catalog.Type.RELATIONAL,
         "jdbc-mysql",
         "comment",
@@ -1123,7 +1102,7 @@ public class TrinoConnectorIT extends AbstractIT {
             .put("jdbc-password", "ds123")
             .put("jdbc-url", String.format("jdbc:mysql://%s:3306?useSSL=false", hiveHost))
             .build());
-    Catalog catalog = createdMetalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Catalog catalog = createdMetalake.loadCatalog(catalogName);
     Assertions.assertEquals("root", catalog.properties().get("jdbc-user"));
 
     String sql = String.format("show catalogs like '%s'", catalogName);
@@ -1141,7 +1120,7 @@ public class TrinoConnectorIT extends AbstractIT {
     String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
     String schemaName = GravitinoITUtils.genRandomName("mysql_schema").toLowerCase();
     String tableName = GravitinoITUtils.genRandomName("mysql_table").toLowerCase();
-    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
     String[] command = {
       "mysql",
       "-h127.0.0.1",
@@ -1156,7 +1135,7 @@ public class TrinoConnectorIT extends AbstractIT {
     String hiveHost = containerSuite.getHiveContainer().getContainerIpAddress();
 
     createdMetalake.createCatalog(
-        NameIdentifier.of(metalakeName, catalogName),
+        catalogName,
         Catalog.Type.RELATIONAL,
         "jdbc-mysql",
         "comment",
@@ -1166,7 +1145,7 @@ public class TrinoConnectorIT extends AbstractIT {
             .put("jdbc-password", "ds123")
             .put("jdbc-url", String.format("jdbc:mysql://%s:3306?useSSL=false", hiveHost))
             .build());
-    Catalog catalog = createdMetalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Catalog catalog = createdMetalake.loadCatalog(catalogName);
     Assertions.assertEquals("root", catalog.properties().get("jdbc-user"));
 
     String sql = String.format("show catalogs like '%s'", catalogName);
@@ -1181,10 +1160,7 @@ public class TrinoConnectorIT extends AbstractIT {
     Schema schema =
         catalog
             .asSchemas()
-            .createSchema(
-                NameIdentifier.of(metalakeName, catalogName, schemaName),
-                null,
-                ImmutableMap.<String, String>builder().build());
+            .createSchema(schemaName, null, ImmutableMap.<String, String>builder().build());
 
     Assertions.assertNotNull(schema);
 
@@ -1255,7 +1231,7 @@ public class TrinoConnectorIT extends AbstractIT {
     String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
     String schemaName = GravitinoITUtils.genRandomName("mysql_schema").toLowerCase();
     String tableName = GravitinoITUtils.genRandomName("mysql_table").toLowerCase();
-    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
     String[] command = {
       "mysql",
       "-h127.0.0.1",
@@ -1270,7 +1246,7 @@ public class TrinoConnectorIT extends AbstractIT {
     String hiveHost = containerSuite.getHiveContainer().getContainerIpAddress();
 
     createdMetalake.createCatalog(
-        NameIdentifier.of(metalakeName, catalogName),
+        catalogName,
         Catalog.Type.RELATIONAL,
         "jdbc-mysql",
         "comment",
@@ -1280,7 +1256,7 @@ public class TrinoConnectorIT extends AbstractIT {
             .put("jdbc-password", "ds123")
             .put("jdbc-url", String.format("jdbc:mysql://%s:3306?useSSL=false", hiveHost))
             .build());
-    Catalog catalog = createdMetalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+    Catalog catalog = createdMetalake.loadCatalog(catalogName);
     Assertions.assertEquals("root", catalog.properties().get("jdbc-user"));
 
     String sql = String.format("show catalogs like '%s'", catalogName);
@@ -1375,7 +1351,7 @@ public class TrinoConnectorIT extends AbstractIT {
   @Test
   void testDropCatalogAndCreateAgain() {
     String catalogName = GravitinoITUtils.genRandomName("mysql_catalog").toLowerCase();
-    GravitinoMetalake createdMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+    GravitinoMetalake createdMetalake = client.loadMetalake(metalakeName);
     String[] command = {
       "mysql",
       "-h127.0.0.1",
@@ -1393,7 +1369,7 @@ public class TrinoConnectorIT extends AbstractIT {
     // well.
     for (int i = 0; i < 3; i++) {
       createdMetalake.createCatalog(
-          NameIdentifier.of(metalakeName, catalogName),
+          catalogName,
           Catalog.Type.RELATIONAL,
           "jdbc-mysql",
           "comment",
@@ -1408,7 +1384,7 @@ public class TrinoConnectorIT extends AbstractIT {
       boolean success = checkTrinoHasLoaded(sql, 30);
       Assertions.assertTrue(success, "Trino should load the catalog: " + sql);
 
-      createdMetalake.dropCatalog(NameIdentifier.of(metalakeName, catalogName));
+      createdMetalake.dropCatalog(catalogName);
       // We need to test we can't load this catalog any more by Trino.
       success = checkTrinoHasRemoved(sql, 30);
       Assertions.assertTrue(success, "Trino should not load the catalog any more: " + sql);
@@ -1420,8 +1396,8 @@ public class TrinoConnectorIT extends AbstractIT {
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
     GravitinoMetalake createdMetalake =
-        client.createMetalake(NameIdentifier.of(metalakeName), "comment", Collections.emptyMap());
-    GravitinoMetalake loadMetalake = client.loadMetalake(NameIdentifier.of(metalakeName));
+        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
     Assertions.assertEquals(createdMetalake, loadMetalake);
 
     metalake = loadMetalake;
@@ -1438,13 +1414,8 @@ public class TrinoConnectorIT extends AbstractIT {
     properties.put("metastore.uris", hiveMetastoreUris);
 
     Catalog createdCatalog =
-        metalake.createCatalog(
-            NameIdentifier.of(metalakeName, catalogName),
-            Catalog.Type.RELATIONAL,
-            "hive",
-            "comment",
-            properties);
-    Catalog loadCatalog = metalake.loadCatalog(NameIdentifier.of(metalakeName, catalogName));
+        metalake.createCatalog(catalogName, Catalog.Type.RELATIONAL, "hive", "comment", properties);
+    Catalog loadCatalog = metalake.loadCatalog(catalogName);
     Assertions.assertEquals(createdCatalog, loadCatalog);
 
     catalog = loadCatalog;

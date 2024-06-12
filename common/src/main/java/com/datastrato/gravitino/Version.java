@@ -22,7 +22,7 @@ public class Version {
     try {
       VersionInfo currentVersionInfo = new VersionInfo();
       projectProperties.load(
-          Version.class.getClassLoader().getResourceAsStream("project.properties"));
+          Version.class.getClassLoader().getResourceAsStream("gravitino-build-info.properties"));
       currentVersionInfo.version = projectProperties.getProperty("project.version");
       currentVersionInfo.compileDate = projectProperties.getProperty("compile.date");
       currentVersionInfo.gitCommit = projectProperties.getProperty("git.commit.id");

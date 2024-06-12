@@ -6,7 +6,6 @@ package com.datastrato.gravitino.integration.test.trino;
 
 import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -79,9 +78,9 @@ public class TrinoQueryIT extends TrinoQueryITBase {
 
   private static void cleanupTestEnv() throws Exception {
     try {
-      Arrays.stream(TrinoQueryITBase.metalake.listCatalogs(Namespace.of(metalakeName)))
-          .filter(catalog -> catalog.name().startsWith("gt_"))
-          .forEach(catalog -> TrinoQueryITBase.dropCatalog(catalog.name()));
+      Arrays.stream(TrinoQueryITBase.metalake.listCatalogs())
+          .filter(catalog -> catalog.startsWith("gt_"))
+          .forEach(TrinoQueryITBase::dropCatalog);
 
       await()
           .atMost(30, TimeUnit.SECONDS)

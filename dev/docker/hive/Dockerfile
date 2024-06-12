@@ -6,9 +6,10 @@
 FROM ubuntu:16.04
 LABEL maintainer="support@datastrato.com"
 
-ARG HADOOP_PACKAGE_NAME
-ARG HIVE_PACKAGE_NAME
+ARG HADOOP_VERSION
+ARG HIVE_VERSION
 ARG JDBC_DIVER_PACKAGE_NAME
+ARG MYSQL_JDBC_DRIVER_VERSION
 ARG DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /
@@ -41,11 +42,9 @@ RUN apt-get update && apt-get upgrade -y && apt-get install --fix-missing -yq \
   openjdk-8-jdk
 
 #################################################################################
-## setup ssh
+# setup ssh
 RUN mkdir /root/.ssh
 RUN cat /dev/zero | ssh-keygen -q -N "" > /dev/null && cat /root/.ssh/id_rsa.pub > /root/.ssh/authorized_keys
-
-COPY packages /tmp/packages
 
 ################################################################################
 # set environment variables
@@ -91,22 +90,19 @@ RUN echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}" >> /etc/environment
 ################################################################################
 # install hadoop
 RUN mkdir ${HADOOP_HOME}
-RUN tar -xz -C ${HADOOP_HOME} --strip-components 1 -f /tmp/packages/${HADOOP_PACKAGE_NAME}
+ADD packages/hadoop-${HADOOP_VERSION}.tar.gz /opt/
+RUN ln -s /opt/hadoop-${HADOOP_VERSION}/* ${HADOOP_HOME}
 
 # replace configuration templates
 RUN rm -f ${HADOOP_CONF_DIR}/core-site.xml
 RUN rm -f ${HADOOP_CONF_DIR}/hadoop-env.sh
-RUN rm -f ${HADOOP_CONF_DIR}/yarn-env.sh
 RUN rm -f ${HADOOP_CONF_DIR}/hdfs-site.xml
 RUN rm -f ${HADOOP_CONF_DIR}/mapred-site.xml
-RUN rm -f ${HADOOP_CONF_DIR}/yarn-site.xml
 
 ADD core-site.xml ${HADOOP_CONF_DIR}/core-site.xml
 ADD hadoop-env.sh ${HADOOP_CONF_DIR}/hadoop-env.sh
-ADD yarn-env.sh ${HADOOP_CONF_DIR}/yarn-env.sh
 ADD hdfs-site.xml ${HADOOP_CONF_DIR}/hdfs-site.xml
 ADD mapred-site.xml ${HADOOP_CONF_DIR}/mapred-site.xml
-ADD yarn-site.xml ${HADOOP_CONF_DIR}/yarn-site.xml
 ADD check-status.sh /tmp/check-status.sh
 
 # format HFS
@@ -115,7 +111,9 @@ RUN ${HADOOP_HOME}/bin/hdfs namenode -format -nonInteractive
 ################################################################################
 # install hive
 RUN mkdir ${HIVE_HOME}
-RUN tar -xz -C ${HIVE_HOME} --strip-components 1 -f /tmp/packages/${HIVE_PACKAGE_NAME}
+ADD packages/apache-hive-${HIVE_VERSION}-bin.tar.gz /opt/
+RUN ln -s /opt/apache-hive-${HIVE_VERSION}-bin/* ${HIVE_HOME}
+
 ADD hive-site.xml ${HIVE_HOME}/conf/hive-site.xml
 
 ################################################################################
@@ -131,7 +129,8 @@ RUN sed -i "s/.*bind-address.*/bind-address = 0.0.0.0/" /etc/mysql/mysql.conf.d/
 
 ################################################################################
 # add mysql jdbc driver
-RUN tar -xz -C ${HIVE_HOME}/lib --strip-components 1 -f /tmp/packages/${JDBC_DIVER_PACKAGE_NAME}
+ADD packages/mysql-connector-java-${MYSQL_JDBC_DRIVER_VERSION}.tar.gz /opt/
+RUN ln -s /opt/mysql-connector-java-${MYSQL_JDBC_DRIVER_VERSION}/* ${HIVE_HOME}/lib
 
 ################################################################################
 # add users and groups

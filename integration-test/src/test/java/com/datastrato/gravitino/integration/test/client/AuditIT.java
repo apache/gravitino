@@ -7,7 +7,6 @@ package com.datastrato.gravitino.integration.test.client;
 
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.MetalakeChange;
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
@@ -37,17 +36,17 @@ public class AuditIT extends AbstractIT {
     String newName = RandomNameUtils.genRandomName("newmetaname");
 
     GravitinoMetalake metaLake =
-        client.createMetalake(
-            NameIdentifier.parse(metalakeAuditName), "metalake A comment", Collections.emptyMap());
+        client.createMetalake(metalakeAuditName, "metalake A comment", Collections.emptyMap());
     Assertions.assertEquals(expectUser, metaLake.auditInfo().creator());
     Assertions.assertNull(metaLake.auditInfo().lastModifier());
     MetalakeChange[] changes =
         new MetalakeChange[] {
           MetalakeChange.rename(newName), MetalakeChange.updateComment("new metalake comment")
         };
-    metaLake = client.alterMetalake(NameIdentifier.of(metalakeAuditName), changes);
+    metaLake = client.alterMetalake(metalakeAuditName, changes);
     Assertions.assertEquals(expectUser, metaLake.auditInfo().creator());
     Assertions.assertEquals(expectUser, metaLake.auditInfo().lastModifier());
-    client.dropMetalake(NameIdentifier.parse(newName));
+    Assertions.assertTrue(client.dropMetalake(newName), "metaLake should be dropped");
+    Assertions.assertFalse(client.dropMetalake(newName), "metalake should be non-existent");
   }
 }

@@ -6,19 +6,21 @@ This software is licensed under the Apache License version 2.
 import logging
 from typing import Dict, List
 
-from gravitino.client.gravitino_admin_client import GravitinoAdminClient
-from gravitino.client.gravitino_metalake import GravitinoMetalake
+from gravitino import (
+    GravitinoAdminClient,
+    GravitinoMetalake,
+    MetalakeChange,
+    NameIdentifier,
+)
 from gravitino.dto.dto_converters import DTOConverters
 from gravitino.dto.requests.metalake_updates_request import MetalakeUpdatesRequest
-from gravitino.api.metalake_change import MetalakeChange
-from gravitino.name_identifier import NameIdentifier
 from tests.integration.integration_test_env import IntegrationTestEnv
 
 logger = logging.getLogger(__name__)
 
 
 class TestMetalake(IntegrationTestEnv):
-    metalake_name: str = "TestMetalake-metalake"
+    metalake_name: str = "TestMetalake_metalake"
     metalake_new_name = metalake_name + "_new"
 
     metalake_comment: str = "metalake_comment"

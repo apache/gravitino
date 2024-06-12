@@ -346,6 +346,18 @@ public class TestMetalakeOperations extends JerseyTest {
     boolean dropped = dropResponse.dropped();
     Assertions.assertTrue(dropped);
 
+    // Test when failed to drop metalake
+    when(metalakeManager.dropMetalake(any())).thenReturn(false);
+    Response resp2 =
+        target("/metalakes/test")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .delete();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp2.getStatus());
+    DropResponse dropResponse2 = resp2.readEntity(DropResponse.class);
+    Assertions.assertEquals(0, dropResponse2.getCode());
+    Assertions.assertFalse(dropResponse2.dropped());
+
     // Test throw an exception when deleting tenant.
     doThrow(new RuntimeException("Internal error")).when(metalakeManager).dropMetalake(any());
 

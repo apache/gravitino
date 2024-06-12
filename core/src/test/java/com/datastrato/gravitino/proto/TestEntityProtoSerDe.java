@@ -9,6 +9,7 @@ import com.datastrato.gravitino.EntitySerDe;
 import com.datastrato.gravitino.EntitySerDeFactory;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.authorization.Privileges;
+import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.meta.GroupEntity;
 import com.datastrato.gravitino.meta.RoleEntity;
@@ -380,14 +381,22 @@ public class TestEntityProtoSerDe {
         Namespace.of("metalake", Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.ROLE_SCHEMA_NAME);
     Long roleId = 1L;
     String roleName = "testRole";
+    String anotherCatalogName = "anotheCatalog";
+    SecurableObject securableObject =
+        SecurableObjects.ofCatalog(
+            catalogName,
+            Lists.newArrayList(Privileges.UseCatalog.allow(), Privileges.DropCatalog.deny()));
+    SecurableObject anotherSecurableObject =
+        SecurableObjects.ofCatalog(
+            anotherCatalogName, Lists.newArrayList(Privileges.UseCatalog.allow()));
+
     RoleEntity roleEntity =
         RoleEntity.builder()
             .withId(roleId)
             .withName(roleName)
             .withNamespace(roleNamespace)
             .withAuditInfo(auditInfo)
-            .withSecurableObject(SecurableObjects.ofCatalog(catalogName))
-            .withPrivileges(Lists.newArrayList(Privileges.UseCatalog.get()))
+            .withSecurableObjects(Lists.newArrayList(securableObject, anotherSecurableObject))
             .withProperties(props)
             .build();
     byte[] roleBytes = protoEntitySerDe.serialize(roleEntity);
@@ -401,8 +410,7 @@ public class TestEntityProtoSerDe {
             .withName(roleName)
             .withNamespace(roleNamespace)
             .withAuditInfo(auditInfo)
-            .withSecurableObject(SecurableObjects.ofCatalog(catalogName))
-            .withPrivileges(Lists.newArrayList(Privileges.UseCatalog.get()))
+            .withSecurableObjects(Lists.newArrayList(securableObject, anotherSecurableObject))
             .build();
     roleBytes = protoEntitySerDe.serialize(roleWithoutFields);
     roleFromBytes = protoEntitySerDe.deserialize(roleBytes, RoleEntity.class, roleNamespace);

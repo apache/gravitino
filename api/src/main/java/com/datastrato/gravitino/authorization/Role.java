@@ -32,20 +32,11 @@ public interface Role extends Auditable {
   Map<String, String> properties();
 
   /**
-   * The privileges of the role. All privileges belong to one securable object. For example: If the
-   * securable object is a table, the privileges could be `READ TABLE`, `WRITE TABLE`, etc. If a
-   * schema has the privilege of `LOAD TABLE`. It means the role can all tables of the schema.
-   *
-   * @return The privileges of the role.
-   */
-  List<Privilege> privileges();
-
-  /**
    * The securable object represents a special kind of entity with a unique identifier. All
    * securable objects are organized by tree structure. For example: If the securable object is a
    * table, the identifier may be `catalog1.schema1.table1`.
    *
-   * @return The securable object of the role.
+   * @return The securable objects of the role.
    */
-  SecurableObject securableObject();
+  List<SecurableObject> securableObjects();
 }

@@ -18,13 +18,13 @@ import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.Schema;
+import com.datastrato.gravitino.SupportsSchemas;
 import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Schema;
-import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
@@ -42,6 +42,7 @@ import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ConnectorMetadata;
 import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.ConnectorTableMetadata;
+import io.trino.spi.connector.SaveMode;
 import io.trino.spi.connector.SchemaTableName;
 import io.trino.testing.ResourcePresence;
 import java.time.Instant;
@@ -65,8 +66,8 @@ public class GravitinoMockServer implements AutoCloseable {
   private GeneralDataTypeTransformer dataTypeTransformer = new HiveDataTypeTransformer();
 
   public GravitinoMockServer() {
-    createMetalake(NameIdentifier.ofMetalake(testMetalake));
-    createCatalog(NameIdentifier.ofCatalog(testMetalake, testCatalog));
+    createMetalake(testMetalake);
+    createCatalog(testMetalake, testCatalog);
   }
 
   public void setCatalogConnectorManager(CatalogConnectorManager catalogConnectorManager) {
@@ -76,133 +77,123 @@ public class GravitinoMockServer implements AutoCloseable {
   public GravitinoAdminClient createGravitinoClient() {
     GravitinoAdminClient client = mock(GravitinoAdminClient.class);
 
-    when(client.createMetalake(any(NameIdentifier.class), anyString(), anyMap()))
+    when(client.createMetalake(anyString(), anyString(), anyMap()))
         .thenAnswer(
             new Answer<GravitinoMetalake>() {
               @Override
               public GravitinoMetalake answer(InvocationOnMock invocation) throws Throwable {
-                NameIdentifier metalakeName = invocation.getArgument(0);
+                String metalakeName = invocation.getArgument(0);
                 return createMetalake(metalakeName);
               }
             });
 
-    when(client.dropMetalake(any(NameIdentifier.class)))
+    when(client.dropMetalake(anyString()))
         .thenAnswer(
             new Answer<Boolean>() {
               @Override
               public Boolean answer(InvocationOnMock invocation) throws Throwable {
-                NameIdentifier metalakeName = invocation.getArgument(0);
-                metalakes.remove(metalakeName.name());
+                String metalakeName = invocation.getArgument(0);
+                metalakes.remove(metalakeName);
                 return true;
               }
             });
 
-    when(client.loadMetalake(any(NameIdentifier.class)))
+    when(client.loadMetalake(anyString()))
         .thenAnswer(
             new Answer<GravitinoMetalake>() {
               @Override
               public GravitinoMetalake answer(InvocationOnMock invocation) throws Throwable {
-                NameIdentifier metalakeName = invocation.getArgument(0);
-                if (!metalakes.containsKey(metalakeName.name())) {
+                String metalakeName = invocation.getArgument(0);
+                if (!metalakes.containsKey(metalakeName)) {
                   throw new NoSuchMetalakeException("metalake does not be found");
                 }
-                return metalakes.get(metalakeName.name()).metalake;
+                return metalakes.get(metalakeName).metalake;
               }
             });
 
-    when(client.metalakeExists(any(NameIdentifier.class)))
+    when(client.metalakeExists(anyString()))
         .thenAnswer(
             new Answer<Boolean>() {
               @Override
               public Boolean answer(InvocationOnMock invocation) throws Throwable {
-                NameIdentifier metalakeName = invocation.getArgument(0);
-                return metalakes.containsKey(metalakeName.name());
+                String metalakeName = invocation.getArgument(0);
+                return metalakes.containsKey(metalakeName);
               }
             });
 
     return client;
   }
 
-  private GravitinoMetalake createMetalake(NameIdentifier metalakeName) {
+  private GravitinoMetalake createMetalake(String metalakeName) {
     GravitinoMetalake metaLake = mock(GravitinoMetalake.class);
-    when(metaLake.name()).thenReturn(metalakeName.name());
-    when(metaLake.listCatalogs(any(Namespace.class)))
+    when(metaLake.name()).thenReturn(metalakeName);
+    when(metaLake.listCatalogs())
         .thenAnswer(
-            new Answer<NameIdentifier[]>() {
+            new Answer<String[]>() {
               @Override
-              public NameIdentifier[] answer(InvocationOnMock invocation) throws Throwable {
-                return metalakes.get(metalakeName.name()).catalogs.keySet().stream()
-                    .map(catalogName -> NameIdentifier.ofCatalog(metalakeName.name(), catalogName))
-                    .toArray(NameIdentifier[]::new);
+              public String[] answer(InvocationOnMock invocation) throws Throwable {
+                return metalakes.get(metalakeName).catalogs.keySet().toArray(String[]::new);
               };
             });
 
     when(metaLake.createCatalog(
-            any(NameIdentifier.class), any(Catalog.Type.class), anyString(), anyString(), anyMap()))
+            anyString(), any(Catalog.Type.class), anyString(), anyString(), anyMap()))
         .thenAnswer(
             new Answer<Catalog>() {
               @Override
               public Catalog answer(InvocationOnMock invocation) throws Throwable {
-                NameIdentifier catalogName = invocation.getArgument(0);
+                String catalogName = invocation.getArgument(0);
 
-                Catalog catalog = createCatalog(catalogName);
+                Catalog catalog = createCatalog(metalakeName, catalogName);
 
                 return catalog;
               }
             });
 
-    when(metaLake.dropCatalog(any(NameIdentifier.class)))
+    when(metaLake.dropCatalog(anyString()))
         .thenAnswer(
             new Answer<Boolean>() {
               @Override
               public Boolean answer(InvocationOnMock invocation) throws Throwable {
-                NameIdentifier catalogName = invocation.getArgument(0);
-                if (!metalakes.get(metalakeName.name()).catalogs.containsKey(catalogName.name())) {
+                String catalogName = invocation.getArgument(0);
+                if (!metalakes.get(metalakeName).catalogs.containsKey(catalogName)) {
                   throw new NoSuchCatalogException("catalog does not be found");
                 }
-                metalakes.get(metalakeName.name()).catalogs.remove(catalogName.name());
+                metalakes.get(metalakeName).catalogs.remove(catalogName);
                 return true;
               }
             });
 
-    when(metaLake.catalogExists(any(NameIdentifier.class)))
+    when(metaLake.catalogExists(anyString()))
         .thenAnswer(
             new Answer<Boolean>() {
               @Override
               public Boolean answer(InvocationOnMock invocation) throws Throwable {
-                NameIdentifier catalogName = invocation.getArgument(0);
-                return metalakes.get(metalakeName.name()).catalogs.containsKey(catalogName.name());
+                String catalogName = invocation.getArgument(0);
+                return metalakes.get(metalakeName).catalogs.containsKey(catalogName);
               }
             });
 
-    when(metaLake.loadCatalog(any(NameIdentifier.class)))
+    when(metaLake.loadCatalog(anyString()))
         .thenAnswer(
             new Answer<Catalog>() {
               @Override
               public Catalog answer(InvocationOnMock invocation) throws Throwable {
-                NameIdentifier catalogName = invocation.getArgument(0);
-                if (!metalakes.get(metalakeName.name()).catalogs.containsKey(catalogName.name())) {
+                String catalogName = invocation.getArgument(0);
+                if (!metalakes.get(metalakeName).catalogs.containsKey(catalogName)) {
                   throw new NoSuchCatalogException("catalog does not be found");
                 }
 
-                return metalakes.get(metalakeName.name()).catalogs.get(catalogName.name());
+                return metalakes.get(metalakeName).catalogs.get(catalogName);
               }
             });
-    metalakes.put(metalakeName.name(), new Metalake(metaLake));
+    metalakes.put(metalakeName, new Metalake(metaLake));
     return metaLake;
   }
 
-  void reloadCatalogs() {
-    GravitinoMetalake metaLake = mock(GravitinoMetalake.class);
-    when(metaLake.name()).thenReturn(testMetalake);
-    when(metaLake.listCatalogs(any()))
-        .thenReturn(new NameIdentifier[] {NameIdentifier.ofCatalog(testMetalake, testCatalog)});
-    catalogConnectorManager.loadCatalogs(metaLake);
-  }
-
-  private Catalog createCatalog(NameIdentifier catalogName) {
+  private Catalog createCatalog(String metalakeName, String catalogName) {
     Catalog catalog = mock(Catalog.class);
-    when(catalog.name()).thenReturn(catalogName.name());
+    when(catalog.name()).thenReturn(catalogName);
     when(catalog.provider()).thenReturn(testCatalogProvider);
     when(catalog.type()).thenReturn(Catalog.Type.RELATIONAL);
     when(catalog.properties()).thenReturn(Map.of("max_ttl", "10"));
@@ -216,18 +207,18 @@ public class GravitinoMockServer implements AutoCloseable {
     when(catalog.asTableCatalog()).thenAnswer(answer -> createTableCatalog(gravitinoCatalog));
 
     when(catalog.asSchemas()).thenAnswer(answer -> createSchemas(gravitinoCatalog));
-    metalakes.get(catalogName.namespace().toString()).catalogs.put(catalogName.name(), catalog);
+    metalakes.get(metalakeName).catalogs.put(catalogName, catalog);
     return catalog;
   }
 
   private SupportsSchemas createSchemas(GravitinoCatalog catalog) {
     SupportsSchemas schemas = mock(SupportsSchemas.class);
-    when(schemas.createSchema(any(NameIdentifier.class), anyString(), anyMap()))
+    when(schemas.createSchema(any(String.class), anyString(), anyMap()))
         .thenAnswer(
             new Answer<Schema>() {
               @Override
               public Schema answer(InvocationOnMock invocation) throws Throwable {
-                NameIdentifier schemaName = invocation.getArgument(0);
+                String schemaName = invocation.getArgument(0);
                 Map<String, String> properties = invocation.getArgument(2);
 
                 // create schema
@@ -242,8 +233,8 @@ public class GravitinoMockServer implements AutoCloseable {
                 catalogConnectorManager
                     .getCatalogConnector(catalogConnectorManager.getTrinoCatalogName(catalog))
                     .getMetadataAdapter();
-                GravitinoSchema schema = new GravitinoSchema(schemaName.name(), properties, "");
-                metadata.createSchema(null, schemaName.name(), emptyMap(), null);
+                GravitinoSchema schema = new GravitinoSchema(schemaName, properties, "");
+                metadata.createSchema(null, schemaName, emptyMap(), null);
 
                 Schema mockSchema =
                     mockSchema(schema.getName(), schema.getComment(), schema.getProperties());
@@ -251,12 +242,12 @@ public class GravitinoMockServer implements AutoCloseable {
               }
             });
 
-    when(schemas.dropSchema(any(NameIdentifier.class), anyBoolean()))
+    when(schemas.dropSchema(any(String.class), anyBoolean()))
         .thenAnswer(
             new Answer<Boolean>() {
               @Override
               public Boolean answer(InvocationOnMock invocation) throws Throwable {
-                NameIdentifier nameIdentifier = invocation.getArgument(0);
+                String schemaName = invocation.getArgument(0);
                 boolean cascade = invocation.getArgument(1);
 
                 // drop schema,
@@ -267,17 +258,16 @@ public class GravitinoMockServer implements AutoCloseable {
                                 catalogConnectorManager.getTrinoCatalogName(catalog))
                             .getInternalConnector();
                 ConnectorMetadata metadata = memoryConnector.getMetadata(null, null);
-                metadata.dropSchema(null, nameIdentifier.name(), cascade);
+                metadata.dropSchema(null, schemaName, cascade);
                 return true;
               }
             });
 
-    when(schemas.listSchemas(any(Namespace.class)))
+    when(schemas.listSchemas())
         .thenAnswer(
-            new Answer<NameIdentifier[]>() {
+            new Answer<String[]>() {
               @Override
-              public NameIdentifier[] answer(InvocationOnMock invocation) throws Throwable {
-                Namespace namespace = invocation.getArgument(0);
+              public String[] answer(InvocationOnMock invocation) throws Throwable {
                 MemoryConnector memoryConnector =
                     (MemoryConnector)
                         catalogConnectorManager
@@ -285,21 +275,16 @@ public class GravitinoMockServer implements AutoCloseable {
                                 catalogConnectorManager.getTrinoCatalogName(catalog))
                             .getInternalConnector();
                 ConnectorMetadata metadata = memoryConnector.getMetadata(null, null);
-                return metadata.listSchemaNames(null).stream()
-                    .map(
-                        schemaName ->
-                            NameIdentifier.ofSchema(
-                                namespace.level(0), namespace.level(1), schemaName))
-                    .toArray(NameIdentifier[]::new);
+                return metadata.listSchemaNames(null).toArray(new String[0]);
               }
             });
 
-    when(schemas.loadSchema(any(NameIdentifier.class)))
+    when(schemas.loadSchema(any(String.class)))
         .thenAnswer(
             new Answer<Schema>() {
               @Override
               public Schema answer(InvocationOnMock invocation) throws Throwable {
-                NameIdentifier schemaName = invocation.getArgument(0);
+                String schemaName = invocation.getArgument(0);
                 MemoryConnector memoryConnector =
                     (MemoryConnector)
                         catalogConnectorManager
@@ -309,7 +294,7 @@ public class GravitinoMockServer implements AutoCloseable {
                 memoryConnector.getMetadata(null, null);
                 ConnectorMetadata metadata = memoryConnector.getMetadata(null, null);
                 Map<String, Object> schemaProperties =
-                    metadata.getSchemaProperties(null, schemaName.name());
+                    metadata.getSchemaProperties(null, schemaName);
 
                 CatalogConnectorMetadataAdapter metadataAdapter =
                     catalogConnectorManager
@@ -318,7 +303,7 @@ public class GravitinoMockServer implements AutoCloseable {
 
                 GravitinoSchema gravitinoSchema =
                     new GravitinoSchema(
-                        schemaName.name(),
+                        schemaName,
                         metadataAdapter.toGravitinoSchemaProperties(schemaProperties),
                         "");
 
@@ -370,7 +355,7 @@ public class GravitinoMockServer implements AutoCloseable {
                                 catalogConnectorManager.getTrinoCatalogName(catalog))
                             .getInternalConnector();
                 ConnectorMetadata metadata = memoryConnector.getMetadata(null, null);
-                metadata.createTable(null, tableMetadata, false);
+                metadata.createTable(null, tableMetadata, SaveMode.FAIL);
                 return null;
               }
             });
@@ -421,7 +406,7 @@ public class GravitinoMockServer implements AutoCloseable {
                 ArrayList<NameIdentifier> tableNames = new ArrayList<>();
                 for (SchemaTableName tableName : metadata.listTables(null, Optional.empty())) {
                   tableNames.add(
-                      NameIdentifier.ofTable(
+                      NameIdentifier.of(
                           schemaName.level(0),
                           schemaName.level(1),
                           schemaName.level(2),

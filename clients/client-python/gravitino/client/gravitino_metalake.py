@@ -122,16 +122,16 @@ class GravitinoMetalake(MetalakeDTO):
     def create_catalog(
         self,
         ident: NameIdentifier,
-        type: Catalog.Type,
+        catalog_type: Catalog.Type,
         provider: str,
         comment: str,
         properties: Dict[str, str],
     ) -> Catalog:
-        """Create a new catalog with specified identifier, type, comment and properties.
+        """Create a new catalog with specified identifier, catalog type, comment and properties.
 
         Args:
             ident: The identifier of the catalog.
-            type: The type of the catalog.
+            catalog_type: The type of the catalog.
             provider: The provider of the catalog.
             comment: The comment of the catalog.
             properties: The properties of the catalog.
@@ -147,7 +147,7 @@ class GravitinoMetalake(MetalakeDTO):
 
         catalog_create_request = CatalogCreateRequest(
             name=ident.name(),
-            type=type,
+            catalog_type=catalog_type,
             provider=provider,
             comment=comment,
             properties=properties,

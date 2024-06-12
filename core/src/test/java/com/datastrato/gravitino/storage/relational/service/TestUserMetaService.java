@@ -5,23 +5,31 @@
 
 package com.datastrato.gravitino.storage.relational.service;
 
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.authorization.AuthorizationUtils;
 import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
+import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.meta.RoleEntity;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.datastrato.gravitino.storage.relational.TestJDBCBackend;
 import com.datastrato.gravitino.storage.relational.mapper.RoleMetaMapper;
 import com.datastrato.gravitino.storage.relational.po.RolePO;
+import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.Instant;
 import java.util.List;
 import java.util.function.Function;
+import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -37,6 +45,10 @@ class TestUserMetaService extends TestJDBCBackend {
     BaseMetalake metalake =
         createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
     backend.insert(metalake, false);
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(), Namespace.of(metalakeName), "catalog", auditInfo);
+    backend.insert(catalog, false);
 
     UserMetaService userMetaService = UserMetaService.getInstance();
     RoleMetaService roleMetaService = RoleMetaService.getInstance();
@@ -63,13 +75,15 @@ class TestUserMetaService extends TestJDBCBackend {
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role1",
-            auditInfo);
+            auditInfo,
+            "catalog");
     RoleEntity role2 =
         createRoleEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role2",
-            auditInfo);
+            auditInfo,
+            "catalog");
     roleMetaService.insertRole(role1, false);
     roleMetaService.insertRole(role2, false);
     UserEntity user2 =
@@ -94,6 +108,10 @@ class TestUserMetaService extends TestJDBCBackend {
     BaseMetalake metalake =
         createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
     backend.insert(metalake, false);
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(), Namespace.of(metalakeName), "catalog", auditInfo);
+    backend.insert(catalog, false);
 
     UserMetaService userMetaService = UserMetaService.getInstance();
     RoleMetaService roleMetaService = RoleMetaService.getInstance();
@@ -141,13 +159,15 @@ class TestUserMetaService extends TestJDBCBackend {
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role1",
-            auditInfo);
+            auditInfo,
+            "catalog");
     RoleEntity role2 =
         createRoleEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role2",
-            auditInfo);
+            auditInfo,
+            "catalog");
     roleMetaService.insertRole(role1, false);
     roleMetaService.insertRole(role2, false);
     UserEntity user2 =
@@ -174,19 +194,63 @@ class TestUserMetaService extends TestJDBCBackend {
     Assertions.assertThrows(
         AlreadyExistsException.class, () -> userMetaService.insertUser(user2Exist, false));
 
-    // insert overwrite user with roles
+    // insert overwrite user with 2 roles
     UserEntity user2Overwrite =
         createUserEntity(
             user1.id(),
             AuthorizationUtils.ofUserNamespace(metalakeName),
             "user2Overwrite",
-            auditInfo);
+            auditInfo,
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
     Assertions.assertDoesNotThrow(() -> userMetaService.insertUser(user2Overwrite, true));
+
+    UserEntity actualOverwriteUser2 =
+        userMetaService.getUserByIdentifier(user2Overwrite.nameIdentifier());
+    Assertions.assertEquals("user2Overwrite", actualOverwriteUser2.name());
+    Assertions.assertEquals(2, actualOverwriteUser2.roleNames().size());
     Assertions.assertEquals(
-        "user2Overwrite",
-        userMetaService.getUserByIdentifier(user2Overwrite.nameIdentifier()).name());
-    Assertions.assertEquals(
-        user2Overwrite, userMetaService.getUserByIdentifier(user2Overwrite.nameIdentifier()));
+        Sets.newHashSet(role1.name(), role2.name()),
+        Sets.newHashSet(actualOverwriteUser2.roleNames()));
+
+    // insert overwrite user with 1 roles
+    RoleEntity role3 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role3",
+            auditInfo,
+            "catalog");
+    roleMetaService.insertRole(role3, false);
+    UserEntity user3Overwrite =
+        createUserEntity(
+            user1.id(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "user3Overwrite",
+            auditInfo,
+            Lists.newArrayList(role3.name()),
+            Lists.newArrayList(role3.id()));
+    Assertions.assertDoesNotThrow(() -> userMetaService.insertUser(user3Overwrite, true));
+
+    UserEntity actualOverwriteUser3 =
+        userMetaService.getUserByIdentifier(user3Overwrite.nameIdentifier());
+    Assertions.assertEquals("user3Overwrite", actualOverwriteUser3.name());
+    Assertions.assertEquals(1, actualOverwriteUser3.roleNames().size());
+    Assertions.assertEquals("role3", actualOverwriteUser3.roleNames().get(0));
+
+    // insert overwrite user with 0 roles
+    UserEntity user4Overwrite =
+        createUserEntity(
+            user1.id(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "user4Overwrite",
+            auditInfo);
+    Assertions.assertDoesNotThrow(() -> userMetaService.insertUser(user4Overwrite, true));
+
+    UserEntity actualOverwriteUser4 =
+        userMetaService.getUserByIdentifier(user4Overwrite.nameIdentifier());
+    Assertions.assertEquals("user4Overwrite", actualOverwriteUser4.name());
+    Assertions.assertNull(actualOverwriteUser4.roleNames());
   }
 
   @Test
@@ -196,6 +260,10 @@ class TestUserMetaService extends TestJDBCBackend {
     BaseMetalake metalake =
         createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
     backend.insert(metalake, false);
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(), Namespace.of(metalakeName), "catalog", auditInfo);
+    backend.insert(catalog, false);
 
     UserMetaService userMetaService = UserMetaService.getInstance();
     RoleMetaService roleMetaService = RoleMetaService.getInstance();
@@ -223,13 +291,15 @@ class TestUserMetaService extends TestJDBCBackend {
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role1",
-            auditInfo);
+            auditInfo,
+            "catalog");
     RoleEntity role2 =
         createRoleEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role2",
-            auditInfo);
+            auditInfo,
+            "catalog");
     roleMetaService.insertRole(role1, false);
     roleMetaService.insertRole(role2, false);
     UserEntity user2 =
@@ -267,6 +337,10 @@ class TestUserMetaService extends TestJDBCBackend {
     BaseMetalake metalake =
         createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
     backend.insert(metalake, false);
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(), Namespace.of(metalakeName), "catalog", auditInfo);
+    backend.insert(catalog, false);
 
     UserMetaService userMetaService = UserMetaService.getInstance();
     RoleMetaService roleMetaService = RoleMetaService.getInstance();
@@ -276,13 +350,15 @@ class TestUserMetaService extends TestJDBCBackend {
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role1",
-            auditInfo);
+            auditInfo,
+            "catalog");
     RoleEntity role2 =
         createRoleEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role2",
-            auditInfo);
+            auditInfo,
+            "catalog");
     roleMetaService.insertRole(role1, false);
     roleMetaService.insertRole(role2, false);
     UserEntity user1 =
@@ -304,7 +380,8 @@ class TestUserMetaService extends TestJDBCBackend {
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role3",
-            auditInfo);
+            auditInfo,
+            "catalog");
     roleMetaService.insertRole(role3, false);
 
     // update user (grant)
@@ -388,7 +465,8 @@ class TestUserMetaService extends TestJDBCBackend {
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role4",
-            auditInfo);
+            auditInfo,
+            "catalog");
     roleMetaService.insertRole(role4, false);
 
     // update user (grant & revoke)
@@ -473,6 +551,10 @@ class TestUserMetaService extends TestJDBCBackend {
     BaseMetalake metalake =
         createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
     backend.insert(metalake, false);
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(), Namespace.of(metalakeName), "catalog", auditInfo);
+    backend.insert(catalog, false);
 
     UserMetaService userMetaService = UserMetaService.getInstance();
     RoleMetaService roleMetaService = RoleMetaService.getInstance();
@@ -482,19 +564,22 @@ class TestUserMetaService extends TestJDBCBackend {
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role1",
-            auditInfo);
+            auditInfo,
+            "catalog");
     RoleEntity role2 =
         createRoleEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role2",
-            auditInfo);
+            auditInfo,
+            "catalog");
     RoleEntity role3 =
         createRoleEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role3",
-            auditInfo);
+            auditInfo,
+            "catalog");
     roleMetaService.insertRole(role1, false);
     roleMetaService.insertRole(role2, false);
     roleMetaService.insertRole(role3, false);
@@ -524,6 +609,8 @@ class TestUserMetaService extends TestJDBCBackend {
         user2.name(), userMetaService.getUserByIdentifier(user2.nameIdentifier()).name());
     Assertions.assertEquals(1, roleMetaService.listRolesByUserId(user2.id()).size());
 
+    Assertions.assertTrue(
+        CatalogMetaService.getInstance().deleteCatalog(catalog.nameIdentifier(), false));
     // delete metalake without cascade
     Assertions.assertTrue(
         MetalakeMetaService.getInstance().deleteMetalake(metalake.nameIdentifier(), false));
@@ -545,6 +632,10 @@ class TestUserMetaService extends TestJDBCBackend {
     BaseMetalake metalake =
         createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
     backend.insert(metalake, false);
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(), Namespace.of(metalakeName), "catalog", auditInfo);
+    backend.insert(catalog, false);
 
     UserMetaService userMetaService = UserMetaService.getInstance();
     RoleMetaService roleMetaService = RoleMetaService.getInstance();
@@ -554,19 +645,22 @@ class TestUserMetaService extends TestJDBCBackend {
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role1",
-            auditInfo);
+            auditInfo,
+            "catalog");
     RoleEntity role2 =
         createRoleEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role2",
-            auditInfo);
+            auditInfo,
+            "catalog");
     RoleEntity role3 =
         createRoleEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role3",
-            auditInfo);
+            auditInfo,
+            "catalog");
     roleMetaService.insertRole(role1, false);
     roleMetaService.insertRole(role2, false);
     roleMetaService.insertRole(role3, false);
@@ -608,5 +702,174 @@ class TestUserMetaService extends TestJDBCBackend {
         () -> userMetaService.getUserByIdentifier(user2.nameIdentifier()));
     Assertions.assertEquals(0, roleMetaService.listRolesByUserId(user1.id()).size());
     Assertions.assertEquals(0, roleMetaService.listRolesByUserId(user2.id()).size());
+  }
+
+  @Test
+  void deleteUserMetasByLegacyTimeline() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    backend.insert(metalake, false);
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(), Namespace.of(metalakeName), "catalog", auditInfo);
+    backend.insert(catalog, false);
+
+    UserMetaService userMetaService = UserMetaService.getInstance();
+    RoleMetaService roleMetaService = RoleMetaService.getInstance();
+
+    RoleEntity role1 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role1",
+            auditInfo,
+            "catalog");
+    RoleEntity role2 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role2",
+            auditInfo,
+            "catalog");
+    roleMetaService.insertRole(role1, false);
+    roleMetaService.insertRole(role2, false);
+
+    UserEntity user1 =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "user1",
+            auditInfo,
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
+    UserEntity user2 =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "user2",
+            auditInfo,
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
+    UserEntity user3 =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "user3",
+            auditInfo,
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
+    UserEntity user4 =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "user4",
+            auditInfo,
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
+    userMetaService.insertUser(user1, false);
+    userMetaService.insertUser(user2, false);
+    userMetaService.insertUser(user3, false);
+    userMetaService.insertUser(user4, false);
+
+    // hard delete before soft delete
+    int deletedCount =
+        userMetaService.deleteUserMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 4);
+    Assertions.assertEquals(0, deletedCount);
+    Assertions.assertEquals(
+        user1.name(), userMetaService.getUserByIdentifier(user1.nameIdentifier()).name());
+    Assertions.assertEquals(
+        user2.name(), userMetaService.getUserByIdentifier(user2.nameIdentifier()).name());
+    Assertions.assertEquals(
+        user3.name(), userMetaService.getUserByIdentifier(user3.nameIdentifier()).name());
+    Assertions.assertEquals(
+        user4.name(), userMetaService.getUserByIdentifier(user4.nameIdentifier()).name());
+    Assertions.assertEquals(2, roleMetaService.listRolesByUserId(user1.id()).size());
+    Assertions.assertEquals(2, roleMetaService.listRolesByUserId(user2.id()).size());
+    Assertions.assertEquals(2, roleMetaService.listRolesByUserId(user3.id()).size());
+    Assertions.assertEquals(2, roleMetaService.listRolesByUserId(user4.id()).size());
+    Assertions.assertEquals(4, countUsers(metalake.id()));
+    Assertions.assertEquals(8, countUserRoleRels());
+
+    // delete metalake
+    Assertions.assertTrue(
+        MetalakeMetaService.getInstance().deleteMetalake(metalake.nameIdentifier(), true));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> userMetaService.getUserByIdentifier(user1.nameIdentifier()));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> userMetaService.getUserByIdentifier(user2.nameIdentifier()));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> userMetaService.getUserByIdentifier(user3.nameIdentifier()));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> userMetaService.getUserByIdentifier(user4.nameIdentifier()));
+    Assertions.assertEquals(0, roleMetaService.listRolesByUserId(user1.id()).size());
+    Assertions.assertEquals(0, roleMetaService.listRolesByUserId(user2.id()).size());
+    Assertions.assertEquals(0, roleMetaService.listRolesByUserId(user3.id()).size());
+    Assertions.assertEquals(0, roleMetaService.listRolesByUserId(user4.id()).size());
+    Assertions.assertEquals(4, countUsers(metalake.id()));
+    Assertions.assertEquals(8, countUserRoleRels());
+
+    // hard delete after soft delete
+    deletedCount =
+        userMetaService.deleteUserMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 3);
+    Assertions.assertEquals(6, deletedCount); // delete 3 user + 3 userRoleRel
+    Assertions.assertEquals(1, countUsers(metalake.id())); // 4 - 3
+    Assertions.assertEquals(5, countUserRoleRels()); // 8 - 3
+
+    deletedCount =
+        userMetaService.deleteUserMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 3);
+    Assertions.assertEquals(4, deletedCount); // delete 1 user + 3 userRoleRel
+    Assertions.assertEquals(0, countUsers(metalake.id()));
+    Assertions.assertEquals(2, countUserRoleRels()); // 5 - 3
+
+    deletedCount =
+        userMetaService.deleteUserMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 3);
+    Assertions.assertEquals(2, deletedCount);
+    Assertions.assertEquals(0, countUsers(metalake.id()));
+    Assertions.assertEquals(0, countUserRoleRels());
+
+    deletedCount =
+        userMetaService.deleteUserMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 3);
+    Assertions.assertEquals(0, deletedCount); // no more to delete
+  }
+
+  private Integer countUsers(Long metalakeId) {
+    int count = 0;
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM user_meta WHERE metalake_id = %d", metalakeId))) {
+      while (rs.next()) {
+        count = rs.getInt(1);
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("SQL execution failed", e);
+    }
+    return count;
+  }
+
+  private Integer countUserRoleRels() {
+    int count = 0;
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs = statement.executeQuery("SELECT count(*) FROM user_role_rel")) {
+      while (rs.next()) {
+        count = rs.getInt(1);
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("SQL execution failed", e);
+    }
+    return count;
   }
 }

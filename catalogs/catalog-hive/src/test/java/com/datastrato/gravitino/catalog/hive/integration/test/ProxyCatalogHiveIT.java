@@ -11,6 +11,7 @@ import static com.datastrato.gravitino.server.GravitinoServer.WEBSERVER_CONF_PRE
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.SupportsSchemas;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.catalog.hive.HiveClientPool;
 import com.datastrato.gravitino.client.GravitinoAdminClient;
@@ -21,7 +22,6 @@ import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
@@ -115,9 +115,11 @@ public class ProxyCatalogHiveIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void stop() throws Exception {
+  public static void stop() {
     setEnv(HADOOP_USER_NAME, originHadoopUser);
     anotherClient.close();
+
+    AbstractIT.client = null;
   }
 
   @Test
@@ -127,7 +129,6 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     String anotherSchemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
 
     NameIdentifier ident = NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaName);
-    NameIdentifier anotherIdent = NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, anotherSchemaName);
 
     String comment = "comment";
     createSchema(schemaName, ident, comment);
@@ -149,7 +150,8 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     SupportsSchemas schemas = anotherCatalog.asSchemas();
     Exception e =
         Assertions.assertThrows(
-            RuntimeException.class, () -> schemas.createSchema(anotherIdent, comment, properties));
+            RuntimeException.class,
+            () -> schemas.createSchema(anotherSchemaName, comment, properties));
     Assertions.assertTrue(e.getMessage().contains("AccessControlException Permission denied"));
   }
 
@@ -209,7 +211,7 @@ public class ProxyCatalogHiveIT extends AbstractIT {
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HDFS_DEFAULTFS_PORT,
             schemaName.toLowerCase()));
-    catalog.asSchemas().createSchema(ident, comment, properties);
+    catalog.asSchemas().createSchema(ident.name(), comment, properties);
   }
 
   @Test
@@ -290,8 +292,8 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
     GravitinoMetalake createdMetalake =
-        client.createMetalake(NameIdentifier.of(METALAKE_NAME), "comment", Collections.emptyMap());
-    GravitinoMetalake loadMetalake = client.loadMetalake(NameIdentifier.of(METALAKE_NAME));
+        client.createMetalake(METALAKE_NAME, "comment", Collections.emptyMap());
+    GravitinoMetalake loadMetalake = client.loadMetalake(METALAKE_NAME);
     Assertions.assertEquals(createdMetalake, loadMetalake);
 
     metalake = loadMetalake;
@@ -309,19 +311,14 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     properties.put(METASTORE_URIS, HIVE_METASTORE_URIS);
     properties.put(IMPERSONATION_ENABLE, "true");
 
-    metalake.createCatalog(
-        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME),
-        Catalog.Type.RELATIONAL,
-        PROVIDER,
-        "comment",
-        properties);
+    metalake.createCatalog(CATALOG_NAME, Catalog.Type.RELATIONAL, PROVIDER, "comment", properties);
 
-    catalog = metalake.loadCatalog(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME));
+    catalog = metalake.loadCatalog(CATALOG_NAME);
   }
 
   private static void loadCatalogWithAnotherClient() {
-    GravitinoMetalake metaLake = anotherClient.loadMetalake(NameIdentifier.of(METALAKE_NAME));
-    anotherCatalog = metaLake.loadCatalog(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME));
+    GravitinoMetalake metaLake = anotherClient.loadMetalake(METALAKE_NAME);
+    anotherCatalog = metaLake.loadCatalog(CATALOG_NAME);
   }
 
   public static void setEnv(String key, String value) {

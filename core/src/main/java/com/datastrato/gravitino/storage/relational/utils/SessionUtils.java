@@ -64,6 +64,21 @@ public class SessionUtils {
   }
 
   /**
+   * This method is used to perform a database operation without a commit and fetch the result. If
+   * the operation fails, will throw the RuntimeException.
+   *
+   * @param mapperClazz mapper class to be used for the operation
+   * @param func the operation to be performed with the mapper
+   * @return the result of the operation
+   * @param <T> the type of the mapper
+   * @param <R> the type of the result
+   */
+  public static <T, R> R doWithoutCommitAndFetchResult(Class<T> mapperClazz, Function<T, R> func) {
+    T mapper = SqlSessions.getMapper(mapperClazz);
+    return func.apply(mapper);
+  }
+
+  /**
    * This method is used to perform a database operation without a commit. If the operation fails,
    * will throw the RuntimeException.
    *
@@ -72,12 +87,8 @@ public class SessionUtils {
    * @param <T> the type of the mapper
    */
   public static <T> void doWithoutCommit(Class<T> mapperClazz, Consumer<T> consumer) {
-    try {
-      T mapper = SqlSessions.getMapper(mapperClazz);
-      consumer.accept(mapper);
-    } catch (Throwable t) {
-      throw t;
-    }
+    T mapper = SqlSessions.getMapper(mapperClazz);
+    consumer.accept(mapper);
   }
 
   /**

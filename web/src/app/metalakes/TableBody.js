@@ -7,8 +7,8 @@ import { useState, useEffect, Fragment } from 'react'
 
 import Link from 'next/link'
 
-import { Box, Typography, Portal, Tooltip } from '@mui/material'
-import { DataGrid, GridActionsCellItem, GridToolbar } from '@mui/x-data-grid'
+import { Box, Typography, Portal, Tooltip, IconButton } from '@mui/material'
+import { DataGrid, GridToolbar } from '@mui/x-data-grid'
 import {
   VisibilityOutlined as ViewIcon,
   EditOutlined as EditIcon,
@@ -156,48 +156,39 @@ const TableBody = props => {
       type: 'actions',
       headerName: 'Actions',
       field: 'actions',
-      getActions: ({ id, row }) => [
-        <GridActionsCellItem
-          key='details'
-          label='Details'
-          title='Details'
-          data-refer={`view-metalake-${row.name}`}
-          icon={<ViewIcon viewBox='0 0 24 22' />}
-          onClick={handleShowDetails(row)}
-          sx={{
-            '& svg': {
-              fontSize: '24px'
-            }
-          }}
-        />,
-        <GridActionsCellItem
-          key='edit'
-          label='Edit'
-          title='Edit'
-          data-refer={`edit-metalake-${row.name}`}
-          icon={<EditIcon />}
-          onClick={handleShowEditDialog(row)}
-          sx={{
-            '& svg': {
-              fontSize: '24px'
-            }
-          }}
-        />,
-        <GridActionsCellItem
-          key='delete'
-          icon={<DeleteIcon />}
-          label='Delete'
-          title='Delete'
-          data-refer={`delete-metalake-${row.name}`}
-          onClick={handleDeleteMetalake(row.name)}
-          sx={{
-            '& svg': {
-              fontSize: '24px',
-              color: theme => theme.palette.error.light
-            }
-          }}
-        />
-      ]
+      renderCell: ({ id, row }) => (
+        <>
+          <IconButton
+            title='Details'
+            size='small'
+            sx={{ color: theme => theme.palette.text.secondary }}
+            onClick={handleShowDetails(row)}
+            data-refer={`view-metalake-${row.name}`}
+          >
+            <ViewIcon viewBox='0 0 24 22' />
+          </IconButton>
+
+          <IconButton
+            title='Edit'
+            size='small'
+            sx={{ color: theme => theme.palette.text.secondary }}
+            onClick={handleShowEditDialog(row)}
+            data-refer={`edit-metalake-${row.name}`}
+          >
+            <EditIcon />
+          </IconButton>
+
+          <IconButton
+            title='Delete'
+            size='small'
+            sx={{ color: theme => theme.palette.error.light }}
+            onClick={handleDeleteMetalake(row.name)}
+            data-refer={`delete-metalake-${row.name}`}
+          >
+            <DeleteIcon />
+          </IconButton>
+        </>
+      )
     }
   ]
 

@@ -76,11 +76,11 @@ public final class KvGarbageCollector implements Closeable {
   }
 
   public void start() {
-    long dateTimeLineMinute = config.get(STORE_DELETE_AFTER_TIME) / 1000 / 60;
+    long dateTimelineMinute = config.get(STORE_DELETE_AFTER_TIME) / 1000 / 60;
 
-    // We will collect garbage every 10 minutes at least. If the dateTimeLineMinute is larger than
-    // 100 minutes, we would collect garbage every dateTimeLineMinute/10 minutes.
-    this.frequencyInMinutes = Math.max(dateTimeLineMinute / 10, 10);
+    // We will collect garbage every 10 minutes at least. If the dateTimelineMinute is larger than
+    // 100 minutes, we would collect garbage every dateTimelineMinute/10 minutes.
+    this.frequencyInMinutes = Math.max(dateTimelineMinute / 10, 10);
     garbageCollectorPool.scheduleAtFixedRate(
         this::collectAndClean, 5, frequencyInMinutes, TimeUnit.MINUTES);
   }
@@ -141,11 +141,11 @@ public final class KvGarbageCollector implements Closeable {
   }
 
   private void collectAndRemoveOldVersionData() throws IOException {
-    long deleteTimeLine = System.currentTimeMillis() - config.get(STORE_DELETE_AFTER_TIME);
+    long deleteTimeline = System.currentTimeMillis() - config.get(STORE_DELETE_AFTER_TIME);
     // Why should we leave shift 18 bits? please refer to TransactionIdGeneratorImpl#nextId
-    // We can delete the data which is older than deleteTimeLine.(old data with transaction id that
+    // We can delete the data which is older than deleteTimeline.(old data with transaction id that
     // is smaller than transactionIdToDelete)
-    long transactionIdToDelete = deleteTimeLine << 18;
+    long transactionIdToDelete = deleteTimeline << 18;
     LOG.info("Start to remove data which is older than {}", transactionIdToDelete);
     byte[] startKey = TransactionalKvBackendImpl.generateCommitKey(transactionIdToDelete);
     commitIdHasBeenCollected = kvBackend.get(LAST_COLLECT_COMMIT_ID_KEY);
@@ -159,7 +159,7 @@ public final class KvGarbageCollector implements Closeable {
         lastGCId,
         lastGCId == 1 ? lastGCId : DateFormatUtils.format(lastGCId >> 18, TIME_STAMP_FORMAT),
         transactionIdToDelete,
-        DateFormatUtils.format(deleteTimeLine, TIME_STAMP_FORMAT));
+        DateFormatUtils.format(deleteTimeline, TIME_STAMP_FORMAT));
 
     // Get all commit marks
     // TODO(yuqi), Use multi-thread to scan the data in case of the data is too large.

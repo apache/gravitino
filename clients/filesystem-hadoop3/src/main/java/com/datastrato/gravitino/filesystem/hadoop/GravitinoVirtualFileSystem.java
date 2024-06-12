@@ -333,8 +333,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
         "URI %s doesn't contains valid identifier",
         virtualPath);
 
-    return NameIdentifier.ofFileset(
-        metalakeName, matcher.group(1), matcher.group(2), matcher.group(3));
+    return NameIdentifier.of(metalakeName, matcher.group(1), matcher.group(2), matcher.group(3));
   }
 
   private FilesetContext getFilesetContext(Path virtualPath) {
@@ -378,8 +377,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   }
 
   private Fileset loadFileset(NameIdentifier identifier) {
-    Catalog catalog =
-        client.loadCatalog(NameIdentifier.ofCatalog(metalakeName, identifier.namespace().level(1)));
+    Catalog catalog = client.loadCatalog(identifier.namespace().level(1));
     return catalog.asFilesetCatalog().loadFileset(identifier);
   }
 
