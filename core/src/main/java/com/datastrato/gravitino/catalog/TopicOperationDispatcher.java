@@ -83,8 +83,14 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
     if (GravitinoEnv.getInstance()
         .schemaDispatcher()
         .schemaExists(NameIdentifier.of(ident.namespace().levels()))) {
-      TreeLockUtils.doWithTreeLock(
-          NameIdentifier.of(ident.namespace().levels()), LockType.WRITE, () -> importTopic(ident));
+      boolean imported =
+          TreeLockUtils.doWithTreeLock(
+              NameIdentifier.of(ident.namespace().levels()),
+              LockType.WRITE,
+              () -> importTopic(ident));
+      if (imported) {
+        LOG.info("Gravitino imports the topic {} successfully", ident);
+      }
     }
     return topic;
   }

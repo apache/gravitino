@@ -168,8 +168,14 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
       return schema;
     }
 
-    TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(ident.namespace().levels()), LockType.WRITE, () -> importSchema(ident));
+    boolean imported =
+        TreeLockUtils.doWithTreeLock(
+            NameIdentifier.of(ident.namespace().levels()),
+            LockType.WRITE,
+            () -> importSchema(ident));
+    if (imported) {
+      LOG.info("Gravitino imports the schema {} successfully", ident);
+    }
 
     return schema;
   }

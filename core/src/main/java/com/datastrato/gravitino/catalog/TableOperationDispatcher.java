@@ -92,8 +92,14 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     if (GravitinoEnv.getInstance()
         .schemaDispatcher()
         .schemaExists(NameIdentifier.of(ident.namespace().levels()))) {
-      TreeLockUtils.doWithTreeLock(
-          NameIdentifier.of(ident.namespace().levels()), LockType.WRITE, () -> importTable(ident));
+      boolean imported =
+          TreeLockUtils.doWithTreeLock(
+              NameIdentifier.of(ident.namespace().levels()),
+              LockType.WRITE,
+              () -> importTable(ident));
+      if (imported) {
+        LOG.info("Gravitino imports the table {} successfully", ident);
+      }
     }
 
     return table;
