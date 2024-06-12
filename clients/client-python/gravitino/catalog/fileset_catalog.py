@@ -32,7 +32,6 @@ class FilesetCatalog(BaseSchemaCatalog):
 
     def __init__(
         self,
-        namespace: Namespace, 
         name: str = None,
         catalog_type: Catalog.Type = Catalog.Type.UNSUPPORTED,
         provider: str = None,
@@ -41,15 +40,19 @@ class FilesetCatalog(BaseSchemaCatalog):
         audit: AuditDTO = None,
         rest_client: HTTPClient = None,
     ):
+
         super().__init__(
-            namespace, name, catalog_type, provider, comment, properties, audit, rest_client
+            name, catalog_type, provider, comment, properties, audit, rest_client
         )
 
     def as_fileset_catalog(self):
         return self
 
-    def list_filesets(self) -> List[NameIdentifier]:
-        """List the filesets in the catalog's schema namespace.
+    def list_filesets(self, namespace: Namespace) -> List[NameIdentifier]:
+        """List the filesets in a schema namespace from the catalog.
+
+        Args:
+            namespace A schema namespace.
 
         Raises:
             NoSuchSchemaException If the schema does not exist.
@@ -57,9 +60,9 @@ class FilesetCatalog(BaseSchemaCatalog):
         Returns:
             An array of fileset identifiers in the namespace.
         """
-        Namespace.check_fileset(self.schema_namespace) 
+        Namespace.check_fileset(namespace)
 
-        resp = self.rest_client.get(self.format_fileset_request_path(self.schema_namespace))
+        resp = self.rest_client.get(self.format_fileset_request_path(namespace))
         entity_list_resp = EntityListResponse.from_json(resp.body, infer_missing=True)
         entity_list_resp.validate()
 
@@ -141,7 +144,7 @@ class FilesetCatalog(BaseSchemaCatalog):
             ident: A fileset identifier.
             changes: The changes to apply to the fileset.
 
-        Raises:
+        Args:
             IllegalArgumentException If the changes are invalid.
             NoSuchFilesetException If the fileset does not exist.
 
