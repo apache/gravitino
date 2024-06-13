@@ -21,8 +21,7 @@ import com.datastrato.gravitino.server.ServerConfig;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import java.io.File;
 import java.io.IOException;
-import java.net.HttpURLConnection;
-import java.net.URL;
+import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -32,7 +31,6 @@ import java.sql.Statement;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -228,15 +226,19 @@ public class AbstractIT {
       client = GravitinoAdminClient.builder(serverUri).build();
     }
 
-    Awaitility.await().atMost(60, TimeUnit.SECONDS).pollInterval(5, TimeUnit.SECONDS).until(() -> {
-      boolean isServerUp = isGravitinoServerUp();
-      if (isServerUp) {
-        LOG.info("Gravitino Server is up and running.");
-      } else {
-        LOG.warn("Gravitino Server is not accessible.");
-      }
-      return isServerUp;
-    });
+    Awaitility.await()
+        .atMost(60, TimeUnit.SECONDS)
+        .pollInterval(5, TimeUnit.SECONDS)
+        .until(
+            () -> {
+              boolean isServerUp = isGravitinoServerUp();
+              if (isServerUp) {
+                LOG.info("Gravitino Server is up and running.");
+              } else {
+                LOG.warn("Gravitino Server is not accessible.");
+              }
+              return isServerUp;
+            });
   }
 
   @AfterAll
@@ -276,15 +278,14 @@ public class AbstractIT {
   }
 
   private static boolean isGravitinoServerUp() {
-    try {
-      URL url = new URL("http://localhost:8090");
-      HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-      connection.setRequestMethod("GET");
-      connection.setConnectTimeout(1000);
-      connection.connect();
-      int responseCode = connection.getResponseCode();
-      return responseCode == 200;
-    } catch (IOException e) {
+    String host = "localhost";
+    int port = 8090;
+    int timeout = 1000; // 1 second timeout
+
+    try (Socket socket = new Socket()) {
+      socket.connect(new java.net.InetSocketAddress(host, port), timeout);
+      return true;
+    } catch (Exception e) {
       return false;
     }
   }
