@@ -376,7 +376,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     }
 
     StringIdentifier stringId = getStringIdFromProperties(schema.properties());
-    // Case 1: The schema is not created by Gravitino or the backend storage does not support
+    // Case 1: The schema is not created by Gravitino or the external system does not support
     // storing string identifiers.
     if (stringId == null) {
       return EntityCombinedSchema.of(schema)
