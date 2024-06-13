@@ -12,6 +12,7 @@ from gravitino.dto.requests.metalake_update_request import MetalakeUpdateRequest
 from gravitino.api.metalake_change import MetalakeChange
 from gravitino.utils import HTTPClient
 from gravitino.namespace import Namespace
+from gravitino.namespace import Namespace
 
 
 class DTOConverters:
