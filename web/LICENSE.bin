@@ -225,7 +225,6 @@
 
    Vben
    ./web/lib/utils/axios
-   ./web/types/axios.d.ts
    ./web/lib/enums/httpEnum.js
    ./web/lib/utils/index.js (parts of)
 
