@@ -168,16 +168,13 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
       return schema;
     }
 
-    boolean imported =
+    EntityCombinedSchema importedSchema =
         TreeLockUtils.doWithTreeLock(
             NameIdentifier.of(ident.namespace().levels()),
             LockType.WRITE,
             () -> importSchema(ident));
-    if (imported) {
-      LOG.info("Gravitino imports the schema {} successfully", ident);
-    }
 
-    return schema;
+    return importedSchema;
   }
 
   /**
@@ -310,10 +307,10 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
         : droppedFromCatalog;
   }
 
-  private boolean importSchema(NameIdentifier identifier) {
+  private EntityCombinedSchema importSchema(NameIdentifier identifier) {
     EntityCombinedSchema combinedSchema = loadCombinedSchema(identifier);
     if (combinedSchema.imported()) {
-      return false;
+      return combinedSchema;
     }
 
     StringIdentifier stringId = null;
@@ -353,7 +350,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
       throw new RuntimeException("Fail to access underlying storage");
     }
 
-    return true;
+    return combinedSchema;
   }
 
   private EntityCombinedSchema loadCombinedSchema(NameIdentifier ident) {

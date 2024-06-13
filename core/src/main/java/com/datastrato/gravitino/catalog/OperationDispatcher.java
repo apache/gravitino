@@ -273,7 +273,7 @@ public abstract class OperationDispatcher {
         IllegalArgumentException.class);
   }
 
-  boolean isEntityExist(NameIdentifier ident, Entity.EntityType type) {
+  protected boolean isEntityExist(NameIdentifier ident, Entity.EntityType type) {
     try {
       return store.exists(ident, type);
     } catch (Exception e) {

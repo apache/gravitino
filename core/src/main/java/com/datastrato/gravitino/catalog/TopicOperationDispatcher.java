@@ -83,14 +83,12 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
     if (GravitinoEnv.getInstance()
         .schemaDispatcher()
         .schemaExists(NameIdentifier.of(ident.namespace().levels()))) {
-      boolean imported =
+      EntityCombinedTopic combinedTopic =
           TreeLockUtils.doWithTreeLock(
               NameIdentifier.of(ident.namespace().levels()),
               LockType.WRITE,
               () -> importTopic(ident));
-      if (imported) {
-        LOG.info("Gravitino imports the topic {} successfully", ident);
-      }
+      return combinedTopic;
     }
     return topic;
   }
@@ -276,12 +274,12 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
         : droppedFromCatalog;
   }
 
-  private boolean importTopic(NameIdentifier identifier) {
+  private EntityCombinedTopic importTopic(NameIdentifier identifier) {
 
     EntityCombinedTopic combinedTopic = loadCombinedTopic(identifier);
 
     if (combinedTopic.imported()) {
-      return false;
+      return combinedTopic;
     }
 
     StringIdentifier stringId = null;
@@ -323,7 +321,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
       throw new RuntimeException("Fail to access underlying storage");
     }
 
-    return true;
+    return combinedTopic;
   }
 
   private EntityCombinedTopic loadCombinedTopic(NameIdentifier ident) {

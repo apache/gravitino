@@ -92,14 +92,12 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     if (GravitinoEnv.getInstance()
         .schemaDispatcher()
         .schemaExists(NameIdentifier.of(ident.namespace().levels()))) {
-      boolean imported =
+      EntityCombinedTable importedTable =
           TreeLockUtils.doWithTreeLock(
               NameIdentifier.of(ident.namespace().levels()),
               LockType.WRITE,
               () -> importTable(ident));
-      if (imported) {
-        LOG.info("Gravitino imports the table {} successfully", ident);
-      }
+      return importedTable;
     }
 
     return table;
@@ -373,11 +371,11 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         : droppedFromCatalog;
   }
 
-  private boolean importTable(NameIdentifier identifier) {
+  private EntityCombinedTable importTable(NameIdentifier identifier) {
     EntityCombinedTable combinedTable = loadCombinedTable(identifier);
 
     if (combinedTable.imported()) {
-      return false;
+      return combinedTable;
     }
 
     StringIdentifier stringId = null;
@@ -416,7 +414,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
       throw new RuntimeException("Fail to access underlying storage");
     }
-    return true;
+    return combinedTable;
   }
 
   private EntityCombinedTable loadCombinedTable(NameIdentifier ident) {
