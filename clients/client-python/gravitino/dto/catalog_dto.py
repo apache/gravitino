@@ -10,7 +10,7 @@ from dataclasses_json import config
 
 from .audit_dto import AuditDTO
 from ..api.catalog import Catalog
-
+from ..namespace import Namespace 
 
 @dataclass
 class CatalogDTO(Catalog):
