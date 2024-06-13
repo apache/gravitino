@@ -51,7 +51,7 @@ public class TestPostgreSqlTypeConverter {
     checkJdbcTypeToGravitinoType(Types.StringType.get(), TEXT, null, null);
     checkJdbcTypeToGravitinoType(Types.BinaryType.get(), BYTEA, null, null);
     checkJdbcTypeToGravitinoType(
-        Types.UnparsedType.of(USER_DEFINED_TYPE), USER_DEFINED_TYPE, null, null);
+        Types.ExternalType.of(USER_DEFINED_TYPE), USER_DEFINED_TYPE, null, null);
   }
 
   @Test
@@ -91,21 +91,20 @@ public class TestPostgreSqlTypeConverter {
     checkGravitinoTypeToJdbcType(BPCHAR + "(20)", Types.FixedCharType.of(20));
     checkGravitinoTypeToJdbcType(TEXT, Types.StringType.get());
     checkGravitinoTypeToJdbcType(BYTEA, Types.BinaryType.get());
+    checkGravitinoTypeToJdbcType(USER_DEFINED_TYPE, Types.ExternalType.of(USER_DEFINED_TYPE));
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () ->
-            POSTGRE_SQL_TYPE_CONVERTER.fromGravitinoType(Types.UnparsedType.of(USER_DEFINED_TYPE)));
+        () -> POSTGRE_SQL_TYPE_CONVERTER.fromGravitino(Types.UnparsedType.of(USER_DEFINED_TYPE)));
   }
 
   protected void checkGravitinoTypeToJdbcType(String jdbcTypeName, Type gravitinoType) {
-    Assertions.assertEquals(
-        jdbcTypeName, POSTGRE_SQL_TYPE_CONVERTER.fromGravitinoType(gravitinoType));
+    Assertions.assertEquals(jdbcTypeName, POSTGRE_SQL_TYPE_CONVERTER.fromGravitino(gravitinoType));
   }
 
   protected void checkJdbcTypeToGravitinoType(
       Type gravitinoType, String jdbcTypeName, String columnSize, String scale) {
     JdbcTypeConverter.JdbcTypeBean typeBean = createTypeBean(jdbcTypeName, columnSize, scale);
-    Assertions.assertEquals(gravitinoType, POSTGRE_SQL_TYPE_CONVERTER.toGravitinoType(typeBean));
+    Assertions.assertEquals(gravitinoType, POSTGRE_SQL_TYPE_CONVERTER.toGravitino(typeBean));
   }
 
   protected static JdbcTypeConverter.JdbcTypeBean createTypeBean(

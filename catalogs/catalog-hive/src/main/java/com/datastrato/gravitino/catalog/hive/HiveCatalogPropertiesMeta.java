@@ -28,13 +28,17 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
 
   public static final boolean DEFAULT_IMPERSONATION_ENABLE = false;
 
-  public static final String KET_TAB_URI = "kerberos.keytab-uri";
+  public static final String KEY_TAB_URI = "kerberos.keytab-uri";
 
   public static final String PRINCIPAL = "kerberos.principal";
 
   public static final String CHECK_INTERVAL_SEC = "kerberos.check-interval-sec";
 
   public static final String FETCH_TIMEOUT_SEC = "kerberos.keytab-fetch-timeout-sec";
+
+  public static final String LIST_ALL_TABLES = "list-all-tables";
+
+  public static final boolean DEFAULT_LIST_ALL_TABLES = false;
 
   private static final Map<String, PropertyEntry<?>> HIVE_CATALOG_PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
@@ -69,9 +73,9 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
                   false,
                   false))
           .put(
-              KET_TAB_URI,
+              KEY_TAB_URI,
               PropertyEntry.stringImmutablePropertyEntry(
-                  KET_TAB_URI, "The uri of key tab for the catalog", false, null, false, false))
+                  KEY_TAB_URI, "The uri of key tab for the catalog", false, null, false, false))
           .put(
               PRINCIPAL,
               PropertyEntry.stringImmutablePropertyEntry(
@@ -88,6 +92,16 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
               FETCH_TIMEOUT_SEC,
               PropertyEntry.integerOptionalPropertyEntry(
                   FETCH_TIMEOUT_SEC, "The timeout to fetch key tab", true, 60, false))
+          .put(
+              LIST_ALL_TABLES,
+              PropertyEntry.booleanPropertyEntry(
+                  LIST_ALL_TABLES,
+                  "Lists all tables in a database, including non-Hive tables, such as Iceberg, etc.",
+                  false,
+                  false,
+                  DEFAULT_LIST_ALL_TABLES,
+                  false,
+                  false))
           .putAll(BASIC_CATALOG_PROPERTY_ENTRIES)
           .build();
 

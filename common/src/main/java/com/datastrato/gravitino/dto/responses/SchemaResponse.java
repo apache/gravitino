@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.dto.responses;
 
-import com.datastrato.gravitino.dto.rel.SchemaDTO;
+import com.datastrato.gravitino.dto.SchemaDTO;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;

@@ -38,7 +38,7 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
     def __init__(
         self,
         name: str = None,
-        type: Catalog.Type = Catalog.Type.UNSUPPORTED,
+        catalog_type: Catalog.Type = Catalog.Type.UNSUPPORTED,
         provider: str = None,
         comment: str = None,
         properties: Dict[str, str] = None,
@@ -47,7 +47,7 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
     ):
         super().__init__(
             _name=name,
-            _type=type,
+            _type=catalog_type,
             _provider=provider,
             _comment=comment,
             _properties=properties,

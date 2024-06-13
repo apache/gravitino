@@ -46,11 +46,11 @@ public final class RelationalGarbageCollector implements Closeable {
   }
 
   public void start() {
-    long dateTimeLineMinute = storeDeleteAfterTimeMillis / 1000 / 60;
+    long dateTimelineMinute = storeDeleteAfterTimeMillis / 1000 / 60;
 
-    // We will collect garbage every 10 minutes at least. If the dateTimeLineMinute is larger than
-    // 100 minutes, we would collect garbage every dateTimeLineMinute/10 minutes.
-    long frequency = Math.max(dateTimeLineMinute / 10, 10);
+    // We will collect garbage every 10 minutes at least. If the dateTimelineMinute is larger than
+    // 100 minutes, we would collect garbage every dateTimelineMinute/10 minutes.
+    long frequency = Math.max(dateTimelineMinute / 10, 10);
     garbageCollectorPool.scheduleAtFixedRate(this::collectAndClean, 5, frequency, TimeUnit.MINUTES);
   }
 
@@ -60,16 +60,16 @@ public final class RelationalGarbageCollector implements Closeable {
 
     try {
       LOG.info("Start to collect and delete legacy data by thread {}", threadId);
-      long legacyTimeLine = System.currentTimeMillis() - storeDeleteAfterTimeMillis;
+      long legacyTimeline = System.currentTimeMillis() - storeDeleteAfterTimeMillis;
       for (Entity.EntityType entityType : Entity.EntityType.values()) {
         long deletedCount = Long.MAX_VALUE;
         LOG.info(
             "Try to physically delete {} legacy data that has been marked deleted before {}",
             entityType,
-            legacyTimeLine);
+            legacyTimeline);
         try {
           while (deletedCount > 0) {
-            deletedCount = backend.hardDeleteLegacyData(entityType, legacyTimeLine);
+            deletedCount = backend.hardDeleteLegacyData(entityType, legacyTimeline);
           }
         } catch (RuntimeException e) {
           LOG.error("Failed to physically delete type of " + entityType + "'s legacy data: ", e);

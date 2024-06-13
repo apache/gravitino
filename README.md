@@ -86,6 +86,14 @@ To stop the Gravitino server, please run:
 ./bin/gravitino.sh stop
 ```
 
+Alternatively, to run the Gravitino server in frontend, please run:
+
+```shell
+./bin/gravitino.sh run
+```
+
+And press `CTRL+C` to stop the Gravitino server.
+
 ### Using Trino with Gravitino
 
 Gravitino provides a Trino connector to access the metadata in Gravitino. To use Trino with Gravitino, please follow the [trino-gravitino-connector doc](docs/trino-connector/index.md).

@@ -60,8 +60,7 @@ public class GravitinoConnector implements Connector {
 
     Connector internalConnector = catalogConnectorContext.getInternalConnector();
     ConnectorMetadata internalMetadata =
-        internalConnector.getMetadata(
-            session, gravitinoTransactionHandle.getInternalTransactionHandle());
+        internalConnector.getMetadata(session, gravitinoTransactionHandle.getInternalHandle());
     Preconditions.checkNotNull(internalMetadata);
 
     GravitinoMetalake metalake = catalogConnectorContext.getMetalake();
@@ -128,7 +127,7 @@ public class GravitinoConnector implements Connector {
     GravitinoTransactionHandle gravitinoTransactionHandle =
         (GravitinoTransactionHandle) transactionHandle;
     Connector internalConnector = catalogConnectorContext.getInternalConnector();
-    internalConnector.commit(gravitinoTransactionHandle.getInternalTransactionHandle());
+    internalConnector.commit(gravitinoTransactionHandle.getInternalHandle());
   }
 
   @Override

@@ -54,7 +54,7 @@ public class CatalogDTO implements Catalog {
    */
   protected CatalogDTO(
       String name,
-      Type type,
+      Catalog.Type type,
       String provider,
       String comment,
       Map<String, String> properties,

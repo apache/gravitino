@@ -5,7 +5,6 @@
 package com.datastrato.gravitino.catalog.postgresql;
 
 import com.datastrato.gravitino.catalog.jdbc.JdbcCatalogOperations;
-import com.datastrato.gravitino.catalog.jdbc.JdbcTablePropertiesMetadata;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
@@ -21,14 +20,12 @@ public class PostgreSQLCatalogOperations extends JdbcCatalogOperations {
       JdbcTypeConverter jdbcTypeConverter,
       JdbcDatabaseOperations databaseOperation,
       JdbcTableOperations tableOperation,
-      JdbcTablePropertiesMetadata jdbcTablePropertiesMetadata,
       JdbcColumnDefaultValueConverter columnDefaultValueConverter) {
     super(
         exceptionConverter,
         jdbcTypeConverter,
         databaseOperation,
         tableOperation,
-        jdbcTablePropertiesMetadata,
         columnDefaultValueConverter);
   }
 

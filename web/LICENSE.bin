@@ -216,6 +216,7 @@
    didyoumean
    doctrine
    eslint-visitor-keys
+   human-signals
    ts-interface-checker
    typescript
 
@@ -235,6 +236,8 @@
    @ant-design/icons
    @ant-design/icons-svg
    @ant-design/react-slick
+   @antfu/install-pkg
+   @antfu/utils
    @babel/code-frame
    @babel/helper-module-imports
    @babel/helper-string-parser
@@ -267,7 +270,9 @@
    @floating-ui/utils
    @hookform/resolvers
    @iconify/react
+   @iconify/tools
    @iconify/types
+   @iconify/utils
    @jridgewell/gen-mapping
    @jridgewell/resolve-uri
    @jridgewell/set-array
@@ -321,6 +326,7 @@
    @types/react
    @types/scheduler
    @types/use-sync-external-store
+   @types/yauzl
    @typescript-eslint/parser
    @typescript-eslint/scope-manager
    @typescript-eslint/types
@@ -359,10 +365,12 @@
    brace-expansion
    braces
    browserslist
+   buffer-crc32
    busboy
    call-bind
    callsites
    camelcase-css
+   cheerio
    chalk
    chokidar
    classnames
@@ -374,12 +382,14 @@
    combined-stream
    compute-scroll-into-view
    concat-map
+   confbox
    convert-source-map
    copy-to-clipboard
    cosmiconfig
    cross-spawn
    css-in-js-utils
    css-tree
+   csso
    csstype
    data-view-buffer
    data-view-byte-length
@@ -394,9 +404,12 @@
    dir-glob
    dlv
    dom-helpers
+   dom-serializer
    duplexer
    eastasianwidth
+   end-of-stream
    enhanced-resolve
+   entities
    env-cmd
    error-ex
    error-stack-parser
@@ -409,6 +422,7 @@
    es-set-tostringtag
    es-shim-unscopables
    es-to-primitive
+   esbuild
    escalade
    eslint
    eslint-config-next
@@ -419,13 +433,15 @@
    eslint-plugin-jsx-a11y
    eslint-plugin-react
    eslint-plugin-react-hooks
-   eslint-scope 
+   eslint-scope
+   execa
    fast-deep-equal
    fast-glob
    fast-json-stable-stringify
    fast-levenshtein
    fast-loops
    fastest-stable-stringify
+   fd-slicer
    file-entry-cache
    fill-range
    find-root
@@ -438,6 +454,7 @@
    function.prototype.name
    functions-have-names
    get-intrinsic
+   get-stream
    get-symbol-description
    get-tsconfig
    globals
@@ -455,6 +472,7 @@
    has-symbols
    has-tostringtag
    hasown
+   htmlparser2
    ignore
    immer
    import-fresh
@@ -484,6 +502,7 @@
    is-regex
    is-set
    is-shared-array-buffer
+   is-stream
    is-string
    is-symbol
    is-typed-array
@@ -504,18 +523,25 @@
    json-parse-even-better-errors
    jsx-ast-utils
    keyv
+   kolorist
    language-tags
    lilconfig
    lines-and-columns
    levn
+   local-minizlib
    locate-path
    lodash.merge
    lodash-es
    loose-envify
+   merge-stream
    micromatch
    minimist
    mime-db
    mime-types
+   mimic-fn
+   minizlib
+   mkdirp
+   mlly
    mrmime
    ms
    mz
@@ -524,6 +550,7 @@
    node-releases
    normalize-path
    normalize-range
+   npm-run-path
    nprogress
    object-assign
    object.entries
@@ -534,20 +561,26 @@
    object-inspect
    object-keys
    object.values
+   onetime
    opener
    optionator
    p-limit
    p-locate
    parent-module
    parse-json
+   parse5
+   parse5-htmlparser2-tree-adapter
    path-exists
    path-is-absolute
    path-key
    path-parse
    path-type
+   pathe
+   pend
    picomatch
    pify
    pirates
+   pkg-types
    postcss
    possible-typed-array-names
    postcss-import
@@ -560,6 +593,7 @@
    prop-types
    property-expr
    proxy-from-env
+   pump
    qrcode.react
    queue-microtask
    rc-cascader
@@ -643,16 +677,19 @@
    strip-ansi
    strip-ansi-cjs
    strip-bom
+   strip-final-newline
    strip-json-comments
    styled-jsx
    stylis
    sucrase
    supports-color
    supports-preserve-symlinks-flag
+   svgo
    tailwindcss
    tapable
    tiny-case
    throttle-debounce
+   thejoshwolfe-yauzl
    thenify
    thenify-all
    to-fast-properties
@@ -662,17 +699,18 @@
    totalist
    ts-api-utils
    tsconfig-paths
+   tsx
    type-check
    typed-array-buffer
    typed-array-byte-length
    typed-array-byte-offset
    typed-array-length
+   ufo
    unbox-primitive
    undici-types
    update-browserslist-db
    use-sync-external-store
    util-deprecate
-   watchpack
    webpack-bundle-analyzer
    which-boxed-primitive
    which-builtin-type
@@ -705,12 +743,19 @@
    This product bundles various third-party components also under the
    BSD 2-Clause license.
 
+   cheerio-select
+   css-select
+   css-what
    damerau-levenshtein
-   glob-to-regexp
+   domelementtype
+   domhandler
+   domutils
    espree
    esrecurse
    estraverse
    esutils
+   extract-zip
+   nth-check
    uri-js
 
    This product bundles various third-party components also under the
@@ -735,14 +780,18 @@
    ISC license.
 
    @isaacs/cliui
+   @trysound/sax
+   @types/tar
    @ungap/structured-clone
    anymatch
+   boolbase
    electron-to-chromium
    eslint-import-resolver-typescript
    fastq
    flatted
    foreground-child
    fs.realpath
+   fs-minipass
    glob
    glob-parent
    graceful-fs
@@ -790,5 +839,6 @@
    This product bundles various third-party components also under the
    Blue Oak Model License version 1.0.0.
 
+   chownr
    jackspeak
    path-scurry

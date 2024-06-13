@@ -8,7 +8,9 @@ import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.authorization.AccessControlManager;
+import com.datastrato.gravitino.authorization.Privilege;
 import com.datastrato.gravitino.authorization.Privileges;
+import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.dto.requests.RoleCreateRequest;
 import com.datastrato.gravitino.dto.responses.DeleteResponse;
@@ -16,6 +18,8 @@ import com.datastrato.gravitino.dto.responses.RoleResponse;
 import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.server.web.Utils;
+import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
@@ -65,23 +69,40 @@ public class RoleOperations {
   @ResponseMetered(name = "create-role", absolute = true)
   public Response createRole(@PathParam("metalake") String metalake, RoleCreateRequest request) {
     try {
-
       return Utils.doAs(
           httpRequest,
-          () ->
-              Utils.ok(
-                  new RoleResponse(
-                      DTOConverters.toDTO(
-                          accessControlManager.createRole(
-                              metalake,
-                              request.getName(),
-                              request.getProperties(),
-                              SecurableObjects.parse(
-                                  request.getSecurableObject().fullName(),
-                                  request.getSecurableObject().type()),
-                              request.getPrivileges().stream()
-                                  .map(Privileges::fromString)
-                                  .collect(Collectors.toList()))))));
+          () -> {
+            List<SecurableObject> securableObjects =
+                Arrays.stream(request.getSecurableObjects())
+                    .map(
+                        securableObjectDTO ->
+                            SecurableObjects.parse(
+                                securableObjectDTO.fullName(),
+                                securableObjectDTO.type(),
+                                securableObjectDTO.privileges().stream()
+                                    .map(
+                                        privilege -> {
+                                          if (privilege
+                                              .condition()
+                                              .equals(Privilege.Condition.ALLOW)) {
+                                            return Privileges.allow(privilege.name());
+                                          } else {
+                                            return Privileges.deny(privilege.name());
+                                          }
+                                        })
+                                    .collect(Collectors.toList())))
+                    .collect(Collectors.toList());
+
+            return Utils.ok(
+                new RoleResponse(
+                    DTOConverters.toDTO(
+                        accessControlManager.createRole(
+                            metalake,
+                            request.getName(),
+                            request.getProperties(),
+                            securableObjects))));
+          });
+
     } catch (Exception e) {
       return ExceptionHandlers.handleRoleException(
           OperationType.CREATE, request.getName(), metalake, e);

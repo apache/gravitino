@@ -1,0 +1,7 @@
+#
+# Copyright 2024 Datastrato Pvt Ltd.
+# This software is licensed under the Apache License version 2.
+#
+
+com.datastrato.gravitino.flink.connector.store.GravitinoCatalogStoreFactory
+com.datastrato.gravitino.flink.connector.hive.GravitinoHiveCatalogFactory

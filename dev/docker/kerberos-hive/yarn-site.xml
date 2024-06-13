@@ -1,0 +1,27 @@
+<configuration>
+  <property>
+    <name>yarn.nodemanager.aux-services</name>
+    <value>mapreduce_shuffle</value>
+  </property>
+
+  <property>
+    <name>yarn.nodemanager.pmem-check-enabled</name>
+    <value>false</value>
+  </property>
+
+  <property>
+    <name>yarn.nodemanager.vmem-check-enabled</name>
+    <value>false</value>
+  </property>
+
+  <property>
+    <name>yarn.resourcemanager.principal</name>
+    <value>>yarn/mockhost@HADOOPKRB</value>
+  </property>
+
+  <property>
+    <name>yarn.resourcemanager.keytab</name>
+    <value>>/yarn.keytab</value>
+  </property>
+
+</configuration>

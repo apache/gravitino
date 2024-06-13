@@ -76,16 +76,16 @@ public class TestGravitinoMetalake extends TestBase {
 
     EntityListResponse resp = new EntityListResponse(new NameIdentifier[] {ident1, ident2});
     buildMockResource(Method.GET, path, null, resp, HttpStatus.SC_OK);
-    NameIdentifier[] catalogs = gravitinoClient.listCatalogs();
+    String[] catalogs = gravitinoClient.listCatalogs();
 
     Assertions.assertEquals(2, catalogs.length);
-    Assertions.assertEquals(ident1, catalogs[0]);
-    Assertions.assertEquals(ident2, catalogs[1]);
+    Assertions.assertEquals(ident1.name(), catalogs[0]);
+    Assertions.assertEquals(ident2.name(), catalogs[1]);
 
     // Test return empty catalog list
     EntityListResponse resp1 = new EntityListResponse(new NameIdentifier[] {});
     buildMockResource(Method.GET, path, null, resp1, HttpStatus.SC_OK);
-    NameIdentifier[] catalogs1 = gravitinoClient.listCatalogs();
+    String[] catalogs1 = gravitinoClient.listCatalogs();
     Assertions.assertEquals(0, catalogs1.length);
 
     // Test return internal error
@@ -367,13 +367,13 @@ public class TestGravitinoMetalake extends TestBase {
     DropResponse resp = new DropResponse(true);
     buildMockResource(Method.DELETE, path, null, resp, HttpStatus.SC_OK);
     boolean dropped = gravitinoClient.dropCatalog(catalogName);
-    Assertions.assertTrue(dropped);
+    Assertions.assertTrue(dropped, "catalog should be dropped");
 
     // Test return false
     DropResponse resp1 = new DropResponse(false);
     buildMockResource(Method.DELETE, path, null, resp1, HttpStatus.SC_OK);
     boolean dropped1 = gravitinoClient.dropCatalog(catalogName);
-    Assertions.assertFalse(dropped1);
+    Assertions.assertFalse(dropped1, "catalog should be non-existent");
   }
 
   static GravitinoMetalake createMetalake(GravitinoAdminClient client, String metalakeName)

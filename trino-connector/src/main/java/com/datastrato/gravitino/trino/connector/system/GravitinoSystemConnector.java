@@ -65,7 +65,7 @@ public class GravitinoSystemConnector implements Connector {
 
   @Override
   public ConnectorSplitManager getSplitManager() {
-    return new SplitManger();
+    return new SplitManager();
   }
 
   @Override
@@ -94,7 +94,7 @@ public class GravitinoSystemConnector implements Connector {
     }
   }
 
-  public static class SplitManger implements ConnectorSplitManager {
+  public static class SplitManager implements ConnectorSplitManager {
 
     @Override
     public ConnectorSplitSource getSplits(

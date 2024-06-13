@@ -1,7 +1,7 @@
 <configuration>
   <property>
     <name>mapreduce.framework.name</name>
-    <value>yarn</value>
+    <value>local</value>
   </property>
 
   <property>

@@ -37,8 +37,9 @@ public interface DatabaseOperation {
   /**
    * @param databaseName The name of the database to check.
    * @param cascade If set to true, drops all the tables in the database as well.
+   * @return true if the database is successfully deleted; false if the database does not exist.
    */
-  void delete(String databaseName, boolean cascade) throws NoSuchSchemaException;
+  boolean delete(String databaseName, boolean cascade);
 
   /** @return The list name of databases. */
   List<String> listDatabases();

@@ -11,6 +11,7 @@ import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.partitions.Partition;
 import com.datastrato.gravitino.rel.partitions.Partitions;
 import com.datastrato.gravitino.rel.types.Types;
+import com.datastrato.gravitino.utils.NameIdentifierUtil;
 import com.google.common.collect.Maps;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -21,7 +22,7 @@ public class TestPartitionNormalizeDispatcher extends TestOperationDispatcher {
   private static PartitionNormalizeDispatcher partitionNormalizeDispatcher;
   private static final String SCHEMA = "test_partition_normalize_schema";
   private static final NameIdentifier TABLE =
-      NameIdentifier.ofTable(metalake, catalog, SCHEMA, "TEST_PARTITION_NORMALIZE_TABLE");
+      NameIdentifierUtil.ofTable(metalake, catalog, SCHEMA, "TEST_PARTITION_NORMALIZE_TABLE");
 
   @BeforeAll
   public static void initialize() {
@@ -29,11 +30,11 @@ public class TestPartitionNormalizeDispatcher extends TestOperationDispatcher {
     partitionNormalizeDispatcher =
         new PartitionNormalizeDispatcher(
             TestPartitionOperationDispatcher.partitionOperationDispatcher);
-    NameIdentifier schemaIdent = NameIdentifier.ofSchema(metalake, catalog, SCHEMA);
+    NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema(metalake, catalog, SCHEMA);
     TestPartitionOperationDispatcher.schemaOperationDispatcher.createSchema(
         schemaIdent, "comment", null);
     NameIdentifier tableIdent =
-        NameIdentifier.ofTable(metalake, catalog, SCHEMA, "test_partition_normalize_table");
+        NameIdentifierUtil.ofTable(metalake, catalog, SCHEMA, "test_partition_normalize_table");
     TestPartitionOperationDispatcher.tableOperationDispatcher.createTable(
         tableIdent,
         new Column[] {

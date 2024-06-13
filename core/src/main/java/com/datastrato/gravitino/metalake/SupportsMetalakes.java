@@ -78,7 +78,7 @@ public interface SupportsMetalakes {
    * Drop a metalake with specified identifier.
    *
    * @param ident The identifier of the metalake.
-   * @return True if the metalake was dropped, false otherwise.
+   * @return True if the metalake was dropped, false if the metalake does not exist.
    */
   boolean dropMetalake(NameIdentifier ident);
 }

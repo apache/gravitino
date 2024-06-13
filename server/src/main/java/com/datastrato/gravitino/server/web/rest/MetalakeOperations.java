@@ -23,6 +23,7 @@ import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.metalake.MetalakeDispatcher;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.server.web.Utils;
+import com.datastrato.gravitino.utils.NameIdentifierUtil;
 import java.util.Arrays;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
@@ -61,6 +62,7 @@ public class MetalakeOperations {
   @Timed(name = "list-metalake." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-metalake", absolute = true)
   public Response listMetalakes() {
+    LOG.info("Received list metalakes request.");
     try {
       return Utils.doAs(
           httpRequest,
@@ -69,7 +71,9 @@ public class MetalakeOperations {
                 TreeLockUtils.doWithRootTreeLock(LockType.READ, metalakeDispatcher::listMetalakes);
             MetalakeDTO[] metalakeDTOS =
                 Arrays.stream(metalakes).map(DTOConverters::toDTO).toArray(MetalakeDTO[]::new);
-            return Utils.ok(new MetalakeListResponse(metalakeDTOS));
+            Response response = Utils.ok(new MetalakeListResponse(metalakeDTOS));
+            LOG.info("List {} metalakes in Gravitino", metalakeDTOS.length);
+            return response;
           });
 
     } catch (Exception e) {
@@ -83,19 +87,22 @@ public class MetalakeOperations {
   @Timed(name = "create-metalake." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-metalake", absolute = true)
   public Response createMetalake(MetalakeCreateRequest request) {
+    LOG.info("Received create metalake request for {}", request.getName());
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
             request.validate();
-            NameIdentifier ident = NameIdentifier.ofMetalake(request.getName());
+            NameIdentifier ident = NameIdentifierUtil.ofMetalake(request.getName());
             Metalake metalake =
                 TreeLockUtils.doWithRootTreeLock(
                     LockType.WRITE,
                     () ->
                         metalakeDispatcher.createMetalake(
                             ident, request.getComment(), request.getProperties()));
-            return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(metalake)));
+            Response response = Utils.ok(new MetalakeResponse(DTOConverters.toDTO(metalake)));
+            LOG.info("Metalake created: {}", metalake.name());
+            return response;
           });
 
     } catch (Exception e) {
@@ -109,15 +116,18 @@ public class MetalakeOperations {
   @Timed(name = "load-metalake." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-metalake", absolute = true)
   public Response loadMetalake(@PathParam("name") String metalakeName) {
+    LOG.info("Received load metalake request for metalake: {}", metalakeName);
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            NameIdentifier identifier = NameIdentifier.ofMetalake(metalakeName);
+            NameIdentifier identifier = NameIdentifierUtil.ofMetalake(metalakeName);
             Metalake metalake =
                 TreeLockUtils.doWithTreeLock(
                     identifier, LockType.READ, () -> metalakeDispatcher.loadMetalake(identifier));
-            return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(metalake)));
+            Response response = Utils.ok(new MetalakeResponse(DTOConverters.toDTO(metalake)));
+            LOG.info("Metalake loaded: {}", metalake.name());
+            return response;
           });
 
     } catch (Exception e) {
@@ -132,12 +142,13 @@ public class MetalakeOperations {
   @ResponseMetered(name = "alter-metalake", absolute = true)
   public Response alterMetalake(
       @PathParam("name") String metalakeName, MetalakeUpdatesRequest updatesRequest) {
+    LOG.info("Received alter metalake request for metalake: {}", metalakeName);
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
             updatesRequest.validate();
-            NameIdentifier identifier = NameIdentifier.ofMetalake(metalakeName);
+            NameIdentifier identifier = NameIdentifierUtil.ofMetalake(metalakeName);
             MetalakeChange[] changes =
                 updatesRequest.getUpdates().stream()
                     .map(MetalakeUpdateRequest::metalakeChange)
@@ -145,7 +156,10 @@ public class MetalakeOperations {
             Metalake updatedMetalake =
                 TreeLockUtils.doWithRootTreeLock(
                     LockType.WRITE, () -> metalakeDispatcher.alterMetalake(identifier, changes));
-            return Utils.ok(new MetalakeResponse(DTOConverters.toDTO(updatedMetalake)));
+            Response response =
+                Utils.ok(new MetalakeResponse(DTOConverters.toDTO(updatedMetalake)));
+            LOG.info("Metalake altered: {}", updatedMetalake.name());
+            return response;
           });
 
     } catch (Exception e) {
@@ -159,11 +173,12 @@ public class MetalakeOperations {
   @Timed(name = "drop-metalake." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-metalake", absolute = true)
   public Response dropMetalake(@PathParam("name") String metalakeName) {
+    LOG.info("Received drop metalake request for metalake: {}", metalakeName);
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            NameIdentifier identifier = NameIdentifier.ofMetalake(metalakeName);
+            NameIdentifier identifier = NameIdentifierUtil.ofMetalake(metalakeName);
             boolean dropped =
                 TreeLockUtils.doWithRootTreeLock(
                     LockType.WRITE, () -> metalakeDispatcher.dropMetalake(identifier));
@@ -171,7 +186,9 @@ public class MetalakeOperations {
               LOG.warn("Failed to drop metalake by name {}", metalakeName);
             }
 
-            return Utils.ok(new DropResponse(dropped));
+            Response response = Utils.ok(new DropResponse(dropped));
+            LOG.info("Metalake dropped: {}", metalakeName);
+            return response;
           });
 
     } catch (Exception e) {

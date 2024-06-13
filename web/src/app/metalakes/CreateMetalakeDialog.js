@@ -32,7 +32,7 @@ import { yupResolver } from '@hookform/resolvers/yup'
 
 import { groupBy } from 'lodash-es'
 import { genUpdates } from '@/lib/utils'
-import { nameRegex, keyRegex } from '@/lib/utils/regex'
+import { nameRegex, nameRegexDesc, keyRegex } from '@/lib/utils/regex'
 
 const defaultValues = {
   name: '',
@@ -40,13 +40,7 @@ const defaultValues = {
 }
 
 const schema = yup.object().shape({
-  name: yup
-    .string()
-    .required()
-    .matches(
-      nameRegex,
-      'This field must start with a letter or underscore, and can only contain letters, numbers, dashes, and underscores'
-    )
+  name: yup.string().required().matches(nameRegex, nameRegexDesc)
 })
 
 const Transition = forwardRef(function Transition(props, ref) {
