@@ -19,7 +19,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 
 public class HadoopProxyPlugin implements ProxyPlugin {
   private HadoopCatalogOperations ops;
-  private UserGroupInformation realUser;
+  private final UserGroupInformation realUser;
 
   public HadoopProxyPlugin() {
     try {

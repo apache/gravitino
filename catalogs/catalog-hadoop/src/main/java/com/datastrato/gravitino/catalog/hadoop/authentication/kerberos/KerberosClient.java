@@ -8,6 +8,7 @@ package com.datastrato.gravitino.catalog.hadoop.authentication.kerberos;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
@@ -22,10 +23,8 @@ import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class KerberosClient {
+public class KerberosClient implements Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(KerberosClient.class);
-
-  public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-%s-keytab";
 
   private final ScheduledThreadPoolExecutor checkTgtExecutor;
   private final Map<String, String> conf;
@@ -52,8 +51,9 @@ public class KerberosClient {
     // Login
     UserGroupInformation.setConfiguration(hadoopConf);
     KerberosName.resetDefaultRealm();
-    UserGroupInformation.loginUserFromKeytab(catalogPrincipal, keytabFilePath);
-    UserGroupInformation kerberosLoginUgi = UserGroupInformation.getCurrentUser();
+    UserGroupInformation kerberosLoginUgi =
+        UserGroupInformation.loginUserFromKeytabAndReturnUGI(catalogPrincipal, keytabFilePath);
+    UserGroupInformation.setLoginUser(kerberosLoginUgi);
 
     // Refresh the cache if it's out of date.
     int checkInterval = kerberosConfig.getCheckIntervalSec();
@@ -72,8 +72,7 @@ public class KerberosClient {
     return principalComponents.get(1);
   }
 
-  public File saveKeyTabFileFromUri(Long catalogId) throws IOException {
-
+  public File saveKeyTabFileFromUri(String keytabPath) throws IOException {
     KerberosConfig kerberosConfig = new KerberosConfig(conf);
 
     String keyTabUri = kerberosConfig.getKeytab();
@@ -89,7 +88,7 @@ public class KerberosClient {
       keytabsDir.mkdir();
     }
 
-    File keytabFile = new File(String.format(GRAVITINO_KEYTAB_FORMAT, catalogId));
+    File keytabFile = new File(keytabPath);
     keytabFile.deleteOnExit();
     if (keytabFile.exists() && !keytabFile.delete()) {
       throw new IllegalStateException(
@@ -104,5 +103,12 @@ public class KerberosClient {
 
   private static ThreadFactory getThreadFactory(String factoryName) {
     return new ThreadFactoryBuilder().setDaemon(true).setNameFormat(factoryName + "-%d").build();
+  }
+
+  @Override
+  public void close() throws IOException {
+    if (checkTgtExecutor != null) {
+      checkTgtExecutor.shutdown();
+    }
   }
 }

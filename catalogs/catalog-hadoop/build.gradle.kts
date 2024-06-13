@@ -15,6 +15,7 @@ dependencies {
   implementation(project(":core"))
   implementation(project(":common"))
 
+  implementation(libs.cglib)
   implementation(libs.guava)
   implementation(libs.hadoop3.common) {
     exclude("com.sun.jersey")
@@ -102,7 +103,7 @@ tasks.test {
 
     doFirst {
       environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.12")
-      environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-kerberos-hive:0.1.2")
+      environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-kerberos-hive:test")
     }
 
     val init = project.extra.get("initIntegrationTest") as (Test) -> Unit

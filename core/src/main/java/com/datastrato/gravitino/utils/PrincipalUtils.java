@@ -33,10 +33,19 @@ public class PrincipalUtils {
   public static Principal getCurrentPrincipal() {
     java.security.AccessControlContext context = java.security.AccessController.getContext();
     Subject subject = Subject.getSubject(context);
-    if (subject == null || subject.getPrincipals(UserPrincipal.class).isEmpty()) {
+    if (subject == null) {
       return new UserPrincipal(AuthConstants.ANONYMOUS_USER);
     }
-    return subject.getPrincipals(UserPrincipal.class).iterator().next();
+
+    if (!subject.getPrincipals(UserPrincipal.class).isEmpty()) {
+      return subject.getPrincipals(UserPrincipal.class).iterator().next();
+    }
+
+    if (!subject.getPrincipals().isEmpty()) {
+      return new UserPrincipal(subject.getPrincipals().iterator().next().getName());
+    }
+
+    return new UserPrincipal(AuthConstants.ANONYMOUS_USER);
   }
 
   public static String getCurrentUserName() {
