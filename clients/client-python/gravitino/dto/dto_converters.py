@@ -12,7 +12,6 @@ from gravitino.dto.requests.metalake_update_request import MetalakeUpdateRequest
 from gravitino.api.metalake_change import MetalakeChange
 from gravitino.utils import HTTPClient
 from gravitino.namespace import Namespace
-from gravitino.namespace import Namespace
 
 
 class DTOConverters:
@@ -40,9 +39,7 @@ class DTOConverters:
 
     @staticmethod
     def to_catalog(catalog: CatalogDTO, client: HTTPClient):
-        namespace = Namespace.of(
-            catalog.namespace().level(0), catalog.namespace().level(1)
-        )
+        namespace = catalog.namespace()
         if catalog.type() == Catalog.Type.FILESET:
             return FilesetCatalog(
                 namespace=namespace,

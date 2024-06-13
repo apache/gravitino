@@ -22,6 +22,7 @@ class CatalogDTO(Catalog):
     _comment: str = field(metadata=config(field_name="comment"))
     _properties: Dict[str, str] = field(metadata=config(field_name="properties"))
     _audit: AuditDTO = field(default=None, metadata=config(field_name="audit"))
+    _namespace: Namespace = field(default=None, metadata=config(field_name="namespace"))
 
     def builder(
         self,
@@ -56,3 +57,6 @@ class CatalogDTO(Catalog):
 
     def audit_info(self) -> AuditDTO:
         return self._audit
+
+    def namespace(self) -> Namespace:
+        return self._namespace
