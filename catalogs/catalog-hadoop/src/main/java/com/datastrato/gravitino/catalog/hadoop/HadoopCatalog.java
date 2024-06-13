@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.hadoop;
 
-import com.datastrato.gravitino.catalog.hadoop.kerberos.KerberosConfig;
+import com.datastrato.gravitino.catalog.hadoop.authentication.kerberos.KerberosConfig;
 import com.datastrato.gravitino.connector.BaseCatalog;
 import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.PropertiesMetadata;

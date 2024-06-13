@@ -126,6 +126,14 @@ public class TopicMetaService {
     return topicPO;
   }
 
+  // Topic may be deleted, so the TopicPO may be null.
+  public TopicPO getTopicPOById(Long topicId) {
+    TopicPO topicPO =
+        SessionUtils.getWithoutCommit(
+            TopicMetaMapper.class, mapper -> mapper.selectTopicMetaById(topicId));
+    return topicPO;
+  }
+
   private void fillTopicPOBuilderParentEntityId(TopicPO.Builder builder, Namespace namespace) {
     NamespaceUtil.checkTopic(namespace);
     Long parentEntityId = null;
@@ -178,15 +186,15 @@ public class TopicMetaService {
     return true;
   }
 
-  public int deleteTopicMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
+  public int deleteTopicMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
         TopicMetaMapper.class,
         mapper -> {
-          return mapper.deleteTopicMetasByLegacyTimeLine(legacyTimeLine, limit);
+          return mapper.deleteTopicMetasByLegacyTimeline(legacyTimeline, limit);
         });
   }
 
-  private Long getTopicIdBySchemaIdAndName(Long schemaId, String topicName) {
+  public Long getTopicIdBySchemaIdAndName(Long schemaId, String topicName) {
     Long topicId =
         SessionUtils.getWithoutCommit(
             TopicMetaMapper.class,

@@ -48,6 +48,14 @@ public class TableMetaService {
     return tablePO;
   }
 
+  // Table may be deleted, so the TablePO may be null.
+  public TablePO getTablePOById(Long tableId) {
+    TablePO tablePO =
+        SessionUtils.getWithoutCommit(
+            TableMetaMapper.class, mapper -> mapper.selectTableMetaById(tableId));
+    return tablePO;
+  }
+
   public Long getTableIdBySchemaIdAndName(Long schemaId, String tableName) {
     Long tableId =
         SessionUtils.getWithoutCommit(
@@ -165,11 +173,11 @@ public class TableMetaService {
     return true;
   }
 
-  public int deleteTableMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
+  public int deleteTableMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
         TableMetaMapper.class,
         mapper -> {
-          return mapper.deleteTableMetasByLegacyTimeLine(legacyTimeLine, limit);
+          return mapper.deleteTableMetasByLegacyTimeline(legacyTimeline, limit);
         });
   }
 

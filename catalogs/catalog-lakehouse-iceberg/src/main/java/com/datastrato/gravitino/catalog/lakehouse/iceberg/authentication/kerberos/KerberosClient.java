@@ -3,7 +3,7 @@
  * This software is licensed under the Apache License version 2.
  */
 
-package com.datastrato.gravitino.catalog.hadoop.kerberos;
+package com.datastrato.gravitino.catalog.lakehouse.iceberg.authentication.kerberos;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
@@ -24,8 +24,6 @@ import org.slf4j.LoggerFactory;
 
 public class KerberosClient {
   private static final Logger LOG = LoggerFactory.getLogger(KerberosClient.class);
-
-  public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-%s-keytab";
 
   private final ScheduledThreadPoolExecutor checkTgtExecutor;
   private final Map<String, String> conf;
@@ -82,20 +80,21 @@ public class KerberosClient {
     Preconditions.checkArgument(
         !keyTabUri.trim().startsWith("hdfs"), "Keytab uri doesn't support to use HDFS");
 
-    java.io.File keytabsDir = new File("keytabs");
+    File keytabsDir = new File("keytabs");
     if (!keytabsDir.exists()) {
-      // Ignore the return value, because there exists many Hadoop catalog operations making
+      // Ignore the return value, because there exists many Hive catalog operations making
       // this directory.
       keytabsDir.mkdir();
     }
 
-    File keytabFile = new File(String.format(GRAVITINO_KEYTAB_FORMAT, catalogId));
+    File keytabFile = new File(String.format(KerberosConfig.GRAVITINO_KEYTAB_FORMAT, catalogId));
     keytabFile.deleteOnExit();
     if (keytabFile.exists() && !keytabFile.delete()) {
       throw new IllegalStateException(
           String.format("Fail to delete keytab file %s", keytabFile.getAbsolutePath()));
     }
 
+    // TODO: Make the configuration
     int fetchKeytabFileTimeout = kerberosConfig.getFetchTimeoutSec();
     FetchFileUtils.fetchFileFromUri(keyTabUri, keytabFile, fetchKeytabFileTimeout, hadoopConf);
 

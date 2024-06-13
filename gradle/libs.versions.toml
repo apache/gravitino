@@ -60,6 +60,7 @@ awaitility = "4.2.1"
 servlet = "3.1.0"
 jodd = "3.5.2"
 flink = "1.18.0"
+cglib = "2.2"
 ranger = "2.4.0"
 
 protobuf-plugin = "0.9.2"
@@ -168,6 +169,8 @@ sun-activation = { group = "com.sun.activation", name = "javax.activation", vers
 kafka-clients = { group = "org.apache.kafka", name = "kafka-clients", version.ref = "kafka" }
 kafka = { group = "org.apache.kafka", name = "kafka_2.12", version.ref = "kafka" }
 curator-test = { group = "org.apache.curator", name = "curator-test", version.ref = "curator"}
+cglib = { group = "cglib", name = "cglib", version.ref = "cglib"}
+
 ranger-intg = { group = "org.apache.ranger", name = "ranger-intg", version.ref = "ranger" }
 selenium = { group = "org.seleniumhq.selenium", name = "selenium-java", version.ref = "selenium" }
 rauschig = { group = "org.rauschig", name = "jarchivelib", version.ref = "rauschig" }

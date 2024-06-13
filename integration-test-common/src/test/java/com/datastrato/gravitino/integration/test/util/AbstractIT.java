@@ -21,6 +21,7 @@ import com.datastrato.gravitino.server.ServerConfig;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -72,6 +73,8 @@ public class AbstractIT {
 
   protected static String serverUri;
 
+  protected static String originConfig;
+
   public static int getGravitinoServerPort() {
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
@@ -83,29 +86,30 @@ public class AbstractIT {
   }
 
   private static void rewriteGravitinoServerConfig() throws IOException {
-    if (customConfigs.isEmpty()) return;
-
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
+    Path configPath = Paths.get(gravitinoHome, "conf", GravitinoServer.CONF_FILE);
+    if (originConfig == null) {
+      originConfig = FileUtils.readFileToString(configPath.toFile(), StandardCharsets.UTF_8);
+    }
+
+    if (customConfigs.isEmpty()) return;
 
     String tmpFileName = GravitinoServer.CONF_FILE + ".tmp";
     Path tmpPath = Paths.get(gravitinoHome, "conf", tmpFileName);
     Files.deleteIfExists(tmpPath);
 
-    Path configPath = Paths.get(gravitinoHome, "conf", GravitinoServer.CONF_FILE);
     Files.move(configPath, tmpPath);
-
     ITUtils.rewriteConfigFile(tmpPath.toString(), configPath.toString(), customConfigs);
   }
 
   private static void recoverGravitinoServerConfig() throws IOException {
-    if (customConfigs.isEmpty()) return;
-
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    String tmpFileName = GravitinoServer.CONF_FILE + ".tmp";
-    Path tmpPath = Paths.get(gravitinoHome, "conf", tmpFileName);
     Path configPath = Paths.get(gravitinoHome, "conf", GravitinoServer.CONF_FILE);
-    Files.deleteIfExists(configPath);
-    Files.move(tmpPath, configPath);
+
+    if (originConfig != null) {
+      Files.deleteIfExists(configPath);
+      FileUtils.write(configPath.toFile(), originConfig, StandardCharsets.UTF_8);
+    }
   }
 
   protected static void downLoadJDBCDriver() throws IOException {
@@ -153,7 +157,7 @@ public class AbstractIT {
               new File(
                   gravitinoHome
                       + String.format(
-                          "/scripts/mysql/schema-%s-mysql.sql", ConfigConstants.VERSION_0_5_0)),
+                          "/scripts/mysql/schema-%s-mysql.sql", ConfigConstants.VERSION_0_6_0)),
               "UTF-8");
       String[] initMySQLBackendSqls = mysqlContent.split(";");
       initMySQLBackendSqls = ArrayUtils.addFirst(initMySQLBackendSqls, "use " + META_DATA + ";");

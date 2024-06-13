@@ -8,4 +8,4 @@ class GravitinoRuntimeException(RuntimeError):
     """Base class for all Gravitino runtime exceptions."""
 
     def __init__(self, message, *args):
-        super().__init__(message.format(*args))
+        super().__init__(message % args)

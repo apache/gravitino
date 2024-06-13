@@ -120,11 +120,16 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
 
   @AfterAll
   public void stop() throws Exception {
-    clearTableAndSchema();
-    metalake.dropCatalog(catalogName);
-    client.dropMetalake(metalakeName);
-    spark.close();
-    AbstractIT.stopIntegrationTest();
+    try {
+      clearTableAndSchema();
+      metalake.dropCatalog(catalogName);
+      client.dropMetalake(metalakeName);
+    } finally {
+      if (spark != null) {
+        spark.close();
+      }
+      AbstractIT.stopIntegrationTest();
+    }
   }
 
   @AfterEach

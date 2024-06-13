@@ -55,6 +55,12 @@ public class SchemaMetaService {
     return schemaPO;
   }
 
+  // Schema may be deleted, so the SchemaPO may be null.
+  public SchemaPO getSchemaPOById(Long schemaId) {
+    return SessionUtils.getWithoutCommit(
+        SchemaMetaMapper.class, mapper -> mapper.selectSchemaMetaById(schemaId));
+  }
+
   public Long getSchemaIdByCatalogIdAndName(Long catalogId, String schemaName) {
     Long schemaId =
         SessionUtils.getWithoutCommit(
@@ -217,11 +223,11 @@ public class SchemaMetaService {
     return true;
   }
 
-  public int deleteSchemaMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
+  public int deleteSchemaMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
         SchemaMetaMapper.class,
         mapper -> {
-          return mapper.deleteSchemaMetasByLegacyTimeLine(legacyTimeLine, limit);
+          return mapper.deleteSchemaMetasByLegacyTimeline(legacyTimeline, limit);
         });
   }
 

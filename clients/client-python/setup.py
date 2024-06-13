@@ -22,7 +22,7 @@ setup(
     author="datastrato",
     author_email="support@datastrato.com",
     python_requires=">=3.8",
-    packages=find_packages(exclude=["tests*"]),
+    packages=find_packages(exclude=["tests*", "scripts*"]),
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',

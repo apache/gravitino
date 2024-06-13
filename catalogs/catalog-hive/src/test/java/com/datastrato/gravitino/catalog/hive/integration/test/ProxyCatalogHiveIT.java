@@ -119,7 +119,6 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     setEnv(HADOOP_USER_NAME, originHadoopUser);
     anotherClient.close();
 
-    AbstractIT.customConfigs.clear();
     AbstractIT.client = null;
   }
 

@@ -57,6 +57,14 @@ public class FilesetMetaService {
     return filesetPO;
   }
 
+  // Filset may be deleted, so the FilesetPO may be null.
+  public FilesetPO getFilesetPOById(Long filesetId) {
+    FilesetPO filesetPO =
+        SessionUtils.getWithoutCommit(
+            FilesetMetaMapper.class, mapper -> mapper.selectFilesetMetaById(filesetId));
+    return filesetPO;
+  }
+
   public Long getFilesetIdBySchemaIdAndName(Long schemaId, String filesetName) {
     Long filesetId =
         SessionUtils.getWithoutCommit(
@@ -220,18 +228,18 @@ public class FilesetMetaService {
     return true;
   }
 
-  public int deleteFilesetAndVersionMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
+  public int deleteFilesetAndVersionMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     int filesetDeletedCount =
         SessionUtils.doWithCommitAndFetchResult(
             FilesetMetaMapper.class,
             mapper -> {
-              return mapper.deleteFilesetMetasByLegacyTimeLine(legacyTimeLine, limit);
+              return mapper.deleteFilesetMetasByLegacyTimeline(legacyTimeline, limit);
             });
     int filesetVersionDeletedCount =
         SessionUtils.doWithCommitAndFetchResult(
             FilesetVersionMapper.class,
             mapper -> {
-              return mapper.deleteFilesetVersionsByLegacyTimeLine(legacyTimeLine, limit);
+              return mapper.deleteFilesetVersionsByLegacyTimeline(legacyTimeline, limit);
             });
     return filesetDeletedCount + filesetVersionDeletedCount;
   }

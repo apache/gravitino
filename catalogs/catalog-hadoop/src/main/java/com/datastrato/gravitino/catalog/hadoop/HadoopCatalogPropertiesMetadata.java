@@ -4,8 +4,8 @@
  */
 package com.datastrato.gravitino.catalog.hadoop;
 
-import com.datastrato.gravitino.catalog.hadoop.kerberos.AuthenticationConfig;
-import com.datastrato.gravitino.catalog.hadoop.kerberos.KerberosConfig;
+import com.datastrato.gravitino.catalog.hadoop.authentication.AuthenticationConfig;
+import com.datastrato.gravitino.catalog.hadoop.authentication.kerberos.KerberosConfig;
 import com.datastrato.gravitino.connector.BaseCatalogPropertiesMetadata;
 import com.datastrato.gravitino.connector.PropertyEntry;
 import com.google.common.collect.ImmutableMap;
