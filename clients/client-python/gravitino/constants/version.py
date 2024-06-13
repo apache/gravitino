@@ -4,9 +4,9 @@ This software is licensed under the Apache License version 2.
 """
 
 from enum import Enum
-from pathlib import Path
 
-PROJECT_HOME = Path(__file__).parent.parent.parent
+from gravitino.constants.root import PROJECT_HOME
+
 VERSION_INI = PROJECT_HOME / "version.ini"
 SETUP_FILE = PROJECT_HOME / "setup.py"
 
