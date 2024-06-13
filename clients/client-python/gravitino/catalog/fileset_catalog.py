@@ -32,6 +32,7 @@ class FilesetCatalog(BaseSchemaCatalog):
 
     def __init__(
         self,
+        namespace: Namespace,
         name: str = None,
         catalog_type: Catalog.Type = Catalog.Type.UNSUPPORTED,
         provider: str = None,
@@ -40,9 +41,15 @@ class FilesetCatalog(BaseSchemaCatalog):
         audit: AuditDTO = None,
         rest_client: HTTPClient = None,
     ):
-
         super().__init__(
-            name, catalog_type, provider, comment, properties, audit, rest_client
+            namespace,
+            name,
+            catalog_type,
+            provider,
+            comment,
+            properties,
+            audit,
+            rest_client,
         )
 
     def as_fileset_catalog(self):
