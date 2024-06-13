@@ -167,7 +167,7 @@ tasks {
     args = listOf("scripts/generate_version.py")
   }
 
-  val doc by registering(VenvTask::class) {
+  val pydoc by registering(VenvTask::class) {
     venvExec = "python"
     args = listOf("scripts/generate_doc.py")
   }
