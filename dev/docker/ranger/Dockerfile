@@ -31,15 +31,15 @@ RUN ARCH=$(uname -m) && \
 
 # install ranger
 ENV RANGER_HOME=/opt/ranger-admin
-RUN mkdir -p ${RANGER_HOME}
 ADD packages/ranger-${RANGER_VERSION}-admin.tar.gz /opt/
-RUN ln -s /opt/ranger-${RANGER_VERSION}-admin/* ${RANGER_HOME}
+RUN ln -s /opt/ranger-${RANGER_VERSION}-admin ${RANGER_HOME}
 
 # Initialize Ranger envirioment
 # We download these packages because ranger-admin required thiese packages
 # but it seems not included in tar file.
 COPY packages/${MYSQL_CONNECTOR_PACKAGE_NAME} ${RANGER_HOME}/ews/webapp/WEB-INF/lib/
 COPY packages/${MYSQL_CONNECTOR_PACKAGE_NAME} ${RANGER_HOME}/jisql/lib/
+COPY packages/${LOG4JDBC_PACKAGE_NAME} ${RANGER_HOME}/ews/webapp/WEB-INF/lib/
 RUN cp -r ${RANGER_HOME}/ews/webapp/WEB-INF/classes/conf.dist/ ${RANGER_HOME}/ews/webapp/WEB-INF/classes/conf && \
     mkdir ${RANGER_HOME}/ews/logs
 
