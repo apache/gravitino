@@ -38,15 +38,16 @@ public class GravitinoDriverPlugin implements DriverPlugin {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoDriverPlugin.class);
 
-  private GravitinoCatalogManager catalogManager;
-  private final List<String> toRegisteredDriverExtensions =
-      Arrays.asList(GravitinoIcebergSparkSessionExtensions.class.getName());
-  private final List<String> gravitinoDriverExtensions = new ArrayList<>();
-  private boolean enableIcebergSupport = false;
-
   @VisibleForTesting
   static final String ICEBERG_SPARK_EXTENSIONS =
       "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions";
+
+  private GravitinoCatalogManager catalogManager;
+  private final List<String> gravitinoIcebergExtensions =
+      Arrays.asList(
+          GravitinoIcebergSparkSessionExtensions.class.getName(), ICEBERG_SPARK_EXTENSIONS);
+  private final List<String> gravitinoDriverExtensions = new ArrayList<>();
+  private boolean enableIcebergSupport = false;
 
   @Override
   public Map<String, String> init(SparkContext sc, PluginContext pluginContext) {
@@ -62,12 +63,10 @@ public class GravitinoDriverPlugin implements DriverPlugin {
         String.format(
             "%s:%s, should not be empty", GravitinoSparkConfig.GRAVITINO_METALAKE, metalake));
 
-    gravitinoDriverExtensions.addAll(toRegisteredDriverExtensions);
-
     this.enableIcebergSupport =
         conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT, false);
     if (enableIcebergSupport) {
-      gravitinoDriverExtensions.add(ICEBERG_SPARK_EXTENSIONS);
+      gravitinoDriverExtensions.addAll(gravitinoIcebergExtensions);
     }
 
     this.catalogManager = GravitinoCatalogManager.create(gravitinoUri, metalake);
