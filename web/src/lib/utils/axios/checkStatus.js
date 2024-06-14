@@ -20,16 +20,24 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-*/
+ */
 
 /**
  * Referred from src/utils/http/axios/checkStatus.ts
  */
 
-import type { ErrorMessageMode } from '@/types/axios'
+/**
+ * @typedef {'none' | 'modal' | 'message' | undefined} ErrorMessageMode
+ */
+
 import toast from 'react-hot-toast'
 
-export function checkStatus(status: number, msg: string, errorMessageMode: ErrorMessageMode = 'message'): void {
+/**
+ * @param {number} status
+ * @param {string} msg
+ * @param {ErrorMessageMode} [errorMessageMode='message']
+ */
+export function checkStatus(status, msg, errorMessageMode = 'message') {
   let errMessage = ''
 
   switch (status) {
@@ -39,9 +47,9 @@ export function checkStatus(status: number, msg: string, errorMessageMode: Error
 
     case 401:
       // ** reserve error message
-      // errMessage = msg || 'The user does not have permission (token, user name, password error or expired)!'
-
+      // errMessage = msg || 'The user does not have permission (token, user name, password error or expired)!';
       break
+
     case 403:
       errMessage = 'The user is authorized, but access is forbidden!'
       break
