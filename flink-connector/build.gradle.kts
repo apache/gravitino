@@ -14,6 +14,7 @@ repositories {
 
 val flinkVersion: String = libs.versions.flink.get()
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
+val artifactName = "gravitino-${project.name}-$scalaVersion"
 
 dependencies {
   implementation(project(":api"))
@@ -140,5 +141,17 @@ tasks.test {
 
     val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
     init(this)
+  }
+}
+
+tasks.withType<Jar> {
+  archiveBaseName.set(artifactName)
+}
+
+publishing {
+  publications {
+    withType<MavenPublication>().configureEach {
+      artifactId = artifactName
+    }
   }
 }
