@@ -30,14 +30,17 @@ import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Types;
+import com.datastrato.gravitino.utils.RandomNameUtils;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -253,6 +256,65 @@ public class CatalogDorisIT extends AbstractIT {
         NoSuchSchemaException.class,
         () -> {
           schemas.loadSchema(schemaName);
+        });
+  }
+
+  @Test
+  void testSchemaWithIllegalName() {
+    SupportsSchemas schemas = catalog.asSchemas();
+    String databaseName = RandomNameUtils.genRandomName("it_db");
+    Map<String, String> properties = new HashMap<>();
+    String comment = "comment";
+
+    // should throw an exception with string that might contain SQL injection
+    String sqlInjection = databaseName + "`; DROP TABLE important_table; -- ";
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          schemas.createSchema(sqlInjection, comment, properties);
+        });
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          schemas.dropSchema(sqlInjection, false);
+        });
+
+    String sqlInjection1 = databaseName + "`; SLEEP(10); -- ";
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          schemas.createSchema(sqlInjection1, comment, properties);
+        });
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          schemas.dropSchema(sqlInjection1, false);
+        });
+
+    String sqlInjection2 =
+        databaseName + "`; UPDATE Users SET password = 'newpassword' WHERE username = 'admin'; -- ";
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          schemas.createSchema(sqlInjection2, comment, properties);
+        });
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          schemas.dropSchema(sqlInjection2, false);
+        });
+
+    // should throw an exception with input that has more than 64 characters
+    String invalidInput = StringUtils.repeat("a", 65);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          schemas.createSchema(invalidInput, comment, properties);
+        });
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          schemas.dropSchema(invalidInput, false);
         });
   }
 

@@ -13,6 +13,7 @@ import com.datastrato.gravitino.connector.BaseCatalog;
 import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.connector.PropertyEntry;
+import com.datastrato.gravitino.connector.capability.Capability;
 import java.util.Collections;
 import java.util.Map;
 
@@ -50,6 +51,11 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
             createJdbcTableOperations(),
             createJdbcColumnDefaultValueConverter());
     return ops;
+  }
+
+  @Override
+  public Capability newCapability() {
+    return new JdbcCatalogCapability();
   }
 
   /** @return The {@link JdbcExceptionConverter} to be used by the catalog. */
