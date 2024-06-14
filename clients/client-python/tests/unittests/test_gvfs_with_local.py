@@ -12,7 +12,6 @@ import pandas
 import pyarrow as pa
 import pyarrow.dataset as dt
 import pyarrow.parquet as pq
-import ray
 from unittest.mock import patch
 
 from gravitino import gvfs
