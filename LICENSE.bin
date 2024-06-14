@@ -396,6 +396,7 @@
    Treelayout
    Kyligence/kylinpy
    elarivie/pyReaderWriterLock
+   tkem/cachetools
 
    This product bundles various third-party components also under the
    Common Development and Distribution License 1.0

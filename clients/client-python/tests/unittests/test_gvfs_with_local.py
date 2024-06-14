@@ -5,12 +5,14 @@ This software is licensed under the Apache License version 2.
 
 import random
 import string
+import time
 import unittest
 import mock_base
 import pandas
 import pyarrow as pa
 import pyarrow.dataset as dt
 import pyarrow.parquet as pq
+import ray
 from unittest.mock import patch
 
 from gravitino import gvfs
@@ -45,6 +47,36 @@ class TestLocalFilesystem(unittest.TestCase):
         local_fs = LocalFileSystem()
         if local_fs.exists(self._local_base_dir_path):
             local_fs.rm(self._local_base_dir_path, recursive=True)
+
+    @patch(
+        "gravitino.catalog.fileset_catalog.FilesetCatalog.load_fileset",
+        return_value=mock_base.mock_load_fileset(
+            "test_cache", f"{_fileset_dir}/test_cache"
+        ),
+    )
+    def test_cache(self, mock_method1, mock_method2, mock_method3, mock_method4):
+        local_fs = LocalFileSystem()
+        fileset_storage_location = f"{self._fileset_dir}/test_cache"
+        fileset_virtual_location = "fileset/fileset_catalog/tmp/test_cache"
+        local_fs.mkdir(fileset_storage_location)
+        self.assertTrue(local_fs.exists(fileset_storage_location))
+
+        fs = gvfs.GravitinoVirtualFileSystem(
+            server_uri="http://localhost:9090",
+            metalake_name="metalake_demo",
+            cache_size=1,
+            cache_expired_time=1,
+        )
+        self.assertTrue(fs.exists(fileset_virtual_location))
+        # wait 2 seconds
+        time.sleep(2)
+        self.assertIsNone(
+            fs._cache.get(
+                NameIdentifier.of_fileset(
+                    "metalake_demo", "fileset_catalog", "tmp", "test_cache"
+                )
+            )
+        )
 
     @patch(
         "gravitino.catalog.fileset_catalog.FilesetCatalog.load_fileset",

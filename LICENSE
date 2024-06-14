@@ -295,6 +295,9 @@
    elarivie/pyReaderWriterLock
    ./clients/client-python/gravitino/filesystem/gvfs.py
 
+   tkem/cachetools
+   ./clients/client-python/gravitino/filesystem/gvfs.py
+
    This product bundles a third-party component under the
    BSD License.
 

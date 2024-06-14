@@ -7,3 +7,4 @@ dataclasses-json
 readerwriterlock==1.0.9
 fsspec==2024.3.1
 pyarrow
+cachetools==5.3.3

@@ -9,6 +9,7 @@ from typing import Dict, Tuple
 import re
 import fsspec
 
+from cachetools import TTLCache
 from fsspec import AbstractFileSystem
 from fsspec.implementations.local import LocalFileSystem
 from fsspec.implementations.arrow import ArrowFSWrapper
@@ -77,12 +78,19 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
     protocol = PROTOCOL_NAME
     _identifier_pattern = re.compile("^fileset/([^/]+)/([^/]+)/([^/]+)(?:/[^/]+)*/?$")
 
-    def __init__(self, server_uri=None, metalake_name=None, **kwargs):
+    def __init__(
+        self,
+        server_uri=None,
+        metalake_name=None,
+        cache_size=20,
+        cache_expired_time=180,
+        **kwargs,
+    ):
         self._metalake = metalake_name
         self._client = GravitinoClient(
             uri=server_uri, metalake_name=metalake_name, check_version=False
         )
-        self._cache: Dict[NameIdentifier, Tuple] = {}
+        self._cache = TTLCache(maxsize=cache_size, ttl=cache_expired_time)
         self._cache_lock = rwlock.RWLockFair()
 
         super().__init__(**kwargs)
