@@ -212,7 +212,8 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
 
     // Reset the current user based on the name identifier.
-    UserGroupInformation currentUser = getCurrentUser(properties, ident, true);
+    UserGroupInformation currentUser = getCurrentUser(properties, ident);
+    String apiLoginUser = PrincipalUtils.getCurrentPrincipal().getName();
     try {
       return currentUser.doAs(
           (PrivilegedExceptionAction<Fileset>)
@@ -300,7 +301,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
                         .withProperties(properties)
                         .withAuditInfo(
                             AuditInfo.builder()
-                                .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+                                .withCreator(apiLoginUser)
                                 .withCreateTime(Instant.now())
                                 .build())
                         .build();
@@ -375,7 +376,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       Path filesetPath = new Path(filesetEntity.storageLocation());
 
       // Reset the current user based on the name identifier.
-      UserGroupInformation currentUser = getCurrentUser(filesetEntity.properties(), ident, true);
+      UserGroupInformation currentUser = getCurrentUser(filesetEntity.properties(), ident);
 
       return currentUser.doAs(
           (PrivilegedExceptionAction<Boolean>)
@@ -459,8 +460,9 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
 
+    String apiLoginUser = PrincipalUtils.getCurrentPrincipal().getName();
     // Reset the current user based on the name identifier and properties.
-    UserGroupInformation currentUser = getCurrentUser(properties, ident, true);
+    UserGroupInformation currentUser = getCurrentUser(properties, ident);
     try {
       return currentUser.doAs(
           (PrivilegedExceptionAction<Schema>)
@@ -507,7 +509,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
                         .withProperties(properties)
                         .withAuditInfo(
                             AuditInfo.builder()
-                                .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+                                .withCreator(apiLoginUser)
                                 .withCreateTime(Instant.now())
                                 .build())
                         .build();
@@ -595,7 +597,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
           Optional.ofNullable(schemaEntity.properties()).orElse(Collections.emptyMap());
 
       // Reset current user based on the name identifier.
-      UserGroupInformation user = getCurrentUser(schemaEntity.properties(), ident, true);
+      UserGroupInformation user = getCurrentUser(schemaEntity.properties(), ident);
 
       return user.doAs(
           (PrivilegedExceptionAction<Boolean>)
@@ -743,10 +745,9 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     this.proxyPlugin = hadoopProxyPlugin;
   }
 
-  public UserGroupInformation getCurrentUser(
-      Map<String, String> properties, NameIdentifier ident, boolean needRelogin) {
+  public UserGroupInformation getCurrentUser(Map<String, String> properties, NameIdentifier ident) {
     KerberosConfig kerberosConfig = new KerberosConfig(properties);
-    if (kerberosConfig.isKerberosAuth() && needRelogin) {
+    if (kerberosConfig.isKerberosAuth()) {
       // We assume that the realm of catalog is the same as the realm of the schema and table.
       String keytabPath =
           String.format(
