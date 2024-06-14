@@ -119,5 +119,9 @@ ${HIVE_HOME}/bin/schematool -initSchema -dbType mysql
 ${HIVE_HOME}/bin/hive --service hiveserver2 > /dev/null 2>&1 &
 ${HIVE_HOME}/bin/hive --service metastore > /dev/null 2>&1 &
 
+# Start another metastore
+export HIVE_CONF_DIR=${HIVE_HOME}/conf1
+${HIVE_HOME}/bin/hive --service metastore > /dev/null 2>&1 &
+
 # persist the container
 tail -f /dev/null

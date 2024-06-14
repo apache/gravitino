@@ -126,6 +126,8 @@ ADD check-status.sh /tmp/check-status.sh
 RUN mkdir ${HIVE_HOME}
 RUN tar -xz -C ${HIVE_HOME} --strip-components 1 -f /tmp/packages/${HIVE_PACKAGE_NAME}
 ADD hive-site.xml ${HIVE_HOME}/conf/hive-site.xml
+RUN mkdir ${HIVE_HOME}/conf1 && cp ${HIVE_HOME}/conf/* ${HIVE_HOME}/conf1/
+ADD hive-site1.xml ${HIVE_HOME}/conf1/hive-site.xml
 
 ################################################################################
 # install MySQL
@@ -163,7 +165,7 @@ RUN rm -rf /tmp/packages
 
 ################################################################################
 # expose port
-EXPOSE 3306 9000 9083 10000 10002 50070 50075 50010 88
+EXPOSE 3306 9000 9083 10000 10002 50070 50075 50010 88 19083
 
 ################################################################################
 # create startup script and set ENTRYPOINT
