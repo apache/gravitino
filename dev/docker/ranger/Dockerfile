@@ -63,12 +63,8 @@ RUN ARCH=$(uname -m) && \
 
 # install ranger
 ENV RANGER_HOME=/opt/ranger-admin
-#ADD packages/ranger-${RANGER_VERSION}-admin.tar.gz /opt/
-#RUN ln -s /opt/ranger-${RANGER_VERSION}-admin ${RANGER_HOME}
-
-# try with docker compose build ranger
-ADD packages/ranger-3.0.0-SNAPSHOT-admin.tar.gz /opt/
-RUN ln -s /opt/ranger-3.0.0-SNAPSHOT-admin ${RANGER_HOME}
+ADD packages/ranger-${RANGER_VERSION}-admin.tar.gz /opt/
+RUN ln -s /opt/ranger-${RANGER_VERSION}-admin ${RANGER_HOME}
 
 # Initialize Ranger envirioment
 # We download these packages because ranger-admin required thiese packages
