@@ -187,6 +187,10 @@ public class GravitinoConnectorPluginManager {
       String connectorName, Map<String, String> config, ConnectorContext context) {
     try {
       Plugin plugin = connectorPlugins.get(connectorName);
+      if (plugin == null) {
+        throw new TrinoException(
+          GRAVITINO_RUNTIME_ERROR, "Can not found plugin for connector " + connectorName);
+      }
       try (ThreadContextClassLoader ignored =
           new ThreadContextClassLoader(plugin.getClass().getClassLoader())) {
         ConnectorFactory connectorFactory = plugin.getConnectorFactories().iterator().next();

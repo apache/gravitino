@@ -7,11 +7,12 @@ package com.datastrato.gravitino.trino.connector;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_MISSING_CONFIG;
 
 import io.trino.spi.TrinoException;
+import org.apache.commons.lang3.StringUtils;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.logging.log4j.util.Strings;
 
 public class GravitinoConfig {
 
@@ -122,7 +123,7 @@ public class GravitinoConfig {
         stringList.add(String.format("\"%s\"='%s'", entry.getKey(), value));
       }
     }
-    return Strings.join(stringList, ',');
+    return StringUtils.join(stringList, ',');
   }
 
   static class ConfigEntry {

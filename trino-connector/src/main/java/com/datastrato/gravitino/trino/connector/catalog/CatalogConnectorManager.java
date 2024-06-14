@@ -107,20 +107,26 @@ public class CatalogConnectorManager {
   }
 
   private void loadMetalake() {
-    if (!catalogRegister.isTrinoStarted()) {
-      LOG.info("Waiting for the Trino started.");
-      return;
-    }
-
-    for (String usedMetalake : usedMetalakes) {
-      try {
-        GravitinoMetalake metalake =
-            metalakes.computeIfAbsent(usedMetalake, this::retrieveMetalake);
-        LOG.info("Load metalake: {}", usedMetalake);
-        loadCatalogs(metalake);
-      } catch (Exception e) {
-        LOG.error("Load Metalake {} failed.", usedMetalake, e);
+    try {
+      if (!catalogRegister.isTrinoStarted()) {
+        LOG.info("Waiting for the Trino started.");
+        return;
       }
+
+      for (String usedMetalake : usedMetalakes) {
+        try {
+          GravitinoMetalake metalake =
+                  metalakes.computeIfAbsent(usedMetalake, this::retrieveMetalake);
+          LOG.info("Load metalake: {}", usedMetalake);
+          loadCatalogs(metalake);
+        } catch (Exception e) {
+          LOG.error("Load Metalake {} failed.", usedMetalake, e);
+        }
+      }
+    }
+    catch(Throwable t)  {
+      LOG.error("Fatal errors when loading metalake", t);
+      System.exit(-1);
     }
   }
 
