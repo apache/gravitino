@@ -27,13 +27,11 @@ public class PartitionNormalizeDispatcher implements PartitionDispatcher {
     String[] partitionNames =
         dispatcher.listPartitionNames(
             applyCaseSensitive(tableIdent, Capability.Scope.TABLE, dispatcher));
+    Capability capabilities = dispatcher.getCatalogCapability(tableIdent);
     return Arrays.stream(partitionNames)
         .map(
             partitionName ->
-                applyCaseSensitiveOnName(
-                    Capability.Scope.PARTITION,
-                    partitionName,
-                    dispatcher.getCatalogCapability(tableIdent)))
+                applyCaseSensitiveOnName(Capability.Scope.PARTITION, partitionName, capabilities))
         .toArray(String[]::new);
   }
 
