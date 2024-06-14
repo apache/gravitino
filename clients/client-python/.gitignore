@@ -13,6 +13,7 @@ dist
 build
 README.md
 version.ini
+docs
 
 # Unit test / coverage reports
 htmlcov/

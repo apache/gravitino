@@ -19,7 +19,7 @@ DROP COLUMN
 COMMENT ''
 WITH (
    input_format = 'org.apache.hadoop.mapred.TextInputFormat',
-   location = 'hdfs://%:9000/user/hive/warehouse/gt_db1.db/tb01',
+   location = 'hdfs://%/user/hive/warehouse/gt_db1.db/tb01',
    num_files = '0',
    output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
    serde_lib = 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe',
@@ -37,7 +37,7 @@ RENAME COLUMN
 COMMENT ''
 WITH (
    input_format = 'org.apache.hadoop.mapred.TextInputFormat',
-   location = 'hdfs://%:9000/user/hive/warehouse/gt_db1.db/tb01',
+   location = 'hdfs://%/user/hive/warehouse/gt_db1.db/tb01',
    num_files = '0',
    output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
    serde_lib = 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe',
@@ -55,7 +55,7 @@ SET COLUMN TYPE
 COMMENT ''
 WITH (
    input_format = 'org.apache.hadoop.mapred.TextInputFormat',
-   location = 'hdfs://%:9000/user/hive/warehouse/gt_db1.db/tb01',
+   location = 'hdfs://%/user/hive/warehouse/gt_db1.db/tb01',
    num_files = '0',
    output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
    serde_lib = 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe',
@@ -73,7 +73,7 @@ COMMENT
 COMMENT 'test table comments'
 WITH (
    input_format = 'org.apache.hadoop.mapred.TextInputFormat',
-   location = 'hdfs://%:9000/user/hive/warehouse/gt_db1.db/tb01',
+   location = 'hdfs://%/user/hive/warehouse/gt_db1.db/tb01',
    num_files = '0',
    output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
    serde_lib = 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe',
@@ -91,7 +91,7 @@ COMMENT
 COMMENT 'test table comments'
 WITH (
    input_format = 'org.apache.hadoop.mapred.TextInputFormat',
-   location = 'hdfs://%:9000/user/hive/warehouse/gt_db1.db/tb01',
+   location = 'hdfs://%/user/hive/warehouse/gt_db1.db/tb01',
    num_files = '0',
    output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
    serde_lib = 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe',
@@ -110,7 +110,7 @@ ADD COLUMN
 COMMENT 'test table comments'
 WITH (
    input_format = 'org.apache.hadoop.mapred.TextInputFormat',
-   location = 'hdfs://%:9000/user/hive/warehouse/gt_db1.db/tb01',
+   location = 'hdfs://%/user/hive/warehouse/gt_db1.db/tb01',
    num_files = '0',
    output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
    serde_lib = 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe',
