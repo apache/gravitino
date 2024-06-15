@@ -1091,6 +1091,144 @@ public class CatalogPostgreSqlIT extends AbstractIT {
   }
 
   @Test
+  void testPGIllegalTableName() {
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    String table_name = "t123";
+
+    String t1_name = table_name + "`; DROP TABLE important_table; -- ";
+    Column t1_col = Column.of(t1_name, Types.LongType.get(), "id", false, false, null);
+    Column[] columns = {t1_col};
+    Index[] t1_indexes = {Indexes.unique("u1_key", new String[][] {{t1_name}})};
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, t1_name);
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          tableCatalog.createTable(
+              tableIdentifier,
+              columns,
+              table_comment,
+              properties,
+              Transforms.EMPTY_TRANSFORM,
+              Distributions.NONE,
+              new SortOrder[0],
+              t1_indexes);
+        });
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          catalog.asTableCatalog().dropTable(tableIdentifier);
+        });
+
+    String t2_name = table_name + "`; SLEEP(10); -- ";
+    Column t2_col = Column.of(t2_name, Types.LongType.get(), "id", false, false, null);
+    Index[] t2_indexes = {Indexes.unique("u2_key", new String[][] {{t2_name}})};
+    Column[] columns2 = new Column[] {t2_col};
+    NameIdentifier tableIdentifier2 =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, t2_name);
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          tableCatalog.createTable(
+              tableIdentifier2,
+              columns2,
+              table_comment,
+              properties,
+              Transforms.EMPTY_TRANSFORM,
+              Distributions.NONE,
+              new SortOrder[0],
+              t2_indexes);
+        });
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          catalog.asTableCatalog().dropTable(tableIdentifier2);
+        });
+
+    String t3_name =
+        table_name + "`; UPDATE Users SET password = 'newpassword' WHERE username = 'admin'; -- ";
+    Column t3_col = Column.of(t3_name, Types.LongType.get(), "id", false, false, null);
+    Index[] t3_indexes = {Indexes.unique("u3_key", new String[][] {{t3_name}})};
+    Column[] columns3 = new Column[] {t3_col};
+    NameIdentifier tableIdentifier3 =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, t3_name);
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          tableCatalog.createTable(
+              tableIdentifier3,
+              columns3,
+              table_comment,
+              properties,
+              Transforms.EMPTY_TRANSFORM,
+              Distributions.NONE,
+              new SortOrder[0],
+              t3_indexes);
+        });
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          catalog.asTableCatalog().dropTable(tableIdentifier3);
+        });
+
+    String invalidInput = StringUtils.repeat("a", 64);
+    Column t4_col = Column.of(invalidInput, Types.LongType.get(), "id", false, false, null);
+    Index[] t4_indexes = {Indexes.unique("u4_key", new String[][] {{invalidInput}})};
+    Column[] columns4 = new Column[] {t4_col};
+    NameIdentifier tableIdentifier4 =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, invalidInput);
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          tableCatalog.createTable(
+              tableIdentifier4,
+              columns4,
+              table_comment,
+              properties,
+              Transforms.EMPTY_TRANSFORM,
+              Distributions.NONE,
+              new SortOrder[0],
+              t4_indexes);
+        });
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          catalog.asTableCatalog().dropTable(tableIdentifier4);
+        });
+
+    String invalidInput2 = RandomNameUtils.genRandomName("$test_db");
+    Column t5_col = Column.of(invalidInput2, Types.LongType.get(), "id", false, false, null);
+    Index[] t5_indexes = {Indexes.unique("u5_key", new String[][] {{invalidInput2}})};
+    Column[] columns5 = new Column[] {t5_col};
+    NameIdentifier tableIdentifier5 =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, invalidInput2);
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          tableCatalog.createTable(
+              tableIdentifier5,
+              columns5,
+              table_comment,
+              properties,
+              Transforms.EMPTY_TRANSFORM,
+              Distributions.NONE,
+              new SortOrder[0],
+              t5_indexes);
+        });
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          catalog.asTableCatalog().dropTable(tableIdentifier5);
+        });
+  }
+
+  @Test
   void testPGTableNameCaseSensitive() {
     Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, false, null);
     Column col2 = Column.of("col_2", Types.IntegerType.get(), "yes", false, false, null);

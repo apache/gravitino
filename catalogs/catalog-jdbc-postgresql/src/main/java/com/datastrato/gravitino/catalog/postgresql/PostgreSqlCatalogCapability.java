@@ -26,7 +26,7 @@ public class PostgreSqlCatalogCapability implements Capability {
     // TODO: Validate the name against reserved words
     if (!name.matches(POSTGRESQL_NAME_PATTERN)) {
       return CapabilityResult.unsupported(
-              String.format("The %s name '%s' is illegal.", scope, name));
+          String.format("The %s name '%s' is illegal.", scope, name));
     }
     return CapabilityResult.SUPPORTED;
   }
