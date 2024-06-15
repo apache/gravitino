@@ -15,12 +15,6 @@ sed -i "s/rangerAdmin_password=/rangerAdmin_password=${RANGER_PASSWORD}/g" /opt/
 sed -i "s/rangerTagsync_password=/rangerTagsync_password=${RANGER_PASSWORD}/g" /opt/ranger-admin/install.properties
 sed -i "s/rangerUsersync_password=/rangerUsersync_password=${RANGER_PASSWORD}/g" /opt/ranger-admin/install.properties
 sed -i "s/keyadmin_password=/keyadmin_password=${RANGER_PASSWORD}/g" /opt/ranger-admin/install.properties
-#sed -i 's/check_java_version/#check_java_version/g' /opt/ranger-admin/setup.sh
-#sed -i 's/#check_java_version()/check_java_version()/g' /opt/ranger-admin/setup.sh
-#sed -i 's/check_db_connector/#check_db_connector/g' /opt/ranger-admin/setup.sh
-#sed -i 's/#check_db_connector()/check_db_connector()/g' /opt/ranger-admin/setup.sh
-#sed -i 's/copy_db_connector/#copy_db_connector/g' /opt/ranger-admin/setup.sh
-#sed -i 's/#copy_db_connector()/copy_db_connector()/g' /opt/ranger-admin/setup.sh
 cd /opt/ranger-admin && /opt/ranger-admin/setup.sh
 
 # Start Ranger Admin
