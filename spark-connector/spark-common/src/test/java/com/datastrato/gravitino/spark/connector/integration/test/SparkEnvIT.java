@@ -5,6 +5,8 @@
 
 package com.datastrato.gravitino.spark.connector.integration.test;
 
+import static com.datastrato.gravitino.spark.connector.iceberg.IcebergPropertiesConstants.ICEBERG_CATALOG_CACHE_ENABLED;
+
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
 import com.datastrato.gravitino.client.GravitinoMetalake;
@@ -22,6 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.spark.SparkConf;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -43,6 +46,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   private final String metalakeName = "test";
   private SparkSession sparkSession;
   private String gravitinoUri = "http://127.0.0.1:8090";
+  private final String lakeHouseIcebergProvider = "lakehouse-iceberg";
 
   protected abstract String getCatalogName();
 
@@ -61,7 +65,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
     initHiveEnv();
     // initialize the hiveMetastoreUri and warehouse at first to inject properties to
     // IcebergRestService
-    if ("lakehouse-iceberg".equalsIgnoreCase(getProvider())) {
+    if (lakeHouseIcebergProvider.equalsIgnoreCase(getProvider())) {
       initIcebergRestServiceEnv();
     }
     // Start Gravitino server
@@ -171,17 +175,25 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   }
 
   private void initSparkEnv() {
+    SparkConf sparkConf =
+        new SparkConf()
+            .set("spark.plugins", GravitinoSparkPlugin.class.getName())
+            .set(GravitinoSparkConfig.GRAVITINO_URI, gravitinoUri)
+            .set(GravitinoSparkConfig.GRAVITINO_METALAKE, metalakeName)
+            .set(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT, "true")
+            .set("hive.exec.dynamic.partition.mode", "nonstrict")
+            .set("spark.sql.warehouse.dir", warehouse)
+            .set("spark.sql.session.timeZone", TIME_ZONE_UTC);
+    if (lakeHouseIcebergProvider.equalsIgnoreCase(getProvider())) {
+      sparkConf.set(
+          String.format("spark.sql.catalog.%s.%s", getCatalogName(), ICEBERG_CATALOG_CACHE_ENABLED),
+          "true");
+    }
     sparkSession =
         SparkSession.builder()
             .master("local[1]")
             .appName("Spark connector integration test")
-            .config("spark.plugins", GravitinoSparkPlugin.class.getName())
-            .config(GravitinoSparkConfig.GRAVITINO_URI, gravitinoUri)
-            .config(GravitinoSparkConfig.GRAVITINO_METALAKE, metalakeName)
-            .config(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT, "true")
-            .config("hive.exec.dynamic.partition.mode", "nonstrict")
-            .config("spark.sql.warehouse.dir", warehouse)
-            .config("spark.sql.session.timeZone", TIME_ZONE_UTC)
+            .config(sparkConf)
             .enableHiveSupport()
             .getOrCreate();
   }
