@@ -87,11 +87,11 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
         throw new RuntimeException("Failed to reflect table name.");
       }
 
-      Option<Seq<SparkPlan>> physicalPlan =
+      Seq<SparkPlan> physicalPlans =
           constructPhysicalPlan(plan, tableName, parameterValues, errors);
 
       if (errors.isEmpty()) {
-        return physicalPlan.get();
+        return physicalPlans;
       } else {
         throw new RuntimeException(
             String.format(
@@ -137,42 +137,42 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
         .collect(Collectors.toList());
   }
 
-  private Option<Seq<SparkPlan>> constructPhysicalPlan(
+  private Seq<SparkPlan> constructPhysicalPlan(
       LogicalPlan plan, List<String> tableName, List<Object> parameterValues, Set<String> errors) {
-    return (Option<Seq<SparkPlan>>)
-        IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(spark, tableName)
-            .map(
-                catalogAndIdentifier -> {
-                  String physicalPlanClassName = ICEBERG_COMMANDS.get(plan.getClass().getName());
-                  try {
-                    Class<?> physicalPlanClazz = Class.forName(physicalPlanClassName);
-                    Constructor<?>[] physicalPlanDeclaredConstructors =
-                        physicalPlanClazz.getDeclaredConstructors();
-                    Preconditions.checkArgument(
-                        physicalPlanDeclaredConstructors.length == 1
-                            && physicalPlanDeclaredConstructors[0].getParameters().length > 0,
-                        String.format(
-                            "Scala case class: %s only have a constructor with parameters.",
-                            physicalPlanClassName));
-                    SparkPlan sparkPlan =
-                        (SparkPlan)
-                            (physicalPlanDeclaredConstructors[0].newInstance(
-                                catalogAndIdentifier.catalog,
-                                catalogAndIdentifier.identifier,
-                                parameterValues.remove(0))); // remove the table parameter
-                    return toSeq(sparkPlan);
-                  } catch (ClassNotFoundException
-                      | InvocationTargetException
-                      | InstantiationException
-                      | IllegalAccessException e) {
-                    LOG.error(
-                        String.format(
-                            "Failed to create a physicalPlan object: %s", physicalPlanClassName),
-                        e);
-                    errors.add(e.getMessage());
-                    return null;
-                  }
-                });
+    return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(spark, tableName)
+        .map(
+            catalogAndIdentifier -> {
+              String physicalPlanClassName = ICEBERG_COMMANDS.get(plan.getClass().getName());
+              try {
+                Class<?> physicalPlanClazz = Class.forName(physicalPlanClassName);
+                Constructor<?>[] physicalPlanDeclaredConstructors =
+                    physicalPlanClazz.getDeclaredConstructors();
+                Preconditions.checkArgument(
+                    physicalPlanDeclaredConstructors.length == 1
+                        && physicalPlanDeclaredConstructors[0].getParameters().length > 0,
+                    String.format(
+                        "Scala case class: %s only have a constructor with parameters.",
+                        physicalPlanClassName));
+                SparkPlan sparkPlan =
+                    (SparkPlan)
+                        (physicalPlanDeclaredConstructors[0].newInstance(
+                            catalogAndIdentifier.catalog,
+                            catalogAndIdentifier.identifier,
+                            parameterValues.remove(0))); // remove the table parameter
+                return toSeq(sparkPlan);
+              } catch (ClassNotFoundException
+                  | InvocationTargetException
+                  | InstantiationException
+                  | IllegalAccessException e) {
+                LOG.error(
+                    String.format(
+                        "Failed to create a physicalPlan object: %s", physicalPlanClassName),
+                    e);
+                errors.add(e.getMessage());
+                return null;
+              }
+            })
+        .get();
   }
 
   private List<String> convertTableName(Stream tableName)
