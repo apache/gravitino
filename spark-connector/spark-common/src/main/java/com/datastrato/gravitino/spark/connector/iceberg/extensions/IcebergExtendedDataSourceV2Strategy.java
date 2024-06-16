@@ -10,6 +10,7 @@ import com.google.common.collect.ImmutableMap;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -31,13 +32,14 @@ import scala.Option;
 import scala.Some;
 import scala.collection.JavaConverters;
 import scala.collection.Seq;
+import scala.collection.immutable.Stream;
 
 public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Strategy {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(IcebergExtendedDataSourceV2Strategy.class);
 
-  private final Map<String, String> icebergCommands =
+  private static final Map<String, String> ICEBERG_COMMANDS =
       ImmutableMap.of(
           "org.apache.spark.sql.catalyst.plans.logical.AddPartitionField",
           "org.apache.spark.sql.execution.datasources.v2.AddPartitionFieldExec",
@@ -78,7 +80,13 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
             String.format("Reflecting LogicalPlan: %s failed.", plan.getClass().getName()));
       }
 
-      Seq<String> tableName = (Seq<String>) parameterValues.get(0);
+      List<String> tableName;
+      try {
+        tableName = convertTableName((Stream) parameterValues.get(0));
+      } catch (NoSuchFieldException | IllegalAccessException e) {
+        throw new RuntimeException("Failed to reflect table name.");
+      }
+
       Option<Seq<SparkPlan>> physicalPlan =
           constructPhysicalPlan(plan, tableName, parameterValues, errors);
 
@@ -88,7 +96,7 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
         throw new RuntimeException(
             String.format(
                 "Constructing PhysicalPlan: %s failed.",
-                icebergCommands.get(plan.getClass().getName())));
+                ICEBERG_COMMANDS.get(plan.getClass().getName())));
       }
     } else {
       return super.apply(plan);
@@ -96,7 +104,7 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
   }
 
   private boolean isIcebergCommand(LogicalPlan plan) {
-    return icebergCommands.keySet().stream()
+    return ICEBERG_COMMANDS.keySet().stream()
         .anyMatch(command -> command.equals(plan.getClass().getName()));
   }
 
@@ -130,12 +138,12 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
   }
 
   private Option<Seq<SparkPlan>> constructPhysicalPlan(
-      LogicalPlan plan, Seq<String> tableName, List<Object> parameterValues, Set<String> errors) {
+      LogicalPlan plan, List<String> tableName, List<Object> parameterValues, Set<String> errors) {
     return (Option<Seq<SparkPlan>>)
         IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(spark, tableName)
             .map(
                 catalogAndIdentifier -> {
-                  String physicalPlanClassName = icebergCommands.get(plan.getClass().getName());
+                  String physicalPlanClassName = ICEBERG_COMMANDS.get(plan.getClass().getName());
                   try {
                     Class<?> physicalPlanClazz = Class.forName(physicalPlanClassName);
                     Constructor<?>[] physicalPlanDeclaredConstructors =
@@ -151,7 +159,7 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
                             (physicalPlanDeclaredConstructors[0].newInstance(
                                 catalogAndIdentifier.catalog,
                                 catalogAndIdentifier.identifier,
-                                parameterValues.remove(0)));
+                                parameterValues.remove(0))); // remove the table parameter
                     return toSeq(sparkPlan);
                   } catch (ClassNotFoundException
                       | InvocationTargetException
@@ -165,6 +173,19 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
                     return null;
                   }
                 });
+  }
+
+  private List<String> convertTableName(Stream tableName)
+      throws NoSuchFieldException, IllegalAccessException {
+    Preconditions.checkArgument(tableName != null, "Table name can not be null or empty.");
+    List<String> tableNameList = new ArrayList<>();
+    while (tableName.size() > 0) {
+      Field hd = tableName.getClass().getDeclaredField("hd");
+      hd.setAccessible(true);
+      tableNameList.add((String) hd.get(tableName));
+      tableName = (Stream) tableName.tail();
+    }
+    return tableNameList;
   }
 
   private Seq<SparkPlan> toSeq(SparkPlan plan) {
@@ -188,9 +209,9 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
     }
 
     static Option<IcebergCatalogAndIdentifier> buildCatalogAndIdentifier(
-        SparkSession spark, Seq<String> identifiers) {
+        SparkSession spark, List<String> identifiers) {
       Spark3Util.CatalogAndIdentifier catalogAndIdentifier =
-          Spark3Util.catalogAndIdentifier(spark, JavaConverters.<String>seqAsJavaList(identifiers));
+          Spark3Util.catalogAndIdentifier(spark, identifiers);
       CatalogPlugin catalog = catalogAndIdentifier.catalog();
       if (catalog instanceof GravitinoIcebergCatalog) {
         return new Some<>(
