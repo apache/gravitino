@@ -5,41 +5,60 @@
 package com.datastrato.gravitino.spark.connector.iceberg.extensions;
 
 import com.datastrato.gravitino.spark.connector.iceberg.GravitinoIcebergCatalog;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.iceberg.spark.Spark3Util;
 import org.apache.spark.sql.SparkSession;
-import org.apache.spark.sql.catalyst.plans.logical.AddPartitionField;
-import org.apache.spark.sql.catalyst.plans.logical.CreateOrReplaceBranch;
-import org.apache.spark.sql.catalyst.plans.logical.CreateOrReplaceTag;
-import org.apache.spark.sql.catalyst.plans.logical.DropBranch;
-import org.apache.spark.sql.catalyst.plans.logical.DropIdentifierFields;
-import org.apache.spark.sql.catalyst.plans.logical.DropPartitionField;
-import org.apache.spark.sql.catalyst.plans.logical.DropTag;
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan;
-import org.apache.spark.sql.catalyst.plans.logical.ReplacePartitionField;
-import org.apache.spark.sql.catalyst.plans.logical.SetIdentifierFields;
-import org.apache.spark.sql.catalyst.plans.logical.SetWriteDistributionAndOrdering;
 import org.apache.spark.sql.connector.catalog.CatalogPlugin;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.execution.SparkPlan;
-import org.apache.spark.sql.execution.datasources.v2.AddPartitionFieldExec;
-import org.apache.spark.sql.execution.datasources.v2.CreateOrReplaceBranchExec;
-import org.apache.spark.sql.execution.datasources.v2.CreateOrReplaceTagExec;
-import org.apache.spark.sql.execution.datasources.v2.DropBranchExec;
-import org.apache.spark.sql.execution.datasources.v2.DropIdentifierFieldsExec;
-import org.apache.spark.sql.execution.datasources.v2.DropPartitionFieldExec;
-import org.apache.spark.sql.execution.datasources.v2.DropTagExec;
 import org.apache.spark.sql.execution.datasources.v2.ExtendedDataSourceV2Strategy;
-import org.apache.spark.sql.execution.datasources.v2.ReplacePartitionFieldExec;
-import org.apache.spark.sql.execution.datasources.v2.SetIdentifierFieldsExec;
-import org.apache.spark.sql.execution.datasources.v2.SetWriteDistributionAndOrderingExec;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import scala.Option;
 import scala.Some;
 import scala.collection.JavaConverters;
 import scala.collection.Seq;
 
 public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Strategy {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(IcebergExtendedDataSourceV2Strategy.class);
+
+  private final Map<String, String> icebergCommands =
+      ImmutableMap.of(
+          "org.apache.spark.sql.catalyst.plans.logical.AddPartitionField",
+          "org.apache.spark.sql.execution.datasources.v2.AddPartitionFieldExec",
+          "org.apache.spark.sql.catalyst.plans.logical.CreateOrReplaceBranch",
+          "org.apache.spark.sql.execution.datasources.v2.CreateOrReplaceBranchExec",
+          "org.apache.spark.sql.catalyst.plans.logical.CreateOrReplaceTag",
+          "org.apache.spark.sql.execution.datasources.v2.CreateOrReplaceTagExec",
+          "org.apache.spark.sql.catalyst.plans.logical.DropBranch",
+          "org.apache.spark.sql.execution.datasources.v2.DropBranchExec",
+          "org.apache.spark.sql.catalyst.plans.logical.DropIdentifierFields",
+          "org.apache.spark.sql.execution.datasources.v2.DropIdentifierFieldsExec",
+          "org.apache.spark.sql.catalyst.plans.logical.DropPartitionField",
+          "org.apache.spark.sql.execution.datasources.v2.DropPartitionFieldExec",
+          "org.apache.spark.sql.catalyst.plans.logical.DropTag",
+          "org.apache.spark.sql.execution.datasources.v2.DropTagExec",
+          "org.apache.spark.sql.catalyst.plans.logical.ReplacePartitionField",
+          "org.apache.spark.sql.execution.datasources.v2.ReplacePartitionFieldExec",
+          "org.apache.spark.sql.catalyst.plans.logical.SetIdentifierFields",
+          "org.apache.spark.sql.execution.datasources.v2.SetIdentifierFieldsExec",
+          "org.apache.spark.sql.catalyst.plans.logical.SetWriteDistributionAndOrdering",
+          "org.apache.spark.sql.execution.datasources.v2.SetWriteDistributionAndOrderingExec");
 
   private final SparkSession spark;
 
@@ -50,161 +69,102 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
 
   @Override
   public Seq<SparkPlan> apply(LogicalPlan plan) {
-    if (plan instanceof AddPartitionField) {
-      AddPartitionField addPartitionField = (AddPartitionField) plan;
-      return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(spark, addPartitionField.table())
-          .map(
-              catalogAndIdentifier -> {
-                AddPartitionFieldExec addPartitionFieldExec =
-                    new AddPartitionFieldExec(
-                        catalogAndIdentifier.catalog,
-                        catalogAndIdentifier.identifier,
-                        addPartitionField.transform(),
-                        addPartitionField.name());
-                return toSeq(addPartitionFieldExec);
-              })
-          .get();
-    } else if (plan instanceof CreateOrReplaceBranch) {
-      CreateOrReplaceBranch createOrReplaceBranch = (CreateOrReplaceBranch) plan;
-      return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(
-              spark, createOrReplaceBranch.table())
-          .map(
-              catalogAndIdentifier -> {
-                CreateOrReplaceBranchExec createOrReplaceBranchExec =
-                    new CreateOrReplaceBranchExec(
-                        catalogAndIdentifier.catalog,
-                        catalogAndIdentifier.identifier,
-                        createOrReplaceBranch.branch(),
-                        createOrReplaceBranch.branchOptions(),
-                        createOrReplaceBranch.create(),
-                        createOrReplaceBranch.replace(),
-                        createOrReplaceBranch.ifNotExists());
-                return toSeq(createOrReplaceBranchExec);
-              })
-          .get();
-    } else if (plan instanceof CreateOrReplaceTag) {
-      CreateOrReplaceTag createOrReplaceTag = (CreateOrReplaceTag) plan;
-      return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(
-              spark, createOrReplaceTag.table())
-          .map(
-              catalogAndIdentifier -> {
-                CreateOrReplaceTagExec createOrReplaceTagExec =
-                    new CreateOrReplaceTagExec(
-                        catalogAndIdentifier.catalog,
-                        catalogAndIdentifier.identifier,
-                        createOrReplaceTag.tag(),
-                        createOrReplaceTag.tagOptions(),
-                        createOrReplaceTag.create(),
-                        createOrReplaceTag.replace(),
-                        createOrReplaceTag.ifNotExists());
-                return toSeq(createOrReplaceTagExec);
-              })
-          .get();
-    } else if (plan instanceof DropBranch) {
-      DropBranch dropBranch = (DropBranch) plan;
-      return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(spark, dropBranch.table())
-          .map(
-              catalogAndIdentifier -> {
-                DropBranchExec dropBranchExec =
-                    new DropBranchExec(
-                        catalogAndIdentifier.catalog,
-                        catalogAndIdentifier.identifier,
-                        dropBranch.branch(),
-                        dropBranch.ifExists());
-                return toSeq(dropBranchExec);
-              })
-          .get();
-    } else if (plan instanceof DropTag) {
-      DropTag dropTag = (DropTag) plan;
-      return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(spark, dropTag.table())
-          .map(
-              catalogAndIdentifier -> {
-                DropTagExec dropTagExec =
-                    new DropTagExec(
-                        catalogAndIdentifier.catalog,
-                        catalogAndIdentifier.identifier,
-                        dropTag.tag(),
-                        dropTag.ifExists());
-                return toSeq(dropTagExec);
-              })
-          .get();
-    } else if (plan instanceof DropPartitionField) {
-      DropPartitionField dropPartitionField = (DropPartitionField) plan;
-      return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(
-              spark, dropPartitionField.table())
-          .map(
-              catalogAndIdentifier -> {
-                DropPartitionFieldExec dropPartitionFieldExec =
-                    new DropPartitionFieldExec(
-                        catalogAndIdentifier.catalog,
-                        catalogAndIdentifier.identifier,
-                        dropPartitionField.transform());
-                return toSeq(dropPartitionFieldExec);
-              })
-          .get();
-    } else if (plan instanceof ReplacePartitionField) {
-      ReplacePartitionField replacePartitionField = (ReplacePartitionField) plan;
-      return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(
-              spark, replacePartitionField.table())
-          .map(
-              catalogAndIdentifier -> {
-                ReplacePartitionFieldExec replacePartitionFieldExec =
-                    new ReplacePartitionFieldExec(
-                        catalogAndIdentifier.catalog,
-                        catalogAndIdentifier.identifier,
-                        replacePartitionField.transformFrom(),
-                        replacePartitionField.transformTo(),
-                        replacePartitionField.name());
-                return toSeq(replacePartitionFieldExec);
-              })
-          .get();
-    } else if (plan instanceof SetIdentifierFields) {
-      SetIdentifierFields setIdentifierFields = (SetIdentifierFields) plan;
-      return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(
-              spark, setIdentifierFields.table())
-          .map(
-              catalogAndIdentifier -> {
-                SetIdentifierFieldsExec setIdentifierFieldsExec =
-                    new SetIdentifierFieldsExec(
-                        catalogAndIdentifier.catalog,
-                        catalogAndIdentifier.identifier,
-                        setIdentifierFields.fields());
-                return toSeq(setIdentifierFieldsExec);
-              })
-          .get();
-    } else if (plan instanceof DropIdentifierFields) {
-      DropIdentifierFields dropIdentifierFields = (DropIdentifierFields) plan;
-      return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(
-              spark, dropIdentifierFields.table())
-          .map(
-              catalogAndIdentifier -> {
-                DropIdentifierFieldsExec dropIdentifierFieldsExec =
-                    new DropIdentifierFieldsExec(
-                        catalogAndIdentifier.catalog,
-                        catalogAndIdentifier.identifier,
-                        dropIdentifierFields.fields());
-                return toSeq(dropIdentifierFieldsExec);
-              })
-          .get();
-    } else if (plan instanceof SetWriteDistributionAndOrdering) {
-      SetWriteDistributionAndOrdering setWriteDistributionAndOrdering =
-          (SetWriteDistributionAndOrdering) plan;
-      return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(
-              spark, setWriteDistributionAndOrdering.table())
-          .map(
-              catalogAndIdentifier -> {
-                SetWriteDistributionAndOrderingExec setWriteDistributionAndOrderingExec =
-                    new SetWriteDistributionAndOrderingExec(
-                        catalogAndIdentifier.catalog,
-                        catalogAndIdentifier.identifier,
-                        setWriteDistributionAndOrdering.distributionMode(),
-                        setWriteDistributionAndOrdering.sortOrder());
-                return toSeq(setWriteDistributionAndOrderingExec);
-              })
-          .get();
+    if (isIcebergCommand(plan)) {
+      Set<String> errors = new HashSet<>();
+      List<Object> parameterValues = getLogicalPlanConstructorParams(plan, errors);
+
+      if (!errors.isEmpty()) {
+        throw new RuntimeException(
+            String.format("Reflecting LogicalPlan: %s failed.", plan.getClass().getName()));
+      }
+
+      Seq<String> tableName = (Seq<String>) parameterValues.get(0);
+      Option<Seq<SparkPlan>> physicalPlan =
+          constructPhysicalPlan(plan, tableName, parameterValues, errors);
+
+      if (errors.isEmpty()) {
+        return physicalPlan.get();
+      } else {
+        throw new RuntimeException(
+            String.format(
+                "Constructing PhysicalPlan: %s failed.",
+                icebergCommands.get(plan.getClass().getName())));
+      }
     } else {
       return super.apply(plan);
     }
+  }
+
+  private boolean isIcebergCommand(LogicalPlan plan) {
+    return icebergCommands.keySet().stream()
+        .anyMatch(command -> command.equals(plan.getClass().getName()));
+  }
+
+  private List<Object> getLogicalPlanConstructorParams(LogicalPlan plan, Set<String> errors) {
+    Class<? extends LogicalPlan> logicalPlanClazz = plan.getClass();
+    String logicalPlanClassName = logicalPlanClazz.getName();
+    Constructor<?>[] logicalPlanDeclaredConstructors = plan.getClass().getDeclaredConstructors();
+    Preconditions.checkArgument(
+        logicalPlanDeclaredConstructors.length == 1
+            && logicalPlanDeclaredConstructors[0].getParameters().length > 0,
+        String.format(
+            "Scala case class: %s only have a constructor with parameters.", logicalPlanClassName));
+    return Arrays.stream(logicalPlanDeclaredConstructors[0].getParameters())
+        .map(
+            parameter -> {
+              try {
+                Field field = logicalPlanClazz.getDeclaredField(parameter.getName());
+                field.setAccessible(true);
+                return field.get(plan);
+              } catch (NoSuchFieldException | IllegalAccessException e) {
+                LOG.error(
+                    String.format(
+                        "Failed to get value of field: %s from LogicalPlan: %s.",
+                        parameter.getName(), logicalPlanClassName),
+                    e);
+                errors.add(e.getMessage());
+                return null;
+              }
+            })
+        .collect(Collectors.toList());
+  }
+
+  private Option<Seq<SparkPlan>> constructPhysicalPlan(
+      LogicalPlan plan, Seq<String> tableName, List<Object> parameterValues, Set<String> errors) {
+    return (Option<Seq<SparkPlan>>)
+        IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(spark, tableName)
+            .map(
+                catalogAndIdentifier -> {
+                  String physicalPlanClassName = icebergCommands.get(plan.getClass().getName());
+                  try {
+                    Class<?> physicalPlanClazz = Class.forName(physicalPlanClassName);
+                    Constructor<?>[] physicalPlanDeclaredConstructors =
+                        physicalPlanClazz.getDeclaredConstructors();
+                    Preconditions.checkArgument(
+                        physicalPlanDeclaredConstructors.length == 1
+                            && physicalPlanDeclaredConstructors[0].getParameters().length > 0,
+                        String.format(
+                            "Scala case class: %s only have a constructor with parameters.",
+                            physicalPlanClassName));
+                    SparkPlan sparkPlan =
+                        (SparkPlan)
+                            (physicalPlanDeclaredConstructors[0].newInstance(
+                                catalogAndIdentifier.catalog,
+                                catalogAndIdentifier.identifier,
+                                parameterValues.remove(0)));
+                    return toSeq(sparkPlan);
+                  } catch (ClassNotFoundException
+                      | InvocationTargetException
+                      | InstantiationException
+                      | IllegalAccessException e) {
+                    LOG.error(
+                        String.format(
+                            "Failed to create a physicalPlan object: %s", physicalPlanClassName),
+                        e);
+                    errors.add(e.getMessage());
+                    return null;
+                  }
+                });
   }
 
   private Seq<SparkPlan> toSeq(SparkPlan plan) {
