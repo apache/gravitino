@@ -190,20 +190,30 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                     .build())
             .build();
 
+    boolean opEntityFail = false;
     try {
       store.put(tableEntity, true /* overwrite */);
+    } catch (NoSuchEntityException noSuchEntityException) {
+      LOG.warn(
+          FormattedErrorMessages.STORE_OP_FAILURE + noSuchEntityException.getMessage(),
+          "put",
+          ident);
+      opEntityFail = true;
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
+      opEntityFail = true;
+    }
+    if (opEntityFail) {
       return EntityCombinedTable.of(table)
           .withHiddenPropertiesSet(
               getHiddenPropertyNames(
                   catalogIdent, HasPropertyMetadata::tablePropertiesMetadata, table.properties()));
+    } else {
+      return EntityCombinedTable.of(table, tableEntity)
+          .withHiddenPropertiesSet(
+              getHiddenPropertyNames(
+                  catalogIdent, HasPropertyMetadata::tablePropertiesMetadata, table.properties()));
     }
-
-    return EntityCombinedTable.of(table, tableEntity)
-        .withHiddenPropertiesSet(
-            getHiddenPropertyNames(
-                catalogIdent, HasPropertyMetadata::tablePropertiesMetadata, table.properties()));
   }
 
   /**
