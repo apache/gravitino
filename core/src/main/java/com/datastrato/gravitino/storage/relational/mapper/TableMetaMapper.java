@@ -55,6 +55,17 @@ public interface TableMetaMapper {
   TablePO selectTableMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("tableName") String name);
 
+  @Select(
+      "SELECT table_id as tableId, table_name as tableName,"
+          + " metalake_id as metalakeId, catalog_id as catalogId,"
+          + " schema_id as schemaId, audit_info as auditInfo,"
+          + " current_version as currentVersion, last_version as lastVersion,"
+          + " deleted_at as deletedAt"
+          + " FROM "
+          + TABLE_NAME
+          + " WHERE table_id = #{tableId} AND deleted_at = 0")
+  TablePO selectTableMetaById(@Param("tableId") Long tableId);
+
   @Insert(
       "INSERT INTO "
           + TABLE_NAME
@@ -156,7 +167,7 @@ public interface TableMetaMapper {
   @Delete(
       "DELETE FROM "
           + TABLE_NAME
-          + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeLine} LIMIT #{limit}")
-  Integer deleteTableMetasByLegacyTimeLine(
-      @Param("legacyTimeLine") Long legacyTimeLine, @Param("limit") int limit);
+          + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}")
+  Integer deleteTableMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 }

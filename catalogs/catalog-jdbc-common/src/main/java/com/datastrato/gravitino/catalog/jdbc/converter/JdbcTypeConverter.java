@@ -4,33 +4,17 @@
  */
 package com.datastrato.gravitino.catalog.jdbc.converter;
 
-import com.datastrato.gravitino.rel.types.Type;
+import com.datastrato.gravitino.connector.DataTypeConverter;
 import java.util.Objects;
 
-/** @param <TO> Implement the corresponding JDBC data type to be converted */
-public abstract class JdbcTypeConverter<TO> {
+public abstract class JdbcTypeConverter
+    implements DataTypeConverter<String, JdbcTypeConverter.JdbcTypeBean> {
 
   public static final String DATE = "date";
   public static final String TIME = "time";
   public static final String TIMESTAMP = "timestamp";
   public static final String VARCHAR = "varchar";
   public static final String TEXT = "text";
-
-  /**
-   * Convert from JDBC type to Gravitino type
-   *
-   * @param type The common jdbc type bean.
-   * @return Gravitino type.
-   */
-  public abstract Type toGravitinoType(JdbcTypeBean type);
-
-  /**
-   * Convert from Gravitino type to JDBC type
-   *
-   * @param type Gravitino type.
-   * @return Implement the corresponding JDBC data type to be converted.
-   */
-  public abstract TO fromGravitinoType(Type type);
 
   public static class JdbcTypeBean {
     /** Data type name. */

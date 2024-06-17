@@ -5,9 +5,9 @@
 package com.datastrato.gravitino.catalog;
 
 import com.datastrato.gravitino.Audit;
+import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.SchemaEntity;
-import com.datastrato.gravitino.rel.Schema;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;

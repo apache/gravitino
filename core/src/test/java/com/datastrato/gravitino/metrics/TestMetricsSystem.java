@@ -10,11 +10,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestMetricsSystem {
-  MetricsSystem metricsSystem = new MetricsSystem();
-
-  private long getCounterValue(String metricsSourceName, String name) {
-    return metricsSystem.getMetricRegistry().counter(metricsSourceName + "." + name).getCount();
-  }
+  private MetricsSystem metricsSystem = new MetricsSystem();
 
   @Test
   void testRegisterMetricsSource() {
@@ -52,5 +48,9 @@ public class TestMetricsSystem {
             .getMetricRegistry()
             .getCounters()
             .containsKey(metricsSource.getMetricsSourceName() + "a.b"));
+  }
+
+  private long getCounterValue(String metricsSourceName, String name) {
+    return metricsSystem.getMetricRegistry().counter(metricsSourceName + "." + name).getCount();
   }
 }

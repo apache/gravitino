@@ -5,10 +5,13 @@
 package com.datastrato.gravitino.proto;
 
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.authorization.Privilege;
 import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.meta.RoleEntity;
+import com.google.common.collect.Lists;
+import java.util.List;
 import java.util.stream.Collectors;
 
 public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
@@ -25,13 +28,25 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
         Role.newBuilder()
             .setId(roleEntity.id())
             .setName(roleEntity.name())
-            .setAuditInfo(new AuditInfoSerDe().serialize(roleEntity.auditInfo()))
-            .addAllPrivileges(
-                roleEntity.privileges().stream()
-                    .map(privilege -> privilege.name().toString())
-                    .collect(Collectors.toList()))
-            .setSecurableObjectFullName(roleEntity.securableObject().fullName())
-            .setSecurableObjectType(roleEntity.securableObject().type().name());
+            .setAuditInfo(new AuditInfoSerDe().serialize(roleEntity.auditInfo()));
+
+    for (SecurableObject securableObject : roleEntity.securableObjects()) {
+      builder.addSecurableObjects(
+          com.datastrato.gravitino.proto.SecurableObject.newBuilder()
+              .setFullName(securableObject.fullName())
+              .setType(securableObject.type().name())
+              .addAllPrivilegeConditions(
+                  securableObject.privileges().stream()
+                      .map(Privilege::condition)
+                      .map(Privilege.Condition::name)
+                      .collect(Collectors.toList()))
+              .addAllPrivilegeNames(
+                  securableObject.privileges().stream()
+                      .map(Privilege::name)
+                      .map(Privilege.Name::name)
+                      .collect(Collectors.toList()))
+              .build());
+    }
 
     if (roleEntity.properties() != null && !roleEntity.properties().isEmpty()) {
       builder.putAllProperties(roleEntity.properties());
@@ -48,19 +63,32 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
    */
   @Override
   public RoleEntity deserialize(Role role, Namespace namespace) {
+    List<SecurableObject> securableObjects = Lists.newArrayList();
+
+    for (int index = 0; index < role.getSecurableObjectsCount(); index++) {
+      List<Privilege> privileges = Lists.newArrayList();
+      com.datastrato.gravitino.proto.SecurableObject object = role.getSecurableObjects(index);
+      for (int privIndex = 0; privIndex < object.getPrivilegeConditionsCount(); privIndex++) {
+        if (Privilege.Condition.ALLOW.name().equals(object.getPrivilegeConditions(privIndex))) {
+          privileges.add(Privileges.allow(object.getPrivilegeNames(privIndex)));
+        } else {
+          privileges.add(Privileges.deny(object.getPrivilegeNames(privIndex)));
+        }
+      }
+
+      SecurableObject securableObject =
+          SecurableObjects.parse(
+              object.getFullName(), SecurableObject.Type.valueOf(object.getType()), privileges);
+
+      securableObjects.add(securableObject);
+    }
+
     RoleEntity.Builder builder =
         RoleEntity.builder()
             .withId(role.getId())
             .withName(role.getName())
             .withNamespace(namespace)
-            .withPrivileges(
-                role.getPrivilegesList().stream()
-                    .map(Privileges::fromString)
-                    .collect(Collectors.toList()))
-            .withSecurableObject(
-                SecurableObjects.parse(
-                    role.getSecurableObjectFullName(),
-                    SecurableObject.Type.valueOf(role.getSecurableObjectType())))
+            .withSecurableObjects(securableObjects)
             .withAuditInfo(new AuditInfoSerDe().deserialize(role.getAuditInfo(), namespace));
 
     if (!role.getPropertiesMap().isEmpty()) {

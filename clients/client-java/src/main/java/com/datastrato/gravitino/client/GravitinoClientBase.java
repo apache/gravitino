@@ -6,6 +6,7 @@
 package com.datastrato.gravitino.client;
 
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.Version;
 import com.datastrato.gravitino.dto.responses.MetalakeResponse;
 import com.datastrato.gravitino.dto.responses.VersionResponse;
@@ -20,8 +21,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collections;
 import java.util.Map;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Base class for Gravitino Java client;
@@ -31,7 +30,6 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class GravitinoClientBase implements Closeable {
 
-  private static final Logger LOG = LoggerFactory.getLogger(GravitinoClientBase.class);
   /** The REST client to communicate with the REST server */
   protected final RESTClient restClient;
   /** The REST API path for listing metalakes */
@@ -129,7 +127,11 @@ public abstract class GravitinoClientBase implements Closeable {
    * @throws IllegalNameIdentifierException If the Metalake name is invalid.
    */
   public void checkMetalakeName(String metalakeName) {
-    NameIdentifier.checkMetalake(NameIdentifier.parse(metalakeName));
+    NameIdentifier identifier = NameIdentifier.parse(metalakeName);
+    Namespace.check(
+        identifier.namespace() != null && identifier.namespace().isEmpty(),
+        "Metalake namespace must be non-null and empty, the input namespace is %s",
+        identifier.namespace());
   }
 
   /**
@@ -168,7 +170,6 @@ public abstract class GravitinoClientBase implements Closeable {
         restClient.close();
       } catch (Exception e) {
         // Swallow the exception
-        LOG.warn("Failed to close the HTTP REST client", e);
       }
     }
   }

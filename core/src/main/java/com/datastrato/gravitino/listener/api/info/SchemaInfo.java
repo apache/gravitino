@@ -6,8 +6,8 @@
 package com.datastrato.gravitino.listener.api.info;
 
 import com.datastrato.gravitino.Audit;
+import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.annotation.DeveloperApi;
-import com.datastrato.gravitino.rel.Schema;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import javax.annotation.Nullable;

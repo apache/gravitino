@@ -8,7 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.Schema;
+import com.datastrato.gravitino.SupportsSchemas;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
@@ -18,10 +19,7 @@ import com.datastrato.gravitino.integration.test.container.DorisContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
-import com.datastrato.gravitino.integration.test.util.JdbcDriverDownloader;
 import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Schema;
-import com.datastrato.gravitino.rel.SupportsSchemas;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
@@ -35,14 +33,11 @@ import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -58,8 +53,6 @@ import org.testcontainers.shaded.org.awaitility.Awaitility;
 public class CatalogDorisIT extends AbstractIT {
 
   private static final String provider = "jdbc-doris";
-  private static final String DOWNLOAD_JDBC_DRIVER_URL =
-      "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar";
 
   private static final String DRIVER_CLASS_NAME = "com.mysql.jdbc.Driver";
 
@@ -88,17 +81,8 @@ public class CatalogDorisIT extends AbstractIT {
 
   protected Catalog catalog;
 
-  protected String mysqlDriverDownloadUrl = DOWNLOAD_JDBC_DRIVER_URL;
-
   @BeforeAll
   public void startup() throws IOException {
-
-    if (!ITUtils.EMBEDDED_TEST_MODE.equals(AbstractIT.testMode)) {
-      String gravitinoHome = System.getenv("GRAVITINO_HOME");
-      Path tmpPath = Paths.get(gravitinoHome, "/catalogs/jdbc-doris/libs");
-      JdbcDriverDownloader.downloadJdbcDriver(mysqlDriverDownloadUrl, tmpPath.toString());
-    }
-
     containerSuite.startDorisContainer();
 
     createMetalake();
@@ -109,6 +93,7 @@ public class CatalogDorisIT extends AbstractIT {
   @AfterAll
   public void stop() {
     clearTableAndSchema();
+    metalake.dropCatalog(catalogName);
     AbstractIT.client.dropMetalake(metalakeName);
   }
 
@@ -119,12 +104,7 @@ public class CatalogDorisIT extends AbstractIT {
   }
 
   private void clearTableAndSchema() {
-    NameIdentifier[] nameIdentifiers =
-        catalog.asTableCatalog().listTables(Namespace.of(metalakeName, catalogName, schemaName));
-    for (NameIdentifier nameIdentifier : nameIdentifiers) {
-      catalog.asTableCatalog().dropTable(nameIdentifier);
-    }
-    catalog.asSchemas().dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), true);
+    catalog.asSchemas().dropSchema(schemaName, true);
   }
 
   private void createMetalake() {
@@ -174,8 +154,8 @@ public class CatalogDorisIT extends AbstractIT {
     Map<String, String> prop = Maps.newHashMap();
     prop.put(propKey, propValue);
 
-    Schema createdSchema = catalog.asSchemas().createSchema(ident, schema_comment, prop);
-    Schema loadSchema = catalog.asSchemas().loadSchema(ident);
+    Schema createdSchema = catalog.asSchemas().createSchema(ident.name(), schema_comment, prop);
+    Schema loadSchema = catalog.asSchemas().loadSchema(ident.name());
     Assertions.assertEquals(createdSchema.name(), loadSchema.name());
 
     Assertions.assertEquals(createdSchema.properties().get(propKey), propValue);
@@ -202,58 +182,47 @@ public class CatalogDorisIT extends AbstractIT {
   @Test
   void testDorisSchemaBasicOperation() {
     SupportsSchemas schemas = catalog.asSchemas();
-    Namespace namespace = Namespace.of(metalakeName, catalogName);
 
     // test list schemas
-    NameIdentifier[] nameIdentifiers = schemas.listSchemas(namespace);
-    Set<String> schemaNames =
-        Arrays.stream(nameIdentifiers).map(NameIdentifier::name).collect(Collectors.toSet());
-    Assertions.assertTrue(schemaNames.contains(schemaName));
+    String[] schemaNames = schemas.listSchemas();
+    Assertions.assertTrue(Arrays.asList(schemaNames).contains(schemaName));
 
     // test create schema already exists
     String testSchemaName = GravitinoITUtils.genRandomName("create_schema_test");
     NameIdentifier schemaIdent = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
-    schemas.createSchema(schemaIdent, schema_comment, Collections.emptyMap());
+    schemas.createSchema(schemaIdent.name(), schema_comment, Collections.emptyMap());
 
-    nameIdentifiers = schemas.listSchemas(Namespace.of(metalakeName, catalogName));
-    Map<String, NameIdentifier> schemaMap =
-        Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v -> v));
-    Assertions.assertTrue(schemaMap.containsKey(testSchemaName));
+    List<String> schemaNameList = Arrays.asList(schemas.listSchemas());
+    Assertions.assertTrue(schemaNameList.contains(testSchemaName));
 
     Assertions.assertThrows(
         SchemaAlreadyExistsException.class,
         () -> {
-          schemas.createSchema(schemaIdent, schema_comment, Collections.emptyMap());
+          schemas.createSchema(schemaIdent.name(), schema_comment, Collections.emptyMap());
         });
 
     // test drop schema
-    Assertions.assertTrue(schemas.dropSchema(schemaIdent, false));
+    Assertions.assertTrue(schemas.dropSchema(schemaIdent.name(), false));
 
     // check schema is deleted
     // 1. check by load schema
-    Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(schemaIdent));
+    Assertions.assertThrows(
+        NoSuchSchemaException.class, () -> schemas.loadSchema(schemaIdent.name()));
 
     // 2. check by list schema
-    nameIdentifiers = schemas.listSchemas(Namespace.of(metalakeName, catalogName));
-    schemaMap =
-        Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v -> v));
-    Assertions.assertFalse(schemaMap.containsKey(testSchemaName));
+    schemaNameList = Arrays.asList(schemas.listSchemas());
+    Assertions.assertFalse(schemaNameList.contains(testSchemaName));
 
     // test drop schema not exists
     NameIdentifier notExistsSchemaIdent = NameIdentifier.of(metalakeName, catalogName, "no-exits");
-    Assertions.assertFalse(schemas.dropSchema(notExistsSchemaIdent, false));
+    Assertions.assertFalse(schemas.dropSchema(notExistsSchemaIdent.name(), false));
   }
 
   @Test
   void testDropDorisSchema() {
     String schemaName = GravitinoITUtils.genRandomName("doris_it_schema_dropped").toLowerCase();
 
-    catalog
-        .asSchemas()
-        .createSchema(
-            NameIdentifier.of(metalakeName, catalogName, schemaName),
-            "test_comment",
-            ImmutableMap.of("key", "value"));
+    catalog.asSchemas().createSchema(schemaName, "test_comment", ImmutableMap.of("key", "value"));
 
     catalog
         .asTableCatalog()
@@ -267,27 +236,23 @@ public class CatalogDorisIT extends AbstractIT {
             null);
 
     // Try to drop a database, and cascade equals to false, it should not be allowed.
-    Assertions.assertFalse(
-        catalog
-            .asSchemas()
-            .dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), false));
+    Throwable excep =
+        Assertions.assertThrows(
+            RuntimeException.class, () -> catalog.asSchemas().dropSchema(schemaName, false));
+    Assertions.assertTrue(excep.getMessage().contains("the value of cascade should be true."));
 
     // Check the database still exists
-    catalog.asSchemas().loadSchema(NameIdentifier.of(metalakeName, catalogName, schemaName));
+    catalog.asSchemas().loadSchema(schemaName);
 
     // Try to drop a database, and cascade equals to true, it should be allowed.
-    Assertions.assertTrue(
-        catalog
-            .asSchemas()
-            .dropSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), true));
+    Assertions.assertTrue(catalog.asSchemas().dropSchema(schemaName, true));
 
     // Check database has been dropped
     SupportsSchemas schemas = catalog.asSchemas();
-    NameIdentifier of = NameIdentifier.of(metalakeName, catalogName, schemaName);
     Assertions.assertThrows(
         NoSuchSchemaException.class,
         () -> {
-          schemas.loadSchema(of);
+          schemas.loadSchema(schemaName);
         });
   }
 

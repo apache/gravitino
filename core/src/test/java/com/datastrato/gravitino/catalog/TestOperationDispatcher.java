@@ -70,7 +70,7 @@ public abstract class TestOperationDispatcher {
     catalogManager = new CatalogManager(config, entityStore, idGenerator);
 
     NameIdentifier ident = NameIdentifier.of(metalake, catalog);
-    Map<String, String> props = ImmutableMap.of();
+    Map<String, String> props = ImmutableMap.of("key1", "value1", "key2", "value2");
     catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, "test", "comment", props);
   }
 

@@ -27,13 +27,12 @@ public class PostgreSqlCatalog extends JdbcCatalog {
 
   @Override
   protected CatalogOperations newOps(Map<String, String> config) {
-    JdbcTypeConverter<String> jdbcTypeConverter = createJdbcTypeConverter();
+    JdbcTypeConverter jdbcTypeConverter = createJdbcTypeConverter();
     return new PostgreSQLCatalogOperations(
         createExceptionConverter(),
         jdbcTypeConverter,
         createJdbcDatabaseOperations(),
         createJdbcTableOperations(),
-        createJdbcTablePropertiesMetadata(),
         createJdbcColumnDefaultValueConverter());
   }
 

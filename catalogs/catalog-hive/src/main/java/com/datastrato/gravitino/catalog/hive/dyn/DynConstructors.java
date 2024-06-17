@@ -111,6 +111,7 @@ public class DynConstructors {
       return constructed;
     }
 
+    @SuppressWarnings("unchecked")
     public C newInstanceChecked(Object... args) throws Exception {
       try {
         if (args.length > ctor.getParameterCount()) {
@@ -121,17 +122,16 @@ public class DynConstructors {
       } catch (InvocationTargetException e) {
         Throwables.throwIfInstanceOf(e.getCause(), Exception.class);
         Throwables.throwIfInstanceOf(e.getCause(), RuntimeException.class);
-        Throwables.throwIfUnchecked(e.getCause());
         throw new RuntimeException(e.getCause());
       }
     }
 
+    @SuppressWarnings("unchecked")
     public C newInstance(Object... args) {
       try {
         return newInstanceChecked(args);
       } catch (Exception e) {
         Throwables.throwIfInstanceOf(e, RuntimeException.class);
-        Throwables.throwIfUnchecked(e);
         throw new RuntimeException(e);
       }
     }

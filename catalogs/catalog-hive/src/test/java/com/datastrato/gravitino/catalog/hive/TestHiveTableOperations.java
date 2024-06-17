@@ -36,6 +36,7 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
   private static final NameIdentifier tableIdentifier =
       NameIdentifier.of(META_LAKE_NAME, HIVE_CATALOG_NAME, HIVE_SCHEMA_NAME, genRandomName());
   private static HiveCatalog hiveCatalog;
+  private static HiveCatalogOperations hiveCatalogOperations;
   private static HiveTable hiveTable;
   private static Column[] columns;
   private static Partition existingPartition;
@@ -43,6 +44,7 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
   @BeforeAll
   public static void setup() {
     hiveCatalog = initHiveCatalog();
+    hiveCatalogOperations = (HiveCatalogOperations) hiveCatalog.ops();
     initHiveSchema(hiveCatalog);
     hiveTable = createPartitionedTable();
 
@@ -73,9 +75,8 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
     Transform[] partitioning = new Transform[] {identity(col1.name()), identity(col2.name())};
 
     return (HiveTable)
-        hiveCatalog
-            .asTableCatalog()
-            .createTable(tableIdentifier, columns, HIVE_COMMENT, properties, partitioning);
+        hiveCatalogOperations.createTable(
+            tableIdentifier, columns, HIVE_COMMENT, properties, partitioning);
   }
 
   @Test
@@ -270,7 +271,9 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
     Assertions.assertEquals(
         "Error partition format: does_not_exist_partition", exception5.getMessage());
 
-    Assertions.assertFalse(hiveTable.supportPartitions().dropPartition("city=not_exist"));
+    Assertions.assertFalse(
+        hiveTable.supportPartitions().dropPartition("city=not_exist"),
+        "partition should be non-existent");
   }
 
   @Test

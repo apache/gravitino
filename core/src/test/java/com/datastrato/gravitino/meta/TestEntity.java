@@ -266,8 +266,10 @@ public class TestEntity {
             .withId(1L)
             .withName(roleName)
             .withAuditInfo(auditInfo)
-            .withSecurableObject(SecurableObjects.ofCatalog(catalogName))
-            .withPrivileges(Lists.newArrayList(Privileges.UseCatalog.get()))
+            .withSecurableObjects(
+                Lists.newArrayList(
+                    SecurableObjects.ofCatalog(
+                        catalogName, Lists.newArrayList(Privileges.UseCatalog.allow()))))
             .withProperties(map)
             .build();
 
@@ -277,17 +279,20 @@ public class TestEntity {
     Assertions.assertEquals(auditInfo, fields.get(RoleEntity.AUDIT_INFO));
     Assertions.assertEquals(map, fields.get(RoleEntity.PROPERTIES));
     Assertions.assertEquals(
-        Lists.newArrayList(Privileges.UseCatalog.get()), fields.get(RoleEntity.PRIVILEGES));
-    Assertions.assertEquals(
-        SecurableObjects.ofCatalog(catalogName), fields.get(RoleEntity.SECURABLE_OBJECT));
+        Lists.newArrayList(
+            SecurableObjects.ofCatalog(
+                catalogName, Lists.newArrayList(Privileges.UseCatalog.allow()))),
+        fields.get(RoleEntity.SECURABLE_OBJECT));
 
     RoleEntity roleWithoutFields =
         RoleEntity.builder()
             .withId(1L)
             .withName(roleName)
             .withAuditInfo(auditInfo)
-            .withSecurableObject(SecurableObjects.ofCatalog(catalogName))
-            .withPrivileges(Lists.newArrayList(Privileges.UseCatalog.get()))
+            .withSecurableObjects(
+                Lists.newArrayList(
+                    SecurableObjects.ofCatalog(
+                        catalogName, Lists.newArrayList(Privileges.UseCatalog.allow()))))
             .build();
     Assertions.assertNull(roleWithoutFields.properties());
   }

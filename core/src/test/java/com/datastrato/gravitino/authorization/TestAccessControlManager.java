@@ -225,8 +225,9 @@ public class TestAccessControlManager {
             "metalake",
             "create",
             props,
-            SecurableObjects.ofCatalog("catalog"),
-            Lists.newArrayList());
+            Lists.newArrayList(
+                SecurableObjects.ofCatalog(
+                    "catalog", Lists.newArrayList(Privileges.UseCatalog.allow()))));
     Assertions.assertEquals("create", role.name());
     testProperties(props, role.properties());
 
@@ -238,8 +239,9 @@ public class TestAccessControlManager {
                 "metalake",
                 "create",
                 props,
-                SecurableObjects.ofCatalog("catalog"),
-                Lists.newArrayList()));
+                Lists.newArrayList(
+                    SecurableObjects.ofCatalog(
+                        "catalog", Lists.newArrayList(Privileges.UseCatalog.allow())))));
   }
 
   @Test
@@ -247,7 +249,12 @@ public class TestAccessControlManager {
     Map<String, String> props = ImmutableMap.of("k1", "v1");
 
     accessControlManager.createRole(
-        "metalake", "loadRole", props, SecurableObjects.ofCatalog("catalog"), Lists.newArrayList());
+        "metalake",
+        "loadRole",
+        props,
+        Lists.newArrayList(
+            SecurableObjects.ofCatalog(
+                "catalog", Lists.newArrayList(Privileges.UseCatalog.allow()))));
 
     Role cachedRole = accessControlManager.getRole("metalake", "loadRole");
     accessControlManager.getRoleManager().getCache().invalidateAll();
@@ -271,7 +278,12 @@ public class TestAccessControlManager {
     Map<String, String> props = ImmutableMap.of("k1", "v1");
 
     accessControlManager.createRole(
-        "metalake", "testDrop", props, SecurableObjects.ofCatalog("catalog"), Lists.newArrayList());
+        "metalake",
+        "testDrop",
+        props,
+        Lists.newArrayList(
+            SecurableObjects.ofCatalog(
+                "catalog", Lists.newArrayList(Privileges.UseCatalog.allow()))));
 
     // Test drop role
     boolean dropped = accessControlManager.deleteRole("metalake", "testDrop");

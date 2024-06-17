@@ -13,6 +13,8 @@ import com.datastrato.gravitino.meta.CatalogEntity;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import java.io.Closeable;
+import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -32,7 +34,7 @@ import org.slf4j.LoggerFactory;
  */
 @Evolving
 public abstract class BaseCatalog<T extends BaseCatalog>
-    implements Catalog, CatalogProvider, HasPropertyMetadata {
+    implements Catalog, CatalogProvider, HasPropertyMetadata, Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(BaseCatalog.class);
 
   // This variable is used as a key in properties of catalogs to inject custom operation to
@@ -96,27 +98,32 @@ public abstract class BaseCatalog<T extends BaseCatalog>
 
   @Override
   public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
-    return ops().tablePropertiesMetadata();
+    throw new UnsupportedOperationException(
+        "The catalog does not support table properties metadata");
   }
 
   @Override
   public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
-    return ops().catalogPropertiesMetadata();
+    throw new UnsupportedOperationException(
+        "The catalog does not support catalog properties metadata");
   }
 
   @Override
   public PropertiesMetadata schemaPropertiesMetadata() throws UnsupportedOperationException {
-    return ops().schemaPropertiesMetadata();
+    throw new UnsupportedOperationException(
+        "The catalog does not support schema properties metadata");
   }
 
   @Override
   public PropertiesMetadata filesetPropertiesMetadata() throws UnsupportedOperationException {
-    return ops().filesetPropertiesMetadata();
+    throw new UnsupportedOperationException(
+        "The catalog does not support fileset properties metadata");
   }
 
   @Override
   public PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException {
-    return ops().topicPropertiesMetadata();
+    throw new UnsupportedOperationException(
+        "The catalog does not support topic properties metadata");
   }
 
   /**
@@ -133,7 +140,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
           Preconditions.checkArgument(
               entity != null && conf != null, "entity and conf must be set before calling ops()");
           CatalogOperations newOps = createOps(conf);
-          newOps.initialize(conf, entity.toCatalogInfo());
+          newOps.initialize(conf, entity.toCatalogInfo(), this);
           ops =
               newProxyPlugin(conf)
                   .map(
@@ -146,6 +153,14 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     }
 
     return ops;
+  }
+
+  @Override
+  public void close() throws IOException {
+    if (ops != null) {
+      ops.close();
+      ops = null;
+    }
   }
 
   public Capability capability() {
@@ -245,8 +260,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
           Map<String, String> tempProperties = Maps.newHashMap(entity.getProperties());
           tempProperties
               .entrySet()
-              .removeIf(
-                  entry -> ops().catalogPropertiesMetadata().isHiddenProperty(entry.getKey()));
+              .removeIf(entry -> catalogPropertiesMetadata().isHiddenProperty(entry.getKey()));
           properties = tempProperties;
         }
       }

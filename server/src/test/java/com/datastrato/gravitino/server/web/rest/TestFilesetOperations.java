@@ -391,7 +391,7 @@ public class TestFilesetOperations extends JerseyTest {
             .accept("application/vnd.gravitino.v1+json")
             .delete();
 
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp1.getStatus());
 
     DropResponse dropResponse1 = resp1.readEntity(DropResponse.class);
     Assertions.assertEquals(0, dropResponse1.getCode());

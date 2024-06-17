@@ -167,7 +167,7 @@ public class MetalakeIT extends AbstractIT {
   public void testDropMetalakes() {
     GravitinoMetalake metalakeA =
         client.createMetalake(metalakeNameA, "metalake A comment", Collections.emptyMap());
-    assertTrue(client.dropMetalake(metalakeA.name()));
+    assertTrue(client.dropMetalake(metalakeA.name()), "metaLake should be dropped");
     NameIdentifier id = NameIdentifier.of(metalakeNameA);
     assertThrows(
         NoSuchMetalakeException.class,
@@ -176,7 +176,7 @@ public class MetalakeIT extends AbstractIT {
         });
 
     // Metalake does not exist, so we return false
-    assertFalse(client.dropMetalake(metalakeA.name()));
+    assertFalse(client.dropMetalake(metalakeA.name()), "metalake should be non-existent");
   }
 
   public void dropMetalakes() {

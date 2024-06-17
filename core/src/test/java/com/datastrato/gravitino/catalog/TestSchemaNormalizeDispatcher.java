@@ -8,8 +8,8 @@ import static com.datastrato.gravitino.Entity.SECURABLE_ENTITY_RESERVED_NAME;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.rel.Schema;
-import com.datastrato.gravitino.rel.SchemaChange;
+import com.datastrato.gravitino.Schema;
+import com.datastrato.gravitino.SchemaChange;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Arrays;
