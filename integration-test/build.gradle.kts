@@ -24,6 +24,7 @@ dependencies {
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
 
+  testImplementation(libs.awaitility)
   testImplementation(libs.commons.cli)
   testImplementation(libs.commons.lang3)
   testImplementation(libs.guava)
