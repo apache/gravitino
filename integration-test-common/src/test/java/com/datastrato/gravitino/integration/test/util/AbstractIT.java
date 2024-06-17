@@ -290,7 +290,7 @@ public class AbstractIT {
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
     String host = jettyServerConfig.getHost();
     int port = jettyServerConfig.getHttpPort();
-    int timeout = 1000; // 1 second timeout
+    int timeout = 3000; // 3 second timeout
 
     try (Socket socket = new Socket()) {
       socket.connect(new java.net.InetSocketAddress(host, port), timeout);
