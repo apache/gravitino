@@ -163,37 +163,57 @@ If you want to contribute to this open-source project, please fork the project o
    `gravitino-trino-connector-{version}.tar.gz.sha256` under the `distribution` directory. You 
    can uncompress and deploy it to Trino to use the Gravitino Trino connector.
 ## How to Build Gravitino on Windows (Using WSL)
+
 ### Download WSL (Ubuntu)
+
 **On Windows:**
+
 Refer to this guide for installation: [WSL Installation Guide](https://learn.microsoft.com/en-us/windows/wsl/install)
+
 *Note: Ubuntu 22.04 can successfully run Gravitino*
 
 This step involves setting up the Windows Subsystem for Linux (WSL) on your Windows machine. WSL allows you to run a Linux distribution alongside Windows, providing a Linux-like environment for development.
+
 ### Update Package List and Install Necessary Packages
+
 **On Ubuntu (WSL):**
+
 ```sh
 sudo apt update
 sudo apt install apt-transport-https ca-certificates curl software-properties-common
 ```
+
 Updating the package list ensures you have the latest information on the newest versions of packages and their dependencies. Installing the necessary packages sets up your system to securely download and manage additional software.
+
 ### Download and Setup Java SDK 17 (11 or 8 also works)
+
 **On Ubuntu (WSL):**
+
 1. Edit your `~/.bashrc` file using any editor. Here, `vim` is used:
+
     ```sh
     vim ~/.bashrc
     ```
+
 2. Add the following lines at the end of the file. Replace `/usr/lib/jvm/java-11-openjdk-amd64` with your actual Java installation path:
+
     ```sh
     export JAVA_HOME="/usr/lib/jvm/java-11-openjdk-amd64"
     export PATH=$PATH:$JAVA_HOME/bin
     ```
+
 3. Save and quit in vim using `:wq`.
 
 4. Run `source ~/.bashrc` to update the `.bashrc` file in your current shell session.
 
     Editing the `~/.bashrc` file allows you to set environment variables that will be available in every terminal session. Setting `JAVA_HOME` and updating `PATH` ensures that your system uses the correct Java version for development.
+
 ### Install Docker
+
 **On Ubuntu (WSL):**
+
+```sh
+curl -fsSL https
 ```sh
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
 sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
@@ -203,9 +223,13 @@ sudo service docker start
 sudo docker run hello-world
 sudo usermod -aG docker $USER
 ```
+
 These commands install Docker, a platform for developing, shipping, and running applications inside containers. Running `hello-world` verifies the installation. Adding your user to the Docker group allows you to run Docker commands without `sudo`.
+
 ### Install Python 3.11
+
 **On Ubuntu (WSL):**
+
 ```sh
 sudo apt update
 sudo apt install software-properties-common
@@ -214,10 +238,15 @@ sudo apt update
 sudo apt install python3.11
 python3.11 --version
 ```
+
 This installs Python 3.11, a programming language used for a variety of applications. The commands add a repository that provides the latest Python versions and then installs Python 3.11.
+
 ### Download Gravitino Project to WSL
+
 **On Ubuntu (WSL):**
+
 Remember the project download location for the next step. If you want to contribute to this open-source project, please fork the project on GitHub first. After forking, clone the forked project to your local environment, make your changes, and submit a pull request (PR).
+
 ```sh
 git clone https://github.com/datastrato/gravitino.git
 cd gravitino
@@ -225,7 +254,9 @@ cd gravitino
 cd distribution/package/
 ./bin/gravitino.sh start
 ```
+
 Access [http://localhost:8090](http://localhost:8090)
+
 Building the Gravitino project compiles the necessary components, and starting the server allows you to access the application in your browser.
 
 For instructions on how to run the project using VSCode or IntelliJ on Windows, please refer to [CONTRIBUTING.md](CONTRIBUTING.md).
