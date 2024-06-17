@@ -22,6 +22,7 @@ import com.datastrato.gravitino.server.web.JettyServerConfig;
 import java.io.File;
 import java.io.IOException;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -228,7 +229,7 @@ public class AbstractIT {
 
     Awaitility.await()
         .atMost(60, TimeUnit.SECONDS)
-        .pollInterval(5, TimeUnit.SECONDS)
+        .pollInterval(1, TimeUnit.SECONDS)
         .until(
             () -> {
               boolean isServerUp = isGravitinoServerUp();
