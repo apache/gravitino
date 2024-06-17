@@ -217,6 +217,20 @@ public class AbstractIT {
       }
 
       GravitinoITUtils.startGravitinoServer();
+      
+      Awaitility.await()
+      .atMost(60, TimeUnit.SECONDS)
+      .pollInterval(1, TimeUnit.SECONDS)
+      .until(
+          () -> {
+            boolean isServerUp = isGravitinoServerUp();
+            if (isServerUp) {
+              LOG.info("Gravitino Server is up and running.");
+            } else {
+              LOG.warn("Gravitino Server is not accessible.");
+            }
+            return isServerUp;
+          });
     }
 
     JettyServerConfig jettyServerConfig =
@@ -243,19 +257,6 @@ public class AbstractIT {
       client = GravitinoAdminClient.builder(serverUri).build();
     }
 
-    Awaitility.await()
-        .atMost(60, TimeUnit.SECONDS)
-        .pollInterval(1, TimeUnit.SECONDS)
-        .until(
-            () -> {
-              boolean isServerUp = isGravitinoServerUp();
-              if (isServerUp) {
-                LOG.info("Gravitino Server is up and running.");
-              } else {
-                LOG.warn("Gravitino Server is not accessible.");
-              }
-              return isServerUp;
-            });
   }
 
   @AfterAll
@@ -295,9 +296,11 @@ public class AbstractIT {
   }
 
   private static boolean isGravitinoServerUp() {
-    String host = "localhost";
-    int port = 8090;
-    int timeout = 1000; // 1 second timeout
+    JettyServerConfig jettyServerConfig =
+        JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
+    String host = jettyServerConfig.getHost();
+    int port = jettyServerConfig.getHttpPort();
+    int timeout = 3000; // 1 second timeout
 
     try (Socket socket = new Socket()) {
       socket.connect(new java.net.InetSocketAddress(host, port), timeout);
