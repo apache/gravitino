@@ -90,7 +90,9 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
     Map<String, String> resultConf = Maps.newHashMap(prefixMap);
     resultConf.putAll(gravitinoConfig);
     resultConf.put("catalog_uuid", info.id().toString());
-
+    if (resultConf.containsKey(IcebergCatalogPropertiesMetadata.ICEBERG_CATALOG_NAME) == false) {
+      resultConf.put(IcebergCatalogPropertiesMetadata.ICEBERG_CATALOG_NAME, info.name());
+    }
     IcebergConfig icebergConfig = new IcebergConfig(resultConf);
 
     this.icebergTableOps = new IcebergTableOps(icebergConfig);

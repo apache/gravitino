@@ -77,5 +77,7 @@ public class IcebergPropertiesConstants {
 
   static final String ICEBERG_CATALOG_CACHE_ENABLED = CatalogProperties.CACHE_ENABLED;
 
+  static final String ICEBERG_CATALOG_NAME = IcebergCatalogPropertiesMetadata.ICEBERG_CATALOG_NAME;
+
   private IcebergPropertiesConstants() {}
 }

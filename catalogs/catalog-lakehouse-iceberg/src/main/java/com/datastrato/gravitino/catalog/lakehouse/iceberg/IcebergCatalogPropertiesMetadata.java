@@ -31,6 +31,7 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
   public static final String GRAVITINO_JDBC_DRIVER = "jdbc-driver";
   public static final String WAREHOUSE = "warehouse";
   public static final String URI = "uri";
+  public static final String ICEBERG_CATALOG_NAME = "iceberg-catalog-name";
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
@@ -50,7 +51,9 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
           URI,
           URI,
           WAREHOUSE,
-          WAREHOUSE);
+          WAREHOUSE,
+          ICEBERG_CATALOG_NAME,
+          ICEBERG_CATALOG_NAME);
 
   public static final Map<String, String> KERBEROS_CONFIGURATION_FOR_HIVE_BACKEND =
       ImmutableMap.of(

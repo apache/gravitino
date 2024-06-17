@@ -22,6 +22,7 @@ import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.datastrato.gravitino.server.web.OverwriteDefaultConfig;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 
 public class IcebergConfig extends Config implements OverwriteDefaultConfig {
@@ -103,8 +104,19 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(1000);
 
+  public static final ConfigEntry<String> ICEBERG_CATALOG_NAME =
+      new ConfigBuilder(IcebergCatalogPropertiesMetadata.ICEBERG_CATALOG_NAME)
+          .doc("The catalog name for Iceberg catalog backend")
+          .version(ConfigConstants.VERSION_0_5_1)
+          .stringConf()
+          .create();
+
   public String getJdbcDriver() {
     return get(JDBC_DRIVER);
+  }
+
+  public String getIcebergCatalogName(String defaultCatalogName) {
+    return Optional.ofNullable(get(ICEBERG_CATALOG_NAME)).orElse(defaultCatalogName);
   }
 
   public IcebergConfig(Map<String, String> properties) {
