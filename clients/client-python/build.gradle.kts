@@ -3,6 +3,15 @@
  * This software is licensed under the Apache License version 2.
  */
 import io.github.piyushroshan.python.VenvTask
+import java.io.BufferedWriter
+import java.io.FileWriter
+import java.net.URL
+import org.w3c.dom.Document
+import org.w3c.dom.Element
+import javax.xml.parsers.DocumentBuilderFactory
+import javax.xml.transform.TransformerFactory
+import javax.xml.transform.dom.DOMSource
+import javax.xml.transform.stream.StreamResult
 
 plugins {
   id("io.github.piyushroshan.python-gradle-miniforge-plugin") version "1.0.0"
@@ -22,14 +31,168 @@ fun deleteCacheDir(targetDir: String) {
 }
 
 fun gravitinoServer(operation: String) {
-    val process = ProcessBuilder("${project.rootDir.path}/distribution/package/bin/gravitino.sh", operation).start()
-    val exitCode = process.waitFor()
-    if (exitCode == 0) {
-      val currentContext = process.inputStream.bufferedReader().readText()
-      println("Gravitino server status: $currentContext")
-    } else {
-      println("Gravitino server execution failed with exit code $exitCode")
+  val processBuilder = ProcessBuilder("${project.rootDir.path}/distribution/package/bin/gravitino.sh", operation)
+  processBuilder.environment()["HADOOP_USER_NAME"] = "datastrato"
+  val process = processBuilder.start()
+  val exitCode = process.waitFor()
+  if (exitCode == 0) {
+    val currentContext = process.inputStream.bufferedReader().readText()
+    println("Gravitino server status: $currentContext")
+  } else {
+    println("Gravitino server execution failed with exit code $exitCode")
+  }
+}
+
+fun startHiveContainer() {
+  val launchScript = "${project.rootDir.path}/clients/client-python/tests/integration/init/launch.sh"
+  val processBuilder = ProcessBuilder("bash", "-c", launchScript)
+  val logPath = System.getenv("gravitino.log.path")
+  if (logPath != null && logPath.isNotBlank()) {
+    val env = mapOf("GRAVITINO_LOG_PATH" to logPath)
+    processBuilder.environment().putAll(env)
+  }
+  val process = processBuilder.start()
+  val exitCode = process.waitFor()
+  if (exitCode != 0) {
+    val output = process.inputStream.bufferedReader().readText()
+    throw RuntimeException("Hive container started failed with exit code $exitCode, msg: $output")
+  }
+}
+
+fun resolveDockerAddress(): Map<String, String> {
+  val resolveAddressScript = "${project.rootDir.path}/clients/client-python/tests/integration/init/inspect_ip.sh"
+  val process = ProcessBuilder("bash", "-c", resolveAddressScript).start()
+
+  val exitCode = process.waitFor()
+  val output = process.inputStream.bufferedReader().readText()
+  if (exitCode == 0) {
+    val lines = output.lines()
+    // expect the output to be like:
+    // hive:10.20.30.19
+    val addressMap = mutableMapOf<String, String>()
+    lines.stream()
+       .filter { line -> line.isNotBlank() }
+       .forEach { line ->
+          val (name, ip) = line.split(":").let { (name, ip) -> Pair(name, ip) }
+          if (name == "hive") {
+            if (ip.isBlank()) {
+              throw RuntimeException("Hive container address is blank.")
+            }
+            addressMap["hive"] = ip
+          }
+      }
+    return addressMap
+  }
+  throw RuntimeException("Docker container address resolved failed with exit code $exitCode, msg: $output")
+}
+
+fun appendCatalogHadoopConf(hiveContainerAddress: String) {
+  val hadoopConfPath = "${project.rootDir.path}/distribution/package/catalogs/hadoop/conf/hadoop.conf"
+  val confFile = File(hadoopConfPath)
+  if (!confFile.exists()) {
+    throw RuntimeException("Hadoop conf file is not found at `$hadoopConfPath`.")
+  }
+  val confs = mapOf(
+    "gravitino.bypass.fs.defaultFS" to "hdfs://$hiveContainerAddress:9000"
+  )
+
+  BufferedWriter(FileWriter(confFile, true)).use { writer ->
+    confs.forEach { (key, value) ->
+      writer.append("\n$key = $value")
     }
+  }
+}
+
+val hadoopVersion = "3.1.0"
+val hadoopPackName = "hadoop-${hadoopVersion}.tar.gz"
+val hadoopDownloadUrl = "https://archive.apache.org/dist/hadoop/core/hadoop-${hadoopVersion}/${hadoopPackName}"
+val localArchiveDir = "${project.rootDir.path}/clients/client-python/it-archive"
+fun downloadAndConfigureHadoopPack(hiveContainerAddress: String) {
+  if (!File(localArchiveDir).exists()) {
+    throw RuntimeException("Local archive directory is not found at `$localArchiveDir`.")
+  }
+  val targetFile = File(localArchiveDir, hadoopPackName)
+  if (!targetFile.exists()) {
+    // Download the Hadoop distribution pack
+    targetFile.outputStream().use { output ->
+      URL(hadoopDownloadUrl).openStream().use { input ->
+        input.copyTo(output)
+      }
+    }
+  }
+  if (!targetFile.exists()) {
+    throw RuntimeException("Target Hadoop distribution pack does not exist: ${targetFile.absolutePath}.")
+  }
+  // Unzip the Hadoop distribution pack
+  val unzipProcess = ProcessBuilder(
+          "tar", "-xvf", "${localArchiveDir}/${hadoopPackName}", "-C", localArchiveDir)
+          .redirectOutput(ProcessBuilder.Redirect.INHERIT)
+          .redirectError(ProcessBuilder.Redirect.INHERIT)
+          .start()
+  val exitCode = unzipProcess.waitFor()
+  if (exitCode != 0) {
+    val output = unzipProcess.inputStream.bufferedReader().readText()
+    throw RuntimeException("Unzip Hadoop distribution pack failed with exit code $exitCode, msg: $output")
+  }
+
+  // Rewrite core-site.xml in the Hadoop distribution pack
+  val coreSiteFile = File("${project.rootDir.path}/clients/client-python/it-archive" +
+     "/hadoop-${hadoopVersion}/etc/hadoop/core-site.xml")
+  if (!coreSiteFile.exists()) {
+    throw RuntimeException("The core-site.xml does not found at ${coreSiteFile.absolutePath}.")
+  }
+
+  val docBuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder()
+  val doc: Document = docBuilder.parse(coreSiteFile)
+  val rootElement = doc.documentElement
+
+  // Create append configuration
+  val propertyElement: Element = doc.createElement("property")
+  val nameElement: Element = doc.createElement("name")
+  nameElement.textContent = "fs.defaultFS"
+  val valueElement: Element = doc.createElement("value")
+  valueElement.textContent = "hdfs://${hiveContainerAddress}:9000"
+
+  // Add name and value to property element
+  propertyElement.appendChild(nameElement)
+  propertyElement.appendChild(valueElement)
+
+  // Add property element to configuration element
+  rootElement.appendChild(propertyElement)
+
+  // Update the core-site.xml
+  val transformer = TransformerFactory.newInstance().newTransformer()
+  transformer.setOutputProperty(javax.xml.transform.OutputKeys.OMIT_XML_DECLARATION, "no")
+  transformer.setOutputProperty(javax.xml.transform.OutputKeys.METHOD, "xml")
+  transformer.setOutputProperty(javax.xml.transform.OutputKeys.INDENT, "yes")
+  transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "2")
+  transformer.setOutputProperty("{http://xml.apache.org/xalan}line-separator", "\n")
+
+  val source = DOMSource(doc)
+  val result = StreamResult(coreSiteFile)
+  transformer.transform(source, result)
+}
+
+fun fetchHdfsClasspath(): String {
+  val hdfsShellPath = "${localArchiveDir}/hadoop-${hadoopVersion}/bin/hdfs"
+  val process = ProcessBuilder(hdfsShellPath, "classpath", "--glob").start()
+  val exitCode = process.waitFor()
+  val output = process.inputStream.bufferedReader().readText()
+  if (exitCode == 0) {
+    return output
+  } else {
+    throw RuntimeException("Hive container started failed with exit code $exitCode, msg: $output")
+  }
+}
+
+fun stopHiveContainer() {
+  val shutdownScript = "${project.rootDir.path}/clients/client-python/tests/integration/init/shutdown.sh"
+  val process = ProcessBuilder("bash", "-c", shutdownScript).start()
+  val exitCode = process.waitFor()
+  if (exitCode != 0) {
+    val output = process.inputStream.bufferedReader().readText()
+    throw RuntimeException("Hive container stopped failed with exit code $exitCode, msg: $output")
+  }
 }
 
 fun generatePypiProjectHomePage() {
@@ -118,20 +281,33 @@ tasks {
 
   val integrationTest by registering(VenvTask::class) {
     doFirst {
+      startHiveContainer()
+      val addressMap = resolveDockerAddress()
+      val hiveContainerAddress = addressMap["hive"] ?: throw RuntimeException("Hive container address is null.")
+      appendCatalogHadoopConf(hiveContainerAddress)
       gravitinoServer("start")
+      downloadAndConfigureHadoopPack(hiveContainerAddress)
+      val hdfsClasspath = fetchHdfsClasspath()
+      environment = mapOf(
+          "PROJECT_VERSION" to project.version,
+          "GRAVITINO_HOME" to project.rootDir.path + "/distribution/package",
+          "START_EXTERNAL_GRAVITINO" to "true",
+          "GRAVITINO_PYTHON_HIVE_ADDRESS" to hiveContainerAddress,
+          "HADOOP_USER_NAME" to "datastrato",
+          "HADOOP_HOME" to "${localArchiveDir}/hadoop-${hadoopVersion}",
+          "HADOOP_CONF_DIR" to "${localArchiveDir}/hadoop-${hadoopVersion}/etc/hadoop",
+          "CLASSPATH" to hdfsClasspath
+      )
     }
 
     venvExec = "coverage"
     args = listOf("run", "--branch", "-m", "unittest")
     workingDir = projectDir.resolve("./tests/integration")
-    environment = mapOf(
-      "PROJECT_VERSION" to project.version,
-      "GRAVITINO_HOME" to project.rootDir.path + "/distribution/package",
-      "START_EXTERNAL_GRAVITINO" to "true"
-    )
+
 
     doLast {
       gravitinoServer("stop")
+      stopHiveContainer()
     }
 
     finalizedBy(integrationCoverageReport)
@@ -206,6 +382,7 @@ tasks {
     delete("tests/unittests/.coverage")
     delete("tests/integration/htmlcov")
     delete("tests/integration/.coverage")
+    delete("it-archive")
 
     doLast {
       deleteCacheDir(".pytest_cache")
