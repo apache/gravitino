@@ -507,6 +507,8 @@ public class CatalogsPage extends AbstractWebIT {
       if (isColumnLevel) {
         xpath = xpath + "//p";
       }
+      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      wait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.xpath(xpath)));
       List<WebElement> list = driver.findElements(By.xpath(xpath));
       List<String> texts = new ArrayList<>();
       for (WebElement element : list) {
