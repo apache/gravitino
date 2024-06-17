@@ -2,38 +2,6 @@
 # Copyright 2023 Datastrato Pvt Ltd.
 # This software is licensed under the Apache License version 2.
 #
-
-# Apache Ranger compile Docker image
-FROM debian:buster as compile-ranger
-LABEL maintainer="support@datastrato.com"
-
-ARG RANGER_VERSION=2.4.0
-# Multiple plugins can be passed using commas, e.g. `plugin-trino,plugin-hive`
-ARG RANGER_PLUGINS=plugin-trino
-
-WORKDIR /root
-
-RUN apt-get -q update && \
-    apt-get install -y -q python python3 gcc mariadb-server vim curl wget openjdk-11-jdk git procps
-
-RUN wget https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.6.3/apache-maven-3.6.3-bin.tar.gz && \
-    tar zxvf apache-maven-3.6.3-bin.tar.gz && \
-    ln -s /root/apache-maven-3.6.3/bin/mvn /usr/local/bin/mvn
-
-ENV JAVA_HOME=/usr/local/jdk
-RUN ARCH=$(uname -m) && \
-    if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
-    ln -s /usr/lib/jvm/java-11-openjdk-arm64 ${JAVA_HOME}; \
-    else \
-    ln -s /usr/lib/jvm/java-11-openjdk-amd64 ${JAVA_HOME}; \
-    fi
-
-RUN wget https://downloads.apache.org/ranger/${RANGER_VERSION}/apache-ranger-${RANGER_VERSION}.tar.gz && \
-    tar zxvf apache-ranger-${RANGER_VERSION}.tar.gz && \
-    ln -s apache-ranger-${RANGER_VERSION} apache-ranger && \
-    cd apache-ranger && \
-    mvn -pl security-admin -P ranger-jdk11 -am -DskipTests=true compile package
-
 # Apache Ranger Admin runtime Docker image
 FROM debian:buster
 LABEL maintainer="support@datastrato.com"
