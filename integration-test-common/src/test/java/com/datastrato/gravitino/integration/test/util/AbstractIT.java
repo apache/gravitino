@@ -219,10 +219,9 @@ public class AbstractIT {
       GravitinoITUtils.startGravitinoServer();
 
       Awaitility.await()
-      .atMost(60, TimeUnit.SECONDS)
-      .pollInterval(1, TimeUnit.SECONDS)
-      .until(
-        () -> isGravitinoServerUp());
+          .atMost(60, TimeUnit.SECONDS)
+          .pollInterval(1, TimeUnit.SECONDS)
+          .until(() -> isGravitinoServerUp());
     }
 
     JettyServerConfig jettyServerConfig =
@@ -248,7 +247,6 @@ public class AbstractIT {
     } else {
       client = GravitinoAdminClient.builder(serverUri).build();
     }
-
   }
 
   @AfterAll
@@ -292,7 +290,7 @@ public class AbstractIT {
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
     String host = jettyServerConfig.getHost();
     int port = jettyServerConfig.getHttpPort();
-    int timeout = 3000; // 1 second timeout
+    int timeout = 1000; // 1 second timeout
 
     try (Socket socket = new Socket()) {
       socket.connect(new java.net.InetSocketAddress(host, port), timeout);
