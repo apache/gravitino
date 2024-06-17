@@ -10,6 +10,7 @@ import com.google.common.collect.ImmutableMap;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -149,12 +150,14 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
                     String.format(
                         "Scala case class: %s only have a constructor with parameters.",
                         physicalPlanClassName));
+                List<Object> initArgs = new ArrayList<>();
+                initArgs.add(
+                    Arrays.asList(catalogAndIdentifier.catalog, catalogAndIdentifier.identifier));
+                initArgs.addAll(
+                    parameterValues.subList(
+                        1, parameterValues.size())); // remove the table parameter
                 SparkPlan sparkPlan =
-                    (SparkPlan)
-                        (physicalPlanDeclaredConstructors[0].newInstance(
-                            catalogAndIdentifier.catalog,
-                            catalogAndIdentifier.identifier,
-                            parameterValues.remove(0))); // remove the table parameter
+                    (SparkPlan) (physicalPlanDeclaredConstructors[0].newInstance(initArgs));
                 return toSeq(sparkPlan);
               } catch (ClassNotFoundException
                   | InvocationTargetException
