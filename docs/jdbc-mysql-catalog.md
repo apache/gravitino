@@ -87,22 +87,26 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 #### Table column types
 
-| Gravitino Type   | MySQL Type  |
-|------------------|-------------|
-| `Byte`           | `Tinyint`   |
-| `Short`          | `Smallint`  |
-| `Integer`        | `Int`       |
-| `Long`           | `Bigint`    |
-| `Float`          | `Float`     |
-| `Double`         | `Double`    |
-| `String`         | `Text`      |
-| `Date`           | `Date`      |
-| `Time`           | `Time`      |
-| `Timestamp`      | `Timestamp` |
-| `Decimal`        | `Decimal`   |
-| `VarChar`        | `VarChar`   |
-| `FixedChar`      | `FixedChar` |
-| `Binary`         | `Binary`    |
+| Gravitino Type   | MySQL Type          |
+|------------------|---------------------|
+| `Byte`           | `Tinyint`           |
+| `Byte(false)`    | `Tinyint Unsigned`  |
+| `Short`          | `Smallint`          |
+| `Short(false)`   | `Smallint Unsigned` |
+| `Integer`        | `Int`               |
+| `Integer(false)` | `Int Unsigned`      |
+| `Long`           | `Bigint`            |
+| `Long(false)`    | `Bigint Unsigned`   | 
+| `Float`          | `Float`             |
+| `Double`         | `Double`            |
+| `String`         | `Text`              |
+| `Date`           | `Date`              |
+| `Time`           | `Time`              |
+| `Timestamp`      | `Timestamp`         |
+| `Decimal`        | `Decimal`           |
+| `VarChar`        | `VarChar`           |
+| `FixedChar`      | `FixedChar`         |
+| `Binary`         | `Binary`            |
 
 :::info
 MySQL doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.

@@ -16,6 +16,10 @@ import static com.datastrato.gravitino.rel.expressions.literals.Literals.shortLi
 import static com.datastrato.gravitino.rel.expressions.literals.Literals.stringLiteral;
 import static com.datastrato.gravitino.rel.expressions.literals.Literals.timeLiteral;
 import static com.datastrato.gravitino.rel.expressions.literals.Literals.timestampLiteral;
+import static com.datastrato.gravitino.rel.expressions.literals.Literals.unsignedByteLiteral;
+import static com.datastrato.gravitino.rel.expressions.literals.Literals.unsignedIntegerLiteral;
+import static com.datastrato.gravitino.rel.expressions.literals.Literals.unsignedLongLiteral;
+import static com.datastrato.gravitino.rel.expressions.literals.Literals.unsignedShortLiteral;
 
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
 import com.datastrato.gravitino.rel.expressions.literals.Literals;
@@ -40,17 +44,33 @@ public class TestLiteral {
     Assertions.assertEquals((byte) 1, literal.value());
     Assertions.assertEquals(Types.ByteType.get(), literal.dataType());
 
+    literal = unsignedByteLiteral(Short.valueOf("1"));
+    Assertions.assertEquals((short) 1, literal.value());
+    Assertions.assertEquals(Types.ByteType.unsigned(), literal.dataType());
+
     literal = shortLiteral(Short.valueOf("1"));
     Assertions.assertEquals((short) 1, literal.value());
     Assertions.assertEquals(Types.ShortType.get(), literal.dataType());
+
+    literal = unsignedShortLiteral(Integer.valueOf("1"));
+    Assertions.assertEquals(1, literal.value());
+    Assertions.assertEquals(Types.ShortType.unsigned(), literal.dataType());
 
     literal = integerLiteral(Integer.valueOf("1"));
     Assertions.assertEquals(1, literal.value());
     Assertions.assertEquals(Types.IntegerType.get(), literal.dataType());
 
+    literal = unsignedIntegerLiteral(Long.valueOf("1"));
+    Assertions.assertEquals(1L, literal.value());
+    Assertions.assertEquals(Types.IntegerType.unsigned(), literal.dataType());
+
     literal = longLiteral(Long.valueOf("1"));
     Assertions.assertEquals(1L, literal.value());
     Assertions.assertEquals(Types.LongType.get(), literal.dataType());
+
+    literal = unsignedLongLiteral(Decimal.of("1"));
+    Assertions.assertEquals(Decimal.of("1"), literal.value());
+    Assertions.assertEquals(Types.LongType.unsigned(), literal.dataType());
 
     literal = floatLiteral(Float.valueOf("1.234"));
     Assertions.assertEquals(1.234f, literal.value());
