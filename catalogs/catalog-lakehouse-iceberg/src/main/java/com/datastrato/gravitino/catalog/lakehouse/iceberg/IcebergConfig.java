@@ -107,7 +107,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
   public static final ConfigEntry<String> ICEBERG_CATALOG_NAME =
       new ConfigBuilder(IcebergCatalogPropertiesMetadata.ICEBERG_CATALOG_NAME)
           .doc("The catalog name for Iceberg catalog backend")
-          .version(ConfigConstants.VERSION_0_5_1)
+          .version(ConfigConstants.VERSION_0_5_2)
           .stringConf()
           .create();
 
