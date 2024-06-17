@@ -22,6 +22,7 @@ import com.datastrato.gravitino.server.web.JettyServerConfig;
 import java.io.File;
 import java.io.IOException;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
