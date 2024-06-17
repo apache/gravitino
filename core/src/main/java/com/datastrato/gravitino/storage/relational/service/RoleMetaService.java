@@ -86,6 +86,7 @@ public class RoleMetaService {
       RolePO.Builder builder = RolePO.builder();
       fillRolePOBuilderParentEntityId(builder, roleEntity.namespace());
       RolePO rolePO = POConverters.initializeRolePOWithVersion(roleEntity, builder);
+
       List<SecurableObjectPO> securableObjectPOs = Lists.newArrayList();
       for (SecurableObject object : roleEntity.securableObjects()) {
         SecurableObjectPO.Builder objectBuilder =
@@ -93,7 +94,7 @@ public class RoleMetaService {
                 roleEntity.id(), object, getEntityType(object));
         objectBuilder.withEntityId(
             MetadataObjectUtils.getSecurableObjectEntityId(
-                metalakeId, object.fullName(), object.type()));
+                rolePO.getMetalakeId(), object.fullName(), object.type()));
         securableObjectPOs.add(objectBuilder.build());
       }
 

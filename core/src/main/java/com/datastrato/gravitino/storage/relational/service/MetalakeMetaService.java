@@ -302,10 +302,10 @@ public class MetalakeMetaService {
                 SessionUtils.doWithoutCommit(
                     RoleMetaMapper.class,
                     mapper -> mapper.softDeleteRoleMetasByMetalakeId(metalakeId)),
-                () ->
-                        SessionUtils.doWithoutCommit(
-                                SecurableObjectMapper.class,
-                                mapper -> mapper.softDeleteRoleMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    SecurableObjectMapper.class,
+                    mapper -> mapper.softDeleteRoleMetasByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
                     CatalogMetaMapper.class,

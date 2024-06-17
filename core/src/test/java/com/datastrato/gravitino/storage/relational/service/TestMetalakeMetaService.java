@@ -6,8 +6,6 @@
 package com.datastrato.gravitino.storage.relational.service;
 
 import com.datastrato.gravitino.Entity;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
@@ -20,6 +18,8 @@ import com.datastrato.gravitino.storage.relational.po.CatalogPO;
 import com.datastrato.gravitino.storage.relational.po.SchemaPO;
 import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
+import com.datastrato.gravitino.utils.NameIdentifierUtil;
+import com.datastrato.gravitino.utils.NamespaceUtil;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -44,11 +44,12 @@ class TestMetalakeMetaService extends TestJDBCBackend {
 
     Assertions.assertDoesNotThrow(() -> metalakeMetaService.insertMetalake(metalake, false));
     BaseMetalake metalakeResult =
-        metalakeMetaService.getMetalakeByIdentifier(NameIdentifier.ofMetalake(metalakeName));
+        metalakeMetaService.getMetalakeByIdentifier(NameIdentifierUtil.ofMetalake(metalakeName));
     Assertions.assertEquals(metalake, metalakeResult);
 
     List<CatalogEntity> catalogEntities =
-        CatalogMetaService.getInstance().listCatalogsByNamespace(Namespace.ofCatalog(metalakeName));
+        CatalogMetaService.getInstance()
+            .listCatalogsByNamespace(NamespaceUtil.ofCatalog(metalakeName));
     Assertions.assertEquals(0, catalogEntities.size());
 
     List<CatalogPO> catalogPOs =
@@ -85,11 +86,12 @@ class TestMetalakeMetaService extends TestJDBCBackend {
     // insert metalake
     metalakeMetaService.insertMetalake(metalake, false);
     BaseMetalake metalakeResult =
-        metalakeMetaService.getMetalakeByIdentifier(NameIdentifier.ofMetalake(metalakeName));
+        metalakeMetaService.getMetalakeByIdentifier(NameIdentifierUtil.ofMetalake(metalakeName));
     Assertions.assertEquals(metalake, metalakeResult);
 
     List<CatalogEntity> catalogEntities =
-        CatalogMetaService.getInstance().listCatalogsByNamespace(Namespace.ofCatalog(metalakeName));
+        CatalogMetaService.getInstance()
+            .listCatalogsByNamespace(NamespaceUtil.ofCatalog(metalakeName));
     Assertions.assertEquals(0, catalogEntities.size());
 
     List<CatalogPO> catalogPOs =
@@ -115,10 +117,12 @@ class TestMetalakeMetaService extends TestJDBCBackend {
             .anyMatch(schemaPO -> schemaPO.getSchemaName().equals(Entity.ROLE_SCHEMA_NAME)));
 
     // delete metalake
-    metalakeMetaService.deleteMetalake(NameIdentifier.ofMetalake(metalakeName), false);
+    metalakeMetaService.deleteMetalake(NameIdentifierUtil.ofMetalake(metalakeName), false);
     Assertions.assertThrows(
         NoSuchEntityException.class,
-        () -> metalakeMetaService.getMetalakeByIdentifier(NameIdentifier.ofMetalake(metalakeName)));
+        () ->
+            metalakeMetaService.getMetalakeByIdentifier(
+                NameIdentifierUtil.ofMetalake(metalakeName)));
 
     List<CatalogPO> catalogPOs1 =
         SessionUtils.getWithoutCommit(
@@ -132,7 +136,8 @@ class TestMetalakeMetaService extends TestJDBCBackend {
         createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake1", auditInfo);
     metalakeMetaService.insertMetalake(metalake1, false);
     List<CatalogEntity> catalogEntities2 =
-        CatalogMetaService.getInstance().listCatalogsByNamespace(Namespace.ofCatalog("metalake1"));
+        CatalogMetaService.getInstance()
+            .listCatalogsByNamespace(NamespaceUtil.ofCatalog("metalake1"));
     Assertions.assertEquals(0, catalogEntities2.size());
 
     List<CatalogPO> catalogPOs2 =
@@ -147,10 +152,12 @@ class TestMetalakeMetaService extends TestJDBCBackend {
     Assertions.assertEquals(3, schemaPOs2.size());
 
     // delete metalake with cascade
-    metalakeMetaService.deleteMetalake(NameIdentifier.ofMetalake("metalake1"), true);
+    metalakeMetaService.deleteMetalake(NameIdentifierUtil.ofMetalake("metalake1"), true);
     Assertions.assertThrows(
         NoSuchEntityException.class,
-        () -> metalakeMetaService.getMetalakeByIdentifier(NameIdentifier.ofMetalake("metalake1")));
+        () ->
+            metalakeMetaService.getMetalakeByIdentifier(
+                NameIdentifierUtil.ofMetalake("metalake1")));
 
     List<CatalogPO> catalogPOs3 =
         SessionUtils.getWithoutCommit(

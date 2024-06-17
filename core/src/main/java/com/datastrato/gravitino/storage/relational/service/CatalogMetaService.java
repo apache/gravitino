@@ -29,8 +29,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
-import javax.annotation.Nullable;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 
 /**
  * The service class for catalog metadata. It provides the basic database operations for catalog.
