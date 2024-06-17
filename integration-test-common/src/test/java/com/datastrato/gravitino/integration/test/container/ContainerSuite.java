@@ -310,10 +310,7 @@ public class ContainerSuite implements Closeable {
       synchronized (ContainerSuite.class) {
         if (rangerContainer == null) {
           // Start Ranger container
-          RangerContainer.Builder rangerBuilder =
-              RangerContainer.builder()
-                  .withNetwork(network)
-                  .withImage("unknowntpo/gravitino-ci-ranger:latest");
+          RangerContainer.Builder rangerBuilder = RangerContainer.builder().withNetwork(network);
           RangerContainer container = closer.register(rangerBuilder.build());
           try {
             container.start();
