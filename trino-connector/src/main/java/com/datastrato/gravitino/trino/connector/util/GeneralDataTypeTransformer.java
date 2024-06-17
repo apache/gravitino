@@ -46,13 +46,29 @@ public class GeneralDataTypeTransformer {
       case BOOLEAN:
         return BOOLEAN;
       case BYTE:
-        return TinyintType.TINYINT;
+        if (((Types.ByteType) type).signed()) {
+          return TinyintType.TINYINT;
+        } else {
+          return SmallintType.SMALLINT;
+        }
       case SHORT:
-        return SmallintType.SMALLINT;
+        if (((Types.ShortType) type).signed()) {
+          return SmallintType.SMALLINT;
+        } else {
+          return INTEGER;
+        }
       case INTEGER:
-        return INTEGER;
+        if (((Types.IntegerType) type).signed()) {
+          return INTEGER;
+        } else {
+          return BIGINT;
+        }
       case LONG:
-        return BIGINT;
+        if (((Types.LongType) type).signed()) {
+          return BIGINT;
+        } else {
+          return io.trino.spi.type.DecimalType.createDecimalType(20, 0);
+        }
       case FLOAT:
         return RealType.REAL;
       case DOUBLE:
