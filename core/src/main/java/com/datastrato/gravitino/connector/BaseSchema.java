@@ -4,9 +4,9 @@
  */
 package com.datastrato.gravitino.connector;
 
+import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.rel.Schema;
 import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.ToString;

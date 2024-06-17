@@ -276,7 +276,7 @@ class NameIdentifier(DataClassJsonMixin):
         return self._namespace == other._namespace and self._name == other._name
 
     def __hash__(self):
-        return hash(self._namespace, self._name)
+        return hash((self._namespace, self._name))
 
     def __str__(self):
         if self.has_namespace():

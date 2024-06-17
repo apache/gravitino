@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.TestIcebergCatalog.ICEBERG_PROPERTIES_METADATA;
 import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.bucket;
 import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.day;
 import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.identity;
@@ -21,9 +22,11 @@ import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Table;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
+import com.datastrato.gravitino.rel.expressions.FunctionExpression;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
 import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
@@ -54,6 +57,7 @@ public class TestIcebergTable {
   private static final String ICEBERG_SCHEMA_NAME = "test_schema";
   private static final String ICEBERG_COMMENT = "test_comment";
   private static IcebergCatalog icebergCatalog;
+  private static IcebergCatalogOperations icebergCatalogOperations;
   private static IcebergSchema icebergSchema;
   private static final NameIdentifier schemaIdent =
       NameIdentifier.of(META_LAKE_NAME, ICEBERG_CATALOG_NAME, ICEBERG_SCHEMA_NAME);
@@ -66,14 +70,13 @@ public class TestIcebergTable {
 
   @AfterEach
   private void resetSchema() {
-    TableCatalog tableCatalog = icebergCatalog.asTableCatalog();
     NameIdentifier[] nameIdentifiers =
-        tableCatalog.listTables(
+        icebergCatalogOperations.listTables(
             Namespace.of(ArrayUtils.add(schemaIdent.namespace().levels(), schemaIdent.name())));
     if (ArrayUtils.isNotEmpty(nameIdentifiers)) {
-      Arrays.stream(nameIdentifiers).forEach(tableCatalog::dropTable);
+      Arrays.stream(nameIdentifiers).forEach(icebergCatalogOperations::dropTable);
     }
-    icebergCatalog.asSchemas().dropSchema(schemaIdent, false);
+    icebergCatalogOperations.dropSchema(schemaIdent, false);
     initIcebergSchema();
   }
 
@@ -82,9 +85,7 @@ public class TestIcebergTable {
     properties.put("key1", "val1");
     properties.put("key2", "val2");
 
-    icebergSchema =
-        (IcebergSchema)
-            icebergCatalog.asSchemas().createSchema(schemaIdent, ICEBERG_COMMENT, properties);
+    icebergSchema = icebergCatalogOperations.createSchema(schemaIdent, ICEBERG_COMMENT, properties);
   }
 
   private static void initIcebergCatalog() {
@@ -92,6 +93,7 @@ public class TestIcebergTable {
 
     Map<String, String> conf = Maps.newHashMap();
     icebergCatalog = new IcebergCatalog().withCatalogConf(conf).withCatalogEntity(entity);
+    icebergCatalogOperations = (IcebergCatalogOperations) icebergCatalog.ops();
   }
 
   private static CatalogEntity createDefaultCatalogEntity() {
@@ -113,7 +115,17 @@ public class TestIcebergTable {
   private SortOrder[] createSortOrder() {
     return new SortOrder[] {
       SortOrders.of(
-          NamedReference.field("col_2"), SortDirection.DESCENDING, NullOrdering.NULLS_FIRST)
+          NamedReference.field("col_2"), SortDirection.DESCENDING, NullOrdering.NULLS_FIRST),
+      SortOrders.of(
+          FunctionExpression.of(
+              "bucket", Literals.integerLiteral(10), NamedReference.field("col_1")),
+          SortDirection.DESCENDING,
+          NullOrdering.NULLS_FIRST),
+      SortOrders.of(
+          FunctionExpression.of(
+              "truncate", Literals.integerLiteral(1), NamedReference.field("col_1")),
+          SortDirection.DESCENDING,
+          NullOrdering.NULLS_FIRST)
     };
   }
 
@@ -163,22 +175,20 @@ public class TestIcebergTable {
 
     SortOrder[] sortOrders = createSortOrder();
     Table table =
-        icebergCatalog
-            .asTableCatalog()
-            .createTable(
-                tableIdentifier,
-                columns,
-                ICEBERG_COMMENT,
-                properties,
-                new Transform[0],
-                Distributions.NONE,
-                sortOrders);
+        icebergCatalogOperations.createTable(
+            tableIdentifier,
+            columns,
+            ICEBERG_COMMENT,
+            properties,
+            new Transform[0],
+            Distributions.NONE,
+            sortOrders);
     Assertions.assertEquals(tableIdentifier.name(), table.name());
     Assertions.assertEquals(ICEBERG_COMMENT, table.comment());
     Assertions.assertEquals("val1", table.properties().get("key1"));
     Assertions.assertEquals("val2", table.properties().get("key2"));
 
-    Table loadedTable = icebergCatalog.asTableCatalog().loadTable(tableIdentifier);
+    Table loadedTable = icebergCatalogOperations.loadTable(tableIdentifier);
 
     Assertions.assertEquals("val1", loadedTable.properties().get("key1"));
     Assertions.assertEquals("val2", loadedTable.properties().get("key2"));
@@ -186,21 +196,22 @@ public class TestIcebergTable {
     Assertions.assertFalse(loadedTable.columns()[1].nullable());
     Assertions.assertFalse(loadedTable.columns()[2].nullable());
 
-    Assertions.assertTrue(icebergCatalog.asTableCatalog().tableExists(tableIdentifier));
-    NameIdentifier[] tableIdents =
-        icebergCatalog.asTableCatalog().listTables(tableIdentifier.namespace());
+    Assertions.assertTrue(icebergCatalogOperations.tableExists(tableIdentifier));
+    NameIdentifier[] tableIdents = icebergCatalogOperations.listTables(tableIdentifier.namespace());
     Assertions.assertTrue(Arrays.asList(tableIdents).contains(tableIdentifier));
 
     Assertions.assertEquals(sortOrders.length, loadedTable.sortOrder().length);
     for (int i = 0; i < loadedTable.sortOrder().length; i++) {
       Assertions.assertEquals(sortOrders[i].direction(), loadedTable.sortOrder()[i].direction());
       Assertions.assertEquals(
+          (sortOrders[i]).nullOrdering(), loadedTable.sortOrder()[i].nullOrdering());
+      Assertions.assertEquals(
           (sortOrders[i]).expression(), loadedTable.sortOrder()[i].expression());
     }
     // Compare sort and order
 
     // Test exception
-    TableCatalog tableCatalog = icebergCatalog.asTableCatalog();
+    TableCatalog tableCatalog = icebergCatalogOperations;
     Throwable exception =
         Assertions.assertThrows(
             TableAlreadyExistsException.class,
@@ -245,28 +256,26 @@ public class TestIcebergTable {
         };
 
     Table table =
-        icebergCatalog
-            .asTableCatalog()
-            .createTable(tableIdentifier, columns, ICEBERG_COMMENT, properties, partitions);
+        icebergCatalogOperations.createTable(
+            tableIdentifier, columns, ICEBERG_COMMENT, properties, partitions);
     Assertions.assertEquals(tableIdentifier.name(), table.name());
     Assertions.assertEquals(ICEBERG_COMMENT, table.comment());
     Assertions.assertEquals("val1", table.properties().get("key1"));
     Assertions.assertEquals("val2", table.properties().get("key2"));
     Assertions.assertArrayEquals(partitions, table.partitioning());
 
-    Table loadedTable = icebergCatalog.asTableCatalog().loadTable(tableIdentifier);
+    Table loadedTable = icebergCatalogOperations.loadTable(tableIdentifier);
 
     Assertions.assertEquals("val1", loadedTable.properties().get("key1"));
     Assertions.assertEquals("val2", loadedTable.properties().get("key2"));
     Assertions.assertArrayEquals(partitions, loadedTable.partitioning());
 
-    Assertions.assertTrue(icebergCatalog.asTableCatalog().tableExists(tableIdentifier));
-    NameIdentifier[] tableIdents =
-        icebergCatalog.asTableCatalog().listTables(tableIdentifier.namespace());
+    Assertions.assertTrue(icebergCatalogOperations.tableExists(tableIdentifier));
+    NameIdentifier[] tableIdents = icebergCatalogOperations.listTables(tableIdentifier.namespace());
     Assertions.assertTrue(Arrays.asList(tableIdents).contains(tableIdentifier));
 
     // Test exception
-    TableCatalog tableCatalog = icebergCatalog.asTableCatalog();
+    TableCatalog tableCatalog = icebergCatalogOperations;
     Transform[] partitions1 = new Transform[] {day(col2.name())};
     Throwable exception =
         Assertions.assertThrows(
@@ -319,26 +328,24 @@ public class TestIcebergTable {
             .build();
     Column[] columns = new Column[] {col1, col2};
 
-    icebergCatalog
-        .asTableCatalog()
-        .createTable(
-            tableIdentifier,
-            columns,
-            ICEBERG_COMMENT,
-            properties,
-            new Transform[0],
-            Distributions.NONE,
-            new SortOrder[0]);
+    icebergCatalogOperations.createTable(
+        tableIdentifier,
+        columns,
+        ICEBERG_COMMENT,
+        properties,
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0]);
 
-    Assertions.assertTrue(icebergCatalog.asTableCatalog().tableExists(tableIdentifier));
-    icebergCatalog.asTableCatalog().dropTable(tableIdentifier);
-    Assertions.assertFalse(icebergCatalog.asTableCatalog().tableExists(tableIdentifier));
+    Assertions.assertTrue(icebergCatalogOperations.tableExists(tableIdentifier));
+    icebergCatalogOperations.dropTable(tableIdentifier);
+    Assertions.assertFalse(icebergCatalogOperations.tableExists(tableIdentifier));
   }
 
   @Test
   public void testListTableException() {
     Namespace tableNs = Namespace.of("metalake", icebergCatalog.name(), "not_exist_db");
-    TableCatalog tableCatalog = icebergCatalog.asTableCatalog();
+    TableCatalog tableCatalog = icebergCatalogOperations;
     Throwable exception =
         Assertions.assertThrows(
             NoSuchSchemaException.class, () -> tableCatalog.listTables(tableNs));
@@ -373,66 +380,68 @@ public class TestIcebergTable {
     SortOrder[] sortOrders = createSortOrder();
 
     Table createdTable =
-        icebergCatalog
-            .asTableCatalog()
-            .createTable(
-                tableIdentifier,
-                columns,
-                ICEBERG_COMMENT,
-                properties,
-                new Transform[0],
-                distribution,
-                sortOrders);
-    Assertions.assertTrue(icebergCatalog.asTableCatalog().tableExists(tableIdentifier));
+        icebergCatalogOperations.createTable(
+            tableIdentifier,
+            columns,
+            ICEBERG_COMMENT,
+            properties,
+            new Transform[0],
+            distribution,
+            sortOrders);
+    Assertions.assertTrue(icebergCatalogOperations.tableExists(tableIdentifier));
 
-    TableCatalog tableCatalog = icebergCatalog.asTableCatalog();
     TableChange update = TableChange.updateComment(ICEBERG_COMMENT + "_new");
     TableChange rename = TableChange.rename("test_iceberg_table_new");
     Throwable exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> tableCatalog.alterTable(tableIdentifier, update, rename));
+            () -> icebergCatalogOperations.alterTable(tableIdentifier, update, rename));
     Assertions.assertTrue(
         exception.getMessage().contains("The operation to change the table name cannot"));
 
     // test alter
-    icebergCatalog
-        .asTableCatalog()
-        .alterTable(
-            tableIdentifier,
-            TableChange.updateComment(ICEBERG_COMMENT + "_new"),
-            TableChange.removeProperty("key1"),
-            TableChange.setProperty("key2", "val2_new"),
-            // columns current format: [col_1:I8:comment, col_2:DATE:comment]
-            TableChange.addColumn(new String[] {"col_3"}, Types.StringType.get()),
-            // columns current format: [col_1:I8:comment, col_2:DATE:comment, col_3:STRING:null]
-            TableChange.renameColumn(new String[] {"col_2"}, "col_2_new"),
-            // columns current format: [col_1:I8:comment, col_2_new:DATE:comment, col_3:STRING:null]
-            TableChange.updateColumnComment(new String[] {"col_1"}, ICEBERG_COMMENT + "_new"),
-            // columns current format: [col_1:I8:comment_new, col_2_new:DATE:comment,
-            // col_3:STRING:null]
-            TableChange.updateColumnType(new String[] {"col_1"}, Types.IntegerType.get()),
-            // columns current format: [col_1:I32:comment_new, col_2_new:DATE:comment,
-            // col_3:STRING:null]
-            TableChange.updateColumnPosition(
-                new String[] {"col_2"}, TableChange.ColumnPosition.first())
-            // columns current: [col_2_new:DATE:comment, col_1:I32:comment_new, col_3:STRING:null]
-            );
+    icebergCatalogOperations.alterTable(
+        tableIdentifier,
+        TableChange.updateComment(ICEBERG_COMMENT + "_new"),
+        TableChange.removeProperty("key1"),
+        TableChange.setProperty("key2", "val2_new"),
+        // columns current format: [col_1:I8:comment, col_2:DATE:comment]
+        TableChange.addColumn(new String[] {"col_3"}, Types.StringType.get()),
+        // columns current format: [col_1:I8:comment, col_2:DATE:comment, col_3:STRING:null]
+        TableChange.renameColumn(new String[] {"col_2"}, "col_2_new"),
+        // columns current format: [col_1:I8:comment, col_2_new:DATE:comment, col_3:STRING:null]
+        TableChange.updateColumnComment(new String[] {"col_1"}, ICEBERG_COMMENT + "_new"),
+        // columns current format: [col_1:I8:comment_new, col_2_new:DATE:comment,
+        // col_3:STRING:null]
+        TableChange.updateColumnType(new String[] {"col_1"}, Types.IntegerType.get()),
+        // columns current format: [col_1:I32:comment_new, col_2_new:DATE:comment,
+        // col_3:STRING:null]
+        TableChange.updateColumnPosition(new String[] {"col_2"}, TableChange.ColumnPosition.first())
+        // columns current: [col_2_new:DATE:comment, col_1:I32:comment_new, col_3:STRING:null]
+        );
 
-    icebergCatalog
-        .asTableCatalog()
-        .alterTable(tableIdentifier, TableChange.rename("test_iceberg_table_new"));
+    icebergCatalogOperations.alterTable(
+        tableIdentifier, TableChange.rename("test_iceberg_table_new"));
 
     Table alteredTable =
-        icebergCatalog
-            .asTableCatalog()
-            .loadTable(NameIdentifier.of(tableIdentifier.namespace(), "test_iceberg_table_new"));
+        icebergCatalogOperations.loadTable(
+            NameIdentifier.of(tableIdentifier.namespace(), "test_iceberg_table_new"));
 
     Assertions.assertEquals(ICEBERG_COMMENT + "_new", alteredTable.comment());
     Assertions.assertFalse(alteredTable.properties().containsKey("key1"));
     Assertions.assertEquals("val2_new", alteredTable.properties().get("key2"));
 
+    sortOrders[0] =
+        SortOrders.of(
+            NamedReference.field("col_2_new"), SortDirection.DESCENDING, NullOrdering.NULLS_FIRST);
     Assertions.assertEquals(sortOrders.length, alteredTable.sortOrder().length);
+    for (int i = 0; i < alteredTable.sortOrder().length; i++) {
+      Assertions.assertEquals(sortOrders[i].direction(), alteredTable.sortOrder()[i].direction());
+      Assertions.assertEquals(
+          (sortOrders[i]).nullOrdering(), alteredTable.sortOrder()[i].nullOrdering());
+      Assertions.assertEquals(
+          (sortOrders[i]).expression(), alteredTable.sortOrder()[i].expression());
+    }
 
     Column[] expected =
         new Column[] {
@@ -455,17 +464,14 @@ public class TestIcebergTable {
     Assertions.assertArrayEquals(expected, alteredTable.columns());
 
     // test delete column change
-    icebergCatalog
-        .asTableCatalog()
-        .alterTable(
-            NameIdentifier.of(tableIdentifier.namespace(), "test_iceberg_table_new"),
-            TableChange.deleteColumn(new String[] {"col_1"}, false));
+    icebergCatalogOperations.alterTable(
+        NameIdentifier.of(tableIdentifier.namespace(), "test_iceberg_table_new"),
+        TableChange.deleteColumn(new String[] {"col_3"}, false));
     Table alteredTable1 =
-        icebergCatalog
-            .asTableCatalog()
-            .loadTable(NameIdentifier.of(tableIdentifier.namespace(), "test_iceberg_table_new"));
+        icebergCatalogOperations.loadTable(
+            NameIdentifier.of(tableIdentifier.namespace(), "test_iceberg_table_new"));
     expected =
-        Arrays.stream(expected).filter(c -> !"col_1".equals(c.name())).toArray(Column[]::new);
+        Arrays.stream(expected).filter(c -> !"col_3".equals(c.name())).toArray(Column[]::new);
     Assertions.assertArrayEquals(expected, alteredTable1.columns());
 
     Assertions.assertNotNull(alteredTable.partitioning());
@@ -476,7 +482,7 @@ public class TestIcebergTable {
   public void testTableProperty() {
     CatalogEntity entity = createDefaultCatalogEntity();
     try (IcebergCatalogOperations ops = new IcebergCatalogOperations()) {
-      ops.initialize(Maps.newHashMap(), entity.toCatalogInfo());
+      ops.initialize(Maps.newHashMap(), entity.toCatalogInfo(), ICEBERG_PROPERTIES_METADATA);
       Map<String, String> map = Maps.newHashMap();
       map.put(IcebergTablePropertiesMetadata.COMMENT, "test");
       map.put(IcebergTablePropertiesMetadata.CREATOR, "test");
@@ -491,7 +497,7 @@ public class TestIcebergTable {
                 put(entry.getKey(), entry.getValue());
               }
             };
-        PropertiesMetadata metadata = ops.tablePropertiesMetadata();
+        PropertiesMetadata metadata = icebergCatalog.tablePropertiesMetadata();
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () -> {
@@ -509,7 +515,7 @@ public class TestIcebergTable {
                 put(entry.getKey(), entry.getValue());
               }
             };
-        PropertiesMetadata metadata = ops.tablePropertiesMetadata();
+        PropertiesMetadata metadata = icebergCatalog.tablePropertiesMetadata();
         Assertions.assertDoesNotThrow(
             () -> {
               PropertiesMetadataHelpers.validatePropertyForCreate(metadata, properties);

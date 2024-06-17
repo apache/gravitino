@@ -103,15 +103,13 @@ public class UserMetaService {
                     }
                   }),
           () -> {
-            if (userRoleRelPOs.isEmpty()) {
-              return;
-            }
             SessionUtils.doWithoutCommit(
                 UserRoleRelMapper.class,
                 mapper -> {
                   if (overwritten) {
-                    mapper.batchInsertUserRoleRelOnDuplicateKeyUpdate(userRoleRelPOs);
-                  } else {
+                    mapper.softDeleteUserRoleRelByUserId(userEntity.id());
+                  }
+                  if (!userRoleRelPOs.isEmpty()) {
                     mapper.batchInsertUserRoleRel(userRoleRelPOs);
                   }
                 });
@@ -208,7 +206,7 @@ public class UserMetaService {
     return newEntity;
   }
 
-  public int deleteUserMetasByLegacyTimeLine(long legacyTimeLine, int limit) {
+  public int deleteUserMetasByLegacyTimeline(long legacyTimeline, int limit) {
     int[] userDeletedCount = new int[] {0};
     int[] userRoleRelDeletedCount = new int[] {0};
 
@@ -217,13 +215,13 @@ public class UserMetaService {
             userDeletedCount[0] =
                 SessionUtils.doWithoutCommitAndFetchResult(
                     UserMetaMapper.class,
-                    mapper -> mapper.deleteUserMetasByLegacyTimeLine(legacyTimeLine, limit)),
+                    mapper -> mapper.deleteUserMetasByLegacyTimeline(legacyTimeline, limit)),
         () ->
             userRoleRelDeletedCount[0] =
                 SessionUtils.doWithoutCommitAndFetchResult(
                     UserRoleRelMapper.class,
                     mapper ->
-                        mapper.deleteUserRoleRelMetasByLegacyTimeLine(legacyTimeLine, limit)));
+                        mapper.deleteUserRoleRelMetasByLegacyTimeline(legacyTimeline, limit)));
 
     return userDeletedCount[0] + userRoleRelDeletedCount[0];
   }

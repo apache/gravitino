@@ -25,6 +25,7 @@ import com.datastrato.gravitino.storage.relational.po.MetalakePO;
 import com.datastrato.gravitino.storage.relational.po.SchemaPO;
 import com.datastrato.gravitino.storage.relational.po.TablePO;
 import com.datastrato.gravitino.storage.relational.po.TopicPO;
+import com.datastrato.gravitino.utils.NamespaceUtil;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
@@ -65,10 +66,10 @@ public class TestPOConverters {
     CatalogPO catalogPO = createCatalogPO(1L, "test", 1L, "this is test");
 
     CatalogEntity expectedCatalog =
-        createCatalog(1L, "test", Namespace.ofCatalog("test_metalake"), "this is test");
+        createCatalog(1L, "test", NamespaceUtil.ofCatalog("test_metalake"), "this is test");
 
     CatalogEntity convertedCatalog =
-        POConverters.fromCatalogPO(catalogPO, Namespace.ofCatalog("test_metalake"));
+        POConverters.fromCatalogPO(catalogPO, NamespaceUtil.ofCatalog("test_metalake"));
 
     // Assert
     assertEquals(expectedCatalog.id(), convertedCatalog.id());
@@ -88,10 +89,11 @@ public class TestPOConverters {
 
     SchemaEntity expectedSchema =
         createSchema(
-            1L, "test", Namespace.ofSchema("test_metalake", "test_catalog"), "this is test");
+            1L, "test", NamespaceUtil.ofSchema("test_metalake", "test_catalog"), "this is test");
 
     SchemaEntity convertedSchema =
-        POConverters.fromSchemaPO(schemaPO, Namespace.ofSchema("test_metalake", "test_catalog"));
+        POConverters.fromSchemaPO(
+            schemaPO, NamespaceUtil.ofSchema("test_metalake", "test_catalog"));
 
     // Assert
     assertEquals(expectedSchema.id(), convertedSchema.id());
@@ -107,11 +109,12 @@ public class TestPOConverters {
     TablePO tablePO = createTablePO(1L, "test", 1L, 1L, 1L);
 
     TableEntity expectedTable =
-        createTable(1L, "test", Namespace.ofTable("test_metalake", "test_catalog", "test_schema"));
+        createTable(
+            1L, "test", NamespaceUtil.ofTable("test_metalake", "test_catalog", "test_schema"));
 
     TableEntity convertedTable =
         POConverters.fromTablePO(
-            tablePO, Namespace.ofTable("test_metalake", "test_catalog", "test_schema"));
+            tablePO, NamespaceUtil.ofTable("test_metalake", "test_catalog", "test_schema"));
 
     // Assert
     assertEquals(expectedTable.id(), convertedTable.id());
@@ -131,14 +134,14 @@ public class TestPOConverters {
         createFileset(
             1L,
             "test",
-            Namespace.ofFileset("test_metalake", "test_catalog", "test_schema"),
+            NamespaceUtil.ofFileset("test_metalake", "test_catalog", "test_schema"),
             "this is test",
             "hdfs://localhost/test",
             new HashMap<>());
 
     FilesetEntity convertedFileset =
         POConverters.fromFilesetPO(
-            filesetPO, Namespace.ofFileset("test_metalake", "test_catalog", "test_schema"));
+            filesetPO, NamespaceUtil.ofFileset("test_metalake", "test_catalog", "test_schema"));
 
     // Assert
     assertEquals(expectedFileset.id(), convertedFileset.id());
@@ -157,13 +160,13 @@ public class TestPOConverters {
         createTopic(
             1L,
             "test",
-            Namespace.ofTopic("test_metalake", "test_catalog", "test_schema"),
+            NamespaceUtil.ofTopic("test_metalake", "test_catalog", "test_schema"),
             "test comment",
             ImmutableMap.of("key", "value"));
 
     TopicEntity convertedTopic =
         POConverters.fromTopicPO(
-            topicPO, Namespace.ofTopic("test_metalake", "test_catalog", "test_schema"));
+            topicPO, NamespaceUtil.ofTopic("test_metalake", "test_catalog", "test_schema"));
 
     assertEquals(expectedTopic.id(), convertedTopic.id());
     assertEquals(expectedTopic.name(), convertedTopic.name());
@@ -206,12 +209,12 @@ public class TestPOConverters {
     CatalogPO catalogPO2 = createCatalogPO(2L, "test2", 1L, "this is test2");
     List<CatalogPO> catalogPOs = new ArrayList<>(Arrays.asList(catalogPO1, catalogPO2));
     List<CatalogEntity> convertedCatalogs =
-        POConverters.fromCatalogPOs(catalogPOs, Namespace.ofCatalog("test_metalake"));
+        POConverters.fromCatalogPOs(catalogPOs, NamespaceUtil.ofCatalog("test_metalake"));
 
     CatalogEntity expectedCatalog1 =
-        createCatalog(1L, "test", Namespace.ofCatalog("test_metalake"), "this is test");
+        createCatalog(1L, "test", NamespaceUtil.ofCatalog("test_metalake"), "this is test");
     CatalogEntity expectedCatalog2 =
-        createCatalog(2L, "test2", Namespace.ofCatalog("test_metalake"), "this is test2");
+        createCatalog(2L, "test2", NamespaceUtil.ofCatalog("test_metalake"), "this is test2");
     List<CatalogEntity> expectedCatalogs =
         new ArrayList<>(Arrays.asList(expectedCatalog1, expectedCatalog2));
 
@@ -239,14 +242,15 @@ public class TestPOConverters {
     SchemaPO schemaPO2 = createSchemaPO(2L, "test2", 1L, 1L, "this is test2");
     List<SchemaPO> schemaPOs = new ArrayList<>(Arrays.asList(schemaPO1, schemaPO2));
     List<SchemaEntity> convertedSchemas =
-        POConverters.fromSchemaPOs(schemaPOs, Namespace.ofSchema("test_metalake", "test_catalog"));
+        POConverters.fromSchemaPOs(
+            schemaPOs, NamespaceUtil.ofSchema("test_metalake", "test_catalog"));
 
     SchemaEntity expectedSchema1 =
         createSchema(
-            1L, "test", Namespace.ofSchema("test_metalake", "test_catalog"), "this is test");
+            1L, "test", NamespaceUtil.ofSchema("test_metalake", "test_catalog"), "this is test");
     SchemaEntity expectedSchema2 =
         createSchema(
-            2L, "test2", Namespace.ofSchema("test_metalake", "test_catalog"), "this is test2");
+            2L, "test2", NamespaceUtil.ofSchema("test_metalake", "test_catalog"), "this is test2");
     List<SchemaEntity> expectedSchemas =
         new ArrayList<>(Arrays.asList(expectedSchema1, expectedSchema2));
 
@@ -271,12 +275,14 @@ public class TestPOConverters {
     List<TablePO> tablePOs = new ArrayList<>(Arrays.asList(tablePO1, tablePO2));
     List<TableEntity> convertedTables =
         POConverters.fromTablePOs(
-            tablePOs, Namespace.ofTable("test_metalake", "test_catalog", "test_schema"));
+            tablePOs, NamespaceUtil.ofTable("test_metalake", "test_catalog", "test_schema"));
 
     TableEntity expectedTable1 =
-        createTable(1L, "test", Namespace.ofTable("test_metalake", "test_catalog", "test_schema"));
+        createTable(
+            1L, "test", NamespaceUtil.ofTable("test_metalake", "test_catalog", "test_schema"));
     TableEntity expectedTable2 =
-        createTable(2L, "test2", Namespace.ofTable("test_metalake", "test_catalog", "test_schema"));
+        createTable(
+            2L, "test2", NamespaceUtil.ofTable("test_metalake", "test_catalog", "test_schema"));
     List<TableEntity> expectedTables =
         new ArrayList<>(Arrays.asList(expectedTable1, expectedTable2));
 
@@ -307,13 +313,13 @@ public class TestPOConverters {
     List<FilesetPO> filesetPOs = new ArrayList<>(Arrays.asList(filesetPO1, filesetPO2));
     List<FilesetEntity> convertedFilesets =
         POConverters.fromFilesetPOs(
-            filesetPOs, Namespace.ofFileset("test_metalake", "test_catalog", "test_schema"));
+            filesetPOs, NamespaceUtil.ofFileset("test_metalake", "test_catalog", "test_schema"));
 
     FilesetEntity expectedFileset1 =
         createFileset(
             1L,
             "test1",
-            Namespace.ofFileset("test_metalake", "test_catalog", "test_schema"),
+            NamespaceUtil.ofFileset("test_metalake", "test_catalog", "test_schema"),
             "this is test1",
             "hdfs://localhost/test1",
             new HashMap<>());
@@ -321,7 +327,7 @@ public class TestPOConverters {
         createFileset(
             2L,
             "test2",
-            Namespace.ofFileset("test_metalake", "test_catalog", "test_schema"),
+            NamespaceUtil.ofFileset("test_metalake", "test_catalog", "test_schema"),
             "this is test2",
             "hdfs://localhost/test2",
             new HashMap<>());
@@ -350,20 +356,20 @@ public class TestPOConverters {
     List<TopicPO> topicPOs = new ArrayList<>(Arrays.asList(topicPO1, topicPO2));
     List<TopicEntity> convertedTopics =
         POConverters.fromTopicPOs(
-            topicPOs, Namespace.ofTopic("test_metalake", "test_catalog", "test_schema"));
+            topicPOs, NamespaceUtil.ofTopic("test_metalake", "test_catalog", "test_schema"));
 
     TopicEntity expectedTopic1 =
         createTopic(
             1L,
             "test1",
-            Namespace.ofTopic("test_metalake", "test_catalog", "test_schema"),
+            NamespaceUtil.ofTopic("test_metalake", "test_catalog", "test_schema"),
             "test comment1",
             ImmutableMap.of("key", "value"));
     TopicEntity expectedTopic2 =
         createTopic(
             2L,
             "test2",
-            Namespace.ofTopic("test_metalake", "test_catalog", "test_schema"),
+            NamespaceUtil.ofTopic("test_metalake", "test_catalog", "test_schema"),
             "test comment2",
             ImmutableMap.of("key", "value"));
     List<TopicEntity> expectedTopics =
@@ -393,7 +399,7 @@ public class TestPOConverters {
   @Test
   public void testInitCatalogPOVersion() {
     CatalogEntity catalog =
-        createCatalog(1L, "test", Namespace.ofCatalog("test_metalake"), "this is test");
+        createCatalog(1L, "test", NamespaceUtil.ofCatalog("test_metalake"), "this is test");
     CatalogPO initPO = POConverters.initializeCatalogPOWithVersion(catalog, 1L);
     assertEquals(1, initPO.getCurrentVersion());
     assertEquals(1, initPO.getLastVersion());
@@ -404,7 +410,7 @@ public class TestPOConverters {
   public void testInitSchemaPOVersion() {
     SchemaEntity schema =
         createSchema(
-            1L, "test", Namespace.ofSchema("test_metalake", "test_catalog"), "this is test");
+            1L, "test", NamespaceUtil.ofSchema("test_metalake", "test_catalog"), "this is test");
     SchemaPO.Builder builder = SchemaPO.builder().withMetalakeId(1L).withCatalogId(1L);
     SchemaPO initPO = POConverters.initializeSchemaPOWithVersion(schema, builder);
     assertEquals(1, initPO.getCurrentVersion());
@@ -415,7 +421,8 @@ public class TestPOConverters {
   @Test
   public void testInitTablePOVersion() {
     TableEntity tableEntity =
-        createTable(1L, "test", Namespace.ofTable("test_metalake", "test_catalog", "test_schema"));
+        createTable(
+            1L, "test", NamespaceUtil.ofTable("test_metalake", "test_catalog", "test_schema"));
     TablePO.Builder builder =
         TablePO.builder().withMetalakeId(1L).withCatalogId(1L).withSchemaId(1L);
     TablePO initPO = POConverters.initializeTablePOWithVersion(tableEntity, builder);
@@ -430,7 +437,7 @@ public class TestPOConverters {
         createFileset(
             1L,
             "test",
-            Namespace.ofFileset("test_metalake", "test_catalog", "test_schema"),
+            NamespaceUtil.ofFileset("test_metalake", "test_catalog", "test_schema"),
             "this is test",
             "hdfs://localhost/test",
             new HashMap<>());
@@ -459,9 +466,9 @@ public class TestPOConverters {
   @Test
   public void testUpdateCatalogPOVersion() {
     CatalogEntity catalog =
-        createCatalog(1L, "test", Namespace.ofCatalog("test_metalake"), "this is test");
+        createCatalog(1L, "test", NamespaceUtil.ofCatalog("test_metalake"), "this is test");
     CatalogEntity updatedCatalog =
-        createCatalog(1L, "test", Namespace.ofCatalog("test_metalake"), "this is test2");
+        createCatalog(1L, "test", NamespaceUtil.ofCatalog("test_metalake"), "this is test2");
     CatalogPO initPO = POConverters.initializeCatalogPOWithVersion(catalog, 1L);
     CatalogPO updatePO = POConverters.updateCatalogPOWithVersion(initPO, updatedCatalog, 1L);
     assertEquals(1, initPO.getCurrentVersion());
@@ -474,10 +481,10 @@ public class TestPOConverters {
   public void testUpdateSchemaPOVersion() {
     SchemaEntity schema =
         createSchema(
-            1L, "test", Namespace.ofSchema("test_metalake", "test_catalog"), "this is test");
+            1L, "test", NamespaceUtil.ofSchema("test_metalake", "test_catalog"), "this is test");
     SchemaEntity updatedSchema =
         createSchema(
-            1L, "test", Namespace.ofSchema("test_metalake", "test_catalog"), "this is test2");
+            1L, "test", NamespaceUtil.ofSchema("test_metalake", "test_catalog"), "this is test2");
     SchemaPO.Builder builder = SchemaPO.builder().withMetalakeId(1L).withCatalogId(1L);
     SchemaPO initPO = POConverters.initializeSchemaPOWithVersion(schema, builder);
     SchemaPO updatePO = POConverters.updateSchemaPOWithVersion(initPO, updatedSchema);
@@ -490,9 +497,11 @@ public class TestPOConverters {
   @Test
   public void testUpdateTablePOVersion() {
     TableEntity tableEntity =
-        createTable(1L, "test", Namespace.ofTable("test_metalake", "test_catalog", "test_schema"));
+        createTable(
+            1L, "test", NamespaceUtil.ofTable("test_metalake", "test_catalog", "test_schema"));
     TableEntity updatedTable =
-        createTable(1L, "test", Namespace.ofTable("test_metalake", "test_catalog", "test_schema"));
+        createTable(
+            1L, "test", NamespaceUtil.ofTable("test_metalake", "test_catalog", "test_schema"));
     TablePO.Builder builder =
         TablePO.builder().withMetalakeId(1L).withCatalogId(1L).withSchemaId(1L);
     TablePO initPO = POConverters.initializeTablePOWithVersion(tableEntity, builder);
@@ -511,7 +520,7 @@ public class TestPOConverters {
         createFileset(
             1L,
             "test",
-            Namespace.ofFileset("test_metalake", "test_catalog", "test_schema"),
+            NamespaceUtil.ofFileset("test_metalake", "test_catalog", "test_schema"),
             "this is test",
             "hdfs://localhost/test",
             properties);
@@ -522,7 +531,7 @@ public class TestPOConverters {
         createFileset(
             1L,
             "test",
-            Namespace.ofFileset("test_metalake", "test_catalog", "test_schema"),
+            NamespaceUtil.ofFileset("test_metalake", "test_catalog", "test_schema"),
             "this is test",
             "hdfs://localhost/test",
             updateProperties);
@@ -531,7 +540,7 @@ public class TestPOConverters {
         createFileset(
             1L,
             "test1",
-            Namespace.ofFileset("test_metalake", "test_catalog", "test_schema"),
+            NamespaceUtil.ofFileset("test_metalake", "test_catalog", "test_schema"),
             "this is test",
             "hdfs://localhost/test",
             properties);

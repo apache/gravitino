@@ -265,6 +265,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
 
     boolean dropped = tableOperationDispatcher.dropTable(tableIdent);
     Assertions.assertTrue(dropped);
+    Assertions.assertFalse(tableOperationDispatcher.dropTable(tableIdent));
 
     // Test if the entity store is failed to drop the table entity
     tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);

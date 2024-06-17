@@ -49,14 +49,15 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
   }
 
   @Override
-  public void delete(String databaseName, boolean cascade) throws NoSuchSchemaException {
+  public boolean delete(String databaseName, boolean cascade) {
     LOG.info("Beginning to drop database {}", databaseName);
-    try (final Connection connection = getConnection()) {
-      JdbcConnectorUtils.executeUpdate(connection, generateDropDatabaseSql(databaseName, cascade));
+    try {
+      dropDatabase(databaseName, cascade);
       LOG.info("Finished dropping database {}", databaseName);
-    } catch (final SQLException se) {
-      throw this.exceptionMapper.toGravitinoException(se);
+    } catch (NoSuchSchemaException e) {
+      return false;
     }
+    return true;
   }
 
   @Override
@@ -72,6 +73,14 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
         }
       }
       return databaseNames;
+    } catch (final SQLException se) {
+      throw this.exceptionMapper.toGravitinoException(se);
+    }
+  }
+
+  protected void dropDatabase(String databaseName, boolean cascade) {
+    try (final Connection connection = getConnection()) {
+      JdbcConnectorUtils.executeUpdate(connection, generateDropDatabaseSql(databaseName, cascade));
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
     }

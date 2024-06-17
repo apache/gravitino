@@ -160,12 +160,12 @@ public class TestMetalakeManager {
     testProperties(props, metalake.properties());
 
     boolean dropped = metalakeManager.dropMetalake(ident);
-    Assertions.assertTrue(dropped);
+    Assertions.assertTrue(dropped, "metalake should be dropped");
 
     // Test with NoSuchMetalakeException
     NameIdentifier ident1 = NameIdentifier.of("test42");
     boolean dropped1 = metalakeManager.dropMetalake(ident1);
-    Assertions.assertFalse(dropped1);
+    Assertions.assertFalse(dropped1, "metalake should be non-existent");
   }
 
   private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {

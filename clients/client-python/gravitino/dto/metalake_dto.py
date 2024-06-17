@@ -49,10 +49,10 @@ class MetalakeDTO(Metalake, DataClassJsonMixin):
         if not isinstance(other, MetalakeDTO):
             return False
         return (
-            self._name == other._name
-            and self._comment == other._comment
-            and self.property_equal(self._properties, other._properties)
-            and self._audit == other._audit
+            self.name() == other.name()
+            and self.comment() == other.comment()
+            and self.property_equal(self.properties(), other.properties())
+            and self.audit_info() == other.audit_info()
         )
 
     def property_equal(self, p1, p2):

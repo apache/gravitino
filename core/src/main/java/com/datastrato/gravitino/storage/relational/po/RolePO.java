@@ -14,10 +14,6 @@ public class RolePO {
   private Long catalogId;
   private Long schemaId;
   private String properties;
-  private String securableObjectFullName;
-  private String securableObjectType;
-  private String privileges;
-  private String privilegeConditions;
   private String auditInfo;
   private Long currentVersion;
   private Long lastVersion;
@@ -45,22 +41,6 @@ public class RolePO {
 
   public String getProperties() {
     return properties;
-  }
-
-  public String getSecurableObjectFullName() {
-    return securableObjectFullName;
-  }
-
-  public String getSecurableObjectType() {
-    return securableObjectType;
-  }
-
-  public String getPrivileges() {
-    return privileges;
-  }
-
-  public String getPrivilegeConditions() {
-    return privilegeConditions;
   }
 
   public String getAuditInfo() {
@@ -94,14 +74,10 @@ public class RolePO {
         && Objects.equal(getCatalogId(), tablePO.getCatalogId())
         && Objects.equal(getSchemaId(), tablePO.getSchemaId())
         && Objects.equal(getProperties(), tablePO.getProperties())
-        && Objects.equal(getSecurableObjectFullName(), tablePO.getSecurableObjectFullName())
-        && Objects.equal(getSecurableObjectType(), tablePO.getSecurableObjectType())
-        && Objects.equal(getPrivileges(), tablePO.getPrivileges())
         && Objects.equal(getAuditInfo(), tablePO.getAuditInfo())
         && Objects.equal(getCurrentVersion(), tablePO.getCurrentVersion())
         && Objects.equal(getLastVersion(), tablePO.getLastVersion())
-        && Objects.equal(getDeletedAt(), tablePO.getDeletedAt())
-        && Objects.equal(getPrivilegeConditions(), tablePO.getPrivilegeConditions());
+        && Objects.equal(getDeletedAt(), tablePO.getDeletedAt());
   }
 
   @Override
@@ -113,14 +89,10 @@ public class RolePO {
         getCatalogId(),
         getSchemaId(),
         getProperties(),
-        getSecurableObjectFullName(),
-        getSecurableObjectType(),
-        getPrivileges(),
         getAuditInfo(),
         getCurrentVersion(),
         getLastVersion(),
-        getDeletedAt(),
-        getPrivilegeConditions());
+        getDeletedAt());
   }
 
   public static class Builder {
@@ -160,26 +132,6 @@ public class RolePO {
       return this;
     }
 
-    public Builder withSecurableObjectFullName(String securableObjectFullName) {
-      rolePO.securableObjectFullName = securableObjectFullName;
-      return this;
-    }
-
-    public Builder withSecurableObjectType(String securableObjectType) {
-      rolePO.securableObjectType = securableObjectType;
-      return this;
-    }
-
-    public Builder withPrivileges(String privileges) {
-      rolePO.privileges = privileges;
-      return this;
-    }
-
-    public Builder withPrivilegeConditions(String privilegeConditions) {
-      rolePO.privilegeConditions = privilegeConditions;
-      return this;
-    }
-
     public Builder withAuditInfo(String auditInfo) {
       rolePO.auditInfo = auditInfo;
       return this;
@@ -206,13 +158,6 @@ public class RolePO {
       Preconditions.checkArgument(rolePO.metalakeId != null, "Metalake id is required");
       Preconditions.checkArgument(rolePO.catalogId != null, "Catalog id is required");
       Preconditions.checkArgument(rolePO.schemaId != null, "Schema id is required");
-      Preconditions.checkArgument(
-          rolePO.securableObjectFullName != null, "Securable object full name is required");
-      Preconditions.checkArgument(
-          rolePO.securableObjectType != null, "Securable object type is required");
-      Preconditions.checkArgument(rolePO.privileges != null, "Privileges are required");
-      Preconditions.checkArgument(
-          rolePO.privilegeConditions != null, "Privilege conditions are required");
       Preconditions.checkArgument(rolePO.auditInfo != null, "Audit info is required");
       Preconditions.checkArgument(rolePO.currentVersion != null, "Current version is required");
       Preconditions.checkArgument(rolePO.lastVersion != null, "Last version is required");

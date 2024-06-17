@@ -21,6 +21,7 @@ import com.datastrato.gravitino.server.ServerConfig;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -61,13 +62,18 @@ public class AbstractIT {
 
   protected static boolean ignoreIcebergRestService = true;
 
-  private static final String DOWNLOAD_JDBC_DRIVER_URL =
+  public static final String DOWNLOAD_MYSQL_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.26/mysql-connector-java-8.0.26.jar";
+
+  public static final String DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL =
+      "https://jdbc.postgresql.org/download/postgresql-42.7.0.jar";
 
   private static TestDatabaseName META_DATA;
   private static MySQLContainer MYSQL_CONTAINER;
 
   protected static String serverUri;
+
+  protected static String originConfig;
 
   public static int getGravitinoServerPort() {
     JettyServerConfig jettyServerConfig =
@@ -80,36 +86,50 @@ public class AbstractIT {
   }
 
   private static void rewriteGravitinoServerConfig() throws IOException {
-    if (customConfigs.isEmpty()) return;
-
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
+    Path configPath = Paths.get(gravitinoHome, "conf", GravitinoServer.CONF_FILE);
+    if (originConfig == null) {
+      originConfig = FileUtils.readFileToString(configPath.toFile(), StandardCharsets.UTF_8);
+    }
+
+    if (customConfigs.isEmpty()) return;
 
     String tmpFileName = GravitinoServer.CONF_FILE + ".tmp";
     Path tmpPath = Paths.get(gravitinoHome, "conf", tmpFileName);
     Files.deleteIfExists(tmpPath);
 
-    Path configPath = Paths.get(gravitinoHome, "conf", GravitinoServer.CONF_FILE);
     Files.move(configPath, tmpPath);
-
     ITUtils.rewriteConfigFile(tmpPath.toString(), configPath.toString(), customConfigs);
   }
 
   private static void recoverGravitinoServerConfig() throws IOException {
-    if (customConfigs.isEmpty()) return;
-
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    String tmpFileName = GravitinoServer.CONF_FILE + ".tmp";
-    Path tmpPath = Paths.get(gravitinoHome, "conf", tmpFileName);
     Path configPath = Paths.get(gravitinoHome, "conf", GravitinoServer.CONF_FILE);
-    Files.deleteIfExists(configPath);
-    Files.move(tmpPath, configPath);
+
+    if (originConfig != null) {
+      Files.deleteIfExists(configPath);
+      FileUtils.write(configPath.toFile(), originConfig, StandardCharsets.UTF_8);
+    }
   }
 
-  protected static void downLoadMySQLDriver(String relativeDeployLibsPath) throws IOException {
+  protected static void downLoadJDBCDriver() throws IOException {
+    String gravitinoHome = System.getenv("GRAVITINO_HOME");
     if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
-      String gravitinoHome = System.getenv("GRAVITINO_HOME");
-      java.nio.file.Path tmpPath = Paths.get(gravitinoHome, relativeDeployLibsPath);
-      JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_JDBC_DRIVER_URL, tmpPath.toString());
+      String serverPath = ITUtils.joinPath(gravitinoHome, "libs");
+      String icebergCatalogPath =
+          ITUtils.joinPath(gravitinoHome, "catalogs", "lakehouse-iceberg", "libs");
+      JdbcDriverDownloader.downloadJdbcDriver(
+          DOWNLOAD_MYSQL_JDBC_DRIVER_URL, serverPath, icebergCatalogPath);
+      JdbcDriverDownloader.downloadJdbcDriver(
+          DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL, serverPath, icebergCatalogPath);
+    } else {
+      Path icebergLibsPath =
+          Paths.get(gravitinoHome, "catalogs", "catalog-lakehouse-iceberg", "build", "libs");
+      JdbcDriverDownloader.downloadJdbcDriver(
+          DOWNLOAD_MYSQL_JDBC_DRIVER_URL, icebergLibsPath.toString());
+
+      JdbcDriverDownloader.downloadJdbcDriver(
+          DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL, icebergLibsPath.toString());
     }
   }
 
@@ -137,7 +157,7 @@ public class AbstractIT {
               new File(
                   gravitinoHome
                       + String.format(
-                          "/scripts/mysql/schema-%s-mysql.sql", ConfigConstants.VERSION_0_5_0)),
+                          "/scripts/mysql/schema-%s-mysql.sql", ConfigConstants.VERSION_0_6_0)),
               "UTF-8");
       String[] initMySQLBackendSqls = mysqlContent.split(";");
       initMySQLBackendSqls = ArrayUtils.addFirst(initMySQLBackendSqls, "use " + META_DATA + ";");
@@ -185,7 +205,7 @@ public class AbstractIT {
     } else {
       rewriteGravitinoServerConfig();
       serverConfig.loadFromFile(GravitinoServer.CONF_FILE);
-      downLoadMySQLDriver("/libs");
+      downLoadJDBCDriver();
       try {
         FileUtils.deleteDirectory(
             FileUtils.getFile(serverConfig.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)));
@@ -215,10 +235,7 @@ public class AbstractIT {
         .toLowerCase()
         .equals(customConfigs.get(Configs.AUTHENTICATOR.getKey()))) {
       serverUri = "http://localhost:" + jettyServerConfig.getHttpPort();
-      client =
-          GravitinoAdminClient.builder(serverUri)
-              .withKerberosAuth(KerberosProviderHelper.getProvider())
-              .build();
+      client = null;
     } else {
       client = GravitinoAdminClient.builder(serverUri).build();
     }

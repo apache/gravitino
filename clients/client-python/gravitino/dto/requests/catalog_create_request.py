@@ -27,13 +27,13 @@ class CatalogCreateRequest(RESTRequest):
     def __init__(
         self,
         name: str = None,
-        type: Catalog.Type = Catalog.Type.UNSUPPORTED,
+        catalog_type: Catalog.Type = Catalog.Type.UNSUPPORTED,
         provider: str = None,
         comment: str = None,
         properties: Dict[str, str] = None,
     ):
         self._name = name
-        self._type = type
+        self._type = catalog_type
         self._provider = provider
         self._comment = comment
         self._properties = properties
@@ -45,7 +45,9 @@ class CatalogCreateRequest(RESTRequest):
             IllegalArgumentException if name or type are not set.
         """
         assert self._name is not None, '"name" field is required and cannot be empty'
-        assert self._type is not None, '"type" field is required and cannot be empty'
+        assert (
+            self._type is not None
+        ), '"catalog_type" field is required and cannot be empty'
         assert (
             self._provider is not None
         ), '"provider" field is required and cannot be empty'

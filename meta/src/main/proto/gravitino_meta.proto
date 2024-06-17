@@ -118,13 +118,17 @@ message Group {
   AuditInfo audit_info = 5;
 }
 
+message SecurableObject {
+  string full_name = 1;
+  string type = 2;
+  repeated string privilege_names = 3;
+  repeated string privilege_conditions = 4;
+}
+
 message Role {
   uint64 id = 1;
   string name = 2;
-  repeated string privileges = 3;
-  repeated string privilege_conditions = 4;
-  string securable_object_full_name = 5;
-  string securable_object_type = 6;
-  map<string, string> properties = 7;
-  AuditInfo audit_info = 8;
+  repeated SecurableObject securable_objects = 3;
+  map<string, string> properties = 4;
+  AuditInfo audit_info = 5;
 }

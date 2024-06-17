@@ -181,6 +181,24 @@ components:
       example: {
         "type": "unparsed",
         "unparsedType": [
-          "user-defined"
+          "unknown-type"
         ]
       }
+
+  ExternalType:
+    type: object
+    required:
+      - type
+      - catalogString
+    properties:
+      type:
+        type: string
+        enum:
+          - "external"
+      catalogString:
+        type: string
+        description: The string representation of this type in the catalog
+    example: {
+      "type": "external",
+      "externalType": "user-defined"
+    }

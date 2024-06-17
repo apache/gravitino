@@ -139,9 +139,6 @@ CREATE TABLE IF NOT EXISTS `role_meta` (
     `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
     `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
     `properties` MEDIUMTEXT DEFAULT NULL COMMENT 'schema properties',
-    `securable_object_full_name` VARCHAR(256) NOT NULL COMMENT 'securable object full name',
-    `securable_object_type` VARCHAR(32) NOT NULL COMMENT 'securable object type',
-    `privileges` VARCHAR(64) NOT NULL COMMENT 'securable privileges',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'role audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'role current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'role last version',
@@ -149,6 +146,21 @@ CREATE TABLE IF NOT EXISTS `role_meta` (
     PRIMARY KEY (`role_id`),
     UNIQUE KEY `uk_mid_rn_del` (`metalake_id`, `role_name`, `deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'role metadata';
+
+CREATE TABLE IF NOT EXISTS `role_meta_securable_object` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `role_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'role id',
+    `entity_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'The entity id of securable object',
+    `type`  VARCHAR(128) NOT NULL COMMENT 'securable object type',
+    `privilege_names` VARCHAR(256) NOT NULL COMMENT 'securable object privilege names',
+    `privilege_conditions` VARCHAR(256) NOT NULL COMMENT 'securable object privilege conditions',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'securable objectcurrent version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'securable object last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'securable object deleted at',
+    PRIMARY KEY (`id`),
+    KEY `idx_obj_rid` (`role_id`),
+    KEY `idx_obj_eid` (`entity_id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'securable object meta';
 
 CREATE TABLE IF NOT EXISTS `user_role_rel` (
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',

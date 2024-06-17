@@ -49,5 +49,6 @@ include clients/client-python/.gitignore
 .node
 
 # integration test
-integration-test/metastore_db
-catalogs/catalog-lakehouse-iceberg/spark-warehouse
+**/metastore_db
+**/spark-warehouse
+derby.log

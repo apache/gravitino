@@ -5,20 +5,20 @@
 package com.datastrato.gravitino.trino.connector;
 
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_MISSING_CONFIG;
-import static org.testng.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.collect.ImmutableMap;
 import io.trino.spi.TrinoException;
-import org.testng.annotations.AfterTest;
-import org.testng.annotations.BeforeTest;
-import org.testng.annotations.Test;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.jupiter.api.Test;
 
 public class TestGravitinoConfig {
 
-  @BeforeTest
+  @BeforeClass
   public static void startup() throws Exception {}
 
-  @AfterTest
+  @AfterClass
   public static void shutdown() throws Exception {}
 
   @Test

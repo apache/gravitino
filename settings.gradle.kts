@@ -8,6 +8,9 @@ plugins {
 
 rootProject.name = "gravitino"
 
+val scalaVersion: String = gradle.startParameter.projectProperties["scalaVersion"]?.toString()
+  ?: settings.extra["defaultScalaVersion"].toString()
+
 include("api", "common", "core", "meta", "server", "integration-test", "server-common")
 include("catalogs:bundled-catalog")
 include("catalogs:catalog-hive")
@@ -28,7 +31,19 @@ include(
   "clients:client-python"
 )
 include("trino-connector")
-include("spark-connector:spark-connector", "spark-connector:spark-connector-runtime")
+include("spark-connector:spark-common")
+// kyuubi hive connector doesn't support 2.13 for Spark3.3
+if (scalaVersion == "2.12") {
+  include("spark-connector:spark-3.3", "spark-connector:spark-runtime-3.3")
+  project(":spark-connector:spark-3.3").projectDir = file("spark-connector/v3.3/spark")
+  project(":spark-connector:spark-runtime-3.3").projectDir = file("spark-connector/v3.3/spark-runtime")
+}
+include("spark-connector:spark-3.4", "spark-connector:spark-runtime-3.4", "spark-connector:spark-3.5", "spark-connector:spark-runtime-3.5")
+project(":spark-connector:spark-3.4").projectDir = file("spark-connector/v3.4/spark")
+project(":spark-connector:spark-runtime-3.4").projectDir = file("spark-connector/v3.4/spark-runtime")
+project(":spark-connector:spark-3.5").projectDir = file("spark-connector/v3.5/spark")
+project(":spark-connector:spark-runtime-3.5").projectDir = file("spark-connector/v3.5/spark-runtime")
+include("flink-connector")
 include("web")
 include("docs")
 include("integration-test-common")

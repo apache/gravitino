@@ -100,14 +100,20 @@ tasks {
   val black by registering(VenvTask::class) {
     dependsOn(pipInstall)
     venvExec = "black"
-    args = listOf("./gravitino", "./tests")
+    args = listOf("./gravitino", "./tests", "./scripts")
   }
 
   val pylint by registering(VenvTask::class) {
     dependsOn(pipInstall)
     mustRunAfter(black)
     venvExec = "pylint"
-    args = listOf("./gravitino", "./tests")
+    args = listOf("./gravitino", "./tests", "./scripts")
+  }
+
+  val integrationCoverageReport by registering(VenvTask::class){
+    venvExec = "coverage"
+    args = listOf("html")
+    workingDir = projectDir.resolve("./tests/integration")
   }
 
   val integrationTest by registering(VenvTask::class) {
@@ -115,8 +121,8 @@ tasks {
       gravitinoServer("start")
     }
 
-    venvExec = "python"
-    args = listOf("-m", "unittest")
+    venvExec = "coverage"
+    args = listOf("run", "--branch", "-m", "unittest")
     workingDir = projectDir.resolve("./tests/integration")
     environment = mapOf(
       "PROJECT_VERSION" to project.version,
@@ -127,12 +133,22 @@ tasks {
     doLast {
       gravitinoServer("stop")
     }
+
+    finalizedBy(integrationCoverageReport)
+  }
+
+  val unitCoverageReport by registering(VenvTask::class){
+    venvExec = "coverage"
+    args = listOf("html")
+    workingDir = projectDir.resolve("./tests/unittests")
   }
 
   val unitTests by registering(VenvTask::class) {
-    venvExec = "python"
-    args = listOf("-m", "unittest")
+    venvExec = "coverage"
+    args = listOf("run", "--branch", "-m", "unittest")
     workingDir = projectDir.resolve("./tests/unittests")
+
+    finalizedBy(unitCoverageReport)
   }
 
   val test by registering(VenvTask::class) {
@@ -146,16 +162,25 @@ tasks {
   }
 
   val build by registering(VenvTask::class) {
+    dependsOn(pylint)
+    venvExec = "python"
+    args = listOf("scripts/generate_version.py")
+  }
+
+  val pydoc by registering(VenvTask::class) {
+    venvExec = "python"
+    args = listOf("scripts/generate_doc.py")
   }
 
   val distribution by registering(VenvTask::class) {
+    dependsOn(build)
     doFirst {
       delete("README.md")
       generatePypiProjectHomePage()
       delete("dist")
     }
 
-    venvExec = "Python3"
+    venvExec = "python"
     args = listOf("setup.py", "sdist")
 
     doLast {
@@ -174,7 +199,13 @@ tasks {
   val clean by registering(Delete::class) {
     delete("build")
     delete("dist")
+    delete("docs")
+    delete("version.ini")
     delete("gravitino.egg-info")
+    delete("tests/unittests/htmlcov")
+    delete("tests/unittests/.coverage")
+    delete("tests/integration/htmlcov")
+    delete("tests/integration/.coverage")
 
     doLast {
       deleteCacheDir(".pytest_cache")
@@ -186,6 +217,6 @@ tasks {
     it.name.endsWith("envSetup")
   }.all {
     // add install package and code formatting before any tasks
-    finalizedBy(pipInstall, black, pylint)
+    finalizedBy(pipInstall, black, pylint, build)
   }
 }

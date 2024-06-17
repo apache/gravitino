@@ -4,11 +4,13 @@
  */
 package com.datastrato.gravitino.authorization;
 
+import com.datastrato.gravitino.MetadataObject;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 
 /** The helper class for {@link SecurableObject}. */
@@ -139,7 +141,11 @@ public class SecurableObjects {
 
     @Override
     public String fullName() {
-      return toString();
+      if (parent != null) {
+        return parent + "." + name;
+      } else {
+        return name;
+      }
     }
 
     @Override
@@ -159,11 +165,18 @@ public class SecurableObjects {
 
     @Override
     public String toString() {
-      if (parent != null) {
-        return parent + "." + name;
-      } else {
-        return name;
-      }
+      String privilegesStr =
+          privileges.stream()
+              .map(p -> "[" + p.simpleString() + "]")
+              .collect(Collectors.joining(","));
+
+      return "SecurableObject: [fullName="
+          + fullName()
+          + "], [type="
+          + type
+          + "], [privileges="
+          + privilegesStr
+          + "]";
     }
 
     @Override
@@ -189,9 +202,9 @@ public class SecurableObjects {
    * @return The created {@link SecurableObject}
    */
   public static SecurableObject parse(
-      String fullName, SecurableObject.Type type, List<Privilege> privileges) {
+      String fullName, MetadataObject.Type type, List<Privilege> privileges) {
     if ("*".equals(fullName)) {
-      if (type != SecurableObject.Type.METALAKE) {
+      if (type != MetadataObject.Type.METALAKE) {
         throw new IllegalArgumentException("If securable object isn't metalake, it can't be `*`");
       }
       return SecurableObjects.ofAllMetalakes(privileges);
@@ -215,7 +228,7 @@ public class SecurableObjects {
    * @return The created {@link SecurableObject}
    */
   static SecurableObject of(
-      SecurableObject.Type type, List<String> names, List<Privilege> privileges) {
+      MetadataObject.Type type, List<String> names, List<Privilege> privileges) {
     if (names == null) {
       throw new IllegalArgumentException("Cannot create a securable object with null names");
     }
@@ -234,8 +247,8 @@ public class SecurableObjects {
     }
 
     if (names.size() == 1
-        && type != SecurableObject.Type.CATALOG
-        && type != SecurableObject.Type.METALAKE) {
+        && type != MetadataObject.Type.CATALOG
+        && type != MetadataObject.Type.METALAKE) {
       throw new IllegalArgumentException(
           "If the length of names is 1, it must be the CATALOG or METALAKE type");
     }
@@ -245,9 +258,9 @@ public class SecurableObjects {
     }
 
     if (names.size() == 3
-        && type != SecurableObject.Type.FILESET
-        && type != SecurableObject.Type.TABLE
-        && type != SecurableObject.Type.TOPIC) {
+        && type != MetadataObject.Type.FILESET
+        && type != MetadataObject.Type.TABLE
+        && type != MetadataObject.Type.TOPIC) {
       throw new IllegalArgumentException(
           "If the length of names is 3, it must be FILESET, TABLE or TOPIC");
     }

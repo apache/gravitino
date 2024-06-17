@@ -9,7 +9,12 @@ import com.codahale.metrics.Counter;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Histogram;
 import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.SlidingTimeWindowArrayReservoir;
 import com.codahale.metrics.Timer;
+import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.Configs;
+import com.datastrato.gravitino.GravitinoEnv;
+import java.util.concurrent.TimeUnit;
 
 /**
  * MetricsSource provides utilities to collect specified kind metrics, all metrics must create with
@@ -24,10 +29,19 @@ public abstract class MetricsSource {
   public static final String JVM_METRIC_NAME = "jvm";
   private final MetricRegistry metricRegistry;
   private final String metricsSourceName;
+  private final int timeSlidingWindowSeconds;
 
   protected MetricsSource(String name) {
     this.metricsSourceName = name;
     metricRegistry = new MetricRegistry();
+    Config config = GravitinoEnv.getInstance().config();
+    if (config != null) {
+      this.timeSlidingWindowSeconds =
+          config.get(Configs.METRICS_TIME_SLIDING_WINDOW_SECONDS).intValue();
+    } else {
+      // Couldn't get config when testing
+      this.timeSlidingWindowSeconds = Configs.DEFAULT_METRICS_TIME_SLIDING_WINDOW_SECONDS;
+    }
   }
 
   /**
@@ -75,7 +89,12 @@ public abstract class MetricsSource {
    * @return a new or pre-existing Histogram
    */
   public Histogram getHistogram(String name) {
-    return this.metricRegistry.histogram(name);
+    return this.metricRegistry.histogram(
+        name,
+        () ->
+            new Histogram(
+                new SlidingTimeWindowArrayReservoir(
+                    getTimeSlidingWindowSeconds(), TimeUnit.SECONDS)));
   }
 
   /**
@@ -85,6 +104,15 @@ public abstract class MetricsSource {
    * @return a new or pre-existing Timer
    */
   public Timer getTimer(String name) {
-    return this.metricRegistry.timer(name);
+    return this.metricRegistry.timer(
+        name,
+        () ->
+            new Timer(
+                new SlidingTimeWindowArrayReservoir(
+                    getTimeSlidingWindowSeconds(), TimeUnit.SECONDS)));
+  }
+
+  protected int getTimeSlidingWindowSeconds() {
+    return timeSlidingWindowSeconds;
   }
 }

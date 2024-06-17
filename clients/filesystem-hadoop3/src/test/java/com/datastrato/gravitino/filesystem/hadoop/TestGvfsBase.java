@@ -504,50 +504,41 @@ public class TestGvfsBase extends GravitinoMockServerBase {
         (GravitinoVirtualFileSystem) managedFilesetPath.getFileSystem(conf)) {
       NameIdentifier identifier =
           fs.extractIdentifier(new URI("gvfs://fileset/catalog1/schema1/fileset1"));
-      assertEquals(
-          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier);
+      assertEquals(NameIdentifier.of(metalakeName, "catalog1", "schema1", "fileset1"), identifier);
 
       NameIdentifier identifier2 =
           fs.extractIdentifier(new URI("gvfs://fileset/catalog1/schema1/fileset1/"));
-      assertEquals(
-          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier2);
+      assertEquals(NameIdentifier.of(metalakeName, "catalog1", "schema1", "fileset1"), identifier2);
 
       NameIdentifier identifier3 =
           fs.extractIdentifier(new URI("gvfs://fileset/catalog1/schema1/fileset1/files"));
-      assertEquals(
-          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier3);
+      assertEquals(NameIdentifier.of(metalakeName, "catalog1", "schema1", "fileset1"), identifier3);
 
       NameIdentifier identifier4 =
           fs.extractIdentifier(new URI("gvfs://fileset/catalog1/schema1/fileset1/dir/dir"));
-      assertEquals(
-          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier4);
+      assertEquals(NameIdentifier.of(metalakeName, "catalog1", "schema1", "fileset1"), identifier4);
 
       NameIdentifier identifier5 =
           fs.extractIdentifier(new URI("gvfs://fileset/catalog1/schema1/fileset1/dir/dir/"));
-      assertEquals(
-          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier5);
+      assertEquals(NameIdentifier.of(metalakeName, "catalog1", "schema1", "fileset1"), identifier5);
 
       NameIdentifier identifier6 = fs.extractIdentifier(new URI("/catalog1/schema1/fileset1"));
-      assertEquals(
-          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier6);
+      assertEquals(NameIdentifier.of(metalakeName, "catalog1", "schema1", "fileset1"), identifier6);
 
       NameIdentifier identifier7 = fs.extractIdentifier(new URI("/catalog1/schema1/fileset1/"));
-      assertEquals(
-          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier7);
+      assertEquals(NameIdentifier.of(metalakeName, "catalog1", "schema1", "fileset1"), identifier7);
 
       NameIdentifier identifier8 = fs.extractIdentifier(new URI("/catalog1/schema1/fileset1/dir"));
-      assertEquals(
-          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier8);
+      assertEquals(NameIdentifier.of(metalakeName, "catalog1", "schema1", "fileset1"), identifier8);
 
       NameIdentifier identifier9 =
           fs.extractIdentifier(new URI("/catalog1/schema1/fileset1/dir/dir/"));
-      assertEquals(
-          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier9);
+      assertEquals(NameIdentifier.of(metalakeName, "catalog1", "schema1", "fileset1"), identifier9);
 
       NameIdentifier identifier10 =
           fs.extractIdentifier(new URI("/catalog1/schema1/fileset1/dir/dir"));
       assertEquals(
-          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier10);
+          NameIdentifier.of(metalakeName, "catalog1", "schema1", "fileset1"), identifier10);
 
       StringBuilder longUri = new StringBuilder("gvfs://fileset/catalog1/schema1/fileset1");
       for (int i = 0; i < 1500; i++) {
@@ -555,11 +546,11 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       }
       NameIdentifier identifier11 = fs.extractIdentifier(new URI(longUri.toString()));
       assertEquals(
-          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier11);
+          NameIdentifier.of(metalakeName, "catalog1", "schema1", "fileset1"), identifier11);
 
       NameIdentifier identifier12 = fs.extractIdentifier(new URI(longUri.delete(0, 14).toString()));
       assertEquals(
-          NameIdentifier.ofFileset(metalakeName, "catalog1", "schema1", "fileset1"), identifier12);
+          NameIdentifier.of(metalakeName, "catalog1", "schema1", "fileset1"), identifier12);
 
       assertThrows(
           IllegalArgumentException.class,

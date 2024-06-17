@@ -27,6 +27,8 @@ public class TrinoQueryTestTool {
               + "The default value is 'all'. If the value is 'gravitino', only the gravitino server will be started automatically.");
 
       options.addOption(
+          "ignore_failed", false, "Ignore the failed test cases, the default value is 'false'");
+      options.addOption(
           "gen_output",
           false,
           "Generate the output file for the test set, the default value is 'false'");
@@ -101,6 +103,10 @@ public class TrinoQueryTestTool {
         }
       }
 
+      if (commandLine.hasOption("ignore_failed")) {
+        TrinoQueryIT.exitOnFailed = false;
+      }
+
       TrinoQueryIT.ciTestsets.clear();
 
       String gravitinoUri = commandLine.getOptionValue("gravitino_uri");
@@ -171,12 +177,11 @@ public class TrinoQueryTestTool {
       if (testSet == null) {
         testerRunner.testSql();
       } else {
-        String catalogFileName = catalog.isEmpty() ? "" : "catalog_" + catalog + "_prepare.sql";
-        testerRunner.testSql(testSetDir, catalogFileName, testerId);
+        testerRunner.testSql(testSetDir, catalog, testerId);
       }
       System.out.printf(
-          "All the testers completed (%d/%d)%n",
-          testerRunner.testCount.get(), testerRunner.totalCount.get());
+          "All testers have finished. Total:%s, Pass: %s\n%s",
+          testerRunner.totalCount, testerRunner.passCount, testerRunner.generateTestStatus());
     } catch (Exception e) {
       System.out.println(e.getMessage());
       e.printStackTrace();
