@@ -20,18 +20,21 @@ import java.util.stream.Collectors;
 public final class EntityCombinedSchema implements Schema {
 
   private final Schema schema;
+
   private final SchemaEntity schemaEntity;
 
   // Sets of properties that should be hidden from the user.
   private Set<String> hiddenProperties;
 
-  // If imported is true, it means that storage backend have stored the correct entity.
-  // Otherwise, we should import the external entity to the storage backend.
+  // Field "imported" is used to indicate whether the entity has been imported to Gravitino
+  // managed storage backend. If "imported" is true, it means that storage backend have stored
+  // the correct entity. Otherwise, we should import the external entity to the storage backend.
   private boolean imported;
 
   private EntityCombinedSchema(Schema schema, SchemaEntity schemaEntity) {
     this.schema = schema;
     this.schemaEntity = schemaEntity;
+    this.imported = false;
   }
 
   public static EntityCombinedSchema of(Schema schema, SchemaEntity schemaEntity) {

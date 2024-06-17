@@ -83,21 +83,22 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
     EntityCombinedTable table =
-        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> loadCombinedTable(ident));
+        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
 
-    if (table.imported()) {
-      return table;
-    }
+    if (!table.imported()) {
+      // Load the schema to make sure the schema is imported.
+      SchemaDispatcher schemaDispatcher = GravitinoEnv.getInstance().schemaDispatcher();
+      NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
+      schemaDispatcher.loadSchema(schemaIdent);
 
-    if (GravitinoEnv.getInstance()
-        .schemaDispatcher()
-        .schemaExists(NameIdentifier.of(ident.namespace().levels()))) {
-      EntityCombinedTable importedTable =
-          TreeLockUtils.doWithTreeLock(
-              NameIdentifier.of(ident.namespace().levels()),
-              LockType.WRITE,
-              () -> importTable(ident));
-      return importedTable;
+      // Import the table.
+      TreeLockUtils.doWithTreeLock(
+          schemaIdent,
+          LockType.WRITE,
+          () -> {
+            importTable(ident);
+            return null;
+          });
     }
 
     return table;
@@ -371,16 +372,16 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         : droppedFromCatalog;
   }
 
-  private EntityCombinedTable importTable(NameIdentifier identifier) {
-    EntityCombinedTable combinedTable = loadCombinedTable(identifier);
+  private void importTable(NameIdentifier identifier) {
+    EntityCombinedTable table = internalLoadTable(identifier);
 
-    if (combinedTable.imported()) {
-      return combinedTable;
+    if (table.imported()) {
+      return;
     }
 
     StringIdentifier stringId = null;
     try {
-      stringId = combinedTable.stringIdentifier();
+      stringId = table.stringIdentifier();
     } catch (IllegalArgumentException ie) {
       LOG.warn(FormattedErrorMessages.STRING_ID_PARSE_ERROR, ie.getMessage());
     }
@@ -389,6 +390,11 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     if (stringId != null) {
       // If the entity in the store doesn't match the external system, we use the data
       // of external system to correct it.
+      LOG.warn(
+          "The Table uid {} existed but still need to be imported, this could be happened "
+              + "when Table is renamed by external systems not controlled by Gravitino. In this case, "
+              + "we need to overwrite the stored entity to keep the consistency.",
+          stringId);
       uid = stringId.id();
     } else {
       // If entity doesn't exist, we import the entity from the external system.
@@ -402,22 +408,21 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             .withNamespace(identifier.namespace())
             .withAuditInfo(
                 AuditInfo.builder()
-                    .withCreator(combinedTable.auditInfo().creator())
-                    .withCreateTime(combinedTable.auditInfo().createTime())
-                    .withLastModifier(combinedTable.auditInfo().lastModifier())
-                    .withLastModifiedTime(combinedTable.auditInfo().lastModifiedTime())
+                    .withCreator(table.auditInfo().creator())
+                    .withCreateTime(table.auditInfo().createTime())
+                    .withLastModifier(table.auditInfo().lastModifier())
+                    .withLastModifiedTime(table.auditInfo().lastModifiedTime())
                     .build())
             .build();
     try {
       store.put(tableEntity, true);
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
-      throw new RuntimeException("Fail to access underlying storage");
+      throw new RuntimeException("Fail to import the table entity to the store.", e);
     }
-    return combinedTable;
   }
 
-  private EntityCombinedTable loadCombinedTable(NameIdentifier ident) {
+  private EntityCombinedTable internalLoadTable(NameIdentifier ident) {
     NameIdentifier catalogIdentifier = getCatalogIdentifier(ident);
     Table table =
         doWithCatalog(
@@ -448,16 +453,12 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             "GET",
             stringId.id());
 
-    // If the entity is inconsistent from the one of the external system,
-    // we should import it.
-    boolean imported = tableEntity != null;
-
     return EntityCombinedTable.of(table, tableEntity)
         .withHiddenPropertiesSet(
             getHiddenPropertyNames(
                 catalogIdentifier,
                 HasPropertyMetadata::tablePropertiesMetadata,
                 table.properties()))
-        .withImported(imported);
+        .withImported(tableEntity != null);
   }
 }

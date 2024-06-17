@@ -25,13 +25,15 @@ public class EntityCombinedTopic implements Topic {
   // Sets of properties that should be hidden from the user.
   private Set<String> hiddenProperties;
 
-  // If imported is true, it means that storage backend have stored the correct entity.
-  // Otherwise, we should import the external entity to the storage backend.
+  // Field "imported" is used to indicate whether the entity has been imported to Gravitino
+  // managed storage backend. If "imported" is true, it means that storage backend have stored
+  // the correct entity. Otherwise, we should import the external entity to the storage backend.
   private boolean imported;
 
   private EntityCombinedTopic(Topic topic, TopicEntity topicEntity) {
     this.topic = topic;
     this.topicEntity = topicEntity;
+    this.imported = false;
   }
 
   public static EntityCombinedTopic of(Topic topic, TopicEntity topicEntity) {

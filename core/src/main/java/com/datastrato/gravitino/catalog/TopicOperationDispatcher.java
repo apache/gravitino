@@ -74,22 +74,25 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
   @Override
   public Topic loadTopic(NameIdentifier ident) throws NoSuchTopicException {
     EntityCombinedTopic topic =
-        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> loadCombinedTopic(ident));
+        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTopic(ident));
 
-    if (topic.imported()) {
-      return topic;
+    if (!topic.imported()) {
+      // Load the schema to make sure the schema is imported.
+      // This is not necessary for Kafka catalog.
+      SchemaDispatcher schemaDispatcher = GravitinoEnv.getInstance().schemaDispatcher();
+      NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
+      schemaDispatcher.loadSchema(schemaIdent);
+
+      // Import the topic
+      TreeLockUtils.doWithTreeLock(
+          schemaIdent,
+          LockType.WRITE,
+          () -> {
+            importTopic(ident);
+            return null;
+          });
     }
 
-    if (GravitinoEnv.getInstance()
-        .schemaDispatcher()
-        .schemaExists(NameIdentifier.of(ident.namespace().levels()))) {
-      EntityCombinedTopic combinedTopic =
-          TreeLockUtils.doWithTreeLock(
-              NameIdentifier.of(ident.namespace().levels()),
-              LockType.WRITE,
-              () -> importTopic(ident));
-      return combinedTopic;
-    }
     return topic;
   }
 
@@ -274,43 +277,47 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
         : droppedFromCatalog;
   }
 
-  private EntityCombinedTopic importTopic(NameIdentifier identifier) {
+  private void importTopic(NameIdentifier identifier) {
 
-    EntityCombinedTopic combinedTopic = loadCombinedTopic(identifier);
+    EntityCombinedTopic topic = internalLoadTopic(identifier);
 
-    if (combinedTopic.imported()) {
-      return combinedTopic;
+    if (topic.imported()) {
+      return;
     }
 
     StringIdentifier stringId = null;
     try {
-      stringId = combinedTopic.stringIdentifier();
+      stringId = topic.stringIdentifier();
     } catch (IllegalArgumentException ie) {
       LOG.warn(FormattedErrorMessages.STRING_ID_PARSE_ERROR, ie.getMessage());
     }
 
     long uid;
     if (stringId != null) {
-      // If the entity in the store doesn't match the external system, we use the data
-      // of external system to correct it.
+      // For Kafka topic, the uid is coming from topic UUID, which is always existed.
+      LOG.warn(
+          "The Topic uid {} existed but still needs to be imported, this could be happened "
+              + "when Topic is created externally without leveraging Gravitino. In this "
+              + "case, we need to store the stored entity to keep consistency.",
+          stringId);
       uid = stringId.id();
     } else {
-      // If entity doesn't exist, we import the entity from the external system.
+      // This will not be happened for now, since we only support Kafka, and it always has an uid.
       uid = idGenerator.nextId();
     }
 
     TopicEntity topicEntity =
         TopicEntity.builder()
             .withId(uid)
-            .withName(combinedTopic.name())
-            .withComment(combinedTopic.comment())
+            .withName(topic.name())
+            .withComment(topic.comment())
             .withNamespace(identifier.namespace())
             .withAuditInfo(
                 AuditInfo.builder()
-                    .withCreator(combinedTopic.auditInfo().creator())
-                    .withCreateTime(combinedTopic.auditInfo().createTime())
-                    .withLastModifier(combinedTopic.auditInfo().lastModifier())
-                    .withLastModifiedTime(combinedTopic.auditInfo().lastModifiedTime())
+                    .withCreator(topic.auditInfo().creator())
+                    .withCreateTime(topic.auditInfo().createTime())
+                    .withLastModifier(topic.auditInfo().lastModifier())
+                    .withLastModifiedTime(topic.auditInfo().lastModifiedTime())
                     .build())
             .build();
 
@@ -318,13 +325,11 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
       store.put(topicEntity, true);
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
-      throw new RuntimeException("Fail to access underlying storage");
+      throw new RuntimeException("Fail to import topic entity to store.", e);
     }
-
-    return combinedTopic;
   }
 
-  private EntityCombinedTopic loadCombinedTopic(NameIdentifier ident) {
+  private EntityCombinedTopic internalLoadTopic(NameIdentifier ident) {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
     Topic topic =
         doWithCatalog(
@@ -333,10 +338,6 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
             NoSuchTopicException.class);
 
     StringIdentifier stringId = getStringIdFromProperties(topic.properties());
-    // Case 1: The topic is not created by Gravitino.
-    // Note: for Kafka catalog, stringId will not be null. Because there is no way to store the
-    // Gravitino
-    // ID in Kafka, therefor we use the topic ID as the Gravitino ID
     if (stringId == null) {
       return EntityCombinedTopic.of(topic)
           .withHiddenPropertiesSet(
@@ -352,12 +353,10 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
             "GET",
             getStringIdFromProperties(topic.properties()).id());
 
-    boolean imported = topicEntity != null;
-
     return EntityCombinedTopic.of(topic, topicEntity)
         .withHiddenPropertiesSet(
             getHiddenPropertyNames(
                 catalogIdent, HasPropertyMetadata::topicPropertiesMetadata, topic.properties()))
-        .withImported(imported);
+        .withImported(topicEntity != null);
   }
 }

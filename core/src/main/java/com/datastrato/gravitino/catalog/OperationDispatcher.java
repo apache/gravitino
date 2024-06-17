@@ -45,7 +45,7 @@ public abstract class OperationDispatcher {
 
   protected final EntityStore store;
 
-  final IdGenerator idGenerator;
+  protected final IdGenerator idGenerator;
 
   /**
    * Creates a new CatalogOperationDispatcher instance.
@@ -61,7 +61,21 @@ public abstract class OperationDispatcher {
     this.idGenerator = idGenerator;
   }
 
-  <R, E extends Throwable> R doWithTable(
+  protected Capability getCatalogCapability(NameIdentifier ident) {
+    return doWithCatalog(
+        getCatalogIdentifier(ident),
+        CatalogManager.CatalogWrapper::capabilities,
+        IllegalArgumentException.class);
+  }
+
+  protected Capability getCatalogCapability(Namespace namespace) {
+    return doWithCatalog(
+        getCatalogIdentifier(NameIdentifier.of(namespace.levels())),
+        CatalogManager.CatalogWrapper::capabilities,
+        IllegalArgumentException.class);
+  }
+
+  protected <R, E extends Throwable> R doWithTable(
       NameIdentifier tableIdent, ThrowableFunction<SupportsPartitions, R> fn, Class<E> ex)
       throws E {
     try {
@@ -79,7 +93,7 @@ public abstract class OperationDispatcher {
     }
   }
 
-  <R, E extends Throwable> R doWithCatalog(
+  protected <R, E extends Throwable> R doWithCatalog(
       NameIdentifier ident, ThrowableFunction<CatalogManager.CatalogWrapper, R> fn, Class<E> ex)
       throws E {
     try {
@@ -96,7 +110,7 @@ public abstract class OperationDispatcher {
     }
   }
 
-  <R, E1 extends Throwable, E2 extends Throwable> R doWithCatalog(
+  protected <R, E1 extends Throwable, E2 extends Throwable> R doWithCatalog(
       NameIdentifier ident,
       ThrowableFunction<CatalogManager.CatalogWrapper, R> fn,
       Class<E1> ex1,
@@ -119,21 +133,7 @@ public abstract class OperationDispatcher {
     }
   }
 
-  Capability getCatalogCapability(NameIdentifier ident) {
-    return doWithCatalog(
-        getCatalogIdentifier(ident),
-        CatalogManager.CatalogWrapper::capabilities,
-        IllegalArgumentException.class);
-  }
-
-  Capability getCatalogCapability(Namespace namespace) {
-    return doWithCatalog(
-        getCatalogIdentifier(NameIdentifier.of(namespace.levels())),
-        CatalogManager.CatalogWrapper::capabilities,
-        IllegalArgumentException.class);
-  }
-
-  Set<String> getHiddenPropertyNames(
+  protected Set<String> getHiddenPropertyNames(
       NameIdentifier catalogIdent,
       ThrowableFunction<HasPropertyMetadata, PropertiesMetadata> provider,
       Map<String, String> properties) {
@@ -150,7 +150,7 @@ public abstract class OperationDispatcher {
         IllegalArgumentException.class);
   }
 
-  <T> void validateAlterProperties(
+  protected <T> void validateAlterProperties(
       NameIdentifier ident,
       ThrowableFunction<HasPropertyMetadata, PropertiesMetadata> provider,
       T... changes) {
@@ -165,27 +165,6 @@ public abstract class OperationDispatcher {
                   return null;
                 }),
         IllegalArgumentException.class);
-  }
-
-  private <T> Map<String, String> getPropertiesForSet(T... t) {
-    Map<String, String> properties = Maps.newHashMap();
-    for (T item : t) {
-      if (item instanceof TableChange.SetProperty) {
-        TableChange.SetProperty setProperty = (TableChange.SetProperty) item;
-        properties.put(setProperty.getProperty(), setProperty.getValue());
-      } else if (item instanceof SchemaChange.SetProperty) {
-        SchemaChange.SetProperty setProperty = (SchemaChange.SetProperty) item;
-        properties.put(setProperty.getProperty(), setProperty.getValue());
-      } else if (item instanceof FilesetChange.SetProperty) {
-        FilesetChange.SetProperty setProperty = (FilesetChange.SetProperty) item;
-        properties.put(setProperty.getProperty(), setProperty.getValue());
-      } else if (item instanceof TopicChange.SetProperty) {
-        TopicChange.SetProperty setProperty = (TopicChange.SetProperty) item;
-        properties.put(setProperty.getProperty(), setProperty.getValue());
-      }
-    }
-
-    return properties;
   }
 
   private <T> Map<String, String> getPropertiesForDelete(T... t) {
@@ -209,7 +188,7 @@ public abstract class OperationDispatcher {
     return properties;
   }
 
-  StringIdentifier getStringIdFromProperties(Map<String, String> properties) {
+  protected StringIdentifier getStringIdFromProperties(Map<String, String> properties) {
     try {
       StringIdentifier stringId = StringIdentifier.fromProperties(properties);
       if (stringId == null) {
@@ -222,7 +201,7 @@ public abstract class OperationDispatcher {
     }
   }
 
-  <R extends HasIdentifier> R operateOnEntity(
+  protected <R extends HasIdentifier> R operateOnEntity(
       NameIdentifier ident, ThrowableFunction<NameIdentifier, R> fn, String opName, long id) {
     R ret = null;
     try {
@@ -248,7 +227,7 @@ public abstract class OperationDispatcher {
 
   // TODO(xun): Remove this method when we implement a better way to get the catalog identifier
   //  [#257] Add an explicit get catalog functions in NameIdentifier
-  NameIdentifier getCatalogIdentifier(NameIdentifier ident) {
+  protected NameIdentifier getCatalogIdentifier(NameIdentifier ident) {
     NameIdentifier.check(
         ident.name() != null, "The name variable in the NameIdentifier must have value.");
     Namespace.check(
@@ -278,8 +257,29 @@ public abstract class OperationDispatcher {
       return store.exists(ident, type);
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "exists", ident, e);
-      throw new RuntimeException("Fail to access underlying storage", e);
+      throw new RuntimeException("Fail to check if entity is existed", e);
     }
+  }
+
+  private <T> Map<String, String> getPropertiesForSet(T... t) {
+    Map<String, String> properties = Maps.newHashMap();
+    for (T item : t) {
+      if (item instanceof TableChange.SetProperty) {
+        TableChange.SetProperty setProperty = (TableChange.SetProperty) item;
+        properties.put(setProperty.getProperty(), setProperty.getValue());
+      } else if (item instanceof SchemaChange.SetProperty) {
+        SchemaChange.SetProperty setProperty = (SchemaChange.SetProperty) item;
+        properties.put(setProperty.getProperty(), setProperty.getValue());
+      } else if (item instanceof FilesetChange.SetProperty) {
+        FilesetChange.SetProperty setProperty = (FilesetChange.SetProperty) item;
+        properties.put(setProperty.getProperty(), setProperty.getValue());
+      } else if (item instanceof TopicChange.SetProperty) {
+        TopicChange.SetProperty setProperty = (TopicChange.SetProperty) item;
+        properties.put(setProperty.getProperty(), setProperty.getValue());
+      }
+    }
+
+    return properties;
   }
 
   static final class FormattedErrorMessages {

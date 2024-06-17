@@ -32,13 +32,15 @@ public final class EntityCombinedTable implements Table {
   // Sets of properties that should be hidden from the user.
   private Set<String> hiddenProperties;
 
-  // If imported is true, it means that storage backend have stored the correct entity.
-  // Otherwise, we should import the external entity to the storage backend.
+  // Field "imported" is used to indicate whether the entity has been imported to Gravitino
+  // managed storage backend. If "imported" is true, it means that storage backend have stored
+  // the correct entity. Otherwise, we should import the external entity to the storage backend.
   private boolean imported;
 
   private EntityCombinedTable(Table table, TableEntity tableEntity) {
     this.table = table;
     this.tableEntity = tableEntity;
+    this.imported = false;
   }
 
   public static EntityCombinedTable of(Table table, TableEntity tableEntity) {
