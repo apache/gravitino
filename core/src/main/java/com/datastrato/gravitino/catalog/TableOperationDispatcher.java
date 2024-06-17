@@ -431,7 +431,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             NoSuchTableException.class);
 
     StringIdentifier stringId = getStringIdFromProperties(table.properties());
-    // Case 1: The table is not created by Gravitino or the backend storage does not support storing
+    // Case 1: The table is not created by Gravitino or the external system does not support storing
     // string identifier.
     if (stringId == null) {
       return EntityCombinedTable.of(table)
