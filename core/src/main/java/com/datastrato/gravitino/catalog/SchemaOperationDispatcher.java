@@ -165,10 +165,6 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     EntityCombinedSchema schema =
         TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadSchema(ident));
 
-    if (schema.imported()) {
-      return schema;
-    }
-
     if (!schema.imported()) {
       TreeLockUtils.doWithTreeLock(
           NameIdentifier.of(ident.namespace().levels()),
