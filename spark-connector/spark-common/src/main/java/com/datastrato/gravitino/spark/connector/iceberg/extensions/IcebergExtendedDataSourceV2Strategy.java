@@ -10,7 +10,6 @@ import com.google.common.collect.ImmutableMap;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -32,7 +31,7 @@ import scala.Option;
 import scala.Some;
 import scala.collection.JavaConverters;
 import scala.collection.Seq;
-import scala.collection.immutable.Stream;
+import scala.collection.mutable.ArrayBuffer;
 
 public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Strategy {
 
@@ -80,12 +79,9 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
             String.format("Reflecting LogicalPlan: %s failed.", plan.getClass().getName()));
       }
 
-      List<String> tableName;
-      try {
-        tableName = convertTableName((Stream) parameterValues.get(0));
-      } catch (NoSuchFieldException | IllegalAccessException e) {
-        throw new RuntimeException("Failed to reflect table name.");
-      }
+      // The first parameter value is tableName in Iceberg commands except `Call`
+      ArrayBuffer<String> firstParameterValue = (ArrayBuffer<String>) parameterValues.get(0);
+      Seq<String> tableName = firstParameterValue.toSeq();
 
       Seq<SparkPlan> physicalPlans =
           constructPhysicalPlan(plan, tableName, parameterValues, errors);
@@ -138,7 +134,7 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
   }
 
   private Seq<SparkPlan> constructPhysicalPlan(
-      LogicalPlan plan, List<String> tableName, List<Object> parameterValues, Set<String> errors) {
+      LogicalPlan plan, Seq<String> tableName, List<Object> parameterValues, Set<String> errors) {
     return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(spark, tableName)
         .map(
             catalogAndIdentifier -> {
@@ -175,19 +171,6 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
         .get();
   }
 
-  private List<String> convertTableName(Stream tableName)
-      throws NoSuchFieldException, IllegalAccessException {
-    Preconditions.checkArgument(tableName != null, "Table name can not be null or empty.");
-    List<String> tableNameList = new ArrayList<>();
-    while (tableName.size() > 0) {
-      Field hd = tableName.getClass().getDeclaredField("hd");
-      hd.setAccessible(true);
-      tableNameList.add((String) hd.get(tableName));
-      tableName = (Stream) tableName.tail();
-    }
-    return tableNameList;
-  }
-
   private Seq<SparkPlan> toSeq(SparkPlan plan) {
     return JavaConverters.asScalaIteratorConverter(Collections.singletonList(plan).listIterator())
         .asScala()
@@ -209,9 +192,9 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
     }
 
     static Option<IcebergCatalogAndIdentifier> buildCatalogAndIdentifier(
-        SparkSession spark, List<String> identifiers) {
+        SparkSession spark, Seq<String> identifiers) {
       Spark3Util.CatalogAndIdentifier catalogAndIdentifier =
-          Spark3Util.catalogAndIdentifier(spark, identifiers);
+          Spark3Util.catalogAndIdentifier(spark, JavaConverters.<String>seqAsJavaList(identifiers));
       CatalogPlugin catalog = catalogAndIdentifier.catalog();
       if (catalog instanceof GravitinoIcebergCatalog) {
         return new Some<>(
