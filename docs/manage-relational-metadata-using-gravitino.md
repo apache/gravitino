@@ -42,7 +42,7 @@ For relational catalog, you must specify the catalog `type` as `RELATIONAL` when
 
 You can create a catalog by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs` endpoint or just use the Gravitino Java client. The following is an example of creating a catalog:
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -100,7 +100,7 @@ Currently, Gravitino supports the following catalog providers:
 
 You can load a catalog by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a catalog:
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -125,7 +125,7 @@ Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "cat
 
 You can modify a catalog by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or just use the Gravitino Java client. The following is an example of altering a catalog:
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -512,7 +512,7 @@ Users should create a metalake, a catalog and a schema before creating a table.
 
 You can create a table by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables` endpoint or just use the Gravitino Java client. The following is an example of creating a table:
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -736,7 +736,7 @@ you can use the ExternalType to represent the type. Similarly, if the original t
 represented by ExternalType.
 The following shows the data structure of an external type in JSON and Java, enabling easy retrieval of its string value.
 
-<Tabs>
+<Tabs groupId='language' queryString>
   <TabItem value="Json" label="Json">
 
 ```json
@@ -764,7 +764,7 @@ deserialization between the server and client. For instance, if a new column typ
 that the client does not recognize, it will be treated as an unparsed type on the client side.
 The following shows the data structure of an unparsed type in JSON and Java, enabling easy retrieval of its value.
 
-<Tabs>
+<Tabs groupId='language' queryString>
   <TabItem value="Json" label="Json">
 
 ```json
@@ -843,7 +843,7 @@ The code above is an example of creating a Hive table. For other catalogs, the c
 
 You can load a table by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a table:
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -877,7 +877,7 @@ tableCatalog.loadTable(NameIdentifier.of("metalake", "hive_catalog", "schema", "
 
 You can modify a table by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or just use the Gravitino Java client. The following is an example of modifying a table:
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -935,7 +935,7 @@ Currently, Gravitino supports the following changes to a table:
 
 You can remove a table by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a table:
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -978,7 +978,7 @@ Hive catalog and lakehouse-iceberg catalog supports `purgeTable` while jdbc-mysq
 
 You can list all tables in a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables` endpoint or just use the Gravitino Java client. The following is an example of list all tables in a schema:
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
