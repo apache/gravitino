@@ -217,20 +217,12 @@ public class AbstractIT {
       }
 
       GravitinoITUtils.startGravitinoServer();
-      
+
       Awaitility.await()
       .atMost(60, TimeUnit.SECONDS)
       .pollInterval(1, TimeUnit.SECONDS)
       .until(
-          () -> {
-            boolean isServerUp = isGravitinoServerUp();
-            if (isServerUp) {
-              LOG.info("Gravitino Server is up and running.");
-            } else {
-              LOG.warn("Gravitino Server is not accessible.");
-            }
-            return isServerUp;
-          });
+        () -> isGravitinoServerUp());
     }
 
     JettyServerConfig jettyServerConfig =
@@ -304,8 +296,10 @@ public class AbstractIT {
 
     try (Socket socket = new Socket()) {
       socket.connect(new java.net.InetSocketAddress(host, port), timeout);
+      LOG.info("Gravitino Server is up and running.");
       return true;
     } catch (Exception e) {
+      LOG.warn("Gravitino Server is not accessible.");
       return false;
     }
   }
