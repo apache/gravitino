@@ -7,7 +7,6 @@ package com.datastrato.gravitino.client;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.SupportsCatalogs;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
@@ -58,7 +57,7 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
   }
 
   @Override
-  public NameIdentifier[] listCatalogs() throws NoSuchMetalakeException {
+  public String[] listCatalogs() throws NoSuchMetalakeException {
     return getMetalake().listCatalogs();
   }
 

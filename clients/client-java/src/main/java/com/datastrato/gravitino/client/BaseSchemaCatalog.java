@@ -28,8 +28,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * BaseSchemaCatalog is the base abstract class for all the catalog with schema. It provides the
@@ -37,8 +35,6 @@ import org.slf4j.LoggerFactory;
  * create, load, alter and drop a schema with specified identifier.
  */
 abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, SupportsSchemas {
-  private static final Logger LOG = LoggerFactory.getLogger(BaseSchemaCatalog.class);
-
   /** The REST client to send the requests. */
   protected final RESTClient restClient;
   /** The namespace of current catalog, which is the metalake name. */
@@ -58,9 +54,12 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
       RESTClient restClient) {
     super(name, type, provider, comment, properties, auditDTO);
     this.restClient = restClient;
-    Namespace.checkCatalog(namespace);
+    Namespace.check(
+        namespace != null && namespace.length() == 1,
+        "Catalog namespace must be non-null and have 1 level, the input namespace is %s",
+        namespace);
     this.namespace = namespace;
-    this.schemaNamespace = Namespace.ofSchema(namespace.level(0), name);
+    this.schemaNamespace = Namespace.of(namespace.level(0), name);
   }
 
   @Override
@@ -71,11 +70,11 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
   /**
    * List all the schemas under the given catalog namespace.
    *
-   * @return A list of {@link NameIdentifier} of the schemas under the given catalog namespace.
+   * @return A list of the schema names under the given catalog namespace.
    * @throws NoSuchCatalogException if the catalog with specified namespace does not exist.
    */
   @Override
-  public NameIdentifier[] listSchemas() throws NoSuchCatalogException {
+  public String[] listSchemas() throws NoSuchCatalogException {
 
     EntityListResponse resp =
         restClient.get(
@@ -85,7 +84,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
             ErrorHandlers.schemaErrorHandler());
     resp.validate();
 
-    return resp.identifiers();
+    return Arrays.stream(resp.identifiers()).map(NameIdentifier::name).toArray(String[]::new);
   }
 
   /**
@@ -180,24 +179,15 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
    */
   @Override
   public boolean dropSchema(String schemaName, boolean cascade) throws NonEmptySchemaException {
-
-    try {
-      DropResponse resp =
-          restClient.delete(
-              formatSchemaRequestPath(schemaNamespace) + "/" + RESTUtils.encodeString(schemaName),
-              Collections.singletonMap("cascade", String.valueOf(cascade)),
-              DropResponse.class,
-              Collections.emptyMap(),
-              ErrorHandlers.schemaErrorHandler());
-      resp.validate();
-      return resp.dropped();
-
-    } catch (NonEmptySchemaException e) {
-      throw e;
-    } catch (Exception e) {
-      LOG.warn("Failed to drop schema {}", schemaName, e);
-      return false;
-    }
+    DropResponse resp =
+        restClient.delete(
+            formatSchemaRequestPath(schemaNamespace) + "/" + RESTUtils.encodeString(schemaName),
+            Collections.singletonMap("cascade", String.valueOf(cascade)),
+            DropResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.schemaErrorHandler());
+    resp.validate();
+    return resp.dropped();
   }
 
   static String formatSchemaRequestPath(Namespace ns) {

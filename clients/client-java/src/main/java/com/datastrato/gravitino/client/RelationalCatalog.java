@@ -39,8 +39,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Relational catalog is a catalog implementation that supports relational database like metadata
@@ -48,8 +46,6 @@ import org.slf4j.LoggerFactory;
  * catalog is under the metalake.
  */
 public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog {
-
-  private static final Logger LOG = LoggerFactory.getLogger(RelationalCatalog.class);
 
   RelationalCatalog(
       Namespace namespace,
@@ -77,7 +73,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
    */
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
-    Namespace.checkTable(namespace);
+    checkTableNamespace(namespace);
 
     EntityListResponse resp =
         restClient.get(
@@ -99,7 +95,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
    */
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
-    NameIdentifier.checkTable(ident);
+    checkTableNameIdentifer(ident);
 
     TableResponse resp =
         restClient.get(
@@ -136,7 +132,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    NameIdentifier.checkTable(ident);
+    checkTableNameIdentifer(ident);
 
     TableCreateRequest req =
         new TableCreateRequest(
@@ -174,7 +170,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
-    NameIdentifier.checkTable(ident);
+    checkTableNameIdentifer(ident);
 
     List<TableUpdateRequest> reqs =
         Arrays.stream(changes)
@@ -199,28 +195,20 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
    * Drop the table with specified identifier.
    *
    * @param ident The identifier of the table.
-   * @return true if the table is dropped successfully, false otherwise.
+   * @return true if the table is dropped successfully, false if the table does not exist.
    */
   @Override
   public boolean dropTable(NameIdentifier ident) {
-    NameIdentifier.checkTable(ident);
+    checkTableNameIdentifer(ident);
 
-    try {
-      DropResponse resp =
-          restClient.delete(
-              formatTableRequestPath(ident.namespace())
-                  + "/"
-                  + RESTUtils.encodeString(ident.name()),
-              DropResponse.class,
-              Collections.emptyMap(),
-              ErrorHandlers.tableErrorHandler());
-      resp.validate();
-      return resp.dropped();
-
-    } catch (Exception e) {
-      LOG.warn("Failed to drop table {}", ident, e);
-      return false;
-    }
+    DropResponse resp =
+        restClient.delete(
+            formatTableRequestPath(ident.namespace()) + "/" + RESTUtils.encodeString(ident.name()),
+            DropResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.tableErrorHandler());
+    resp.validate();
+    return resp.dropped();
   }
 
   /**
@@ -231,7 +219,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
    */
   @Override
   public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
-    NameIdentifier.checkTable(ident);
+    checkTableNameIdentifer(ident);
 
     Map<String, String> params = new HashMap<>();
     params.put("purge", "true");
@@ -247,11 +235,9 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
               ErrorHandlers.tableErrorHandler());
       resp.validate();
       return resp.dropped();
-
     } catch (UnsupportedOperationException e) {
       throw e;
     } catch (Exception e) {
-      LOG.warn("Failed to purge table {}", ident, e);
       return false;
     }
   }
@@ -265,6 +251,30 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
         .append(RESTUtils.encodeString(ns.level(2)))
         .append("/tables")
         .toString();
+  }
+
+  /**
+   * Check whether the namespace of a table is valid
+   *
+   * @param namespace The namespace to check
+   */
+  static void checkTableNamespace(Namespace namespace) {
+    Namespace.check(
+        namespace != null && namespace.length() == 3,
+        "Table namespace must be non-null and have 3 level, the input namespace is %s",
+        namespace);
+  }
+
+  /**
+   * Check whether the NameIdentifier of a table is valid
+   *
+   * @param ident The NameIdentifier to check
+   */
+  static void checkTableNameIdentifer(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "NameIdentifer must not be null");
+    NameIdentifier.check(
+        ident.name() != null && !ident.name().isEmpty(), "NameIdentifer name must not be empty");
+    checkTableNamespace(ident.namespace());
   }
 
   /**
@@ -296,7 +306,10 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
 
     @Override
     public RelationalCatalog build() {
-      Namespace.checkCatalog(namespace);
+      Namespace.check(
+          namespace != null && namespace.length() == 1,
+          "Catalog namespace must be non-null and have 1 level, the input namespace is %s",
+          namespace);
       Preconditions.checkArgument(restClient != null, "restClient must be set");
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name must not be blank");
       Preconditions.checkArgument(type != null, "type must not be null");

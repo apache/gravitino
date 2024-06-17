@@ -18,8 +18,6 @@ import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.MySQLContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
-import com.datastrato.gravitino.integration.test.util.ITUtils;
-import com.datastrato.gravitino.integration.test.util.JdbcDriverDownloader;
 import com.datastrato.gravitino.integration.test.util.TestDatabaseName;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Table;
@@ -27,8 +25,6 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.Maps;
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.util.Collections;
 import java.util.Map;
@@ -44,8 +40,6 @@ public class AuditCatalogMysqlIT extends AbstractIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   public static final String metalakeName = GravitinoITUtils.genRandomName("audit_mysql_metalake");
   private static final String expectUser = System.getProperty("user.name");
-  public static final String DOWNLOAD_JDBC_DRIVER_URL =
-      "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar";
   protected static TestDatabaseName TEST_DB_NAME;
   private static final String provider = "jdbc-mysql";
 
@@ -60,12 +54,6 @@ public class AuditCatalogMysqlIT extends AbstractIT {
     registerCustomConfigs(configs);
     AbstractIT.startIntegrationTest();
 
-    if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
-      String gravitinoHome = System.getenv("GRAVITINO_HOME");
-      Path tmpPath = Paths.get(gravitinoHome, "/catalogs/jdbc-mysql/libs");
-      JdbcDriverDownloader.downloadJdbcDriver(DOWNLOAD_JDBC_DRIVER_URL, tmpPath.toString());
-    }
-
     containerSuite.startMySQLContainer(TestDatabaseName.MYSQL_AUDIT_CATALOG_MYSQL_IT);
     MYSQL_CONTAINER = containerSuite.getMySQLContainer();
     TEST_DB_NAME = TestDatabaseName.MYSQL_AUDIT_CATALOG_MYSQL_IT;
@@ -75,9 +63,9 @@ public class AuditCatalogMysqlIT extends AbstractIT {
 
   @AfterAll
   public static void stopIntegrationTest() throws IOException, InterruptedException {
-    AbstractIT.stopIntegrationTest();
     client.dropMetalake(metalakeName);
     mysqlService.close();
+    AbstractIT.stopIntegrationTest();
   }
 
   @Test
@@ -92,6 +80,8 @@ public class AuditCatalogMysqlIT extends AbstractIT {
     catalog = metalake.alterCatalog(catalogName, CatalogChange.setProperty("key1", "value1"));
     Assertions.assertEquals(expectUser, catalog.auditInfo().creator());
     Assertions.assertEquals(expectUser, catalog.auditInfo().lastModifier());
+
+    metalake.dropCatalog(catalogName);
   }
 
   @Test
@@ -103,6 +93,9 @@ public class AuditCatalogMysqlIT extends AbstractIT {
     Schema schema = catalog.asSchemas().createSchema(schemaName, null, prop);
     Assertions.assertEquals(expectUser, schema.auditInfo().creator());
     Assertions.assertNull(schema.auditInfo().lastModifier());
+
+    catalog.asSchemas().dropSchema(schemaName, true);
+    metalake.dropCatalog(catalogName);
   }
 
   @Test
@@ -134,6 +127,12 @@ public class AuditCatalogMysqlIT extends AbstractIT {
                 TableChange.addColumn(new String[] {"col_4"}, Types.StringType.get()));
     Assertions.assertEquals(expectUser, table.auditInfo().creator());
     Assertions.assertEquals(expectUser, table.auditInfo().lastModifier());
+
+    catalog
+        .asTableCatalog()
+        .dropTable(NameIdentifier.of(metalakeName, catalogName, schemaName, tableName));
+    catalog.asSchemas().dropSchema(schemaName, true);
+    metalake.dropCatalog(catalogName);
   }
 
   private static Catalog createCatalog(String catalogName) throws SQLException {

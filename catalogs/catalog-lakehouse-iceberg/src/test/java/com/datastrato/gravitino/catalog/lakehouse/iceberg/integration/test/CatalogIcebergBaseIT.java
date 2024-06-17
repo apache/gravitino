@@ -56,6 +56,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -119,10 +120,16 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
 
   @AfterAll
   public void stop() throws Exception {
-    clearTableAndSchema();
-    client.dropMetalake(metalakeName);
-    spark.close();
-    AbstractIT.stopIntegrationTest();
+    try {
+      clearTableAndSchema();
+      metalake.dropCatalog(catalogName);
+      client.dropMetalake(metalakeName);
+    } finally {
+      if (spark != null) {
+        spark.close();
+      }
+      AbstractIT.stopIntegrationTest();
+    }
   }
 
   @AfterEach
@@ -159,12 +166,14 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
   }
 
   private void clearTableAndSchema() {
-    NameIdentifier[] nameIdentifiers =
-        catalog.asTableCatalog().listTables(Namespace.of(metalakeName, catalogName, schemaName));
-    for (NameIdentifier nameIdentifier : nameIdentifiers) {
-      catalog.asTableCatalog().dropTable(nameIdentifier);
+    if (catalog.asSchemas().schemaExists(schemaName)) {
+      NameIdentifier[] nameIdentifiers =
+          catalog.asTableCatalog().listTables(Namespace.of(metalakeName, catalogName, schemaName));
+      for (NameIdentifier nameIdentifier : nameIdentifiers) {
+        catalog.asTableCatalog().dropTable(nameIdentifier);
+      }
+      catalog.asSchemas().dropSchema(schemaName, false);
     }
-    catalog.asSchemas().dropSchema(schemaName, false);
   }
 
   private void createMetalake() {
@@ -248,9 +257,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
   void testOperationIcebergSchema() {
     SupportsSchemas schemas = catalog.asSchemas();
     // list schema check.
-    NameIdentifier[] nameIdentifiers = schemas.listSchemas();
-    Set<String> schemaNames =
-        Arrays.stream(nameIdentifiers).map(NameIdentifier::name).collect(Collectors.toSet());
+    Set<String> schemaNames = new HashSet<>(Arrays.asList(schemas.listSchemas()));
     Assertions.assertTrue(schemaNames.contains(schemaName));
 
     List<org.apache.iceberg.catalog.Namespace> icebergNamespaces =
@@ -263,10 +270,9 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     String testSchemaName = GravitinoITUtils.genRandomName("test_schema_1");
     NameIdentifier schemaIdent = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
     schemas.createSchema(schemaIdent.name(), schema_comment, Collections.emptyMap());
-    nameIdentifiers = schemas.listSchemas();
-    Map<String, NameIdentifier> schemaMap =
-        Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v -> v));
-    Assertions.assertTrue(schemaMap.containsKey(testSchemaName));
+
+    schemaNames = new HashSet<>(Arrays.asList(schemas.listSchemas()));
+    Assertions.assertTrue(schemaNames.contains(testSchemaName));
 
     icebergNamespaces =
         icebergSupportsNamespaces.listNamespaces(IcebergTableOpsHelper.getIcebergNamespace());
@@ -302,10 +308,8 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
           icebergSupportsNamespaces.loadNamespaceMetadata(icebergNamespace);
         });
 
-    nameIdentifiers = schemas.listSchemas();
-    schemaMap =
-        Arrays.stream(nameIdentifiers).collect(Collectors.toMap(NameIdentifier::name, v -> v));
-    Assertions.assertFalse(schemaMap.containsKey(testSchemaName));
+    schemaNames = new HashSet<>(Arrays.asList(schemas.listSchemas()));
+    Assertions.assertFalse(schemaNames.contains(testSchemaName));
     Assertions.assertFalse(schemas.dropSchema("no-exits", false));
     TableCatalog tableCatalog = catalog.asTableCatalog();
 
@@ -324,7 +328,12 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
                 Distributions.NONE,
                 null));
     // drop schema failed check.
-    Assertions.assertFalse(schemas.dropSchema(schemaIdent.name(), true));
+    Throwable excep =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> schemas.dropSchema(schemaIdent.name(), true));
+    Assertions.assertTrue(
+        excep.getMessage().contains("Iceberg does not support cascading delete operations."));
+
     Assertions.assertFalse(schemas.dropSchema(schemaIdent.name(), false));
     Assertions.assertFalse(tableCatalog.dropTable(table));
     icebergNamespaces =
@@ -731,6 +740,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     Table delColTable = catalog.asTableCatalog().loadTable(tableIdentifier);
     Assertions.assertEquals(1, delColTable.columns().length);
     Assertions.assertEquals(col1.name(), delColTable.columns()[0].name());
+    catalog.asTableCatalog().dropTable(tableIdentifier);
   }
 
   @Test

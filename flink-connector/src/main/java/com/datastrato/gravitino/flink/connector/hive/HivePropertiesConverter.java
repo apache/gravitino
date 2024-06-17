@@ -5,8 +5,7 @@
 
 package com.datastrato.gravitino.flink.connector.hive;
 
-import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
-
+import com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta;
 import com.datastrato.gravitino.flink.connector.PropertiesConverter;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -21,19 +20,21 @@ public class HivePropertiesConverter implements PropertiesConverter {
 
   public static final HivePropertiesConverter INSTANCE = new HivePropertiesConverter();
 
-  private static final Map<String, String> HIVE_CONFIG_TO_GRAVITINO =
-      ImmutableMap.of(HiveConf.ConfVars.METASTOREURIS.varname, METASTORE_URIS);
+  private static final Map<String, String> HIVE_CATALOG_CONFIG_TO_GRAVITINO =
+      ImmutableMap.of(
+          HiveConf.ConfVars.METASTOREURIS.varname, HiveCatalogPropertiesMeta.METASTORE_URIS);
   private static final Map<String, String> GRAVITINO_CONFIG_TO_HIVE =
-      ImmutableMap.of(METASTORE_URIS, HiveConf.ConfVars.METASTOREURIS.varname);
+      ImmutableMap.of(
+          HiveCatalogPropertiesMeta.METASTORE_URIS, HiveConf.ConfVars.METASTOREURIS.varname);
 
   @Override
   public Map<String, String> toGravitinoCatalogProperties(Configuration flinkConf) {
     Map<String, String> gravitinoProperties = Maps.newHashMap();
 
     for (Map.Entry<String, String> entry : flinkConf.toMap().entrySet()) {
-      String hiveKey = HIVE_CONFIG_TO_GRAVITINO.get(entry.getKey());
-      if (hiveKey != null) {
-        gravitinoProperties.put(hiveKey, entry.getValue());
+      String gravitinoKey = HIVE_CATALOG_CONFIG_TO_GRAVITINO.get(entry.getKey());
+      if (gravitinoKey != null) {
+        gravitinoProperties.put(gravitinoKey, entry.getValue());
       } else if (!entry.getKey().startsWith(FLINK_PROPERTY_PREFIX)) {
         gravitinoProperties.put(FLINK_PROPERTY_PREFIX + entry.getKey(), entry.getValue());
       } else {

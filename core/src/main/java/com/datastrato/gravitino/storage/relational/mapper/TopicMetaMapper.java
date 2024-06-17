@@ -91,6 +91,17 @@ public interface TopicMetaMapper {
   TopicPO selectTopicMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("topicName") String topicName);
 
+  @Select(
+      "SELECT topic_id as topicId, topic_name as topicName,"
+          + " metalake_id as metalakeId, catalog_id as catalogId, schema_id as schemaId,"
+          + " comment as comment, properties as properties, audit_info as auditInfo,"
+          + " current_version as currentVersion, last_version as lastVersion,"
+          + " deleted_at as deletedAt"
+          + " FROM "
+          + TABLE_NAME
+          + " WHERE topic_id = #{topicId} AND deleted_at = 0")
+  TopicPO selectTopicMetaById(@Param("topicId") Long topicId);
+
   @Update(
       "UPDATE "
           + TABLE_NAME
@@ -157,7 +168,7 @@ public interface TopicMetaMapper {
   @Delete(
       "DELETE FROM "
           + TABLE_NAME
-          + " WHERE deleted_at != 0 AND deleted_at < #{legacyTimeLine} LIMIT #{limit}")
-  Integer deleteTopicMetasByLegacyTimeLine(
-      @Param("legacyTimeLine") Long legacyTimeLine, @Param("limit") int limit);
+          + " WHERE deleted_at != 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}")
+  Integer deleteTopicMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 }

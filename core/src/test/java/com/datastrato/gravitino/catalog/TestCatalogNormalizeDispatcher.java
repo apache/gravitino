@@ -17,8 +17,10 @@ import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.datastrato.gravitino.storage.memory.TestMemoryEntityStore;
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Map;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -83,8 +85,9 @@ public class TestCatalogNormalizeDispatcher {
     String[] legalNames = {"catalog", "_catalog", "1_catalog", "_", "1"};
     for (String legalName : legalNames) {
       NameIdentifier catalogIdent = NameIdentifier.of(metalake, legalName);
+      Map<String, String> props = ImmutableMap.of("key1", "value1", "key2", "value2");
       Catalog catalog =
-          catalogNormalizeDispatcher.createCatalog(catalogIdent, RELATIONAL, "test", null, null);
+          catalogNormalizeDispatcher.createCatalog(catalogIdent, RELATIONAL, "test", null, props);
       Assertions.assertEquals(legalName, catalog.name());
     }
 

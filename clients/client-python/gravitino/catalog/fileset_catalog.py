@@ -33,7 +33,7 @@ class FilesetCatalog(BaseSchemaCatalog):
     def __init__(
         self,
         name: str = None,
-        type: Catalog.Type = Catalog.Type.UNSUPPORTED,
+        catalog_type: Catalog.Type = Catalog.Type.UNSUPPORTED,
         provider: str = None,
         comment: str = None,
         properties: Dict[str, str] = None,
@@ -41,7 +41,9 @@ class FilesetCatalog(BaseSchemaCatalog):
         rest_client: HTTPClient = None,
     ):
 
-        super().__init__(name, type, provider, comment, properties, audit, rest_client)
+        super().__init__(
+            name, catalog_type, provider, comment, properties, audit, rest_client
+        )
 
     def as_fileset_catalog(self):
         return self
@@ -92,7 +94,7 @@ class FilesetCatalog(BaseSchemaCatalog):
         self,
         ident: NameIdentifier,
         comment: str,
-        type: Fileset.Type,
+        fileset_type: Fileset.Type,
         storage_location: str,
         properties: Dict[str, str],
     ) -> Fileset:
@@ -106,7 +108,7 @@ class FilesetCatalog(BaseSchemaCatalog):
         Args:
             ident: A fileset identifier.
             comment: The comment of the fileset.
-            type: The type of the fileset.
+            fileset_type: The type of the fileset.
             storage_location: The storage location of the fileset.
             properties: The properties of the fileset.
 
@@ -122,7 +124,7 @@ class FilesetCatalog(BaseSchemaCatalog):
         req = FilesetCreateRequest(
             name=ident.name(),
             comment=comment,
-            type=type,
+            fileset_type=fileset_type,
             storage_location=storage_location,
             properties=properties,
         )

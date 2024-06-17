@@ -34,7 +34,7 @@ class GravitinoClient(GravitinoClientBase):
 
     _metalake: GravitinoMetalake
 
-    def __init__(self, uri: str, metalake_name: str):
+    def __init__(self, uri: str, metalake_name: str, check_version: bool = True):
         """Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
 
         Args:
@@ -45,7 +45,7 @@ class GravitinoClient(GravitinoClientBase):
         Raises:
             NoSuchMetalakeException if the metalake with specified name does not exist.
         """
-        super().__init__(uri)
+        super().__init__(uri, check_version)
         self._metalake = super().load_metalake(NameIdentifier.of(metalake_name))
 
     def get_metalake(self) -> GravitinoMetalake:
@@ -71,13 +71,13 @@ class GravitinoClient(GravitinoClientBase):
     def create_catalog(
         self,
         ident: NameIdentifier,
-        type: Catalog.Type,
+        catalog_type: Catalog.Type,
         provider: str,
         comment: str,
         properties: Dict[str, str],
     ) -> Catalog:
         return self.get_metalake().create_catalog(
-            ident, type, provider, comment, properties
+            ident, catalog_type, provider, comment, properties
         )
 
     def alter_catalog(self, ident: NameIdentifier, *changes: CatalogChange):

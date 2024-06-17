@@ -101,12 +101,17 @@ public class TestRoleOperations extends JerseyTest {
   public void testCreateRole() {
     SecurableObject securableObject =
         SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
+    SecurableObject anotherSecurableObject =
+        SecurableObjects.ofCatalog(
+            "another_catalog", Lists.newArrayList(Privileges.DropCatalog.deny()));
 
     RoleCreateRequest req =
         new RoleCreateRequest(
             "role",
             Collections.emptyMap(),
-            new SecurableObjectDTO[] {DTOConverters.toDTO(securableObject)});
+            new SecurableObjectDTO[] {
+              DTOConverters.toDTO(securableObject), DTOConverters.toDTO(anotherSecurableObject)
+            });
     Role role = buildRole("role1");
 
     when(manager.createRole(any(), any(), any(), any())).thenReturn(role);
@@ -125,6 +130,19 @@ public class TestRoleOperations extends JerseyTest {
 
     RoleDTO roleDTO = roleResponse.getRole();
     Assertions.assertEquals("role1", roleDTO.name());
+    Assertions.assertEquals(
+        SecurableObjects.ofCatalog(
+                "another_catalog", Lists.newArrayList(Privileges.DropCatalog.deny()))
+            .fullName(),
+        roleDTO.securableObjects().get(1).fullName());
+    Assertions.assertEquals(1, roleDTO.securableObjects().get(1).privileges().size());
+    Assertions.assertEquals(
+        Privileges.DropCatalog.deny().name(),
+        roleDTO.securableObjects().get(1).privileges().get(0).name());
+    Assertions.assertEquals(
+        Privileges.UseCatalog.deny().condition(),
+        roleDTO.securableObjects().get(1).privileges().get(0).condition());
+
     Assertions.assertEquals(
         SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()))
             .fullName(),
@@ -267,11 +285,15 @@ public class TestRoleOperations extends JerseyTest {
   private Role buildRole(String role) {
     SecurableObject catalog =
         SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
+    SecurableObject anotherSecurableObject =
+        SecurableObjects.ofCatalog(
+            "another_catalog", Lists.newArrayList(Privileges.DropCatalog.deny()));
+
     return RoleEntity.builder()
         .withId(1L)
         .withName(role)
         .withProperties(Collections.emptyMap())
-        .withSecurableObject(catalog)
+        .withSecurableObjects(Lists.newArrayList(catalog, anotherSecurableObject))
         .withAuditInfo(
             AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .build();

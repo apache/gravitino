@@ -15,7 +15,8 @@ import java.util.Map;
  * corresponding to CatalogEntity that is used internally.
  *
  * <p>This class object will be passed in through {@link CatalogOperations#initialize(Map,
- * CatalogInfo)}, users can leverage this object to get the information about the catalog.
+ * CatalogInfo, HasPropertyMetadata)}, users can leverage this object to get the information about
+ * the catalog.
  */
 @Evolving
 public final class CatalogInfo implements Catalog {

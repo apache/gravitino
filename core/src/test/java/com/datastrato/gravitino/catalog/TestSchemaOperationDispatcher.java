@@ -189,6 +189,7 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
 
     boolean dropped = dispatcher.dropSchema(schemaIdent, false);
     Assertions.assertTrue(dropped);
+    Assertions.assertFalse(dispatcher.dropSchema(schemaIdent, false));
 
     // Test if entity store is failed to drop the schema entity
     dispatcher.createSchema(schemaIdent, "comment", props);

@@ -18,12 +18,12 @@ import java.util.Map;
 public interface SupportsCatalogs {
 
   /**
-   * List all catalogs in the metalake.
+   * List the name of all catalogs in the metalake.
    *
-   * @return The list of catalog's name identifiers.
-   * @throws NoSuchMetalakeException If the metalake with namespace does not exist.
+   * @return The list of catalog's names.
+   * @throws NoSuchMetalakeException If the metalake does not exist.
    */
-  NameIdentifier[] listCatalogs() throws NoSuchMetalakeException;
+  String[] listCatalogs() throws NoSuchMetalakeException;
 
   /**
    * List all catalogs with their information in the metalake.

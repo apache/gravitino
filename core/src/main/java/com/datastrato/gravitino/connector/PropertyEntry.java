@@ -11,7 +11,7 @@ import com.google.common.base.Preconditions;
 import java.util.EnumSet;
 import java.util.function.Function;
 import lombok.Getter;
-import org.apache.logging.log4j.util.Strings;
+import org.apache.commons.lang3.StringUtils;
 
 @Getter
 public final class PropertyEntry<T> {
@@ -51,9 +51,9 @@ public final class PropertyEntry<T> {
       Function<T, String> encoder,
       boolean hidden,
       boolean reserved) {
-    Preconditions.checkArgument(Strings.isNotBlank(name), "name cannot be null or empty");
+    Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
     Preconditions.checkArgument(
-        Strings.isNotBlank(description), "description cannot be null or empty");
+        StringUtils.isNotBlank(description), "description cannot be null or empty");
     Preconditions.checkArgument(javaType != null, "javaType cannot be null");
     Preconditions.checkArgument(decoder != null, "decoder cannot be null");
     Preconditions.checkArgument(encoder != null, "encoder cannot be null");

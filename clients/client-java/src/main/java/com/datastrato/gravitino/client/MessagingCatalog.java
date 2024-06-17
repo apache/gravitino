@@ -69,7 +69,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
    */
   @Override
   public NameIdentifier[] listTopics(Namespace namespace) throws NoSuchSchemaException {
-    Namespace.checkTopic(namespace);
+    checkTopicNamespace(namespace);
 
     EntityListResponse resp =
         restClient.get(
@@ -92,7 +92,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
    */
   @Override
   public Topic loadTopic(NameIdentifier ident) throws NoSuchTopicException {
-    NameIdentifier.checkTopic(ident);
+    checkTopicNameIdentifer(ident);
 
     TopicResponse resp =
         restClient.get(
@@ -122,7 +122,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
   public Topic createTopic(
       NameIdentifier ident, String comment, DataLayout dataLayout, Map<String, String> properties)
       throws NoSuchSchemaException, TopicAlreadyExistsException {
-    NameIdentifier.checkTopic(ident);
+    checkTopicNameIdentifer(ident);
 
     TopicCreateRequest req =
         TopicCreateRequest.builder()
@@ -155,7 +155,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
   @Override
   public Topic alterTopic(NameIdentifier ident, TopicChange... changes)
       throws NoSuchTopicException, IllegalArgumentException {
-    NameIdentifier.checkTopic(ident);
+    checkTopicNameIdentifer(ident);
 
     List<TopicUpdateRequest> updates =
         Arrays.stream(changes)
@@ -184,7 +184,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
    */
   @Override
   public boolean dropTopic(NameIdentifier ident) {
-    NameIdentifier.checkTopic(ident);
+    checkTopicNameIdentifer(ident);
 
     DropResponse resp =
         restClient.delete(
@@ -201,6 +201,30 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
   static String formatTopicRequestPath(Namespace ns) {
     Namespace schemaNs = Namespace.of(ns.level(0), ns.level(1));
     return formatSchemaRequestPath(schemaNs) + "/" + ns.level(2) + "/topics";
+  }
+
+  /**
+   * Check whether the namespace of a topic is valid
+   *
+   * @param namespace The namespace to check
+   */
+  static void checkTopicNamespace(Namespace namespace) {
+    Namespace.check(
+        namespace != null && namespace.length() == 3,
+        "Topic namespace must be non-null and have 3 level, the input namespace is %s",
+        namespace);
+  }
+
+  /**
+   * Check whether the NameIdentifier of a topic is valid
+   *
+   * @param ident The NameIdentifier to check
+   */
+  static void checkTopicNameIdentifer(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "NameIdentifer must not be null");
+    NameIdentifier.check(
+        ident.name() != null && !ident.name().isEmpty(), "NameIdentifer name must not be empty");
+    checkTopicNamespace(ident.namespace());
   }
 
   static class Builder extends CatalogDTO.Builder<Builder> {
@@ -224,7 +248,10 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
 
     @Override
     public MessagingCatalog build() {
-      Namespace.checkCatalog(namespace);
+      Namespace.check(
+          namespace != null && namespace.length() == 1,
+          "Catalog namespace must be non-null and have 1 level, the input namespace is %s",
+          namespace);
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name must not be blank");
       Preconditions.checkArgument(type != null, "type must not be null");
       Preconditions.checkArgument(StringUtils.isNotBlank(provider), "provider must not be blank");

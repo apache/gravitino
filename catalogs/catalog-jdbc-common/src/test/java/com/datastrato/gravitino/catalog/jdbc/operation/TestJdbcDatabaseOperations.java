@@ -91,11 +91,15 @@ public class TestJdbcDatabaseOperations {
     Assertions.assertTrue(listDatabases.contains(database2));
 
     // drop database
-    JDBC_DATABASE_OPERATIONS.delete(database1);
+    Assertions.assertTrue(JDBC_DATABASE_OPERATIONS.delete(database1), "database should be dropped");
     List<String> databases = JDBC_DATABASE_OPERATIONS.listDatabases();
     Assertions.assertFalse(databases.contains(database1));
     Assertions.assertNotNull(JDBC_DATABASE_OPERATIONS.load(database2));
-    JDBC_DATABASE_OPERATIONS.delete(database2);
+    Assertions.assertTrue(JDBC_DATABASE_OPERATIONS.delete(database2), "database should be dropped");
     Assertions.assertNull(JDBC_DATABASE_OPERATIONS.load(database2));
+
+    // drop non-existent database
+    Assertions.assertFalse(
+        JDBC_DATABASE_OPERATIONS.delete(database1), "database should be non-existent");
   }
 }

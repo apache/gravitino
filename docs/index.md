@@ -60,7 +60,7 @@ REST API and the Java SDK. You can use either to manage metadata. See
 
 Also, you can find the complete REST API definition in
 [Gravitino Open API](./api/rest/gravitino-rest-api), and the
-Java SDK definition in [Gravitino Javadoc](pathname:///docs/0.5.0/api/java/index.html).
+Java SDK definition in [Gravitino Javadoc](pathname:///docs/0.5.1/api/java/index.html).
 
 Gravitino provides a web UI to manage the metadata. Visit the web UI in the browser via `http://<ip-address>:8090`. See [Gravitino web UI](./webui.md) for details.
 
@@ -138,7 +138,7 @@ Gravitino provides several ways to configure and manage the Gravitino server. Se
 
 * [Gravitino Open API](./api/rest/gravitino-rest-api): provides the complete Open API definition of
   Gravitino.
-* [Gravitino Javadoc](pathname:///docs/0.5.0/api/java/index.html): provides the Javadoc for the Gravitino API.
+* [Gravitino Javadoc](pathname:///docs/0.5.1/api/java/index.html): provides the Javadoc for the Gravitino API.
 
 ### Development guides
 

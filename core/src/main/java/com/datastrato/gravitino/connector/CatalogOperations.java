@@ -16,7 +16,7 @@ import java.util.Map;
  * operation, {@link TableCatalog} to support table operations, etc.
  */
 @Evolving
-public interface CatalogOperations extends Closeable, HasPropertyMetadata {
+public interface CatalogOperations extends Closeable {
 
   /**
    * Initialize the CatalogOperation with specified configuration. This method is called after
@@ -26,7 +26,10 @@ public interface CatalogOperations extends Closeable, HasPropertyMetadata {
    *
    * @param config The configuration of this Catalog.
    * @param info The information of this Catalog.
+   * @param propertiesMetadata The properties metadata of this Catalog.
    * @throws RuntimeException if the initialization failed.
    */
-  void initialize(Map<String, String> config, CatalogInfo info) throws RuntimeException;
+  void initialize(
+      Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
+      throws RuntimeException;
 }

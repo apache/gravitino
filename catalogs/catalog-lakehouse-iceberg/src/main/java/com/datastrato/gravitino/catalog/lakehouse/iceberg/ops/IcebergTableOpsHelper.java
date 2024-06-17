@@ -5,8 +5,9 @@
 
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.ops;
 
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.IcebergDataTypeConverter.CONVERTER;
+
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.ConvertUtil;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.TableChange.AddColumn;
 import com.datastrato.gravitino.rel.TableChange.After;
@@ -150,8 +151,7 @@ public class IcebergTableOpsHelper {
         fieldName);
 
     icebergTableSchema.findField(fieldName).isOptional();
-    org.apache.iceberg.types.Type type =
-        ConvertUtil.toIcebergType(updateColumnType.getNewDataType());
+    org.apache.iceberg.types.Type type = CONVERTER.fromGravitino(updateColumnType.getNewDataType());
     Preconditions.checkArgument(
         type.isPrimitiveType(), "Cannot update %s, not a primitive type: %s", fieldName, type);
     icebergUpdateSchema.updateColumn(fieldName, (PrimitiveType) type);
@@ -199,7 +199,7 @@ public class IcebergTableOpsHelper {
       icebergUpdateSchema.addColumn(
           getParentName(addColumn.fieldName()),
           getLeafName(addColumn.fieldName()),
-          ConvertUtil.toIcebergType(addColumn.getDataType()),
+          CONVERTER.fromGravitino(addColumn.getDataType()),
           addColumn.getComment());
     } else {
       // TODO: figure out how to enable users to add required columns
@@ -207,7 +207,7 @@ public class IcebergTableOpsHelper {
       icebergUpdateSchema.addRequiredColumn(
           getParentName(addColumn.fieldName()),
           getLeafName(addColumn.fieldName()),
-          ConvertUtil.toIcebergType(addColumn.getDataType()),
+          CONVERTER.fromGravitino(addColumn.getDataType()),
           addColumn.getComment());
     }
 

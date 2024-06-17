@@ -139,16 +139,16 @@ public class TestRelationalCatalog extends TestBase {
 
     EntityListResponse resp = new EntityListResponse(new NameIdentifier[] {schema1, schema2});
     buildMockResource(Method.GET, schemaPath, null, resp, SC_OK);
-    NameIdentifier[] schemas = catalog.asSchemas().listSchemas();
+    String[] schemas = catalog.asSchemas().listSchemas();
 
     Assertions.assertEquals(2, schemas.length);
-    Assertions.assertEquals(schema1, schemas[0]);
-    Assertions.assertEquals(schema2, schemas[1]);
+    Assertions.assertEquals(schema1.name(), schemas[0]);
+    Assertions.assertEquals(schema2.name(), schemas[1]);
 
     // Test return empty schema list
     EntityListResponse emptyResp = new EntityListResponse(new NameIdentifier[] {});
     buildMockResource(Method.GET, schemaPath, null, emptyResp, SC_OK);
-    NameIdentifier[] emptySchemas = catalog.asSchemas().listSchemas();
+    String[] emptySchemas = catalog.asSchemas().listSchemas();
     Assertions.assertEquals(0, emptySchemas.length);
 
     // Test throw NoSuchCatalogException
@@ -1073,7 +1073,10 @@ public class TestRelationalCatalog extends TestBase {
     ErrorResponse errorResp = ErrorResponse.internalError("internal error");
     buildMockResource(Method.DELETE, tablePath, null, errorResp, SC_INTERNAL_SERVER_ERROR);
 
-    Assertions.assertFalse(catalog.asTableCatalog().dropTable(tableId));
+    Throwable excep =
+        Assertions.assertThrows(
+            RuntimeException.class, () -> catalog.asTableCatalog().dropTable(tableId));
+    Assertions.assertTrue(excep.getMessage().contains("internal error"));
   }
 
   @Test

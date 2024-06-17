@@ -28,8 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Gravitino Metalake is the top-level metadata repository for users. It contains a list of catalogs
@@ -37,9 +35,6 @@ import org.slf4j.LoggerFactory;
  * alter and drop a catalog with specified identifier.
  */
 public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
-
-  private static final Logger LOG = LoggerFactory.getLogger(GravitinoMetalake.class);
-
   private static final String API_METALAKES_CATALOGS_PATH = "api/metalakes/%s/catalogs/%s";
 
   private final RESTClient restClient;
@@ -57,11 +52,11 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
   /**
    * List all the catalogs under this metalake.
    *
-   * @return A list of {@link NameIdentifier} of the catalogs under the specified namespace.
-   * @throws NoSuchMetalakeException if the metalake with specified namespace does not exist.
+   * @return A list of the catalog names under the current metalake.
+   * @throws NoSuchMetalakeException If the metalake does not exist.
    */
   @Override
-  public NameIdentifier[] listCatalogs() throws NoSuchMetalakeException {
+  public String[] listCatalogs() throws NoSuchMetalakeException {
 
     EntityListResponse resp =
         restClient.get(
@@ -71,7 +66,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
             ErrorHandlers.catalogErrorHandler());
     resp.validate();
 
-    return resp.identifiers();
+    return Arrays.stream(resp.identifiers()).map(NameIdentifier::name).toArray(String[]::new);
   }
 
   /**
@@ -192,25 +187,19 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
    * Drop the catalog with specified identifier.
    *
    * @param catalogName the name of the catalog.
-   * @return true if the catalog is dropped successfully, false otherwise.
+   * @return true if the catalog is dropped successfully, false if the catalog does not exist.
    */
   @Override
   public boolean dropCatalog(String catalogName) {
 
-    try {
-      DropResponse resp =
-          restClient.delete(
-              String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName),
-              DropResponse.class,
-              Collections.emptyMap(),
-              ErrorHandlers.catalogErrorHandler());
-      resp.validate();
-      return resp.dropped();
-
-    } catch (Exception e) {
-      LOG.warn("Failed to drop catalog {}", catalogName, e);
-      return false;
-    }
+    DropResponse resp =
+        restClient.delete(
+            String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName),
+            DropResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.catalogErrorHandler());
+    resp.validate();
+    return resp.dropped();
   }
 
   static class Builder extends MetalakeDTO.Builder<Builder> {

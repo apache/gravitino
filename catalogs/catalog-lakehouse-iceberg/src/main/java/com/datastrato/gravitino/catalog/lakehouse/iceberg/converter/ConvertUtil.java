@@ -4,12 +4,13 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.converter;
 
+import static com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.IcebergDataTypeConverter.CONVERTER;
+
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergColumn;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable;
 import java.util.Arrays;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.types.Type;
-import org.apache.iceberg.types.TypeUtil;
 import org.apache.iceberg.types.Types;
 
 public class ConvertUtil {
@@ -29,26 +30,6 @@ public class ConvertUtil {
   }
 
   /**
-   * Convert the Gravitino type to the Iceberg type.
-   *
-   * @param gravitinoType Gravitino type.
-   * @return Iceberg type.
-   */
-  public static Type toIcebergType(com.datastrato.gravitino.rel.types.Type gravitinoType) {
-    return ToIcebergTypeVisitor.visit(gravitinoType, new ToIcebergType());
-  }
-
-  /**
-   * Convert the nested type of Iceberg to the type of gravitino.
-   *
-   * @param type Iceberg type of field.
-   * @return Gravitino type.
-   */
-  public static com.datastrato.gravitino.rel.types.Type formIcebergType(Type type) {
-    return TypeUtil.visit(type, new FromIcebergType());
-  }
-
-  /**
    * Convert the nested field of Iceberg to the Iceberg column.
    *
    * @param nestedField Iceberg nested field.
@@ -59,7 +40,7 @@ public class ConvertUtil {
         .withName(nestedField.name())
         .withNullable(nestedField.isOptional())
         .withComment(nestedField.doc())
-        .withType(ConvertUtil.formIcebergType(nestedField.type()))
+        .withType(CONVERTER.toGravitino(nestedField.type()))
         .build();
   }
 

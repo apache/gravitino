@@ -8,8 +8,8 @@ package com.datastrato.gravitino.trino.connector.catalog.jdbc.postgresql;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
 import com.datastrato.gravitino.trino.connector.util.GeneralDataTypeTransformer;
-import org.testng.Assert;
-import org.testng.annotations.Test;
+import org.junit.Assert;
+import org.junit.jupiter.api.Test;
 
 public class TestPostgreSQLDataTypeTransformer {
 

@@ -14,6 +14,7 @@ repositories {
 
 val flinkVersion: String = libs.versions.flink.get()
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
+val artifactName = "gravitino-${project.name}-$scalaVersion"
 
 dependencies {
   implementation(project(":api"))
@@ -73,6 +74,15 @@ dependencies {
   testImplementation(libs.hadoop2.common) {
     exclude("*")
   }
+  testImplementation(libs.hadoop2.hdfs) {
+    exclude("com.sun.jersey")
+    exclude("commons-cli", "commons-cli")
+    exclude("commons-io", "commons-io")
+    exclude("commons-codec", "commons-codec")
+    exclude("commons-logging", "commons-logging")
+    exclude("javax.servlet", "servlet-api")
+    exclude("org.mortbay.jetty")
+  }
   testImplementation(libs.hadoop2.mapreduce.client.core) {
     exclude("*")
   }
@@ -125,7 +135,23 @@ tasks.test {
   } else {
     dependsOn(tasks.jar)
 
+    doFirst {
+      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.12")
+    }
+
     val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
     init(this)
+  }
+}
+
+tasks.withType<Jar> {
+  archiveBaseName.set(artifactName)
+}
+
+publishing {
+  publications {
+    withType<MavenPublication>().configureEach {
+      artifactId = artifactName
+    }
   }
 }

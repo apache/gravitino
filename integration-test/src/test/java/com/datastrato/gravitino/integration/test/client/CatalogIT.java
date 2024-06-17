@@ -90,6 +90,23 @@ public class CatalogIT extends AbstractIT {
   }
 
   @Test
+  public void testDropCatalog() {
+    String catalogName = GravitinoITUtils.genRandomName("catalog");
+    Assertions.assertFalse(metalake.catalogExists(catalogName));
+
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("metastore.uris", hmsUri);
+    Catalog catalog =
+        metalake.createCatalog(
+            catalogName, Catalog.Type.RELATIONAL, "hive", "catalog comment", properties);
+    Assertions.assertTrue(metalake.catalogExists(catalogName));
+    Assertions.assertEquals(catalogName, catalog.name());
+
+    Assertions.assertTrue(metalake.dropCatalog(catalogName), "catalog should be dropped");
+    Assertions.assertFalse(metalake.dropCatalog(catalogName), "catalog should be non-existent");
+  }
+
+  @Test
   public void testCreateCatalogWithoutProperties() {
     String catalogName = GravitinoITUtils.genRandomName("catalog");
     Assertions.assertFalse(metalake.catalogExists(catalogName));
@@ -159,6 +176,9 @@ public class CatalogIT extends AbstractIT {
     }
     Assertions.assertTrue(ArrayUtils.contains(catalogs, relCatalog));
     Assertions.assertTrue(ArrayUtils.contains(catalogs, fileCatalog));
+
+    metalake.dropCatalog(relCatalogName);
+    metalake.dropCatalog(fileCatalogName);
   }
 
   private void assertCatalogEquals(Catalog catalog1, Catalog catalog2) {

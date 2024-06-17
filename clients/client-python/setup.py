@@ -15,14 +15,14 @@ except FileNotFoundError:
 setup(
     name="gravitino",
     description="Python lib/client for Gravitino",
-    version="0.5.0.dev21",
+    version="0.6.0.dev1",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/datastrato/gravitino",
     author="datastrato",
     author_email="support@datastrato.com",
     python_requires=">=3.8",
-    packages=find_packages(exclude=["tests*"]),
+    packages=find_packages(exclude=["tests*", "scripts*"]),
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',

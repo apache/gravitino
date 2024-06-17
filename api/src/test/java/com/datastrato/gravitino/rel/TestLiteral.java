@@ -4,6 +4,23 @@
  */
 package com.datastrato.gravitino.rel;
 
+import static com.datastrato.gravitino.rel.expressions.literals.Literals.booleanLiteral;
+import static com.datastrato.gravitino.rel.expressions.literals.Literals.byteLiteral;
+import static com.datastrato.gravitino.rel.expressions.literals.Literals.dateLiteral;
+import static com.datastrato.gravitino.rel.expressions.literals.Literals.decimalLiteral;
+import static com.datastrato.gravitino.rel.expressions.literals.Literals.doubleLiteral;
+import static com.datastrato.gravitino.rel.expressions.literals.Literals.floatLiteral;
+import static com.datastrato.gravitino.rel.expressions.literals.Literals.integerLiteral;
+import static com.datastrato.gravitino.rel.expressions.literals.Literals.longLiteral;
+import static com.datastrato.gravitino.rel.expressions.literals.Literals.shortLiteral;
+import static com.datastrato.gravitino.rel.expressions.literals.Literals.stringLiteral;
+import static com.datastrato.gravitino.rel.expressions.literals.Literals.timeLiteral;
+import static com.datastrato.gravitino.rel.expressions.literals.Literals.timestampLiteral;
+import static com.datastrato.gravitino.rel.expressions.literals.Literals.unsignedByteLiteral;
+import static com.datastrato.gravitino.rel.expressions.literals.Literals.unsignedIntegerLiteral;
+import static com.datastrato.gravitino.rel.expressions.literals.Literals.unsignedLongLiteral;
+import static com.datastrato.gravitino.rel.expressions.literals.Literals.unsignedShortLiteral;
+
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
 import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.types.Decimal;

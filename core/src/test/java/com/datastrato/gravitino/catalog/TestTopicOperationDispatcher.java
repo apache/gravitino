@@ -193,6 +193,7 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
 
     boolean dropped = topicOperationDispatcher.dropTopic(topicIdent);
     Assertions.assertTrue(dropped);
+    Assertions.assertFalse(topicOperationDispatcher.dropTopic(topicIdent));
 
     // Test if the entity store is failed to drop the topic entity
     topicOperationDispatcher.createTopic(topicIdent, "comment", null, props);
