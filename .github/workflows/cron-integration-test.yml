@@ -96,8 +96,17 @@ jobs:
           name: integrate test reports
           path: |
             build/reports
-            integration-test/build/integration-test.log
+            integration-test/build/*.log
+            integration-test/build/*.tar
+            integration-test/build/trino-ci-container-log/hive/*.*
+            integration-test/build/trino-ci-container-log/hdfs/*.*
             distribution/package/logs/gravitino-server.out
             distribution/package/logs/gravitino-server.log
             catalogs/**/*.log
             catalogs/**/*.tar
+            distribution/**/*.log
+            spark-connector/v3.3/spark/build/spark-3.3-integration-test.log
+            spark-connector/v3.4/spark/build/spark-3.4-integration-test.log
+            spark-connector/v3.5/spark/build/spark-3.5-integration-test.log
+            flink-connector/build/flink-connector-integration-test.log
+            flink-connector/build/*.tar
