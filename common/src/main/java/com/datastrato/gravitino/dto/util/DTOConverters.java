@@ -316,13 +316,19 @@ public class DTOConverters {
 
     } else if (transform instanceof Transforms.ListTransform) {
       Transforms.ListTransform listTransform = (Transforms.ListTransform) transform;
-      return ListPartitioningDTO.of(
-          listTransform.fieldNames(), (ListPartitionDTO[]) toDTOs(listTransform.assignments()));
+      ListPartitionDTO[] assignments =
+          Arrays.stream(listTransform.assignments())
+              .map(DTOConverters::toDTO)
+              .toArray(ListPartitionDTO[]::new);
+      return ListPartitioningDTO.of(listTransform.fieldNames(), assignments);
 
     } else if (transform instanceof Transforms.RangeTransform) {
       Transforms.RangeTransform rangeTransform = (Transforms.RangeTransform) transform;
-      return RangePartitioningDTO.of(
-          rangeTransform.fieldName(), (RangePartitionDTO[]) toDTOs(rangeTransform.assignments()));
+      RangePartitionDTO[] assignments =
+          Arrays.stream(rangeTransform.assignments())
+              .map(DTOConverters::toDTO)
+              .toArray(RangePartitionDTO[]::new);
+      return RangePartitioningDTO.of(rangeTransform.fieldName(), assignments);
 
     } else if (transform instanceof Transforms.ApplyTransform) {
       return FunctionPartitioningDTO.of(transform.name(), toFunctionArg(transform.arguments()));
