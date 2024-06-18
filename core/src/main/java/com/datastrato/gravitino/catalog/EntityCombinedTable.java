@@ -35,6 +35,8 @@ public final class EntityCombinedTable implements Table {
   // Field "imported" is used to indicate whether the entity has been imported to Gravitino
   // managed storage backend. If "imported" is true, it means that storage backend have stored
   // the correct entity. Otherwise, we should import the external entity to the storage backend.
+  // This is used for tag/access control related purposes, only the imported entities have the
+  // unique id, and based on this id, we can label and control the access to the entities.
   private boolean imported;
 
   private EntityCombinedTable(Table table, TableEntity tableEntity) {
