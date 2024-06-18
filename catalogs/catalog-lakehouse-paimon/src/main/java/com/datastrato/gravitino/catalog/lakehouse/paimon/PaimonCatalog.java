@@ -14,6 +14,15 @@ import java.util.Map;
 /** Implementation of {@link Catalog} that represents a Paimon catalog in Gravitino. */
 public class PaimonCatalog extends BaseCatalog<PaimonCatalog> {
 
+  static final PaimonCatalogPropertiesMetadata CATALOG_PROPERTIES_META =
+      new PaimonCatalogPropertiesMetadata();
+
+  static final PaimonSchemaPropertiesMetadata SCHEMA_PROPERTIES_META =
+      new PaimonSchemaPropertiesMetadata();
+
+  static final PaimonTablePropertiesMetadata TABLE_PROPERTIES_META =
+      new PaimonTablePropertiesMetadata();
+
   /** @return The short name of the catalog. */
   @Override
   public String shortName() {
@@ -38,19 +47,16 @@ public class PaimonCatalog extends BaseCatalog<PaimonCatalog> {
 
   @Override
   public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
-    throw new UnsupportedOperationException(
-        "The catalog does not support table properties metadata");
+    return TABLE_PROPERTIES_META;
   }
 
   @Override
   public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
-    throw new UnsupportedOperationException(
-        "The catalog does not support catalog properties metadata");
+    return CATALOG_PROPERTIES_META;
   }
 
   @Override
   public PropertiesMetadata schemaPropertiesMetadata() throws UnsupportedOperationException {
-    throw new UnsupportedOperationException(
-        "The catalog does not support schema properties metadata");
+    return SCHEMA_PROPERTIES_META;
   }
 }
