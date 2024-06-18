@@ -12,6 +12,7 @@ import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.SupportsSchemas;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.client.GravitinoMetalake;
+import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
@@ -27,14 +28,20 @@ import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.datastrato.gravitino.rel.expressions.literals.Literal;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
+import com.datastrato.gravitino.rel.partitions.ListPartition;
+import com.datastrato.gravitino.rel.partitions.Partitions;
+import com.datastrato.gravitino.rel.partitions.RangePartition;
 import com.datastrato.gravitino.rel.types.Types;
 import com.datastrato.gravitino.utils.RandomNameUtils;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -72,6 +79,7 @@ public class CatalogDorisIT extends AbstractIT {
   public String DORIS_COL_NAME1 = "doris_col_name1";
   public String DORIS_COL_NAME2 = "doris_col_name2";
   public String DORIS_COL_NAME3 = "doris_col_name3";
+  public String DORIS_COL_NAME4 = "doris_col_name4";
 
   // Because the creation of Schema Change is an asynchronous process, we need to wait for a while
   // For more information, you can refer to the comment in
@@ -169,8 +177,65 @@ public class CatalogDorisIT extends AbstractIT {
     Column col1 = Column.of(DORIS_COL_NAME1, Types.IntegerType.get(), "col_1_comment");
     Column col2 = Column.of(DORIS_COL_NAME2, Types.VarCharType.of(10), "col_2_comment");
     Column col3 = Column.of(DORIS_COL_NAME3, Types.VarCharType.of(10), "col_3_comment");
+    Column col4 = Column.of(DORIS_COL_NAME4, Types.DateType.get(), "col_4_comment");
 
-    return new Column[] {col1, col2, col3};
+    return new Column[] {col1, col2, col3, col4};
+  }
+
+  private Transform[] createRangePartition() {
+    LocalDate today = LocalDate.now();
+    LocalDate tomorrow = today.plusDays(1);
+    LiteralDTO todayLiteral =
+        LiteralDTO.builder().withDataType(Types.DateType.get()).withValue(today.toString()).build();
+    LiteralDTO tomorrowLiteral =
+        LiteralDTO.builder()
+            .withDataType(Types.DateType.get())
+            .withValue(tomorrow.toString())
+            .build();
+    RangePartition rangePartition1 =
+        (RangePartition) Partitions.range("p1", todayLiteral, LiteralDTO.NULL, null);
+    RangePartition rangePartition2 =
+        (RangePartition) Partitions.range("p2", tomorrowLiteral, todayLiteral, null);
+    RangePartition rangePartition3 =
+        (RangePartition) Partitions.range("p3", LiteralDTO.NULL, tomorrowLiteral, null);
+    return new Transform[] {
+      Transforms.range(
+          new String[] {DORIS_COL_NAME4},
+          new RangePartition[] {rangePartition1, rangePartition2, rangePartition3})
+    };
+  }
+
+  private Transform[] createListPartition() {
+    LocalDate today = LocalDate.now();
+    LocalDate tomorrow = today.plusDays(1);
+    LiteralDTO todayLiteral =
+        LiteralDTO.builder().withDataType(Types.DateType.get()).withValue(today.toString()).build();
+    LiteralDTO tomorrowLiteral =
+        LiteralDTO.builder()
+            .withDataType(Types.DateType.get())
+            .withValue(tomorrow.toString())
+            .build();
+    LiteralDTO intLiteral1 =
+        LiteralDTO.builder().withDataType(Types.IntegerType.get()).withValue("1").build();
+    LiteralDTO intLiteral2 =
+        LiteralDTO.builder().withDataType(Types.IntegerType.get()).withValue("2").build();
+    ListPartition listPartition1 =
+        (ListPartition)
+            Partitions.list(
+                "p1",
+                new Literal[][] {{intLiteral1, todayLiteral}, {intLiteral1, tomorrowLiteral}},
+                null);
+    ListPartition listPartition2 =
+        (ListPartition)
+            Partitions.list(
+                "p2",
+                new Literal[][] {{intLiteral2, todayLiteral}, {intLiteral2, tomorrowLiteral}},
+                null);
+    return new Transform[] {
+      Transforms.list(
+          new String[][] {{DORIS_COL_NAME1}, {DORIS_COL_NAME4}},
+          new ListPartition[] {listPartition1, listPartition2})
+    };
   }
 
   private Map<String, String> createTableProperties() {
@@ -334,6 +399,7 @@ public class CatalogDorisIT extends AbstractIT {
         };
 
     Map<String, String> properties = createTableProperties();
+    Transform[] partitions = createRangePartition();
     TableCatalog tableCatalog = catalog.asTableCatalog();
     Table createdTable =
         tableCatalog.createTable(
@@ -341,7 +407,7 @@ public class CatalogDorisIT extends AbstractIT {
             columns,
             table_comment,
             properties,
-            Transforms.EMPTY_TRANSFORM,
+            partitions,
             distribution,
             null,
             indexes);
@@ -491,6 +557,7 @@ public class CatalogDorisIT extends AbstractIT {
         };
 
     Map<String, String> properties = createTableProperties();
+    Transform[] partitions = createListPartition();
     TableCatalog tableCatalog = catalog.asTableCatalog();
     Table createdTable =
         tableCatalog.createTable(
@@ -498,7 +565,7 @@ public class CatalogDorisIT extends AbstractIT {
             columns,
             table_comment,
             properties,
-            Transforms.EMPTY_TRANSFORM,
+            partitions,
             distribution,
             null,
             indexes);
@@ -539,7 +606,26 @@ public class CatalogDorisIT extends AbstractIT {
     tableCatalog.alterTable(
         tableIdentifier,
         TableChange.addColumn(
-            new String[] {"col_4"}, Types.VarCharType.of(255), "col_4_comment", true));
+            new String[] {"col_5"}, Types.VarCharType.of(255), "col_5_comment", true));
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () ->
+                Assertions.assertEquals(
+                    5, tableCatalog.loadTable(tableIdentifier).columns().length));
+
+    ITUtils.assertColumn(
+        Column.of("col_5", Types.VarCharType.of(255), "col_5_comment"),
+        tableCatalog.loadTable(tableIdentifier).columns()[4]);
+
+    // change column position
+    // TODO: change column position is unstable, add it later
+
+    // drop column
+    tableCatalog.alterTable(
+        tableIdentifier, TableChange.deleteColumn(new String[] {"col_5"}, true));
+
     Awaitility.await()
         .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
         .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
@@ -547,25 +633,6 @@ public class CatalogDorisIT extends AbstractIT {
             () ->
                 Assertions.assertEquals(
                     4, tableCatalog.loadTable(tableIdentifier).columns().length));
-
-    ITUtils.assertColumn(
-        Column.of("col_4", Types.VarCharType.of(255), "col_4_comment"),
-        tableCatalog.loadTable(tableIdentifier).columns()[3]);
-
-    // change column position
-    // TODO: change column position is unstable, add it later
-
-    // drop column
-    tableCatalog.alterTable(
-        tableIdentifier, TableChange.deleteColumn(new String[] {"col_4"}, true));
-
-    Awaitility.await()
-        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
-        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
-        .untilAsserted(
-            () ->
-                Assertions.assertEquals(
-                    3, tableCatalog.loadTable(tableIdentifier).columns().length));
   }
 
   @Test
