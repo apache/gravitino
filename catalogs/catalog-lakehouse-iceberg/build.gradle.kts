@@ -55,6 +55,8 @@ dependencies {
     exclude("com.sun.jersey", "jersey-server")
   }
   implementation(libs.iceberg.hive.metastore)
+  implementation(libs.iceberg.aws)
+  implementation(libs.aws.sdk)
   implementation(libs.jackson.annotations)
   implementation(libs.jackson.databind)
   implementation(libs.jackson.datatype.jdk8)

@@ -14,7 +14,11 @@ import java.sql.Driver;
 import java.sql.DriverManager;
 import java.util.Collections;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import javax.ws.rs.NotSupportedException;
+import org.apache.iceberg.PartitionsUtils;
+import org.apache.iceberg.Table;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
@@ -29,6 +33,7 @@ import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.CreateNamespaceResponse;
 import org.apache.iceberg.rest.responses.GetNamespaceResponse;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
+import org.apache.iceberg.rest.responses.ListPartitionsResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
@@ -43,6 +48,8 @@ public class IcebergTableOps implements AutoCloseable {
   private final String catalogType;
   private String catalogUri = null;
 
+  private ExecutorService executorService;
+
   public IcebergTableOps(IcebergConfig icebergConfig) {
     this.catalogType = icebergConfig.get(IcebergConfig.CATALOG_BACKEND);
     if (!IcebergCatalogBackend.MEMORY.name().equalsIgnoreCase(catalogType)) {
@@ -53,6 +60,7 @@ public class IcebergTableOps implements AutoCloseable {
     if (catalog instanceof SupportsNamespaces) {
       asNamespaceCatalog = (SupportsNamespaces) catalog;
     }
+    executorService = Executors.newFixedThreadPool(icebergConfig.get(IcebergConfig.ICEBERG_EXECUTOR_POOL_SIZE));
   }
 
   public IcebergTableOps() {
@@ -141,6 +149,13 @@ public class IcebergTableOps implements AutoCloseable {
     Transaction transaction = icebergTableChange.getTransaction();
     transaction.commitTransaction();
     return loadTable(icebergTableChange.getTableIdentifier());
+  }
+
+  public ListPartitionsResponse listPartitions(TableIdentifier tableIdentifier) {
+    // get all partitions for given table
+    Table table = catalog.loadTable(tableIdentifier);
+    return ListPartitionsResponse.builder().addAll(
+        PartitionsUtils.partitions(table, executorService)).build();
   }
 
   @Override
