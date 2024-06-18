@@ -101,7 +101,19 @@ public interface Type {
   abstract class ComplexType implements Type {}
 
   /** The base type of all integral types. */
-  abstract class IntegralType extends NumericType {}
+  abstract class IntegralType extends NumericType {
+    private final boolean signed;
+
+    /** @param signed or unsigned of the integer type. */
+    public IntegralType(boolean signed) {
+      this.signed = signed;
+    }
+
+    /** @return True if the integer type has signed, false otherwise. */
+    public boolean signed() {
+      return signed;
+    }
+  }
 
   /** The base type of all fractional types. */
   abstract class FractionType extends NumericType {}
