@@ -82,9 +82,7 @@ public class TableNormalizeDispatcher implements TableDispatcher {
 
   @Override
   public boolean dropTable(NameIdentifier ident) {
-    // The constraints of the name spec may be more strict than underlying catalog,
-    // and for compatibility reasons, we only apply case-sensitive capabilities here.
-    return dispatcher.dropTable(applyCaseSensitive(ident, Capability.Scope.TABLE, dispatcher));
+    return dispatcher.dropTable(normalizeNameIdentifier(ident));
   }
 
   @Override

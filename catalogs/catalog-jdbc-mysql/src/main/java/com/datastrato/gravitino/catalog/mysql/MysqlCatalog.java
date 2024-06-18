@@ -18,6 +18,7 @@ import com.datastrato.gravitino.catalog.mysql.operation.MysqlDatabaseOperations;
 import com.datastrato.gravitino.catalog.mysql.operation.MysqlTableOperations;
 import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.PropertiesMetadata;
+import com.datastrato.gravitino.connector.capability.Capability;
 import java.util.Map;
 
 /** Implementation of a Mysql catalog in Gravitino. */
@@ -40,6 +41,11 @@ public class MysqlCatalog extends JdbcCatalog {
         createJdbcDatabaseOperations(),
         createJdbcTableOperations(),
         createJdbcColumnDefaultValueConverter());
+  }
+
+  @Override
+  public Capability newCapability() {
+    return new MysqlCatalogCapability();
   }
 
   @Override
