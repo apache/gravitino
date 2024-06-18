@@ -3,6 +3,7 @@
  * This software is licensed under the Apache License version 2.
  */
 import io.github.piyushroshan.python.VenvTask
+import java.net.Socket
 
 plugins {
   id("io.github.piyushroshan.python-gradle-miniforge-plugin") version "1.0.0"
@@ -21,11 +22,29 @@ fun deleteCacheDir(targetDir: String) {
   }
 }
 
+fun waitForPort(port: Int, host: String = "localhost", timeout: Long = 60000) {
+  val startTime = System.currentTimeMillis()
+  while (true) {
+    try {
+      Socket(host, port).use { return }  // If this succeeds, the port is open
+    } catch (e: Exception) {
+      // Port is not open yet, continue to wait
+    }
+    if (System.currentTimeMillis() - startTime > timeout) {
+      throw RuntimeException("Timed out waiting for port $port to be available")
+    }
+    Thread.sleep(1000)  // Wait for 1 second before checking again
+  }
+}
+
 fun gravitinoServer(operation: String) {
     val process = ProcessBuilder("${project.rootDir.path}/distribution/package/bin/gravitino.sh", operation).start()
     val exitCode = process.waitFor()
     if (exitCode == 0) {
       val currentContext = process.inputStream.bufferedReader().readText()
+      if (operation == "start") {
+        waitForPort(8090)
+      }
       println("Gravitino server status: $currentContext")
     } else {
       println("Gravitino server execution failed with exit code $exitCode")
