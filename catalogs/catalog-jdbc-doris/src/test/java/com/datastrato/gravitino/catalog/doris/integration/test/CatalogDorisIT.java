@@ -174,10 +174,12 @@ public class CatalogDorisIT extends AbstractIT {
   }
 
   private Column[] createColumns() {
-    Column col1 = Column.of(DORIS_COL_NAME1, Types.IntegerType.get(), "col_1_comment");
+    Column col1 =
+        Column.of(DORIS_COL_NAME1, Types.IntegerType.get(), "col_1_comment", false, false, null);
     Column col2 = Column.of(DORIS_COL_NAME2, Types.VarCharType.of(10), "col_2_comment");
     Column col3 = Column.of(DORIS_COL_NAME3, Types.VarCharType.of(10), "col_3_comment");
-    Column col4 = Column.of(DORIS_COL_NAME4, Types.DateType.get(), "col_4_comment");
+    Column col4 =
+        Column.of(DORIS_COL_NAME4, Types.DateType.get(), "col_4_comment", false, false, null);
 
     return new Column[] {col1, col2, col3, col4};
   }

@@ -273,7 +273,7 @@ public class DorisTableOperations extends JdbcTableOperations {
       partitionSqlBuilder.append(NEW_LINE).append(")");
     } else if (partitioning[0] instanceof Transforms.ListTransform) {
       Transforms.ListTransform listPartition = (Transforms.ListTransform) partitioning[0];
-      partitionSqlBuilder.append(" PARTITION BY LIST(");
+      partitionSqlBuilder.append(NEW_LINE).append(" PARTITION BY LIST(");
 
       ImmutableList.Builder<String> partitionColumnsBuilder = ImmutableList.builder();
       String[][] filedNames = listPartition.fieldNames();
