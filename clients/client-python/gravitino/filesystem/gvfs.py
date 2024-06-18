@@ -153,7 +153,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         """Check if a file or a directory exists.
         :param path: Virtual fileset path
         :param kwargs: Extra args
-        :return A file or directory exists, a boolean
+        :return If a file or directory exists, it returns True, otherwise False
         """
         context: FilesetContext = self._get_fileset_context(path)
         return context.get_fs().exists(
@@ -388,11 +388,8 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
     def cat_file(self, path, start=None, end=None, **kwargs):
         """Get the content of a file.
         :param path: Virtual fileset path
-        :param start:
-        :param end:
-            Bytes limits of the read. If negative, backwards from end,
-            like usual python slices. Either can be None for start or
-            end of file, respectively
+        :param start: The offset in bytes to start reading from. It can be None.
+        :param end: The offset in bytes to end reading at. It can be None.
         :param kwargs: Extra args
         :return File content
         """
