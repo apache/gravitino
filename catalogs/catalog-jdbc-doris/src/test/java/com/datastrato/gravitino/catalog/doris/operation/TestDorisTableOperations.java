@@ -454,12 +454,9 @@ public class TestDorisTableOperations extends TestDoris {
             .withDataType(Types.DateType.get())
             .withValue(tomorrow.toString())
             .build();
-    RangePartition rangePartition1 =
-        (RangePartition) Partitions.range("p1", todayLiteral, LiteralDTO.NULL, null);
-    RangePartition rangePartition2 =
-        (RangePartition) Partitions.range("p2", tomorrowLiteral, todayLiteral, null);
-    RangePartition rangePartition3 =
-        (RangePartition) Partitions.range("p3", LiteralDTO.NULL, tomorrowLiteral, null);
+    RangePartition rangePartition1 = Partitions.range("p1", todayLiteral, LiteralDTO.NULL, null);
+    RangePartition rangePartition2 = Partitions.range("p2", tomorrowLiteral, todayLiteral, null);
+    RangePartition rangePartition3 = Partitions.range("p3", LiteralDTO.NULL, tomorrowLiteral, null);
     Transform[] rangePartition =
         new Transform[] {
           Transforms.range(
@@ -491,17 +488,15 @@ public class TestDorisTableOperations extends TestDoris {
     LiteralDTO intLiteral2 =
         LiteralDTO.builder().withDataType(Types.IntegerType.get()).withValue("2").build();
     ListPartition listPartition1 =
-        (ListPartition)
-            Partitions.list(
-                "p1",
-                new Literal[][] {{intLiteral1, todayLiteral}, {intLiteral1, tomorrowLiteral}},
-                null);
+        Partitions.list(
+            "p1",
+            new Literal[][] {{intLiteral1, todayLiteral}, {intLiteral1, tomorrowLiteral}},
+            null);
     ListPartition listPartition2 =
-        (ListPartition)
-            Partitions.list(
-                "p2",
-                new Literal[][] {{intLiteral2, todayLiteral}, {intLiteral2, tomorrowLiteral}},
-                null);
+        Partitions.list(
+            "p2",
+            new Literal[][] {{intLiteral2, todayLiteral}, {intLiteral2, tomorrowLiteral}},
+            null);
     Transform[] listPartition =
         new Transform[] {
           Transforms.list(
