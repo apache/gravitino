@@ -641,6 +641,7 @@ tasks {
     dependsOn(
       ":catalogs:catalog-hive:copyLibAndConfig",
       ":catalogs:catalog-lakehouse-iceberg:copyLibAndConfig",
+      ":catalogs:catalog-lakehouse-paimon:copyLibAndConfig",
       ":catalogs:catalog-jdbc-doris:copyLibAndConfig",
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig",
