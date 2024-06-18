@@ -6,19 +6,25 @@ package com.datastrato.gravitino.catalog.doris.operation;
 
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
+import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
+import com.datastrato.gravitino.rel.expressions.literals.Literal;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
+import com.datastrato.gravitino.rel.partitions.ListPartition;
+import com.datastrato.gravitino.rel.partitions.Partitions;
+import com.datastrato.gravitino.rel.partitions.RangePartition;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
 import com.datastrato.gravitino.utils.RandomNameUtils;
 import com.google.common.collect.Maps;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -439,7 +445,27 @@ public class TestDorisTableOperations extends TestDoris {
 
     // create table with range partition
     String rangePartitionTableName = GravitinoITUtils.genRandomName("range_partition_table");
-    Transform[] rangePartition = new Transform[] {Transforms.range(new String[] {col4.name()})};
+    LocalDate today = LocalDate.now();
+    LocalDate tomorrow = today.plusDays(1);
+    LiteralDTO todayLiteral =
+        LiteralDTO.builder().withDataType(Types.DateType.get()).withValue(today.toString()).build();
+    LiteralDTO tomorrowLiteral =
+        LiteralDTO.builder()
+            .withDataType(Types.DateType.get())
+            .withValue(tomorrow.toString())
+            .build();
+    RangePartition rangePartition1 =
+        (RangePartition) Partitions.range("p1", todayLiteral, LiteralDTO.NULL, null);
+    RangePartition rangePartition2 =
+        (RangePartition) Partitions.range("p2", tomorrowLiteral, todayLiteral, null);
+    RangePartition rangePartition3 =
+        (RangePartition) Partitions.range("p3", LiteralDTO.NULL, tomorrowLiteral, null);
+    Transform[] rangePartition =
+        new Transform[] {
+          Transforms.range(
+              new String[] {col4.name()},
+              new RangePartition[] {rangePartition1, rangePartition2, rangePartition3})
+        };
     TABLE_OPERATIONS.create(
         databaseName,
         rangePartitionTableName,
@@ -460,8 +486,28 @@ public class TestDorisTableOperations extends TestDoris {
 
     // create table with list partition
     String listPartitionTableName = GravitinoITUtils.genRandomName("list_partition_table");
+    LiteralDTO intLiteral1 =
+        LiteralDTO.builder().withDataType(Types.IntegerType.get()).withValue("1").build();
+    LiteralDTO intLiteral2 =
+        LiteralDTO.builder().withDataType(Types.IntegerType.get()).withValue("2").build();
+    ListPartition listPartition1 =
+        (ListPartition)
+            Partitions.list(
+                "p1",
+                new Literal[][] {{intLiteral1, todayLiteral}, {intLiteral1, tomorrowLiteral}},
+                null);
+    ListPartition listPartition2 =
+        (ListPartition)
+            Partitions.list(
+                "p2",
+                new Literal[][] {{intLiteral2, todayLiteral}, {intLiteral2, tomorrowLiteral}},
+                null);
     Transform[] listPartition =
-        new Transform[] {Transforms.list(new String[] {col1.name()}, new String[] {col4.name()})};
+        new Transform[] {
+          Transforms.list(
+              new String[][] {{col1.name()}, {col4.name()}},
+              new ListPartition[] {listPartition1, listPartition2})
+        };
     TABLE_OPERATIONS.create(
         databaseName,
         listPartitionTableName,
