@@ -62,12 +62,11 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
           TestColumn.builder().withName("colNAME2").withType(Types.StringType.get()).build()
         };
     RangePartition assignedPartition =
-        (RangePartition)
-            Partitions.range(
-                "partition_V1",
-                Literals.stringLiteral("value1"),
-                Literals.stringLiteral("value2"),
-                null);
+        Partitions.range(
+            "partition_V1",
+            Literals.stringLiteral("value1"),
+            Literals.stringLiteral("value2"),
+            null);
     Transform[] transforms =
         new Transform[] {
           Transforms.range(
