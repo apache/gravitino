@@ -238,6 +238,12 @@ You can use this image to control Trino's permissions.
 
 Changelog
 
+- gravitino-ci-ranger:0.1.1
+  - Docker image datastrato/gravitino-ci-ranger:0.1.1
+  - Use `ranger-admin` release from `datastrato/apache-ranger:2.4.0` to build docker image.
+  - Remove unnecessary hack in `start-ranger-service.sh`.
+  - Reduce docker image build time from `~1h` to `~5min`.
+
 - gravitino-ci-ranger:0.1.0
   - Docker image `datastrato/gravitino-ci-ranger:0.1.0`
   - Support Apache Ranger 2.4.0
