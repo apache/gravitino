@@ -191,8 +191,7 @@ public class TestDTOConverters {
     Literal<?> lower = Literals.stringLiteral("2008-08-08");
     Literal<?> upper = Literals.stringLiteral("us");
     Map<String, String> properties = Collections.singletonMap("key", "value");
-    RangePartition rangePartition =
-        (RangePartition) Partitions.range("range", upper, lower, properties);
+    RangePartition rangePartition = Partitions.range("range", upper, lower, properties);
     Transform rangeTransform =
         Transforms.range(new String[] {"col1"}, new RangePartition[] {rangePartition});
 
@@ -210,7 +209,7 @@ public class TestDTOConverters {
 
     Literal<?> value = Literals.stringLiteral(Types.StringType.get().simpleString());
     Literal<?>[][] values = {new Literal[] {value}};
-    ListPartition listPartition = (ListPartition) Partitions.list("list", values, properties);
+    ListPartition listPartition = Partitions.list("list", values, properties);
     Transform listTransform =
         Transforms.list(new String[][] {{"col2"}}, new ListPartition[] {listPartition});
     ListPartitioningDTO listPartitioning = (ListPartitioningDTO) DTOConverters.toDTO(listTransform);
