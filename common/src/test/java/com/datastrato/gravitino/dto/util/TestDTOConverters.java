@@ -191,13 +191,13 @@ public class TestDTOConverters {
     Literal<?> lower = Literals.stringLiteral("2008-08-08");
     Literal<?> upper = Literals.stringLiteral("us");
     Map<String, String> properties = Collections.singletonMap("key", "value");
-    RangePartition rangePartition = (RangePartition) Partitions.range("range", upper, lower, properties);
+    RangePartition rangePartition =
+        (RangePartition) Partitions.range("range", upper, lower, properties);
     Transform rangeTransform =
-            Transforms.range(
-                    new String[]{"col1"},
-                    new RangePartition[]{rangePartition});
+        Transforms.range(new String[] {"col1"}, new RangePartition[] {rangePartition});
 
-    RangePartitioningDTO rangePartitioning = (RangePartitioningDTO) DTOConverters.toDTO(rangeTransform);
+    RangePartitioningDTO rangePartitioning =
+        (RangePartitioningDTO) DTOConverters.toDTO(rangeTransform);
     String[] rangePartitionFieldName = rangePartitioning.fieldName();
     RangePartitionDTO[] rangePartitionAssignments = rangePartitioning.assignments();
 
@@ -208,21 +208,19 @@ public class TestDTOConverters {
     Assertions.assertEquals("us", rangePartitionAssignments[0].upper().value());
     Assertions.assertEquals(properties, rangePartitionAssignments[0].properties());
 
-
     Literal<?> value = Literals.stringLiteral(Types.StringType.get().simpleString());
     Literal<?>[][] values = {new Literal[] {value}};
     ListPartition listPartition = (ListPartition) Partitions.list("list", values, properties);
     Transform listTransform =
-            Transforms.list(
-                    new String[][]{{"col2"}},
-                    new ListPartition[]{listPartition});
+        Transforms.list(new String[][] {{"col2"}}, new ListPartition[] {listPartition});
     ListPartitioningDTO listPartitioning = (ListPartitioningDTO) DTOConverters.toDTO(listTransform);
     String[][] listPartitionFieldNames = listPartitioning.fieldNames();
     ListPartitionDTO[] listPartitionAssignments = listPartitioning.assignments();
 
     Assertions.assertEquals("col2", listPartitionFieldNames[0][0]);
     Assertions.assertEquals(value.dataType(), listPartitionAssignments[0].lists()[0][0].dataType());
-    Assertions.assertEquals(Types.StringType.get().simpleString(), listPartitionAssignments[0].lists()[0][0].value());
+    Assertions.assertEquals(
+        Types.StringType.get().simpleString(), listPartitionAssignments[0].lists()[0][0].value());
     Assertions.assertEquals(properties, listPartitionAssignments[0].properties());
   }
 }
