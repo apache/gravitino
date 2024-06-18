@@ -283,7 +283,6 @@
 
    Apache Arrow
    ./dev/ci/util_free_space.sh
-   ./clients/client-python/gravitino/filesystem/gvfs.py
 
    This product bundles a third-party component under the
    MIT License.
