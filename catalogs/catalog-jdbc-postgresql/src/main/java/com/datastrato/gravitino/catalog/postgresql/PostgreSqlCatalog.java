@@ -16,6 +16,7 @@ import com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlTypeConve
 import com.datastrato.gravitino.catalog.postgresql.operation.PostgreSqlSchemaOperations;
 import com.datastrato.gravitino.catalog.postgresql.operation.PostgreSqlTableOperations;
 import com.datastrato.gravitino.connector.CatalogOperations;
+import com.datastrato.gravitino.connector.capability.Capability;
 import java.util.Map;
 
 public class PostgreSqlCatalog extends JdbcCatalog {
@@ -34,6 +35,11 @@ public class PostgreSqlCatalog extends JdbcCatalog {
         createJdbcDatabaseOperations(),
         createJdbcTableOperations(),
         createJdbcColumnDefaultValueConverter());
+  }
+
+  @Override
+  public Capability newCapability() {
+    return new PostgreSqlCatalogCapability();
   }
 
   @Override
