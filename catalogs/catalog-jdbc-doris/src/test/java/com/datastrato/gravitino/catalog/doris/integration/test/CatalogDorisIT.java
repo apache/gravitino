@@ -27,8 +27,8 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
-import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
+import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.indexes.Index;
@@ -263,9 +263,7 @@ public class CatalogDorisIT extends AbstractIT {
 
     Assertions.assertThrows(
         SchemaAlreadyExistsException.class,
-        () -> {
-          schemas.createSchema(schemaIdent.name(), schema_comment, Collections.emptyMap());
-        });
+        () -> schemas.createSchema(schemaIdent.name(), schema_comment, Collections.emptyMap()));
 
     // test drop schema
     Assertions.assertTrue(schemas.dropSchema(schemaIdent.name(), false));
@@ -315,11 +313,7 @@ public class CatalogDorisIT extends AbstractIT {
 
     // Check database has been dropped
     SupportsSchemas schemas = catalog.asSchemas();
-    Assertions.assertThrows(
-        NoSuchSchemaException.class,
-        () -> {
-          schemas.loadSchema(schemaName);
-        });
+    Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(schemaName));
   }
 
   @Test
@@ -333,52 +327,32 @@ public class CatalogDorisIT extends AbstractIT {
     String sqlInjection = databaseName + "`; DROP TABLE important_table; -- ";
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> {
-          schemas.createSchema(sqlInjection, comment, properties);
-        });
+        () -> schemas.createSchema(sqlInjection, comment, properties));
     Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> {
-          schemas.dropSchema(sqlInjection, false);
-        });
+        IllegalArgumentException.class, () -> schemas.dropSchema(sqlInjection, false));
 
     String sqlInjection1 = databaseName + "`; SLEEP(10); -- ";
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> {
-          schemas.createSchema(sqlInjection1, comment, properties);
-        });
+        () -> schemas.createSchema(sqlInjection1, comment, properties));
     Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> {
-          schemas.dropSchema(sqlInjection1, false);
-        });
+        IllegalArgumentException.class, () -> schemas.dropSchema(sqlInjection1, false));
 
     String sqlInjection2 =
         databaseName + "`; UPDATE Users SET password = 'newpassword' WHERE username = 'admin'; -- ";
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> {
-          schemas.createSchema(sqlInjection2, comment, properties);
-        });
+        () -> schemas.createSchema(sqlInjection2, comment, properties));
     Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> {
-          schemas.dropSchema(sqlInjection2, false);
-        });
+        IllegalArgumentException.class, () -> schemas.dropSchema(sqlInjection2, false));
 
     // should throw an exception with input that has more than 64 characters
     String invalidInput = StringUtils.repeat("a", 65);
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> {
-          schemas.createSchema(invalidInput, comment, properties);
-        });
+        () -> schemas.createSchema(invalidInput, comment, properties));
     Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> {
-          schemas.dropSchema(invalidInput, false);
-        });
+        IllegalArgumentException.class, () -> schemas.dropSchema(invalidInput, false));
   }
 
   @Test
@@ -442,22 +416,18 @@ public class CatalogDorisIT extends AbstractIT {
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> {
-          tableCatalog.createTable(
-              tableIdentifier,
-              columns,
-              table_comment,
-              properties,
-              Transforms.EMPTY_TRANSFORM,
-              Distributions.NONE,
-              new SortOrder[0],
-              t1_indexes);
-        });
+        () ->
+            tableCatalog.createTable(
+                tableIdentifier,
+                columns,
+                table_comment,
+                properties,
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                new SortOrder[0],
+                t1_indexes));
     Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> {
-          catalog.asTableCatalog().dropTable(tableIdentifier);
-        });
+        IllegalArgumentException.class, () -> catalog.asTableCatalog().dropTable(tableIdentifier));
 
     String t2_name = table_name + "`; SLEEP(10); -- ";
     Column t2_col = Column.of(t2_name, Types.LongType.get(), "id", false, false, null);
@@ -468,22 +438,18 @@ public class CatalogDorisIT extends AbstractIT {
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> {
-          tableCatalog.createTable(
-              tableIdentifier2,
-              columns2,
-              table_comment,
-              properties,
-              Transforms.EMPTY_TRANSFORM,
-              Distributions.NONE,
-              new SortOrder[0],
-              t2_indexes);
-        });
+        () ->
+            tableCatalog.createTable(
+                tableIdentifier2,
+                columns2,
+                table_comment,
+                properties,
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                new SortOrder[0],
+                t2_indexes));
     Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> {
-          catalog.asTableCatalog().dropTable(tableIdentifier2);
-        });
+        IllegalArgumentException.class, () -> catalog.asTableCatalog().dropTable(tableIdentifier2));
 
     String t3_name =
         table_name + "`; UPDATE Users SET password = 'newpassword' WHERE username = 'admin'; -- ";
@@ -495,22 +461,18 @@ public class CatalogDorisIT extends AbstractIT {
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> {
-          tableCatalog.createTable(
-              tableIdentifier3,
-              columns3,
-              table_comment,
-              properties,
-              Transforms.EMPTY_TRANSFORM,
-              Distributions.NONE,
-              new SortOrder[0],
-              t3_indexes);
-        });
+        () ->
+            tableCatalog.createTable(
+                tableIdentifier3,
+                columns3,
+                table_comment,
+                properties,
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                new SortOrder[0],
+                t3_indexes));
     Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> {
-          catalog.asTableCatalog().dropTable(tableIdentifier3);
-        });
+        IllegalArgumentException.class, () -> catalog.asTableCatalog().dropTable(tableIdentifier3));
 
     String invalidInput = StringUtils.repeat("a", 65);
     Column t4_col = Column.of(invalidInput, Types.LongType.get(), "id", false, false, null);
@@ -521,22 +483,18 @@ public class CatalogDorisIT extends AbstractIT {
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> {
-          tableCatalog.createTable(
-              tableIdentifier4,
-              columns4,
-              table_comment,
-              properties,
-              Transforms.EMPTY_TRANSFORM,
-              Distributions.NONE,
-              new SortOrder[0],
-              t4_indexes);
-        });
+        () ->
+            tableCatalog.createTable(
+                tableIdentifier4,
+                columns4,
+                table_comment,
+                properties,
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                new SortOrder[0],
+                t4_indexes));
     Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> {
-          catalog.asTableCatalog().dropTable(tableIdentifier4);
-        });
+        IllegalArgumentException.class, () -> catalog.asTableCatalog().dropTable(tableIdentifier4));
   }
 
   @Test
