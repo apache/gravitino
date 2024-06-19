@@ -97,7 +97,7 @@ You can use these kinds of Docker images to facilitate integration testing of al
 You can use this kind of image to test the catalog of Apache Hive with kerberos enable
 
 Changelog
-- gravitino-ci-kerberos-hive:0.1.2
+- gravitino-ci-kerberos-hive:0.1.3
   - Add more proxy users in the core-site.xml file.
   - fix bugs in the `start.sh` script.
 
