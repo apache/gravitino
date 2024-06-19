@@ -91,7 +91,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
    */
   @Override
   public Fileset loadFileset(NameIdentifier ident) throws NoSuchFilesetException {
-    checkFilesetNameIdentifer(ident);
+    checkFilesetNameIdentifier(ident);
 
     Namespace fullNamespace = getFilesetFullNamespace(ident.namespace());
     FilesetResponse resp =
@@ -130,7 +130,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
       String storageLocation,
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
-    checkFilesetNameIdentifer(ident);
+    checkFilesetNameIdentifier(ident);
 
     Namespace fullNamespace = getFilesetFullNamespace(ident.namespace());
     FilesetCreateRequest req =
@@ -166,7 +166,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
   @Override
   public Fileset alterFileset(NameIdentifier ident, FilesetChange... changes)
       throws NoSuchFilesetException, IllegalArgumentException {
-    checkFilesetNameIdentifer(ident);
+    checkFilesetNameIdentifier(ident);
 
     Namespace fullNamespace = getFilesetFullNamespace(ident.namespace());
     List<FilesetUpdateRequest> updates =
@@ -199,7 +199,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
    */
   @Override
   public boolean dropFileset(NameIdentifier ident) {
-    checkFilesetNameIdentifer(ident);
+    checkFilesetNameIdentifier(ident);
 
     Namespace fullNamespace = getFilesetFullNamespace(ident.namespace());
     DropResponse resp =
@@ -241,10 +241,10 @@ public class FilesetCatalog extends BaseSchemaCatalog
    *
    * @param ident The NameIdentifier to check
    */
-  static void checkFilesetNameIdentifer(NameIdentifier ident) {
-    NameIdentifier.check(ident != null, "NameIdentifer must not be null");
+  static void checkFilesetNameIdentifier(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "NameIdentifier must not be null");
     NameIdentifier.check(
-        ident.name() != null && !ident.name().isEmpty(), "NameIdentifer name must not be empty");
+        ident.name() != null && !ident.name().isEmpty(), "NameIdentifier name must not be empty");
     checkFilesetNamespace(ident.namespace());
   }
 
