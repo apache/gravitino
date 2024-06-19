@@ -31,6 +31,8 @@ public class TestMetalakeAdminFilter {
     Mockito.when(requestContext.getMethod()).thenReturn(BasedRoleFilter.POST);
     AccessControlManager accessControlManager = Mockito.mock(AccessControlManager.class);
     RoleEntity roleEntity = Mockito.mock(RoleEntity.class);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "accessControlManager", accessControlManager, true);
     Mockito.when(accessControlManager.getRolesByUserFromMetalake(any(), any()))
         .thenReturn(Lists.newArrayList(roleEntity));
     Mockito.when(
