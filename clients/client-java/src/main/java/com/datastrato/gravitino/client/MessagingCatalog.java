@@ -96,7 +96,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
    */
   @Override
   public Topic loadTopic(NameIdentifier ident) throws NoSuchTopicException {
-    checkTopicNameIdentifer(ident);
+    checkTopicNameIdentifier(ident);
 
     Namespace fullNamespace = getTopicFullNamespace(ident.namespace());
     TopicResponse resp =
@@ -127,7 +127,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
   public Topic createTopic(
       NameIdentifier ident, String comment, DataLayout dataLayout, Map<String, String> properties)
       throws NoSuchSchemaException, TopicAlreadyExistsException {
-    checkTopicNameIdentifer(ident);
+    checkTopicNameIdentifier(ident);
 
     Namespace fullNamespace = getTopicFullNamespace(ident.namespace());
     TopicCreateRequest req =
@@ -161,7 +161,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
   @Override
   public Topic alterTopic(NameIdentifier ident, TopicChange... changes)
       throws NoSuchTopicException, IllegalArgumentException {
-    checkTopicNameIdentifer(ident);
+    checkTopicNameIdentifier(ident);
 
     Namespace fullNamespace = getTopicFullNamespace(ident.namespace());
     List<TopicUpdateRequest> updates =
@@ -191,7 +191,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
    */
   @Override
   public boolean dropTopic(NameIdentifier ident) {
-    checkTopicNameIdentifer(ident);
+    checkTopicNameIdentifier(ident);
 
     Namespace fullNamespace = getTopicFullNamespace(ident.namespace());
     DropResponse resp =
@@ -228,10 +228,10 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
    *
    * @param ident The NameIdentifier to check
    */
-  static void checkTopicNameIdentifer(NameIdentifier ident) {
-    NameIdentifier.check(ident != null, "NameIdentifer must not be null");
+  static void checkTopicNameIdentifier(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "NameIdentifier must not be null");
     NameIdentifier.check(
-        ident.name() != null && !ident.name().isEmpty(), "NameIdentifer name must not be empty");
+        ident.name() != null && !ident.name().isEmpty(), "NameIdentifier name must not be empty");
     checkTopicNamespace(ident.namespace());
   }
 
