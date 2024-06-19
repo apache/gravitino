@@ -67,11 +67,11 @@ public class HiveUserAuthenticationIT extends AbstractIT {
 
   private static String TMP_DIR;
 
-  private static String HIVE_METASTORE_URI;
+  protected static String HIVE_METASTORE_URI;
 
   private static GravitinoAdminClient adminClient;
 
-  private static HiveContainer kerberosHiveContainer;
+  protected static HiveContainer kerberosHiveContainer;
 
   private static final String METALAKE_NAME = GravitinoITUtils.genRandomName("test_metalake");
   private static final String CATALOG_NAME = GravitinoITUtils.genRandomName("test_catalog");
