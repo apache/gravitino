@@ -29,8 +29,8 @@ public class MetadataObjects {
   /**
    * Create the metadata object with the given name, parent and type.
    *
-   * @param name The name of the metadata object
    * @param parent The parent of the metadata object
+   * @param name The name of the metadata object
    * @param type The type of the metadata object
    * @return The created metadata object
    */
@@ -96,7 +96,7 @@ public class MetadataObjects {
       if (type != MetadataObject.Type.METALAKE) {
         throw new IllegalArgumentException("If metadata object isn't metalake, it can't be `*`");
       }
-      return new MetadataObjectImpl(METADATA_OBJECT_RESERVED_NAME, null, type);
+      return new MetadataObjectImpl(null, METADATA_OBJECT_RESERVED_NAME, type);
     }
 
     Preconditions.checkArgument(
@@ -135,9 +135,16 @@ public class MetadataObjects {
 
     private final Type type;
 
+    /**
+     * Create the metadata object with the given name, parent and type.
+     *
+     * @param parent The parent of the metadata object
+     * @param name The name of the metadata object
+     * @param type The type of the metadata object
+     */
     public MetadataObjectImpl(String parent, String name, Type type) {
-      this.name = name;
       this.parent = parent;
+      this.name = name;
       this.type = type;
     }
 
