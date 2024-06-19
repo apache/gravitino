@@ -97,13 +97,29 @@ public class SparkTypeConverter {
 
   public DataType toSparkType(Type gravitinoType) {
     if (gravitinoType instanceof Types.ByteType) {
-      return DataTypes.ByteType;
+      if (((Types.ByteType) gravitinoType).signed()) {
+        return DataTypes.ByteType;
+      } else {
+        return DataTypes.ShortType;
+      }
     } else if (gravitinoType instanceof Types.ShortType) {
-      return DataTypes.ShortType;
+      if (((Types.ShortType) gravitinoType).signed()) {
+        return DataTypes.ShortType;
+      } else {
+        return DataTypes.IntegerType;
+      }
     } else if (gravitinoType instanceof Types.IntegerType) {
-      return DataTypes.IntegerType;
+      if (((Types.IntegerType) gravitinoType).signed()) {
+        return DataTypes.IntegerType;
+      } else {
+        return DataTypes.LongType;
+      }
     } else if (gravitinoType instanceof Types.LongType) {
-      return DataTypes.LongType;
+      if (((Types.LongType) gravitinoType).signed()) {
+        return DataTypes.LongType;
+      } else {
+        return DataTypes.createDecimalType(20, 0);
+      }
     } else if (gravitinoType instanceof Types.FloatType) {
       return DataTypes.FloatType;
     } else if (gravitinoType instanceof Types.DoubleType) {

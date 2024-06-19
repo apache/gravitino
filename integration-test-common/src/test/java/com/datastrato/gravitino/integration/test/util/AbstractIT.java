@@ -21,6 +21,7 @@ import com.datastrato.gravitino.server.ServerConfig;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import java.io.File;
 import java.io.IOException;
+import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -30,6 +31,7 @@ import java.sql.DriverManager;
 import java.sql.Statement;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -40,6 +42,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 @ExtendWith({PrintFuncNameExtension.class, CloseContainerExtension.class})
 public class AbstractIT {
@@ -214,6 +217,11 @@ public class AbstractIT {
       }
 
       GravitinoITUtils.startGravitinoServer();
+
+      Awaitility.await()
+          .atMost(60, TimeUnit.SECONDS)
+          .pollInterval(1, TimeUnit.SECONDS)
+          .until(() -> isGravitinoServerUp());
     }
 
     JettyServerConfig jettyServerConfig =
@@ -274,6 +282,23 @@ public class AbstractIT {
     } catch (IOException e) {
       LOG.warn("Can't get git commit id for:", e);
       return "";
+    }
+  }
+
+  private static boolean isGravitinoServerUp() {
+    JettyServerConfig jettyServerConfig =
+        JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
+    String host = jettyServerConfig.getHost();
+    int port = jettyServerConfig.getHttpPort();
+    int timeout = 3000; // 3 second timeout
+
+    try (Socket socket = new Socket()) {
+      socket.connect(new java.net.InetSocketAddress(host, port), timeout);
+      LOG.info("Gravitino Server is up and running.");
+      return true;
+    } catch (Exception e) {
+      LOG.warn("Gravitino Server is not accessible.");
+      return false;
     }
   }
 }

@@ -105,9 +105,9 @@ public interface FilesetVersionMapper {
   @Delete(
       "DELETE FROM "
           + VERSION_TABLE_NAME
-          + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeLine} LIMIT #{limit}")
-  Integer deleteFilesetVersionsByLegacyTimeLine(
-      @Param("legacyTimeLine") Long legacyTimeLine, @Param("limit") int limit);
+          + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}")
+  Integer deleteFilesetVersionsByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 
   @Select(
       "SELECT fileset_id as filesetId,"

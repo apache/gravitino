@@ -85,8 +85,8 @@ elif [ "${component_type}" == "doris" ]; then
   . ${script_dir}/doris/doris-dependency.sh --platform ${platform_type}
   build_args="--build-arg DORIS_VERSION=${DORIS_VERSION}"
 elif [ "${component_type}" == "ranger" ]; then
-  # Multiple plugins can be passed using commas, e.g. `plugin-trino,plugin-hive`
-  build_args="--build-arg RANGER_VERSION=2.4.0 --build-arg RANGER_PLUGINS=plugin-trino,plugin-hive"
+  . ${script_dir}/ranger/ranger-dependency.sh
+  build_args="--build-arg RANGER_PACKAGE_NAME=${RANGER_PACKAGE_NAME} --build-arg MYSQL_CONNECTOR_PACKAGE_NAME=${MYSQL_CONNECTOR_PACKAGE_NAME} --build-arg LOG4JDBC_PACKAGE_NAME=${LOG4JDBC_PACKAGE_NAME} --build-arg RANGER_VERSION=${RANGER_VERSION}"
 else
   echo "ERROR : ${component_type} is not a valid component type"
   usage

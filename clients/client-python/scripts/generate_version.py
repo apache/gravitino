@@ -37,7 +37,13 @@ def main():
         Version.COMPILE_DATE.value: compile_date,
     }
 
+    license_header = [
+        "# Copyright 2024 Datastrato Pvt Ltd.\n",
+        "# This software is licensed under the Apache License version 2.\n",
+    ]
+
     with open(VERSION_INI, "w", encoding="utf-8") as f:
+        f.writelines(license_header)
         config.write(f)
 
 

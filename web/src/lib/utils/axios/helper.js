@@ -20,7 +20,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-*/
+ */
 
 /**
  * Referred from src/utils/http/axios/helper.ts
@@ -30,9 +30,13 @@ import { isObject, isString } from '@/lib/utils/is'
 
 const DATE_TIME_FORMAT = 'YYYY-MM-DD HH:mm:ss'
 
-export function joinTimestamp<T extends boolean>(join: boolean, restful: T): T extends true ? string : object
-
-export function joinTimestamp(join: boolean, restful = false): string | object {
+/**
+ * @template T
+ * @param {boolean} join
+ * @param {T} restful
+ * @returns {T extends true ? string : object}
+ */
+export function joinTimestamp(join, restful = false) {
   if (!join) {
     return restful ? '' : {}
   }
@@ -45,9 +49,14 @@ export function joinTimestamp(join: boolean, restful = false): string | object {
 }
 
 /**
- * @description: Format request parameter time
+ * @typedef {Object.<string, any>} Recordable
  */
-export function formatRequestDate(params: Recordable) {
+
+/**
+ * @description: Format request parameter time
+ * @param {Recordable} params
+ */
+export function formatRequestDate(params) {
   if (Object.prototype.toString.call(params) !== '[object Object]') {
     return
   }
@@ -62,7 +71,7 @@ export function formatRequestDate(params: Recordable) {
       if (value) {
         try {
           params[key] = isString(value) ? value.trim() : value
-        } catch (error: any) {
+        } catch (error) {
           throw new Error(error)
         }
       }

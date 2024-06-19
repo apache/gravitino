@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.trino.connector;
 
+import static com.datastrato.gravitino.trino.connector.GravitinoConnectorFactory.DEFAULT_CONNECTOR_NAME;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.trino.spi.connector.ConnectorTransactionHandle;
@@ -36,5 +38,10 @@ public class GravitinoTransactionHandle
   @Override
   public ConnectorTransactionHandle getInternalHandle() {
     return handleWrapper.getHandle();
+  }
+
+  @Override
+  public String toString() {
+    return DEFAULT_CONNECTOR_NAME + "->" + getInternalHandle().toString();
   }
 }
