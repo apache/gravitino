@@ -4,11 +4,11 @@
  */
 package com.datastrato.gravitino.catalog;
 
-import static com.datastrato.gravitino.Entity.SECURABLE_ENTITY_RESERVED_NAME;
 import static com.datastrato.gravitino.Entity.SYSTEM_CATALOG_RESERVED_NAME;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
+import com.datastrato.gravitino.MetadataObjects;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
@@ -21,7 +21,7 @@ import java.util.Set;
 
 public class CatalogNormalizeDispatcher implements CatalogDispatcher {
   private static final Set<String> RESERVED_WORDS =
-      ImmutableSet.of(SECURABLE_ENTITY_RESERVED_NAME, SYSTEM_CATALOG_RESERVED_NAME);
+      ImmutableSet.of(MetadataObjects.METADATA_OBJECT_RESERVED_NAME, SYSTEM_CATALOG_RESERVED_NAME);
   /**
    * Regular expression explanation:
    *
