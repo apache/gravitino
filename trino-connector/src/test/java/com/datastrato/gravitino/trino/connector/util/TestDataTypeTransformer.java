@@ -130,6 +130,16 @@ public class TestDataTypeTransformer {
         DecimalType.createDecimalType(10, 2));
 
     Assertions.assertEquals(
+        dataTypeTransformer.getTrinoType(Types.ByteType.unsigned()), SmallintType.SMALLINT);
+    Assertions.assertEquals(
+        dataTypeTransformer.getTrinoType(Types.ShortType.unsigned()), IntegerType.INTEGER);
+    Assertions.assertEquals(
+        dataTypeTransformer.getTrinoType(Types.IntegerType.unsigned()), BigintType.BIGINT);
+    Assertions.assertEquals(
+        dataTypeTransformer.getTrinoType(Types.LongType.unsigned()),
+        DecimalType.createDecimalType(20, 0));
+
+    Assertions.assertEquals(
         dataTypeTransformer.getTrinoType(Types.FixedCharType.of(10)), CharType.createCharType(10));
     Assertions.assertEquals(
         dataTypeTransformer.getTrinoType(Types.VarCharType.of(10)),

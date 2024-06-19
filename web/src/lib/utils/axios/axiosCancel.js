@@ -20,28 +20,58 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-*/
-
-/**
- * Referred from src/enums/httpEnum.ts
  */
 
-export enum ContentTypeEnum {
-  JSON = 'application/json;charset=UTF-8',
-  FORM_URLENCODED = 'application/x-www-form-urlencoded;charset=UTF-8',
-  FORM_DATA = 'multipart/form-data;charset=UTF-8'
+import axios from 'axios'
+
+/**
+ * @typedef {import('axios').AxiosRequestConfig} AxiosRequestConfig
+ */
+
+const pendingMap = new Map()
+
+/**
+ * @param {AxiosRequestConfig} config
+ * @returns {string}
+ */
+const getPendingUrl = config => {
+  return [config.method, config.url].join('&')
 }
 
-export enum RequestEnum {
-  GET = 'GET',
-  POST = 'POST',
-  PUT = 'PUT',
-  DELETE = 'DELETE'
+class AxiosCanceler {
+  addPending(config) {
+    this.removePending(config)
+    const url = getPendingUrl(config)
+    const controller = new AbortController()
+    config.signal = config.signal || controller.signal
+    if (!pendingMap.has(url)) {
+      pendingMap.set(url, controller)
+    }
+  }
+
+  removeAllPending() {
+    pendingMap.forEach(abortController => {
+      if (abortController) {
+        abortController.abort()
+      }
+    })
+    this.reset()
+  }
+
+  removePending(config) {
+    const url = getPendingUrl(config)
+    if (pendingMap.has(url)) {
+      const abortController = pendingMap.get(url)
+      if (abortController) {
+        abortController.abort(url)
+      }
+      pendingMap.delete(url)
+    }
+  }
+
+  reset() {
+    pendingMap.clear()
+  }
 }
 
-export enum ResultEnum {
-  SUCCESS = 0,
-  ERROR = -1,
-  TIMEOUT = 401,
-  TYPE = 'success'
-}
+export { AxiosCanceler }

@@ -30,6 +30,9 @@ DORIS_BE_SCRIPT="${DORIS_BE_HOME}/bin/start_be.sh"
 sed -i '/Please set vm.max_map_count/,/exit 1/{s/exit 1/#exit 1\n        echo "skip this"/}' ${DORIS_BE_SCRIPT}
 sed -i '/Please set the maximum number of open file descriptors/,/exit 1/{s/exit 1/#exit 1\n        echo "skip this"/}' ${DORIS_BE_SCRIPT}
 
+# remove chmod command in start_be.sh, it will cost a lot of time. Add it to Dockerfile
+sed -i 's/chmod 755 "${DORIS_HOME}\/lib\/doris_be"/#&/' ${DORIS_BE_SCRIPT}
+
 # update fe.conf & be.conf, set priority_networks
 CONTAINER_IP=$(hostname -i)
 PRIORITY_NETWORKS=$(echo "${CONTAINER_IP}" | awk -F '.' '{print$1"."$2"."$3".0/24"}')

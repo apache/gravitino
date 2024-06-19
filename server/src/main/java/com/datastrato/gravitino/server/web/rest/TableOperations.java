@@ -148,9 +148,7 @@ public class TableOperations {
           httpRequest,
           () -> {
             NameIdentifier ident = NameIdentifierUtil.ofTable(metalake, catalog, schema, table);
-            Table t =
-                TreeLockUtils.doWithTreeLock(
-                    ident, LockType.READ, () -> dispatcher.loadTable(ident));
+            Table t = dispatcher.loadTable(ident);
             Response response = Utils.ok(new TableResponse(DTOConverters.toDTO(t)));
             LOG.info("Table loaded: {}.{}.{}.{}", metalake, catalog, schema, table);
             return response;

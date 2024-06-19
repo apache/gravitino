@@ -20,29 +20,24 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-*/
-
+ */
 /**
  * Referred from src/utils/http/axios/index.ts
  */
 
-// ** The axios configuration can be changed according to the project, just change the file, other files can be left unchanged
-
-import type { AxiosInstance, AxiosResponse } from 'axios'
+import axios from 'axios'
 import { clone } from 'lodash-es'
-import type { RequestOptions, Result } from '@/types/axios'
-import type { AxiosTransform, CreateAxiosOptions } from './axiosTransform'
-import { NextAxios } from './Axios'
-import { checkStatus } from './checkStatus'
 import toast from 'react-hot-toast'
+import qs from 'qs'
 import { RequestEnum, ResultEnum, ContentTypeEnum } from '@/lib/enums/httpEnum'
 import { isString, isUndefined, isNull, isEmpty } from '@/lib/utils/is'
 import { setObjToUrlParams, deepMerge } from '@/lib/utils'
 import { joinTimestamp, formatRequestDate } from './helper'
 import { AxiosRetry } from './axiosRetry'
-import axios from 'axios'
+import { AxiosCanceler } from './axiosCancel'
+import { NextAxios } from './Axios'
+import { checkStatus } from './checkStatus'
 import { useAuth as Auth } from '../../provider/session'
-import qs from 'qs'
 
 let isRefreshing = false
 
@@ -64,11 +59,14 @@ const resetToLoginState = () => {
 /**
  * @description: Data processing to facilitate the distinction of multiple processing methods
  */
-const transform: AxiosTransform = {
+const transform = {
   /**
    * @description: Handling response data. If the data does not conform to the expected format, an error can be thrown directly
+   * @param {AxiosResponse<Result>} res
+   * @param {RequestOptions} options
+   * @returns {any}
    */
-  transformResponseHook: (res: AxiosResponse<Result>, options: RequestOptions) => {
+  transformResponseHook: (res, options) => {
     const { isTransformResponse, isReturnNativeResponse } = options
 
     // ** Whether to return the native response headers, for example: use this property when you need to access the response headers
@@ -112,7 +110,6 @@ const transform: AxiosTransform = {
       case ResultEnum.TIMEOUT:
         timeoutMsg = 'Login timed out, please log in again!'
         Auth().logout()
-
         break
       default:
         if (message) {
@@ -130,6 +127,11 @@ const transform: AxiosTransform = {
   },
 
   // ** Handling Configuration Prior to Request
+  /**
+   * @param {InternalAxiosRequestConfig} config
+   * @param {RequestOptions} options
+   * @returns {InternalAxiosRequestConfig}
+   */
   beforeRequestHook: (config, options) => {
     const { apiUrl, joinPrefix, joinParamsToUrl, formatDate, joinTime = true, urlPrefix } = options
 
@@ -168,7 +170,7 @@ const transform: AxiosTransform = {
           // config.params = undefined
         }
         if (joinParamsToUrl) {
-          config.url = setObjToUrlParams(config.url as string, Object.assign({}, config.params, config.data))
+          config.url = setObjToUrlParams(config.url, Object.assign({}, config.params, config.data))
         }
       } else {
         // ** Supporting RESTful Style
@@ -181,37 +183,40 @@ const transform: AxiosTransform = {
   },
 
   /**
-   * @description: Interceptor Handling of Requests
+   * @param {InternalAxiosRequestConfig} config
+   * @param {CreateAxiosOptions} options
+   * @returns {InternalAxiosRequestConfig}
    */
   requestInterceptors: (config, options) => {
     // ** Pre-Request Configuration Handling
     const token = localStorage.getItem('accessToken')
 
-    if (token && (config as Recordable)?.requestOptions?.withToken !== false) {
+    if (token && config?.requestOptions?.withToken !== false) {
       // ** jwt token
-      ;(config as Recordable).headers.Authorization = options.authenticationScheme
-        ? `${options.authenticationScheme} ${token}`
-        : token
+      config.headers.Authorization = options.authenticationScheme ? `${options.authenticationScheme} ${token}` : token
     }
 
     return config
   },
 
   /**
-   * @description: Interceptor Handling of Responses
+   * @param {AxiosResponse<any>} res
+   * @returns {AxiosResponse<any>}
    */
-  responseInterceptors: (res: AxiosResponse<any>) => {
+  responseInterceptors: res => {
     return res
   },
 
   /**
-   * @description: Error Response Handling
+   * @param {AxiosInstance} axiosInstance
+   * @param {any} error
+   * @returns {Promise<any>}
    */
-  responseInterceptorsCatch: (axiosInstance: AxiosInstance, error: any) => {
+  responseInterceptorsCatch: (axiosInstance, error) => {
     const { response, code, message, config: originConfig } = error || {}
     const errorMessageMode = originConfig?.requestOptions?.errorMessageMode || 'none'
-    const msg: string = response?.data?.error?.message ?? response?.data?.message ?? ''
-    const err: string = error?.toString?.() ?? ''
+    const msg = response?.data?.error?.message ?? response?.data?.message ?? ''
+    const err = error?.toString?.() ?? ''
     let errMessage = ''
 
     if (axios.isCancel(error)) {
@@ -236,7 +241,7 @@ const transform: AxiosTransform = {
         return Promise.reject(error)
       }
     } catch (error) {
-      throw new Error(error as unknown as string)
+      throw new Error(error)
     }
 
     checkStatus(error?.response?.status, msg, errorMessageMode)
@@ -283,7 +288,11 @@ const transform: AxiosTransform = {
   }
 }
 
-function createAxios(opt?: Partial<CreateAxiosOptions>) {
+/**
+ * @param {Partial<CreateAxiosOptions>} [opt]
+ * @returns {NextAxios}
+ */
+function createAxios(opt) {
   return new NextAxios(
     deepMerge(
       {

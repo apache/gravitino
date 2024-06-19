@@ -140,7 +140,7 @@ public class ConfigEntry<T> {
    * Split the string to a list, then map each string element to its converted form.
    *
    * @param str The string form of the value list from the conf entry.
-   * @param converter The orignal ConfigEntry valueConverter.
+   * @param converter The original ConfigEntry valueConverter.
    * @return The list of converted type.
    */
   public List<T> strToSeq(String str, Function<String, T> converter) {
@@ -154,7 +154,7 @@ public class ConfigEntry<T> {
    * Reduce the values then join them as a string.
    *
    * @param seq The sequence of the value list from the conf entry.
-   * @param converter The orignal ConfigEntry stringConverter.
+   * @param converter The original ConfigEntry stringConverter.
    * @return The converted string.
    */
   public String seqToStr(List<T> seq, Function<T, String> converter) {

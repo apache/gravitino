@@ -58,7 +58,7 @@ public class TableDTO implements Table {
    * @param properties The properties associated with the table.
    * @param audit The audit information for the table.
    * @param partitioning The partitioning of the table.
-   * @param indexes Teh indexes of the table.
+   * @param indexes The indexes of the table.
    */
   private TableDTO(
       String name,

@@ -39,7 +39,6 @@ public class TrinoQueryITBase {
 
   protected static boolean started = false;
 
-  // TODO(yuhui) redo get the configs after we have the Docker image ready for testing.
   protected static String gravitinoUri = "http://127.0.0.1:8090";
   protected static String trinoUri = "http://127.0.0.1:8080";
   protected static String hiveMetastoreUri = "thrift://127.0.0.1:9083";
