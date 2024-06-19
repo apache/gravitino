@@ -209,7 +209,7 @@ Each list in the lists must have the same length. The values in each list must c
 You can add a partition to a partitioned table by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{partitioned_table_name}/partitions` endpoint or by using the Gravitino Java client.
 The following is an example of adding a identity partition to a Hive partitioned table:
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -275,7 +275,7 @@ Partition addedPartition =
 You can get a partition by its name via sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{partitioned_table_name}/partitions/{partition_name}` endpoint or by using the Gravitino Java client.
 The following is an example of getting a partition by its name:
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -315,7 +315,7 @@ Partition Partition =
 You can list all partition names under a partitioned table by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{partitioned_table_name}/partitions` endpoint or by using the Gravitino Java client.
 The following is an example of listing all partition names under a partitioned table:
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -351,7 +351,7 @@ String[] partitionNames =
 If you want to get more detailed information about the partitions under a partitioned table, you can list all partitions under a partitioned table by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{partitioned_table_name}/partitions` endpoint or by using the Gravitino Java client.
 The following is an example of listing all partitions under a partitioned table:
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -382,7 +382,7 @@ Partition[] partitions =
 You can drop a partition by its name via sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{partitioned_table_name}/partitions/{partition_name}` endpoint or by using the Gravitino Java client.
 The following is an example of dropping a partition by its name:
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell

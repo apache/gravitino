@@ -24,7 +24,7 @@ public class Partitions {
    * @param properties The properties of the partition.
    * @return The created partition.
    */
-  public static Partition range(
+  public static RangePartition range(
       String name, Literal<?> upper, Literal<?> lower, Map<String, String> properties) {
     return new RangePartitionImpl(name, upper, lower, properties);
   }
@@ -37,7 +37,8 @@ public class Partitions {
    * @param properties The properties of the partition.
    * @return The created partition.
    */
-  public static Partition list(String name, Literal<?>[][] lists, Map<String, String> properties) {
+  public static ListPartition list(
+      String name, Literal<?>[][] lists, Map<String, String> properties) {
     return new ListPartitionImpl(name, lists, properties);
   }
 
@@ -52,7 +53,7 @@ public class Partitions {
    * @param properties The properties of the partition.
    * @return The created partition.
    */
-  public static Partition identity(
+  public static IdentityPartition identity(
       String name, String[][] fieldNames, Literal<?>[] values, Map<String, String> properties) {
     return new IdentityPartitionImpl(name, fieldNames, values, properties);
   }
@@ -64,7 +65,7 @@ public class Partitions {
    * @param values The values of the identity partition.
    * @return The created partition.
    */
-  public static Partition identity(String[][] fieldNames, Literal<?>[] values) {
+  public static IdentityPartition identity(String[][] fieldNames, Literal<?>[] values) {
     return identity(null, fieldNames, values, null);
   }
 

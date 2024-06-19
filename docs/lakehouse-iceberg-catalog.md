@@ -130,7 +130,7 @@ For `bucket` and `truncate`, the first argument must be integer literal, and the
 
 - Gravitino used by default `NoneDistribution`.
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="json" label="JSON">
 
 ```json
@@ -153,7 +153,7 @@ Distributions.NONE;
 
 - Support `HashDistribution`, Hash distribute by partition key.
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="json" label="JSON">
 
 ```json
@@ -175,7 +175,7 @@ Distributions.HASH;
 
 - Support `RangeDistribution`, You can pass `range` as values through the API. Range distribute by partition key or sort key if table has an SortOrder.
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="json" label="JSON">
 
 ```json
