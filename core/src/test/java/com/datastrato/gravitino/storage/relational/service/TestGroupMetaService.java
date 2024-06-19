@@ -707,7 +707,7 @@ class TestGroupMetaService extends TestJDBCBackend {
   }
 
   @Test
-  void deleteGroupMetasByLegacyTimeLine() {
+  void deleteGroupMetasByLegacyTimeline() {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     BaseMetalake metalake =
@@ -777,7 +777,7 @@ class TestGroupMetaService extends TestJDBCBackend {
 
     // hard delete before soft delete
     int deletedCount =
-        groupMetaService.deleteGroupMetasByLegacyTimeLine(Instant.now().toEpochMilli() + 1000, 4);
+        groupMetaService.deleteGroupMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 4);
     Assertions.assertEquals(0, deletedCount);
     Assertions.assertEquals(
         group1.name(), groupMetaService.getGroupByIdentifier(group1.nameIdentifier()).name());
@@ -818,25 +818,25 @@ class TestGroupMetaService extends TestJDBCBackend {
 
     // hard delete after soft delete
     deletedCount =
-        groupMetaService.deleteGroupMetasByLegacyTimeLine(Instant.now().toEpochMilli() + 1000, 3);
+        groupMetaService.deleteGroupMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 3);
     Assertions.assertEquals(6, deletedCount); // delete 3 group + 3 groupRoleRel
     Assertions.assertEquals(1, countGroups(metalake.id())); // 4 - 3
     Assertions.assertEquals(5, countGroupRoleRels()); // 8 - 3
 
     deletedCount =
-        groupMetaService.deleteGroupMetasByLegacyTimeLine(Instant.now().toEpochMilli() + 1000, 3);
+        groupMetaService.deleteGroupMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 3);
     Assertions.assertEquals(4, deletedCount); // delete 1 group + 3 groupRoleRel
     Assertions.assertEquals(0, countGroups(metalake.id()));
     Assertions.assertEquals(2, countGroupRoleRels()); // 5 - 3
 
     deletedCount =
-        groupMetaService.deleteGroupMetasByLegacyTimeLine(Instant.now().toEpochMilli() + 1000, 3);
+        groupMetaService.deleteGroupMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 3);
     Assertions.assertEquals(2, deletedCount);
     Assertions.assertEquals(0, countGroups(metalake.id()));
     Assertions.assertEquals(0, countGroupRoleRels());
 
     deletedCount =
-        groupMetaService.deleteGroupMetasByLegacyTimeLine(Instant.now().toEpochMilli() + 1000, 3);
+        groupMetaService.deleteGroupMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 3);
     Assertions.assertEquals(0, deletedCount); // no more to delete
   }
 

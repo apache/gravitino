@@ -62,17 +62,18 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: actions/setup-java@v3
+      - uses: actions/setup-java@v4
         with:
           java-version: ${{ matrix.java-version }}
           distribution: 'temurin'
+          cache: 'gradle'
+
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
 
       - name: Package Gravitino
         run: |
-          ./gradlew build -x test -PjdkVersion=${{ matrix.java-version }}
           ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
 
       - name: Setup debug Github Action
@@ -86,7 +87,7 @@ jobs:
       - name: Integration Test
         id: integrationTest
         run: |
-          ./gradlew test --rerun-tasks -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }}
+          ./gradlew test -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }}
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
@@ -95,8 +96,17 @@ jobs:
           name: integrate test reports
           path: |
             build/reports
-            integration-test/build/integration-test.log
+            integration-test/build/*.log
+            integration-test/build/*.tar
+            integration-test/build/trino-ci-container-log/hive/*.*
+            integration-test/build/trino-ci-container-log/hdfs/*.*
             distribution/package/logs/gravitino-server.out
             distribution/package/logs/gravitino-server.log
             catalogs/**/*.log
             catalogs/**/*.tar
+            distribution/**/*.log
+            spark-connector/v3.3/spark/build/spark-3.3-integration-test.log
+            spark-connector/v3.4/spark/build/spark-3.4-integration-test.log
+            spark-connector/v3.5/spark/build/spark-3.5-integration-test.log
+            flink-connector/build/flink-connector-integration-test.log
+            flink-connector/build/*.tar

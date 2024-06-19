@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.catalog;
 
 import com.datastrato.gravitino.Audit;
+import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.messaging.Topic;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.TopicEntity;
@@ -24,9 +25,17 @@ public class EntityCombinedTopic implements Topic {
   // Sets of properties that should be hidden from the user.
   private Set<String> hiddenProperties;
 
+  // Field "imported" is used to indicate whether the entity has been imported to Gravitino
+  // managed storage backend. If "imported" is true, it means that storage backend have stored
+  // the correct entity. Otherwise, we should import the external entity to the storage backend.
+  // This is used for tag/access control related purposes, only the imported entities have the
+  // unique id, and based on this id, we can label and control the access to the entities.
+  private boolean imported;
+
   private EntityCombinedTopic(Topic topic, TopicEntity topicEntity) {
     this.topic = topic;
     this.topicEntity = topicEntity;
+    this.imported = false;
   }
 
   public static EntityCombinedTopic of(Topic topic, TopicEntity topicEntity) {
@@ -39,6 +48,11 @@ public class EntityCombinedTopic implements Topic {
 
   public EntityCombinedTopic withHiddenPropertiesSet(Set<String> hiddenProperties) {
     this.hiddenProperties = hiddenProperties;
+    return this;
+  }
+
+  public EntityCombinedTopic withImported(boolean imported) {
+    this.imported = imported;
     return this;
   }
 
@@ -72,5 +86,13 @@ public class EntityCombinedTopic implements Topic {
     return topicEntity == null
         ? topic.auditInfo()
         : mergedAudit.merge(topicEntity.auditInfo(), true /* overwrite */);
+  }
+
+  public boolean imported() {
+    return imported;
+  }
+
+  StringIdentifier stringIdentifier() {
+    return StringIdentifier.fromProperties(topic.properties());
   }
 }

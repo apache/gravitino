@@ -20,17 +20,27 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-*/
+ */
 
 /**
  * Referred from src/utils/http/axios/axiosRetry.ts
  */
 
-import { AxiosError, AxiosInstance } from 'axios'
+import axios from 'axios'
 
-export class AxiosRetry {
-  retry(axiosInstance: AxiosInstance, error: AxiosError) {
-    const { config }: any = error.response
+/**
+ * @typedef {import('axios').AxiosError} AxiosError
+ * @typedef {import('axios').AxiosInstance} AxiosInstance
+ */
+
+class AxiosRetry {
+  /**
+   * @param {AxiosInstance} axiosInstance
+   * @param {AxiosError} error
+   * @returns {Promise}
+   */
+  retry(axiosInstance, error) {
+    const { config } = error.response
     const { waitTime, count } = config?.requestOptions?.retryRequest ?? {}
     config.__retryCount = config.__retryCount || 0
     if (config.__retryCount >= count) {
@@ -43,7 +53,13 @@ export class AxiosRetry {
     return this.delay(waitTime).then(() => axiosInstance(config))
   }
 
-  private delay(waitTime: number) {
+  /**
+   * @param {number} waitTime
+   * @returns {Promise}
+   */
+  delay(waitTime) {
     return new Promise(resolve => setTimeout(resolve, waitTime))
   }
 }
+
+export { AxiosRetry }

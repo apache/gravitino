@@ -114,7 +114,7 @@ public interface GroupRoleRelMapper {
   @Delete(
       "DELETE FROM "
           + GROUP_ROLE_RELATION_TABLE_NAME
-          + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeLine} LIMIT #{limit}")
-  Integer deleteGroupRoleRelMetasByLegacyTimeLine(
-      @Param("legacyTimeLine") Long legacyTimeLine, @Param("limit") int limit);
+          + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}")
+  Integer deleteGroupRoleRelMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 }

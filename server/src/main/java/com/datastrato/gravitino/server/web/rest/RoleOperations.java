@@ -6,7 +6,9 @@ package com.datastrato.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.GravitinoEnv;
+import com.datastrato.gravitino.MetadataObject;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.authorization.AuthorizationUtils;
@@ -14,6 +16,7 @@ import com.datastrato.gravitino.authorization.Privilege;
 import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.SecurableObjects;
+import com.datastrato.gravitino.dto.authorization.SecurableObjectDTO;
 import com.datastrato.gravitino.dto.requests.RoleCreateRequest;
 import com.datastrato.gravitino.dto.responses.DeleteResponse;
 import com.datastrato.gravitino.dto.responses.RoleResponse;
@@ -88,6 +91,10 @@ public class RoleOperations {
           LockType.READ,
           () -> AuthorizationUtils.checkMetalakeExists(metalake));
 
+      for (SecurableObjectDTO object : request.getSecurableObjects()) {
+        checkSecurableObject(metalake, object);
+      }
+
       return Utils.doAs(
           httpRequest,
           () -> {
@@ -153,5 +160,77 @@ public class RoleOperations {
     } catch (Exception e) {
       return ExceptionHandlers.handleRoleException(OperationType.DELETE, role, metalake, e);
     }
+  }
+
+  // Check every securable object whether exists and is imported.
+  static void checkSecurableObject(String metalake, SecurableObjectDTO object) {
+    NameIdentifier identifier;
+
+    // Securable object ignores the metalake namespace, so we should add it back.
+    if (object.type() == MetadataObject.Type.METALAKE) {
+      // All metalakes don't need to check the securable object whether exists.
+      if (object.name().equals(Entity.SECURABLE_ENTITY_RESERVED_NAME)) {
+        return;
+      }
+      identifier = NameIdentifier.parse(object.fullName());
+    } else {
+      identifier = NameIdentifier.parse(String.format("%s.%s", metalake, object.fullName()));
+    }
+
+    String existErrMsg = "Securable object % doesn't exist";
+
+    TreeLockUtils.doWithTreeLock(
+        identifier,
+        LockType.READ,
+        () -> {
+          switch (object.type()) {
+            case METALAKE:
+              if (!GravitinoEnv.getInstance().metalakeDispatcher().metalakeExists(identifier)) {
+                throw new IllegalArgumentException(String.format(existErrMsg, object.fullName()));
+              }
+
+              break;
+
+            case CATALOG:
+              if (!GravitinoEnv.getInstance().catalogDispatcher().catalogExists(identifier)) {
+                throw new IllegalArgumentException(String.format(existErrMsg, object.fullName()));
+              }
+
+              break;
+
+            case SCHEMA:
+              if (!GravitinoEnv.getInstance().schemaDispatcher().schemaExists(identifier)) {
+                throw new IllegalArgumentException(String.format(existErrMsg, object.fullName()));
+              }
+
+              break;
+
+            case FILESET:
+              if (!GravitinoEnv.getInstance().filesetDispatcher().filesetExists(identifier)) {
+                throw new IllegalArgumentException(String.format(existErrMsg, object.fullName()));
+              }
+
+              break;
+            case TABLE:
+              if (!GravitinoEnv.getInstance().tableDispatcher().tableExists(identifier)) {
+                throw new IllegalArgumentException(String.format(existErrMsg, object.fullName()));
+              }
+
+              break;
+
+            case TOPIC:
+              if (!GravitinoEnv.getInstance().topicDispatcher().topicExists(identifier)) {
+                throw new IllegalArgumentException(String.format(existErrMsg, object.fullName()));
+              }
+
+              break;
+
+            default:
+              throw new IllegalArgumentException(
+                  String.format("Doesn't support the type %s", object.type()));
+          }
+
+          return null;
+        });
   }
 }

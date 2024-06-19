@@ -126,7 +126,7 @@ Meanwhile, the data types other than listed above are mapped to Gravitino **[Ext
 
 - Supports PRIMARY_KEY and UNIQUE_KEY.
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="json" label="Json">
 
 ```json

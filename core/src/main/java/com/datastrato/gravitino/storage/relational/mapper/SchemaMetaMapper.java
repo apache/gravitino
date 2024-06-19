@@ -165,7 +165,7 @@ public interface SchemaMetaMapper {
   @Delete(
       "DELETE FROM "
           + TABLE_NAME
-          + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeLine} LIMIT #{limit}")
-  Integer deleteSchemaMetasByLegacyTimeLine(
-      @Param("legacyTimeLine") Long legacyTimeLine, @Param("limit") int limit);
+          + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}")
+  Integer deleteSchemaMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 }
