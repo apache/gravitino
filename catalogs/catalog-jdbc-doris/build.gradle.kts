@@ -70,7 +70,7 @@ tasks {
 tasks.test {
   val skipUTs = project.hasProperty("skipTests")
   doFirst {
-    environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "datastrato/gravitino-ci-doris:0.1.3")
+    environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "datastrato/gravitino-ci-doris:0.1.4")
   }
 
   if (skipUTs) {
