@@ -57,6 +57,7 @@ echo -e "${PASS}\n" | kinit hive/${HOSTNAME}
 sed -i "s/mockhost/${HOSTNAME}/g" ${HADOOP_CONF_DIR}/hdfs-site.xml
 sed -i "s/mockhost/${HOSTNAME}/g" ${HADOOP_CONF_DIR}/core-site.xml
 sed -i "s/mockhost/${HOSTNAME}/g" ${HIVE_HOME}/conf/hive-site.xml
+sed -i "s/mockhost/${HOSTNAME}/g" ${HIVE_HOME}/conf1/hive-site.xml
 
 # format HDFS
 ${HADOOP_HOME}/bin/hdfs namenode -format -nonInteractive
