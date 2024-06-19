@@ -16,20 +16,20 @@ import com.datastrato.gravitino.meta.RoleEntity;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import javax.ws.rs.container.ContainerRequestContext;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 public class TestMetalakeAdminFilter {
 
   @Test
-  void testAdminFilterAllow() throws IOException {
+  void testAdminFilterAllow() throws IOException, IllegalAccessException {
     MetalakeAdminFilter filter = new MetalakeAdminFilter();
     ContainerRequestContext requestContext = Mockito.mock(ContainerRequestContext.class);
 
     // Add metalake admin
     Mockito.when(requestContext.getMethod()).thenReturn(BasedRoleFilter.POST);
     AccessControlManager accessControlManager = Mockito.mock(AccessControlManager.class);
-    GravitinoEnv.getInstance().setAccessControlManager(accessControlManager);
     RoleEntity roleEntity = Mockito.mock(RoleEntity.class);
     Mockito.when(accessControlManager.getRolesByUserFromMetalake(any(), any()))
         .thenReturn(Lists.newArrayList(roleEntity));
@@ -53,8 +53,9 @@ public class TestMetalakeAdminFilter {
     Mockito.verify(requestContext, Mockito.never()).abortWith(any());
 
     // Remove metalake admin
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "accessControlManager", accessControlManager, true);
     Mockito.when(requestContext.getMethod()).thenReturn(BasedRoleFilter.DELETE);
-    GravitinoEnv.getInstance().setAccessControlManager(accessControlManager);
     Mockito.when(accessControlManager.getRolesByUserFromMetalake(any(), any()))
         .thenReturn(Lists.newArrayList(roleEntity));
     Mockito.when(
@@ -78,13 +79,14 @@ public class TestMetalakeAdminFilter {
   }
 
   @Test
-  void testAdminFilterDeny() throws IOException {
+  void testAdminFilterDeny() throws IOException, IllegalAccessException {
     MetalakeAdminFilter filter = new MetalakeAdminFilter();
     ContainerRequestContext requestContext = Mockito.mock(ContainerRequestContext.class);
     Mockito.when(requestContext.getMethod()).thenReturn(BasedRoleFilter.POST);
     AccessControlManager accessControlManager = Mockito.mock(AccessControlManager.class);
-    GravitinoEnv.getInstance().setAccessControlManager(accessControlManager);
 
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "accessControlManager", accessControlManager, true);
     RoleEntity roleEntity = Mockito.mock(RoleEntity.class);
     Mockito.when(accessControlManager.getRolesByUserFromMetalake(any(), any()))
         .thenReturn(Lists.newArrayList(roleEntity));
@@ -95,7 +97,8 @@ public class TestMetalakeAdminFilter {
     // Remove metalake admin
     Mockito.reset(requestContext);
     Mockito.when(requestContext.getMethod()).thenReturn(BasedRoleFilter.DELETE);
-    GravitinoEnv.getInstance().setAccessControlManager(accessControlManager);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "accessControlManager", accessControlManager, true);
     Mockito.when(accessControlManager.getRolesByUserFromMetalake(any(), any()))
         .thenReturn(Lists.newArrayList(roleEntity));
     Mockito.when(roleEntity.hasPrivilegeWithCondition(any(), any(), any())).thenReturn(true);

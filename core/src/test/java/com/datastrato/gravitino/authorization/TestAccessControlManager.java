@@ -172,9 +172,9 @@ public class TestAccessControlManager {
     Assertions.assertEquals("test", user.name());
     Assertions.assertEquals(1, user.roles().size());
 
-    // Test with UserAlreadyExistsException
+    // Test with RoleAlreadyExistsException
     Assertions.assertThrows(
-        UserAlreadyExistsException.class, () -> accessControlManager.addMetalakeAdmin("test"));
+        RoleAlreadyExistsException.class, () -> accessControlManager.addMetalakeAdmin("test"));
 
     // Test to remove admin
     boolean removed = accessControlManager.removeMetalakeAdmin("test");
@@ -189,9 +189,9 @@ public class TestAccessControlManager {
     Assertions.assertEquals("admin1", admin.name());
     Assertions.assertEquals(2, admin.roles().size());
 
-    // Test service admin with UserAlreadyExistsException
+    // Test service admin with RoleAlreadyExistsException
     Assertions.assertThrows(
-        UserAlreadyExistsException.class, () -> accessControlManager.addMetalakeAdmin("admin1"));
+        RoleAlreadyExistsException.class, () -> accessControlManager.addMetalakeAdmin("admin1"));
 
     // Test service admin to remove admin
     removed = accessControlManager.removeMetalakeAdmin("admin1");

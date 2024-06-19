@@ -8,7 +8,6 @@ import static com.datastrato.gravitino.Configs.SERVICE_ADMINS;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.EntityStore;
-import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.StringIdentifier;
@@ -60,8 +59,6 @@ public class TestMetalakeManager {
 
   @Test
   public void testCreateMetalake() {
-    GravitinoEnv.getInstance().setAccessControlManager(null);
-
     NameIdentifier ident = NameIdentifier.of("test1");
     Map<String, String> props = ImmutableMap.of("key1", "value1");
 
@@ -78,8 +75,6 @@ public class TestMetalakeManager {
 
   @Test
   public void testListMetalakes() throws IOException {
-    GravitinoEnv.getInstance().setAccessControlManager(null);
-
     NameIdentifier ident1 = NameIdentifier.of("test11");
     NameIdentifier ident2 = NameIdentifier.of("test12");
     Map<String, String> props = ImmutableMap.of("key1", "value1");
@@ -94,8 +89,6 @@ public class TestMetalakeManager {
 
   @Test
   public void testLoadMetalake() throws IOException {
-    GravitinoEnv.getInstance().setAccessControlManager(null);
-
     NameIdentifier ident = NameIdentifier.of("test21");
     Map<String, String> props = ImmutableMap.of("key1", "value1");
 
@@ -119,8 +112,6 @@ public class TestMetalakeManager {
 
   @Test
   public void testAlterMetalake() throws IOException {
-    GravitinoEnv.getInstance().setAccessControlManager(null);
-
     NameIdentifier ident = NameIdentifier.of("test31");
     Map<String, String> props = ImmutableMap.of("key1", "value1");
 
@@ -166,8 +157,6 @@ public class TestMetalakeManager {
 
   @Test
   public void testDropMetalake() throws IOException {
-    GravitinoEnv.getInstance().setAccessControlManager(null);
-
     NameIdentifier ident = NameIdentifier.of("test41");
     Map<String, String> props = ImmutableMap.of("key1", "value1");
 
