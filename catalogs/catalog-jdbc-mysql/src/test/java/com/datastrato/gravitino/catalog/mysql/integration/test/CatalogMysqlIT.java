@@ -1785,8 +1785,7 @@ public class CatalogMysqlIT extends AbstractIT {
     String tableName = "default_integer_types_table";
     Column[] newColumns = new Column[] {col1, col2, col3, col4, col5, col6, col7, col8};
 
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
     Map<String, String> properties = createProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
     tableCatalog.createTable(
