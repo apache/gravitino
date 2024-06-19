@@ -6,13 +6,13 @@ package com.datastrato.gravitino.catalog.doris.operation;
 
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
-import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.indexes.Index;
@@ -447,16 +447,11 @@ public class TestDorisTableOperations extends TestDoris {
     String rangePartitionTableName = GravitinoITUtils.genRandomName("range_partition_table");
     LocalDate today = LocalDate.now();
     LocalDate tomorrow = today.plusDays(1);
-    LiteralDTO todayLiteral =
-        LiteralDTO.builder().withDataType(Types.DateType.get()).withValue(today.toString()).build();
-    LiteralDTO tomorrowLiteral =
-        LiteralDTO.builder()
-            .withDataType(Types.DateType.get())
-            .withValue(tomorrow.toString())
-            .build();
-    RangePartition rangePartition1 = Partitions.range("p1", todayLiteral, LiteralDTO.NULL, null);
+    Literals.LiteralImpl<LocalDate> todayLiteral = Literals.dateLiteral(today);
+    Literals.LiteralImpl<LocalDate> tomorrowLiteral = Literals.dateLiteral(tomorrow);
+    RangePartition rangePartition1 = Partitions.range("p1", todayLiteral, Literals.NULL, null);
     RangePartition rangePartition2 = Partitions.range("p2", tomorrowLiteral, todayLiteral, null);
-    RangePartition rangePartition3 = Partitions.range("p3", LiteralDTO.NULL, tomorrowLiteral, null);
+    RangePartition rangePartition3 = Partitions.range("p3", Literals.NULL, tomorrowLiteral, null);
     Transform[] rangePartition =
         new Transform[] {
           Transforms.range(
@@ -483,19 +478,17 @@ public class TestDorisTableOperations extends TestDoris {
 
     // create table with list partition
     String listPartitionTableName = GravitinoITUtils.genRandomName("list_partition_table");
-    LiteralDTO intLiteral1 =
-        LiteralDTO.builder().withDataType(Types.IntegerType.get()).withValue("1").build();
-    LiteralDTO intLiteral2 =
-        LiteralDTO.builder().withDataType(Types.IntegerType.get()).withValue("2").build();
+    Literals.LiteralImpl<Integer> integerLiteral1 = Literals.integerLiteral(1);
+    Literals.LiteralImpl<Integer> integerLiteral2 = Literals.integerLiteral(2);
     ListPartition listPartition1 =
         Partitions.list(
             "p1",
-            new Literal[][] {{intLiteral1, todayLiteral}, {intLiteral1, tomorrowLiteral}},
+            new Literal[][] {{integerLiteral1, todayLiteral}, {integerLiteral1, tomorrowLiteral}},
             null);
     ListPartition listPartition2 =
         Partitions.list(
             "p2",
-            new Literal[][] {{intLiteral2, todayLiteral}, {intLiteral2, tomorrowLiteral}},
+            new Literal[][] {{integerLiteral2, todayLiteral}, {integerLiteral2, tomorrowLiteral}},
             null);
     Transform[] listPartition =
         new Transform[] {

@@ -11,7 +11,6 @@ import com.datastrato.gravitino.catalog.doris.utils.DorisUtils;
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
-import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
 import com.datastrato.gravitino.exceptions.NoSuchColumnException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
@@ -20,6 +19,7 @@ import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.indexes.Index;
@@ -233,18 +233,18 @@ public class DorisTableOperations extends JdbcTableOperations {
               .append(part.name())
               .append(BACK_QUOTE)
               .append(" VALUES ");
-          LiteralDTO upper = (LiteralDTO) part.upper();
-          LiteralDTO lower = (LiteralDTO) part.lower();
-          if (LiteralDTO.NULL.equals(upper) && LiteralDTO.NULL.equals(lower)) {
+          Literal<?> upper = part.upper();
+          Literal<?> lower = part.lower();
+          if (Literals.NULL.equals(upper) && Literals.NULL.equals(lower)) {
             partitionAssignSqlBuilder.append("LESS THAN MAXVALUE");
-          } else if (LiteralDTO.NULL.equals(lower)) {
+          } else if (Literals.NULL.equals(lower)) {
             partitionAssignSqlBuilder
                 .append("LESS THAN (")
                 .append(DOUBLE_QUOTE)
                 .append(upper.value())
                 .append(DOUBLE_QUOTE)
                 .append(")");
-          } else if (LiteralDTO.NULL.equals(upper)) {
+          } else if (Literals.NULL.equals(upper)) {
             partitionAssignSqlBuilder
                 .append("[(")
                 .append(DOUBLE_QUOTE)
