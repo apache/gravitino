@@ -99,7 +99,7 @@ public class TestRoleOperations extends JerseyTest {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", tableDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "topicDispatcher", topicDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "filesetDispatcher", filesetDispatcher, true);
-      FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", store, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", store, true);
   }
 
   @Override
