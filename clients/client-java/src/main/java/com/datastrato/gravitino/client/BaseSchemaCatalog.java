@@ -41,9 +41,6 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
   /** The namespace of current catalog, which is the metalake name. */
   private final Namespace namespace;
 
-  /** The namespace of the schemas, which is the metalake name with catalog name. */
-  protected final Namespace schemaNamespace;
-
   BaseSchemaCatalog(
       Namespace namespace,
       String name,
@@ -60,7 +57,6 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
         "Catalog namespace must be non-null and have 1 level, the input namespace is %s",
         namespace);
     this.namespace = namespace;
-    this.schemaNamespace = Namespace.of(namespace.level(0), name);
   }
 
   @Override
@@ -79,7 +75,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
 
     EntityListResponse resp =
         restClient.get(
-            formatSchemaRequestPath(schemaNamespace),
+            formatSchemaRequestPath(Namespace.of(namespace.level(0), this.name())),
             EntityListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.schemaErrorHandler());
@@ -108,7 +104,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
 
     SchemaResponse resp =
         restClient.post(
-            formatSchemaRequestPath(schemaNamespace),
+            formatSchemaRequestPath(Namespace.of(namespace.level(0), this.name())),
             req,
             SchemaResponse.class,
             Collections.emptyMap(),
@@ -130,7 +126,9 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
 
     SchemaResponse resp =
         restClient.get(
-            formatSchemaRequestPath(schemaNamespace) + "/" + RESTUtils.encodeString(schemaName),
+            formatSchemaRequestPath(Namespace.of(namespace.level(0), this.name()))
+                + "/"
+                + RESTUtils.encodeString(schemaName),
             SchemaResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.schemaErrorHandler());
@@ -160,7 +158,9 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
 
     SchemaResponse resp =
         restClient.put(
-            formatSchemaRequestPath(schemaNamespace) + "/" + RESTUtils.encodeString(schemaName),
+            formatSchemaRequestPath(Namespace.of(namespace.level(0), this.name()))
+                + "/"
+                + RESTUtils.encodeString(schemaName),
             updatesRequest,
             SchemaResponse.class,
             Collections.emptyMap(),
@@ -182,7 +182,9 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
   public boolean dropSchema(String schemaName, boolean cascade) throws NonEmptySchemaException {
     DropResponse resp =
         restClient.delete(
-            formatSchemaRequestPath(schemaNamespace) + "/" + RESTUtils.encodeString(schemaName),
+            formatSchemaRequestPath(Namespace.of(namespace.level(0), this.name()))
+                + "/"
+                + RESTUtils.encodeString(schemaName),
             Collections.singletonMap("cascade", String.valueOf(cascade)),
             DropResponse.class,
             Collections.emptyMap(),
@@ -196,7 +198,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
    *
    * @return The namespace of the current catalog.
    */
-  public Namespace namespace() {
+  protected Namespace namespace() {
     return namespace;
   }
 
