@@ -78,7 +78,7 @@ public class TestMetalakeAdminFilter {
   }
 
   @Test
-  void testAdminFilterForbidden() throws IOException {
+  void testAdminFilterDeny() throws IOException {
     MetalakeAdminFilter filter = new MetalakeAdminFilter();
     ContainerRequestContext requestContext = Mockito.mock(ContainerRequestContext.class);
     Mockito.when(requestContext.getMethod()).thenReturn(BasedRoleFilter.POST);

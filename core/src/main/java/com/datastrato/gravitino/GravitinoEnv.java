@@ -198,13 +198,17 @@ public class GravitinoEnv {
         new TopicNormalizeDispatcher(topicOperationDispatcher);
     this.topicDispatcher = new TopicEventDispatcher(eventBus, topicNormalizeDispatcher);
 
+    // Create a system metalake. Although the system metalake is only now related to the
+    // authorization,
+    // we still add more features unrelated to authorization about system metalake in the future.
+    NameIdentifier systemMetalake = NameIdentifier.of(Entity.SYSTEM_METALAKE_RESERVED_NAME);
+    if (!metalakeManager.metalakeExists(systemMetalake)) {
+      metalakeManager.createMetalake(systemMetalake, null, Collections.emptyMap());
+    }
+
     // Create and initialize access control related modules
     boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);
     if (enableAuthorization) {
-      NameIdentifier systemMetalake = NameIdentifier.of(Entity.SYSTEM_METALAKE_RESERVED_NAME);
-      if (!metalakeManager.metalakeExists(systemMetalake)) {
-        metalakeManager.createMetalake(systemMetalake, null, Collections.emptyMap());
-      }
       this.accessControlManager = new AccessControlManager(entityStore, idGenerator, config);
     } else {
       this.accessControlManager = null;

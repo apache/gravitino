@@ -37,7 +37,7 @@ public class AdminIT extends AbstractIT {
   }
 
   @Test
-  public void testAdminInterfacePass() throws Exception {
+  public void testAdminInterfaceAllow() throws Exception {
     Map<String, String> configs = Maps.newHashMap();
     configs.put(Configs.ENABLE_AUTHORIZATION.getKey(), "true");
     configs.put(Configs.SERVICE_ADMINS.getKey(), AuthConstants.ANONYMOUS_USER);
@@ -51,7 +51,7 @@ public class AdminIT extends AbstractIT {
   }
 
   @Test
-  public void testAdminIntefaceReject() throws Exception {
+  public void testAdminIntefaceDeny() throws Exception {
     Map<String, String> configs = Maps.newHashMap();
     configs.put(Configs.ENABLE_AUTHORIZATION.getKey(), "true");
     configs.put(Configs.SERVICE_ADMINS.getKey(), "admin");

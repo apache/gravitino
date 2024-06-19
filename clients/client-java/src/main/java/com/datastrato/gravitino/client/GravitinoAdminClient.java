@@ -325,10 +325,10 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
    *
    * @param user The name of the User.
    * @return The added User instance.
-   * @throws UserAlreadyExistsException If a metalake admin with the same name already exists.
+   * @throws RoleAlreadyExistsException If the metalake admin with the same name already added.
    * @throws RuntimeException If adding the User encounters storage issues.
    */
-  public User addMetalakeAdmin(String user) throws UserAlreadyExistsException {
+  public User addMetalakeAdmin(String user) throws RoleAlreadyExistsException {
     UserAddRequest req = new UserAddRequest(user);
     req.validate();
 

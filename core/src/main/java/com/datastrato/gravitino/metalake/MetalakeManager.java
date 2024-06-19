@@ -59,6 +59,8 @@ public class MetalakeManager implements MetalakeDispatcher {
   @Override
   public BaseMetalake[] listMetalakes() {
     try {
+      // We filter the system metalake temporarily. If we add more features in the future, we can
+      // show it for users.
       return store.list(Namespace.empty(), BaseMetalake.class, EntityType.METALAKE).stream()
           .filter(baseMetalake -> !baseMetalake.name().equals(Entity.SYSTEM_METALAKE_RESERVED_NAME))
           .toArray(BaseMetalake[]::new);

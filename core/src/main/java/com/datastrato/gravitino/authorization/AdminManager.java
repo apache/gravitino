@@ -10,7 +10,7 @@ import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
+import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.IdGenerator;
@@ -51,7 +51,7 @@ class AdminManager {
   User addMetalakeAdmin(String user) {
     try {
       if (isServiceAdmin(user)) {
-        if (hasUserMetalakeCreateRole(user)) {
+        if (hasCreateMetalakeRole(user)) {
           throw new EntityAlreadyExistsException(
               "Metalake admin has added the metalake create role");
         }
@@ -83,8 +83,8 @@ class AdminManager {
         return userEntity;
       }
     } catch (EntityAlreadyExistsException e) {
-      LOG.warn("User {} in the metalake admin already exists", user, e);
-      throw new UserAlreadyExistsException("User %s in the metalake admin already exists", user);
+      LOG.warn("The metalake admin {} has been added before", user, e);
+      throw new RoleAlreadyExistsException("The metalake admin %s has been added before", user);
     } catch (IOException ioe) {
       LOG.error("Adding user {} failed to the metalake admin due to storage issues", user, ioe);
       throw new RuntimeException(ioe);
@@ -97,7 +97,7 @@ class AdminManager {
         return store.delete(ofMetalakeAdmin(user), Entity.EntityType.USER);
       }
 
-      if (hasUserMetalakeCreateRole(user)) {
+      if (hasCreateMetalakeRole(user)) {
         updateUserEntity(user, Lists.newArrayList(Entity.SYSTEM_METALAKE_MANAGE_USER_ROLE));
         return true;
       } else {
@@ -118,7 +118,7 @@ class AdminManager {
     return AuthorizationUtils.ofUser(Entity.SYSTEM_METALAKE_RESERVED_NAME, user);
   }
 
-  private boolean hasUserMetalakeCreateRole(String user) throws IOException {
+  private boolean hasCreateMetalakeRole(String user) throws IOException {
     UserEntity userEntity =
         store.get(ofMetalakeAdmin(user), Entity.EntityType.USER, UserEntity.class);
     return userEntity.roleNames().contains(Entity.METALAKE_CREATE_ROLE);
@@ -164,18 +164,28 @@ class AdminManager {
               Entity.EntityType.USER);
 
       for (UserEntity userEntity : userEntities) {
+        // Case 1: If the user is the service admin, we should the system metalake manage user role
+        // for it.
         if (serviceAdmins.contains(userEntity.name())) {
-          updateUserEntity(
-              userEntity.name(),
-              Lists.newArrayList(
-                  Entity.METALAKE_CREATE_ROLE, Entity.SYSTEM_METALAKE_MANAGE_USER_ROLE));
+          if (!userEntity.roleNames().contains(Entity.SYSTEM_METALAKE_MANAGE_USER_ROLE)) {
+            List<String> newRoleNames = Lists.newArrayList(userEntity.roleNames());
+            newRoleNames.add(Entity.SYSTEM_METALAKE_MANAGE_USER_ROLE);
+            updateUserEntity(userEntity.name(), newRoleNames);
+          }
         } else if (userEntity.roleNames().contains(Entity.METALAKE_CREATE_ROLE)) {
-          updateUserEntity(userEntity.name(), Lists.newArrayList(Entity.METALAKE_CREATE_ROLE));
+          // Case 2: If the user isn't the service admin and has metalake create role,
+          // we should remove system metalake manage user role.
+          if (userEntity.roleNames().contains(Entity.SYSTEM_METALAKE_MANAGE_USER_ROLE)) {
+            updateUserEntity(userEntity.name(), Lists.newArrayList(Entity.METALAKE_CREATE_ROLE));
+          }
         } else {
+          // Case 3: If the user isn't the service admin and has no other role,
+          // we should delete it.
           store.delete(userEntity.nameIdentifier(), Entity.EntityType.USER);
         }
       }
 
+      // Case 4: If the user is service admin and isn't stored before, we store them.
       for (String user : serviceAdmins) {
         if (!store.exists(ofMetalakeAdmin(user), Entity.EntityType.USER)) {
           long roleId =

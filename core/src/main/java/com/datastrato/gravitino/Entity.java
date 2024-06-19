@@ -37,6 +37,10 @@ public interface Entity extends Serializable {
   /** The pre-created role entity of the system metalake to allow to create any metalake */
   String METALAKE_CREATE_ROLE = "system_role_metalake_create";
 
+  /**
+   * The pre-created role entity of the system metalake to allow to manager user. Actually, the
+   * users in the system metalake are metalake admin.
+   */
   String SYSTEM_METALAKE_MANAGE_USER_ROLE = "system_role_metalake_system_manage_user";
 
   /** The reserved the prefix of the role names */

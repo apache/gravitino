@@ -164,6 +164,7 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
       MetadataObject targetObject, Privilege.Name targetPrivilege, Privilege.Condition condition) {
     String metalake = namespace.level(0);
     for (SecurableObject object : securableObjects) {
+      // If one entity's parent has the privilege, the entity will have the privilege.
       if (isSameOrParent(
           convertInnerObject(metalake, object), convertInnerObject(metalake, targetObject))) {
         for (Privilege privilege : object.privileges()) {
@@ -318,6 +319,7 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
     }
   }
 
+  // TODO: Add more tests in the next pull requests in table/topic filters.
   private static boolean isSameOrParent(InnerSecurableObject object, InnerSecurableObject target) {
     if (object.equals(target)) {
       return true;

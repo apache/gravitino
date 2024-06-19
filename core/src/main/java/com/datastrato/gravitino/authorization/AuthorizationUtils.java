@@ -136,6 +136,9 @@ public class AuthorizationUtils {
 
       for (RoleEntity role : roles) {
         for (Privilege privilege : object.privileges()) {
+          // The deny privilege is prior to the allow privilege. It means that one entity has the
+          // deny privilege and allow privilege at the same time. The entity doesn't have the
+          // privilege.
           if (role.hasPrivilegeWithCondition(object, privilege.name(), Privilege.Condition.DENY)) {
             continue;
           }
@@ -146,6 +149,7 @@ public class AuthorizationUtils {
         }
       }
     } catch (NoSuchUserException noSuchUserException) {
+      // If one user doesn't exist in the metalake, the user doesn't have any privilege.
       return false;
     }
 
