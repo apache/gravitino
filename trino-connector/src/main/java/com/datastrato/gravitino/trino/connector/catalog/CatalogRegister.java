@@ -93,7 +93,7 @@ public class CatalogRegister {
     properties.put("user", config.getTrinoUser());
     properties.put("password", config.getTrinoPassword());
     try {
-      connection = driver.connect(config.getTrinoURI(), properties);
+      connection = driver.connect(config.getTrinoJdbcURI(), properties);
     } catch (SQLException e) {
       throw new TrinoException(
           GRAVITINO_RUNTIME_ERROR, "Failed to initialize the Trino connection.", e);

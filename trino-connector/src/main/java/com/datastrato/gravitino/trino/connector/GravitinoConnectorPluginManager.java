@@ -4,10 +4,13 @@
  */
 package com.datastrato.gravitino.trino.connector;
 
+import static com.datastrato.gravitino.trino.connector.GravitinoConfig.TRINO_PLUGIN_BUNDLES;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_CREATE_INTERNAL_CONNECTOR_ERROR;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR;
 
+import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
+import io.airlift.resolver.ArtifactResolver;
 import io.trino.spi.Plugin;
 import io.trino.spi.TrinoException;
 import io.trino.spi.classloader.ThreadContextClassLoader;
@@ -18,6 +21,7 @@ import java.io.File;
 import java.lang.reflect.Constructor;
 import java.net.URL;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -26,6 +30,7 @@ import java.util.ServiceLoader;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.sonatype.aether.artifact.Artifact;
 
 /** This class is mange the internal connector plugin and help to create the connector. */
 public class GravitinoConnectorPluginManager {
@@ -45,7 +50,7 @@ public class GravitinoConnectorPluginManager {
 
   private static volatile GravitinoConnectorPluginManager instance;
 
-  private final Class<?> pluginLoaderClass;
+  private Class<?> pluginLoaderClass;
 
   private static final Set<String> usePlugins =
       Set.of(
@@ -59,31 +64,18 @@ public class GravitinoConnectorPluginManager {
   private final ClassLoader appClassloader;
 
   public GravitinoConnectorPluginManager(ClassLoader classLoader) {
+    this.appClassloader = classLoader;
+
     try {
-      // Retrieve plugin directory
-      // The Trino plugin director like:
-      //    /data/trino/plugin/hive/**.jar
-      //    /data/trino/plugin/gravitino/**.jar
-      //    /data/trino/plugin/mysql/**.jar
-      String jarPath =
-          GravitinoConnectorPluginManager.class
-              .getProtectionDomain()
-              .getCodeSource()
-              .getLocation()
-              .toURI()
-              .getPath();
-      String pluginDir = Paths.get(jarPath).getParent().getParent().toString();
-
-      this.appClassloader = classLoader;
       pluginLoaderClass = appClassloader.loadClass(PLUGIN_CLASSLOADER_CLASS_NAME);
+    } catch (ClassNotFoundException e) {
+      throw new TrinoException(GRAVITINO_RUNTIME_ERROR, "Can not load Plugin class loader", e);
+    }
 
-      // Load all plugins
-      for (String pluginName : usePlugins) {
-        loadPlugin(pluginDir, pluginName);
-        LOG.info("Load plugin {}/{} successful", pluginDir, pluginName);
-      }
-    } catch (Exception e) {
-      throw new TrinoException(GRAVITINO_RUNTIME_ERROR, "Error while loading plugins", e);
+    if (GravitinoConfig.trinoConfig.contains(TRINO_PLUGIN_BUNDLES)) {
+      loadPluginsFromBundle();
+    } else {
+      loadPluginsFromFile();
     }
   }
 
@@ -111,6 +103,32 @@ public class GravitinoConnectorPluginManager {
     return instance;
   }
 
+  private void loadPluginsFromFile() {
+    try {
+      // Retrieve plugin directory
+      // The Trino plugin director like:
+      //    /data/trino/plugin/hive/**.jar
+      //    /data/trino/plugin/gravitino/**.jar
+      //    /data/trino/plugin/mysql/**.jar
+      String jarPath =
+          GravitinoConnectorPluginManager.class
+              .getProtectionDomain()
+              .getCodeSource()
+              .getLocation()
+              .toURI()
+              .getPath();
+      String pluginDir = Paths.get(jarPath).getParent().getParent().toString();
+
+      // Load all plugins
+      for (String pluginName : usePlugins) {
+        loadPlugin(pluginDir, pluginName);
+        LOG.info("Load plugin {}/{} successful", pluginDir, pluginName);
+      }
+    } catch (Exception e) {
+      throw new TrinoException(GRAVITINO_RUNTIME_ERROR, "Error while loading plugins from file", e);
+    }
+  }
+
   private void loadPlugin(String pluginPath, String pluginName) {
     String dirName = pluginPath + "/" + pluginName;
     File directory = new File(dirName);
@@ -136,7 +154,10 @@ public class GravitinoConnectorPluginManager {
                   }
                 })
             .toList();
+    loadPluginWithUrls(files, pluginName);
+  }
 
+  private void loadPluginWithUrls(List<URL> urls, String pluginName) {
     try {
       Constructor<?> constructor =
           pluginLoaderClass.getConstructor(String.class, List.class, ClassLoader.class, List.class);
@@ -146,7 +167,7 @@ public class GravitinoConnectorPluginManager {
       Object pluginClassLoader =
           constructor.newInstance(
               classLoaderName,
-              files,
+              urls,
               appClassloader,
               List.of(
                   "io.trino.spi.",
@@ -179,6 +200,56 @@ public class GravitinoConnectorPluginManager {
     }
   }
 
+  private void loadPluginsFromBundle() {
+    // load plugin from bundle config
+    // plugin.bundles=\
+    //  ../../plugin/trino-jmx/pom.xml,\
+    //  ../../plugin/trino-hive/pom.xml,\
+
+    ArtifactResolver artifactResolver =
+        new ArtifactResolver(ArtifactResolver.USER_LOCAL_REPO, ArtifactResolver.MAVEN_CENTRAL_URI);
+
+    String value = GravitinoConfig.trinoConfig.getProperty(TRINO_PLUGIN_BUNDLES);
+    Splitter splitter = Splitter.on(',').omitEmptyStrings().trimResults();
+    splitter.splitToList(value).stream()
+        .forEach(
+            v -> {
+              int start = v.indexOf("trino-");
+              if (start == -1) {
+                return;
+              }
+              int end = v.indexOf('/', start);
+              if (end == -1) {
+                return;
+              }
+              String key = v.substring(start, end).replace("trino-", "");
+              if (!usePlugins.contains(key)) {
+                return;
+              }
+              loadPluginByPom(artifactResolver.resolvePom(new File(v)), key);
+            });
+  }
+
+  private void loadPluginByPom(List<Artifact> artifacts, String pluginName) {
+    try {
+      List<URL> urls = new ArrayList<>();
+      for (Artifact artifact : artifacts) {
+        if (artifact.getFile() == null) {
+          throw new RuntimeException("Could not resolve artifact: " + artifact);
+        }
+        File file = artifact.getFile().getCanonicalFile();
+        urls.add(file.toURI().toURL());
+      }
+      File root =
+          new File(
+              artifacts.get(0).getFile().getParentFile().getCanonicalFile(), "plugin-discovery");
+      urls.add(root.toURI().toURL());
+      loadPluginWithUrls(urls, pluginName);
+    } catch (Exception e) {
+      throw new TrinoException(GRAVITINO_RUNTIME_ERROR, "Error while loading plugins from pom", e);
+    }
+  }
+
   public void installPlugin(String pluginName, Plugin plugin) {
     connectorPlugins.put(pluginName, plugin);
   }
@@ -189,7 +260,7 @@ public class GravitinoConnectorPluginManager {
       Plugin plugin = connectorPlugins.get(connectorName);
       if (plugin == null) {
         throw new TrinoException(
-          GRAVITINO_RUNTIME_ERROR, "Can not found plugin for connector " + connectorName);
+            GRAVITINO_RUNTIME_ERROR, "Can not found plugin for connector " + connectorName);
       }
       try (ThreadContextClassLoader ignored =
           new ThreadContextClassLoader(plugin.getClass().getClassLoader())) {
