@@ -491,9 +491,6 @@ public class TestEntityStorage {
 
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
-      //      if (store instanceof RelationalEntityStore) {
-      //        prepareJdbcTable();
-      //      }
 
       BaseMetalake metalake = createBaseMakeLake(1L, "metalake", auditInfo);
       store.put(metalake);
