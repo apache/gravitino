@@ -4,6 +4,7 @@
  */
 package com.datastrato.gravitino.storage.relational;
 
+import static com.datastrato.gravitino.Configs.EMBEDDED_ENTITY_RELATIONAL_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 
 import com.datastrato.gravitino.Config;
@@ -34,7 +35,10 @@ public class RelationalEntityStore implements EntityStore {
   private static final Logger LOGGER = LoggerFactory.getLogger(RelationalEntityStore.class);
   public static final ImmutableMap<String, String> RELATIONAL_BACKENDS =
       ImmutableMap.of(
-          Configs.DEFAULT_ENTITY_RELATIONAL_STORE, JDBCBackend.class.getCanonicalName());
+          Configs.DEFAULT_ENTITY_RELATIONAL_STORE,
+          JDBCBackend.class.getCanonicalName(),
+          EMBEDDED_ENTITY_RELATIONAL_STORE,
+          EmbeddedJDBCBackend.class.getCanonicalName());
   private RelationalBackend backend;
   private RelationalGarbageCollector garbageCollector;
 

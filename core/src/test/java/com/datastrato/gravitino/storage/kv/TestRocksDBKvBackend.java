@@ -48,7 +48,9 @@ public class TestRocksDBKvBackend {
     kvBackend = new RocksDBKvBackend();
     path = kvBackend.getStoragePath(config);
     // We haven't set the GRAVITINO_HOME
-    Assertions.assertEquals("null/data/rocksdb", path);
+
+    String gravitinoHome = System.getenv("GRAVITINO_HOME");
+    Assertions.assertEquals(gravitinoHome + "/data/rocksdb", path);
   }
 
   @Test
