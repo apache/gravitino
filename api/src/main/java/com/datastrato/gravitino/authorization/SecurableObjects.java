@@ -161,12 +161,8 @@ public class SecurableObjects {
         return false;
       }
 
-      if (!super.equals(other)) {
-        return false;
-      }
-
       SecurableObject otherSecurableObject = (SecurableObject) other;
-      return Objects.equals(privileges, otherSecurableObject.privileges());
+      return super.equals(other) && Objects.equals(privileges, otherSecurableObject.privileges());
     }
   }
 
