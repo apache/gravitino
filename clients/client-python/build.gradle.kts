@@ -24,14 +24,16 @@ fun deleteCacheDir(targetDir: String) {
 
 fun waitForPort(port: Int, host: String = "localhost", timeout: Long = 60000) {
   val startTime = System.currentTimeMillis()
+  var exception: java.lang.Exception?
   while (true) {
     try {
       Socket(host, port).use { return }  // If this succeeds, the port is open
     } catch (e: Exception) {
       // Port is not open yet, continue to wait
+      exception = e
     }
     if (System.currentTimeMillis() - startTime > timeout) {
-      throw RuntimeException("Timed out waiting for port $port to be available")
+      throw RuntimeException("Timed out waiting for port $port to be available", exception)
     }
     Thread.sleep(1000)  // Wait for 1 second before checking again
   }
