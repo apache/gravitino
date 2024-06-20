@@ -132,7 +132,7 @@ public class SecurableObjects {
     @Override
     public int hashCode() {
       int result = super.hashCode();
-      return 31 * result + Objects.hash(privileges);
+      return Objects.hash(result, privileges);
     }
 
     @Override
