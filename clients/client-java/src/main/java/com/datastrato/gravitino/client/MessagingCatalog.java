@@ -236,7 +236,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
   }
 
   private Namespace getTopicFullNamespace(Namespace tableNamespace) {
-    return Namespace.of(this.namespace().level(0), this.name(), tableNamespace.level(0));
+    return Namespace.of(this.catalogNamespace().level(0), this.name(), tableNamespace.level(0));
   }
 
   static class Builder extends CatalogDTO.Builder<Builder> {
