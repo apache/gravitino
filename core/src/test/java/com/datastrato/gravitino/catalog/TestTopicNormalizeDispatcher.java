@@ -22,7 +22,7 @@ public class TestTopicNormalizeDispatcher extends TestOperationDispatcher {
   private static SchemaNormalizeDispatcher schemaNormalizeDispatcher;
 
   @BeforeAll
-  public static void initialize() throws IOException {
+  public static void initialize() throws IOException, IllegalAccessException {
     TestTopicOperationDispatcher.initialize();
     schemaNormalizeDispatcher =
         new SchemaNormalizeDispatcher(TestTopicOperationDispatcher.schemaOperationDispatcher);

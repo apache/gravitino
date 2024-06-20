@@ -40,7 +40,6 @@ import com.datastrato.gravitino.metrics.MetricsSystem;
 import com.datastrato.gravitino.metrics.source.JVMMetricsSource;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -96,40 +95,6 @@ public class GravitinoEnv {
    */
   public static GravitinoEnv getInstance() {
     return InstanceHolder.INSTANCE;
-  }
-
-  /**
-   * This method is used for testing purposes only to set the lock manager for test in package
-   * `com.datastrato.gravitino.server.web.rest`, as tree lock depends on the lock manager and we did
-   * not mock the lock manager in the test, so we need to set the lock manager for test.
-   *
-   * @param lockManager The lock manager to be set.
-   */
-  @VisibleForTesting
-  public void setLockManager(LockManager lockManager) {
-    this.lockManager = lockManager;
-  }
-
-  /**
-   * This method is used for testing purposes only to set the access manager for test in package
-   * `com.datastrato.gravitino.server.web.rest` and `com.datastrato.gravitino.authorization`.
-   *
-   * @param accessControlManager The access control manager to be set.
-   */
-  @VisibleForTesting
-  public void setAccessControlManager(AccessControlManager accessControlManager) {
-    this.accessControlManager = accessControlManager;
-  }
-
-  /**
-   * This method is used for testing purposes only to set the entity store for test in package
-   * `com.datastrato.gravitino.authorization`.
-   *
-   * @param entityStore The entity store to be set.
-   */
-  @VisibleForTesting
-  public void setEntityStore(EntityStore entityStore) {
-    this.entityStore = entityStore;
   }
 
   /**

@@ -142,9 +142,7 @@ public class TopicOperations {
           () -> {
             LOG.info("Loading topic: {}.{}.{}.{}", metalake, catalog, schema, topic);
             NameIdentifier ident = NameIdentifierUtil.ofTopic(metalake, catalog, schema, topic);
-            Topic t =
-                TreeLockUtils.doWithTreeLock(
-                    ident, LockType.READ, () -> dispatcher.loadTopic(ident));
+            Topic t = dispatcher.loadTopic(ident);
             Response response = Utils.ok(new TopicResponse(DTOConverters.toDTO(t)));
             LOG.info("Topic loaded: {}.{}.{}.{}", metalake, catalog, schema, topic);
             return response;

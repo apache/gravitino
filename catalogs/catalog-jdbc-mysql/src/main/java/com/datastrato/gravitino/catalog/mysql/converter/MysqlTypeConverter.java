@@ -12,9 +12,13 @@ import com.datastrato.gravitino.rel.types.Types;
 public class MysqlTypeConverter extends JdbcTypeConverter {
 
   static final String TINYINT = "tinyint";
+  static final String TINYINT_UNSIGNED = "tinyint unsigned";
   static final String SMALLINT = "smallint";
+  static final String SMALLINT_UNSIGNED = "smallint unsigned";
   static final String INT = "int";
+  static final String INT_UNSIGNED = "int unsigned";
   static final String BIGINT = "bigint";
+  static final String BIGINT_UNSIGNED = "bigint unsigned";
   static final String FLOAT = "float";
   static final String DOUBLE = "double";
   static final String DECIMAL = "decimal";
@@ -27,12 +31,20 @@ public class MysqlTypeConverter extends JdbcTypeConverter {
     switch (typeBean.getTypeName().toLowerCase()) {
       case TINYINT:
         return Types.ByteType.get();
+      case TINYINT_UNSIGNED:
+        return Types.ByteType.unsigned();
       case SMALLINT:
         return Types.ShortType.get();
+      case SMALLINT_UNSIGNED:
+        return Types.ShortType.unsigned();
       case INT:
         return Types.IntegerType.get();
+      case INT_UNSIGNED:
+        return Types.IntegerType.unsigned();
       case BIGINT:
         return Types.LongType.get();
+      case BIGINT_UNSIGNED:
+        return Types.LongType.unsigned();
       case FLOAT:
         return Types.FloatType.get();
       case DOUBLE:
@@ -68,13 +80,29 @@ public class MysqlTypeConverter extends JdbcTypeConverter {
   @Override
   public String fromGravitino(Type type) {
     if (type instanceof Types.ByteType) {
-      return TINYINT;
+      if (((Types.ByteType) type).signed()) {
+        return TINYINT;
+      } else {
+        return TINYINT_UNSIGNED;
+      }
     } else if (type instanceof Types.ShortType) {
-      return SMALLINT;
+      if (((Types.ShortType) type).signed()) {
+        return SMALLINT;
+      } else {
+        return SMALLINT_UNSIGNED;
+      }
     } else if (type instanceof Types.IntegerType) {
-      return INT;
+      if (((Types.IntegerType) type).signed()) {
+        return INT;
+      } else {
+        return INT_UNSIGNED;
+      }
     } else if (type instanceof Types.LongType) {
-      return BIGINT;
+      if (((Types.LongType) type).signed()) {
+        return BIGINT;
+      } else {
+        return BIGINT_UNSIGNED;
+      }
     } else if (type instanceof Types.FloatType) {
       return type.simpleString();
     } else if (type instanceof Types.DoubleType) {

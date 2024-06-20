@@ -316,13 +316,19 @@ public class DTOConverters {
 
     } else if (transform instanceof Transforms.ListTransform) {
       Transforms.ListTransform listTransform = (Transforms.ListTransform) transform;
-      return ListPartitioningDTO.of(
-          listTransform.fieldNames(), (ListPartitionDTO[]) toDTOs(listTransform.assignments()));
+      ListPartitionDTO[] assignments =
+          Arrays.stream(listTransform.assignments())
+              .map(DTOConverters::toDTO)
+              .toArray(ListPartitionDTO[]::new);
+      return ListPartitioningDTO.of(listTransform.fieldNames(), assignments);
 
     } else if (transform instanceof Transforms.RangeTransform) {
       Transforms.RangeTransform rangeTransform = (Transforms.RangeTransform) transform;
-      return RangePartitioningDTO.of(
-          rangeTransform.fieldName(), (RangePartitionDTO[]) toDTOs(rangeTransform.assignments()));
+      RangePartitionDTO[] assignments =
+          Arrays.stream(rangeTransform.assignments())
+              .map(DTOConverters::toDTO)
+              .toArray(RangePartitionDTO[]::new);
+      return RangePartitioningDTO.of(rangeTransform.fieldName(), assignments);
 
     } else if (transform instanceof Transforms.ApplyTransform) {
       return FunctionPartitioningDTO.of(transform.name(), toFunctionArg(transform.arguments()));
@@ -699,22 +705,33 @@ public class DTOConverters {
     switch (partitionDTO.type()) {
       case IDENTITY:
         IdentityPartitionDTO identityPartitionDTO = (IdentityPartitionDTO) partitionDTO;
+        Literal<?>[] values =
+            Arrays.stream(identityPartitionDTO.values())
+                .map(DTOConverters::fromFunctionArg)
+                .toArray(Literal<?>[]::new);
         return Partitions.identity(
             identityPartitionDTO.name(),
             identityPartitionDTO.fieldNames(),
-            identityPartitionDTO.values(),
+            values,
             identityPartitionDTO.properties());
       case RANGE:
         RangePartitionDTO rangePartitionDTO = (RangePartitionDTO) partitionDTO;
         return Partitions.range(
             rangePartitionDTO.name(),
-            rangePartitionDTO.upper(),
-            rangePartitionDTO.lower(),
+            (Literal<?>) fromFunctionArg(rangePartitionDTO.upper()),
+            (Literal<?>) fromFunctionArg(rangePartitionDTO.lower()),
             rangePartitionDTO.properties());
       case LIST:
         ListPartitionDTO listPartitionDTO = (ListPartitionDTO) partitionDTO;
-        return Partitions.list(
-            listPartitionDTO.name(), listPartitionDTO.lists(), listPartitionDTO.properties());
+        Literal<?>[][] lists =
+            Arrays.stream(listPartitionDTO.lists())
+                .map(
+                    list ->
+                        Arrays.stream(list)
+                            .map(DTOConverters::fromFunctionArg)
+                            .toArray(Literal<?>[]::new))
+                .toArray(Literal<?>[][]::new);
+        return Partitions.list(listPartitionDTO.name(), lists, listPartitionDTO.properties());
       default:
         throw new IllegalArgumentException("Unsupported partition type: " + partitionDTO.type());
     }
