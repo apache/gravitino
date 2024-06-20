@@ -3,9 +3,12 @@
  * This software is licensed under the Apache License version 2.
  */
 import io.github.piyushroshan.python.VenvTask
+import org.gradle.internal.os.OperatingSystem
 import java.io.BufferedWriter
 import java.io.FileWriter
 import java.net.URL
+import java.nio.file.Files
+import java.nio.file.Paths
 
 plugins {
   id("io.github.piyushroshan.python-gradle-miniforge-plugin") version "1.0.0"
@@ -127,6 +130,27 @@ fun getAndUnzipHadoopPack() {
   if (exitCode != 0) {
     val output = unzipProcess.inputStream.bufferedReader().readText()
     throw RuntimeException("Unzip Hadoop distribution pack failed with exit code $exitCode, msg: $output")
+  }
+
+  // Replace the Hadoop native libs for macOS
+  if (OperatingSystem.current().isMacOsX()) {
+    val hadoopNativeLibsDir = File("${localArchiveDir}/hadoop-${hadoopVersion}/lib/native")
+    if (hadoopNativeLibsDir.exists()) {
+      // Backup the original native libs
+      val hadoopNativeLibsDirBack = File("${hadoopNativeLibsDir.absolutePath}_bak")
+      hadoopNativeLibsDirBack.deleteRecursively()
+      Files.move(hadoopNativeLibsDir.toPath(), hadoopNativeLibsDirBack.toPath())
+    }
+    val cpuArch = System.getProperty("os.arch")
+    val macosNativeLibPath = if (cpuArch.contains("arm") || cpuArch.contains("aarch64")) {
+      Paths.get("${project.rootDir.path}/clients/client-python/tests/integration/hadoop-${hadoopVersion}/macos/arm/native")
+    } else {
+      Paths.get("${project.rootDir.path}/clients/client-python/tests/integration/hadoop-${hadoopVersion}/macos/intel/native")
+    }
+    Files.walk(macosNativeLibPath).forEach { source ->
+      val target = hadoopNativeLibsDir.toPath().resolve(macosNativeLibPath.relativize(source))
+      Files.copy(source, target)
+    }
   }
 }
 

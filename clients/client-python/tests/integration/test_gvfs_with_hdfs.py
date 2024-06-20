@@ -2,7 +2,6 @@
 #  This software is licensed under the Apache License version 2.
 import logging
 import os
-import platform
 import unittest
 from random import randint
 
@@ -29,11 +28,6 @@ from gravitino.exceptions.gravitino_runtime_exception import GravitinoRuntimeExc
 logger = logging.getLogger(__name__)
 
 
-# TODO
-#  The Hadoop distribution package does not have native hdfs libraries for macOS
-#  (`libhdfs.dylib` for macOS), so the integration tests can only run
-#  on Linux at present.
-@unittest.skipIf(platform.system() != "Linux", "Not applicable on this platform")
 class TestGvfsWithHDFS(unittest.TestCase):
     metalake_name: str = "TestGvfsWithHDFS_metalake" + str(randint(1, 10000))
     catalog_name: str = "test_gvfs_catalog"
