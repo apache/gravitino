@@ -100,9 +100,7 @@ const DetailsDrawer = props => {
         <Grid item xs={12} sx={{ mb: [0, 5] }}>
           <Typography
             variant='subtitle1'
-            className={
-              'twc-py-2 twc-font-semibold twc-text-[1.2rem] twc-w-full twc-overflow-hidden twc-text-ellipsis'
-            }
+            className={'twc-py-2 twc-font-semibold twc-text-[1.2rem] twc-w-full twc-overflow-hidden twc-text-ellipsis'}
             sx={{
               borderBottom: theme => `1px solid ${theme.palette.divider}`,
               whiteSpace: 'nowrap'
