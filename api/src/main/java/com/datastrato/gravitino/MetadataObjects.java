@@ -24,6 +24,8 @@ import com.google.common.base.Splitter;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 
+import javax.annotation.Nullable;
+
 /** The helper class for {@link MetadataObject}. */
 public class MetadataObjects {
 
@@ -96,6 +98,46 @@ public class MetadataObjects {
     }
 
     return new MetadataObjectImpl(getParentFullName(names), getLastName(names), type);
+  }
+
+  /**
+   * Get the parent metadata object of the given metadata object.
+   *
+   * @param object The metadata object
+   * @return The parent metadata object if it exists, otherwise null
+   */
+  @Nullable
+  public static MetadataObject parent(MetadataObject object) {
+    if (object == null) {
+      return null;
+    }
+
+    // Return null if the object is the root object
+    if (object.type() == MetadataObject.Type.METALAKE
+        || object.type() == MetadataObject.Type.CATALOG) {
+      return null;
+    }
+
+    MetadataObject.Type parentType;
+    switch (object.type()) {
+      case COLUMN:
+        parentType = MetadataObject.Type.TABLE;
+        break;
+      case TABLE:
+      case FILESET:
+      case TOPIC:
+        parentType = MetadataObject.Type.SCHEMA;
+        break;
+      case SCHEMA:
+        parentType = MetadataObject.Type.CATALOG;
+        break;
+
+      default:
+        throw new IllegalArgumentException(
+            "Unexpected to reach here for metadata object type: " + object.type());
+    }
+
+    return parse(object.parent(), parentType);
   }
 
   /**

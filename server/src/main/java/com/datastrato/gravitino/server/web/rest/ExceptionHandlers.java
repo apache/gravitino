@@ -29,6 +29,7 @@ import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
+import com.datastrato.gravitino.exceptions.TagAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TopicAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.server.web.Utils;
@@ -101,6 +102,11 @@ public class ExceptionHandlers {
   public static Response handleGroupPermissionOperationException(
       OperationType op, String roles, String parent, Exception e) {
     return GroupPermissionOperationExceptionHandler.INSTANCE.handle(op, roles, parent, e);
+  }
+
+  public static Response handleTagException(
+      OperationType op, String tag, String parent, Exception e) {
+    return TagExceptionHandler.INSTANCE.handle(op, tag, parent, e);
   }
 
   private static class PartitionExceptionHandler extends BaseExceptionHandler {
@@ -484,6 +490,38 @@ public class ExceptionHandlers {
 
       } else {
         return super.handle(op, roles, parent, e);
+      }
+    }
+  }
+
+  private static class TagExceptionHandler extends BaseExceptionHandler {
+
+    private static final ExceptionHandler INSTANCE = new TagExceptionHandler();
+
+    private static String getTagErrorMsg(
+        String tag, String operation, String parent, String reason) {
+      return String.format(
+          "Failed to operate tag(s)%s operation [%s] under object [%s], reason [%s]",
+          tag, operation, parent, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String tag, String parent, Exception e) {
+      String formatted = StringUtil.isBlank(tag) ? "" : " [" + tag + "]";
+      String errorMsg = getTagErrorMsg(formatted, op.name(), parent, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof TagAlreadyExistsException) {
+        return Utils.alreadyExists(errorMsg, e);
+
+      } else {
+        return super.handle(op, tag, parent, e);
       }
     }
   }

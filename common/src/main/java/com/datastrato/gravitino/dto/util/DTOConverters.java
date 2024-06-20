@@ -22,6 +22,7 @@ import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.NAM
 
 import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.MetadataObject;
 import com.datastrato.gravitino.Metalake;
 import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.authorization.Group;
@@ -65,6 +66,8 @@ import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.ListPartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.PartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.RangePartitionDTO;
+import com.datastrato.gravitino.dto.tag.MetadataObjectDTO;
+import com.datastrato.gravitino.dto.tag.TagDTO;
 import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.messaging.Topic;
 import com.datastrato.gravitino.rel.Column;
@@ -91,6 +94,9 @@ import com.datastrato.gravitino.rel.partitions.RangePartition;
 import com.datastrato.gravitino.rel.types.Types;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Optional;
+
+import com.datastrato.gravitino.tag.Tag;
 import org.apache.commons.lang3.ArrayUtils;
 
 /** Utility class for converting between DTOs and domain objects. */
@@ -463,6 +469,44 @@ public class DTOConverters {
         .withName(privilege.name())
         .withCondition(privilege.condition())
         .build();
+  }
+
+  /**
+   * Converts a MetadataObject to a MetadataObjectDTO.
+   *
+   * @param metadataObject The metadata object to be converted.
+   * @return The metadata object DTO.
+   */
+  public static MetadataObjectDTO toDTO(MetadataObject metadataObject) {
+    return MetadataObjectDTO.builder()
+        .withParent(metadataObject.parent())
+        .withName(metadataObject.name())
+        .withType(metadataObject.type())
+        .build();
+  }
+
+  /**
+   * Converts a Tag to a TagDTO.
+   *
+   * @param tag The tag to be converted.
+   * @param inherited The inherited flag.
+   * @return The tag DTO.
+   */
+  public static TagDTO toDTO(Tag tag, Optional<Boolean> inherited) {
+    TagDTO.Builder builder = TagDTO.builder()
+        .withName(tag.name())
+        .withComment(tag.comment())
+        .withProperties(tag.properties())
+        .withAudit(toDTO(tag.auditInfo()))
+        .withInherited(inherited);
+
+    Optional.ofNullable(tag.associatedObjects().objects())
+        .map(Arrays::stream)
+        .ifPresent(objects ->
+            builder
+                .withObjects(objects.map(DTOConverters::toDTO).toArray(MetadataObjectDTO[]::new)));
+
+    return builder.build();
   }
 
   /**
