@@ -20,8 +20,10 @@ dependencies {
   implementation(project(":common"))
   implementation(project(":core"))
   implementation(libs.bundles.paimon)
-  implementation(libs.bundles.log4j)
+  implementation(libs.bundles.jetty)
+  implementation(libs.bundles.jersey)
   implementation(libs.commons.lang3)
+  implementation(libs.bundles.log4j)
   implementation(libs.guava)
   implementation(libs.hadoop2.common) {
     exclude("com.github.spotbugs")

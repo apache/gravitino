@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.catalog.lakehouse.paimon;
 
 import static com.datastrato.gravitino.connector.PropertyEntry.enumImmutablePropertyEntry;
+import static com.datastrato.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
 import static com.datastrato.gravitino.connector.PropertyEntry.stringRequiredPropertyEntry;
 
 import com.datastrato.gravitino.connector.BaseCatalogPropertiesMetadata;
@@ -44,7 +45,7 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                 false,
                 false),
             stringRequiredPropertyEntry(WAREHOUSE, "Paimon catalog warehouse config", false, false),
-            stringRequiredPropertyEntry(URI, "Paimon catalog uri config", false, false));
+            stringOptionalPropertyEntry(URI, "Paimon catalog uri config", false, null, false));
     HashMap<String, PropertyEntry<?>> result = Maps.newHashMap(BASIC_CATALOG_PROPERTY_ENTRIES);
     result.putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName));
     PROPERTIES_METADATA = ImmutableMap.copyOf(result);

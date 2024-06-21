@@ -137,11 +137,9 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
 
     // load schema check.
     Schema schema = schemas.loadSchema(schemaIdent.name());
-    schema.properties().forEach((k, v) -> Assertions.assertEquals(schemaProperties.get(k), v));
-
-    paimonCatalog
-        .loadDatabaseProperties(schemaIdent.name())
-        .forEach((k, v) -> Assertions.assertEquals(schemaProperties.get(k), v));
+    // database properties is empty for Paimon FilesystemCatalog.
+    Assertions.assertTrue(schema.properties().isEmpty());
+    Assertions.assertTrue(paimonCatalog.loadDatabaseProperties(schemaIdent.name()).isEmpty());
 
     Map<String, String> emptyMap = Collections.emptyMap();
     Assertions.assertThrows(
@@ -149,7 +147,7 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
         () -> schemas.createSchema(schemaIdent.name(), schema_comment, emptyMap));
 
     // alter schema check.
-    // unSupport alter schema operation.
+    // alter schema operation is unsupported.
     Assertions.assertThrowsExactly(
         UnsupportedOperationException.class,
         () -> schemas.alterSchema(schemaIdent.name(), SchemaChange.setProperty("k1", "v1")));
@@ -500,12 +498,7 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
 
   private void clearTableAndSchema() {
     if (catalog.asSchemas().schemaExists(schemaName)) {
-      NameIdentifier[] nameIdentifiers =
-          catalog.asTableCatalog().listTables(Namespace.of(metalakeName, catalogName, schemaName));
-      for (NameIdentifier nameIdentifier : nameIdentifiers) {
-        catalog.asTableCatalog().dropTable(nameIdentifier);
-      }
-      catalog.asSchemas().dropSchema(schemaName, false);
+      catalog.asSchemas().dropSchema(schemaName, true);
     }
   }
 
@@ -546,9 +539,11 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     prop.put("key2", "val2");
 
     Schema createdSchema = catalog.asSchemas().createSchema(ident.name(), schema_comment, prop);
+    // database properties is empty for Paimon FilesystemCatalog.
     Schema loadSchema = catalog.asSchemas().loadSchema(ident.name());
     Assertions.assertEquals(createdSchema.name(), loadSchema.name());
-    prop.forEach((key, value) -> Assertions.assertEquals(loadSchema.properties().get(key), value));
+    Assertions.assertTrue(loadSchema.properties().isEmpty());
+    Assertions.assertTrue(createdSchema.properties().isEmpty());
   }
 
   private Column[] createColumns() {
