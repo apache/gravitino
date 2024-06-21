@@ -8,8 +8,9 @@ import com.datastrato.gravitino.catalog.doris.utils.DorisUtils;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTablePartitionOperations;
+import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
 import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
-import com.datastrato.gravitino.exceptions.NoSuchPartitionedTableException;
+import com.datastrato.gravitino.exceptions.NotPartitionedTableException;
 import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
 import com.datastrato.gravitino.rel.expressions.literals.Literals;
@@ -51,9 +52,9 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
   public String[] listPartitionNames() {
     try (Connection connection = getConnection(databaseName)) {
       if (getPartitionType(connection) == PartitionType.NONE) {
-        throw new NoSuchPartitionedTableException("%s is not a partitioned table", tableName);
+        throw new NotPartitionedTableException("%s is not a partitioned table", tableName);
       }
-      String showPartitionsSql = String.format("SHOW PARTITIONS FROM %s", tableName);
+      String showPartitionsSql = String.format("SHOW PARTITIONS FROM `%s`", tableName);
       try (Statement statement = connection.createStatement();
           ResultSet result = statement.executeQuery(showPartitionsSql)) {
         ImmutableList.Builder<String> partitionNames = ImmutableList.builder();
@@ -72,10 +73,10 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
     try (Connection connection = getConnection(databaseName)) {
       PartitionType partitionType = getPartitionType(connection);
       if (partitionType == PartitionType.NONE) {
-        throw new NoSuchPartitionedTableException("%s is not a partitioned table", tableName);
+        throw new NotPartitionedTableException("%s is not a partitioned table", tableName);
       }
       Map<String, Type> columnTypes = getColumnType(connection);
-      String showPartitionsSql = String.format("SHOW PARTITIONS FROM %s", tableName);
+      String showPartitionsSql = String.format("SHOW PARTITIONS FROM `%s`", tableName);
       try (Statement statement = connection.createStatement();
           ResultSet result = statement.executeQuery(showPartitionsSql)) {
         ImmutableList.Builder<Partition> partitions = ImmutableList.builder();
@@ -91,7 +92,25 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
 
   @Override
   public Partition getPartition(String partitionName) throws NoSuchPartitionException {
-    return null;
+    try (Connection connection = getConnection(databaseName)) {
+      PartitionType partitionType = getPartitionType(connection);
+      if (partitionType == PartitionType.NONE) {
+        throw new NotPartitionedTableException("%s is not a partitioned table", tableName);
+      }
+      Map<String, Type> columnTypes = getColumnType(connection);
+      String showPartitionsSql =
+          String.format(
+              "SHOW PARTITIONS FROM `%s` WHERE PartitionName = \"%s\"", tableName, partitionName);
+      try (Statement statement = connection.createStatement();
+          ResultSet result = statement.executeQuery(showPartitionsSql)) {
+        while (result.next()) {
+          return fromDorisPartition(result, partitionType, columnTypes);
+        }
+      }
+    } catch (SQLException e) {
+      throw exceptionConverter.toGravitinoException(e);
+    }
+    throw new NoSuchPartitionException("Partition %s does not exist", partitionName);
   }
 
   @Override
@@ -101,7 +120,23 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
 
   @Override
   public boolean dropPartition(String partitionName) {
-    return false;
+    try (Connection connection = getConnection(databaseName)) {
+      if (getPartitionType(connection) == PartitionType.NONE) {
+        throw new NotPartitionedTableException("%s is not a partitioned table", tableName);
+      }
+      String dropPartitionsSql =
+          String.format("ALTER TABLE `%s` DROP PARTITION `%s`", tableName, partitionName);
+      try (Statement statement = connection.createStatement()) {
+        statement.executeUpdate(dropPartitionsSql);
+        return true;
+      }
+    } catch (SQLException e) {
+      GravitinoRuntimeException exception = exceptionConverter.toGravitinoException(e);
+      if (exception instanceof NoSuchPartitionException) {
+        return false;
+      }
+      throw exception;
+    }
   }
 
   private PartitionType getPartitionType(Connection connection) throws SQLException {
@@ -172,7 +207,7 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
               partitionName, lists.build().stream().toArray(Literal<?>[][]::new), properties);
         }
       default:
-        throw new NoSuchPartitionedTableException("%s is not a partitioned table", tableName);
+        throw new NotPartitionedTableException("%s is not a partitioned table", tableName);
     }
   }
 

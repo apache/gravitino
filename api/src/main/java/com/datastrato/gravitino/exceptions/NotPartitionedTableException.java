@@ -8,7 +8,7 @@ import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 
 /** Exception thrown when a partitioned table is not exists. */
-public class NoSuchPartitionedTableException extends NotFoundException {
+public class NotPartitionedTableException extends NotFoundException {
 
   /**
    * Constructs a new exception with the specified detail message.
@@ -17,7 +17,7 @@ public class NoSuchPartitionedTableException extends NotFoundException {
    * @param args the arguments to the message.
    */
   @FormatMethod
-  public NoSuchPartitionedTableException(@FormatString String message, Object... args) {
+  public NotPartitionedTableException(@FormatString String message, Object... args) {
     super(message, args);
   }
 
@@ -29,7 +29,7 @@ public class NoSuchPartitionedTableException extends NotFoundException {
    * @param args the arguments to the message.
    */
   @FormatMethod
-  public NoSuchPartitionedTableException(Throwable cause, String message, Object... args) {
+  public NotPartitionedTableException(Throwable cause, String message, Object... args) {
     super(cause, message, args);
   }
 }
