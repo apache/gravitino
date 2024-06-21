@@ -94,7 +94,7 @@ const TableBody = props => {
 
         return (
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Tooltip title={name} placement='right'>
+            <Tooltip title={row.comment} placement='right'>
               <Typography
                 noWrap
                 component={Link}
