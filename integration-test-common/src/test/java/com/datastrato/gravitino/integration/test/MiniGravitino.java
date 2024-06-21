@@ -24,7 +24,6 @@ import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
-import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.HashMap;
@@ -243,64 +242,4 @@ public class MiniGravitino {
 
     ITUtils.rewriteConfigFile(configTempFileName, configFileName, configMap);
   }
-
-  public static boolean isPortOpen(String host, int port, int timeout) {
-    try (Socket socket = new Socket()) {
-      socket.connect(new java.net.InetSocketAddress(host, port), timeout);
-      return true;
-    } catch (Exception e) {
-      return false;
-    }
-  }
-
-  //  private boolean checkIfServerIsRunning() {
-  //    String URI = String.format("http://%s:%d", host, port);
-  //    LOG.info("checkIfServerIsRunning() URI: {}", URI);
-  //
-  //    // Use kerberos, we need to use sdk to check
-  //    if (Objects.equals(serverConfig.get(Configs.AUTHENTICATOR), "kerberos")) {
-  //      try {
-  //        KerberosTokenProvider provider =
-  //            KerberosTokenProvider.builder()
-  //                .withClientPrincipal((String) properties.get("client.kerberos.principal"))
-  //                .withKeyTabFile(new File((String) properties.get("client.kerberos.keytab")))
-  //                .build();
-  //        GravitinoAdminClient adminClient =
-  //            GravitinoAdminClient.builder(URI).withKerberosAuth(provider).build();
-  //
-  //        adminClient.listMetalakes();
-  //        return true;
-  //      } catch (Exception e) {
-  //        if (isPortOpen(host, port, 1000)) {
-  //          return true;
-  //        }
-  //
-  //        LOG.warn(
-  //            "Kerberos checkIfServerIsRunning() fails, GravitinoServer is not running {}",
-  //            e.getMessage());
-  //        return false;
-  //      }
-  //    }
-  //
-  //    // Not auth, we can use the rest client to check
-  //    VersionResponse response = null;
-  //    try {
-  //      response =
-  //          restClient.get(
-  //              "api/version",
-  //              VersionResponse.class,
-  //              Collections.emptyMap(),
-  //              ErrorHandlers.restErrorHandler());
-  //    } catch (RESTException e) {
-  //      LOG.warn("checkIfServerIsRunning() fails, GravitinoServer is not running {}",
-  // e.getMessage());
-  //      return false;
-  //    }
-  //    if (response != null && response.getCode() == 0) {
-  //      return true;
-  //    } else {
-  //      LOG.warn("checkIfServerIsRunning() fails, GravitinoServer is not running");
-  //      return false;
-  //    }
-  //  }
 }
