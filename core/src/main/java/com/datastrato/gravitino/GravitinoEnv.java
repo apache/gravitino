@@ -40,6 +40,7 @@ import com.datastrato.gravitino.metrics.MetricsSystem;
 import com.datastrato.gravitino.metrics.source.JVMMetricsSource;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
+import com.datastrato.gravitino.tag.TagManager;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import org.slf4j.Logger;
@@ -81,7 +82,10 @@ public class GravitinoEnv {
   private MetricsSystem metricsSystem;
 
   private LockManager lockManager;
+
   private EventListenerManager eventListenerManager;
+
+  private TagManager tagManager;
 
   private GravitinoEnv() {}
 
@@ -185,6 +189,10 @@ public class GravitinoEnv {
 
     // Tree lock
     this.lockManager = new LockManager(config);
+
+    // Tag manager
+    this.tagManager = new TagManager(idGenerator, entityStore);
+
     LOG.info("Gravitino Environment is initialized.");
   }
 
@@ -294,6 +302,15 @@ public class GravitinoEnv {
    */
   public AccessControlManager accessControlManager() {
     return accessControlManager;
+  }
+
+  /**
+   * Get the TagManager associated with the Gravitino environment.
+   *
+   * @return The TagManager instance.
+   */
+  public TagManager tagManager() {
+    return tagManager;
   }
 
   public void start() {

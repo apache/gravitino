@@ -6,9 +6,9 @@ package com.datastrato.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.MetadataObject;
+import com.datastrato.gravitino.MetadataObjects;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.authorization.AuthorizationUtils;
@@ -169,7 +169,7 @@ public class RoleOperations {
     // Securable object ignores the metalake namespace, so we should add it back.
     if (object.type() == MetadataObject.Type.METALAKE) {
       // All metalakes don't need to check the securable object whether exists.
-      if (object.name().equals(Entity.SECURABLE_ENTITY_RESERVED_NAME)) {
+      if (object.name().equals(MetadataObjects.METADATA_OBJECT_RESERVED_NAME)) {
         return;
       }
       identifier = NameIdentifier.parse(object.fullName());

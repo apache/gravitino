@@ -5,18 +5,18 @@
 package com.datastrato.gravitino.authorization;
 
 import com.datastrato.gravitino.MetadataObject;
+import com.datastrato.gravitino.MetadataObjects;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.StringUtils;
 
 /** The helper class for {@link SecurableObject}. */
 public class SecurableObjects {
 
-  private static final Splitter DOT = Splitter.on('.');
+  private static final Splitter DOT_SPLITTER = Splitter.on('.');
 
   /**
    * Create the metalake {@link SecurableObject} with the given metalake name.
@@ -51,7 +51,6 @@ public class SecurableObjects {
    */
   public static SecurableObject ofSchema(
       SecurableObject catalog, String schema, List<Privilege> privileges) {
-
     return of(
         SecurableObject.Type.SCHEMA, Lists.newArrayList(catalog.fullName(), schema), privileges);
   }
@@ -66,7 +65,7 @@ public class SecurableObjects {
    */
   public static SecurableObject ofTable(
       SecurableObject schema, String table, List<Privilege> privileges) {
-    List<String> names = Lists.newArrayList(DOT.splitToList(schema.fullName()));
+    List<String> names = Lists.newArrayList(DOT_SPLITTER.splitToList(schema.fullName()));
     names.add(table);
     return of(SecurableObject.Type.TABLE, names, privileges);
   }
@@ -81,7 +80,7 @@ public class SecurableObjects {
    */
   public static SecurableObject ofTopic(
       SecurableObject schema, String topic, List<Privilege> privileges) {
-    List<String> names = Lists.newArrayList(DOT.splitToList(schema.fullName()));
+    List<String> names = Lists.newArrayList(DOT_SPLITTER.splitToList(schema.fullName()));
     names.add(topic);
     return of(SecurableObject.Type.TOPIC, names, privileges);
   }
@@ -97,7 +96,7 @@ public class SecurableObjects {
    */
   public static SecurableObject ofFileset(
       SecurableObject schema, String fileset, List<Privilege> privileges) {
-    List<String> names = Lists.newArrayList(DOT.splitToList(schema.fullName()));
+    List<String> names = Lists.newArrayList(DOT_SPLITTER.splitToList(schema.fullName()));
     names.add(fileset);
     return of(SecurableObject.Type.FILESET, names, privileges);
   }
@@ -115,42 +114,14 @@ public class SecurableObjects {
     return new SecurableObjectImpl(null, "*", SecurableObject.Type.METALAKE, privileges);
   }
 
-  private static class SecurableObjectImpl implements SecurableObject {
+  private static class SecurableObjectImpl extends MetadataObjects.MetadataObjectImpl
+      implements SecurableObject {
 
-    private final String parent;
-    private final String name;
-    private final Type type;
     private List<Privilege> privileges;
 
     SecurableObjectImpl(String parent, String name, Type type, List<Privilege> privileges) {
-      this.parent = parent;
-      this.name = name;
-      this.type = type;
+      super(parent, name, type);
       this.privileges = ImmutableList.copyOf(privileges);
-    }
-
-    @Override
-    public String parent() {
-      return parent;
-    }
-
-    @Override
-    public String name() {
-      return name;
-    }
-
-    @Override
-    public String fullName() {
-      if (parent != null) {
-        return parent + "." + name;
-      } else {
-        return name;
-      }
-    }
-
-    @Override
-    public Type type() {
-      return type;
     }
 
     @Override
@@ -160,7 +131,8 @@ public class SecurableObjects {
 
     @Override
     public int hashCode() {
-      return Objects.hash(parent, name, type, privileges);
+      int result = super.hashCode();
+      return Objects.hash(result, privileges);
     }
 
     @Override
@@ -173,7 +145,7 @@ public class SecurableObjects {
       return "SecurableObject: [fullName="
           + fullName()
           + "], [type="
-          + type
+          + type()
           + "], [privileges="
           + privilegesStr
           + "]";
@@ -181,15 +153,16 @@ public class SecurableObjects {
 
     @Override
     public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+
       if (!(other instanceof SecurableObject)) {
         return false;
       }
 
       SecurableObject otherSecurableObject = (SecurableObject) other;
-      return Objects.equals(parent, otherSecurableObject.parent())
-          && Objects.equals(name, otherSecurableObject.name())
-          && Objects.equals(type, otherSecurableObject.type())
-          && Objects.equals(privileges, otherSecurableObject.privileges());
+      return super.equals(other) && Objects.equals(privileges, otherSecurableObject.privileges());
     }
   }
 
@@ -203,20 +176,9 @@ public class SecurableObjects {
    */
   public static SecurableObject parse(
       String fullName, MetadataObject.Type type, List<Privilege> privileges) {
-    if ("*".equals(fullName)) {
-      if (type != MetadataObject.Type.METALAKE) {
-        throw new IllegalArgumentException("If securable object isn't metalake, it can't be `*`");
-      }
-      return SecurableObjects.ofAllMetalakes(privileges);
-    }
-
-    if (StringUtils.isBlank(fullName)) {
-      throw new IllegalArgumentException("securable object full name can't be blank");
-    }
-
-    List<String> parts = DOT.splitToList(fullName);
-
-    return SecurableObjects.of(type, parts, privileges);
+    MetadataObject metadataObject = MetadataObjects.parse(fullName, type);
+    return new SecurableObjectImpl(
+        metadataObject.parent(), metadataObject.name(), type, privileges);
   }
 
   /**
@@ -229,68 +191,8 @@ public class SecurableObjects {
    */
   static SecurableObject of(
       MetadataObject.Type type, List<String> names, List<Privilege> privileges) {
-    if (names == null) {
-      throw new IllegalArgumentException("Cannot create a securable object with null names");
-    }
-
-    if (names.isEmpty()) {
-      throw new IllegalArgumentException("Cannot create a securable object with no names");
-    }
-
-    if (type == null) {
-      throw new IllegalArgumentException("Cannot create a securable object with no type");
-    }
-
-    if (names.size() > 3) {
-      throw new IllegalArgumentException(
-          "Cannot create a securable object with the name length which is greater than 3");
-    }
-
-    if (names.size() == 1
-        && type != MetadataObject.Type.CATALOG
-        && type != MetadataObject.Type.METALAKE) {
-      throw new IllegalArgumentException(
-          "If the length of names is 1, it must be the CATALOG or METALAKE type");
-    }
-
-    if (names.size() == 2 && type != SecurableObject.Type.SCHEMA) {
-      throw new IllegalArgumentException("If the length of names is 2, it must be the SCHEMA type");
-    }
-
-    if (names.size() == 3
-        && type != MetadataObject.Type.FILESET
-        && type != MetadataObject.Type.TABLE
-        && type != MetadataObject.Type.TOPIC) {
-      throw new IllegalArgumentException(
-          "If the length of names is 3, it must be FILESET, TABLE or TOPIC");
-    }
-
-    for (String name : names) {
-      checkName(name);
-    }
-
-    return new SecurableObjectImpl(getParentFullName(names), getLastName(names), type, privileges);
-  }
-
-  private static String getParentFullName(List<String> names) {
-    if (names.size() <= 1) {
-      return null;
-    }
-
-    return String.join(".", names.subList(0, names.size() - 1));
-  }
-
-  private static String getLastName(List<String> names) {
-    return names.get(names.size() - 1);
-  }
-
-  private static void checkName(String name) {
-    if (name == null) {
-      throw new IllegalArgumentException("Cannot create a securable object with null name");
-    }
-
-    if ("*".equals(name)) {
-      throw new IllegalArgumentException("Cannot create a securable object with `*` name.");
-    }
+    MetadataObject metadataObject = MetadataObjects.of(names, type);
+    return new SecurableObjectImpl(
+        metadataObject.parent(), metadataObject.name(), type, privileges);
   }
 }
