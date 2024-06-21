@@ -21,9 +21,13 @@ import org.apache.commons.lang3.StringUtils;
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY)
 @JsonSubTypes({
   @JsonSubTypes.Type(value = TagUpdateRequest.RenameTagRequest.class, name = "rename"),
-  @JsonSubTypes.Type(value = TagUpdateRequest.UpdateTagCommentRequest.class, name = "updateComment"),
+  @JsonSubTypes.Type(
+      value = TagUpdateRequest.UpdateTagCommentRequest.class,
+      name = "updateComment"),
   @JsonSubTypes.Type(value = TagUpdateRequest.SetTagPropertyRequest.class, name = "setProperty"),
-  @JsonSubTypes.Type(value = TagUpdateRequest.RemoveTagPropertyRequest.class, name = "removeProperty")
+  @JsonSubTypes.Type(
+      value = TagUpdateRequest.RemoveTagPropertyRequest.class,
+      name = "removeProperty")
 })
 public interface TagUpdateRequest extends RESTRequest {
 
@@ -64,8 +68,7 @@ public interface TagUpdateRequest extends RESTRequest {
 
     @Override
     public void validate() throws IllegalArgumentException {
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(newName), "\"newName\" must not be blank");
+      Preconditions.checkArgument(StringUtils.isNotBlank(newName), "\"newName\" must not be blank");
     }
   }
 
@@ -86,7 +89,6 @@ public interface TagUpdateRequest extends RESTRequest {
     public UpdateTagCommentRequest(String newComment) {
       this.newComment = newComment;
     }
-
 
     /** This is the constructor that is used by Jackson deserializer */
     public UpdateTagCommentRequest() {
@@ -144,8 +146,7 @@ public interface TagUpdateRequest extends RESTRequest {
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
           StringUtils.isNotBlank(property), "\"property\" must not be blank");
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(value), "\"value\" must not be blank");
+      Preconditions.checkArgument(StringUtils.isNotBlank(value), "\"value\" must not be blank");
     }
   }
 
@@ -184,5 +185,3 @@ public interface TagUpdateRequest extends RESTRequest {
     }
   }
 }
-
-

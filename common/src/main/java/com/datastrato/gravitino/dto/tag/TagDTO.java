@@ -9,11 +9,12 @@ import com.datastrato.gravitino.MetadataObject;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.tag.Tag;
 import com.fasterxml.jackson.annotation.JsonProperty;
-
 import java.util.Map;
 import java.util.Optional;
+import lombok.EqualsAndHashCode;
 
 /** Represents a Tag Data Transfer Object (DTO). */
+@EqualsAndHashCode
 public class TagDTO implements Tag, Tag.AssociatedObjects {
 
   @JsonProperty("name")
@@ -29,10 +30,10 @@ public class TagDTO implements Tag, Tag.AssociatedObjects {
   private AuditDTO audit;
 
   @JsonProperty("inherited")
-  private Optional<Boolean> inherited;
+  private Optional<Boolean> inherited = Optional.empty();
 
   @JsonProperty("objects")
-  private MetadataObject[] objects;
+  private MetadataObjectDTO[] objects;
 
   private TagDTO() {}
 
@@ -64,6 +65,11 @@ public class TagDTO implements Tag, Tag.AssociatedObjects {
   @Override
   public MetadataObject[] objects() {
     return objects;
+  }
+
+  @Override
+  public AssociatedObjects associatedObjects() {
+    return this;
   }
 
   /** @return a new builder for constructing a Tag DTO. */
@@ -140,7 +146,7 @@ public class TagDTO implements Tag, Tag.AssociatedObjects {
      * @param objects The objects associated with the tag.
      * @return The builder instance.
      */
-    public Builder withObjects(MetadataObject[] objects) {
+    public Builder withObjects(MetadataObjectDTO[] objects) {
       tagDTO.objects = objects;
       return this;
     }

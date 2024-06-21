@@ -41,11 +41,10 @@ import com.datastrato.gravitino.server.web.mapper.JsonMappingExceptionMapper;
 import com.datastrato.gravitino.server.web.mapper.JsonParseExceptionMapper;
 import com.datastrato.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
 import com.datastrato.gravitino.server.web.ui.WebUIFilter;
+import com.datastrato.gravitino.tag.TagManager;
 import java.io.File;
 import java.util.Properties;
 import javax.servlet.Servlet;
-
-import com.datastrato.gravitino.tag.TagManager;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;

@@ -7,13 +7,12 @@ package com.datastrato.gravitino.dto.requests;
 import com.datastrato.gravitino.rest.RESTRequest;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.Map;
+import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
-
-import javax.annotation.Nullable;
-import java.util.Map;
 
 /** Represents a request to create a tag. */
 @Getter

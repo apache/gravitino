@@ -22,9 +22,8 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import java.util.List;
-import org.apache.commons.lang3.StringUtils;
-
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 
 /** The helper class for {@link MetadataObject}. */
 public class MetadataObjects {

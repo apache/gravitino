@@ -15,6 +15,7 @@ import com.datastrato.gravitino.dto.requests.TagsAssociateRequest;
 import com.datastrato.gravitino.dto.responses.DropResponse;
 import com.datastrato.gravitino.dto.responses.NameListResponse;
 import com.datastrato.gravitino.dto.responses.TagListResponse;
+import com.datastrato.gravitino.dto.responses.TagResponse;
 import com.datastrato.gravitino.dto.tag.TagDTO;
 import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.exceptions.NoSuchTagException;
@@ -24,13 +25,13 @@ import com.datastrato.gravitino.tag.Tag;
 import com.datastrato.gravitino.tag.TagChange;
 import com.datastrato.gravitino.tag.TagManager;
 import com.google.common.collect.Lists;
-import org.apache.commons.lang3.ArrayUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
-import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -41,11 +42,9 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Locale;
-import java.util.Optional;
+import org.apache.commons.lang3.ArrayUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Path("metalakes/{metalake}/tags")
 public class TagOperations {
@@ -71,7 +70,7 @@ public class TagOperations {
       @QueryParam("extended") @DefaultValue("false") boolean extended) {
     LOG.info(
         "Received list tag {} with extended {} request for metalake: {}",
-        verbose? "infos" : "names",
+        verbose ? "infos" : "names",
         extended,
         metalake);
 
@@ -85,14 +84,15 @@ public class TagOperations {
               if (ArrayUtils.isEmpty(tags)) {
                 tagDTOs = new TagDTO[0];
               } else {
-                tagDTOs = Arrays.stream(tags)
-                    .map(t -> DTOConverters.toDTO(t, Optional.empty()))
-                    .toArray(TagDTO[]::new);
+                tagDTOs =
+                    Arrays.stream(tags)
+                        .map(t -> DTOConverters.toDTO(t, Optional.empty()))
+                        .toArray(TagDTO[]::new);
               }
 
               LOG.info(
                   "List {} tags info with extended {} under metalake: {}",
-                  tags.length,
+                  tagDTOs.length,
                   extended,
                   metalake);
               return Utils.ok(new TagListResponse(tagDTOs));
@@ -114,8 +114,7 @@ public class TagOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "create-tag." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-tag", absolute = true)
-  public Response createTag(
-      @PathParam("metalake") String metalake, TagCreateRequest request) {
+  public Response createTag(@PathParam("metalake") String metalake, TagCreateRequest request) {
     LOG.info("Received create tag request under metalake: {}", metalake);
 
     try {
@@ -123,11 +122,12 @@ public class TagOperations {
           httpRequest,
           () -> {
             request.validate();
-            Tag tag = tagManager.createTag(
-                metalake, request.getName(), request.getComment(), request.getProperties());
+            Tag tag =
+                tagManager.createTag(
+                    metalake, request.getName(), request.getComment(), request.getProperties());
 
             LOG.info("Created tag: {} under metalake: {}", tag.name(), metalake);
-            return Utils.ok(DTOConverters.toDTO(tag, Optional.empty()));
+            return Utils.ok(new TagResponse(DTOConverters.toDTO(tag, Optional.empty())));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleTagException(
@@ -152,7 +152,7 @@ public class TagOperations {
           () -> {
             Tag tag = tagManager.getTag(metalake, name, extended);
             LOG.info("Get tag: {} under metalake: {}", name, metalake);
-            return Utils.ok(DTOConverters.toDTO(tag, Optional.empty()));
+            return Utils.ok(new TagResponse(DTOConverters.toDTO(tag, Optional.empty())));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleTagException(OperationType.GET, name, metalake, e);
@@ -178,12 +178,12 @@ public class TagOperations {
 
             TagChange[] changes =
                 request.getUpdates().stream()
-                .map(TagUpdateRequest::tagChange)
-                .toArray(TagChange[]::new);
+                    .map(TagUpdateRequest::tagChange)
+                    .toArray(TagChange[]::new);
             Tag tag = tagManager.alterTag(metalake, name, changes);
 
             LOG.info("Altered tag: {} under metalake: {}", name, metalake);
-            return Utils.ok(DTOConverters.toDTO(tag, Optional.empty()));
+            return Utils.ok(new TagResponse(DTOConverters.toDTO(tag, Optional.empty())));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleTagException(OperationType.ALTER, name, metalake, e);
@@ -228,7 +228,7 @@ public class TagOperations {
       @QueryParam("details") @DefaultValue("false") boolean verbose) {
     LOG.info(
         "Received list tag {} request for object type: {}, full name: {} under metalake: {}",
-        verbose? "infos" : "names",
+        verbose ? "infos" : "names",
         type,
         fullName,
         metalake);
@@ -252,12 +252,12 @@ public class TagOperations {
 
               MetadataObject parentObject = MetadataObjects.parent(object);
               while (parentObject != null) {
-                Tag[] heritageTags =
+                Tag[] inheritedTags =
                     tagManager.listTagsInfoForMetadataObject(metalake, parentObject);
-                if (ArrayUtils.isNotEmpty(heritageTags)) {
+                if (ArrayUtils.isNotEmpty(inheritedTags)) {
                   Collections.addAll(
                       tags,
-                      Arrays.stream(heritageTags)
+                      Arrays.stream(inheritedTags)
                           .map(t -> DTOConverters.toDTO(t, Optional.of(true)))
                           .toArray(TagDTO[]::new));
                 }
@@ -282,10 +282,10 @@ public class TagOperations {
 
               MetadataObject parentObject = MetadataObjects.parent(object);
               while (parentObject != null) {
-                String[] heritageTagNames =
+                String[] inheritedTagNames =
                     tagManager.listTagsForMetadataObject(metalake, parentObject);
-                if (ArrayUtils.isNotEmpty(heritageTagNames)) {
-                  Collections.addAll(tagNames, heritageTagNames);
+                if (ArrayUtils.isNotEmpty(inheritedTagNames)) {
+                  Collections.addAll(tagNames, inheritedTagNames);
                 }
                 parentObject = MetadataObjects.parent(parentObject);
               }
@@ -328,8 +328,7 @@ public class TagOperations {
           () -> {
             MetadataObject object = MetadataObjects.parse(fullName, toType(type));
             Optional<Tag> tag = getTagForObject(metalake, object, tagName);
-            Optional<TagDTO> tagDTO =
-                tag.map(t -> DTOConverters.toDTO(t, Optional.of(false)));
+            Optional<TagDTO> tagDTO = tag.map(t -> DTOConverters.toDTO(t, Optional.of(false)));
 
             MetadataObject parentObject = MetadataObjects.parent(object);
             while (!tag.isPresent() && parentObject != null) {
@@ -339,12 +338,22 @@ public class TagOperations {
             }
 
             if (!tagDTO.isPresent()) {
-              LOG.warn("Tag {} not found for object type: {}, full name: {} under metalake: {}",
-                  tagName, type, fullName, metalake);
+              LOG.warn(
+                  "Tag {} not found for object type: {}, full name: {} under metalake: {}",
+                  tagName,
+                  type,
+                  fullName,
+                  metalake);
               return Utils.notFound(
                   NoSuchTagException.class.getSimpleName(),
-                  "Tag not found: " + tagName + " for object type: " + type +
-                      ", full name: " + fullName + " under metalake: " + metalake);
+                  "Tag not found: "
+                      + tagName
+                      + " for object type: "
+                      + type
+                      + ", full name: "
+                      + fullName
+                      + " under metalake: "
+                      + metalake);
             } else {
               LOG.info(
                   "Get tag: {} for object type: {}, full name: {} under metalake: {}",
@@ -352,7 +361,7 @@ public class TagOperations {
                   type,
                   fullName,
                   metalake);
-              return Utils.ok(tagDTO.get());
+              return Utils.ok(new TagResponse(tagDTO.get()));
             }
           });
 
@@ -383,8 +392,10 @@ public class TagOperations {
           () -> {
             request.validate();
             MetadataObject object = MetadataObjects.parse(fullName, toType(type));
-            String[] tagNames = tagManager.associateTagsForMetadataObject(
-                metalake, object, request.getTagsToAdd(), request.getTagsToRemove());
+            String[] tagNames =
+                tagManager.associateTagsForMetadataObject(
+                    metalake, object, request.getTagsToAdd(), request.getTagsToRemove());
+            tagNames = tagNames == null ? new String[0] : tagNames;
 
             LOG.info(
                 "Associated tags: {} for object type: {}, full name: {} under metalake: {}",
@@ -410,19 +421,10 @@ public class TagOperations {
 
   private Optional<Tag> getTagForObject(String metalake, MetadataObject object, String tagName) {
     try {
-      return Optional.of(tagManager.getTagForMetadataObject(metalake, object, tagName));
+      return Optional.ofNullable(tagManager.getTagForMetadataObject(metalake, object, tagName));
     } catch (NoSuchTagException e) {
       LOG.info("Tag {} not found for object: {}", tagName, object);
       return Optional.empty();
     }
   }
-
-
-
-
-
-
-
-
-
 }

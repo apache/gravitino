@@ -7,8 +7,10 @@ package com.datastrato.gravitino.dto.tag;
 
 import com.datastrato.gravitino.MetadataObject;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.EqualsAndHashCode;
 
 /** Represents a Metadata Object DTO (Data Transfer Object). */
+@EqualsAndHashCode
 public class MetadataObjectDTO implements MetadataObject {
 
   private String parent;
@@ -38,10 +40,14 @@ public class MetadataObjectDTO implements MetadataObject {
   /** @return The full name of the metadata object. */
   @JsonProperty("fullName")
   public String getFullName() {
-    return parent + "." + name;
+    return fullName();
   }
 
-  /** Sets the full name of the metadata object. */
+  /**
+   * Sets the full name of the metadata object.
+   *
+   * @param fullName The full name of the metadata object.
+   */
   @JsonProperty("fullName")
   public void setFullName(String fullName) {
     int index = fullName.lastIndexOf(".");

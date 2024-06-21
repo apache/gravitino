@@ -7,11 +7,10 @@ package com.datastrato.gravitino.dto.requests;
 import com.datastrato.gravitino.rest.RESTRequest;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.List;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
-
-import java.util.List;
 
 /** Represents a request to update a tag. */
 @Getter

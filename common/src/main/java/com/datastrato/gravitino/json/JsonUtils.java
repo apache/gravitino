@@ -69,6 +69,7 @@ import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.cfg.EnumFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -252,7 +253,8 @@ public class JsonUtils {
             .configure(EnumFeature.WRITE_ENUMS_TO_LOWERCASE, true)
             .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
             .build()
-            .registerModule(new JavaTimeModule());
+            .registerModule(new JavaTimeModule())
+            .registerModule(new Jdk8Module());
   }
 
   /**
@@ -288,7 +290,8 @@ public class JsonUtils {
             .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
             .build()
             .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY)
-            .registerModule(new JavaTimeModule());
+            .registerModule(new JavaTimeModule())
+            .registerModule(new Jdk8Module());
   }
 
   /**

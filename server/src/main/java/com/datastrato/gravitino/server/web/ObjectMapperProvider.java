@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.cfg.EnumFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import javax.ws.rs.ext.ContextResolver;
 import javax.ws.rs.ext.Provider;
@@ -39,7 +40,8 @@ public class ObjectMapperProvider implements ContextResolver<ObjectMapper> {
             .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
             .build()
             .setSerializationInclusion(JsonInclude.Include.NON_NULL)
-            .registerModule(new JavaTimeModule());
+            .registerModule(new JavaTimeModule())
+            .registerModule(new Jdk8Module());
   }
 
   /**

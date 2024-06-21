@@ -92,11 +92,10 @@ import com.datastrato.gravitino.rel.partitions.Partition;
 import com.datastrato.gravitino.rel.partitions.Partitions;
 import com.datastrato.gravitino.rel.partitions.RangePartition;
 import com.datastrato.gravitino.rel.types.Types;
+import com.datastrato.gravitino.tag.Tag;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
-
-import com.datastrato.gravitino.tag.Tag;
 import org.apache.commons.lang3.ArrayUtils;
 
 /** Utility class for converting between DTOs and domain objects. */
@@ -493,18 +492,20 @@ public class DTOConverters {
    * @return The tag DTO.
    */
   public static TagDTO toDTO(Tag tag, Optional<Boolean> inherited) {
-    TagDTO.Builder builder = TagDTO.builder()
-        .withName(tag.name())
-        .withComment(tag.comment())
-        .withProperties(tag.properties())
-        .withAudit(toDTO(tag.auditInfo()))
-        .withInherited(inherited);
+    TagDTO.Builder builder =
+        TagDTO.builder()
+            .withName(tag.name())
+            .withComment(tag.comment())
+            .withProperties(tag.properties())
+            .withAudit(toDTO(tag.auditInfo()))
+            .withInherited(inherited);
 
     Optional.ofNullable(tag.associatedObjects().objects())
         .map(Arrays::stream)
-        .ifPresent(objects ->
-            builder
-                .withObjects(objects.map(DTOConverters::toDTO).toArray(MetadataObjectDTO[]::new)));
+        .ifPresent(
+            objects ->
+                builder.withObjects(
+                    objects.map(DTOConverters::toDTO).toArray(MetadataObjectDTO[]::new)));
 
     return builder.build();
   }

@@ -1,3 +1,8 @@
+/*
+ * Copyright 2024 Datastrato Pvt Ltd.
+ * This software is licensed under the Apache License version 2.
+ */
+
 package com.datastrato.gravitino.dto.responses;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -36,6 +41,6 @@ public class NameListResponse extends BaseResponse {
   public void validate() throws IllegalArgumentException {
     super.validate();
 
-  Preconditions.checkArgument(names != null, "names must not be null");
+    Preconditions.checkArgument(names != null, "\"names\" must not be null");
   }
 }

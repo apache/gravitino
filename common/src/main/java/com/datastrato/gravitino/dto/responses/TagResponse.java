@@ -43,6 +43,6 @@ public class TagResponse extends BaseResponse {
   public void validate() throws IllegalArgumentException {
     super.validate();
 
-    Preconditions.checkArgument(tag != null, "tag must not be null");
+    Preconditions.checkArgument(tag != null, "\"tag\" must not be null");
   }
 }
