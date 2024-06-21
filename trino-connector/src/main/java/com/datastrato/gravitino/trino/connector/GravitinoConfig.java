@@ -168,6 +168,10 @@ public class GravitinoConfig {
       this.properties = new Properties();
       try {
         String configFileName = System.getProperty("config");
+        if (StringUtils.isEmpty(configFileName)) {
+          return;
+        }
+
         properties.load(new FileInputStream(configFileName));
         if (properties.containsKey(TRINO_CATALOG_STORE)
             && !properties
