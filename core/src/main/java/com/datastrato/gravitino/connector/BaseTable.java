@@ -63,10 +63,7 @@ public abstract class BaseTable implements Table {
         if (ops == null) {
           TableOperations newOps = newOps();
           ops =
-              proxyPlugin
-                  .map(
-                      plugin -> OperationsProxy.createProxy(newOps, plugin))
-                  .orElse(newOps);
+              proxyPlugin.map(plugin -> OperationsProxy.createProxy(newOps, plugin)).orElse(newOps);
         }
       }
     }

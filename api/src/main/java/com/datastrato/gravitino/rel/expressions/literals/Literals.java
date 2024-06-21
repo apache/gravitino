@@ -24,7 +24,7 @@ public class Literals {
    * @param value the literal value
    * @param dataType the data type of the literal
    * @param <T> the JVM type of value held by the literal
-   * @return a new {@link com.datastrato.gravitino.rel.expressions.Literal} instance
+   * @return a new {@link Literal} instance
    */
   public static <T> LiteralImpl<T> of(T value, Type dataType) {
     return new LiteralImpl<>(value, dataType);
