@@ -12,14 +12,14 @@ plugins {
 
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark34.get()
+val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
+val paimonVersion: String = libs.versions.paimon.get()
 
 dependencies {
   implementation(project(":api"))
   implementation(project(":common"))
   implementation(project(":core"))
   implementation(libs.bundles.paimon)
-  implementation(libs.bundles.jetty)
-  implementation(libs.bundles.jersey)
   implementation(libs.bundles.log4j)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
@@ -43,6 +43,7 @@ dependencies {
     exclude("io.dropwizard.metrics")
     exclude("org.rocksdb")
   }
+  testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion")
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.jersey.test.framework.core) {
     exclude(group = "org.junit.jupiter")
@@ -52,13 +53,9 @@ dependencies {
   }
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
-
   testImplementation(libs.mysql.driver)
-  testImplementation(libs.postgresql.driver)
   testImplementation(libs.slf4j.api)
   testImplementation(libs.testcontainers)
-  testImplementation(libs.testcontainers.mysql)
-  testImplementation(libs.testcontainers.postgresql)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

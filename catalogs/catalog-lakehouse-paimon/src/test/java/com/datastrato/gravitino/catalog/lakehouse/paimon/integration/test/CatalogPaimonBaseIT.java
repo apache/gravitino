@@ -428,7 +428,7 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     // select data
     Dataset<Row> sql = spark.sql(String.format(SELECT_ALL_TEMPLATE, dbTable));
     Assertions.assertEquals(4, sql.count());
-    Row[] result = sql.sort(PAIMON_COL_NAME1).collect();
+    Row[] result = (Row[]) sql.sort(PAIMON_COL_NAME1).collect();
     LocalDate currentDate = LocalDate.now();
     DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     for (int i = 0; i < result.length; i++) {
