@@ -148,7 +148,7 @@ public class MiniGravitino {
 
     String url = URI + "/metrics";
     while (System.currentTimeMillis() - beginTime < 1000 * 60 * 3) {
-      started = AbstractIT.isGravitinoServerUp(url);
+      started = AbstractIT.isHttpServerUp(url);
       if (started || future.isDone()) {
         break;
       }
@@ -179,7 +179,7 @@ public class MiniGravitino {
     String url = String.format("http://%s:%d/metrics", host, port);
     while (System.currentTimeMillis() - beginTime < 1000 * 60 * 3) {
       sleepUninterruptibly(500, TimeUnit.MILLISECONDS);
-      started = AbstractIT.isGravitinoServerUp(url);
+      started = AbstractIT.isHttpServerUp(url);
       if (!started) {
         break;
       }

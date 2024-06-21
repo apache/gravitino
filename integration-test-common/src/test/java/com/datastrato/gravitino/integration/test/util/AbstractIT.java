@@ -19,8 +19,6 @@ import com.datastrato.gravitino.integration.test.container.MySQLContainer;
 import com.datastrato.gravitino.server.GravitinoServer;
 import com.datastrato.gravitino.server.ServerConfig;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -37,9 +35,9 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
-import org.apache.hc.client5.http.impl.classic.BasicHttpClientResponseHandler;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -234,7 +232,7 @@ public class AbstractIT {
       Awaitility.await()
           .atMost(60, TimeUnit.SECONDS)
           .pollInterval(1, TimeUnit.SECONDS)
-          .until(() -> isGravitinoServerUp(versionUrl));
+          .until(() -> isHttpServerUp(versionUrl));
     }
 
     JettyServerConfig jettyServerConfig =
@@ -298,17 +296,20 @@ public class AbstractIT {
     }
   }
 
-  public static boolean isGravitinoServerUp(String url) {
+  /**
+   * Check if the http server is up, If http response status code is 200, then we're assuming the
+   * server is up. Or else we assume the server is not ready.
+   *
+   * <p>Note: The method will ignore the response body and only check the status code.
+   *
+   * @param testUrl A url that we want to test ignore the response body.
+   * @return true if the server is up, false otherwise.
+   */
+  public static boolean isHttpServerUp(String testUrl) {
     try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
-      HttpGet request = new HttpGet(url);
-      String responseBody = httpClient.execute(request, new BasicHttpClientResponseHandler());
-      JsonObject jsonObject = new JsonParser().parse(responseBody).getAsJsonObject();
-      String version = jsonObject.get("version").getAsString();
-      if (null != version) {
-        return true;
-      }
-      LOG.warn("Gravitino server is not ready for " + responseBody);
-      return false;
+      HttpGet request = new HttpGet(testUrl);
+      ClassicHttpResponse response = httpClient.execute(request, a -> a);
+      return response.getCode() == 200;
     } catch (Exception e) {
       LOG.warn("Check Gravitino server failed: ", e);
       return false;

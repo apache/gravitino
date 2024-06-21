@@ -24,7 +24,7 @@ fun deleteCacheDir(targetDir: String) {
 }
 
 
-fun waitForServerIsReady(host: String = "http://localhost", port: Int = 8090, timeout: Long = 60000) {
+fun waitForServerIsReady(host: String = "http://localhost", port: Int = 8090, timeout: Long = 30000) {
   val startTime = System.currentTimeMillis()
   var exception: java.lang.Exception?
   val urlString = "$host:$port/metrics"
@@ -57,7 +57,7 @@ fun waitForServerIsReady(host: String = "http://localhost", port: Int = 8090, ti
     if (System.currentTimeMillis() - startTime > timeout) {
       throw RuntimeException("Timed out waiting for API to be available", exception)
     }
-    Thread.sleep(1000)  // Wait for 1 second before checking again
+    Thread.sleep(500)  // Wait for 0.5 second before checking again
   }
 }
 
