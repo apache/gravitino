@@ -68,7 +68,13 @@ public interface MetadataObject {
    *
    * @return The name of the object.
    */
-  String fullName();
+  default String fullName() {
+    if (parent() == null) {
+      return name();
+    } else {
+      return parent() + "." + name();
+    }
+  }
 
   /**
    * The type of the object.
