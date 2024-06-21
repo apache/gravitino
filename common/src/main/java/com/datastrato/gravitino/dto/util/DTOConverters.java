@@ -705,22 +705,33 @@ public class DTOConverters {
     switch (partitionDTO.type()) {
       case IDENTITY:
         IdentityPartitionDTO identityPartitionDTO = (IdentityPartitionDTO) partitionDTO;
+        Literal<?>[] values =
+            Arrays.stream(identityPartitionDTO.values())
+                .map(DTOConverters::fromFunctionArg)
+                .toArray(Literal<?>[]::new);
         return Partitions.identity(
             identityPartitionDTO.name(),
             identityPartitionDTO.fieldNames(),
-            identityPartitionDTO.values(),
+            values,
             identityPartitionDTO.properties());
       case RANGE:
         RangePartitionDTO rangePartitionDTO = (RangePartitionDTO) partitionDTO;
         return Partitions.range(
             rangePartitionDTO.name(),
-            rangePartitionDTO.upper(),
-            rangePartitionDTO.lower(),
+            (Literal<?>) fromFunctionArg(rangePartitionDTO.upper()),
+            (Literal<?>) fromFunctionArg(rangePartitionDTO.lower()),
             rangePartitionDTO.properties());
       case LIST:
         ListPartitionDTO listPartitionDTO = (ListPartitionDTO) partitionDTO;
-        return Partitions.list(
-            listPartitionDTO.name(), listPartitionDTO.lists(), listPartitionDTO.properties());
+        Literal<?>[][] lists =
+            Arrays.stream(listPartitionDTO.lists())
+                .map(
+                    list ->
+                        Arrays.stream(list)
+                            .map(DTOConverters::fromFunctionArg)
+                            .toArray(Literal<?>[]::new))
+                .toArray(Literal<?>[][]::new);
+        return Partitions.list(listPartitionDTO.name(), lists, listPartitionDTO.properties());
       default:
         throw new IllegalArgumentException("Unsupported partition type: " + partitionDTO.type());
     }

@@ -6,6 +6,7 @@ package com.datastrato.gravitino.storage.relational.service;
 
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.MetadataObject;
+import com.datastrato.gravitino.MetadataObjects;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.authorization.AuthorizationUtils;
 import com.datastrato.gravitino.authorization.SecurableObject;
@@ -92,8 +93,7 @@ public class RoleMetaService {
             POConverters.initializeSecurablePOBuilderWithVersion(
                 roleEntity.id(), object, getEntityType(object));
         objectBuilder.withEntityId(
-            MetadataObjectUtils.getSecurableObjectEntityId(
-                metalakeId, object.fullName(), object.type()));
+            MetadataObjectUtils.getMetadataObjectId(metalakeId, object.fullName(), object.type()));
         securableObjectPOs.add(objectBuilder.build());
       }
 
@@ -139,7 +139,7 @@ public class RoleMetaService {
 
     for (SecurableObjectPO securableObjectPO : securableObjectPOs) {
       String fullName =
-          MetadataObjectUtils.getSecurableObjectFullName(
+          MetadataObjectUtils.getMetadataObjectFullName(
               securableObjectPO.getType(), securableObjectPO.getEntityId());
       if (fullName != null) {
         securableObjects.add(
@@ -230,7 +230,7 @@ public class RoleMetaService {
 
   private String getEntityType(SecurableObject securableObject) {
     if (securableObject.type() == MetadataObject.Type.METALAKE
-        && securableObject.name().equals(Entity.SECURABLE_ENTITY_RESERVED_NAME)) {
+        && securableObject.name().equals(MetadataObjects.METADATA_OBJECT_RESERVED_NAME)) {
       return Entity.ALL_METALAKES_ENTITY_TYPE;
     }
     return securableObject.type().name();
