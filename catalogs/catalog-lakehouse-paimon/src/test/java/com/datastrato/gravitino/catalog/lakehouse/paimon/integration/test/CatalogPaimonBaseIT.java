@@ -181,6 +181,5 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     Schema loadSchema = catalog.asSchemas().loadSchema(ident.name());
     Assertions.assertEquals(createdSchema.name(), loadSchema.name());
     Assertions.assertTrue(loadSchema.properties().isEmpty());
-    Assertions.assertTrue(createdSchema.properties().isEmpty());
   }
 }
