@@ -223,7 +223,7 @@ public class AbstractIT {
 
       JettyServerConfig jettyServerConfig =
           JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
-      String versionUrl =
+      String checkServerUrl =
           "http://"
               + jettyServerConfig.getHost()
               + ":"
@@ -232,7 +232,7 @@ public class AbstractIT {
       Awaitility.await()
           .atMost(60, TimeUnit.SECONDS)
           .pollInterval(1, TimeUnit.SECONDS)
-          .until(() -> isHttpServerUp(versionUrl));
+          .until(() -> isHttpServerUp(checkServerUrl));
     }
 
     JettyServerConfig jettyServerConfig =
