@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.meta;
 
+import static com.datastrato.gravitino.MetadataObjects.METADATA_OBJECT_RESERVED_NAME;
+
 import com.datastrato.gravitino.Auditable;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Field;
@@ -268,7 +270,7 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
   private static InnerSecurableObject convertInnerObject(
       String metalake, MetadataObject securableObject) {
     if (MetadataObject.Type.METALAKE.equals(securableObject.type())) {
-      if (Entity.SECURABLE_ENTITY_RESERVED_NAME.equals(securableObject.name())) {
+      if (METADATA_OBJECT_RESERVED_NAME.equals(securableObject.name())) {
         return ROOT;
       } else {
         return new InnerSecurableObject(ROOT, securableObject.name());
