@@ -27,8 +27,8 @@ fun deleteCacheDir(targetDir: String) {
 fun waitForServerIsReady(host: String = "http://localhost", port: Int = 8090, timeout: Long = 60000) {
   val startTime = System.currentTimeMillis()
   var exception: java.lang.Exception?
-  val urlString = "$host:$port/api/version"
-  val successPattern = Regex("\"code\"\\s*:\\s*0")
+  val urlString = "$host:$port/metrics"
+  val successPattern = Regex("\"version\"\\s*:")
 
   while (true) {
     try {

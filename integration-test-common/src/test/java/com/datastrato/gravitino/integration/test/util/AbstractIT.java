@@ -230,7 +230,7 @@ public class AbstractIT {
               + jettyServerConfig.getHost()
               + ":"
               + jettyServerConfig.getHttpPort()
-              + "/api/version";
+              + "/metrics";
       Awaitility.await()
           .atMost(60, TimeUnit.SECONDS)
           .pollInterval(1, TimeUnit.SECONDS)
@@ -303,8 +303,8 @@ public class AbstractIT {
       HttpGet request = new HttpGet(url);
       String responseBody = httpClient.execute(request, new BasicHttpClientResponseHandler());
       JsonObject jsonObject = new JsonParser().parse(responseBody).getAsJsonObject();
-      int code = jsonObject.get("code").getAsInt();
-      if (code == 0) {
+      String version = jsonObject.get("version").getAsString();
+      if (null != version) {
         return true;
       }
       LOG.warn("Gravitino server is not ready for " + responseBody);

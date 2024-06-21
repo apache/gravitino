@@ -146,7 +146,7 @@ public class MiniGravitino {
     long beginTime = System.currentTimeMillis();
     boolean started = false;
 
-    String url = URI + "/api/version";
+    String url = URI + "/metrics";
     while (System.currentTimeMillis() - beginTime < 1000 * 60 * 3) {
       started = AbstractIT.isGravitinoServerUp(url);
       if (started || future.isDone()) {
@@ -176,7 +176,7 @@ public class MiniGravitino {
     long beginTime = System.currentTimeMillis();
     boolean started = true;
 
-    String url = String.format("http://%s:%d/api/version", host, port);
+    String url = String.format("http://%s:%d/metrics", host, port);
     while (System.currentTimeMillis() - beginTime < 1000 * 60 * 3) {
       sleepUninterruptibly(500, TimeUnit.MILLISECONDS);
       started = AbstractIT.isGravitinoServerUp(url);
