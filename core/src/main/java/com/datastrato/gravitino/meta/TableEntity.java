@@ -105,7 +105,6 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
       return false;
     }
 
-    // Ignore field namespace
     TableEntity baseTable = (TableEntity) o;
     return Objects.equal(id, baseTable.id)
         && Objects.equal(name, baseTable.name)

@@ -47,12 +47,6 @@ dependencies {
   }
   testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion")
   testImplementation(libs.bundles.log4j)
-  testImplementation(libs.jersey.test.framework.core) {
-    exclude(group = "org.junit.jupiter")
-  }
-  testImplementation(libs.jersey.test.framework.provider.jetty) {
-    exclude(group = "org.junit.jupiter")
-  }
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mysql.driver)
