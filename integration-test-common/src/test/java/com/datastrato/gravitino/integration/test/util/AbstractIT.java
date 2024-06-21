@@ -19,9 +19,10 @@ import com.datastrato.gravitino.integration.test.container.MySQLContainer;
 import com.datastrato.gravitino.server.GravitinoServer;
 import com.datastrato.gravitino.server.ServerConfig;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.io.File;
 import java.io.IOException;
-import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -35,6 +36,10 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.impl.classic.BasicHttpClientResponseHandler;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -218,10 +223,18 @@ public class AbstractIT {
 
       GravitinoITUtils.startGravitinoServer();
 
+      JettyServerConfig jettyServerConfig =
+          JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
+      String versionUrl =
+          "http://"
+              + jettyServerConfig.getHost()
+              + ":"
+              + jettyServerConfig.getHttpPort()
+              + "/api/version";
       Awaitility.await()
           .atMost(60, TimeUnit.SECONDS)
           .pollInterval(1, TimeUnit.SECONDS)
-          .until(() -> isGravitinoServerUp());
+          .until(() -> isGravitinoServerUp(versionUrl));
     }
 
     JettyServerConfig jettyServerConfig =
@@ -285,19 +298,19 @@ public class AbstractIT {
     }
   }
 
-  private static boolean isGravitinoServerUp() {
-    JettyServerConfig jettyServerConfig =
-        JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
-    String host = jettyServerConfig.getHost();
-    int port = jettyServerConfig.getHttpPort();
-    int timeout = 3000; // 3 second timeout
-
-    try (Socket socket = new Socket()) {
-      socket.connect(new java.net.InetSocketAddress(host, port), timeout);
-      LOG.info("Gravitino Server is up and running.");
-      return true;
+  public static boolean isGravitinoServerUp(String url) {
+    try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+      HttpGet request = new HttpGet(url);
+      String responseBody = httpClient.execute(request, new BasicHttpClientResponseHandler());
+      JsonObject jsonObject = new JsonParser().parse(responseBody).getAsJsonObject();
+      int code = jsonObject.get("code").getAsInt();
+      if (code == 0) {
+        return true;
+      }
+      LOG.warn("Gravitino server is not ready for " + responseBody);
+      return false;
     } catch (Exception e) {
-      LOG.warn("Gravitino Server is not accessible.");
+      LOG.warn("Check Gravitino server failed: ", e);
       return false;
     }
   }

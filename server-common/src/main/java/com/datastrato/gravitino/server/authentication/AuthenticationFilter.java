@@ -7,10 +7,12 @@ package com.datastrato.gravitino.server.authentication;
 import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.Enumeration;
+import java.util.Set;
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
 import javax.servlet.FilterConfig;
@@ -23,6 +25,8 @@ import javax.servlet.http.HttpServletResponse;
 public class AuthenticationFilter implements Filter {
 
   private final Authenticator filterAuthenticator;
+
+  private static final Set<String> AUTHENTICATION_EXCLUDE_PATH = ImmutableSet.of("/api/version");
 
   public AuthenticationFilter() {
     filterAuthenticator = null;
@@ -39,6 +43,13 @@ public class AuthenticationFilter implements Filter {
   @Override
   public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
       throws IOException, ServletException {
+    HttpServletRequest httpRequest = (HttpServletRequest) request;
+    String path = httpRequest.getRequestURI();
+    if (AUTHENTICATION_EXCLUDE_PATH.contains(path)) {
+      chain.doFilter(request, response);
+      return;
+    }
+
     try {
       Authenticator authenticator;
       if (filterAuthenticator == null) {
