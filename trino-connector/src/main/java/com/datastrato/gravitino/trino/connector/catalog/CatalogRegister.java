@@ -99,7 +99,7 @@ public class CatalogRegister {
           GRAVITINO_RUNTIME_ERROR, "Failed to initialize the Trino connection.", e);
     }
 
-    catalogStoreDirectory = config.getCatalogStoreDirectory();
+    catalogStoreDirectory = config.getCatalogConfigDirectory();
     if (!Files.exists(Path.of(catalogStoreDirectory))) {
       throw new TrinoException(
           GRAVITINO_MISSING_CONFIG,

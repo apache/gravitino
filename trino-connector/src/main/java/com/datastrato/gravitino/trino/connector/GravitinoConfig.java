@@ -27,12 +27,12 @@ public class GravitinoConfig {
   public static final String TRINO_CATALOG_MANAGEMENT = "catalog.management";
 
   // Trino config default value
-  private static final String TRINO_CATALOG_CONFIG_DIR_DEAFAULT_VALUE = "etc/catalog";
+  private static final String TRINO_CATALOG_CONFIG_DIR_DEFAULT_VALUE = "etc/catalog";
   public static final String TRINO_CATALOG_STORE_DEFAULT_VALUE = "file";
   public static final String TRINO_CATALOG_MANAGEMENT_DEFAULT_VALUE = "static";
 
   // The trino configuration of etc/config.properties
-  public static TrinoConfig trinoConfig = new TrinoConfig();
+  public static final TrinoConfig trinoConfig = new TrinoConfig();
 
   // Gravitino config keys
   public static final String GRAVITINO_DYNAMIC_CONNECTOR = "__gravitino.dynamic.connector";
@@ -109,7 +109,12 @@ public class GravitinoConfig {
   }
 
   public String getTrinoJdbcURI() {
-    String uriString = trinoConfig.getProperty(TRINO_DISCOVERY_URI);
+    String uriString = "";
+    if (config.containsKey(TRINO_DISCOVERY_URI)) {
+      uriString = config.get(TRINO_DISCOVERY_URI);
+    } else {
+      uriString = trinoConfig.getProperty(TRINO_DISCOVERY_URI);
+    }
     try {
       URI trinoURI = new URI(uriString);
       return String.format("jdbc:trino://%s:%s", trinoURI.getHost(), trinoURI.getPort());
@@ -120,9 +125,13 @@ public class GravitinoConfig {
     }
   }
 
-  public String getCatalogStoreDirectory() {
-    return trinoConfig.getProperty(
-        TRINO_CATALOG_CONFIG_DIR, TRINO_CATALOG_CONFIG_DIR_DEAFAULT_VALUE);
+  public String getCatalogConfigDirectory() {
+    if (config.containsKey(TRINO_CATALOG_CONFIG_DIR)) {
+      return config.get(TRINO_CATALOG_CONFIG_DIR);
+    } else {
+      return trinoConfig.getProperty(
+          TRINO_CATALOG_CONFIG_DIR, TRINO_CATALOG_CONFIG_DIR_DEFAULT_VALUE);
+    }
   }
 
   public String getTrinoUser() {
