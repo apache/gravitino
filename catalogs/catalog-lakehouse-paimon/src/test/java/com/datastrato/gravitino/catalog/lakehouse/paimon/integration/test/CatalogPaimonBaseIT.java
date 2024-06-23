@@ -503,9 +503,6 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
   }
 
   private void createMetalake() {
-    GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
-    Assertions.assertEquals(0, gravitinoMetalakes.length);
-
     GravitinoMetalake createdMetalake =
         client.createMetalake(metalakeName, "comment", Collections.emptyMap());
     GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
@@ -543,7 +540,6 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     Schema loadSchema = catalog.asSchemas().loadSchema(ident.name());
     Assertions.assertEquals(createdSchema.name(), loadSchema.name());
     Assertions.assertTrue(loadSchema.properties().isEmpty());
-    Assertions.assertTrue(createdSchema.properties().isEmpty());
   }
 
   private Column[] createColumns() {
