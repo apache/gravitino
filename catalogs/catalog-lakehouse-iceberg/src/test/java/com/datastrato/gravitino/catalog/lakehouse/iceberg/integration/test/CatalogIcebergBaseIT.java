@@ -202,7 +202,8 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     Map<String, String> icebergCatalogProperties = Maps.newHashMap();
     icebergCatalogProperties.put(IcebergConfig.CATALOG_URI.getKey(), URIS);
     icebergCatalogProperties.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), WAREHOUSE);
-    icebergCatalogProperties.put(IcebergConfig.CATALOG_BACKEND_NAME.getKey(), icebergCatalogBackendName);
+    icebergCatalogProperties.put(
+        IcebergConfig.CATALOG_BACKEND_NAME.getKey(), icebergCatalogBackendName);
 
     icebergCatalog = IcebergCatalogUtil.loadCatalogBackend(TYPE, icebergCatalogProperties);
     if (icebergCatalog instanceof SupportsNamespaces) {
