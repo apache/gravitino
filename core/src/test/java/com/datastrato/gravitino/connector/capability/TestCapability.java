@@ -4,8 +4,7 @@
  */
 package com.datastrato.gravitino.connector.capability;
 
-import static com.datastrato.gravitino.Entity.SECURABLE_ENTITY_RESERVED_NAME;
-
+import com.datastrato.gravitino.MetadataObjects;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -25,7 +24,9 @@ public class TestCapability {
       Assertions.assertTrue(result.supported());
 
       // test for reserved name
-      result = Capability.DEFAULT.specificationOnName(scope, SECURABLE_ENTITY_RESERVED_NAME);
+      result =
+          Capability.DEFAULT.specificationOnName(
+              scope, MetadataObjects.METADATA_OBJECT_RESERVED_NAME);
       Assertions.assertFalse(result.supported());
       Assertions.assertTrue(result.unsupportedMessage().contains("is reserved"));
 

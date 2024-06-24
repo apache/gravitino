@@ -4,8 +4,7 @@
  */
 package com.datastrato.gravitino.catalog;
 
-import static com.datastrato.gravitino.Entity.SECURABLE_ENTITY_RESERVED_NAME;
-
+import com.datastrato.gravitino.MetadataObjects;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.TestColumn;
@@ -122,7 +121,8 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     schemaNormalizeDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
 
-    NameIdentifier tableIdent1 = NameIdentifier.of(tableNs, SECURABLE_ENTITY_RESERVED_NAME);
+    NameIdentifier tableIdent1 =
+        NameIdentifier.of(tableNs, MetadataObjects.METADATA_OBJECT_RESERVED_NAME);
     Column[] columns =
         new Column[] {
           TestColumn.builder().withName("colNAME1").withType(Types.StringType.get()).build(),
@@ -147,7 +147,7 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
     Column[] columns1 =
         new Column[] {
           TestColumn.builder()
-              .withName(SECURABLE_ENTITY_RESERVED_NAME)
+              .withName(MetadataObjects.METADATA_OBJECT_RESERVED_NAME)
               .withType(Types.StringType.get())
               .build()
         };
