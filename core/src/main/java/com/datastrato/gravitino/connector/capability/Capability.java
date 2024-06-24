@@ -4,8 +4,7 @@
  */
 package com.datastrato.gravitino.connector.capability;
 
-import static com.datastrato.gravitino.Entity.SECURABLE_ENTITY_RESERVED_NAME;
-
+import com.datastrato.gravitino.MetadataObjects;
 import com.datastrato.gravitino.annotation.Evolving;
 import com.google.common.collect.ImmutableSet;
 import java.util.Set;
@@ -82,7 +81,7 @@ public interface Capability {
   class DefaultCapability implements Capability {
 
     private static final Set<String> RESERVED_WORDS =
-        ImmutableSet.of(SECURABLE_ENTITY_RESERVED_NAME);
+        ImmutableSet.of(MetadataObjects.METADATA_OBJECT_RESERVED_NAME);
 
     /**
      * Regular expression explanation:

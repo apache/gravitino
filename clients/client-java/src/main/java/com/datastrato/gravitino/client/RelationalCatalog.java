@@ -93,7 +93,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
   /**
    * Load the table with specified identifier.
    *
-   * @param ident The identifier of the table to load.
+   * @param ident The identifier of the table to load, which should be a "schema.table" style.
    * @return The {@link Table} with specified identifier.
    * @throws NoSuchTableException if the table with specified identifier does not exist.
    */
@@ -116,7 +116,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
   /**
    * Create a new table with specified identifier, columns, comment and properties.
    *
-   * @param ident The identifier of the table.
+   * @param ident The identifier of the table, which should be a "schema.table" style.
    * @param columns The columns of the table.
    * @param comment The comment of the table.
    * @param properties The properties of the table.
@@ -167,7 +167,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
   /**
    * Alter the table with specified identifier by applying the changes.
    *
-   * @param ident The identifier of the table.
+   * @param ident The identifier of the table, which should be a "schema.table" style.
    * @param changes Table changes to apply to the table.
    * @return The altered {@link Table}.
    * @throws NoSuchTableException if the table with specified identifier does not exist.
@@ -201,7 +201,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
   /**
    * Drop the table with specified identifier.
    *
-   * @param ident The identifier of the table.
+   * @param ident The identifier of the table, which should be a "schema.table" style.
    * @return true if the table is dropped successfully, false if the table does not exist.
    */
   @Override
@@ -222,7 +222,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
   /**
    * Purge the table with specified identifier.
    *
-   * @param ident The identifier of the table.
+   * @param ident The identifier of the table, which should be a "schema.table" style.
    * @return true if the table is purged successfully, false otherwise.
    */
   @Override
@@ -261,7 +261,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
   }
 
   /**
-   * Check whether the namespace of a table is valid
+   * Check whether the namespace of a table is valid, which should be "schema".
    *
    * @param namespace The namespace to check
    */
@@ -273,7 +273,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
   }
 
   /**
-   * Check whether the NameIdentifier of a table is valid
+   * Check whether the NameIdentifier of a table is valid, which should be a "schema.table" style.
    *
    * @param ident The NameIdentifier to check
    */
@@ -284,9 +284,16 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
     checkTableNamespace(ident.namespace());
   }
 
+  /**
+   * Get the full namespace of the table with the given table's short namespace (schema name).
+   *
+   * @param tableNamespace The table's short namespace (schema name).
+   * @return full namespace of the table (metalake.catalog.schema).
+   */
   private Namespace getTableFullNamespace(Namespace tableNamespace) {
     return Namespace.of(this.catalogNamespace().level(0), this.name(), tableNamespace.level(0));
   }
+
   /**
    * Create a new builder for the relational catalog.
    *
