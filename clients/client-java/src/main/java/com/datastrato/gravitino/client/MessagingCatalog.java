@@ -90,7 +90,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
   /**
    * Load the topic with the given identifier.
    *
-   * @param ident The identifier of the topic to load.
+   * @param ident The identifier of the topic to load, which should be a "schema.topic" style.
    * @return The {@link Topic} with the specified identifier.
    * @throws NoSuchTopicException if the topic with the specified identifier does not exist.
    */
@@ -113,7 +113,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
   /**
    * Create a new topic with the given identifier, comment, data layout and properties.
    *
-   * @param ident A topic identifier.
+   * @param ident A topic identifier, which should be a "schema.topic" style.
    * @param comment The comment of the topic object. Null is set if no comment is specified.
    * @param dataLayout The message schema of the topic object. Always null because it's not
    *     supported yet.
@@ -152,7 +152,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
   /**
    * Alter the topic with the given identifier.
    *
-   * @param ident A topic identifier.
+   * @param ident A topic identifier, which should be a "schema.topic" style.
    * @param changes The changes to apply to the topic.
    * @return The altered topic object.
    * @throws NoSuchTopicException if the topic with the specified identifier does not exist.
@@ -186,7 +186,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
   /**
    * Drop the topic with the given identifier.
    *
-   * @param ident A topic identifier.
+   * @param ident A topic identifier, which should be a "schema.topic" style.
    * @return True if the topic is dropped successfully, false the topic does not exist.
    */
   @Override
