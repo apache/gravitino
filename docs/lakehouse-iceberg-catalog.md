@@ -33,11 +33,12 @@ Builds with Hadoop 2.10.x, there may be compatibility issues when accessing Hado
 
 ### Catalog properties
 
-| Property name     | Description                                                                                                                                                                                     | Default value | Required | Since Version |
-|-------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `catalog-backend` | Catalog backend of Gravitino Iceberg catalog. Supports `hive` or `jdbc` or `rest`.                                                                                                              | (none)        | Yes      | 0.2.0         |
-| `uri`             | The URI configuration of the Iceberg catalog. `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db` or `http://127.0.0.1:9001`. | (none)        | Yes      | 0.2.0         |
-| `warehouse`       | Warehouse directory of catalog. `file:///user/hive/warehouse-hive/` for local fs or `hdfs://namespace/hdfs/path` for HDFS.                                                                      | (none)        | Yes      | 0.2.0         |
+| Property name          | Description                                                                                                                                                                                     | Default value          | Required | Since Version |
+|------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------|----------|---------------|
+| `catalog-backend`      | Catalog backend of Gravitino Iceberg catalog. Supports `hive` or `jdbc` or `rest`.                                                                                                              | (none)                 | Yes      | 0.2.0         |
+| `uri`                  | The URI configuration of the Iceberg catalog. `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db` or `http://127.0.0.1:9001`. | (none)                 | Yes      | 0.2.0         |
+| `warehouse`            | Warehouse directory of catalog. `file:///user/hive/warehouse-hive/` for local fs or `hdfs://namespace/hdfs/path` for HDFS.                                                                      | (none)                 | Yes      | 0.2.0         |
+| `catalog-backend-name` | The catalog name passed to underlying Iceberg catalog backend. Catalog name in JDBC backend is used to isolate namespace and tables.                                                            | Gravitino catalog name | No       | 0.5.2         |
 
 Any properties not defined by Gravitino with `gravitino.bypass.` prefix will pass to Iceberg catalog properties and HDFS configuration. For example, if specify `gravitino.bypass.list-all-tables`, `list-all-tables` will pass to Iceberg catalog properties.
 
@@ -56,6 +57,8 @@ If you are using JDBC catalog, you must provide `jdbc-user`, `jdbc-password` and
 | `jdbc-password`   | JDBC password                                                                                           | (none)        | Yes      | 0.2.0         |
 | `jdbc-driver`     | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL | (none)        | Yes      | 0.3.0         |
 | `jdbc-initialize` | Whether to initialize meta tables when create JDBC catalog                                              | `true`        | No       | 0.2.0         |
+
+If you have a JDBC Iceberg catalog prior, you must set `catalog-backend-name` to keep consistent with your Jdbc Iceberg catalog name to operate the prior namespace and tables.
 
 :::caution
 You must download the corresponding JDBC driver to the `catalogs/lakehouse-iceberg/libs` directory.
