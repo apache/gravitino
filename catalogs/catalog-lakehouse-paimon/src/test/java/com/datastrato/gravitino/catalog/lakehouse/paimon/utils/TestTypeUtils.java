@@ -75,12 +75,16 @@ public class TestTypeUtils {
   private Type assertDataType(DataType dataType) {
     switch (dataType.getTypeRoot()) {
       case VARCHAR:
-        return assertDataType(
-            dataType,
-            Name.VARCHAR,
-            type ->
-                assertEquals(
-                    ((VarCharType) dataType).getLength(), ((Types.VarCharType) type).length()));
+        if (((VarCharType) dataType).getLength() == Integer.MAX_VALUE) {
+          return assertDataType(dataType, Name.STRING);
+        } else {
+          return assertDataType(
+              dataType,
+              Name.VARCHAR,
+              type ->
+                  assertEquals(
+                      ((VarCharType) dataType).getLength(), ((Types.VarCharType) type).length()));
+        }
       case BOOLEAN:
         return assertDataType(dataType, Name.BOOLEAN);
       case BINARY:

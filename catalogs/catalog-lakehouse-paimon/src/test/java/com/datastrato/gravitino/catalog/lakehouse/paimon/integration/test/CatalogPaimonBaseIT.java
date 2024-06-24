@@ -192,7 +192,7 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
   }
 
   @Test
-  void testCreateAndLoadIcebergTable()
+  void testCreateAndLoadPaimonTable()
       throws org.apache.paimon.catalog.Catalog.TableNotExistException {
     // Create table from Gravitino API
     Column[] columns = createColumns();
@@ -294,7 +294,7 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     TableCatalog tableCatalog = catalog.asTableCatalog();
     Table createdTable =
         tableCatalog.createTable(tableIdentifier, columns, table_comment, properties);
-    Assertions.assertEquals("paimong_column_1", createdTable.columns()[0].name());
+    Assertions.assertEquals("paimon_column_1", createdTable.columns()[0].name());
     Assertions.assertEquals(
         Types.TimestampType.withTimeZone(), createdTable.columns()[0].dataType());
     Assertions.assertEquals("col_1_comment", createdTable.columns()[0].comment());
@@ -307,7 +307,7 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     Assertions.assertTrue(createdTable.columns()[1].nullable());
 
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
-    Assertions.assertEquals("paimong_column_1", loadTable.columns()[0].name());
+    Assertions.assertEquals("paimon_column_1", loadTable.columns()[0].name());
     Assertions.assertEquals(Types.TimestampType.withTimeZone(), loadTable.columns()[0].dataType());
     Assertions.assertEquals("col_1_comment", loadTable.columns()[0].comment());
     Assertions.assertTrue(loadTable.columns()[0].nullable());
@@ -324,17 +324,17 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     FileStoreTable fileStoreTable = (FileStoreTable) table;
     TableSchema tableSchema = fileStoreTable.schema();
     Assertions.assertEquals("paimon_column_1", tableSchema.fields().get(0).name());
-    Assertions.assertEquals(new TimestampType().nullable(), tableSchema.fields().get(0).type());
+    Assertions.assertEquals(
+        new LocalZonedTimestampType().nullable(), tableSchema.fields().get(0).type());
     Assertions.assertEquals("col_1_comment", tableSchema.fields().get(0).description());
 
     Assertions.assertEquals("paimon_column_2", tableSchema.fields().get(1).name());
-    Assertions.assertEquals(
-        new LocalZonedTimestampType().nullable(), tableSchema.fields().get(1).type());
+    Assertions.assertEquals(new TimestampType().nullable(), tableSchema.fields().get(1).type());
     Assertions.assertEquals("col_2_comment", tableSchema.fields().get(1).description());
   }
 
   @Test
-  void testListAndDropIcebergTable() throws DatabaseNotExistException {
+  void testListAndDropPaimonTable() throws DatabaseNotExistException {
     Column[] columns = createColumns();
 
     String tableName1 = "table_1";
@@ -396,7 +396,7 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
   }
 
   @Test
-  public void testAlterIcebergTable() {
+  public void testAlterPaimonTable() {
     // TODO: support alter table
   }
 
@@ -464,7 +464,7 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
       }
     }
     // delete data
-    spark.sql(String.format("DELETE FROM iceberg.%s WHERE %s = 100", dbTable, PAIMON_COL_NAME1));
+    spark.sql(String.format("DELETE FROM paimon.%s WHERE %s = 100", dbTable, PAIMON_COL_NAME1));
     sql = spark.sql(String.format(SELECT_ALL_TEMPLATE, dbTable));
     Assertions.assertEquals(3, sql.count());
     result = (Row[]) sql.sort(PAIMON_COL_NAME1).collect();
@@ -572,7 +572,7 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     spark =
         SparkSession.builder()
             .master("local[1]")
-            .appName("Iceberg Catalog integration test")
+            .appName("Paimon Catalog integration test")
             .config("spark.sql.warehouse.dir", WAREHOUSE)
             .config("spark.sql.catalog.paimon", "org.apache.paimon.spark.SparkCatalog")
             .config("spark.sql.catalog.paimon.warehouse", WAREHOUSE)

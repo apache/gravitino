@@ -21,7 +21,6 @@ package com.datastrato.gravitino.catalog.lakehouse.paimon.utils;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
 import java.util.Arrays;
-import java.util.stream.Collectors;
 import org.apache.paimon.types.ArrayType;
 import org.apache.paimon.types.BigIntType;
 import org.apache.paimon.types.BinaryType;
@@ -75,7 +74,11 @@ public class TypeUtils {
 
     @Override
     public Type visit(VarCharType varCharType) {
-      return Types.VarCharType.of(varCharType.getLength());
+      if (varCharType.getLength() == Integer.MAX_VALUE) {
+        return Types.StringType.get();
+      } else {
+        return Types.VarCharType.of(varCharType.getLength());
+      }
     }
 
     @Override
@@ -225,13 +228,16 @@ public class TypeUtils {
           Types.MapType mapType = (Types.MapType) type;
           return DataTypes.MAP(visit(mapType.keyType()), visit(mapType.valueType()));
         case STRUCT:
-          return RowType.builder()
-              .fields(
-                  Arrays.stream(((Types.StructType) type).fields())
-                      .map(Types.StructType.Field::type)
-                      .map(GravitinoToPaimonTypeVisitor::visit)
-                      .collect(Collectors.toList()))
-              .build();
+          RowType.Builder builder = RowType.builder();
+          Arrays.stream(((Types.StructType) type).fields())
+              .forEach(
+                  field -> {
+                    DataType dataType = GravitinoToPaimonTypeVisitor.visit(field.type());
+                    DataType dataTypeWithNullable =
+                        field.nullable() ? dataType.nullable() : dataType.notNull();
+                    builder.field(field.name(), dataTypeWithNullable, field.comment());
+                  });
+          return builder.build();
         default:
           throw new UnsupportedOperationException(
               String.format(

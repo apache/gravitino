@@ -33,6 +33,7 @@ import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.utils.MapUtils;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
@@ -210,15 +211,19 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
    */
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
-    NameIdentifier schemaIdentifier = NameIdentifier.of(namespace.levels());
+    Preconditions.checkArgument(
+        namespace != null && namespace.levels().length > 0,
+        "Namespace can not be null or empty when listTables.");
+    String[] levels = namespace.levels();
+    NameIdentifier schemaIdentifier = NameIdentifier.of(levels[levels.length - 1]);
     if (!schemaExists(schemaIdentifier)) {
-      throw new NoSuchSchemaException(NO_SUCH_SCHEMA_EXCEPTION, schemaIdentifier);
+      throw new NoSuchSchemaException(NO_SUCH_SCHEMA_EXCEPTION, namespace.toString());
     }
     List<String> tables;
     try {
       tables = paimonTableOps.listTables(schemaIdentifier.name());
     } catch (Catalog.DatabaseNotExistException e) {
-      throw new NoSuchSchemaException(NO_SUCH_SCHEMA_EXCEPTION, schemaIdentifier);
+      throw new NoSuchSchemaException(NO_SUCH_SCHEMA_EXCEPTION, namespace.toString());
     }
     return tables.stream()
         .map(
@@ -238,7 +243,8 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
   public PaimonTable loadTable(NameIdentifier identifier) throws NoSuchTableException {
     Table table;
     try {
-      table = paimonTableOps.loadTable(identifier.toString());
+      NameIdentifier tableIdentifier = buildPaimonNameIdentifier(identifier);
+      table = paimonTableOps.loadTable(tableIdentifier.toString());
     } catch (Catalog.TableNotExistException e) {
       throw new NoSuchTableException(e, NO_SUCH_TABLE_EXCEPTION, identifier);
     }
@@ -270,7 +276,8 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    NameIdentifier schemaIdentifier = NameIdentifier.of(identifier.namespace().levels());
+    NameIdentifier nameIdentifier = buildPaimonNameIdentifier(identifier);
+    NameIdentifier schemaIdentifier = NameIdentifier.of(nameIdentifier.namespace().levels());
     if (!schemaExists(schemaIdentifier)) {
       throw new NoSuchSchemaException(NO_SUCH_SCHEMA_EXCEPTION, schemaIdentifier);
     }
@@ -303,7 +310,7 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
                 AuditInfo.builder().withCreator(currentUser).withCreateTime(Instant.now()).build())
             .build();
     try {
-      paimonTableOps.createTable(createdTable.toPaimonTable(identifier.toString()));
+      paimonTableOps.createTable(createdTable.toPaimonTable(nameIdentifier.toString()));
     } catch (Catalog.DatabaseNotExistException e) {
       throw new NoSuchSchemaException(e, NO_SUCH_SCHEMA_EXCEPTION, identifier);
     } catch (Catalog.TableAlreadyExistException e) {
@@ -343,7 +350,8 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
   @Override
   public boolean dropTable(NameIdentifier identifier) {
     try {
-      paimonTableOps.dropTable(identifier.toString());
+      NameIdentifier tableIdentifier = buildPaimonNameIdentifier(identifier);
+      paimonTableOps.dropTable(tableIdentifier.toString());
     } catch (Catalog.TableNotExistException e) {
       LOG.warn("Paimon table {} does not exist.", identifier);
       return false;
@@ -377,5 +385,15 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
 
   private static String currentUser() {
     return System.getProperty("user.name");
+  }
+
+  private NameIdentifier buildPaimonNameIdentifier(NameIdentifier identifier) {
+    Preconditions.checkArgument(
+        identifier != null
+            && identifier.namespace() != null
+            && identifier.namespace().levels().length > 0,
+        "Namespace can not be null or empty.");
+    String[] levels = identifier.namespace().levels();
+    return NameIdentifier.of(levels[levels.length - 1], identifier.name());
   }
 }

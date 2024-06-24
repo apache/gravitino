@@ -38,7 +38,9 @@ dependencies {
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
-  testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion")
+  testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion") {
+    exclude("org.apache.hadoop")
+  }
   testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion") {
     exclude("org.apache.avro")
     exclude("org.apache.hadoop")
@@ -46,7 +48,9 @@ dependencies {
     exclude("io.dropwizard.metrics")
     exclude("org.rocksdb")
   }
-  testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion")
+  testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
+    exclude("org.apache.hadoop")
+  }
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
