@@ -23,13 +23,8 @@ public class Configs {
   public static final String DEFAULT_ENTITY_KV_STORE = "RocksDBKvBackend";
   public static final String ENTITY_KV_STORE_KEY = "gravitino.entity.store.kv";
 
-  public static final String EMBEDDED_ENTITY_RELATIONAL_STORE = "EmbeddedJDBCBackend";
   public static final String DEFAULT_ENTITY_RELATIONAL_STORE = "JDBCBackend";
   public static final String ENTITY_RELATIONAL_STORE_KEY = "gravitino.entity.store.relational";
-
-  public static final String DEFAULT_ENTITY_RELATIONAL_STORE_EMBEDDED_IMPLEMENTATION = "H2";
-  public static final String ENTITY_RELATIONAL_STORE_EMBEDDED_IMPLEMENTATION_KEY =
-      "gravitino.entity.store.relational.embedded";
 
   public static final String ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY =
       "gravitino.entity.store.relational.jdbcUrl";
@@ -112,7 +107,7 @@ public class Configs {
           .version(ConfigConstants.VERSION_0_5_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
-          .create();
+          .createWithDefault("jdbc:h2");
 
   public static final ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER =
       new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER_KEY)
@@ -136,14 +131,6 @@ public class Configs {
           .version(ConfigConstants.VERSION_0_5_0)
           .stringConf()
           .create();
-
-  public static final ConfigEntry<String> ENTRY_RELATIONAL_STORE_EMBEDDED_IMPLEMENTATION =
-      new ConfigBuilder(ENTITY_RELATIONAL_STORE_EMBEDDED_IMPLEMENTATION_KEY)
-          .doc(
-              "The detailed implementation of embedded relational storage, such as h2, derby, sqlite")
-          .version(ConfigConstants.VERSION_0_6_0)
-          .stringConf()
-          .createWithDefault(DEFAULT_ENTITY_RELATIONAL_STORE_EMBEDDED_IMPLEMENTATION);
 
   public static final ConfigEntry<String> ENTRY_RELATIONAL_JDBC_BACKEND_PATH =
       new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_STORAGE_PATH_KEY)
