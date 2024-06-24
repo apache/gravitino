@@ -14,21 +14,29 @@ dependencies {
   implementation(project(":api"))
   implementation(project(":common"))
   implementation(project(":core"))
-  implementation(libs.bundles.paimon)
-  implementation(libs.bundles.jetty)
-  implementation(libs.bundles.jersey)
+  implementation(libs.bundles.paimon) {
+    exclude("com.sun.jersey")
+    exclude("javax.servlet")
+  }
   implementation(libs.guava)
   implementation(libs.hadoop2.common) {
     exclude("com.github.spotbugs")
+    exclude("com.sun.jersey")
+    exclude("javax.servlet")
   }
-  implementation(libs.hadoop2.hdfs)
-  implementation(libs.hadoop2.mapreduce.client.core)
+  implementation(libs.hadoop2.hdfs) {
+    exclude("com.sun.jersey")
+    exclude("javax.servlet")
+  }
+  implementation(libs.hadoop2.mapreduce.client.core) {
+    exclude("com.sun.jersey")
+    exclude("javax.servlet")
+  }
 
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
 
   testImplementation(libs.mysql.driver)
-
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
