@@ -68,7 +68,7 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
         while (result.next()) {
           partitionNames.add(result.getString("PartitionName"));
         }
-        return partitionNames.build().toArray(new String[0]);
+        return partitionNames.build().stream().toArray(String[]::new);
       }
     } catch (SQLException e) {
       throw exceptionConverter.toGravitinoException(e);
