@@ -325,6 +325,7 @@ public class JDBCBackend implements RelationalBackend {
 
     String storagePath = getStoragePath(config);
 
+    LOG.info("Embedded path: {}", storagePath);
     String jdbcUrl = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL);
     String jdbcType = getJDBCType(jdbcUrl);
 

@@ -107,12 +107,20 @@ public class MiniGravitino {
     try {
       File file = new File(serverConfig.get(ENTRY_RELATIONAL_JDBC_BACKEND_PATH));
       File p = file.getParentFile();
+      LOG.info(
+          "Deleting rocksdb backend storage directory: {}, files: {}",
+          p.getAbsolutePath(),
+          file.getAbsolutePath());
       if (p.exists()) {
         FileUtils.deleteDirectory(p);
       }
+
+      LOG.info(
+          "Deleting rocksdb backend storage directory: {}, exists: {}",
+          p.getAbsolutePath(),
+          p.exists());
     } catch (Exception e) {
       // Ignore
-      System.out.println(e);
     }
 
     // Initialize the REST client
