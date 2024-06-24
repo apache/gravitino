@@ -14,7 +14,6 @@ import com.datastrato.gravitino.StringIdentifier;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
@@ -38,17 +37,10 @@ public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier 
   public static final Field SCHEMA_VERSION =
       Field.required("version", SchemaVersion.class, "The version of the schema for the metalake");
 
-  private Long id;
-
-  private String name;
-
-  @Nullable private String comment;
-
-  @Nullable private Map<String, String> properties;
-
   private AuditInfo auditInfo;
 
   @Getter SchemaVersion version;
+  private EntityMetadata entityMetadata = new EntityMetadata(null, null, null, null);
 
   private BaseMetalake() {}
 
@@ -60,10 +52,10 @@ public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier 
   @Override
   public Map<Field, Object> fields() {
     Map<Field, Object> fields = new HashMap<>();
-    fields.put(ID, id);
-    fields.put(NAME, name);
-    fields.put(COMMENT, comment);
-    fields.put(PROPERTIES, properties);
+    fields.put(ID, entityMetadata.getId());
+    fields.put(NAME, entityMetadata.getName());
+    fields.put(COMMENT, entityMetadata.getComment());
+    fields.put(PROPERTIES, entityMetadata.getProperties());
     fields.put(AUDIT_INFO, auditInfo);
     fields.put(SCHEMA_VERSION, version);
 
@@ -87,7 +79,7 @@ public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier 
    */
   @Override
   public String name() {
-    return name;
+    return entityMetadata.getName();
   }
 
   /**
@@ -97,7 +89,7 @@ public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier 
    */
   @Override
   public Long id() {
-    return id;
+    return entityMetadata.getId();
   }
 
   /**
@@ -107,7 +99,7 @@ public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier 
    */
   @Override
   public String comment() {
-    return comment;
+    return entityMetadata.getComment();
   }
 
   /**
@@ -127,7 +119,7 @@ public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier 
    */
   @Override
   public Map<String, String> properties() {
-    return StringIdentifier.newPropertiesWithoutId(properties);
+    return StringIdentifier.newPropertiesWithoutId(entityMetadata.getProperties());
   }
 
   /** Builder class for creating instances of {@link BaseMetalake}. */
@@ -146,7 +138,7 @@ public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier 
      * @return the builder instance.
      */
     public Builder withId(Long id) {
-      metalake.id = id;
+      metalake.entityMetadata.setId(id);
       return this;
     }
 
@@ -157,7 +149,7 @@ public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier 
      * @return the builder instance.
      */
     public Builder withName(String name) {
-      metalake.name = name;
+      metalake.entityMetadata.setName(name);
       return this;
     }
 
@@ -168,7 +160,7 @@ public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier 
      * @return the builder instance.
      */
     public Builder withComment(String comment) {
-      metalake.comment = comment;
+      metalake.entityMetadata.setComment(comment);
       return this;
     }
 
@@ -179,7 +171,7 @@ public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier 
      * @return the builder instance.
      */
     public Builder withProperties(Map<String, String> properties) {
-      metalake.properties = properties;
+      metalake.entityMetadata.setProperties(properties);
       return this;
     }
 

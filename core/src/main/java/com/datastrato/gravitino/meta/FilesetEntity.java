@@ -35,13 +35,7 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
   public static final Field PROPERTIES =
       Field.optional("properties", Map.class, "The properties of the fileset entity.");
 
-  private Long id;
-
-  private String name;
-
   private Namespace namespace;
-
-  private String comment;
 
   private Fileset.Type type;
 
@@ -49,7 +43,7 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
 
   private AuditInfo auditInfo;
 
-  private Map<String, String> properties;
+  private EntityMetadata entityMetadata = new EntityMetadata(null, null, null, null);
 
   private FilesetEntity() {}
 
@@ -61,13 +55,13 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
   @Override
   public Map<Field, Object> fields() {
     Map<Field, Object> fields = Maps.newHashMap();
-    fields.put(ID, id);
-    fields.put(NAME, name);
-    fields.put(COMMENT, comment);
+    fields.put(ID, entityMetadata.getId());
+    fields.put(NAME, entityMetadata.getName());
+    fields.put(COMMENT, entityMetadata.getComment());
     fields.put(TYPE, type);
     fields.put(STORAGE_LOCATION, storageLocation);
     fields.put(AUDIT_INFO, auditInfo);
-    fields.put(PROPERTIES, properties);
+    fields.put(PROPERTIES, entityMetadata.getProperties());
 
     return Collections.unmodifiableMap(fields);
   }
@@ -79,7 +73,7 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
    */
   @Override
   public String name() {
-    return name;
+    return entityMetadata.getName();
   }
 
   /**
@@ -99,7 +93,7 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
    */
   @Override
   public Long id() {
-    return id;
+    return entityMetadata.getId();
   }
 
   /**
@@ -128,7 +122,7 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
    * @return The comment of the fileset entity.
    */
   public String comment() {
-    return comment;
+    return entityMetadata.getComment();
   }
 
   /**
@@ -155,7 +149,7 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
    * @return The properties of the fileset entity.
    */
   public Map<String, String> properties() {
-    return properties;
+    return entityMetadata.getProperties();
   }
 
   @Override
@@ -164,19 +158,26 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
     if (!(o instanceof FilesetEntity)) return false;
 
     FilesetEntity that = (FilesetEntity) o;
-    return Objects.equals(id, that.id)
-        && Objects.equals(name, that.name)
+    return Objects.equals(entityMetadata.getId(), that.entityMetadata.getId())
+        && Objects.equals(entityMetadata.getName(), that.entityMetadata.getName())
         && Objects.equals(namespace, that.namespace)
-        && Objects.equals(comment, that.comment)
+        && Objects.equals(entityMetadata.getComment(), that.entityMetadata.getComment())
         && Objects.equals(type, that.type)
         && Objects.equals(storageLocation, that.storageLocation)
         && Objects.equals(auditInfo, that.auditInfo)
-        && Objects.equals(properties, that.properties);
+        && Objects.equals(entityMetadata.getProperties(), that.entityMetadata.getProperties());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, comment, type, storageLocation, auditInfo, properties);
+    return Objects.hash(
+        entityMetadata.getId(),
+        entityMetadata.getName(),
+        entityMetadata.getComment(),
+        type,
+        storageLocation,
+        auditInfo,
+        entityMetadata.getProperties());
   }
 
   public static class Builder {
@@ -194,7 +195,7 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
      * @return The builder instance.
      */
     public Builder withId(Long id) {
-      fileset.id = id;
+      fileset.entityMetadata.setId(id);
       return this;
     }
 
@@ -205,7 +206,7 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
      * @return The builder instance.
      */
     public Builder withName(String name) {
-      fileset.name = name;
+      fileset.entityMetadata.setName(name);
       return this;
     }
 
@@ -227,7 +228,7 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
      * @return The builder instance.
      */
     public Builder withComment(String comment) {
-      fileset.comment = comment;
+      fileset.entityMetadata.setComment(comment);
       return this;
     }
 
@@ -273,7 +274,7 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
      * @return The builder instance.
      */
     public Builder withProperties(Map<String, String> properties) {
-      fileset.properties = properties;
+      fileset.entityMetadata.setProperties(properties);
       return this;
     }
 

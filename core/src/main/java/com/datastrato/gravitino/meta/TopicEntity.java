@@ -28,17 +28,14 @@ public class TopicEntity implements Entity, Auditable, HasIdentifier {
       Field.required("audit_info", AuditInfo.class, "The audit details of the topic entity.");
   public static final Field PROPERTIES =
       Field.optional("properties", Map.class, "The properties of the topic entity.");
+  private EntityMetadata entityMetadata = new EntityMetadata(null, null, null, null);
 
   public static Builder builder() {
     return new Builder();
   }
 
-  private Long id;
-  private String name;
   private Namespace namespace;
-  private String comment;
   private AuditInfo auditInfo;
-  private Map<String, String> properties;
 
   private TopicEntity() {}
 
@@ -50,11 +47,11 @@ public class TopicEntity implements Entity, Auditable, HasIdentifier {
   @Override
   public Map<Field, Object> fields() {
     Map<Field, Object> fields = Maps.newHashMap();
-    fields.put(ID, id);
-    fields.put(NAME, name);
-    fields.put(COMMENT, comment);
+    fields.put(ID, entityMetadata.getId());
+    fields.put(NAME, entityMetadata.getName());
+    fields.put(COMMENT, entityMetadata.getComment());
     fields.put(AUDIT_INFO, auditInfo);
-    fields.put(PROPERTIES, properties);
+    fields.put(PROPERTIES, entityMetadata.getProperties());
 
     return Collections.unmodifiableMap(fields);
   }
@@ -66,7 +63,7 @@ public class TopicEntity implements Entity, Auditable, HasIdentifier {
    */
   @Override
   public String name() {
-    return name;
+    return entityMetadata.getName();
   }
 
   /**
@@ -86,7 +83,7 @@ public class TopicEntity implements Entity, Auditable, HasIdentifier {
    */
   @Override
   public Long id() {
-    return id;
+    return entityMetadata.getId();
   }
 
   /**
@@ -95,7 +92,7 @@ public class TopicEntity implements Entity, Auditable, HasIdentifier {
    * @return The comment or description of the topic.
    */
   public String comment() {
-    return comment;
+    return entityMetadata.getComment();
   }
 
   /**
@@ -124,7 +121,7 @@ public class TopicEntity implements Entity, Auditable, HasIdentifier {
    * @return The properties of the topic entity.
    */
   public Map<String, String> properties() {
-    return properties;
+    return entityMetadata.getProperties();
   }
 
   @Override
@@ -133,17 +130,22 @@ public class TopicEntity implements Entity, Auditable, HasIdentifier {
     if (!(o instanceof TopicEntity)) return false;
 
     TopicEntity that = (TopicEntity) o;
-    return Objects.equals(id, that.id)
-        && Objects.equals(name, that.name)
+    return Objects.equals(entityMetadata.getId(), that.entityMetadata.getId())
+        && Objects.equals(entityMetadata.getName(), that.entityMetadata.getName())
         && Objects.equals(namespace, that.namespace)
-        && Objects.equals(comment, that.comment)
+        && Objects.equals(entityMetadata.getComment(), that.entityMetadata.getComment())
         && Objects.equals(auditInfo, that.auditInfo)
-        && Objects.equals(properties, that.properties);
+        && Objects.equals(entityMetadata.getProperties(), that.entityMetadata.getProperties());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, comment, auditInfo, properties);
+    return Objects.hash(
+        entityMetadata.getId(),
+        entityMetadata.getName(),
+        entityMetadata.getComment(),
+        auditInfo,
+        entityMetadata.getProperties());
   }
 
   public static class Builder {
@@ -160,7 +162,7 @@ public class TopicEntity implements Entity, Auditable, HasIdentifier {
      * @return The builder instance.
      */
     public TopicEntity.Builder withId(Long id) {
-      topic.id = id;
+      topic.entityMetadata.setId(id);
       return this;
     }
 
@@ -171,7 +173,7 @@ public class TopicEntity implements Entity, Auditable, HasIdentifier {
      * @return The builder instance.
      */
     public TopicEntity.Builder withName(String name) {
-      topic.name = name;
+      topic.entityMetadata.setName(name);
       return this;
     }
 
@@ -193,7 +195,7 @@ public class TopicEntity implements Entity, Auditable, HasIdentifier {
      * @return The builder instance.
      */
     public TopicEntity.Builder withComment(String comment) {
-      topic.comment = comment;
+      topic.entityMetadata.setComment(comment);
       return this;
     }
 
@@ -215,7 +217,7 @@ public class TopicEntity implements Entity, Auditable, HasIdentifier {
      * @return The builder instance.
      */
     public TopicEntity.Builder withProperties(Map<String, String> properties) {
-      topic.properties = properties;
+      topic.entityMetadata.setProperties(properties);
       return this;
     }
 

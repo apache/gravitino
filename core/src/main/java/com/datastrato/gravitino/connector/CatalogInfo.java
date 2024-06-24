@@ -8,6 +8,7 @@ import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.annotation.Evolving;
+import com.datastrato.gravitino.meta.EntityMetadata;
 import java.util.Map;
 
 /**
@@ -21,21 +22,14 @@ import java.util.Map;
 @Evolving
 public final class CatalogInfo implements Catalog {
 
-  private final Long id;
-
-  private final String name;
-
   private final Catalog.Type type;
 
   private final String provider;
 
-  private final String comment;
-
-  private final Map<String, String> properties;
-
   private final Audit auditInfo;
 
   private final Namespace namespace;
+  private EntityMetadata entityMetadata = new EntityMetadata(null, null, null, null);
 
   public CatalogInfo(
       Long id,
@@ -46,25 +40,25 @@ public final class CatalogInfo implements Catalog {
       Map<String, String> properties,
       Audit auditInfo,
       Namespace namespace) {
-    this.id = id;
-    this.name = name;
+    this.entityMetadata.setId(id);
+    this.entityMetadata.setName(name);
     this.type = type;
     this.provider = provider;
-    this.comment = comment;
-    this.properties = properties;
+    this.entityMetadata.setComment(comment);
+    this.entityMetadata.setProperties(properties);
     this.auditInfo = auditInfo;
     this.namespace = namespace;
   }
 
   /** @return The unique id of the catalog. */
   public Long id() {
-    return id;
+    return entityMetadata.getId();
   }
 
   /** @return The name of the catalog. */
   @Override
   public String name() {
-    return name;
+    return entityMetadata.getName();
   }
 
   /** @return The type of the catalog. */
@@ -82,13 +76,13 @@ public final class CatalogInfo implements Catalog {
   /** @return The comment or description for the catalog. */
   @Override
   public String comment() {
-    return comment;
+    return entityMetadata.getComment();
   }
 
   /** @return The associated properties of the catalog. */
   @Override
   public Map<String, String> properties() {
-    return properties;
+    return entityMetadata.getProperties();
   }
 
   /** @return The audit details of the catalog. */

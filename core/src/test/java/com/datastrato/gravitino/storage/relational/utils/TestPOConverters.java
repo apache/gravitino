@@ -9,10 +9,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
+import com.datastrato.gravitino.meta.EntityMetadata;
 import com.datastrato.gravitino.meta.FilesetEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
@@ -132,12 +134,9 @@ public class TestPOConverters {
 
     FilesetEntity expectedFileset =
         createFileset(
-            1L,
-            "test",
             NamespaceUtil.ofFileset("test_metalake", "test_catalog", "test_schema"),
-            "this is test",
             "hdfs://localhost/test",
-            new HashMap<>());
+            new EntityMetadata(1L, "test", "this is test", new HashMap<>()));
 
     FilesetEntity convertedFileset =
         POConverters.fromFilesetPO(
@@ -154,15 +153,16 @@ public class TestPOConverters {
   @Test
   public void testFromTopicPO() throws JsonProcessingException {
     TopicPO topicPO =
-        createTopicPO(1L, "test", 1L, 1L, 1L, "test comment", ImmutableMap.of("key", "value"));
+        createTopicPO(
+            1L,
+            1L,
+            1L,
+            new EntityMetadata(1L, "test", "test comment", ImmutableMap.of("key", "value")));
 
     TopicEntity expectedTopic =
         createTopic(
-            1L,
-            "test",
             NamespaceUtil.ofTopic("test_metalake", "test_catalog", "test_schema"),
-            "test comment",
-            ImmutableMap.of("key", "value"));
+            new EntityMetadata(1L, "test", "test comment", ImmutableMap.of("key", "value")));
 
     TopicEntity convertedTopic =
         POConverters.fromTopicPO(
@@ -317,20 +317,14 @@ public class TestPOConverters {
 
     FilesetEntity expectedFileset1 =
         createFileset(
-            1L,
-            "test1",
             NamespaceUtil.ofFileset("test_metalake", "test_catalog", "test_schema"),
-            "this is test1",
             "hdfs://localhost/test1",
-            new HashMap<>());
+            new EntityMetadata(1L, "test1", "this is test1", new HashMap<>()));
     FilesetEntity expectedFileset2 =
         createFileset(
-            2L,
-            "test2",
             NamespaceUtil.ofFileset("test_metalake", "test_catalog", "test_schema"),
-            "this is test2",
             "hdfs://localhost/test2",
-            new HashMap<>());
+            new EntityMetadata(2L, "test2", "this is test2", new HashMap<>()));
     List<FilesetEntity> expectedFilesets =
         new ArrayList<>(Arrays.asList(expectedFileset1, expectedFileset2));
 
@@ -350,9 +344,17 @@ public class TestPOConverters {
   @Test
   public void testFromTopicPOs() throws JsonProcessingException {
     TopicPO topicPO1 =
-        createTopicPO(1L, "test1", 1L, 1L, 1L, "test comment1", ImmutableMap.of("key", "value"));
+        createTopicPO(
+            1L,
+            1L,
+            1L,
+            new EntityMetadata(1L, "test1", "test comment1", ImmutableMap.of("key", "value")));
     TopicPO topicPO2 =
-        createTopicPO(2L, "test2", 1L, 1L, 1L, "test comment2", ImmutableMap.of("key", "value"));
+        createTopicPO(
+            1L,
+            1L,
+            1L,
+            new EntityMetadata(2L, "test2", "test comment2", ImmutableMap.of("key", "value")));
     List<TopicPO> topicPOs = new ArrayList<>(Arrays.asList(topicPO1, topicPO2));
     List<TopicEntity> convertedTopics =
         POConverters.fromTopicPOs(
@@ -360,18 +362,12 @@ public class TestPOConverters {
 
     TopicEntity expectedTopic1 =
         createTopic(
-            1L,
-            "test1",
             NamespaceUtil.ofTopic("test_metalake", "test_catalog", "test_schema"),
-            "test comment1",
-            ImmutableMap.of("key", "value"));
+            new EntityMetadata(1L, "test1", "test comment1", ImmutableMap.of("key", "value")));
     TopicEntity expectedTopic2 =
         createTopic(
-            2L,
-            "test2",
             NamespaceUtil.ofTopic("test_metalake", "test_catalog", "test_schema"),
-            "test comment2",
-            ImmutableMap.of("key", "value"));
+            new EntityMetadata(2L, "test2", "test comment2", ImmutableMap.of("key", "value")));
     List<TopicEntity> expectedTopics =
         new ArrayList<>(Arrays.asList(expectedTopic1, expectedTopic2));
 
@@ -435,12 +431,9 @@ public class TestPOConverters {
   public void testInitFilesetPOVersion() {
     FilesetEntity filesetEntity =
         createFileset(
-            1L,
-            "test",
             NamespaceUtil.ofFileset("test_metalake", "test_catalog", "test_schema"),
-            "this is test",
             "hdfs://localhost/test",
-            new HashMap<>());
+            new EntityMetadata(1L, "test", "this is test", new HashMap<>()));
     FilesetPO.Builder builder =
         FilesetPO.builder().withMetalakeId(1L).withCatalogId(1L).withSchemaId(1L);
     FilesetPO initPO = POConverters.initializeFilesetPOWithVersion(filesetEntity, builder);
@@ -518,32 +511,23 @@ public class TestPOConverters {
     properties.put("key", "value");
     FilesetEntity filesetEntity =
         createFileset(
-            1L,
-            "test",
             NamespaceUtil.ofFileset("test_metalake", "test_catalog", "test_schema"),
-            "this is test",
             "hdfs://localhost/test",
-            properties);
+            new EntityMetadata(1L, "test", "this is test", properties));
 
     Map<String, String> updateProperties = new HashMap<>();
     updateProperties.put("key", "value1");
     FilesetEntity updatedFileset =
         createFileset(
-            1L,
-            "test",
             NamespaceUtil.ofFileset("test_metalake", "test_catalog", "test_schema"),
-            "this is test",
             "hdfs://localhost/test",
-            updateProperties);
+            new EntityMetadata(1L, "test", "this is test", updateProperties));
 
     FilesetEntity updatedFileset1 =
         createFileset(
-            1L,
-            "test1",
             NamespaceUtil.ofFileset("test_metalake", "test_catalog", "test_schema"),
-            "this is test",
             "hdfs://localhost/test",
-            properties);
+            new EntityMetadata(1L, "test1", "this is test", properties));
 
     FilesetPO.Builder builder =
         FilesetPO.builder().withMetalakeId(1L).withCatalogId(1L).withSchemaId(1L);
@@ -701,16 +685,15 @@ public class TestPOConverters {
         .build();
   }
 
-  private static TopicEntity createTopic(
-      Long id, String name, Namespace namespace, String comment, Map<String, String> properties) {
+  private static TopicEntity createTopic(Namespace namespace, EntityMetadata entityMetadata) {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
     return TopicEntity.builder()
-        .withId(id)
-        .withName(name)
+        .withId(entityMetadata.getId())
+        .withName(entityMetadata.getName())
         .withNamespace(namespace)
-        .withComment(comment)
-        .withProperties(properties)
+        .withComment(entityMetadata.getComment())
+        .withProperties(entityMetadata.getProperties())
         .withAuditInfo(auditInfo)
         .build();
   }
@@ -734,24 +717,19 @@ public class TestPOConverters {
   }
 
   private static TopicPO createTopicPO(
-      Long id,
-      String name,
-      Long metalakeId,
-      Long catalogId,
-      Long schemaId,
-      String comment,
-      Map<String, String> properties)
+      Long metalakeId, Long catalogId, Long schemaId, EntityMetadata entityMetadata)
       throws JsonProcessingException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
     return TopicPO.builder()
-        .withTopicId(id)
-        .withTopicName(name)
+        .withTopicId(entityMetadata.getId())
+        .withTopicName(entityMetadata.getName())
         .withMetalakeId(metalakeId)
         .withCatalogId(catalogId)
         .withSchemaId(schemaId)
-        .withComment(comment)
-        .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(properties))
+        .withComment(entityMetadata.getComment())
+        .withProperties(
+            JsonUtils.anyFieldMapper().writeValueAsString(entityMetadata.getProperties()))
         .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
         .withCurrentVersion(1L)
         .withLastVersion(1L)
@@ -760,22 +738,17 @@ public class TestPOConverters {
   }
 
   private static FilesetEntity createFileset(
-      Long id,
-      String name,
-      Namespace namespace,
-      String comment,
-      String storageLocation,
-      Map<String, String> properties) {
+      Namespace namespace, String storageLocation, EntityMetadata entityMetadata) {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
     return FilesetEntity.builder()
-        .withId(id)
-        .withName(name)
+        .withId(entityMetadata.getId())
+        .withName(entityMetadata.getName())
         .withNamespace(namespace)
-        .withFilesetType(com.datastrato.gravitino.file.Fileset.Type.MANAGED)
+        .withFilesetType(Fileset.Type.MANAGED)
         .withStorageLocation(storageLocation)
-        .withProperties(properties)
-        .withComment(comment)
+        .withProperties(entityMetadata.getProperties())
+        .withComment(entityMetadata.getComment())
         .withAuditInfo(auditInfo)
         .build();
   }

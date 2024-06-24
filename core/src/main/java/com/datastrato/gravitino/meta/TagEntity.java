@@ -40,23 +40,20 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
   public static final Field AUDIT_INFO =
       Field.required("audit_info", Audit.class, "The audit details of the tag entity.");
 
-  private Long id;
-  private String name;
   private Namespace namespace;
-  private String comment;
-  private Map<String, String> properties;
   private MetadataObject[] objects = null;
   private Audit auditInfo;
+  private EntityMetadata entityMetadata = new EntityMetadata(null, null, null, null);
 
   private TagEntity() {}
 
   @Override
   public Map<Field, Object> fields() {
     Map<Field, Object> fields = Maps.newHashMap();
-    fields.put(ID, id);
-    fields.put(NAME, name);
-    fields.put(COMMENT, comment);
-    fields.put(PROPERTIES, properties);
+    fields.put(ID, entityMetadata.getId());
+    fields.put(NAME, entityMetadata.getName());
+    fields.put(COMMENT, entityMetadata.getComment());
+    fields.put(PROPERTIES, entityMetadata.getProperties());
     fields.put(AUDIT_INFO, auditInfo);
     fields.put(ASSOCIATED_OBJECTS, objects);
 
@@ -70,12 +67,12 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
 
   @Override
   public Long id() {
-    return id;
+    return entityMetadata.getId();
   }
 
   @Override
   public String name() {
-    return name;
+    return entityMetadata.getName();
   }
 
   @Override
@@ -85,12 +82,12 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
 
   @Override
   public String comment() {
-    return comment;
+    return entityMetadata.getComment();
   }
 
   @Override
   public Map<String, String> properties() {
-    return properties;
+    return entityMetadata.getProperties();
   }
 
   @Override
@@ -117,17 +114,23 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
     }
 
     TagEntity that = (TagEntity) o;
-    return Objects.equals(id, that.id)
-        && Objects.equals(name, that.name)
+    return Objects.equals(entityMetadata.getId(), that.entityMetadata.getId())
+        && Objects.equals(entityMetadata.getName(), that.entityMetadata.getName())
         && Objects.equals(namespace, that.namespace)
-        && Objects.equals(comment, that.comment)
-        && Objects.equals(properties, that.properties)
+        && Objects.equals(entityMetadata.getComment(), that.entityMetadata.getComment())
+        && Objects.equals(entityMetadata.getProperties(), that.entityMetadata.getProperties())
         && Objects.equals(auditInfo, that.auditInfo);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, namespace, comment, properties, auditInfo);
+    return Objects.hash(
+        entityMetadata.getId(),
+        entityMetadata.getName(),
+        namespace,
+        entityMetadata.getComment(),
+        entityMetadata.getProperties(),
+        auditInfo);
   }
 
   public static Builder builder() {
@@ -143,12 +146,12 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
     }
 
     public Builder withId(Long id) {
-      tagEntity.id = id;
+      tagEntity.entityMetadata.setId(id);
       return this;
     }
 
     public Builder withName(String name) {
-      tagEntity.name = name;
+      tagEntity.entityMetadata.setName(name);
       return this;
     }
 
@@ -158,12 +161,12 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
     }
 
     public Builder withComment(String comment) {
-      tagEntity.comment = comment;
+      tagEntity.entityMetadata.setComment(comment);
       return this;
     }
 
     public Builder withProperties(Map<String, String> properties) {
-      tagEntity.properties = properties;
+      tagEntity.entityMetadata.setProperties(properties);
       return this;
     }
 
