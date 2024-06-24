@@ -53,7 +53,7 @@ to recompile the native libraries like `libhdfs` and others, and completely repl
 | `server_uri`         | The Gravitino server uri, e.g. `http://localhost:8090`.                                                                   | (none)        | Yes      | 0.6.0         |.                                                                                                                | (none)        | Yes                                 | 0.6.0         |
 | `metalake_name`      | The metalake name which the fileset belongs to.                                                                           | (none)        | Yes      | 0.6.0         |.                                                                                                                |  (none)        | Yes                                 | 0.6.0         | .                               | (none)        | Yes      | 0.6.0         |
 | `cache_size`         | The cache capacity of the Gravitino Virtual File System.                                                                  | `20`          | No       | 0.6.0         |.                                                                                                                |  (none)        | Yes                                 | 0.6.0         | .                               | (none)        | Yes      | 0.6.0         |
-| `cache_expired_time` | The value of time that the cache expires after accessing in the Gravitino Virtual File System. The value is in `seconds`. | `300`         | No       | 0.6.0         |.                                                                                                                |  (none)        | Yes                                 | 0.6.0         | .                               | (none)        | Yes      | 0.6.0         |
+| `cache_expired_time` | The value of time that the cache expires after accessing in the Gravitino Virtual File System. The value is in `seconds`. | `3600`        | No       | 0.6.0         |.                                                                                                                |  (none)        | Yes                                 | 0.6.0         | .                               | (none)        | Yes      | 0.6.0         |
 
 
 You can configure these properties when obtaining the `Gravitino Virtual FileSystem` in Python like this:
@@ -64,7 +64,7 @@ from gravitino import gvfs
 fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalake_name="test_metalake")
 ```
 
-## How to use the Gravitino Virtual File System
+## How to use the Gravitino Virtual File System in Python
 
 1. Make sure to obtain the Gravitino library.
    You can get it by [pip](https://pip.pypa.io/en/stable/installation/):
@@ -82,7 +82,7 @@ export HADOOP_CONF_DIR=${YOUR_HADOOP_PATH}/etc/hadoop
 export CLASSPATH=`$HADOOP_HOME/bin/hdfs classpath --glob`
 ```
 
-### Using GVFS's fsspec-style interface via Python
+### Using GVFS's fsspec-style interface
 
 You can use the GVFS fsspec-style interface to perform operations on the fileset storage.
 
@@ -136,6 +136,13 @@ fs.rmdir(path="gvfs://fileset/fileset_catalog/tmp/tmp_fileset/sub_dir_2")
 # move a file or a directory
 fs.mv(path1="gvfs://fileset/fileset_catalog/tmp/tmp_fileset/test-1.txt",
       path2="gvfs://fileset/fileset_catalog/tmp/tmp_fileset/sub_dir/test-2.txt")
+
+# get the content of a file
+fs.cat_file(path="gvfs://fileset/fileset_catalog/tmp/tmp_fileset/test-1.txt")
+
+# copy a remote file to local
+fs.get_file(rpath="gvfs://fileset/fileset_catalog/tmp/tmp_fileset/test-1.txt",
+            lpath="/tmp/local-file-1.txt")
 ```
 
 ### Integrating GVFS with Third-party Python libraries
