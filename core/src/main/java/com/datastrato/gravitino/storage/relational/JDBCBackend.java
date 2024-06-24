@@ -294,7 +294,7 @@ public class JDBCBackend implements RelationalBackend {
     SqlSessionFactoryHelper.getInstance().close();
   }
 
-  enum EmbeddedJDBCBackendType {
+  enum JDBCBackendType {
     H2("h2"),
     DERBY("derby"),
     SQLITE("sqlite"),
@@ -302,12 +302,12 @@ public class JDBCBackend implements RelationalBackend {
 
     private final String name;
 
-    EmbeddedJDBCBackendType(String name) {
+    JDBCBackendType(String name) {
       this.name = name;
     }
 
-    public static EmbeddedJDBCBackendType fromName(String name) {
-      for (EmbeddedJDBCBackendType backend : EmbeddedJDBCBackendType.values()) {
+    public static JDBCBackendType fromName(String name) {
+      for (JDBCBackendType backend : JDBCBackendType.values()) {
         if (backend.name.equalsIgnoreCase(name)) {
           return backend;
         }
@@ -318,26 +318,29 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   private static void initJDBCBackend(Config config) {
-    String embeddedJDBCUserName = "gravitino";
-    String embeddedJDBCPassword = "gravitino";
+
+    // Default username and password for embedded database like H2
+    String jdbcUserName = "gravitino";
+    String jdbcPassword = "gravitino";
+
     String storagePath = getStoragePath(config);
 
     String jdbcUrl = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL);
     String jdbcType = getJDBCType(jdbcUrl);
 
-    EmbeddedJDBCBackendType embeddedJDBCBackend = EmbeddedJDBCBackendType.fromName(jdbcType);
+    JDBCBackendType jdbcBackend = JDBCBackendType.fromName(jdbcType);
 
-    switch (embeddedJDBCBackend) {
+    switch (jdbcBackend) {
       case H2:
-        initH2Backend(config, embeddedJDBCUserName, embeddedJDBCPassword, storagePath);
+        initH2Backend(config, jdbcUserName, jdbcPassword, storagePath);
         break;
       case DERBY:
       case SQLITE:
-        throw new UnsupportedOperationException(embeddedJDBCPassword + " is not supported yet.");
+        throw new UnsupportedOperationException(jdbcPassword + " is not supported yet.");
       case MYSQL:
         break;
       default:
-        throw new IllegalArgumentException("Unknown EmbeddedJDBCBackend: " + embeddedJDBCBackend);
+        throw new IllegalArgumentException("Unknown EmbeddedJDBCBackend: " + jdbcBackend);
     }
   }
 
