@@ -44,13 +44,14 @@ public class GravitinoIcebergCatalog extends BaseCatalog
   @Override
   protected TableCatalog createAndInitSparkCatalog(
       String name, CaseInsensitiveStringMap options, Map<String, String> properties) {
-    String icebergCatalogName =
-        Optional.ofNullable(properties.get(IcebergPropertiesConstants.ICEBERG_CATALOG_NAME))
+    String catalogBackendName =
+        Optional.ofNullable(
+                properties.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND_NAME))
             .orElse(name);
     Map<String, String> all =
         getPropertiesConverter().toSparkCatalogProperties(options, properties);
     TableCatalog icebergCatalog = new SparkCatalog();
-    icebergCatalog.initialize(icebergCatalogName, new CaseInsensitiveStringMap(all));
+    icebergCatalog.initialize(catalogBackendName, new CaseInsensitiveStringMap(all));
     return icebergCatalog;
   }
 

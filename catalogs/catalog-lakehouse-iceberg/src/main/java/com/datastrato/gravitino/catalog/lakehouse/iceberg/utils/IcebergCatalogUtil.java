@@ -35,7 +35,7 @@ public class IcebergCatalogUtil {
 
   private static InMemoryCatalog loadMemoryCatalog(Map<String, String> properties) {
     IcebergConfig icebergConfig = new IcebergConfig(properties);
-    String icebergCatalogName = icebergConfig.getIcebergCatalogName("memory");
+    String icebergCatalogName = icebergConfig.getCatalogBackendName("memory");
     InMemoryCatalog memoryCatalog = new InMemoryCatalog();
     Map<String, String> resultProperties = new HashMap<>(properties);
     resultProperties.put(CatalogProperties.WAREHOUSE_LOCATION, "/tmp");
@@ -48,7 +48,7 @@ public class IcebergCatalogUtil {
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
     properties.forEach(hdfsConfiguration::set);
     IcebergConfig icebergConfig = new IcebergConfig(properties);
-    String icebergCatalogName = icebergConfig.getIcebergCatalogName("hive");
+    String icebergCatalogName = icebergConfig.getCatalogBackendName("hive");
 
     AuthenticationConfig authenticationConfig = new AuthenticationConfig(properties);
     if (authenticationConfig.isSimpleAuth()) {
@@ -92,7 +92,7 @@ public class IcebergCatalogUtil {
   private static JdbcCatalog loadJdbcCatalog(Map<String, String> properties) {
     IcebergConfig icebergConfig = new IcebergConfig(properties);
     String driverClassName = icebergConfig.getJdbcDriver();
-    String icebergCatalogName = icebergConfig.getIcebergCatalogName("jdbc");
+    String icebergCatalogName = icebergConfig.getCatalogBackendName("jdbc");
 
     icebergConfig.get(IcebergConfig.JDBC_USER);
     icebergConfig.get(IcebergConfig.JDBC_PASSWORD);
@@ -117,7 +117,7 @@ public class IcebergCatalogUtil {
 
   private static Catalog loadRestCatalog(Map<String, String> properties) {
     IcebergConfig icebergConfig = new IcebergConfig(properties);
-    String icebergCatalogName = icebergConfig.getIcebergCatalogName("rest");
+    String icebergCatalogName = icebergConfig.getCatalogBackendName("rest");
     RESTCatalog restCatalog = new RESTCatalog();
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
     properties.forEach(hdfsConfiguration::set);

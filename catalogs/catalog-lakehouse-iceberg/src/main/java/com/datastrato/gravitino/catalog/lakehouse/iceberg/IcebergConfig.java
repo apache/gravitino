@@ -5,7 +5,6 @@
 
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
-import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.CATALOG_BACKEND_NAME;
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.GRAVITINO_JDBC_DRIVER;
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.ICEBERG_JDBC_INITIALIZE;
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.ICEBERG_JDBC_PASSWORD;
@@ -28,7 +27,7 @@ import org.apache.commons.lang3.StringUtils;
 public class IcebergConfig extends Config implements OverwriteDefaultConfig {
 
   public static final ConfigEntry<String> CATALOG_BACKEND =
-      new ConfigBuilder(CATALOG_BACKEND_NAME)
+      new ConfigBuilder(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND)
           .doc("Catalog backend of Gravitino Iceberg catalog")
           .version(ConfigConstants.VERSION_0_2_0)
           .stringConf()
@@ -104,8 +103,8 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(1000);
 
-  public static final ConfigEntry<String> ICEBERG_CATALOG_NAME =
-      new ConfigBuilder(IcebergCatalogPropertiesMetadata.ICEBERG_CATALOG_NAME)
+  public static final ConfigEntry<String> CATALOG_BACKEND_NAME =
+      new ConfigBuilder(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND_NAME)
           .doc("The catalog name for Iceberg catalog backend")
           .version(ConfigConstants.VERSION_0_5_2)
           .stringConf()
@@ -115,8 +114,8 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
     return get(JDBC_DRIVER);
   }
 
-  public String getIcebergCatalogName(String defaultCatalogName) {
-    return Optional.ofNullable(get(ICEBERG_CATALOG_NAME)).orElse(defaultCatalogName);
+  public String getCatalogBackendName(String defaultCatalogBackendName) {
+    return Optional.ofNullable(get(CATALOG_BACKEND_NAME)).orElse(defaultCatalogBackendName);
   }
 
   public IcebergConfig(Map<String, String> properties) {
