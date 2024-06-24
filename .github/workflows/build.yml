@@ -75,6 +75,9 @@ jobs:
       matrix:
         java-version: [ 8, 11, 17 ]
     timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: write
     needs: changes
     if: needs.changes.outputs.source_changes == 'true'
     # Steps represent a sequence of tasks that will be executed as part of the job
