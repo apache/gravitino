@@ -168,7 +168,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
   private void clearTableAndSchema() {
     if (catalog.asSchemas().schemaExists(schemaName)) {
       NameIdentifier[] nameIdentifiers =
-          catalog.asTableCatalog().listTables(Namespace.of(metalakeName, catalogName, schemaName));
+          catalog.asTableCatalog().listTables(Namespace.of(schemaName));
       for (NameIdentifier nameIdentifier : nameIdentifiers) {
         catalog.asTableCatalog().dropTable(nameIdentifier);
       }
@@ -216,7 +216,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
   }
 
   private void createSchema() {
-    NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, schemaName);
+    NameIdentifier ident = NameIdentifier.of(schemaName);
     Map<String, String> prop = Maps.newHashMap();
     prop.put("key1", "val1");
     prop.put("key2", "val2");
@@ -268,7 +268,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
 
     // create schema check.
     String testSchemaName = GravitinoITUtils.genRandomName("test_schema_1");
-    NameIdentifier schemaIdent = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
+    NameIdentifier schemaIdent = NameIdentifier.of(testSchemaName);
     schemas.createSchema(schemaIdent.name(), schema_comment, Collections.emptyMap());
 
     schemaNames = new HashSet<>(Arrays.asList(schemas.listSchemas()));
@@ -314,8 +314,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     TableCatalog tableCatalog = catalog.asTableCatalog();
 
     // create failed check.
-    NameIdentifier table =
-        NameIdentifier.of(metalakeName, catalogName, testSchemaName, "test_table");
+    NameIdentifier table = NameIdentifier.of(testSchemaName, "test_table");
     Assertions.assertThrows(
         NoSuchSchemaException.class,
         () ->
@@ -346,8 +345,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
   @Test
   void testCreateTableWithNullComment() {
     Column[] columns = createColumns();
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
 
     TableCatalog tableCatalog = catalog.asTableCatalog();
     Table createdTable =
@@ -363,8 +361,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     // Create table from Gravitino API
     Column[] columns = createColumns();
 
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
     Distribution distribution = Distributions.NONE;
 
     final SortOrder[] sortOrders =
@@ -466,8 +463,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
 
     String timestampTableName = "timestamp_table";
 
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(metalakeName, catalogName, schemaName, timestampTableName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, timestampTableName);
 
     Map<String, String> properties = createProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
@@ -514,7 +510,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
   void testListAndDropIcebergTable() {
     Column[] columns = createColumns();
 
-    NameIdentifier table1 = NameIdentifier.of(metalakeName, catalogName, schemaName, "table_1");
+    NameIdentifier table1 = NameIdentifier.of(schemaName, "table_1");
 
     Map<String, String> properties = createProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
@@ -526,8 +522,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
         Transforms.EMPTY_TRANSFORM,
         Distributions.NONE,
         new SortOrder[0]);
-    NameIdentifier[] nameIdentifiers =
-        tableCatalog.listTables(Namespace.of(metalakeName, catalogName, schemaName));
+    NameIdentifier[] nameIdentifiers = tableCatalog.listTables(Namespace.of(schemaName));
     Assertions.assertEquals(1, nameIdentifiers.length);
     Assertions.assertEquals("table_1", nameIdentifiers[0].name());
 
@@ -536,7 +531,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     Assertions.assertEquals(1, tableIdentifiers.size());
     Assertions.assertEquals("table_1", tableIdentifiers.get(0).name());
 
-    NameIdentifier table2 = NameIdentifier.of(metalakeName, catalogName, schemaName, "table_2");
+    NameIdentifier table2 = NameIdentifier.of(schemaName, "table_2");
     tableCatalog.createTable(
         table2,
         columns,
@@ -545,7 +540,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
         Transforms.EMPTY_TRANSFORM,
         Distributions.NONE,
         new SortOrder[0]);
-    nameIdentifiers = tableCatalog.listTables(Namespace.of(metalakeName, catalogName, schemaName));
+    nameIdentifiers = tableCatalog.listTables(Namespace.of(schemaName));
     Assertions.assertEquals(2, nameIdentifiers.length);
     Assertions.assertEquals("table_1", nameIdentifiers[0].name());
     Assertions.assertEquals("table_2", nameIdentifiers[1].name());
@@ -558,13 +553,12 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
 
     Assertions.assertDoesNotThrow(() -> tableCatalog.dropTable(table1));
 
-    nameIdentifiers = tableCatalog.listTables(Namespace.of(metalakeName, catalogName, schemaName));
+    nameIdentifiers = tableCatalog.listTables(Namespace.of(schemaName));
     Assertions.assertEquals(1, nameIdentifiers.length);
     Assertions.assertEquals("table_2", nameIdentifiers[0].name());
 
     Assertions.assertDoesNotThrow(() -> tableCatalog.dropTable(table2));
-    Namespace schemaNamespace = Namespace.of(metalakeName, catalogName, schemaName);
-    nameIdentifiers = tableCatalog.listTables(schemaNamespace);
+    nameIdentifiers = tableCatalog.listTables(Namespace.of(schemaName));
     Assertions.assertEquals(0, nameIdentifiers.length);
 
     tableIdentifiers =
@@ -579,7 +573,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
         catalog
             .asTableCatalog()
             .createTable(
-                NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+                NameIdentifier.of(schemaName, tableName),
                 columns,
                 table_comment,
                 createProperties(),
@@ -592,7 +586,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
           catalog
               .asTableCatalog()
               .alterTable(
-                  NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+                  NameIdentifier.of(schemaName, tableName),
                   TableChange.rename(alertTableName),
                   TableChange.updateComment(table_comment + "_new"));
         });
@@ -601,15 +595,14 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
         catalog
             .asTableCatalog()
             .alterTable(
-                NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
-                TableChange.rename(alertTableName));
+                NameIdentifier.of(schemaName, tableName), TableChange.rename(alertTableName));
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, table.auditInfo().lastModifier());
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, table.auditInfo().creator());
 
     catalog
         .asTableCatalog()
         .alterTable(
-            NameIdentifier.of(metalakeName, catalogName, schemaName, alertTableName),
+            NameIdentifier.of(schemaName, alertTableName),
             TableChange.updateComment(table_comment + "_new"),
             TableChange.removeProperty("key1"),
             TableChange.setProperty("key2", "val2_new"),
@@ -619,10 +612,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
             TableChange.updateColumnType(
                 new String[] {ICEBERG_COL_NAME1}, Types.IntegerType.get()));
 
-    table =
-        catalog
-            .asTableCatalog()
-            .loadTable(NameIdentifier.of(metalakeName, catalogName, schemaName, alertTableName));
+    table = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, alertTableName));
     Assertions.assertEquals(alertTableName, table.name());
     Assertions.assertEquals("val2_new", table.properties().get("key2"));
 
@@ -661,9 +651,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
             () ->
                 catalog
                     .asTableCatalog()
-                    .alterTable(
-                        NameIdentifier.of(metalakeName, catalogName, schemaName, alertTableName),
-                        withDefaultValue));
+                    .alterTable(NameIdentifier.of(schemaName, alertTableName), withDefaultValue));
     Assertions.assertTrue(
         exception
             .getMessage()
@@ -676,11 +664,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
 
     Column[] newColumns = new Column[] {col1, col2, col3};
     NameIdentifier tableIdentifier =
-        NameIdentifier.of(
-            metalakeName,
-            catalogName,
-            schemaName,
-            GravitinoITUtils.genRandomName("CatalogHiveIT_table"));
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("CatalogHiveIT_table"));
     catalog
         .asTableCatalog()
         .createTable(
@@ -759,7 +743,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     catalog
         .asTableCatalog()
         .createTable(
-            NameIdentifier.of(metalakeName, catalogName, schemaName, testTableName),
+            NameIdentifier.of(schemaName, testTableName),
             columns,
             table_comment,
             createProperties(),
@@ -808,7 +792,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     catalog
         .asTableCatalog()
         .createTable(
-            NameIdentifier.of(metalakeName, catalogName, schemaName, testTableName),
+            NameIdentifier.of(schemaName, testTableName),
             columns,
             table_comment,
             createProperties(),
@@ -894,7 +878,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
 
   @Test
   public void testOperatorSchemeProperties() {
-    NameIdentifier ident = NameIdentifier.of(metalakeName, catalogName, "testCreateSchemaCheck");
+    NameIdentifier ident = NameIdentifier.of("testCreateSchemaCheck");
     Map<String, String> prop = Maps.newHashMap();
     prop.put(IcebergSchemaPropertiesMetadata.COMMENT, "val1");
     prop.put("key2", "val2");
@@ -940,8 +924,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
   public void testTableDistribution() {
     Column[] columns = createColumns();
 
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
     Distribution distribution = Distributions.NONE;
 
     final SortOrder[] sortOrders =
@@ -1085,8 +1068,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     // Create table from Gravitino API
     Column[] columns = createColumns();
 
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
     Distribution distribution = Distributions.NONE;
 
     final SortOrder[] sortOrders =
@@ -1173,8 +1155,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
   public void testTableSortOrder() {
     Column[] columns = createColumns();
 
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
     Distribution distribution = Distributions.NONE;
 
     final SortOrder[] sortOrders =
