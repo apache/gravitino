@@ -27,19 +27,20 @@ public class TestAuthorizationOperations1 implements AuthorizationOperations {
   }
 
   @Override
-  public Boolean toUser(String userName) throws UnsupportedOperationException {
+  public Boolean toUser(String roleName, String userName) throws UnsupportedOperationException {
     user1 = userName;
     return false;
   }
 
   @Override
-  public Boolean toGroup(String groupName) throws UnsupportedOperationException {
+  public Boolean toGroup(String roleName, String groupName) throws UnsupportedOperationException {
     group1 = groupName;
     return false;
   }
 
   @Override
-  public Role updateRole(String name, RoleChange... changes) throws UnsupportedOperationException {
+  public Role updateRole(String roleName, RoleChange... changes)
+      throws UnsupportedOperationException {
     updateRole1 = true;
     return null;
   }

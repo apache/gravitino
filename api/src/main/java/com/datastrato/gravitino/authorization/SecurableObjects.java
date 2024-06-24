@@ -20,11 +20,9 @@ package com.datastrato.gravitino.authorization;
 
 import com.datastrato.gravitino.MetadataObject;
 import com.datastrato.gravitino.MetadataObjects;
-import com.datastrato.gravitino.Namespace;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -84,11 +82,6 @@ public class SecurableObjects {
     List<String> names = Lists.newArrayList(DOT_SPLITTER.splitToList(schema.fullName()));
     names.add(table);
     return of(SecurableObject.Type.TABLE, names, privileges);
-  }
-
-  public static SecurableObject ofNamespace(
-      MetadataObject.Type type, Namespace namespace, List<Privilege> privileges) {
-    return of(type, Arrays.asList(namespace.levels()), privileges);
   }
 
   /**
@@ -215,27 +208,5 @@ public class SecurableObjects {
     MetadataObject metadataObject = MetadataObjects.of(names, type);
     return new SecurableObjectImpl(
         metadataObject.parent(), metadataObject.name(), type, privileges);
-  }
-
-  private static String getParentFullName(List<String> names) {
-    if (names.size() <= 1) {
-      return null;
-    }
-
-    return String.join(".", names.subList(0, names.size() - 1));
-  }
-
-  private static String getLastName(List<String> names) {
-    return names.get(names.size() - 1);
-  }
-
-  private static void checkName(String name) {
-    if (name == null) {
-      throw new IllegalArgumentException("Cannot create a securable object with null name");
-    }
-
-    if ("*".equals(name)) {
-      throw new IllegalArgumentException("Cannot create a securable object with `*` name.");
-    }
   }
 }

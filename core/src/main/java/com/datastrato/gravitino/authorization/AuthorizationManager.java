@@ -4,7 +4,6 @@
  */
 package com.datastrato.gravitino.authorization;
 
-import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.exceptions.NoSuchAuthorizationException;
@@ -14,13 +13,11 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Streams;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
-import java.io.File;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -141,8 +138,10 @@ public class AuthorizationManager implements Closeable {
 
   private IsolatedClassLoader createClassLoader(String provider, Map<String, String> conf) {
     if (config.get(Configs.AUTHORIZATION_LOAD_ISOLATED)) {
-      String pkgPath = buildPkgPath(conf, provider);
-      String confPath = buildConfPath(conf, provider);
+      String pkgPath =
+          IsolatedClassLoader.buildPkgPath(conf, provider, "authorizations", "authorization-");
+      String confPath =
+          IsolatedClassLoader.buildConfPath(conf, provider, "authorizations", "authorization-");
       return IsolatedClassLoader.buildClassLoader(Lists.newArrayList(pkgPath, confPath));
     } else {
       // This will use the current class loader, it is mainly used for test.
@@ -205,57 +204,5 @@ public class AuthorizationManager implements Closeable {
     } else {
       return Iterables.getOnlyElement(providers);
     }
-  }
-
-  private String buildPkgPath(Map<String, String> conf, String provider) {
-    String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    Preconditions.checkArgument(gravitinoHome != null, "GRAVITINO_HOME not set");
-    boolean testEnv = System.getenv("GRAVITINO_TEST") != null;
-
-    String pkg = conf.get(Catalog.PROPERTY_PACKAGE);
-    String pkgPath;
-    if (pkg != null) {
-      pkgPath = String.join(File.separator, pkg, "libs");
-    } else if (testEnv) {
-      // In test, the authorization package is under the build directory.
-      pkgPath =
-          String.join(
-              File.separator,
-              gravitinoHome,
-              "authorizations",
-              "authorization-" + provider,
-              "build",
-              "libs");
-    } else {
-      // In real environment, the authorization package is under the authorization directory.
-      pkgPath = String.join(File.separator, gravitinoHome, "authorizations", provider, "libs");
-    }
-
-    return pkgPath;
-  }
-
-  private String buildConfPath(Map<String, String> properties, String provider) {
-    String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    Preconditions.checkArgument(gravitinoHome != null, "GRAVITINO_HOME not set");
-    boolean testEnv = System.getenv("GRAVITINO_TEST") != null;
-
-    String confPath;
-    String pkg = properties.get(Catalog.PROPERTY_PACKAGE);
-    if (pkg != null) {
-      confPath = String.join(File.separator, pkg, "conf");
-    } else if (testEnv) {
-      confPath =
-          String.join(
-              File.separator,
-              gravitinoHome,
-              "authorizations",
-              "authorization-" + provider,
-              "build",
-              "resources",
-              "main");
-    } else {
-      confPath = String.join(File.separator, gravitinoHome, "authorizations", provider, "conf");
-    }
-    return confPath;
   }
 }

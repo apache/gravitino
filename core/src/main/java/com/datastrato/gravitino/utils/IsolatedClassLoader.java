@@ -18,6 +18,8 @@
  */
 package com.datastrato.gravitino.utils;
 
+import com.datastrato.gravitino.Catalog;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.Closeable;
 import java.io.File;
@@ -28,6 +30,7 @@ import java.net.URLClassLoader;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.JavaVersion;
 import org.apache.commons.lang3.SystemUtils;
@@ -284,5 +287,58 @@ public class IsolatedClassLoader implements Closeable {
 
   private String classToPath(String name) {
     return name.replaceAll("\\.", "/") + ".class";
+  }
+
+  public static String buildPkgPath(
+      Map<String, String> conf, String provider, String libRootPath, String libPrefix) {
+    String gravitinoHome = System.getenv("GRAVITINO_HOME");
+    Preconditions.checkArgument(gravitinoHome != null, "GRAVITINO_HOME not set");
+    boolean testEnv = System.getenv("GRAVITINO_TEST") != null;
+
+    String pkg = conf.get(Catalog.PROPERTY_PACKAGE);
+    String pkgPath;
+    if (pkg != null) {
+      pkgPath = String.join(File.separator, pkg, "libs");
+    } else if (testEnv) {
+      // In test, the authorization package is under the build directory.
+      pkgPath =
+          String.join(
+              File.separator, gravitinoHome, libRootPath, libPrefix + provider, "build", "libs");
+    } else {
+      // In real environment, the authorization package is under the authorization directory.
+      pkgPath = String.join(File.separator, gravitinoHome, libRootPath, provider, "libs");
+    }
+
+    return pkgPath;
+  }
+
+  /**
+   * Build the config path from the specific provider. Usually, the configuration file is under the
+   * conf and conf and package are under the same directory.
+   */
+  public static String buildConfPath(
+      Map<String, String> properties, String provider, String libsRootPath, String libPrefix) {
+    String gravitinoHome = System.getenv("GRAVITINO_HOME");
+    Preconditions.checkArgument(gravitinoHome != null, "GRAVITINO_HOME not set");
+    boolean testEnv = System.getenv("GRAVITINO_TEST") != null;
+
+    String confPath;
+    String pkg = properties.get(Catalog.PROPERTY_PACKAGE);
+    if (pkg != null) {
+      confPath = String.join(File.separator, pkg, "conf");
+    } else if (testEnv) {
+      confPath =
+          String.join(
+              File.separator,
+              gravitinoHome,
+              libsRootPath,
+              libPrefix + provider,
+              "build",
+              "resources",
+              "main");
+    } else {
+      confPath = String.join(File.separator, gravitinoHome, libsRootPath, provider, "conf");
+    }
+    return confPath;
   }
 }

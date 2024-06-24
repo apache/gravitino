@@ -109,23 +109,34 @@ public interface Privilege {
     REVOKE_ROLE(0L, 1L << 32),
     /** The privilege to get a role */
     GET_ROLE(0L, 1L << 33),
-
+    /** The privilege to select a tabular object */
     TABULAR_SELECT(0L, 1L << 34),
+    /** The privilege to update a tabular object */
     TABULAR_UPDATE(0L, 1L << 35),
+    /** The privilege to create a tabular object */
     TABULAR_CREATE(0L, 1L << 36),
+    /** The privilege to drop a tabular object */
     TABULAR_DROP(0L, 1L << 37),
+    /** The privilege to alter a tabular object */
     TABULAR_ALTER(0L, 1L << 38),
+    /** The privilege to index a tabular object */
     TABULAR_INDEX(0L, 1L << 39),
+    /** The privilege to lock a tabular */
     TABULAR_LOCK(0L, 1L << 40),
+    /** The privilege to read a tabular object */
     TABULAR_READ(0L, 1L << 41),
+    /** The privilege to write a tabular object */
     TABULAR_WRITE(0L, 1L << 42),
+    /** The privilege to Repl Dump/Load operation */
     TABULAR_REPL_ADMIN(0L, 1L << 43),
+    /** The privilege to control kill query `queryId` */
     TABULAR_SERVICE_ADMIN(0L, 1L << 44),
-    /** Temporary UDF Admin */
+    /** The privilege temporary UDF admin */
     TABULAR_TEMP_UDF_ADMIN(0L, 1L << 45),
+    /** The privilege to refresh metadata */
     TABULAR_REFRESH(0L, 1L << 46),
-    TABULAR_ALL(0L, 1L << 47),
-    ;
+    /** The all privilege to a tabular */
+    TABULAR_ALL(0L, 1L << 47);
 
     private final long highBits;
     private final long lowBits;

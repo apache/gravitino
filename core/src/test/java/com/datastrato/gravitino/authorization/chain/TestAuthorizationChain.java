@@ -10,11 +10,16 @@ import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.authorization.AuthorizationManager;
 import com.datastrato.gravitino.authorization.AuthorizationOperations;
+import com.datastrato.gravitino.authorization.Privileges;
+import com.datastrato.gravitino.authorization.RoleChange;
+import com.datastrato.gravitino.authorization.SecurableObject;
+import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.authorization.chain.authorization1.TestAuthorizationOperations1;
 import com.datastrato.gravitino.authorization.chain.authorization2.TestAuthorizationOperations2;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import java.time.Instant;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -78,12 +83,15 @@ public class TestAuthorizationChain {
 
   @Test
   public void testAuthorizationCatalog1() {
+    SecurableObject securableObject =
+        SecurableObjects.ofCatalog("default", Lists.newArrayList(Privileges.TabularSelect.allow()));
+
     authorizationManager.runAuthorizationChain(
         catalogTest1,
         ops -> ops.createRole("role1"),
-        ops -> ops.toUser("user1"),
-        ops -> ops.toGroup("group1"),
-        ops -> ops.updateRole("role1", null));
+        ops -> ops.toUser("role1", "user1"),
+        ops -> ops.toGroup("role1", "group1"),
+        ops -> ops.updateRole("role1", RoleChange.addSecurableObject(securableObject)));
 
     AuthorizationOperations authOps1 =
         authorizationManager.loadAuthorizationAndWrap(catalogTest1).getOps();
@@ -97,12 +105,14 @@ public class TestAuthorizationChain {
 
   @Test
   public void testAuthorizationCatalog2() {
+    SecurableObject securableObject =
+        SecurableObjects.ofCatalog("default", Lists.newArrayList(Privileges.TabularSelect.allow()));
     authorizationManager.runAuthorizationChain(
         catalogTest2,
         ops -> ops.createRole("role2"),
-        ops -> ops.toUser("user2"),
-        ops -> ops.toGroup("group2"),
-        ops -> ops.updateRole("role2", null));
+        ops -> ops.toUser("role2", "user2"),
+        ops -> ops.toGroup("role2", "group2"),
+        ops -> ops.updateRole("role2", RoleChange.addSecurableObject(securableObject)));
 
     AuthorizationOperations authOps2 =
         authorizationManager.loadAuthorizationAndWrap(catalogTest2).getOps();

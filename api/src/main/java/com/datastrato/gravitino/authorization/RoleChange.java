@@ -25,11 +25,17 @@ import com.datastrato.gravitino.annotation.Evolving;
 /** The RoleChange interface defines the public API for managing roles in an authorization. */
 @Evolving
 public interface RoleChange {
+  /**
+   * Add a securable object RoleChange.
+   *
+   * @param securableObject The securable object.
+   * @return return a RoleChange for the add securable object.
+   */
   static RoleChange addSecurableObject(SecurableObject securableObject) {
     return new AddSecurableObject(securableObject);
   }
 
-  /** A RoleChange to update a table's comment. */
+  /** A AddSecurableObject to add securable object to role. */
   final class AddSecurableObject implements RoleChange {
     private final SecurableObject securableObject;
 
@@ -37,16 +43,21 @@ public interface RoleChange {
       this.securableObject = securableObject;
     }
 
+    /**
+     * Returns the securable object to be added.
+     *
+     * @return return a securable object.
+     */
     public SecurableObject getSecurableObject() {
       return this.securableObject;
     }
 
     /**
-     * Compares this UpdateComment instance with another object for equality. The comparison is
-     * based on the new comment of the table.
+     * Compares this AddSecurableObject instance with another object for equality. The comparison is
+     * based on the add securable object to role.
      *
      * @param o The object to compare with this instance.
-     * @return true if the given object represents the same table comment update; false otherwise.
+     * @return true if the given object represents the same add securable object; false otherwise.
      */
     @Override
     public boolean equals(Object o) {
@@ -57,10 +68,10 @@ public interface RoleChange {
     }
 
     /**
-     * Generates a hash code for this UpdateComment instance. The hash code is based on the new
-     * comment of the table.
+     * Generates a hash code for this AddSecurableObject instance. The hash code is based on the add
+     * securable object.
      *
-     * @return A hash code value for this table comment update operation.
+     * @return A hash code value for this add securable object operation.
      */
     @Override
     public int hashCode() {
@@ -68,10 +79,10 @@ public interface RoleChange {
     }
 
     /**
-     * Returns a string representation of the UpdateComment instance. This string format includes
-     * the class name followed by the property name to be updated.
+     * Returns a string representation of the AddSecurableObject instance. This string format
+     * includes the class name followed by the add securable object operation.
      *
-     * @return A string representation of the UpdateComment instance.
+     * @return A string representation of the AddSecurableObject instance.
      */
     @Override
     public String toString() {
