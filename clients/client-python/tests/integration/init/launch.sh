@@ -11,7 +11,7 @@ isExist=`which docker`
 if [ ! $isExist ]
 then
   echo "ERROR: No docker service environment found, please install docker first."
-  exit
+  exit 1
 fi
 
 cd ${playground_dir}
