@@ -179,8 +179,7 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
   @Test
   void testCreateTableWithNullComment() {
     Column[] columns = createColumns();
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
 
     TableCatalog tableCatalog = catalog.asTableCatalog();
     Table createdTable =
@@ -197,8 +196,7 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     // Create table from Gravitino API
     Column[] columns = createColumns();
 
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
     Distribution distribution = Distributions.NONE;
 
     Transform[] partitioning = Transforms.EMPTY_TRANSFORM;
@@ -287,8 +285,7 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
 
     String timestampTableName = "timestamp_table";
 
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(metalakeName, catalogName, schemaName, timestampTableName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, timestampTableName);
 
     Map<String, String> properties = createProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
@@ -339,7 +336,7 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
 
     String tableName1 = "table_1";
 
-    NameIdentifier table1 = NameIdentifier.of(metalakeName, catalogName, schemaName, tableName1);
+    NameIdentifier table1 = NameIdentifier.of(schemaName, tableName1);
 
     Map<String, String> properties = createProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
@@ -351,8 +348,7 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
         Transforms.EMPTY_TRANSFORM,
         Distributions.NONE,
         new SortOrder[0]);
-    NameIdentifier[] nameIdentifiers =
-        tableCatalog.listTables(Namespace.of(metalakeName, catalogName, schemaName));
+    NameIdentifier[] nameIdentifiers = tableCatalog.listTables(Namespace.of(schemaName));
     Assertions.assertEquals(1, nameIdentifiers.length);
     Assertions.assertEquals("table_1", nameIdentifiers[0].name());
 
@@ -362,7 +358,7 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
 
     String tableName2 = "table_2";
 
-    NameIdentifier table2 = NameIdentifier.of(metalakeName, catalogName, schemaName, tableName2);
+    NameIdentifier table2 = NameIdentifier.of(schemaName, tableName2);
     tableCatalog.createTable(
         table2,
         columns,
@@ -371,7 +367,7 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
         Transforms.EMPTY_TRANSFORM,
         Distributions.NONE,
         new SortOrder[0]);
-    nameIdentifiers = tableCatalog.listTables(Namespace.of(metalakeName, catalogName, schemaName));
+    nameIdentifiers = tableCatalog.listTables(Namespace.of(schemaName));
     Assertions.assertEquals(2, nameIdentifiers.length);
     Assertions.assertEquals("table_1", nameIdentifiers[0].name());
     Assertions.assertEquals("table_2", nameIdentifiers[1].name());
@@ -383,12 +379,12 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
 
     Assertions.assertDoesNotThrow(() -> tableCatalog.dropTable(table1));
 
-    nameIdentifiers = tableCatalog.listTables(Namespace.of(metalakeName, catalogName, schemaName));
+    nameIdentifiers = tableCatalog.listTables(Namespace.of(schemaName));
     Assertions.assertEquals(1, nameIdentifiers.length);
     Assertions.assertEquals("table_2", nameIdentifiers[0].name());
 
     Assertions.assertDoesNotThrow(() -> tableCatalog.dropTable(table2));
-    Namespace schemaNamespace = Namespace.of(metalakeName, catalogName, schemaName);
+    Namespace schemaNamespace = Namespace.of(schemaName);
     nameIdentifiers = tableCatalog.listTables(schemaNamespace);
     Assertions.assertEquals(0, nameIdentifiers.length);
 
@@ -409,7 +405,7 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     catalog
         .asTableCatalog()
         .createTable(
-            NameIdentifier.of(metalakeName, catalogName, schemaName, testTableName),
+            NameIdentifier.of(schemaName, testTableName),
             columns,
             table_comment,
             createProperties(),
