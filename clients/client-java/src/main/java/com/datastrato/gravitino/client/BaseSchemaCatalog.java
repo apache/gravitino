@@ -188,11 +188,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
   }
 
   /**
-<<<<<<< HEAD
-   * Get the namespace of the current catalog.
-=======
    * Get the namespace of the current catalog, which is "metalake".
->>>>>>> main
    *
    * @return The namespace of the current catalog.
    */
