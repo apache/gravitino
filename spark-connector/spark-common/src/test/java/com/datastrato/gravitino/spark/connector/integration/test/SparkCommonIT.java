@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.spark.connector.integration.test;
 
+import static com.datastrato.gravitino.Configs.ENTRY_RELATIONAL_JDBC_BACKEND_PATH;
+
 import com.datastrato.gravitino.spark.connector.ConnectorConstants;
 import com.datastrato.gravitino.spark.connector.integration.test.util.SparkTableInfo;
 import com.datastrato.gravitino.spark.connector.integration.test.util.SparkTableInfo.SparkColumnInfo;
@@ -951,5 +953,18 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   protected void checkParquetFile(SparkTableInfo tableInfo) {
     String location = tableInfo.getTableLocation();
     Assertions.assertDoesNotThrow(() -> getSparkSession().read().parquet(location).printSchema());
+  }
+
+  @AfterAll
+  static void removeStorageFiles() {
+    try {
+      File file = new File(serverConfig.get(ENTRY_RELATIONAL_JDBC_BACKEND_PATH));
+      File p = file.getParentFile();
+      if (p.exists()) {
+        FileUtils.deleteDirectory(p);
+      }
+    } catch (Exception e) {
+      // Ignore
+    }
   }
 }
