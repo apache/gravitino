@@ -5,6 +5,7 @@
 package com.datastrato.gravitino.integration.test;
 
 import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
+import static com.datastrato.gravitino.Configs.ENTRY_RELATIONAL_JDBC_BACKEND_PATH;
 import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterruptibly;
 
 import com.datastrato.gravitino.Config;
@@ -102,11 +103,16 @@ public class MiniGravitino {
 
     serverConfig.loadFromProperties(properties);
 
-    // Prepare delete the rocksdb backend storage directory
+    // Prepare to delete the rocksdb backend storage directory
     try {
-      FileUtils.deleteDirectory(FileUtils.getFile(serverConfig.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)));
+      File file = new File(serverConfig.get(ENTRY_RELATIONAL_JDBC_BACKEND_PATH));
+      File p = file.getParentFile();
+      if (p.exists()) {
+        FileUtils.deleteDirectory(p);
+      }
     } catch (Exception e) {
       // Ignore
+      System.out.println(e);
     }
 
     // Initialize the REST client

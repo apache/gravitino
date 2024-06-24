@@ -77,28 +77,28 @@ public interface FilesetVersionMapper {
   @Update(
       "UPDATE "
           + VERSION_TABLE_NAME
-          + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
+          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
           + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0")
   Integer softDeleteFilesetVersionsByMetalakeId(@Param("metalakeId") Long metalakeId);
 
   @Update(
       "UPDATE "
           + VERSION_TABLE_NAME
-          + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
+          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
           + " WHERE catalog_id = #{catalogId} AND deleted_at = 0")
   Integer softDeleteFilesetVersionsByCatalogId(@Param("catalogId") Long catalogId);
 
   @Update(
       "UPDATE "
           + VERSION_TABLE_NAME
-          + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
+          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
           + " WHERE schema_id = #{schemaId} AND deleted_at = 0")
   Integer softDeleteFilesetVersionsBySchemaId(@Param("schemaId") Long schemaId);
 
   @Update(
       "UPDATE "
           + VERSION_TABLE_NAME
-          + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
+          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
           + " WHERE fileset_id = #{filesetId} AND deleted_at = 0")
   Integer softDeleteFilesetVersionsByFilesetId(@Param("filesetId") Long filesetId);
 
@@ -122,7 +122,7 @@ public interface FilesetVersionMapper {
   @Update(
       "UPDATE "
           + VERSION_TABLE_NAME
-          + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
+          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
           + " WHERE fileset_id = #{filesetId} AND version <= #{versionRetentionLine} AND deleted_at = 0 LIMIT #{limit}")
   Integer softDeleteFilesetVersionsByRetentionLine(
       @Param("filesetId") Long filesetId,

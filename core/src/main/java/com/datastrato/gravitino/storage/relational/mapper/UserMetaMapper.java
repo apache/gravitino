@@ -90,14 +90,14 @@ public interface UserMetaMapper {
   @Update(
       "UPDATE "
           + USER_TABLE_NAME
-          + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
+          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
           + " WHERE user_id = #{userId} AND deleted_at = 0")
   void softDeleteUserMetaByUserId(@Param("userId") Long userId);
 
   @Update(
       "UPDATE "
           + USER_TABLE_NAME
-          + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
+          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
           + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0")
   void softDeleteUserMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
 

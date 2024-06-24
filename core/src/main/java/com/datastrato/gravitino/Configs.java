@@ -70,7 +70,7 @@ public class Configs {
       String.join(File.separator, System.getenv("GRAVITINO_HOME"), "data", "rocksdb");
 
   public static final String DEFAULT_RELATIONAL_JDBC_BACKEND_PATH =
-      String.join(File.separator, System.getenv("GRAVITINO_HOME"), "data");
+      String.join(File.separator, System.getenv("GRAVITINO_HOME"), "data", "embedded");
 
   public static final int GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT = 100;
   public static final long MAX_NODE_IN_MEMORY = 100000L;
@@ -84,12 +84,11 @@ public class Configs {
           .doc("Which storage implementation to use")
           .version(ConfigConstants.VERSION_0_1_0)
           .stringConf()
-          .createWithDefault(DEFAULT_ENTITY_STORE);
+          .createWithDefault(RELATIONAL_ENTITY_STORE);
 
   public static final ConfigEntry<String> ENTITY_KV_STORE =
       new ConfigBuilder(ENTITY_KV_STORE_KEY)
           .doc("Detailed implementation of Kv storage")
-          .version(ConfigConstants.VERSION_0_1_0)
           .stringConf()
           .createWithDefault(DEFAULT_ENTITY_KV_STORE);
 
@@ -138,10 +137,10 @@ public class Configs {
               "The storage path for JDBC storage implementation. It supports both absolute and"
                   + " relative path, if the value is a relative path, the final path is "
                   + "`${GRAVITINO_HOME}/${PATH_YOU_HAVA_SET}`, default value is "
-                  + "`${GRAVITINO_HOME}/data`")
+                  + "`${GRAVITINO_HOME}/data/embedded`")
           .version(ConfigConstants.VERSION_0_6_0)
           .stringConf()
-          .createWithDefault(DEFAULT_KV_ROCKSDB_BACKEND_PATH);
+          .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_PATH);
 
   public static final ConfigEntry<String> ENTRY_KV_ROCKSDB_BACKEND_PATH =
       new ConfigBuilder(ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY)
