@@ -9,18 +9,18 @@ import static com.datastrato.gravitino.catalog.lakehouse.paimon.utils.CatalogUti
 import com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonConfig;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.Catalog.DatabaseAlreadyExistException;
 import org.apache.paimon.catalog.Catalog.DatabaseNotEmptyException;
 import org.apache.paimon.catalog.Catalog.DatabaseNotExistException;
-import org.apache.paimon.utils.Pair;
 
 /** Table operation proxy that handles table operations of an underlying Paimon catalog. */
-public class PaimonTableOps implements AutoCloseable {
+public class PaimonCatalogOps implements AutoCloseable {
 
   protected Catalog catalog;
 
-  public PaimonTableOps(PaimonConfig paimonConfig) {
+  public PaimonCatalogOps(PaimonConfig paimonConfig) {
     catalog = loadCatalogBackend(paimonConfig);
   }
 

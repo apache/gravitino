@@ -11,7 +11,6 @@ import static com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonConfig.CAT
 import com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonCatalogBackend;
 import com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonConfig;
 import com.google.common.base.Preconditions;
-import java.util.Locale;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.CatalogContext;
@@ -36,10 +35,7 @@ public class CatalogUtils {
     String warehouse = paimonConfig.get(CATALOG_WAREHOUSE);
     Preconditions.checkArgument(
         StringUtils.isNotBlank(warehouse), "Paimon Catalog warehouse can not be null or empty.");
-    if (!PaimonCatalogBackend.FILESYSTEM
-        .name()
-        .toLowerCase(Locale.ROOT)
-        .equals(metastore.toLowerCase(Locale.ROOT))) {
+    if (!PaimonCatalogBackend.FILESYSTEM.name().equalsIgnoreCase(metastore)) {
       String uri = paimonConfig.get(CATALOG_URI);
       Preconditions.checkArgument(
           StringUtils.isNotBlank(uri), "Paimon Catalog uri can not be null or empty.");

@@ -9,7 +9,7 @@ import static com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonCatalog.SC
 
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.PropertiesMetadataHelpers;
-import com.datastrato.gravitino.catalog.lakehouse.paimon.ops.PaimonTableOps;
+import com.datastrato.gravitino.catalog.lakehouse.paimon.ops.PaimonCatalogOps;
 import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;
 import com.datastrato.gravitino.connector.PropertiesMetadata;
@@ -77,10 +77,10 @@ public class TestPaimonCatalog {
     Assertions.assertInstanceOf(PaimonCatalogOperations.class, catalogOperations);
 
     PaimonCatalogOperations paimonCatalogOperations = (PaimonCatalogOperations) catalogOperations;
-    PaimonTableOps paimonTableOps = paimonCatalogOperations.paimonTableOps;
+    PaimonCatalogOps paimonCatalogOps = paimonCatalogOperations.paimonCatalogOps;
     Assertions.assertEquals(
         paimonCatalogOperations.listSchemas(Namespace.empty()).length,
-        paimonTableOps.listDatabases().size());
+        paimonCatalogOps.listDatabases().size());
   }
 
   @Test
