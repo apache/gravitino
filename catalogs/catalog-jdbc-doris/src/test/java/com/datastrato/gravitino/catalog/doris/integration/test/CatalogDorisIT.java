@@ -636,8 +636,7 @@ public class CatalogDorisIT extends AbstractIT {
   @Test
   void testDorisTablePartitionOperation() {
     // Create a partitioned table
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
     Column[] columns = createColumns();
     Distribution distribution = createDistribution();
     Index[] indexes =
