@@ -236,6 +236,7 @@ public class JDBCBackend implements RelationalBackend {
         return RoleMetaService.getInstance()
             .deleteRoleMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case TAG:
       case COLUMN:
       case AUDIT:
         return 0;
@@ -260,6 +261,7 @@ public class JDBCBackend implements RelationalBackend {
       case GROUP:
       case AUDIT:
       case ROLE:
+      case TAG:
         // These entity types have not implemented multi-versions, so we can skip.
         return 0;
 
