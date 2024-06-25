@@ -397,6 +397,8 @@ public class JDBCBackend implements RelationalBackend {
       originURI = originURI + ";MODE=MYSQL";
     }
 
+    originURI = originURI + ";AUTO_SERVER=TRUE";
+
     return originURI;
   }
 

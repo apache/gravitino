@@ -198,7 +198,13 @@ public class AbstractIT {
       setMySQLBackend();
     }
 
+    File baseDir = new File(System.getProperty("java.io.tmpdir"));
+    File file = Files.createTempDirectory(baseDir.toPath(), "test").toFile();
+    file.mkdir();
+    file.deleteOnExit();
+
     serverConfig = new ServerConfig();
+    customConfigs.put(ENTRY_RELATIONAL_JDBC_BACKEND_PATH.getKey(), file.getAbsolutePath());
     if (testMode != null && testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {
       MiniGravitinoContext context =
           new MiniGravitinoContext(customConfigs, ignoreIcebergRestService);
@@ -209,15 +215,6 @@ public class AbstractIT {
       rewriteGravitinoServerConfig();
       serverConfig.loadFromFile(GravitinoServer.CONF_FILE);
       downLoadJDBCDriver();
-      try {
-        File file = new File(serverConfig.get(ENTRY_RELATIONAL_JDBC_BACKEND_PATH));
-        File p = file.getParentFile();
-        if (p.exists()) {
-          FileUtils.deleteDirectory(p);
-        }
-      } catch (Exception e) {
-        // Ignore
-      }
 
       GravitinoITUtils.startGravitinoServer();
 

@@ -210,9 +210,5 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
     catalog.asSchemas().alterSchema(SCHEMA_NAME, SchemaChange.setProperty("k1", "value1"));
 
     catalog.asSchemas().dropSchema(SCHEMA_NAME, true);
-
-    gravitinoMetalake.dropCatalog(CATALOG_NAME);
-
-    adminClient.dropMetalake(METALAKE_NAME);
   }
 }

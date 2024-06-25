@@ -192,6 +192,9 @@ public class HiveUserAuthenticationIT extends AbstractIT {
             .build();
     adminClient = GravitinoAdminClient.builder(serverUri).withKerberosAuth(provider).build();
 
+    GravitinoMetalake[] metalakes = adminClient.listMetalakes();
+    Assertions.assertEquals(0, metalakes.length);
+
     GravitinoMetalake gravitinoMetalake =
         adminClient.createMetalake(METALAKE_NAME, null, ImmutableMap.of());
 
@@ -260,8 +263,6 @@ public class HiveUserAuthenticationIT extends AbstractIT {
 
     // Drop catalog
     Assertions.assertTrue(gravitinoMetalake.dropCatalog(CATALOG_NAME));
-
-    adminClient.dropMetalake(METALAKE_NAME);
   }
 
   private static Column[] createColumns() {

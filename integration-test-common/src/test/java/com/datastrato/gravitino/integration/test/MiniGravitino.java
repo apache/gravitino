@@ -5,7 +5,6 @@
 package com.datastrato.gravitino.integration.test;
 
 import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
-import static com.datastrato.gravitino.Configs.ENTRY_RELATIONAL_JDBC_BACKEND_PATH;
 import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterruptibly;
 
 import com.datastrato.gravitino.Config;
@@ -102,26 +101,6 @@ public class MiniGravitino {
     }
 
     serverConfig.loadFromProperties(properties);
-
-    // Prepare to delete the rocksdb backend storage directory
-    try {
-      File file = new File(serverConfig.get(ENTRY_RELATIONAL_JDBC_BACKEND_PATH));
-      File p = file.getParentFile();
-      LOG.info(
-          "Deleting rocksdb backend storage directory: {}, files: {}",
-          p.getAbsolutePath(),
-          file.getAbsolutePath());
-      if (p.exists()) {
-        FileUtils.deleteDirectory(p);
-      }
-
-      LOG.info(
-          "Deleting rocksdb backend storage directory: {}, exists: {}",
-          p.getAbsolutePath(),
-          p.exists());
-    } catch (Exception e) {
-      // Ignore
-    }
 
     // Initialize the REST client
     JettyServerConfig jettyServerConfig =
