@@ -72,7 +72,7 @@ public class KerberosClient {
     return principalComponents.get(1);
   }
 
-  public File saveKeyTabFileFromUri(Long catalogId) throws IOException {
+  public File saveKeyTabFileFromUri(String catalogId) throws IOException {
 
     KerberosConfig kerberosConfig = new KerberosConfig(conf);
 

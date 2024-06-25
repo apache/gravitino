@@ -98,8 +98,7 @@ public class CatalogUtils {
       Map<String, String> properties, Configuration conf) {
     try {
       KerberosClient kerberosClient = new KerberosClient(properties, conf);
-      File keytabFile =
-          kerberosClient.saveKeyTabFileFromUri(Long.valueOf(properties.get("catalog_uuid")));
+      File keytabFile = kerberosClient.saveKeyTabFileFromUri(properties.get("catalog_uuid"));
       return kerberosClient.login(keytabFile.getAbsolutePath());
     } catch (IOException e) {
       throw new RuntimeException("Failed to login with kerberos", e);

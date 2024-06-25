@@ -9,7 +9,6 @@ import com.datastrato.gravitino.utils.PrincipalUtils;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.security.PrivilegedExceptionAction;
-import java.util.Map;
 import net.sf.cglib.proxy.Enhancer;
 import net.sf.cglib.proxy.MethodInterceptor;
 import net.sf.cglib.proxy.MethodProxy;

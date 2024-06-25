@@ -37,15 +37,6 @@ public class CatalogPaimonKerberosFilesystemIT extends CatalogPaimonBaseIT {
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
-  //  private static final String SDK_KERBEROS_PRINCIPAL_KEY = "client.kerberos.principal";
-  //  private static final String SDK_KERBEROS_KEYTAB_KEY = "client.kerberos.keytab";
-
-  //  private static final String GRAVITINO_CLIENT_PRINCIPAL = "gravitino_client@HADOOPKRB";
-  private static final String GRAVITINO_CLIENT_KEYTAB = "/gravitino_client.keytab";
-
-  //  private static final String GRAVITINO_SERVER_PRINCIPAL = "HTTP/localhost@HADOOPKRB";
-  //  private static final String GRAVITINO_SERVER_KEYTAB = "/gravitino_server.keytab";
-
   private static final String FILESYSTEM_CLIENT_PRINCIPAL = "cli@HADOOPKRB";
   private static final String FILESYSTEM_CLIENT_KEYTAB = "/client.keytab";
 
@@ -53,20 +44,15 @@ public class CatalogPaimonKerberosFilesystemIT extends CatalogPaimonBaseIT {
 
   private static HiveContainer kerberosHiveContainer;
 
-  //  private static GravitinoAdminClient adminClient;
-
-  //  private static final String METALAKE_NAME = GravitinoITUtils.genRandomName("test_metalake");
-  //  private static final String CATALOG_NAME = GravitinoITUtils.genRandomName("test_catalog");
-  //  private static final String SCHEMA_NAME = GravitinoITUtils.genRandomName("test_schema");
-  //  private static final String TABLE_NAME = GravitinoITUtils.genRandomName("test_table");
-
   //  private static String URIS;
   private static String TYPE;
   private static String WAREHOUSE;
 
-  //  private static final String PAIMON_COL_NAME1 = "col1";
-  //  private static final String PAIMON_COL_NAME2 = "col2";
-  //  private static final String PAIMON_COL_NAME3 = "col3";
+  @Override
+  protected void startHiveContainer() {
+    containerSuite.startKerberosHiveContainer();
+    kerberosHiveContainer = containerSuite.getKerberosHiveContainer();
+  }
 
   @Override
   protected Map<String, String> initPaimonCatalogProperties() {
@@ -74,19 +60,17 @@ public class CatalogPaimonKerberosFilesystemIT extends CatalogPaimonBaseIT {
     catalogProperties.put("key1", "val1");
     catalogProperties.put("key2", "val2");
 
-    catalogProperties.put(AUTH_TYPE_KEY, "kerberos");
-    catalogProperties.put(KEY_TAB_URI_KEY, TMP_DIR + FILESYSTEM_CLIENT_KEYTAB);
-    catalogProperties.put(PRINCIPAL_KEY, FILESYSTEM_CLIENT_PRINCIPAL);
-    catalogProperties.put(CATALOG_BYPASS_PREFIX + "fs.defaultFS", defaultBaseLocation());
-    catalogProperties.put(CATALOG_BYPASS_PREFIX + "fs.hdfs.impl.disable.cache", "true");
-
     TYPE = "filesystem";
     WAREHOUSE =
-        String.format(
-            "hdfs://%s:%d/user/hive/paimon_catalog_warehouse/",
-            kerberosHiveContainer.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
+            String.format(
+                    "hdfs://%s:%d/user/hive/paimon_catalog_warehouse/",
+                    kerberosHiveContainer.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
     catalogProperties.put(PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND, TYPE);
     catalogProperties.put(PaimonCatalogPropertiesMetadata.WAREHOUSE, WAREHOUSE);
+    catalogProperties.put(AUTH_TYPE_KEY, "kerberos");
+    catalogProperties.put(PRINCIPAL_KEY, FILESYSTEM_CLIENT_PRINCIPAL);
+    catalogProperties.put(KEY_TAB_URI_KEY, TMP_DIR + FILESYSTEM_CLIENT_KEYTAB);
+    catalogProperties.put(CATALOG_BYPASS_PREFIX + "fs.defaultFS", defaultBaseLocation());
 
     // to prepare related kerberos configs
     try {
@@ -97,18 +81,11 @@ public class CatalogPaimonKerberosFilesystemIT extends CatalogPaimonBaseIT {
 
       // Prepare kerberos related-config;
       prepareKerberosConfig();
-
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
 
     return catalogProperties;
-  }
-
-  @Override
-  protected void startHiveContainer() {
-    containerSuite.startKerberosHiveContainer();
-    kerberosHiveContainer = containerSuite.getKerberosHiveContainer();
   }
 
   @Override
@@ -138,22 +115,12 @@ public class CatalogPaimonKerberosFilesystemIT extends CatalogPaimonBaseIT {
             .config(
                 "spark.sql.extensions",
                 "org.apache.paimon.spark.extensions.PaimonSparkSessionExtensions")
-            .config("", "")
-            .config("", "")
+            .config("spark.kerberos.principal", FILESYSTEM_CLIENT_PRINCIPAL)
+            .config("spark.kerberos.keytab", TMP_DIR + FILESYSTEM_CLIENT_KEYTAB)
             .getOrCreate();
   }
 
   private static void prepareKerberosConfig() throws Exception {
-    // Keytab of the Gravitino SDK client
-    kerberosHiveContainer
-        .getContainer()
-        .copyFileFromContainer("/gravitino_client.keytab", TMP_DIR + GRAVITINO_CLIENT_KEYTAB);
-
-    //    // Keytab of the Gravitino server
-    //    kerberosHiveContainer
-    //        .getContainer()
-    //        .copyFileFromContainer("/gravitino_server.keytab", TMP_DIR + GRAVITINO_SERVER_KEYTAB);
-
     // Keytab of Gravitino server to connect to HDFS
     kerberosHiveContainer
         .getContainer()
@@ -195,150 +162,10 @@ public class CatalogPaimonKerberosFilesystemIT extends CatalogPaimonBaseIT {
       throw new RuntimeException(e);
     }
   }
-  //
-  //  @Test
-  //  void testIcebergWithKerberosAndUserImpersonation() throws IOException {
-  //    KerberosTokenProvider provider =
-  //        KerberosTokenProvider.builder()
-  //            .withClientPrincipal(GRAVITINO_CLIENT_PRINCIPAL)
-  //            .withKeyTabFile(new File(TMP_DIR + GRAVITINO_CLIENT_KEYTAB))
-  //            .build();
-  //    adminClient = GravitinoAdminClient.builder(serverUri).withKerberosAuth(provider).build();
-  //
-  //    GravitinoMetalake gravitinoMetalake =
-  //        adminClient.createMetalake(METALAKE_NAME, null, ImmutableMap.of());
-  //
-  //    // Create a catalog
-  //    Map<String, String> properties = Maps.newHashMap();
-  //    properties.put(AuthenticationConfig.IMPERSONATION_ENABLE_KEY, "true");
-  //    properties.put(AUTH_TYPE_KEY, "kerberos");
-  //
-  //    properties.put(KET_TAB_URI_KEY, TMP_DIR + HIVE_METASTORE_CLIENT_KEYTAB);
-  //    properties.put(PRINCIPAL_KEY, HIVE_METASTORE_CLIENT_PRINCIPAL);
-  //    properties.put(
-  //        CATALOG_BYPASS_PREFIX + "hive.metastore.kerberos.principal",
-  //        "hive/_HOST@HADOOPKRB"
-  //            .replace("_HOST", containerSuite.getKerberosHiveContainer().getHostName()));
-  //    properties.put(CATALOG_BYPASS_PREFIX + "hive.metastore.sasl.enabled", "true");
-  //
-  //    properties.put(PaimonConfig.CATALOG_BACKEND.getKey(), TYPE);
-  //    properties.put(PaimonConfig.CATALOG_URI.getKey(), URIS);
-  //    properties.put(PaimonConfig.CATALOG_WAREHOUSE.getKey(), WAREHOUSE);
-  //    properties.put("location", "hdfs://localhost:9000/user/hive/paimon_catalog_warehouse");
-  //
-  //    Catalog catalog =
-  //        gravitinoMetalake.createCatalog(
-  //            CATALOG_NAME, Catalog.Type.RELATIONAL, "lakehouse-paimon", "comment", properties);
-  //
-  //    // Test create schema
-  //    Exception exception =
-  //        Assertions.assertThrows(
-  //            Exception.class,
-  //            () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
-  //    String exceptionMessage = Throwables.getStackTraceAsString(exception);
-  //
-  //    // Make sure the real user is 'gravitino_client'
-  //    Assertions.assertTrue(
-  //        exceptionMessage.contains("Permission denied: user=gravitino_client, access=WRITE"));
-  //
-  //    // Now try to permit the user to create the schema again
-  //    kerberosHiveContainer.executeInContainer(
-  //        "hadoop", "fs", "-mkdir", "/user/hive/warehouse-catalog-iceberg");
-  //    kerberosHiveContainer.executeInContainer(
-  //        "hadoop", "fs", "-chmod", "-R", "777", "/user/hive/warehouse-catalog-iceberg");
-  //    Assertions.assertDoesNotThrow(
-  //        () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
-  //
-  //    // Create table
-  //    NameIdentifier tableNameIdentifier = NameIdentifier.of(SCHEMA_NAME, TABLE_NAME);
-  //    catalog
-  //        .asTableCatalog()
-  //        .createTable(
-  //            tableNameIdentifier,
-  //            createColumns(),
-  //            "",
-  //            ImmutableMap.of(),
-  //            Transforms.EMPTY_TRANSFORM,
-  //            Distributions.NONE,
-  //            SortOrders.NONE);
-  //
-  //    // Now try to alter the table
-  //    catalog.asTableCatalog().alterTable(tableNameIdentifier, TableChange.rename("new_table"));
-  //    NameIdentifier newTableIdentifier = NameIdentifier.of(SCHEMA_NAME, "new_table");
-  //
-  //    // Old table name should not exist
-  //    Assertions.assertFalse(catalog.asTableCatalog().tableExists(tableNameIdentifier));
-  //    Assertions.assertTrue(catalog.asTableCatalog().tableExists(newTableIdentifier));
-  //
-  //    // Drop table
-  //    catalog.asTableCatalog().dropTable(newTableIdentifier);
-  //    Assertions.assertFalse(catalog.asTableCatalog().tableExists(newTableIdentifier));
-  //
-  //    // Drop schema
-  //    catalog.asSchemas().dropSchema(SCHEMA_NAME, false);
-  //    Assertions.assertFalse(catalog.asSchemas().schemaExists(SCHEMA_NAME));
-  //
-  //    // Drop catalog
-  //    Assertions.assertTrue(gravitinoMetalake.dropCatalog(CATALOG_NAME));
-  //  }
-  //
-  //  @Test
-  //  void testIcebergWithKerberos() {
-  //    KerberosTokenProvider provider =
-  //        KerberosTokenProvider.builder()
-  //            .withClientPrincipal(GRAVITINO_CLIENT_PRINCIPAL)
-  //            .withKeyTabFile(new File(TMP_DIR + GRAVITINO_CLIENT_KEYTAB))
-  //            .build();
-  //    adminClient = GravitinoAdminClient.builder(serverUri).withKerberosAuth(provider).build();
-  //
-  //    String metalakeName = GravitinoITUtils.genRandomName("test_metalake");
-  //    GravitinoMetalake gravitinoMetalake =
-  //        adminClient.createMetalake(metalakeName, null, ImmutableMap.of());
-  //
-  //    // Create a catalog
-  //    Map<String, String> properties = Maps.newHashMap();
-  //    properties.put(AUTH_TYPE_KEY, "kerberos");
-  //    // Not user impersonation here
-  //
-  //    properties.put(KEY_TAB_URI_KEY, TMP_DIR + HIVE_METASTORE_CLIENT_KEYTAB);
-  //    properties.put(PRINCIPAL_KEY, HIVE_METASTORE_CLIENT_PRINCIPAL);
-  //    properties.put(
-  //        CATALOG_BYPASS_PREFIX + "hive.metastore.kerberos.principal",
-  //        "hive/_HOST@HADOOPKRB"
-  //            .replace("_HOST", containerSuite.getKerberosHiveContainer().getHostName()));
-  //    properties.put(CATALOG_BYPASS_PREFIX + "hive.metastore.sasl.enabled", "true");
-  //
-  //    properties.put(PaimonConfig.CATALOG_BACKEND.getKey(), TYPE);
-  //    properties.put(PaimonConfig.CATALOG_URI.getKey(), URIS);
-  //    properties.put(PaimonConfig.CATALOG_WAREHOUSE.getKey(), WAREHOUSE);
-  //    properties.put("location", "hdfs://localhost:9000/user/hive/paimon_catalog_warehouse");
-  //
-  //    Catalog catalog =
-  //        gravitinoMetalake.createCatalog(
-  //            CATALOG_NAME, Catalog.Type.RELATIONAL, "lakehouse-paimon", "comment", properties);
-  //
-  //    // Test create schema
-  //    Exception exception =
-  //        Assertions.assertThrows(
-  //            Exception.class,
-  //            () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
-  //    String exceptionMessage = Throwables.getStackTraceAsString(exception);
-  //
-  //    // Make sure the real user is 'cli' because no impersonation here.
-  //    Assertions.assertTrue(exceptionMessage.contains("Permission denied: user=cli,
-  // access=WRITE"));
-  //  }
-  //
-  //  private static Column[] createColumns() {
-  //    Column col1 = Column.of(PAIMON_COL_NAME1, Types.IntegerType.get(), "col_1_comment");
-  //    Column col2 = Column.of(PAIMON_COL_NAME2, Types.DateType.get(), "col_2_comment");
-  //    Column col3 = Column.of(PAIMON_COL_NAME3, Types.StringType.get(), "col_3_comment");
-  //    return new Column[] {col1, col2, col3};
-  //  }
 
   private static String defaultBaseLocation() {
     return String.format(
-        "hdfs://%s:%d/user/",
+        "hdfs://%s:%d",
         kerberosHiveContainer.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
   }
 }
