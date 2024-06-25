@@ -44,6 +44,7 @@ public class CatalogUtils {
       Preconditions.checkArgument(
           StringUtils.isNotBlank(uri), "Paimon Catalog uri can not be null or empty.");
     }
+
     CatalogContext catalogContext =
         CatalogContext.create(Options.fromMap(paimonConfig.getAllConfig()));
     return CatalogFactory.createCatalog(catalogContext);

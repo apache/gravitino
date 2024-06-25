@@ -86,6 +86,7 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
 
     Map<String, String> resultConf = Maps.newHashMap(prefixMap);
     resultConf.putAll(gravitinoConfig);
+    resultConf.put("catalog_uuid", info.id().toString());
 
     this.paimonTableOps = new PaimonTableOps(new PaimonConfig(resultConf));
   }
