@@ -14,7 +14,7 @@ import org.apache.iceberg.CatalogUtil;
 public class IcebergPropertiesConstants {
   @VisibleForTesting
   public static final String GRAVITINO_ICEBERG_CATALOG_BACKEND =
-      IcebergCatalogPropertiesMetadata.CATALOG_BACKEND_NAME;
+      IcebergCatalogPropertiesMetadata.CATALOG_BACKEND;
 
   static final String ICEBERG_CATALOG_TYPE = CatalogUtil.ICEBERG_CATALOG_TYPE;
 
@@ -76,6 +76,9 @@ public class IcebergPropertiesConstants {
   public static final String ICEBERG_FORMAT_VERSION = IcebergTablePropertiesMetadata.FORMAT_VERSION;
 
   static final String ICEBERG_CATALOG_CACHE_ENABLED = CatalogProperties.CACHE_ENABLED;
+
+  static final String GRAVITINO_ICEBERG_CATALOG_BACKEND_NAME =
+      IcebergCatalogPropertiesMetadata.CATALOG_BACKEND_NAME;
 
   private IcebergPropertiesConstants() {}
 }
