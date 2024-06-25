@@ -60,7 +60,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   protected static String mysqlUri = "jdbc:mysql://127.0.0.1";
   protected static String postgresqlUri = "jdbc:postgresql://127.0.0.1";
 
-    private static final long MAX_WAIT_IN_SECONDS = 5;
+  private static final long MAX_WAIT_IN_SECONDS = 5;
   private static final long WAIT_INTERVAL_IN_SECONDS = 1;
 
   private static final String WEB_TITLE = "Gravitino";
