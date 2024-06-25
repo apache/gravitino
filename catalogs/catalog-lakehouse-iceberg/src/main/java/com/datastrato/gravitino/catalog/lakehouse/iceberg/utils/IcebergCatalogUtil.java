@@ -26,25 +26,30 @@ public class IcebergCatalogUtil {
   private static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogUtil.class);
 
   private static InMemoryCatalog loadMemoryCatalog(Map<String, String> properties) {
+    IcebergConfig icebergConfig = new IcebergConfig(properties);
+    String icebergCatalogName = icebergConfig.getCatalogBackendName("memory");
     InMemoryCatalog memoryCatalog = new InMemoryCatalog();
     Map<String, String> resultProperties = new HashMap<>(properties);
     resultProperties.put(CatalogProperties.WAREHOUSE_LOCATION, "/tmp");
-    memoryCatalog.initialize("memory", resultProperties);
+    memoryCatalog.initialize(icebergCatalogName, resultProperties);
     return memoryCatalog;
   }
 
   private static HiveCatalog loadHiveCatalog(Map<String, String> properties) {
+    IcebergConfig icebergConfig = new IcebergConfig(properties);
+    String icebergCatalogName = icebergConfig.getCatalogBackendName("hive");
     HiveCatalog hiveCatalog = new HiveCatalog();
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
     properties.forEach(hdfsConfiguration::set);
     hiveCatalog.setConf(hdfsConfiguration);
-    hiveCatalog.initialize("hive", properties);
+    hiveCatalog.initialize(icebergCatalogName, properties);
     return hiveCatalog;
   }
 
   private static JdbcCatalog loadJdbcCatalog(Map<String, String> properties) {
     IcebergConfig icebergConfig = new IcebergConfig(properties);
     String driverClassName = icebergConfig.getJdbcDriver();
+    String icebergCatalogName = icebergConfig.getCatalogBackendName("jdbc");
 
     icebergConfig.get(IcebergConfig.JDBC_USER);
     icebergConfig.get(IcebergConfig.JDBC_PASSWORD);
@@ -63,16 +68,18 @@ public class IcebergCatalogUtil {
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
     properties.forEach(hdfsConfiguration::set);
     jdbcCatalog.setConf(hdfsConfiguration);
-    jdbcCatalog.initialize("jdbc", properties);
+    jdbcCatalog.initialize(icebergCatalogName, properties);
     return jdbcCatalog;
   }
 
   private static Catalog loadRestCatalog(Map<String, String> properties) {
+    IcebergConfig icebergConfig = new IcebergConfig(properties);
+    String icebergCatalogName = icebergConfig.getCatalogBackendName("rest");
     RESTCatalog restCatalog = new RESTCatalog();
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
     properties.forEach(hdfsConfiguration::set);
     restCatalog.setConf(hdfsConfiguration);
-    restCatalog.initialize("rest", properties);
+    restCatalog.initialize(icebergCatalogName, properties);
     return restCatalog;
   }
 

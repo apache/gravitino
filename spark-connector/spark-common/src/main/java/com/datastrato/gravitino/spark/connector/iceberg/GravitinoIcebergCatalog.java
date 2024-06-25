@@ -13,6 +13,7 @@ import com.datastrato.gravitino.spark.connector.catalog.BaseCatalog;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.spark.SparkCatalog;
 import org.apache.iceberg.spark.procedures.SparkProcedures;
@@ -43,10 +44,14 @@ public class GravitinoIcebergCatalog extends BaseCatalog
   @Override
   protected TableCatalog createAndInitSparkCatalog(
       String name, CaseInsensitiveStringMap options, Map<String, String> properties) {
+    String catalogBackendName =
+        Optional.ofNullable(
+                properties.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND_NAME))
+            .orElse(name);
     Map<String, String> all =
         getPropertiesConverter().toSparkCatalogProperties(options, properties);
     TableCatalog icebergCatalog = new SparkCatalog();
-    icebergCatalog.initialize(name, new CaseInsensitiveStringMap(all));
+    icebergCatalog.initialize(catalogBackendName, new CaseInsensitiveStringMap(all));
     return icebergCatalog;
   }
 
