@@ -27,11 +27,13 @@ import org.apache.spark.sql.catalyst.analysis.TableAlreadyExistsException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.junit.jupiter.api.condition.EnabledIf;
 
+@Tag("gravitino-docker-it")
 @SuppressWarnings("FormatStringAnnotation")
 @TestInstance(Lifecycle.PER_CLASS)
 public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
