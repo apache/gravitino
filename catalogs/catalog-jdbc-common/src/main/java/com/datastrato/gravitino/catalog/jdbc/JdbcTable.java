@@ -4,30 +4,28 @@
  */
 package com.datastrato.gravitino.catalog.jdbc;
 
-import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTablePartitionOperations;
+import com.datastrato.gravitino.catalog.jdbc.operation.TableOperation;
 import com.datastrato.gravitino.connector.BaseTable;
 import com.datastrato.gravitino.connector.TableOperations;
 import com.datastrato.gravitino.rel.SupportsPartitions;
 import com.google.common.collect.Maps;
 import java.util.Map;
-import lombok.Getter;
 import lombok.ToString;
 
 /** Represents a Jdbc Table entity in the jdbc table. */
 @ToString
-@Getter
 public class JdbcTable extends BaseTable {
-
-  private JdbcTablePartitionOperations tablePartitionOperations;
+  private String databaseName;
+  private TableOperation tableOperation;
 
   private JdbcTable() {}
 
   @Override
   protected TableOperations newOps() {
-    if (tablePartitionOperations == null) {
+    if (tableOperation == null) {
       throw new UnsupportedOperationException("Does not support TableOperations yet.");
     }
-    return tablePartitionOperations;
+    return tableOperation.createJdbcTablePartitionOperations(databaseName, name);
   }
 
   @Override
@@ -37,18 +35,28 @@ public class JdbcTable extends BaseTable {
 
   /** A builder class for constructing JdbcTable instances. */
   public static class Builder extends BaseTableBuilder<Builder, JdbcTable> {
-
-    private JdbcTablePartitionOperations tablePartitionOperations;
+    private String databaseName;
+    private TableOperation tableOperation;
 
     /**
-     * Sets the tablePartitionOperations to be used for operate partition.
+     * Sets the name of database.
      *
-     * @param tablePartitionOperations The instance of JdbcTablePartitionOperations.
+     * @param databaseName The instance of TableOperation.
      * @return This Builder instance.
      */
-    public Builder withTablePartitionOperations(
-        JdbcTablePartitionOperations tablePartitionOperations) {
-      this.tablePartitionOperations = tablePartitionOperations;
+    public Builder withDatabaseName(String databaseName) {
+      this.databaseName = databaseName;
+      return this;
+    }
+
+    /**
+     * Sets the table operation to be used for partition operations.
+     *
+     * @param tableOperation The instance of TableOperation.
+     * @return This Builder instance.
+     */
+    public Builder withTableOperation(TableOperation tableOperation) {
+      this.tableOperation = tableOperation;
       return this;
     }
 
@@ -72,7 +80,8 @@ public class JdbcTable extends BaseTable {
       jdbcTable.sortOrders = sortOrders;
       jdbcTable.indexes = indexes;
       jdbcTable.proxyPlugin = proxyPlugin;
-      jdbcTable.tablePartitionOperations = tablePartitionOperations;
+      jdbcTable.databaseName = databaseName;
+      jdbcTable.tableOperation = tableOperation;
       return jdbcTable;
     }
 
