@@ -38,7 +38,8 @@ public class CatalogUtils {
     if (!PaimonCatalogBackend.FILESYSTEM.name().equalsIgnoreCase(metastore)) {
       String uri = paimonConfig.get(CATALOG_URI);
       Preconditions.checkArgument(
-          StringUtils.isNotBlank(uri), "Paimon Catalog uri can not be null or empty.");
+          StringUtils.isNotBlank(uri),
+          String.format("Paimon Catalog uri can not be null or empty for %s.", metastore));
     }
     CatalogContext catalogContext =
         CatalogContext.create(Options.fromMap(paimonConfig.getAllConfig()));

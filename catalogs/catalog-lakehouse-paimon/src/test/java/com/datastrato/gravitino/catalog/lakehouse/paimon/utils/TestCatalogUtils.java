@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
 import com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonCatalogBackend;
 import com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonConfig;
 import com.google.common.collect.ImmutableMap;
+import java.io.File;
 import java.util.Locale;
 import java.util.function.Consumer;
 import org.apache.paimon.catalog.Catalog;
@@ -43,7 +44,10 @@ public class TestCatalogUtils {
                     PaimonConfig.CATALOG_BACKEND.getKey(),
                     metastore,
                     PaimonConfig.CATALOG_WAREHOUSE.getKey(),
-                    "/tmp/paimon_catalog_warehouse",
+                    String.join(
+                        File.separator,
+                        System.getProperty("java.io.tmpdir"),
+                        "paimon_catalog_warehouse"),
                     PaimonConfig.CATALOG_URI.getKey(),
                     "uri")))) {
       consumer.accept(catalog);

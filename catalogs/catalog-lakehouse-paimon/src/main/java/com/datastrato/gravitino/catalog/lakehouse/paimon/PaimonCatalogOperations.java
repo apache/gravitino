@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.paimon;
 
-import static com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonSchema.fromPaimonSchema;
+import static com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonSchema.fromOriginalPaimonSchema;
 import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import com.datastrato.gravitino.NameIdentifier;
@@ -33,7 +33,6 @@ import com.datastrato.gravitino.utils.MapUtils;
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
-import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
 import org.apache.paimon.catalog.Catalog;
@@ -120,14 +119,14 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
                 AuditInfo.builder().withCreator(currentUser).withCreateTime(Instant.now()).build())
             .build();
     try {
-      paimonCatalogOps.createDatabase(createdSchema.toPaimonSchema());
+      paimonCatalogOps.createDatabase(createdSchema.toOriginalPaimonSchema());
     } catch (Catalog.DatabaseAlreadyExistException e) {
       throw new SchemaAlreadyExistsException(e, SCHEMA_ALREADY_EXISTS_EXCEPTION, identifier);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
     LOG.info(
-        "Created Paimon schema (database): {}.\nCurrent user: {} \nComment: {}.\nMetadata: {}.",
+        "Created Paimon schema (database): {}. Current user: {}. Comment: {}. Metadata: {}.",
         identifier,
         currentUser,
         comment,
@@ -151,7 +150,7 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
       throw new NoSuchSchemaException(e, NO_SUCH_SCHEMA_EXCEPTION, identifier);
     }
     LOG.info("Loaded Paimon schema (database) {}.", identifier);
-    return fromPaimonSchema(identifier.name(), properties);
+    return fromOriginalPaimonSchema(identifier.name(), properties);
   }
 
   /**
@@ -285,12 +284,12 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
     if (paimonCatalogOps != null) {
       try {
         paimonCatalogOps.close();
       } catch (Exception e) {
-        throw new IOException(e.getMessage());
+        throw new RuntimeException(e);
       }
     }
   }

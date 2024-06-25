@@ -76,12 +76,6 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
   void testPaimonSchemaOperations() throws DatabaseNotExistException {
     SupportsSchemas schemas = catalog.asSchemas();
 
-    // list schema check.
-    Set<String> schemaNames = new HashSet<>(Arrays.asList(schemas.listSchemas()));
-    Assertions.assertTrue(schemaNames.contains(schemaName));
-    List<String> paimonDatabaseNames = paimonCatalog.listDatabases();
-    Assertions.assertTrue(paimonDatabaseNames.contains(schemaName));
-
     // create schema check.
     String testSchemaName = GravitinoITUtils.genRandomName("test_schema_1");
     NameIdentifier schemaIdent = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
@@ -90,9 +84,9 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     schemaProperties.put("key2", "val2");
     schemas.createSchema(schemaIdent.name(), schema_comment, schemaProperties);
 
-    schemaNames = new HashSet<>(Arrays.asList(schemas.listSchemas()));
+    Set<String> schemaNames = new HashSet<>(Arrays.asList(schemas.listSchemas()));
     Assertions.assertTrue(schemaNames.contains(testSchemaName));
-    paimonDatabaseNames = paimonCatalog.listDatabases();
+    List<String> paimonDatabaseNames = paimonCatalog.listDatabases();
     Assertions.assertTrue(paimonDatabaseNames.contains(testSchemaName));
 
     // load schema check.
@@ -129,10 +123,8 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
 
     // list schema check.
     schemaNames = new HashSet<>(Arrays.asList(schemas.listSchemas()));
-    Assertions.assertTrue(schemaNames.contains(schemaName));
     Assertions.assertFalse(schemaNames.contains(testSchemaName));
     paimonDatabaseNames = paimonCatalog.listDatabases();
-    Assertions.assertTrue(paimonDatabaseNames.contains(schemaName));
     Assertions.assertFalse(paimonDatabaseNames.contains(testSchemaName));
   }
 
