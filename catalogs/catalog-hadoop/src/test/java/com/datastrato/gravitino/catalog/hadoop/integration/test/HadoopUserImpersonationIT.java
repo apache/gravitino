@@ -45,11 +45,13 @@ import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@Tag("gravitino-docker-it")
 public class HadoopUserImpersonationIT extends AbstractIT {
   private static final Logger LOG = LoggerFactory.getLogger(HadoopCatalogIT.class);
 
