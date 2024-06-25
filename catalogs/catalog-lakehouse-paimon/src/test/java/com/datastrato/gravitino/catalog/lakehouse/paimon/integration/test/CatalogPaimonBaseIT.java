@@ -66,6 +66,8 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
   protected String WAREHOUSE;
   protected String URIS;
   protected String TYPE;
+  protected GravitinoMetalake metalake;
+  protected SparkSession spark;
 
   private static final String provider = "lakehouse-paimon";
   private static final String catalog_comment = "catalog_comment";
@@ -75,21 +77,19 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
   private static final String PAIMON_COL_NAME2 = "paimon_col_name2";
   private static final String PAIMON_COL_NAME3 = "paimon_col_name3";
   private static final String PAIMON_COL_NAME4 = "paimon_col_name4";
-  private String metalakeName = GravitinoITUtils.genRandomName("paimon_it_metalake");
-  private String catalogName = GravitinoITUtils.genRandomName("paimon_it_catalog");
+  protected String metalakeName = GravitinoITUtils.genRandomName("paimon_it_metalake");
+  protected String catalogName = GravitinoITUtils.genRandomName("paimon_it_catalog");
   private String schemaName = GravitinoITUtils.genRandomName("paimon_it_schema");
   private String tableName = GravitinoITUtils.genRandomName("paimon_it_table");
   private static String INSERT_BATCH_WITHOUT_PARTITION_TEMPLATE = "INSERT INTO paimon.%s VALUES %s";
   private static final String SELECT_ALL_TEMPLATE = "SELECT * FROM paimon.%s";
-  private GravitinoMetalake metalake;
   private Catalog catalog;
   private org.apache.paimon.catalog.Catalog paimonCatalog;
-  private SparkSession spark;
   private Map<String, String> catalogProperties;
 
   @BeforeAll
   public void startup() {
-    containerSuite.startHiveContainer();
+    startHiveContainer();
     catalogProperties = initPaimonCatalogProperties();
     createMetalake();
     createCatalog();
@@ -99,9 +99,7 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
 
   @AfterAll
   public void stop() {
-    clearTableAndSchema();
-    metalake.dropCatalog(catalogName);
-    client.dropMetalake(metalakeName);
+    cleanUp();
   }
 
   @AfterEach
@@ -474,6 +472,37 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     }
   }
 
+  protected void startHiveContainer() {
+    containerSuite.startHiveContainer();
+  }
+
+  protected void initSparkEnv() {
+    spark =
+        SparkSession.builder()
+            .master("local[1]")
+            .appName("Paimon Catalog integration test")
+            .config("spark.sql.warehouse.dir", WAREHOUSE)
+            .config("spark.sql.catalog.paimon", "org.apache.paimon.spark.SparkCatalog")
+            .config("spark.sql.catalog.paimon.warehouse", WAREHOUSE)
+            .config(
+                "spark.sql.extensions",
+                "org.apache.paimon.spark.extensions.PaimonSparkSessionExtensions")
+            .enableHiveSupport()
+            .getOrCreate();
+  }
+
+  protected void clearTableAndSchema() {
+    if (catalog.asSchemas().schemaExists(schemaName)) {
+      catalog.asSchemas().dropSchema(schemaName, true);
+    }
+  }
+
+  protected void cleanUp() {
+    clearTableAndSchema();
+    metalake.dropCatalog(catalogName);
+    client.dropMetalake(metalakeName);
+  }
+
   private static @NotNull List<String> getValues() {
     List<String> values = new ArrayList<>();
     for (int i = 1; i < 5; i++) {
@@ -490,12 +519,6 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
           String.format("(%d, date_sub(current_date(), %d), 'data%d', %s)", i, i, i, structValue));
     }
     return values;
-  }
-
-  private void clearTableAndSchema() {
-    if (catalog.asSchemas().schemaExists(schemaName)) {
-      catalog.asSchemas().dropSchema(schemaName, true);
-    }
   }
 
   private void createMetalake() {
@@ -562,20 +585,5 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     properties.put("key1", "val1");
     properties.put("key2", "val2");
     return properties;
-  }
-
-  private void initSparkEnv() {
-    spark =
-        SparkSession.builder()
-            .master("local[1]")
-            .appName("Paimon Catalog integration test")
-            .config("spark.sql.warehouse.dir", WAREHOUSE)
-            .config("spark.sql.catalog.paimon", "org.apache.paimon.spark.SparkCatalog")
-            .config("spark.sql.catalog.paimon.warehouse", WAREHOUSE)
-            .config(
-                "spark.sql.extensions",
-                "org.apache.paimon.spark.extensions.PaimonSparkSessionExtensions")
-            .enableHiveSupport()
-            .getOrCreate();
   }
 }

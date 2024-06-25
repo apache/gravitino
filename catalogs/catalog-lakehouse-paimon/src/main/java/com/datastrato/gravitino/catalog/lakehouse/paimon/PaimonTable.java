@@ -16,7 +16,7 @@ import lombok.ToString;
 import org.apache.paimon.schema.Schema;
 import org.apache.paimon.table.Table;
 import org.apache.paimon.types.DataField;
-import org.apache.paimon.utils.Pair;
+import org.apache.commons.lang3.tuple.Pair;
 
 /** Implementation of {@link Table} that represents a Paimon Table entity in the Paimon table. */
 @ToString

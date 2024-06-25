@@ -11,9 +11,8 @@ import com.datastrato.gravitino.config.ConfigConstants;
 import com.datastrato.gravitino.config.ConfigEntry;
 import com.datastrato.gravitino.connector.PropertyEntry;
 import com.google.common.collect.ImmutableMap;
-import org.apache.commons.lang3.StringUtils;
-
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 
 public class KerberosConfig extends AuthenticationConfig {
   public static final String KEY_TAB_URI_KEY = "authentication.kerberos.keytab-uri";

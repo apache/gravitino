@@ -9,6 +9,7 @@ import static com.datastrato.gravitino.catalog.lakehouse.paimon.utils.CatalogUti
 import com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonConfig;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.Catalog.DatabaseAlreadyExistException;
 import org.apache.paimon.catalog.Catalog.DatabaseNotEmptyException;
@@ -17,7 +18,6 @@ import org.apache.paimon.catalog.Catalog.TableNotExistException;
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.schema.Schema;
 import org.apache.paimon.table.Table;
-import org.apache.commons.lang3.tuple.Pair;
 
 /** Table operation proxy that handles table operations of an underlying Paimon catalog. */
 public class PaimonTableOps implements AutoCloseable {
