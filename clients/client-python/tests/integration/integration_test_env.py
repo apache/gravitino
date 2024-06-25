@@ -12,6 +12,8 @@ import sys
 
 import requests
 
+from gravitino.exceptions.gravitino_runtime_exception import GravitinoRuntimeException
+
 logger = logging.getLogger(__name__)
 
 
@@ -118,3 +120,29 @@ class IntegrationTestEnv(unittest.TestCase):
 
         if gravitino_server_running:
             logger.error("Can't stop Gravitino server!")
+
+    @classmethod
+    def restart_server(cls):
+        gravitino_home = os.environ.get("GRAVITINO_HOME")
+        gravitino_startup_script = os.path.join(gravitino_home, "bin/gravitino.sh")
+        if not os.path.exists(gravitino_startup_script):
+            raise GravitinoRuntimeException(
+                f"Can't find Gravitino startup script: {gravitino_startup_script}, "
+                "Please execute `./gradlew compileDistribution -x test` in the Gravitino "
+                "project root directory."
+            )
+
+        # Restart Gravitino Server
+        result = subprocess.run(
+            [gravitino_startup_script, "restart"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.stdout:
+            logger.info("stdout: %s", result.stdout)
+        if result.stderr:
+            logger.info("stderr: %s", result.stderr)
+
+        if not check_gravitino_server_status():
+            raise GravitinoRuntimeException("ERROR: Can't start Gravitino server!")
