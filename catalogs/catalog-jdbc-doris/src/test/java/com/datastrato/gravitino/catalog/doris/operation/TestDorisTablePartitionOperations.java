@@ -114,10 +114,10 @@ public class TestDorisTablePartitionOperations extends TestDoris {
     // Create Table Partition Operations manually
     JdbcTablePartitionOperations tablePartitionOperations =
         new DorisTablePartitionOperations(
-            JDBC_EXCEPTION_CONVERTER,
             DATA_SOURCE,
             databaseName,
             rangePartitionTableName,
+            JDBC_EXCEPTION_CONVERTER,
             TYPE_CONVERTER);
 
     // Assert partition info when there is no partitions actually
@@ -247,10 +247,10 @@ public class TestDorisTablePartitionOperations extends TestDoris {
     // Create Table Partition Operations manually
     JdbcTablePartitionOperations tablePartitionOperations =
         new DorisTablePartitionOperations(
-            JDBC_EXCEPTION_CONVERTER,
             DATA_SOURCE,
             databaseName,
             listPartitionTableName,
+            JDBC_EXCEPTION_CONVERTER,
             TYPE_CONVERTER);
 
     // Assert partition info when there is no partitions actually
@@ -376,7 +376,7 @@ public class TestDorisTablePartitionOperations extends TestDoris {
     // Create Table Partition Operations manually
     JdbcTablePartitionOperations tablePartitionOperations =
         new DorisTablePartitionOperations(
-            JDBC_EXCEPTION_CONVERTER, DATA_SOURCE, databaseName, tableName, TYPE_CONVERTER);
+            DATA_SOURCE, databaseName, tableName, JDBC_EXCEPTION_CONVERTER, TYPE_CONVERTER);
 
     // Operations for not-partitioned table
     assertThrows(

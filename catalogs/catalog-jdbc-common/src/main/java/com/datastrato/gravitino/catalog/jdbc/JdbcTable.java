@@ -23,7 +23,7 @@ public class JdbcTable extends BaseTable {
   @Override
   protected TableOperations newOps() {
     if (tableOperation == null) {
-      throw new UnsupportedOperationException("Does not support TableOperations yet.");
+      throw new UnsupportedOperationException("Table partition operation is not supported yet");
     }
     return tableOperation.createJdbcTablePartitionOperations(databaseName, name);
   }
@@ -41,7 +41,7 @@ public class JdbcTable extends BaseTable {
     /**
      * Sets the name of database.
      *
-     * @param databaseName The instance of TableOperation.
+     * @param databaseName The name of database.
      * @return This Builder instance.
      */
     public Builder withDatabaseName(String databaseName) {

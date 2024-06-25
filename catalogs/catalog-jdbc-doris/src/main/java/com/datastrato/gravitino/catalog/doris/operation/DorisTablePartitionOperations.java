@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.catalog.doris.operation;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 import com.datastrato.gravitino.catalog.doris.utils.DorisUtils;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
@@ -45,15 +47,19 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
   private static final Pattern RANGE_PARTITION_PATTERN =
       Pattern.compile(RANGE_PARTITION_PATTERN_STRING);
 
+  private final JdbcExceptionConverter exceptionConverter;
   private final JdbcTypeConverter typeConverter;
 
   public DorisTablePartitionOperations(
-      JdbcExceptionConverter exceptionConverter,
       DataSource dataSource,
       String databaseName,
       String tableName,
+      JdbcExceptionConverter exceptionConverter,
       JdbcTypeConverter typeConverter) {
-    super(exceptionConverter, dataSource, databaseName, tableName);
+    super(dataSource, databaseName, tableName);
+    checkArgument(exceptionConverter != null, "exceptionConverter is null");
+    checkArgument(typeConverter != null, "typeConverter is null");
+    this.exceptionConverter = exceptionConverter;
     this.typeConverter = typeConverter;
   }
 

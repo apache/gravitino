@@ -73,7 +73,7 @@ public class DorisTableOperations extends JdbcTableOperations {
   public JdbcTablePartitionOperations createJdbcTablePartitionOperations(
       String databaseName, String tableName) {
     return new DorisTablePartitionOperations(
-        exceptionMapper, dataSource, databaseName, tableName, typeConverter);
+        dataSource, databaseName, tableName, exceptionMapper, typeConverter);
   }
 
   @Override
