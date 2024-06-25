@@ -189,14 +189,18 @@ const DetailsDrawer = props => {
                   return (
                     <TableRow key={index} data-refer={`details-props-index-${index}`}>
                       <TableCell className={'twc-py-[0.7rem]'} data-refer={`details-props-key-${item.key}`}>
-                        {item.key}
+                        <Tooltip title={item.key} placement='bottom'>
+                          {item.key.length > 22 ? `${item.key.substring(0, 22)}...` : item.key}
+                        </Tooltip>
                       </TableCell>
                       <TableCell
                         className={'twc-py-[0.7rem]'}
                         data-refer={`details-props-value-${item.value}`}
                         data-prev-refer={`details-props-key-${item.key}`}
                       >
-                        {item.value}
+                        <Tooltip title={item.value} placement='bottom'>
+                          {item.value.length > 22 ? `${item.value.substring(0, 22)}...` : item.value}
+                        </Tooltip>
                       </TableCell>
                     </TableRow>
                   )
