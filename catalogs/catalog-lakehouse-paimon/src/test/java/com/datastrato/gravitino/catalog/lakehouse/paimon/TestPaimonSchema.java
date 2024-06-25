@@ -37,7 +37,7 @@ public class TestPaimonSchema {
   }
 
   @Test
-  public void testCreateIcebergSchema() {
+  public void testCreatePaimonSchema() {
     PaimonCatalog paimonCatalog = initPaimonCatalog("testCreatePaimonSchema");
     PaimonCatalogOperations paimonCatalogOperations = (PaimonCatalogOperations) paimonCatalog.ops();
 
