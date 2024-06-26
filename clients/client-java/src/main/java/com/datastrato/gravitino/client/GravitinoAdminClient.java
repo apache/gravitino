@@ -340,7 +340,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
             req,
             UserResponse.class,
             Collections.emptyMap(),
-            ErrorHandlers.metalakeErrorHandler());
+            ErrorHandlers.metalakeAdminErrorHandler());
     resp.validate();
 
     return resp.getUser();

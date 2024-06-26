@@ -141,15 +141,25 @@ public class AuthorizationUtils {
     try {
       roles = accessControlManager.listRolesByUser(metalake, currentUser);
 
-      for (RoleEntity role : roles) {
-        for (Privilege privilege : object.privileges()) {
+      // If any privilege of securable object is satisfied, the operation will be allowed.
+      // For example, The `loadTable` operation will be allowed when the user has the privilege
+      // of reading table or writing table.
+      for (Privilege privilege : object.privileges()) {
+        boolean privilegeDenied = false;
+        for (RoleEntity role : roles) {
           // The deny privilege is prior to the allow privilege. If one entity has the
           // deny privilege and allow privilege at the same time. The entity doesn't have the
           // privilege.
           if (hasPrivilegeWithCondition(role, object, privilege.name(), Privilege.Condition.DENY)) {
-            continue;
+            privilegeDenied = true;
+            break;
           }
+        }
+        if (privilegeDenied) {
+          continue;
+        }
 
+        for (RoleEntity role : roles) {
           if (hasPrivilegeWithCondition(
               role, object, privilege.name(), Privilege.Condition.ALLOW)) {
             return true;

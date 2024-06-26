@@ -21,7 +21,6 @@ import com.datastrato.gravitino.dto.responses.ErrorResponse;
 import com.datastrato.gravitino.dto.responses.RemoveResponse;
 import com.datastrato.gravitino.dto.responses.UserResponse;
 import com.datastrato.gravitino.exceptions.PrivilegesAlreadyGrantedException;
-import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
 import com.datastrato.gravitino.lock.LockManager;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.UserEntity;
@@ -128,7 +127,7 @@ public class TestMetalakeAdminOperations extends JerseyTest {
     ErrorResponse errorResponse1 = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.ALREADY_EXISTS_CODE, errorResponse1.getCode());
     Assertions.assertEquals(
-        RoleAlreadyExistsException.class.getSimpleName(), errorResponse1.getType());
+        PrivilegesAlreadyGrantedException.class.getSimpleName(), errorResponse1.getType());
 
     // Test to throw internal RuntimeException
     Mockito.doThrow(new RuntimeException("mock error")).when(manager).addMetalakeAdmin(any());
