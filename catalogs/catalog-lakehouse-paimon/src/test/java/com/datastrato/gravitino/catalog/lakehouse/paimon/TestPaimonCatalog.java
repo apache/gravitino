@@ -58,7 +58,7 @@ public class TestPaimonCatalog {
       String.join(File.separator, System.getProperty("java.io.tmpdir"), "paimon_catalog_warehouse");
 
   @Test
-  public void testListDatabases() {
+  public void testCatalogOperation() {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 

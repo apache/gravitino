@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.paimon;
 
-import static com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonSchema.fromOriginalPaimonSchema;
+import static com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonSchema.fromPaimonProperties;
 import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import com.datastrato.gravitino.NameIdentifier;
@@ -119,7 +119,7 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
                 AuditInfo.builder().withCreator(currentUser).withCreateTime(Instant.now()).build())
             .build();
     try {
-      paimonCatalogOps.createDatabase(createdSchema.toOriginalPaimonSchema());
+      paimonCatalogOps.createDatabase(createdSchema.toPaimonProperties());
     } catch (Catalog.DatabaseAlreadyExistException e) {
       throw new SchemaAlreadyExistsException(e, SCHEMA_ALREADY_EXISTS_EXCEPTION, identifier);
     } catch (Exception e) {
@@ -150,7 +150,7 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
       throw new NoSuchSchemaException(e, NO_SUCH_SCHEMA_EXCEPTION, identifier);
     }
     LOG.info("Loaded Paimon schema (database) {}.", identifier);
-    return fromOriginalPaimonSchema(identifier.name(), properties);
+    return fromPaimonProperties(identifier.name(), properties);
   }
 
   /**
