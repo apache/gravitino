@@ -674,15 +674,15 @@ fun printDockerCheckInfo() {
   val macDockerConnector = project.extra["macDockerConnector"] as? Boolean ?: false
   val isOrbStack = project.extra["isOrbStack"] as? Boolean ?: false
 
-  if (extra["skipDockerDependentTests"].toString().toBoolean()) {
-    project.extra["docker_it_test"] = false
+  if (extra["skipDockerTests"].toString().toBoolean()) {
+    project.extra["dockerTests"] = false
   } else if (OperatingSystem.current().isMacOsX() &&
     dockerRunning &&
     (macDockerConnector || isOrbStack)
   ) {
-    project.extra["docker_it_test"] = true
+    project.extra["dockerTests"] = true
   } else if (OperatingSystem.current().isLinux() && dockerRunning) {
-    project.extra["docker_it_test"] = true
+    project.extra["dockerTests"] = true
   }
 
   println("------------------ Check Docker environment ---------------------")
@@ -692,11 +692,11 @@ fun printDockerCheckInfo() {
     println("OrbStack status ................................................. [${if (dockerRunning && isOrbStack) "yes" else "no"}]")
   }
 
-  val docker_it_test = project.extra["docker_it_test"] as? Boolean ?: false
-  if (!docker_it_test) {
-    println("Run test cases without `gravitino-docker-it` tag ................ [$testMode test]")
+  val dockerTests = project.extra["dockerTests"] as? Boolean ?: false
+  if (dockerTests) {
+    println("Using Docker container to run all tests. [$testMode test]")
   } else {
-    println("Using Gravitino IT Docker container to run all integration tests. [$testMode test]")
+    println("Run test cases without `gravitino-docker-it` tag ................ [$testMode test]")
   }
   println("-----------------------------------------------------------------")
 
