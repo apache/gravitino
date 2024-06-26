@@ -111,8 +111,7 @@ public class TestPaimonSchema {
         paimonCatalogOperations.createSchema(ident, COMMENT_VALUE, properties);
     Assertions.assertTrue(paimonCatalogOperations.schemaExists(ident));
     properties.forEach(
-        (k, v) ->
-            Assertions.assertEquals(v, paimonSchema.toOriginalPaimonSchema().getValue().get(k)));
+        (k, v) -> Assertions.assertEquals(v, paimonSchema.toPaimonProperties().getValue().get(k)));
 
     // schema properties of FilesystemCatalog is empty when loadDatabase.
     Map<String, String> properties1 = paimonCatalogOperations.loadSchema(ident).properties();
