@@ -13,8 +13,11 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class DorisUtils {
+  private static final Logger LOGGER = LoggerFactory.getLogger(DorisUtils.class);
   private static final String PARTITION_BY = "PARTITION BY";
   private static final String LIST_PARTITION = "LIST";
   private static final String RANGE_PARTITION = "RANGE";
@@ -83,12 +86,14 @@ public final class DorisUtils {
           } else if (RANGE_PARTITION.equals(partitionType)) {
             return Optional.of(Transforms.range(new String[] {columns[0]}));
           } else {
-            throw new RuntimeException("Cannot extract partition type from create table SQL");
+            throw new RuntimeException(
+                "Cannot extract partition type from SQL:\n" + createTableSql);
           }
         }
       }
       return Optional.empty();
     } catch (Exception e) {
+      LOGGER.warn("Failed to extract partition info", e);
       return Optional.empty();
     }
   }

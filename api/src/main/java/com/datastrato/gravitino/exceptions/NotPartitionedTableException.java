@@ -7,7 +7,7 @@ package com.datastrato.gravitino.exceptions;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 
-/** Exception thrown when a partitioned table is not existed. */
+/** Exception thrown when a partitioned table does not exist. */
 public class NotPartitionedTableException extends NotFoundException {
 
   /**

@@ -126,7 +126,7 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
       Transform partitionInfo = getPartitionInfo(connection);
 
       String addPartitionSqlFormat = "ALTER TABLE `%s` ADD PARTITION `%s` VALUES %s";
-      String addPartitionSql;
+      String partitionValues;
       Partition added;
 
       if (partition instanceof RangePartition) {
@@ -136,24 +136,16 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
             tableName);
 
         RangePartition rangePartition = (RangePartition) partition;
-        Literal<?> upper = rangePartition.upper();
-        Literal<?> lower = rangePartition.lower();
-        String partitionValues;
-        if (Literals.NULL.equals(upper) && Literals.NULL.equals(lower)) {
-          partitionValues = "LESS THAN MAXVALUE";
-        } else if (Literals.NULL.equals(lower)) {
-          partitionValues = "LESS THAN (\"" + upper.value() + "\")";
-        } else if (Literals.NULL.equals(upper)) {
-          partitionValues = "[(\"" + lower.value() + "\"), (MAXVALUE))";
-        } else {
-          partitionValues = "[(\"" + lower.value() + "\"), (\"" + upper.value() + "\"))";
-        }
-        addPartitionSql =
-            String.format(addPartitionSqlFormat, tableName, rangePartition.name(), partitionValues);
+        partitionValues = buildRangePartitionValues(rangePartition);
 
         // The partition properties actually cannot be passed into Doris, we just return an empty
         // map instead.
-        added = Partitions.range(rangePartition.name(), upper, lower, Collections.emptyMap());
+        added =
+            Partitions.range(
+                rangePartition.name(),
+                rangePartition.upper(),
+                rangePartition.lower(),
+                Collections.emptyMap());
       } else if (partition instanceof ListPartition) {
         Preconditions.checkArgument(
             partitionInfo instanceof Transforms.ListTransform,
@@ -161,39 +153,19 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
             tableName);
 
         ListPartition listPartition = (ListPartition) partition;
-        Literal<?>[][] lists = listPartition.lists();
-        ImmutableList.Builder<String> listValues = ImmutableList.builder();
-        for (Literal<?>[] part : lists) {
-          Preconditions.checkArgument(
-              part.length == ((Transforms.ListTransform) partitionInfo).fieldNames().length,
-              "The number of partitioning columns must be consistent");
+        partitionValues =
+            buildListPartitionValues(
+                listPartition, ((Transforms.ListTransform) partitionInfo).fieldNames().length);
 
-          StringBuilder values = new StringBuilder();
-          if (part.length > 1) {
-            values
-                .append("(")
-                .append(
-                    Arrays.stream(part)
-                        .map(p -> "\"" + p.value() + "\"")
-                        .collect(Collectors.joining(",")))
-                .append(")");
-          } else {
-            values.append("\"").append(part[0].value()).append("\"");
-          }
-          listValues.add(values.toString());
-        }
-        String partitionValues =
-            String.format("IN (%s)", listValues.build().stream().collect(Collectors.joining(",")));
-        addPartitionSql =
-            String.format(addPartitionSqlFormat, tableName, listPartition.name(), partitionValues);
-
-        added = Partitions.list(listPartition.name(), lists, Collections.emptyMap());
+        added =
+            Partitions.list(listPartition.name(), listPartition.lists(), Collections.emptyMap());
       } else {
         throw new IllegalArgumentException("Unsupported partition type of Doris");
       }
 
       try (Statement statement = connection.createStatement()) {
-        statement.executeUpdate(addPartitionSql);
+        statement.executeUpdate(
+            String.format(addPartitionSqlFormat, tableName, partition.name(), partitionValues));
         return added;
       }
     } catch (SQLException e) {
@@ -309,5 +281,49 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
       }
       return columnTypes.build();
     }
+  }
+
+  private String buildRangePartitionValues(RangePartition rangePartition) {
+    Literal<?> upper = rangePartition.upper();
+    Literal<?> lower = rangePartition.lower();
+    String partitionValues;
+    if (Literals.NULL.equals(upper) && Literals.NULL.equals(lower)) {
+      partitionValues = "LESS THAN MAXVALUE";
+    } else if (Literals.NULL.equals(lower)) {
+      partitionValues = "LESS THAN (\"" + upper.value() + "\")";
+    } else if (Literals.NULL.equals(upper)) {
+      partitionValues = "[(\"" + lower.value() + "\"), (MAXVALUE))";
+    } else {
+      partitionValues = "[(\"" + lower.value() + "\"), (\"" + upper.value() + "\"))";
+    }
+    return partitionValues;
+  }
+
+  private String buildListPartitionValues(ListPartition listPartition, int partitionedFieldNums) {
+    Literal<?>[][] lists = listPartition.lists();
+    Preconditions.checkArgument(
+        lists.length > 0, "The number of values in list partition must be greater than 0");
+
+    ImmutableList.Builder<String> listValues = ImmutableList.builder();
+    for (Literal<?>[] part : lists) {
+      Preconditions.checkArgument(
+          part.length == partitionedFieldNums,
+          "The number of partitioning columns must be consistent");
+
+      StringBuilder values = new StringBuilder();
+      if (part.length > 1) {
+        values
+            .append("(")
+            .append(
+                Arrays.stream(part)
+                    .map(p -> "\"" + p.value() + "\"")
+                    .collect(Collectors.joining(",")))
+            .append(")");
+      } else {
+        values.append("\"").append(part[0].value()).append("\"");
+      }
+      listValues.add(values.toString());
+    }
+    return String.format("IN (%s)", listValues.build().stream().collect(Collectors.joining(",")));
   }
 }
