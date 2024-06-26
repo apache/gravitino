@@ -83,15 +83,11 @@ public class AuthorizationManager implements Closeable {
       this.classLoader = classLoader;
     }
 
-    public <R> boolean runAuthorizationChain(Function<AuthorizationOperations, R>... functions) {
+    @SafeVarargs
+    public final <R> boolean doAs(Function<AuthorizationOperations, R>... functions) {
       try {
         return classLoader.withClassLoader(
-            cl -> {
-              for (Function<AuthorizationOperations, R> function : functions) {
-                function.apply(authorization.ops());
-              }
-              return true;
-            });
+            cl -> authorization.ops().runAuthorizationChain(Lists.newArrayList(functions)));
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
@@ -120,10 +116,11 @@ public class AuthorizationManager implements Closeable {
     }
   }
 
+  /** Chained call functions support complex authorization combinations */
   @SafeVarargs
   public final <R> boolean runAuthorizationChain(
       CatalogEntity entity, Function<AuthorizationOperations, R>... functions) {
-    return loadAuthorizationAndWrap(entity).runAuthorizationChain(functions);
+    return loadAuthorizationAndWrap(entity).doAs(functions);
   }
 
   private AuthorizationWrapper createAuthorizationWrapper(CatalogEntity entity) {

@@ -231,26 +231,27 @@ public class IsolatedClassLoader implements Closeable {
         || name.startsWith("org.apache.log4j")
         || name.startsWith("org.apache.logging.log4j")
         || name.startsWith("java.")
-        || !isCatalogClass(name)
+        || !isPluginClass(name)
         || sharedClasses.stream().anyMatch(name::startsWith);
   }
 
   /**
-   * Checks if a given class name belongs to a catalog class.
+   * Checks if a given class name belongs to a catalog or authorization class.
    *
    * @param name The fully qualified class name.
    * @return true if the class is a catalog class, false otherwise.
    */
-  private boolean isCatalogClass(String name) {
-    return name.startsWith("com.datastrato.gravitino.catalog")
-        && (name.startsWith("com.datastrato.gravitino.catalog.hive.")
-            || name.startsWith("com.datastrato.gravitino.catalog.lakehouse.")
-            || name.startsWith("com.datastrato.gravitino.catalog.jdbc.")
-            || name.startsWith("com.datastrato.gravitino.catalog.mysql.")
-            || name.startsWith("com.datastrato.gravitino.catalog.postgresql.")
-            || name.startsWith("com.datastrato.gravitino.catalog.doris.")
-            || name.startsWith("com.datastrato.gravitino.catalog.hadoop.")
-            || name.startsWith("com.datastrato.gravitino.catalog.kafka."));
+  private boolean isPluginClass(String name) {
+    return (name.startsWith("com.datastrato.gravitino.catalog")
+            && (name.startsWith("com.datastrato.gravitino.catalog.hive.")
+                || name.startsWith("com.datastrato.gravitino.catalog.lakehouse.")
+                || name.startsWith("com.datastrato.gravitino.catalog.jdbc.")
+                || name.startsWith("com.datastrato.gravitino.catalog.mysql.")
+                || name.startsWith("com.datastrato.gravitino.catalog.postgresql.")
+                || name.startsWith("com.datastrato.gravitino.catalog.doris.")
+                || name.startsWith("com.datastrato.gravitino.catalog.hadoop.")
+                || name.startsWith("com.datastrato.gravitino.catalog.kafka.")))
+        || (name.startsWith("com.datastrato.gravitino.authorization"));
   }
 
   /**
