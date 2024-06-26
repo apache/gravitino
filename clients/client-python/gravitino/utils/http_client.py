@@ -117,7 +117,7 @@ class HTTPClient:
             return opener.open(request, timeout=timeout)
         except HTTPError as err:
             exc = handle_error(err)
-            raise exc from None
+            raise exc(err.reason) from None
 
     def _request(
         self, method, endpoint, params=None, json=None, headers=None, timeout=None
