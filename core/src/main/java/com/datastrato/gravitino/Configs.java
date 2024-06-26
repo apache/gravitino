@@ -140,7 +140,7 @@ public class Configs {
               "The storage path for JDBC storage implementation. It supports both absolute and"
                   + " relative path, if the value is a relative path, the final path is "
                   + "`${GRAVITINO_HOME}/${PATH_YOU_HAVA_SET}`, default value is "
-                  + "`${GRAVITINO_HOME}/data`")
+                  + "`${GRAVITINO_HOME}/data/jdbc`")
           .version(ConfigConstants.VERSION_0_6_0)
           .stringConf()
           .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_PATH);
