@@ -789,8 +789,20 @@ class TestAuthorizationUtils {
     AccessControlManager manager = Mockito.mock(AccessControlManager.class);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "accessControlManager", manager, true);
     SecurableObject metalake =
-            SecurableObjects.ofMetalake(
-                    "metalake", Lists.newArrayList(Privileges.AddUser.allow(), Privileges.RemoveUser.allow(), Privileges.GetUser.allow(), Privileges.AddGroup.allow(), Privileges.RemoveGroup.allow(), Privileges.GetGroup.allow(), Privileges.GrantRole.allow(), Privileges.RevokeRole.allow(), Privileges.CreateRole.allow(), Privileges.DeleteRole.allow(), Privileges.GetRole.allow()));
+        SecurableObjects.ofMetalake(
+            "metalake",
+            Lists.newArrayList(
+                Privileges.AddUser.allow(),
+                Privileges.RemoveUser.allow(),
+                Privileges.GetUser.allow(),
+                Privileges.AddGroup.allow(),
+                Privileges.RemoveGroup.allow(),
+                Privileges.GetGroup.allow(),
+                Privileges.GrantRole.allow(),
+                Privileges.RevokeRole.allow(),
+                Privileges.CreateRole.allow(),
+                Privileges.DeleteRole.allow(),
+                Privileges.GetRole.allow()));
     RoleEntity roleEntity = Mockito.mock(RoleEntity.class);
     Mockito.when(roleEntity.namespace()).thenReturn(Namespace.of("metalake"));
     Mockito.when(roleEntity.securableObjects()).thenReturn(Lists.newArrayList(metalake));
@@ -798,143 +810,155 @@ class TestAuthorizationUtils {
 
     // Allow to operate user
     Assertions.assertTrue(
-            AuthorizationUtils.satisfyPrivileges(
-                    "metalake",
-                    SecurableObjects.ofMetalake(
-                            "metalake", Lists.newArrayList(Privileges.AddUser.allow()))));
+        AuthorizationUtils.satisfyPrivileges(
+            "metalake",
+            SecurableObjects.ofMetalake(
+                "metalake", Lists.newArrayList(Privileges.AddUser.allow()))));
 
     Assertions.assertTrue(
-            AuthorizationUtils.satisfyPrivileges(
-                    "metalake",
-                    SecurableObjects.ofMetalake(
-                            "metalake", Lists.newArrayList(Privileges.RemoveUser.allow()))));
+        AuthorizationUtils.satisfyPrivileges(
+            "metalake",
+            SecurableObjects.ofMetalake(
+                "metalake", Lists.newArrayList(Privileges.RemoveUser.allow()))));
 
     Assertions.assertTrue(
-            AuthorizationUtils.satisfyPrivileges(
-                    "metalake",
-                    SecurableObjects.ofMetalake(
-                            "metalake", Lists.newArrayList(Privileges.GetUser.allow()))));
+        AuthorizationUtils.satisfyPrivileges(
+            "metalake",
+            SecurableObjects.ofMetalake(
+                "metalake", Lists.newArrayList(Privileges.GetUser.allow()))));
 
     // Allow to operate group
     Assertions.assertTrue(
-            AuthorizationUtils.satisfyPrivileges(
-                    "metalake",
-                    SecurableObjects.ofMetalake(
-                            "metalake", Lists.newArrayList(Privileges.AddGroup.allow()))));
+        AuthorizationUtils.satisfyPrivileges(
+            "metalake",
+            SecurableObjects.ofMetalake(
+                "metalake", Lists.newArrayList(Privileges.AddGroup.allow()))));
 
     Assertions.assertTrue(
-            AuthorizationUtils.satisfyPrivileges(
-                    "metalake",
-                    SecurableObjects.ofMetalake(
-                            "metalake", Lists.newArrayList(Privileges.RemoveGroup.allow()))));
+        AuthorizationUtils.satisfyPrivileges(
+            "metalake",
+            SecurableObjects.ofMetalake(
+                "metalake", Lists.newArrayList(Privileges.RemoveGroup.allow()))));
 
     Assertions.assertTrue(
-            AuthorizationUtils.satisfyPrivileges(
-                    "metalake",
-                    SecurableObjects.ofMetalake(
-                            "metalake", Lists.newArrayList(Privileges.GetGroup.allow()))));
+        AuthorizationUtils.satisfyPrivileges(
+            "metalake",
+            SecurableObjects.ofMetalake(
+                "metalake", Lists.newArrayList(Privileges.GetGroup.allow()))));
     // Allow to operate role
     Assertions.assertTrue(
-            AuthorizationUtils.satisfyPrivileges(
-                    "metalake",
-                    SecurableObjects.ofMetalake(
-                            "metalake", Lists.newArrayList(Privileges.CreateRole.allow()))));
+        AuthorizationUtils.satisfyPrivileges(
+            "metalake",
+            SecurableObjects.ofMetalake(
+                "metalake", Lists.newArrayList(Privileges.CreateRole.allow()))));
 
     Assertions.assertTrue(
-            AuthorizationUtils.satisfyPrivileges(
-                    "metalake",
-                    SecurableObjects.ofMetalake(
-                            "metalake", Lists.newArrayList(Privileges.DeleteRole.allow()))));
+        AuthorizationUtils.satisfyPrivileges(
+            "metalake",
+            SecurableObjects.ofMetalake(
+                "metalake", Lists.newArrayList(Privileges.DeleteRole.allow()))));
 
     Assertions.assertTrue(
-            AuthorizationUtils.satisfyPrivileges(
-                    "metalake",
-                    SecurableObjects.ofMetalake(
-                            "metalake", Lists.newArrayList(Privileges.GetRole.allow()))));
+        AuthorizationUtils.satisfyPrivileges(
+            "metalake",
+            SecurableObjects.ofMetalake(
+                "metalake", Lists.newArrayList(Privileges.GetRole.allow()))));
     // Allow to operate permission
     Assertions.assertTrue(
-            AuthorizationUtils.satisfyPrivileges(
-                    "metalake",
-                    SecurableObjects.ofMetalake(
-                            "metalake", Lists.newArrayList(Privileges.GrantRole.allow()))));
+        AuthorizationUtils.satisfyPrivileges(
+            "metalake",
+            SecurableObjects.ofMetalake(
+                "metalake", Lists.newArrayList(Privileges.GrantRole.allow()))));
 
     Assertions.assertTrue(
-            AuthorizationUtils.satisfyPrivileges(
-                    "metalake",
-                    SecurableObjects.ofMetalake(
-                            "metalake", Lists.newArrayList(Privileges.RevokeRole.allow()))));
+        AuthorizationUtils.satisfyPrivileges(
+            "metalake",
+            SecurableObjects.ofMetalake(
+                "metalake", Lists.newArrayList(Privileges.RevokeRole.allow()))));
 
     metalake =
-            SecurableObjects.ofMetalake(
-                    "metalake", Lists.newArrayList(Privileges.AddUser.deny(), Privileges.RemoveUser.deny(), Privileges.GetUser.deny(), Privileges.AddGroup.deny(), Privileges.RemoveGroup.deny(), Privileges.GetGroup.deny(), Privileges.GrantRole.deny(), Privileges.RevokeRole.deny(), Privileges.CreateRole.deny(), Privileges.DeleteRole.deny(), Privileges.GetRole.deny()));
+        SecurableObjects.ofMetalake(
+            "metalake",
+            Lists.newArrayList(
+                Privileges.AddUser.deny(),
+                Privileges.RemoveUser.deny(),
+                Privileges.GetUser.deny(),
+                Privileges.AddGroup.deny(),
+                Privileges.RemoveGroup.deny(),
+                Privileges.GetGroup.deny(),
+                Privileges.GrantRole.deny(),
+                Privileges.RevokeRole.deny(),
+                Privileges.CreateRole.deny(),
+                Privileges.DeleteRole.deny(),
+                Privileges.GetRole.deny()));
     Mockito.when(roleEntity.securableObjects()).thenReturn(Lists.newArrayList(metalake));
 
     // Deny to operate user
     Assertions.assertFalse(
-            AuthorizationUtils.satisfyPrivileges(
-                    "metalake",
-                    SecurableObjects.ofMetalake(
-                            "metalake", Lists.newArrayList(Privileges.AddUser.allow()))));
+        AuthorizationUtils.satisfyPrivileges(
+            "metalake",
+            SecurableObjects.ofMetalake(
+                "metalake", Lists.newArrayList(Privileges.AddUser.allow()))));
 
     Assertions.assertFalse(
-            AuthorizationUtils.satisfyPrivileges(
-                    "metalake",
-                    SecurableObjects.ofMetalake(
-                            "metalake", Lists.newArrayList(Privileges.RemoveUser.allow()))));
+        AuthorizationUtils.satisfyPrivileges(
+            "metalake",
+            SecurableObjects.ofMetalake(
+                "metalake", Lists.newArrayList(Privileges.RemoveUser.allow()))));
 
     Assertions.assertFalse(
-            AuthorizationUtils.satisfyPrivileges(
-                    "metalake",
-                    SecurableObjects.ofMetalake(
-                            "metalake", Lists.newArrayList(Privileges.GetUser.allow()))));
+        AuthorizationUtils.satisfyPrivileges(
+            "metalake",
+            SecurableObjects.ofMetalake(
+                "metalake", Lists.newArrayList(Privileges.GetUser.allow()))));
 
     // Deny to operate group
     Assertions.assertFalse(
-            AuthorizationUtils.satisfyPrivileges(
-                    "metalake",
-                    SecurableObjects.ofMetalake(
-                            "metalake", Lists.newArrayList(Privileges.AddGroup.allow()))));
+        AuthorizationUtils.satisfyPrivileges(
+            "metalake",
+            SecurableObjects.ofMetalake(
+                "metalake", Lists.newArrayList(Privileges.AddGroup.allow()))));
 
     Assertions.assertFalse(
-            AuthorizationUtils.satisfyPrivileges(
-                    "metalake",
-                    SecurableObjects.ofMetalake(
-                            "metalake", Lists.newArrayList(Privileges.RemoveGroup.allow()))));
+        AuthorizationUtils.satisfyPrivileges(
+            "metalake",
+            SecurableObjects.ofMetalake(
+                "metalake", Lists.newArrayList(Privileges.RemoveGroup.allow()))));
 
     Assertions.assertFalse(
-            AuthorizationUtils.satisfyPrivileges(
-                    "metalake",
-                    SecurableObjects.ofMetalake(
-                            "metalake", Lists.newArrayList(Privileges.GetGroup.allow()))));
+        AuthorizationUtils.satisfyPrivileges(
+            "metalake",
+            SecurableObjects.ofMetalake(
+                "metalake", Lists.newArrayList(Privileges.GetGroup.allow()))));
     // Deny to operate role
     Assertions.assertFalse(
-            AuthorizationUtils.satisfyPrivileges(
-                    "metalake",
-                    SecurableObjects.ofMetalake(
-                            "metalake", Lists.newArrayList(Privileges.CreateRole.allow()))));
+        AuthorizationUtils.satisfyPrivileges(
+            "metalake",
+            SecurableObjects.ofMetalake(
+                "metalake", Lists.newArrayList(Privileges.CreateRole.allow()))));
 
     Assertions.assertFalse(
-            AuthorizationUtils.satisfyPrivileges(
-                    "metalake",
-                    SecurableObjects.ofMetalake(
-                            "metalake", Lists.newArrayList(Privileges.DeleteRole.allow()))));
+        AuthorizationUtils.satisfyPrivileges(
+            "metalake",
+            SecurableObjects.ofMetalake(
+                "metalake", Lists.newArrayList(Privileges.DeleteRole.allow()))));
 
     Assertions.assertFalse(
-            AuthorizationUtils.satisfyPrivileges(
-                    "metalake",
-                    SecurableObjects.ofMetalake(
-                            "metalake", Lists.newArrayList(Privileges.GetRole.allow()))));
+        AuthorizationUtils.satisfyPrivileges(
+            "metalake",
+            SecurableObjects.ofMetalake(
+                "metalake", Lists.newArrayList(Privileges.GetRole.allow()))));
     // Deny to operate permission
     Assertions.assertFalse(
-            AuthorizationUtils.satisfyPrivileges(
-                    "metalake",
-                    SecurableObjects.ofMetalake(
-                            "metalake", Lists.newArrayList(Privileges.GrantRole.allow()))));
+        AuthorizationUtils.satisfyPrivileges(
+            "metalake",
+            SecurableObjects.ofMetalake(
+                "metalake", Lists.newArrayList(Privileges.GrantRole.allow()))));
 
     Assertions.assertFalse(
-            AuthorizationUtils.satisfyPrivileges(
-                    "metalake",
-                    SecurableObjects.ofMetalake(
-                            "metalake", Lists.newArrayList(Privileges.RevokeRole.allow()))));
+        AuthorizationUtils.satisfyPrivileges(
+            "metalake",
+            SecurableObjects.ofMetalake(
+                "metalake", Lists.newArrayList(Privileges.RevokeRole.allow()))));
   }
 }
