@@ -16,7 +16,7 @@ One Kafka catalog corresponds to one Kafka cluster.
 
 ### Catalog properties
 
-Besides the [common catalog properties](./manage-messaging-metadata-using-gravitino.md#catalog-properties), the Kafka catalog has the following properties:
+Besides the [common catalog properties](./gravitino-server-config.md#gravitino-catalog-properties-configuration), the Kafka catalog has the following properties:
 
 | Property Name       | Description                                                                                                                                                                                                   | Default Value | Required | Since Version |
 |---------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|

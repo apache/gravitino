@@ -24,7 +24,7 @@ Hadoop 3. If there's any compatibility issue, please create an [issue](https://g
 
 ### Catalog properties
 
-Besides the [common catalog properties](./manage-fileset-metadata-using-gravitino.md#catalog-properties), the Hadoop catalog has the following properties:
+Besides the [common catalog properties](./gravitino-server-config.md#gravitino-catalog-properties-configuration), the Hadoop catalog has the following properties:
 
 | Property Name                                      | Description                                                                                    | Default Value | Required                                                    | Since Version |
 |----------------------------------------------------|------------------------------------------------------------------------------------------------|---------------|-------------------------------------------------------------|---------------|
