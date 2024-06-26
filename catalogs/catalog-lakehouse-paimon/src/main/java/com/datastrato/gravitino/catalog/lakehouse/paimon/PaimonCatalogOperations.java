@@ -4,9 +4,9 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.paimon;
 
+import static com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonSchema.fromPaimonProperties;
 import static com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonTable.fromPaimonTable;
 import static com.datastrato.gravitino.catalog.lakehouse.paimon.utils.TableOpsUtils.checkColumn;
-import static com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonSchema.fromPaimonProperties;
 import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import com.datastrato.gravitino.NameIdentifier;
@@ -221,7 +221,7 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
     }
     List<String> tables;
     try {
-      tables = paimonTableOps.listTables(schemaIdentifier.name());
+      tables = paimonCatalogOps.listTables(schemaIdentifier.name());
     } catch (Catalog.DatabaseNotExistException e) {
       throw new NoSuchSchemaException(NO_SUCH_SCHEMA_EXCEPTION, namespace.toString());
     }
@@ -244,7 +244,7 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
     Table table;
     try {
       NameIdentifier tableIdentifier = buildPaimonNameIdentifier(identifier);
-      table = paimonTableOps.loadTable(tableIdentifier.toString());
+      table = paimonCatalogOps.loadTable(tableIdentifier.toString());
     } catch (Catalog.TableNotExistException e) {
       throw new NoSuchTableException(e, NO_SUCH_TABLE_EXCEPTION, identifier);
     }
@@ -310,7 +310,7 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
                 AuditInfo.builder().withCreator(currentUser).withCreateTime(Instant.now()).build())
             .build();
     try {
-      paimonTableOps.createTable(createdTable.toPaimonTable(nameIdentifier.toString()));
+      paimonCatalogOps.createTable(createdTable.toPaimonProperties(nameIdentifier.toString()));
     } catch (Catalog.DatabaseNotExistException e) {
       throw new NoSuchSchemaException(e, NO_SUCH_SCHEMA_EXCEPTION, identifier);
     } catch (Catalog.TableAlreadyExistException e) {
@@ -351,7 +351,7 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
   public boolean dropTable(NameIdentifier identifier) {
     try {
       NameIdentifier tableIdentifier = buildPaimonNameIdentifier(identifier);
-      paimonTableOps.dropTable(tableIdentifier.toString());
+      paimonCatalogOps.dropTable(tableIdentifier.toString());
     } catch (Catalog.TableNotExistException e) {
       LOG.warn("Paimon table {} does not exist.", identifier);
       return false;

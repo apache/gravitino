@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.schema.Schema;
 import org.apache.paimon.table.Table;
@@ -28,17 +29,16 @@ import org.apache.paimon.types.MapType;
 import org.apache.paimon.types.RowType;
 import org.apache.paimon.types.TimestampType;
 import org.apache.paimon.types.VarCharType;
-import org.apache.paimon.utils.Pair;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** Tests for {@link PaimonTableOps}. */
-public class TestPaimonTableOps {
+/** Tests for {@link PaimonCatalogOps}. */
+public class TestPaimonCatalogOps {
 
-  private PaimonTableOps paimonTableOps;
+  private PaimonCatalogOps paimonCatalogOps;
   @TempDir private File warehouse;
 
   private static final String DATABASE = "test_table_ops_database";
@@ -49,8 +49,8 @@ public class TestPaimonTableOps {
 
   @BeforeEach
   public void setUp() throws Exception {
-    paimonTableOps =
-        new PaimonTableOps(
+    paimonCatalogOps =
+        new PaimonCatalogOps(
             new PaimonConfig(
                 ImmutableMap.of(PaimonCatalogPropertiesMetadata.WAREHOUSE, warehouse.getPath())));
     createDatabase();
@@ -59,15 +59,16 @@ public class TestPaimonTableOps {
   @AfterEach
   public void tearDown() throws Exception {
     dropDatabase();
-    if (paimonTableOps != null) {
-      paimonTableOps.close();
+    if (paimonCatalogOps != null) {
+      paimonCatalogOps.close();
     }
   }
 
   @Test
   void testTableOperations() throws Exception {
     // list tables
-    Assertions.assertEquals(0, paimonTableOps.listTables(IDENTIFIER.namespace().toString()).size());
+    Assertions.assertEquals(
+        0, paimonCatalogOps.listTables(IDENTIFIER.namespace().toString()).size());
 
     // create table
     Pair<String, Schema> tableInfo =
@@ -98,10 +99,10 @@ public class TestPaimonTableOps {
                 .comment(COMMENT)
                 .options(OPTIONS)
                 .build());
-    paimonTableOps.createTable(tableInfo);
+    paimonCatalogOps.createTable(tableInfo);
 
     // load table
-    Table table = paimonTableOps.loadTable(IDENTIFIER.toString());
+    Table table = paimonCatalogOps.loadTable(IDENTIFIER.toString());
 
     assertEquals(TABLE, table.name());
     assertTrue(table.comment().isPresent());
@@ -137,34 +138,35 @@ public class TestPaimonTableOps {
     // TODO: alter table is unsupported now.
 
     // drop table
-    Assertions.assertDoesNotThrow(() -> paimonTableOps.dropTable(IDENTIFIER.toString()));
+    Assertions.assertDoesNotThrow(() -> paimonCatalogOps.dropTable(IDENTIFIER.toString()));
     Assertions.assertThrowsExactly(
         Catalog.TableNotExistException.class,
-        () -> paimonTableOps.dropTable(IDENTIFIER.toString()));
+        () -> paimonCatalogOps.dropTable(IDENTIFIER.toString()));
 
     // list table again
-    Assertions.assertEquals(0, paimonTableOps.listTables(IDENTIFIER.namespace().toString()).size());
+    Assertions.assertEquals(
+        0, paimonCatalogOps.listTables(IDENTIFIER.namespace().toString()).size());
 
     // create a new table to make database not empty to test drop database cascade
-    paimonTableOps.createTable(tableInfo);
-    Assertions.assertNotNull(paimonTableOps.loadTable(IDENTIFIER.toString()));
+    paimonCatalogOps.createTable(tableInfo);
+    Assertions.assertNotNull(paimonCatalogOps.loadTable(IDENTIFIER.toString()));
   }
 
   private void createDatabase() throws Exception {
     // list databases
-    assertEquals(0, paimonTableOps.listDatabases().size());
+    assertEquals(0, paimonCatalogOps.listDatabases().size());
 
     // create database
-    paimonTableOps.createDatabase(Pair.of(DATABASE, Maps.newHashMap()));
-    assertEquals(1, paimonTableOps.listDatabases().size());
+    paimonCatalogOps.createDatabase(Pair.of(DATABASE, Maps.newHashMap()));
+    assertEquals(1, paimonCatalogOps.listDatabases().size());
     // load database
-    assertNotNull(paimonTableOps.loadDatabase(DATABASE));
+    assertNotNull(paimonCatalogOps.loadDatabase(DATABASE));
   }
 
   private void dropDatabase() throws Exception {
-    Assertions.assertEquals(1, paimonTableOps.listDatabases().size());
-    Assertions.assertEquals(1, paimonTableOps.listTables(DATABASE).size());
-    paimonTableOps.dropDatabase(DATABASE, true);
-    Assertions.assertTrue(paimonTableOps.listDatabases().isEmpty());
+    Assertions.assertEquals(1, paimonCatalogOps.listDatabases().size());
+    Assertions.assertEquals(1, paimonCatalogOps.listTables(DATABASE).size());
+    paimonCatalogOps.dropDatabase(DATABASE, true);
+    Assertions.assertTrue(paimonCatalogOps.listDatabases().isEmpty());
   }
 }

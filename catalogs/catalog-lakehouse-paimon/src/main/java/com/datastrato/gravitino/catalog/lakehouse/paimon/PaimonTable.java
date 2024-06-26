@@ -13,10 +13,10 @@ import com.datastrato.gravitino.connector.TableOperations;
 import com.google.common.collect.Maps;
 import lombok.Getter;
 import lombok.ToString;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.paimon.schema.Schema;
 import org.apache.paimon.table.Table;
 import org.apache.paimon.types.DataField;
-import org.apache.paimon.utils.Pair;
 
 /** Implementation of {@link Table} that represents a Paimon Table entity in the Paimon table. */
 @ToString
@@ -36,7 +36,7 @@ public class PaimonTable extends BaseTable {
    *
    * @return The converted inner table.
    */
-  public Pair<String, Schema> toPaimonTable(String tableName) {
+  public Pair<String, Schema> toPaimonProperties(String tableName) {
     Schema.Builder builder = Schema.newBuilder().comment(comment).options(properties);
     for (int index = 0; index < columns.length; index++) {
       DataField dataField = toPaimonColumn(index, columns[index]);
