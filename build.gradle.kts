@@ -10,12 +10,10 @@ import com.github.jk1.license.render.InventoryHtmlReportRenderer
 import com.github.jk1.license.render.ReportRenderer
 import com.github.vlsi.gradle.dsl.configureEach
 import net.ltgt.gradle.errorprone.errorprone
-import org.gradle.api.tasks.testing.Test
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.internal.hash.ChecksumService
 import org.gradle.internal.os.OperatingSystem
 import org.gradle.kotlin.dsl.support.serviceOf
-import java.io.File
 import java.io.IOException
 import java.util.Locale
 
@@ -676,7 +674,9 @@ fun printDockerCheckInfo() {
   val macDockerConnector = project.extra["macDockerConnector"] as? Boolean ?: false
   val isOrbStack = project.extra["isOrbStack"] as? Boolean ?: false
 
-  if (OperatingSystem.current().isMacOsX() &&
+  if (extra["skipDockerDependentTests"].toString().toBoolean()) {
+    project.extra["docker_it_test"] = false
+  } else if (OperatingSystem.current().isMacOsX() &&
     dockerRunning &&
     (macDockerConnector || isOrbStack)
   ) {

@@ -66,7 +66,7 @@ jobs:
           cache: 'gradle'
 
       - name: Build with Gradle
-        run: ./gradlew build -x test -PjdkVersion=8
+        run: ./gradlew build -x test -PjdkVersion=8 -PskipDockerDependentTests=false
 
   build:
     # The type of runner that the job will run on
@@ -96,7 +96,7 @@ jobs:
           dev/ci/util_free_space.sh
 
       - name: Build with Gradle
-        run: ./gradlew build -PskipITs -PjdkVersion=${{ matrix.java-version }} -x :clients:client-python:build
+        run: ./gradlew build -PskipITs -PjdkVersion=${{ matrix.java-version }} -PskipDockerDependentTests=false -x :clients:client-python:build
 
       - name: Upload unit tests report
         uses: actions/upload-artifact@v3
