@@ -4,9 +4,12 @@
  */
 package com.datastrato.gravitino.authorization;
 
+import static com.datastrato.gravitino.MetadataObjects.METADATA_OBJECT_RESERVED_NAME;
+
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.GravitinoEnv;
+import com.datastrato.gravitino.MetadataObject;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.ForbiddenException;
@@ -14,8 +17,10 @@ import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.meta.RoleEntity;
 import com.datastrato.gravitino.utils.PrincipalUtils;
+import com.google.common.base.Splitter;
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -29,6 +34,8 @@ public class AuthorizationUtils {
   static final String ROLE_DOES_NOT_EXIST_MSG = "Role %s does not exist in th metalake %s";
   private static final Logger LOG = LoggerFactory.getLogger(AuthorizationUtils.class);
   private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";
+
+  private static final Splitter DOT_SPLITTER = Splitter.on('.');
 
   private AuthorizationUtils() {}
 
@@ -60,7 +67,7 @@ public class AuthorizationUtils {
         Entity.SYSTEM_METALAKE_RESERVED_NAME,
         Entity.SYSTEM_CATALOG_RESERVED_NAME,
         Entity.ROLE_SCHEMA_NAME,
-        Entity.SYSTEM_METALAKE_MANAGE_USER_ROLE);
+        Entity.MANAGE_METALAKE_ADMIN_ROLE);
   }
 
   public static Namespace ofRoleNamespace(String metalake) {
@@ -132,18 +139,19 @@ public class AuthorizationUtils {
     AccessControlManager accessControlManager = GravitinoEnv.getInstance().accessControlManager();
     List<RoleEntity> roles;
     try {
-      roles = accessControlManager.getRolesByUserFromMetalake(metalake, currentUser);
+      roles = accessControlManager.listRolesByUser(metalake, currentUser);
 
       for (RoleEntity role : roles) {
         for (Privilege privilege : object.privileges()) {
-          // The deny privilege is prior to the allow privilege. It means that one entity has the
+          // The deny privilege is prior to the allow privilege. If one entity has the
           // deny privilege and allow privilege at the same time. The entity doesn't have the
           // privilege.
-          if (role.hasPrivilegeWithCondition(object, privilege.name(), Privilege.Condition.DENY)) {
+          if (hasPrivilegeWithCondition(role, object, privilege.name(), Privilege.Condition.DENY)) {
             continue;
           }
 
-          if (role.hasPrivilegeWithCondition(object, privilege.name(), Privilege.Condition.ALLOW)) {
+          if (hasPrivilegeWithCondition(
+              role, object, privilege.name(), Privilege.Condition.ALLOW)) {
             return true;
           }
         }
@@ -170,5 +178,92 @@ public class AuthorizationUtils {
       LOG.error("Failed to do storage operation", e);
       throw new RuntimeException(e);
     }
+  }
+
+  private static boolean hasPrivilegeWithCondition(
+      RoleEntity roleEntity,
+      MetadataObject targetObject,
+      Privilege.Name targetPrivilege,
+      Privilege.Condition condition) {
+    String metalake = roleEntity.namespace().level(0);
+    for (SecurableObject object : roleEntity.securableObjects()) {
+      // If one entity's parent has the privilege, the entity will have the privilege.
+      if (isSameOrParent(
+          convertInnerObject(metalake, object), convertInnerObject(metalake, targetObject))) {
+        for (Privilege privilege : object.privileges()) {
+          if (privilege.name().equals(targetPrivilege) && privilege.condition().equals(condition)) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  private static InnerSecurableObject convertInnerObject(
+      String metalake, MetadataObject securableObject) {
+    if (MetadataObject.Type.METALAKE.equals(securableObject.type())) {
+      if (METADATA_OBJECT_RESERVED_NAME.equals(securableObject.name())) {
+        return ROOT;
+      } else {
+        return new InnerSecurableObject(ROOT, securableObject.name());
+      }
+    }
+
+    InnerSecurableObject currentObject = new InnerSecurableObject(ROOT, metalake);
+    List<String> names = DOT_SPLITTER.splitToList(securableObject.fullName());
+    for (String name : names) {
+      currentObject = new InnerSecurableObject(currentObject, name);
+    }
+    return currentObject;
+  }
+
+  private static final InnerSecurableObject ROOT = new InnerSecurableObject(null, "*");
+
+  private static class InnerSecurableObject {
+    InnerSecurableObject parent;
+    String name;
+
+    InnerSecurableObject(InnerSecurableObject parent, String name) {
+      this.parent = parent;
+      this.name = name;
+    }
+
+    public InnerSecurableObject getParent() {
+      return parent;
+    }
+
+    public String getName() {
+      return name;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(parent, name);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (!(obj instanceof InnerSecurableObject)) {
+        return false;
+      }
+
+      InnerSecurableObject innerSecurableObject = (InnerSecurableObject) obj;
+      return Objects.equals(this.name, innerSecurableObject.name)
+          && Objects.equals(this.parent, innerSecurableObject.parent);
+    }
+  }
+
+  // TODO: Add more tests in the next pull requests in table/topic filters.
+  private static boolean isSameOrParent(InnerSecurableObject object, InnerSecurableObject target) {
+    if (object.equals(target)) {
+      return true;
+    }
+
+    if (target.getParent() != null) {
+      return isSameOrParent(object, target.getParent());
+    }
+
+    return false;
   }
 }

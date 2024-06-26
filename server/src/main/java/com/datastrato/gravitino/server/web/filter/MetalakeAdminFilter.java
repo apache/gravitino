@@ -58,6 +58,9 @@ public class MetalakeAdminFilter implements BasedRoleFilter {
 
   @Override
   public String getMetalakeName(ContainerRequestContext requestContext) {
+    // System metalake will store the privileges which don't belong any concrete metalake.
+    // `*` means all the metalakes.  We don't have a concrete metalake named `*`. So we use
+    // system metalake to store the privileges about `*`.
     return Entity.SYSTEM_METALAKE_RESERVED_NAME;
   }
 

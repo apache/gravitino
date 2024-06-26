@@ -17,6 +17,8 @@ import java.util.Map;
 @Evolving
 public interface Role extends Auditable {
 
+  /** The reserved role names' prefix */
+  String SYSTEM_RESERVED_ROLE_NAME_PREFIX = "system_role";
   /**
    * The name of the role.
    *

@@ -12,6 +12,7 @@ import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.NotFoundException;
 import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
+import com.datastrato.gravitino.exceptions.PrivilegesAlreadyGrantedException;
 import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
@@ -349,7 +350,7 @@ public class ExceptionHandlers {
       } else if (e instanceof NotFoundException) {
         return Utils.notFound(errorMsg, e);
 
-      } else if (e instanceof RoleAlreadyExistsException) {
+      } else if (e instanceof PrivilegesAlreadyGrantedException) {
         return Utils.alreadyExists(errorMsg, e);
 
       } else {

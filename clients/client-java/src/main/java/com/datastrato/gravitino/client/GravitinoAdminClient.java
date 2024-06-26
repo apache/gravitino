@@ -34,6 +34,7 @@ import com.datastrato.gravitino.exceptions.NoSuchGroupException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.exceptions.NoSuchRoleException;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
+import com.datastrato.gravitino.exceptions.PrivilegesAlreadyGrantedException;
 import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.google.common.base.Preconditions;
@@ -325,10 +326,11 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
    *
    * @param user The name of the User.
    * @return The added User instance.
-   * @throws RoleAlreadyExistsException If the metalake admin with the same name already added.
+   * @throws PrivilegesAlreadyGrantedException If the metalake admin with the same name already
+   *     added.
    * @throws RuntimeException If adding the User encounters storage issues.
    */
-  public User addMetalakeAdmin(String user) throws RoleAlreadyExistsException {
+  public User addMetalakeAdmin(String user) throws PrivilegesAlreadyGrantedException {
     UserAddRequest req = new UserAddRequest(user);
     req.validate();
 
@@ -338,7 +340,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
             req,
             UserResponse.class,
             Collections.emptyMap(),
-            ErrorHandlers.userErrorHandler());
+            ErrorHandlers.metalakeErrorHandler());
     resp.validate();
 
     return resp.getUser();
@@ -358,7 +360,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
             String.format(API_ADMIN_PATH, user),
             RemoveResponse.class,
             Collections.emptyMap(),
-            ErrorHandlers.userErrorHandler());
+            ErrorHandlers.metalakeAdminErrorHandler());
     resp.validate();
 
     return resp.removed();

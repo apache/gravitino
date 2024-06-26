@@ -37,7 +37,7 @@ public class TestAdminManager {
     when(roleManager.getRole(Entity.SYSTEM_METALAKE_RESERVED_NAME, Entity.METALAKE_CREATE_ROLE))
         .thenReturn(createRoleEntity);
     when(roleManager.getRole(
-            Entity.SYSTEM_METALAKE_RESERVED_NAME, Entity.SYSTEM_METALAKE_MANAGE_USER_ROLE))
+            Entity.SYSTEM_METALAKE_RESERVED_NAME, Entity.MANAGE_METALAKE_ADMIN_ROLE))
         .thenReturn(manageRoleEntity);
     when(createRoleEntity.id()).thenReturn(1L);
     when(manageRoleEntity.id()).thenReturn(2L);
@@ -60,8 +60,7 @@ public class TestAdminManager {
             .withName("admin2")
             .withNamespace(AuthorizationUtils.ofUserNamespace(Entity.SYSTEM_METALAKE_RESERVED_NAME))
             .withRoleNames(
-                Lists.newArrayList(
-                    Entity.METALAKE_CREATE_ROLE, Entity.SYSTEM_METALAKE_MANAGE_USER_ROLE))
+                Lists.newArrayList(Entity.METALAKE_CREATE_ROLE, Entity.MANAGE_METALAKE_ADMIN_ROLE))
             .withRoleIds(Lists.newArrayList(1L, 2L))
             .withAuditInfo(
                 AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
@@ -99,7 +98,7 @@ public class TestAdminManager {
     Assertions.assertEquals(admin3.name(), admin3New.name());
     Assertions.assertNotEquals(admin3.roleNames(), admin3New.roleNames());
     Assertions.assertEquals(2, admin2New.roles().size());
-    Assertions.assertTrue(admin2New.roles().contains(Entity.SYSTEM_METALAKE_MANAGE_USER_ROLE));
+    Assertions.assertTrue(admin2New.roles().contains(Entity.MANAGE_METALAKE_ADMIN_ROLE));
     Assertions.assertTrue(admin2New.roles().contains(Entity.METALAKE_CREATE_ROLE));
 
     entityStore.close();

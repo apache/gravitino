@@ -20,6 +20,7 @@ import com.datastrato.gravitino.dto.responses.ErrorConstants;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
 import com.datastrato.gravitino.dto.responses.RemoveResponse;
 import com.datastrato.gravitino.dto.responses.UserResponse;
+import com.datastrato.gravitino.exceptions.PrivilegesAlreadyGrantedException;
 import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
 import com.datastrato.gravitino.lock.LockManager;
 import com.datastrato.gravitino.meta.AuditInfo;
@@ -112,8 +113,8 @@ public class TestMetalakeAdminOperations extends JerseyTest {
     Assertions.assertNotNull(userDTO.roles());
     Assertions.assertTrue(userDTO.roles().isEmpty());
 
-    // Test to throw UserAlreadyExistsException
-    Mockito.doThrow(new RoleAlreadyExistsException("mock error"))
+    // Test to throw PrivilegesAlreadyGrantedException
+    Mockito.doThrow(new PrivilegesAlreadyGrantedException("mock error"))
         .when(manager)
         .addMetalakeAdmin(any());
     Response resp2 =

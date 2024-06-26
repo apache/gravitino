@@ -79,10 +79,6 @@ class RoleManager {
       Map<String, String> properties,
       List<SecurableObject> securableObjects)
       throws RoleAlreadyExistsException {
-    if (role.startsWith(Entity.SYSTEM_RESERVED_ROLE_NAME_PREFIX)) {
-      throw new IllegalArgumentException(
-          "Can't create a role with with reserved prefix `system_role`");
-    }
 
     RoleEntity roleEntity =
         RoleEntity.builder()
@@ -182,7 +178,7 @@ class RoleManager {
         RoleEntity roleEntity =
             RoleEntity.builder()
                 .withId(idGenerator.nextId())
-                .withName(Entity.SYSTEM_METALAKE_MANAGE_USER_ROLE)
+                .withName(Entity.MANAGE_METALAKE_ADMIN_ROLE)
                 .withNamespace(
                     AuthorizationUtils.ofRoleNamespace(Entity.SYSTEM_METALAKE_RESERVED_NAME))
                 .withSecurableObjects(

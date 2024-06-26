@@ -15,6 +15,7 @@ import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchGroupException;
 import com.datastrato.gravitino.exceptions.NoSuchRoleException;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
+import com.datastrato.gravitino.exceptions.PrivilegesAlreadyGrantedException;
 import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
@@ -172,9 +173,10 @@ public class TestAccessControlManager {
     Assertions.assertEquals("test", user.name());
     Assertions.assertEquals(1, user.roles().size());
 
-    // Test with RoleAlreadyExistsException
+    // Test with PrivilegesAlreadyGrantedException
     Assertions.assertThrows(
-        RoleAlreadyExistsException.class, () -> accessControlManager.addMetalakeAdmin("test"));
+        PrivilegesAlreadyGrantedException.class,
+        () -> accessControlManager.addMetalakeAdmin("test"));
 
     // Test to remove admin
     boolean removed = accessControlManager.removeMetalakeAdmin("test");
@@ -189,9 +191,10 @@ public class TestAccessControlManager {
     Assertions.assertEquals("admin1", admin.name());
     Assertions.assertEquals(2, admin.roles().size());
 
-    // Test service admin with RoleAlreadyExistsException
+    // Test service admin with PrivilegesAlreadyGrantedException
     Assertions.assertThrows(
-        RoleAlreadyExistsException.class, () -> accessControlManager.addMetalakeAdmin("admin1"));
+        PrivilegesAlreadyGrantedException.class,
+        () -> accessControlManager.addMetalakeAdmin("admin1"));
 
     // Test service admin to remove admin
     removed = accessControlManager.removeMetalakeAdmin("admin1");

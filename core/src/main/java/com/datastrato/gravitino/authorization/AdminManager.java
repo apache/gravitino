@@ -10,7 +10,7 @@ import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
+import com.datastrato.gravitino.exceptions.PrivilegesAlreadyGrantedException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.IdGenerator;
@@ -51,14 +51,13 @@ class AdminManager {
   User addMetalakeAdmin(String user) {
     try {
       if (isServiceAdmin(user)) {
-        if (hasCreateMetalakeRole(user)) {
-          throw new EntityAlreadyExistsException(
+        if (hasMetalakeCreateRole(user)) {
+          throw new PrivilegesAlreadyGrantedException(
               "Metalake admin has added the metalake create role");
         }
         return updateUserEntity(
             user,
-            Lists.newArrayList(
-                Entity.METALAKE_CREATE_ROLE, Entity.SYSTEM_METALAKE_MANAGE_USER_ROLE));
+            Lists.newArrayList(Entity.METALAKE_CREATE_ROLE, Entity.MANAGE_METALAKE_ADMIN_ROLE));
       } else {
         long roleId =
             roleManager
@@ -84,7 +83,8 @@ class AdminManager {
       }
     } catch (EntityAlreadyExistsException e) {
       LOG.warn("The metalake admin {} has been added before", user, e);
-      throw new RoleAlreadyExistsException("The metalake admin %s has been added before", user);
+      throw new PrivilegesAlreadyGrantedException(
+          "The metalake admin %s has been added before", user);
     } catch (IOException ioe) {
       LOG.error("Adding user {} failed to the metalake admin due to storage issues", user, ioe);
       throw new RuntimeException(ioe);
@@ -97,8 +97,8 @@ class AdminManager {
         return store.delete(ofMetalakeAdmin(user), Entity.EntityType.USER);
       }
 
-      if (hasCreateMetalakeRole(user)) {
-        updateUserEntity(user, Lists.newArrayList(Entity.SYSTEM_METALAKE_MANAGE_USER_ROLE));
+      if (hasMetalakeCreateRole(user)) {
+        updateUserEntity(user, Lists.newArrayList(Entity.MANAGE_METALAKE_ADMIN_ROLE));
         return true;
       } else {
         return false;
@@ -118,7 +118,7 @@ class AdminManager {
     return AuthorizationUtils.ofUser(Entity.SYSTEM_METALAKE_RESERVED_NAME, user);
   }
 
-  private boolean hasCreateMetalakeRole(String user) throws IOException {
+  private boolean hasMetalakeCreateRole(String user) throws IOException {
     UserEntity userEntity =
         store.get(ofMetalakeAdmin(user), Entity.EntityType.USER, UserEntity.class);
     return userEntity.roleNames().contains(Entity.METALAKE_CREATE_ROLE);
@@ -164,18 +164,19 @@ class AdminManager {
               Entity.EntityType.USER);
 
       for (UserEntity userEntity : userEntities) {
-        // Case 1: If the user is the service admin, we should the system metalake manage user role
+        // Case 1: If the user is the service admin, we should add the system metalake manage user
+        // role
         // for it.
         if (serviceAdmins.contains(userEntity.name())) {
-          if (!userEntity.roleNames().contains(Entity.SYSTEM_METALAKE_MANAGE_USER_ROLE)) {
+          if (!userEntity.roleNames().contains(Entity.MANAGE_METALAKE_ADMIN_ROLE)) {
             List<String> newRoleNames = Lists.newArrayList(userEntity.roleNames());
-            newRoleNames.add(Entity.SYSTEM_METALAKE_MANAGE_USER_ROLE);
+            newRoleNames.add(Entity.MANAGE_METALAKE_ADMIN_ROLE);
             updateUserEntity(userEntity.name(), newRoleNames);
           }
         } else if (userEntity.roleNames().contains(Entity.METALAKE_CREATE_ROLE)) {
           // Case 2: If the user isn't the service admin and has metalake create role,
           // we should remove system metalake manage user role.
-          if (userEntity.roleNames().contains(Entity.SYSTEM_METALAKE_MANAGE_USER_ROLE)) {
+          if (userEntity.roleNames().contains(Entity.MANAGE_METALAKE_ADMIN_ROLE)) {
             updateUserEntity(userEntity.name(), Lists.newArrayList(Entity.METALAKE_CREATE_ROLE));
           }
         } else {
@@ -190,8 +191,7 @@ class AdminManager {
         if (!store.exists(ofMetalakeAdmin(user), Entity.EntityType.USER)) {
           long roleId =
               roleManager
-                  .getRole(
-                      Entity.SYSTEM_METALAKE_RESERVED_NAME, Entity.SYSTEM_METALAKE_MANAGE_USER_ROLE)
+                  .getRole(Entity.SYSTEM_METALAKE_RESERVED_NAME, Entity.MANAGE_METALAKE_ADMIN_ROLE)
                   .id();
           UserEntity userEntity =
               UserEntity.builder()
@@ -199,7 +199,7 @@ class AdminManager {
                   .withName(user)
                   .withNamespace(
                       AuthorizationUtils.ofUserNamespace(Entity.SYSTEM_METALAKE_RESERVED_NAME))
-                  .withRoleNames(Lists.newArrayList(Entity.SYSTEM_METALAKE_MANAGE_USER_ROLE))
+                  .withRoleNames(Lists.newArrayList(Entity.MANAGE_METALAKE_ADMIN_ROLE))
                   .withRoleIds(Lists.newArrayList(roleId))
                   .withAuditInfo(
                       AuditInfo.builder()

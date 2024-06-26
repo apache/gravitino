@@ -11,6 +11,7 @@ import com.datastrato.gravitino.exceptions.NoSuchGroupException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.exceptions.NoSuchRoleException;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
+import com.datastrato.gravitino.exceptions.PrivilegesAlreadyGrantedException;
 import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.meta.RoleEntity;
@@ -206,10 +207,11 @@ public class AccessControlManager {
    *
    * @param user The name of the User.
    * @return The added User instance.
-   * @throws RoleAlreadyExistsException If the metalake admin with the same name already added.
+   * @throws PrivilegesAlreadyGrantedException If the metalake admin with the same name already
+   *     added.
    * @throws RuntimeException If adding the User encounters storage issues.
    */
-  public User addMetalakeAdmin(String user) throws RoleAlreadyExistsException {
+  public User addMetalakeAdmin(String user) throws PrivilegesAlreadyGrantedException {
     return doWithAdminLock(() -> adminManager.addMetalakeAdmin(user));
   }
 
@@ -286,7 +288,7 @@ public class AccessControlManager {
     return doWithNonAdminLock(() -> roleManager.deleteRole(metalake, role));
   }
 
-  public List<RoleEntity> getRolesByUserFromMetalake(String metalake, String currentUser) {
+  public List<RoleEntity> listRolesByUser(String metalake, String currentUser) {
     return doWithNonAdminLock(
         () -> {
           User user = getUser(metalake, currentUser);

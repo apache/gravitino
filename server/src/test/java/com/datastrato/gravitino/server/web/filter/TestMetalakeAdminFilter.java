@@ -8,8 +8,8 @@ import static org.mockito.ArgumentMatchers.any;
 
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.GravitinoEnv;
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.authorization.AccessControlManager;
-import com.datastrato.gravitino.authorization.Privilege;
 import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.meta.RoleEntity;
@@ -33,49 +33,33 @@ public class TestMetalakeAdminFilter {
     RoleEntity roleEntity = Mockito.mock(RoleEntity.class);
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "accessControlManager", accessControlManager, true);
-    Mockito.when(accessControlManager.getRolesByUserFromMetalake(any(), any()))
+    Mockito.when(accessControlManager.listRolesByUser(any(), any()))
         .thenReturn(Lists.newArrayList(roleEntity));
-    Mockito.when(
-            roleEntity.hasPrivilegeWithCondition(
+    Mockito.when(roleEntity.namespace())
+        .thenReturn(Namespace.of(Entity.SYSTEM_METALAKE_RESERVED_NAME));
+    Mockito.when(roleEntity.securableObjects())
+        .thenReturn(
+            Lists.newArrayList(
                 SecurableObjects.ofMetalake(
                     Entity.SYSTEM_METALAKE_RESERVED_NAME,
-                    Lists.newArrayList(Privileges.AddUser.allow())),
-                Privilege.Name.ADD_USER,
-                Privilege.Condition.ALLOW))
-        .thenReturn(true);
-    Mockito.when(
-            roleEntity.hasPrivilegeWithCondition(
-                SecurableObjects.ofMetalake(
-                    Entity.SYSTEM_METALAKE_RESERVED_NAME,
-                    Lists.newArrayList(Privileges.AddUser.allow())),
-                Privilege.Name.ADD_USER,
-                Privilege.Condition.DENY))
-        .thenReturn(false);
+                    Lists.newArrayList(Privileges.AddUser.allow()))));
+
     filter.filter(requestContext);
     Mockito.verify(requestContext, Mockito.never()).abortWith(any());
 
     // Remove metalake admin
+    Mockito.when(roleEntity.securableObjects())
+        .thenReturn(
+            Lists.newArrayList(
+                SecurableObjects.ofMetalake(
+                    Entity.SYSTEM_METALAKE_RESERVED_NAME,
+                    Lists.newArrayList(Privileges.RemoveUser.allow()))));
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "accessControlManager", accessControlManager, true);
     Mockito.when(requestContext.getMethod()).thenReturn(BasedRoleFilter.DELETE);
-    Mockito.when(accessControlManager.getRolesByUserFromMetalake(any(), any()))
+    Mockito.when(accessControlManager.listRolesByUser(any(), any()))
         .thenReturn(Lists.newArrayList(roleEntity));
-    Mockito.when(
-            roleEntity.hasPrivilegeWithCondition(
-                SecurableObjects.ofMetalake(
-                    Entity.SYSTEM_METALAKE_RESERVED_NAME,
-                    Lists.newArrayList(Privileges.RemoveUser.allow())),
-                Privilege.Name.REMOVE_USER,
-                Privilege.Condition.ALLOW))
-        .thenReturn(true);
-    Mockito.when(
-            roleEntity.hasPrivilegeWithCondition(
-                SecurableObjects.ofMetalake(
-                    Entity.SYSTEM_METALAKE_RESERVED_NAME,
-                    Lists.newArrayList(Privileges.RemoveUser.allow())),
-                Privilege.Name.REMOVE_USER,
-                Privilege.Condition.DENY))
-        .thenReturn(false);
+
     filter.filter(requestContext);
     Mockito.verify(requestContext, Mockito.never()).abortWith(any());
   }
@@ -90,9 +74,16 @@ public class TestMetalakeAdminFilter {
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "accessControlManager", accessControlManager, true);
     RoleEntity roleEntity = Mockito.mock(RoleEntity.class);
-    Mockito.when(accessControlManager.getRolesByUserFromMetalake(any(), any()))
+    Mockito.when(accessControlManager.listRolesByUser(any(), any()))
         .thenReturn(Lists.newArrayList(roleEntity));
-    Mockito.when(roleEntity.hasPrivilegeWithCondition(any(), any(), any())).thenReturn(true);
+    Mockito.when(roleEntity.namespace())
+        .thenReturn(Namespace.of(Entity.SYSTEM_METALAKE_RESERVED_NAME));
+    Mockito.when(roleEntity.securableObjects())
+        .thenReturn(
+            Lists.newArrayList(
+                SecurableObjects.ofMetalake(
+                    Entity.SYSTEM_METALAKE_RESERVED_NAME,
+                    Lists.newArrayList(Privileges.AddUser.deny()))));
     filter.filter(requestContext);
     Mockito.verify(requestContext).abortWith(any());
 
@@ -101,9 +92,16 @@ public class TestMetalakeAdminFilter {
     Mockito.when(requestContext.getMethod()).thenReturn(BasedRoleFilter.DELETE);
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "accessControlManager", accessControlManager, true);
-    Mockito.when(accessControlManager.getRolesByUserFromMetalake(any(), any()))
+    Mockito.when(accessControlManager.listRolesByUser(any(), any()))
         .thenReturn(Lists.newArrayList(roleEntity));
-    Mockito.when(roleEntity.hasPrivilegeWithCondition(any(), any(), any())).thenReturn(true);
+    Mockito.when(roleEntity.namespace())
+        .thenReturn(Namespace.of(Entity.SYSTEM_METALAKE_RESERVED_NAME));
+    Mockito.when(roleEntity.securableObjects())
+        .thenReturn(
+            Lists.newArrayList(
+                SecurableObjects.ofMetalake(
+                    Entity.SYSTEM_METALAKE_RESERVED_NAME,
+                    Lists.newArrayList(Privileges.RemoveUser.deny()))));
     filter.filter(requestContext);
     Mockito.verify(requestContext).abortWith(any());
   }

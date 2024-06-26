@@ -15,7 +15,7 @@ import com.datastrato.gravitino.dto.requests.UserAddRequest;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
 import com.datastrato.gravitino.dto.responses.RemoveResponse;
 import com.datastrato.gravitino.dto.responses.UserResponse;
-import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
+import com.datastrato.gravitino.exceptions.PrivilegesAlreadyGrantedException;
 import java.time.Instant;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.Assertions;
@@ -45,14 +45,14 @@ public class TestMetalakeAdmin extends TestBase {
     Assertions.assertNotNull(addedUser);
     assertUser(addedUser, mockUser);
 
-    // test UserAlreadyExistsException
+    // test PrivilegeGrantAlreadyExistsException
     ErrorResponse errResp1 =
         ErrorResponse.alreadyExists(
-            UserAlreadyExistsException.class.getSimpleName(), "user already exists");
+            PrivilegesAlreadyGrantedException.class.getSimpleName(), "user already exists");
     buildMockResource(Method.POST, userPath, request, errResp1, SC_CONFLICT);
     Exception ex =
         Assertions.assertThrows(
-            UserAlreadyExistsException.class, () -> client.addMetalakeAdmin(username));
+            PrivilegesAlreadyGrantedException.class, () -> client.addMetalakeAdmin(username));
     Assertions.assertEquals("user already exists", ex.getMessage());
 
     // test RuntimeException

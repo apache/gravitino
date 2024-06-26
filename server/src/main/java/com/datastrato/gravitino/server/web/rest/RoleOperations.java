@@ -14,6 +14,7 @@ import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.authorization.AuthorizationUtils;
 import com.datastrato.gravitino.authorization.Privilege;
 import com.datastrato.gravitino.authorization.Privileges;
+import com.datastrato.gravitino.authorization.Role;
 import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.dto.authorization.SecurableObjectDTO;
@@ -90,6 +91,11 @@ public class RoleOperations {
           NameIdentifier.of(metalake),
           LockType.READ,
           () -> AuthorizationUtils.checkMetalakeExists(metalake));
+
+      if (request.getName().startsWith(Role.SYSTEM_RESERVED_ROLE_NAME_PREFIX)) {
+        throw new IllegalArgumentException(
+            "Can't create a role with with reserved prefix `system_role`");
+      }
 
       for (SecurableObjectDTO object : request.getSecurableObjects()) {
         checkSecurableObject(metalake, object);

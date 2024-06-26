@@ -26,6 +26,7 @@ import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.NotFoundException;
 import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
+import com.datastrato.gravitino.exceptions.PrivilegesAlreadyGrantedException;
 import com.datastrato.gravitino.exceptions.RESTException;
 import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
@@ -142,6 +143,15 @@ public class ErrorHandlers {
    */
   public static Consumer<ErrorResponse> groupErrorHandler() {
     return GroupErrorHandler.INSTANCE;
+  }
+
+  /**
+   * Creates an error handler specific to MetalakeAdmin operations.
+   *
+   * @return A Consumer representing the MetalakeAdmin error handler.
+   */
+  public static Consumer<ErrorResponse> metalakeAdminErrorHandler() {
+    return MetalakeAdminErrorHandler.INSTANCE;
   }
 
   /**
@@ -564,6 +574,44 @@ public class ErrorHandlers {
 
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new GroupAlreadyExistsException(errorMessage);
+
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMessage);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMessage);
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
+  /** Error handler specific to MetalakeAdmin operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class MetalakeAdminErrorHandler extends RestErrorHandler {
+
+    private static final MetalakeAdminErrorHandler INSTANCE = new MetalakeAdminErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMessage);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchMetalakeException.class.getSimpleName())) {
+            throw new NoSuchMetalakeException(errorMessage);
+          } else if (errorResponse.getType().equals(NoSuchUserException.class.getSimpleName())) {
+            throw new NoSuchUserException(errorMessage);
+          } else {
+            throw new NotFoundException(errorMessage);
+          }
+
+        case ErrorConstants.ALREADY_EXISTS_CODE:
+          throw new PrivilegesAlreadyGrantedException(errorMessage);
 
         case ErrorConstants.FORBIDDEN_CODE:
           throw new ForbiddenException(errorMessage);
