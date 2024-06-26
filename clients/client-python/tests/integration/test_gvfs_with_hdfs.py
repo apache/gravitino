@@ -96,9 +96,9 @@ def _download_and_unzip_hadoop_pack():
 
 
 def _configure_hadoop_environment():
-    os.environ.putenv("HADOOP_USER_NAME", "datastrato")
-    os.environ.putenv("HADOOP_HOME", f"{LOCAL_HADOOP_DIR}/{HADOOP_DIR_NAME}")
-    os.environ.putenv(
+    os.putenv("HADOOP_USER_NAME", "datastrato")
+    os.putenv("HADOOP_HOME", f"{LOCAL_HADOOP_DIR}/{HADOOP_DIR_NAME}")
+    os.putenv(
         "HADOOP_CONF_DIR",
         f"{LOCAL_HADOOP_DIR}/{HADOOP_DIR_NAME}/etc/hadoop",
     )
@@ -112,7 +112,7 @@ def _configure_hadoop_environment():
             check=True,
         )
         if result.returncode == 0:
-            os.environ.putenv("CLASSPATH", str(result.stdout))
+            os.putenv("CLASSPATH", str(result.stdout))
         else:
             raise GravitinoRuntimeException(
                 f"Command failed with return code is not 0, stdout: {result.stdout}, stderr:{result.stderr}"

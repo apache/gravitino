@@ -116,7 +116,6 @@ class HTTPClient:
         try:
             return opener.open(request, timeout=timeout)
         except HTTPError as err:
-            print(err)
             exc = handle_error(err)
             raise exc() from None
 

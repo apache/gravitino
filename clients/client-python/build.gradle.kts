@@ -62,17 +62,17 @@ fun waitForServerIsReady(host: String = "http://localhost", port: Int = 8090, ti
 }
 
 fun gravitinoServer(operation: String) {
-  val process = ProcessBuilder("${project.rootDir.path}/distribution/package/bin/gravitino.sh", operation).start()
-  val exitCode = process.waitFor()
-  if (exitCode == 0) {
-    val currentContext = process.inputStream.bufferedReader().readText()
-    if (operation == "start") {
-      waitForServerIsReady()
+    val process = ProcessBuilder("${project.rootDir.path}/distribution/package/bin/gravitino.sh", operation).start()
+    val exitCode = process.waitFor()
+    if (exitCode == 0) {
+      val currentContext = process.inputStream.bufferedReader().readText()
+      if (operation == "start") {
+        waitForServerIsReady()
+      }
+      println("Gravitino server status: $currentContext")
+    } else {
+      println("Gravitino server execution failed with exit code $exitCode")
     }
-    println("Gravitino server status: $currentContext")
-  } else {
-    println("Gravitino server execution failed with exit code $exitCode")
-  }
 }
 
 fun generatePypiProjectHomePage() {
