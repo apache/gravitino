@@ -7,7 +7,11 @@ package com.datastrato.gravitino.authorization;
 import java.util.List;
 import java.util.function.Function;
 
-/** authorization operations interfaces. */
+/**
+ * authorization operations interfaces. Note: Because each interface function needs to perform
+ * multiple steps in the underlying permission system, the implementation method of these function
+ * interface must be idempotent.
+ */
 public interface AuthorizationOperations {
   /**
    * Update a role.
