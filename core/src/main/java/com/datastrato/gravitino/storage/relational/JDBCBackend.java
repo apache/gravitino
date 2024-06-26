@@ -27,7 +27,6 @@ import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.meta.TopicEntity;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.relational.backend.H2Database;
-import com.datastrato.gravitino.storage.relational.backend.MySQLDatabase;
 import com.datastrato.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 import com.datastrato.gravitino.storage.relational.service.CatalogMetaService;
 import com.datastrato.gravitino.storage.relational.service.FilesetMetaService;
@@ -53,10 +52,8 @@ import java.util.function.Function;
  */
 public class JDBCBackend implements RelationalBackend {
 
-  private static final Map<JDBCBackendType, String> JDBC_DATABASE_MAP =
-      ImmutableMap.of(
-          JDBCBackendType.H2, H2Database.class.getCanonicalName(),
-          JDBCBackendType.MYSQL, MySQLDatabase.class.getCanonicalName());
+  private static final Map<JDBCBackendType, String> EMBEDDED_JDBC_DATABASE_MAP =
+      ImmutableMap.of(JDBCBackendType.H2, H2Database.class.getCanonicalName());
 
   /** Initialize the jdbc backend instance. */
   @Override
@@ -291,23 +288,13 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   enum JDBCBackendType {
-    H2("h2"),
-    MYSQL("mysql");
+    H2(true),
+    MYSQL(false);
 
-    private final String name;
+    private final boolean embedded;
 
-    JDBCBackendType(String name) {
-      this.name = name;
-    }
-
-    public static JDBCBackendType fromName(String name) {
-      for (JDBCBackendType backend : JDBCBackendType.values()) {
-        if (backend.name.equalsIgnoreCase(name)) {
-          return backend;
-        }
-      }
-
-      throw new IllegalArgumentException("Unknown JDBCBackend: " + name);
+    JDBCBackendType(boolean embedded) {
+      this.embedded = embedded;
     }
 
     public static JDBCBackendType fromURI(String jdbcURI) {
@@ -326,15 +313,17 @@ public class JDBCBackend implements RelationalBackend {
     String jdbcUrl = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL);
     JDBCBackendType jdbcBackendType = JDBCBackendType.fromURI(jdbcUrl);
 
-    try {
-      JDBCDatabase jdbcDatabase =
-          (JDBCDatabase)
-              Class.forName(JDBC_DATABASE_MAP.get(jdbcBackendType))
-                  .getDeclaredConstructor()
-                  .newInstance();
-      jdbcDatabase.initialize(config);
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to create and initialize JDBCBackend.", e);
+    if (jdbcBackendType.embedded) {
+      try {
+        JDBCDatabase jdbcDatabase =
+            (JDBCDatabase)
+                Class.forName(EMBEDDED_JDBC_DATABASE_MAP.get(jdbcBackendType))
+                    .getDeclaredConstructor()
+                    .newInstance();
+        jdbcDatabase.initialize(config);
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to create and initialize JDBCBackend.", e);
+      }
     }
   }
 }
