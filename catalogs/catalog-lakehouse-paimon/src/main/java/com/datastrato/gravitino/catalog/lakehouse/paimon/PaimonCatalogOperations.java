@@ -4,9 +4,13 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.paimon;
 
+import static com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonSchema.fromPaimonProperties;
+import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
+
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.SchemaChange;
+import com.datastrato.gravitino.catalog.lakehouse.paimon.ops.PaimonCatalogOps;
 import com.datastrato.gravitino.connector.CatalogInfo;
 import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;
@@ -17,6 +21,7 @@ import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
+import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
@@ -24,14 +29,32 @@ import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
-import java.io.IOException;
+import com.datastrato.gravitino.utils.MapUtils;
+import com.datastrato.gravitino.utils.PrincipalUtils;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Maps;
+import java.time.Instant;
 import java.util.Map;
+import org.apache.paimon.catalog.Catalog;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Implementation of {@link CatalogOperations} that represents operations for interacting with the
  * Paimon catalog in Gravitino.
  */
 public class PaimonCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
+
+  public static final Logger LOG = LoggerFactory.getLogger(PaimonCatalogOperations.class);
+
+  @VisibleForTesting public PaimonCatalogOps paimonCatalogOps;
+
+  private static final String NO_SUCH_SCHEMA_EXCEPTION =
+      "Paimon schema (database) %s does not exist.";
+  private static final String NON_EMPTY_SCHEMA_EXCEPTION =
+      "Paimon schema (database) %s is not empty. One or more tables exist.";
+  private static final String SCHEMA_ALREADY_EXISTS_EXCEPTION =
+      "Paimon schema (database) %s already exists.";
 
   /**
    * Initializes the Paimon catalog operations with the provided configuration.
@@ -43,7 +66,20 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
   @Override
   public void initialize(
       Map<String, String> conf, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
-      throws RuntimeException {}
+      throws RuntimeException {
+    // Key format like gravitino.bypass.a.b
+    Map<String, String> prefixMap = MapUtils.getPrefixMap(conf, CATALOG_BYPASS_PREFIX);
+
+    // Hold keys that lie in GRAVITINO_CONFIG_TO_PAIMON
+    Map<String, String> gravitinoConfig =
+        ((PaimonCatalogPropertiesMetadata) propertiesMetadata.catalogPropertiesMetadata())
+            .transformProperties(conf);
+
+    Map<String, String> resultConf = Maps.newHashMap(prefixMap);
+    resultConf.putAll(gravitinoConfig);
+
+    this.paimonCatalogOps = new PaimonCatalogOps(new PaimonConfig(resultConf));
+  }
 
   /**
    * Lists the schemas under the specified namespace.
@@ -54,7 +90,9 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
    */
   @Override
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
-    throw new UnsupportedOperationException();
+    return paimonCatalogOps.listDatabases().stream()
+        .map(paimonNamespace -> NameIdentifier.of(namespace, paimonNamespace))
+        .toArray(NameIdentifier[]::new);
   }
 
   /**
@@ -71,7 +109,29 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
   public PaimonSchema createSchema(
       NameIdentifier identifier, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    throw new UnsupportedOperationException();
+    String currentUser = currentUser();
+    PaimonSchema createdSchema =
+        PaimonSchema.builder()
+            .withName(identifier.name())
+            .withComment(comment)
+            .withProperties(properties)
+            .withAuditInfo(
+                AuditInfo.builder().withCreator(currentUser).withCreateTime(Instant.now()).build())
+            .build();
+    try {
+      paimonCatalogOps.createDatabase(createdSchema.toPaimonProperties());
+    } catch (Catalog.DatabaseAlreadyExistException e) {
+      throw new SchemaAlreadyExistsException(e, SCHEMA_ALREADY_EXISTS_EXCEPTION, identifier);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+    LOG.info(
+        "Created Paimon schema (database): {}. Current user: {}. Comment: {}. Metadata: {}.",
+        identifier,
+        currentUser,
+        comment,
+        properties);
+    return createdSchema;
   }
 
   /**
@@ -83,7 +143,14 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
    */
   @Override
   public PaimonSchema loadSchema(NameIdentifier identifier) throws NoSuchSchemaException {
-    throw new UnsupportedOperationException();
+    Map<String, String> properties;
+    try {
+      properties = paimonCatalogOps.loadDatabase(identifier.name());
+    } catch (Catalog.DatabaseNotExistException e) {
+      throw new NoSuchSchemaException(e, NO_SUCH_SCHEMA_EXCEPTION, identifier);
+    }
+    LOG.info("Loaded Paimon schema (database) {}.", identifier);
+    return fromPaimonProperties(identifier.name(), properties);
   }
 
   /**
@@ -98,7 +165,7 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
   @Override
   public PaimonSchema alterSchema(NameIdentifier identifier, SchemaChange... changes)
       throws NoSuchSchemaException {
-    throw new UnsupportedOperationException();
+    throw new UnsupportedOperationException("Alter schema is not supported in Paimon Catalog.");
   }
 
   /**
@@ -112,7 +179,18 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
   @Override
   public boolean dropSchema(NameIdentifier identifier, boolean cascade)
       throws NonEmptySchemaException {
-    throw new UnsupportedOperationException();
+    try {
+      paimonCatalogOps.dropDatabase(identifier.name(), cascade);
+    } catch (Catalog.DatabaseNotExistException e) {
+      LOG.warn("Paimon schema (database) {} does not exist.", identifier);
+      return false;
+    } catch (Catalog.DatabaseNotEmptyException e) {
+      throw new NonEmptySchemaException(e, NON_EMPTY_SCHEMA_EXCEPTION, identifier);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+    LOG.info("Dropped Paimon schema (database) {}.", identifier);
+    return true;
   }
 
   /**
@@ -206,5 +284,17 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
   }
 
   @Override
-  public void close() throws IOException {}
+  public void close() {
+    if (paimonCatalogOps != null) {
+      try {
+        paimonCatalogOps.close();
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }
+  }
+
+  private static String currentUser() {
+    return PrincipalUtils.getCurrentUserName();
+  }
 }
