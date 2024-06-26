@@ -37,14 +37,14 @@ dependencies {
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
 
-  testImplementation(libs.mysql.driver)
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
-  testImplementation(libs.bundles.log4j)
   testImplementation(libs.slf4j.api)
   testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.mysql.driver)
+  testImplementation(libs.bundles.log4j)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.testcontainers)
 
