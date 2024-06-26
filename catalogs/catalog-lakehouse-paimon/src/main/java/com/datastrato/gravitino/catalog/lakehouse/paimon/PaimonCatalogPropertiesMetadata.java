@@ -11,6 +11,7 @@ import static com.datastrato.gravitino.connector.PropertyEntry.stringRequiredPro
 import com.datastrato.gravitino.connector.BaseCatalogPropertiesMetadata;
 import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.connector.PropertyEntry;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -23,14 +24,13 @@ import java.util.Map;
  */
 public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
 
-  public static final String GRAVITINO_CATALOG_BACKEND = "catalog-backend";
-  public static final String PAIMON_METASTORE = "metastore";
-  public static final String WAREHOUSE = "warehouse";
-  public static final String URI = "uri";
+  @VisibleForTesting public static final String GRAVITINO_CATALOG_BACKEND = "catalog-backend";
+  @VisibleForTesting public static final String PAIMON_METASTORE = "metastore";
+  @VisibleForTesting public static final String WAREHOUSE = "warehouse";
+  @VisibleForTesting public static final String URI = "uri";
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
-
-  public static final Map<String, String> GRAVITINO_CONFIG_TO_PAIMON =
+  private static final Map<String, String> GRAVITINO_CONFIG_TO_PAIMON =
       ImmutableMap.of(GRAVITINO_CATALOG_BACKEND, PAIMON_METASTORE, WAREHOUSE, WAREHOUSE, URI, URI);
 
   static {
@@ -56,7 +56,7 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
     return PROPERTIES_METADATA;
   }
 
-  public Map<String, String> transformProperties(Map<String, String> properties) {
+  protected Map<String, String> transformProperties(Map<String, String> properties) {
     Map<String, String> gravitinoConfig = Maps.newHashMap();
     properties.forEach(
         (key, value) -> {

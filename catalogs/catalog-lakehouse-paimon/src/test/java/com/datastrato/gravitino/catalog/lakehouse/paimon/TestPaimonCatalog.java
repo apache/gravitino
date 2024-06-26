@@ -10,13 +10,14 @@ import static com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonCatalog.TA
 
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.PropertiesMetadataHelpers;
-import com.datastrato.gravitino.catalog.lakehouse.paimon.ops.PaimonTableOps;
+import com.datastrato.gravitino.catalog.lakehouse.paimon.ops.PaimonCatalogOps;
 import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;
 import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.google.common.collect.Maps;
+import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
@@ -54,8 +55,11 @@ public class TestPaimonCatalog {
         }
       };
 
+  private String tempDir =
+      String.join(File.separator, System.getProperty("java.io.tmpdir"), "paimon_catalog_warehouse");
+
   @Test
-  public void testListDatabases() {
+  public void testCatalogOperation() {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
@@ -71,17 +75,17 @@ public class TestPaimonCatalog {
 
     Map<String, String> conf = Maps.newHashMap();
     conf.put(PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND, "filesystem");
-    conf.put(PaimonCatalogPropertiesMetadata.WAREHOUSE, "/tmp/paimon_catalog_warehouse");
+    conf.put(PaimonCatalogPropertiesMetadata.WAREHOUSE, tempDir);
     PaimonCatalog paimonCatalog =
         new PaimonCatalog().withCatalogConf(conf).withCatalogEntity(entity);
     CatalogOperations catalogOperations = paimonCatalog.ops();
     Assertions.assertInstanceOf(PaimonCatalogOperations.class, catalogOperations);
 
     PaimonCatalogOperations paimonCatalogOperations = (PaimonCatalogOperations) catalogOperations;
-    PaimonTableOps paimonTableOps = paimonCatalogOperations.paimonTableOps;
+    PaimonCatalogOps paimonCatalogOps = paimonCatalogOperations.paimonCatalogOps;
     Assertions.assertEquals(
         paimonCatalogOperations.listSchemas(Namespace.empty()).length,
-        paimonTableOps.listDatabases().size());
+        paimonCatalogOps.listDatabases().size());
   }
 
   @Test
@@ -101,7 +105,7 @@ public class TestPaimonCatalog {
 
     Map<String, String> conf = Maps.newHashMap();
     conf.put(PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND, "filesystem");
-    conf.put(PaimonCatalogPropertiesMetadata.WAREHOUSE, "/tmp/paimon_catalog_warehouse");
+    conf.put(PaimonCatalogPropertiesMetadata.WAREHOUSE, tempDir);
     try (PaimonCatalogOperations ops = new PaimonCatalogOperations()) {
       ops.initialize(conf, entity.toCatalogInfo(), PAIMON_PROPERTIES_METADATA);
       Map<String, String> map1 = Maps.newHashMap();
