@@ -16,7 +16,7 @@ gravitino/version.ini
 docs
 
 # Unit test / coverage reports
-htmlcov/
+**/htmlcov/**/
 .tox/
 .nox/
 .coverage

@@ -462,9 +462,6 @@ tasks.rat {
     "**/licenses/*.md",
     "integration-test/**",
     "web/.**",
-    "web/next-env.d.ts",
-    "web/dist/**/*",
-    "web/node_modules/**/*",
     "web/src/lib/utils/axios/**/*",
     "web/src/lib/enums/httpEnum.js",
     "web/src/types/axios.d.ts",
@@ -475,19 +472,30 @@ tasks.rat {
     "**/LICENSE.*",
     "**/NOTICE.*",
     "ROADMAP.md",
-    "clients/client-python/.pytest_cache/*",
-    "clients/client-python/gravitino.egg-info/*",
     "clients/client-python/gravitino/utils/exceptions.py",
     "clients/client-python/gravitino/utils/http_client.py"
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.
-  val gitIgnore = project(":").file(".gitignore")
-  if (gitIgnore.exists()) {
-    val gitIgnoreExcludes = gitIgnore.readLines().filter {
-      it.isNotEmpty() && !it.startsWith("#")
+  val gitIgnores = mutableListOf(
+    project(":").file(".gitignore"),
+    project(":").file("clients/client-python/.gitignore"),
+    project(":").file("web/.gitignore")
+  )
+
+  gitIgnores.forEach { gitIgnore ->
+    if (gitIgnore.exists()) {
+      val path = gitIgnore.relativeTo(projectDir).parent?.let { "$it" } ?: ""
+      gitIgnore.readLines().filter {
+        it.isNotEmpty() && !it.startsWith("#")
+      }.forEach { file ->
+        if (path == "" || file.startsWith("/")) {
+          exclusions.add("$path$file")
+        } else {
+          exclusions.add("$path/$file")
+        }
+      }
     }
-    exclusions.addAll(gitIgnoreExcludes)
   }
 
   dependsOn(":web:nodeSetup")
