@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.server;
 
-import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
+import static com.datastrato.gravitino.Configs.ENTITY_KV_ROCKSDB_BACKEND_PATH;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
@@ -36,7 +36,7 @@ public class TestGravitinoServer {
     ServerConfig serverConfig = new ServerConfig();
     serverConfig.loadFromMap(
         ImmutableMap.of(
-            ENTRY_KV_ROCKSDB_BACKEND_PATH.getKey(),
+            ENTITY_KV_ROCKSDB_BACKEND_PATH.getKey(),
             ROCKS_DB_STORE_PATH,
             GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
             String.valueOf(RESTUtils.findAvailablePort(5000, 6000))),
@@ -76,7 +76,7 @@ public class TestGravitinoServer {
   @Test
   void testConfig() {
     Assertions.assertEquals(
-        ROCKS_DB_STORE_PATH, spyServerConfig.get(ENTRY_KV_ROCKSDB_BACKEND_PATH));
+        ROCKS_DB_STORE_PATH, spyServerConfig.get(ENTITY_KV_ROCKSDB_BACKEND_PATH));
   }
 
   @Test

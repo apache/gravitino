@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.integration.test.util;
 
-import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
+import static com.datastrato.gravitino.Configs.ENTITY_KV_ROCKSDB_BACKEND_PATH;
 import static com.datastrato.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
 import com.datastrato.gravitino.Config;
@@ -211,7 +211,7 @@ public class AbstractIT {
       downLoadJDBCDriver();
       try {
         FileUtils.deleteDirectory(
-            FileUtils.getFile(serverConfig.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)));
+            FileUtils.getFile(serverConfig.get(ENTITY_KV_ROCKSDB_BACKEND_PATH)));
       } catch (Exception e) {
         // Ignore
       }

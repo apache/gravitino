@@ -72,6 +72,8 @@ public class Configs {
   public static final String DEFAULT_RELATIONAL_JDBC_BACKEND_PATH =
       String.join(File.separator, System.getenv("GRAVITINO_HOME"), "data");
 
+  public static final String DEFAULT_RELATIONAL_JDBC_BACKEND_URL = "jdbc:h2";
+
   public static final int GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT = 100;
   public static final long MAX_NODE_IN_MEMORY = 100000L;
 
@@ -107,7 +109,7 @@ public class Configs {
           .version(ConfigConstants.VERSION_0_5_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
-          .createWithDefault("jdbc:h2");
+          .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_URL);
 
   public static final ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER =
       new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER_KEY)
@@ -132,7 +134,7 @@ public class Configs {
           .stringConf()
           .create();
 
-  public static final ConfigEntry<String> ENTRY_RELATIONAL_JDBC_BACKEND_PATH =
+  public static final ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_PATH =
       new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_STORAGE_PATH_KEY)
           .doc(
               "The storage path for JDBC storage implementation. It supports both absolute and"
@@ -143,7 +145,7 @@ public class Configs {
           .stringConf()
           .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_PATH);
 
-  public static final ConfigEntry<String> ENTRY_KV_ROCKSDB_BACKEND_PATH =
+  public static final ConfigEntry<String> ENTITY_KV_ROCKSDB_BACKEND_PATH =
       new ConfigBuilder(ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY)
           .doc(
               "The storage path for RocksDB storage implementation. It supports both absolute and"
