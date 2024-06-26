@@ -476,7 +476,7 @@ tasks.rat {
     "clients/client-python/gravitino/utils/http_client.py"
   )
 
-  // Add .gitignore excludes to the Apache Rat exclusion list.
+  // Add .gitignore of subprojects, make them excludes to the Apache Rat exclusion list.
   val gitIgnores = mutableListOf(
     project(":").file(".gitignore"),
     project(":").file("clients/client-python/.gitignore"),
