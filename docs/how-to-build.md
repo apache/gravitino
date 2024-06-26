@@ -26,7 +26,7 @@ This software is licensed under the Apache License version 2."
   You don't have to preinstall the specified JDK environment, as Gradle detects the JDK version needed and downloads it automatically.
 + Gravitino uses the Gradle Java Toolchain to detect and manage JDK versions, it checks the
   installed JDK by running the `./gradlew javaToolchains` command. See [Gradle Java Toolchain](https://docs.gradle.org/current/userguide/toolchains.html#sec:java_toolchain).
-+ Gravitino excludes all Docker-related tests by default. To run integration tests, make sure you have installed
++ Gravitino excludes all Docker-related tests by default. To run Docker related tests, make sure you have installed
   Docker in your environment and set `skipDockerTests=false` in the `gradle.properties` file(or
   use `-PskipDockerTests=false` in the command). Otherwise, some Docker-related tests may not execute.
 + macOS uses `docker-connector` to make the Gravitino Trino connector work with Docker
