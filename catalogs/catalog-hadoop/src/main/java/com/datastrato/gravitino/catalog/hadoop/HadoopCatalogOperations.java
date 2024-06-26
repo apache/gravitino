@@ -767,7 +767,11 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   private UserGroupInformation getUserBaseOnNameIdentifier(NameIdentifier nameIdentifier) {
     UserInfo userInfo = getNearestUserGroupInformation(nameIdentifier);
     if (userInfo == null) {
-      return UserGroupInformation.createRemoteUser(PrincipalUtils.getCurrentUserName());
+      try {
+        return UserGroupInformation.getCurrentUser();
+      } catch (IOException e) {
+        throw new RuntimeException("Failed to get login user", e);
+      }
     }
 
     UserGroupInformation ugi = userInfo.loginUser;
