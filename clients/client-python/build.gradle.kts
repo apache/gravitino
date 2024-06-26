@@ -243,7 +243,7 @@ tasks {
     delete("build")
     delete("dist")
     delete("docs")
-    delete("version.ini")
+    delete("gravitino/version.ini")
     delete("gravitino.egg-info")
     delete("tests/unittests/htmlcov")
     delete("tests/unittests/.coverage")
