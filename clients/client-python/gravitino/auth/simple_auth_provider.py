@@ -37,3 +37,6 @@ class SimpleAuthProvider(AuthDataProvider):
 
     def get_token_data(self) -> bytes:
         return self._token
+
+    def close(self):
+        pass

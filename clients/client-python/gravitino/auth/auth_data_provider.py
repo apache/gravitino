@@ -7,8 +7,8 @@ from abc import ABC, abstractmethod
 
 
 class AuthDataProvider(ABC):
-    """
-    The provider of authentication data
+    """The provider of authentication data
+
     """
 
     @abstractmethod
@@ -28,4 +28,10 @@ class AuthDataProvider(ABC):
 
         Returns:
             the token data is used for authentication.
+        """
+
+    @abstractmethod
+    def close(self):
+        """Close the resource in the provider.
+
         """

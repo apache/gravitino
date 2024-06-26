@@ -170,6 +170,7 @@ class HTTPClient:
 
     def close(self):
         self._request("close", "/")
+        self.auth_data_provider.close()
 
 
 def unpack(path: str):
