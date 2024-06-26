@@ -264,7 +264,6 @@ public class AuthorizationUtils {
     }
   }
 
-  // TODO: Add more tests in the next pull requests in table/topic filters.
   private static boolean isSameOrParent(InnerSecurableObject object, InnerSecurableObject target) {
     if (object.equals(target)) {
       return true;
