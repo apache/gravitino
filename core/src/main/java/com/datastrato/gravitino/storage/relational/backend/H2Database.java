@@ -8,6 +8,7 @@ import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.storage.relational.JDBCDatabase;
 import java.io.File;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -21,23 +22,25 @@ import org.slf4j.LoggerFactory;
 
 public class H2Database implements JDBCDatabase {
   private static final Logger LOG = LoggerFactory.getLogger(H2Database.class);
-
-  private static final String H2_DEFAULT_USER_NAME = "gravitino";
-  private static final String H2_DEFAULT_PASSWORD = "gravitino";
+  private String h2ConnectionUri;
+  private String username;
+  private String password;
 
   @Override
   public void initialize(Config config) throws RuntimeException {
-    startH2Backend(config);
+    this.h2ConnectionUri = startH2Backend(config);
   }
 
-  public void startH2Backend(Config config) {
-
+  public String startH2Backend(Config config) {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     String storagePath = getStoragePath(config);
     String originalJDBCUrl = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL);
+    this.username = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER);
+    this.password = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD);
+
     String connectionUrl = constructH2URI(originalJDBCUrl, storagePath);
-    try (Connection connection =
-            DriverManager.getConnection(connectionUrl, H2_DEFAULT_USER_NAME, H2_DEFAULT_PASSWORD);
+
+    try (Connection connection = DriverManager.getConnection(connectionUrl, username, password);
         Statement statement = connection.createStatement()) {
       String sqlContent =
           FileUtils.readFileToString(
@@ -50,9 +53,8 @@ public class H2Database implements JDBCDatabase {
     }
 
     config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL, connectionUrl);
-    config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER, H2_DEFAULT_USER_NAME);
-    config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD, H2_DEFAULT_PASSWORD);
-    config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER, "org.h2.Driver");
+
+    return connectionUrl;
   }
 
   private static String constructH2URI(String originURI, String storagePath) {
@@ -85,5 +87,16 @@ public class H2Database implements JDBCDatabase {
     }
 
     return dbPath;
+  }
+
+  @Override
+  public void close() throws IOException {
+    try (Connection connection = DriverManager.getConnection(h2ConnectionUri, username, password);
+        Statement statement = connection.createStatement()) {
+      statement.execute("SHUTDOWN");
+    } catch (Exception e) {
+      LOG.error("Failed to shutdown H2 database.", e);
+      throw new RuntimeException("Failed to shutdown H2 database.", e);
+    }
   }
 }

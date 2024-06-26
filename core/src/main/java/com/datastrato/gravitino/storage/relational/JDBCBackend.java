@@ -55,10 +55,13 @@ public class JDBCBackend implements RelationalBackend {
   private static final Map<JDBCBackendType, String> EMBEDDED_JDBC_DATABASE_MAP =
       ImmutableMap.of(JDBCBackendType.H2, H2Database.class.getCanonicalName());
 
+  // Database instance of this JDBCBackend.
+  private JDBCDatabase jdbcDatabase;
+
   /** Initialize the jdbc backend instance. */
   @Override
   public void initialize(Config config) {
-    startJDBCDatabaseIfNecessary(config);
+    jdbcDatabase = startJDBCDatabaseIfNecessary(config);
 
     SqlSessionFactoryHelper.getInstance().init(config);
     SQLExceptionConverterFactory.initConverter(config);
@@ -287,6 +290,10 @@ public class JDBCBackend implements RelationalBackend {
   @Override
   public void close() throws IOException {
     SqlSessionFactoryHelper.getInstance().close();
+
+    if (jdbcDatabase != null) {
+      jdbcDatabase.close();
+    }
   }
 
   enum JDBCBackendType {
@@ -311,21 +318,25 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   /** Start JDBC backend if necessary. For example, start H2 backend if the backend is H2. */
-  private static void startJDBCDatabaseIfNecessary(Config config) {
+  private static JDBCDatabase startJDBCDatabaseIfNecessary(Config config) {
     String jdbcUrl = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL);
     JDBCBackendType jdbcBackendType = JDBCBackendType.fromURI(jdbcUrl);
 
-    if (jdbcBackendType.embedded) {
-      try {
-        JDBCDatabase jdbcDatabase =
-            (JDBCDatabase)
-                Class.forName(EMBEDDED_JDBC_DATABASE_MAP.get(jdbcBackendType))
-                    .getDeclaredConstructor()
-                    .newInstance();
-        jdbcDatabase.initialize(config);
-      } catch (Exception e) {
-        throw new RuntimeException("Failed to create and initialize JDBCBackend.", e);
-      }
+    // Not an embedded database.
+    if (!jdbcBackendType.embedded) {
+      return null;
+    }
+
+    try {
+      JDBCDatabase jdbcDatabase =
+          (JDBCDatabase)
+              Class.forName(EMBEDDED_JDBC_DATABASE_MAP.get(jdbcBackendType))
+                  .getDeclaredConstructor()
+                  .newInstance();
+      jdbcDatabase.initialize(config);
+      return jdbcDatabase;
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to create and initialize JDBCBackend.", e);
     }
   }
 }

@@ -5,8 +5,9 @@
 package com.datastrato.gravitino.storage.relational;
 
 import com.datastrato.gravitino.Config;
+import java.io.Closeable;
 
-public interface JDBCDatabase {
+public interface JDBCDatabase extends Closeable {
 
   /**
    * Initializes the embedded Relational Backend environment with the provided configuration.

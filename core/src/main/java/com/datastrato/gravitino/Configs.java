@@ -74,6 +74,12 @@ public class Configs {
 
   public static final String DEFAULT_RELATIONAL_JDBC_BACKEND_URL = "jdbc:h2";
 
+  public static final String DEFAULT_RELATIONAL_JDBC_BACKEND_DRIVER = "org.h2.Driver";
+
+  public static final String DEFAULT_RELATIONAL_JDBC_BACKEND_USERNAME = "gravitino";
+
+  public static final String DEFAULT_RELATIONAL_JDBC_BACKEND_PASSWORD = "gravitino";
+
   public static final int GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT = 100;
   public static final long MAX_NODE_IN_MEMORY = 100000L;
 
@@ -117,7 +123,7 @@ public class Configs {
           .version(ConfigConstants.VERSION_0_5_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
-          .create();
+          .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_DRIVER);
 
   public static final ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_USER =
       new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_USER_KEY)
@@ -125,14 +131,14 @@ public class Configs {
           .version(ConfigConstants.VERSION_0_5_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
-          .create();
+          .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_USERNAME);
 
   public static final ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD =
       new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD_KEY)
           .doc("Password of `JDBCBackend`")
           .version(ConfigConstants.VERSION_0_5_0)
           .stringConf()
-          .create();
+          .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_PASSWORD);
 
   public static final ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_PATH =
       new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_STORAGE_PATH_KEY)
