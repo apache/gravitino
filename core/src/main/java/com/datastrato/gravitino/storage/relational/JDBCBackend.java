@@ -26,6 +26,8 @@ import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.meta.TopicEntity;
 import com.datastrato.gravitino.meta.UserEntity;
+import com.datastrato.gravitino.storage.relational.backend.H2Database;
+import com.datastrato.gravitino.storage.relational.backend.MySQLDatabase;
 import com.datastrato.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 import com.datastrato.gravitino.storage.relational.service.CatalogMetaService;
 import com.datastrato.gravitino.storage.relational.service.FilesetMetaService;
@@ -37,20 +39,11 @@ import com.datastrato.gravitino.storage.relational.service.TableMetaService;
 import com.datastrato.gravitino.storage.relational.service.TopicMetaService;
 import com.datastrato.gravitino.storage.relational.service.UserMetaService;
 import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelper;
-import java.io.File;
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.Statement;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * {@link JDBCBackend} is a jdbc implementation of {@link RelationalBackend} interface. You can use
@@ -60,12 +53,15 @@ import org.slf4j.LoggerFactory;
  */
 public class JDBCBackend implements RelationalBackend {
 
-  private static final Logger LOG = LoggerFactory.getLogger(JDBCBackend.class);
+  private static final Map<JDBCBackendType, String> JDBC_DATABASE_MAP =
+      ImmutableMap.of(
+          JDBCBackendType.H2, H2Database.class.getCanonicalName(),
+          JDBCBackendType.MYSQL, MySQLDatabase.class.getCanonicalName());
 
   /** Initialize the jdbc backend instance. */
   @Override
   public void initialize(Config config) {
-    initJDBCBackend(config);
+    startJDBCDatabaseIfNecessary(config);
 
     SqlSessionFactoryHelper.getInstance().init(config);
     SQLExceptionConverterFactory.initConverter(config);
@@ -296,8 +292,6 @@ public class JDBCBackend implements RelationalBackend {
 
   enum JDBCBackendType {
     H2("h2"),
-    DERBY("derby"),
-    SQLITE("sqlite"),
     MYSQL("mysql");
 
     private final String name;
@@ -313,105 +307,34 @@ public class JDBCBackend implements RelationalBackend {
         }
       }
 
-      throw new IllegalArgumentException("Unknown EmbeddedJDBCBackend: " + name);
+      throw new IllegalArgumentException("Unknown JDBCBackend: " + name);
+    }
+
+    public static JDBCBackendType getJDBCTypeFromURI(String jdbcURI) {
+      if (jdbcURI.startsWith("jdbc:h2")) {
+        return JDBCBackendType.H2;
+      } else if (jdbcURI.startsWith("jdbc:mysql")) {
+        return JDBCBackendType.MYSQL;
+      } else {
+        throw new IllegalArgumentException("Unknown JDBC URI: " + jdbcURI);
+      }
     }
   }
 
-  private static void initJDBCBackend(Config config) {
-
-    // Default username and password for embedded database like H2
-    String jdbcUserName = "gravitino";
-    String jdbcPassword = "gravitino";
-
-    String storagePath = getStoragePath(config);
-
+  /** Start JDBC backend if necessary. For example, start H2 backend if the backend is H2. */
+  private static void startJDBCDatabaseIfNecessary(Config config) {
     String jdbcUrl = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL);
-    String jdbcType = getJDBCType(jdbcUrl);
+    JDBCBackendType jdbcBackendType = JDBCBackendType.getJDBCTypeFromURI(jdbcUrl);
 
-    JDBCBackendType jdbcBackend = JDBCBackendType.fromName(jdbcType);
-
-    switch (jdbcBackend) {
-      case H2:
-        initH2Backend(config, jdbcUserName, jdbcPassword, storagePath);
-        break;
-      case DERBY:
-      case SQLITE:
-        throw new UnsupportedOperationException(jdbcPassword + " is not supported yet.");
-      case MYSQL:
-        break;
-      default:
-        throw new IllegalArgumentException("Unknown EmbeddedJDBCBackend: " + jdbcBackend);
-    }
-  }
-
-  private static String getJDBCType(String jdbcURI) {
-    if (jdbcURI.startsWith("jdbc:h2")) {
-      return "h2";
-    } else if (jdbcURI.startsWith("jdbc:derby")) {
-      return "derby";
-    } else if (jdbcURI.startsWith("jdbc:sqlite")) {
-      return "sqlite";
-    } else if (jdbcURI.startsWith("jdbc:mysql")) {
-      return "mysql";
-    } else {
-      throw new IllegalArgumentException("Unknown JDBC URI: " + jdbcURI);
-    }
-  }
-
-  private static void initH2Backend(
-      Config config, String h2UserName, String h2UserPassword, String storagePath) {
-    String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    String originalJDBCUrl = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL);
-
-    String connectionUrl = constructH2URI(originalJDBCUrl, storagePath);
-    try (Connection connection =
-            DriverManager.getConnection(connectionUrl, h2UserName, h2UserPassword);
-        Statement statement = connection.createStatement()) {
-      String sqlContent =
-          FileUtils.readFileToString(
-              new File(gravitinoHome + "/scripts/h2/schema-h2.sql"), StandardCharsets.UTF_8);
-
-      statement.execute(sqlContent);
+    try {
+      JDBCDatabase jdbcDatabase =
+          (JDBCDatabase)
+              Class.forName(JDBC_DATABASE_MAP.get(jdbcBackendType))
+                  .getDeclaredConstructor()
+                  .newInstance();
+      jdbcDatabase.initialize(config);
     } catch (Exception e) {
-      LOG.error("Failed to create table for H2 database.", e);
-      throw new RuntimeException("Failed to create table for H2 database.", e);
+      throw new RuntimeException("Failed to create and initialize JDBCBackend.", e);
     }
-
-    config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL, connectionUrl);
-    config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER, h2UserName);
-    config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD, h2UserPassword);
-    config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER, "org.h2.Driver");
-  }
-
-  private static String constructH2URI(String originURI, String storagePath) {
-    if (!originURI.contains(":file:")) {
-      originURI = "jdbc:h2:file:" + storagePath;
-    }
-
-    if (!originURI.contains("DB_CLOSE_DELAY")) {
-      originURI = originURI + ";DB_CLOSE_DELAY=-1";
-    }
-
-    if (!originURI.contains("MODE")) {
-      originURI = originURI + ";MODE=MYSQL";
-    }
-
-    return originURI;
-  }
-
-  static String getStoragePath(Config config) {
-    String dbPath = config.get(Configs.ENTRY_RELATIONAL_JDBC_BACKEND_PATH);
-    if (StringUtils.isBlank(dbPath)) {
-      return Configs.DEFAULT_RELATIONAL_JDBC_BACKEND_PATH;
-    }
-
-    Path path = Paths.get(dbPath);
-    // Relative Path
-    if (!path.isAbsolute()) {
-      path = Paths.get(System.getenv("GRAVITINO_HOME"), dbPath);
-      return path.toString();
-    }
-
-    return dbPath;
   }
 }

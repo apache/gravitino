@@ -141,7 +141,7 @@ public class Configs {
                   + "`${GRAVITINO_HOME}/data`")
           .version(ConfigConstants.VERSION_0_6_0)
           .stringConf()
-          .createWithDefault(DEFAULT_KV_ROCKSDB_BACKEND_PATH);
+          .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_PATH);
 
   public static final ConfigEntry<String> ENTRY_KV_ROCKSDB_BACKEND_PATH =
       new ConfigBuilder(ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY)
