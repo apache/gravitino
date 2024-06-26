@@ -14,6 +14,9 @@ import java.util.Map;
 /** Implementation of {@link Catalog} that represents a Paimon catalog in Gravitino. */
 public class PaimonCatalog extends BaseCatalog<PaimonCatalog> {
 
+  static final PaimonCatalogPropertiesMetadata CATALOG_PROPERTIES_META =
+      new PaimonCatalogPropertiesMetadata();
+
   /** @return The short name of the catalog. */
   @Override
   public String shortName() {
@@ -44,8 +47,7 @@ public class PaimonCatalog extends BaseCatalog<PaimonCatalog> {
 
   @Override
   public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
-    throw new UnsupportedOperationException(
-        "The catalog does not support catalog properties metadata");
+    return CATALOG_PROPERTIES_META;
   }
 
   @Override

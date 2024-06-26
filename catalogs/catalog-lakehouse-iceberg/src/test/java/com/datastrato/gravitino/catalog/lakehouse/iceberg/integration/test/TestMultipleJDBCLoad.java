@@ -109,7 +109,7 @@ public class TestMultipleJDBCLoad extends AbstractIT {
     mysqlCatalog
         .asTableCatalog()
         .createTable(
-            NameIdentifier.of(metalakeName, mysqlCatalogName, schemaName, tableName),
+            NameIdentifier.of(schemaName, tableName),
             new Column[] {col1},
             comment,
             Collections.emptyMap());
@@ -117,19 +117,14 @@ public class TestMultipleJDBCLoad extends AbstractIT {
     postgreSqlCatalog
         .asTableCatalog()
         .createTable(
-            NameIdentifier.of(metalakeName, postgreSqlCatalogName, schemaName, tableName),
+            NameIdentifier.of(schemaName, tableName),
             new Column[] {col1},
             comment,
             Collections.emptyMap());
 
     Assertions.assertTrue(
-        mysqlCatalog
-            .asTableCatalog()
-            .tableExists(NameIdentifier.of(metalakeName, mysqlCatalogName, schemaName, tableName)));
+        mysqlCatalog.asTableCatalog().tableExists(NameIdentifier.of(schemaName, tableName)));
     Assertions.assertTrue(
-        postgreSqlCatalog
-            .asTableCatalog()
-            .tableExists(
-                NameIdentifier.of(metalakeName, postgreSqlCatalogName, schemaName, tableName)));
+        postgreSqlCatalog.asTableCatalog().tableExists(NameIdentifier.of(schemaName, tableName)));
   }
 }

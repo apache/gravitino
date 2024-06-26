@@ -231,7 +231,7 @@ public class CatalogDorisIT extends AbstractIT {
     catalog
         .asTableCatalog()
         .createTable(
-            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            NameIdentifier.of(schemaName, tableName),
             createColumns(),
             "Created by gravitino client",
             createTableProperties(),
@@ -322,8 +322,7 @@ public class CatalogDorisIT extends AbstractIT {
   @Test
   void testDorisTableBasicOperation() {
     // create a table
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
     Column[] columns = createColumns();
 
     Distribution distribution = createDistribution();
@@ -357,8 +356,7 @@ public class CatalogDorisIT extends AbstractIT {
     // rename table
     String newTableName = GravitinoITUtils.genRandomName("new_table_name");
     tableCatalog.alterTable(tableIdentifier, TableChange.rename(newTableName));
-    NameIdentifier newTableIdentifier =
-        NameIdentifier.of(metalakeName, catalogName, schemaName, newTableName);
+    NameIdentifier newTableIdentifier = NameIdentifier.of(schemaName, newTableName);
     Table renamedTable = tableCatalog.loadTable(newTableIdentifier);
     ITUtils.assertionsTableInfo(
         newTableName, table_comment, Arrays.asList(columns), properties, indexes, renamedTable);
@@ -479,8 +477,7 @@ public class CatalogDorisIT extends AbstractIT {
   @Test
   void testAlterDorisTable() {
     // create a table
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
     Column[] columns = createColumns();
 
     Distribution distribution = createDistribution();
@@ -572,8 +569,7 @@ public class CatalogDorisIT extends AbstractIT {
   void testDorisIndex() {
     String tableName = GravitinoITUtils.genRandomName("test_add_index");
 
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
     Column[] columns = createColumns();
 
     Distribution distribution = createDistribution();
@@ -593,7 +589,7 @@ public class CatalogDorisIT extends AbstractIT {
 
     // add index test.
     tableCatalog.alterTable(
-        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+        NameIdentifier.of(schemaName, tableName),
         TableChange.addIndex(
             Index.IndexType.PRIMARY_KEY, "k1_index", new String[][] {{DORIS_COL_NAME1}}));
 
@@ -605,14 +601,13 @@ public class CatalogDorisIT extends AbstractIT {
                 assertEquals(
                     1,
                     tableCatalog
-                        .loadTable(
-                            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName))
+                        .loadTable(NameIdentifier.of(schemaName, tableName))
                         .index()
                         .length));
 
     // delete index and add new column and index.
     tableCatalog.alterTable(
-        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+        NameIdentifier.of(schemaName, tableName),
         TableChange.deleteIndex("k1_index", true),
         TableChange.addIndex(
             Index.IndexType.PRIMARY_KEY, "k2_index", new String[][] {{DORIS_COL_NAME2}}));
@@ -625,8 +620,7 @@ public class CatalogDorisIT extends AbstractIT {
                 assertEquals(
                     1,
                     tableCatalog
-                        .loadTable(
-                            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName))
+                        .loadTable(NameIdentifier.of(schemaName, tableName))
                         .index()
                         .length));
   }
