@@ -4,55 +4,66 @@
  */
 package com.datastrato.gravitino.authorization;
 
+import java.util.List;
+
 /** Authorization Role interface. */
 public interface AuthorizationRole {
   /**
-   * Create a role.
-   *
-   * @param name The role's name.
-   * @return The created role object.
-   * @throws UnsupportedOperationException If the authorization does not support to create a role.
-   */
-  Role createRole(String name) throws UnsupportedOperationException;
-
-  /**
-   * Drop a role.
-   *
-   * @param role to be deleted.
-   * @return True if the delete operation success; False otherwise.
-   * @throws UnsupportedOperationException If the authorization does not support to drop a role.
-   */
-  Boolean dropRole(Role role) throws UnsupportedOperationException;
-
-  /**
-   * Grant a role to a user.
-   *
-   * @param roleName role name.
-   * @param userName user name.
-   * @return True if the grant operation success; False otherwise.
-   * @throws UnsupportedOperationException If the authorization does not support to grant a role to
-   *     a user.
-   */
-  Boolean toUser(String roleName, String userName) throws UnsupportedOperationException;
-
-  /**
-   * Grant a role to a group.
-   *
-   * @param roleName role name.
-   * @param groupName group name.
-   * @return True if the grant operation success; False otherwise.
-   * @throws UnsupportedOperationException If the authorization does not support to grant a role to
-   *     a group.
-   */
-  Boolean toGroup(String roleName, String groupName) throws UnsupportedOperationException;
-
-  /**
    * Update a role.
    *
-   * @param roleName role name.
+   * @param role The entity of the Role.
    * @param changes role changes apply to the role.
-   * @return True if the grant operation success; False otherwise.
-   * @throws UnsupportedOperationException If the authorization does not support to update a role.
+   * @return True if the update operation success; False otherwise.
+   * @throws RuntimeException If update role encounters storage issues.
    */
-  Role updateRole(String roleName, RoleChange... changes) throws UnsupportedOperationException;
+  Boolean updateRole(Role role, RoleChange... changes) throws RuntimeException;
+
+  /**
+   * Drop roles.
+   *
+   * @param roles The entities of the Role.
+   * @return True if the delete operation success; False otherwise.
+   * @throws RuntimeException If delete role encounters storage issues.
+   */
+  Boolean deleteRoles(List<Role> roles) throws RuntimeException;
+
+  /**
+   * Grant roles to a user.
+   *
+   * @param roles The entities of the Role.
+   * @param user The name of the User.
+   * @return True if the roles are grant to a user successfully, False otherwise.
+   * @throws RuntimeException If granting roles to a user encounters storage issues.
+   */
+  Boolean grantRolesToUser(List<Role> roles, String user) throws RuntimeException;
+
+  /**
+   * Grant roles to a group.
+   *
+   * @param roles The entities of the Role.
+   * @param group The name of the Group.
+   * @return True if the roles are grant to a group successfully, False otherwise.
+   * @throws RuntimeException If granting roles to a group encounters storage issues.
+   */
+  Boolean grantRolesToGroup(List<Role> roles, String group) throws RuntimeException;
+
+  /**
+   * Revoke roles from a user.
+   *
+   * @param roles The entities of the Role.
+   * @param user The name of the User.
+   * @return True if the roles are revoke from user successfully, False otherwise.
+   * @throws RuntimeException If revoking roles from a user encounters storage issues.
+   */
+  Boolean revokeRolesFromUser(List<Role> roles, String user) throws RuntimeException;
+
+  /**
+   * Revoke roles from a group.
+   *
+   * @param roles The entities of the Role.
+   * @param group The name of the Group.
+   * @return True if the roles are revoke from group successfully, False otherwise.
+   * @throws RuntimeException If revoking roles from a group encounters storage issues.
+   */
+  Boolean revokeRolesFromGroup(List<Role> roles, String group) throws RuntimeException;
 }

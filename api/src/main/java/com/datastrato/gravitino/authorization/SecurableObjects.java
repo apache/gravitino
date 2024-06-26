@@ -20,9 +20,11 @@ package com.datastrato.gravitino.authorization;
 
 import com.datastrato.gravitino.MetadataObject;
 import com.datastrato.gravitino.MetadataObjects;
+import com.datastrato.gravitino.Namespace;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -33,6 +35,19 @@ public class SecurableObjects {
   private static final Splitter DOT_SPLITTER = Splitter.on('.');
 
   /**
+   * Create the securable object {@link SecurableObject} with the given object namespace.
+   *
+   * @param type The type of the object
+   * @param namespace The object
+   * @param privileges The privileges of the securable object
+   * @return The created securable object {@link SecurableObject}
+   */
+  public static SecurableObject ofNamespace(
+      MetadataObject.Type type, Namespace namespace, List<Privilege> privileges) {
+    return of(type, Arrays.asList(namespace.levels()), privileges);
+  }
+
+  /**
    * Create the metalake {@link SecurableObject} with the given metalake name.
    *
    * @param metalake The metalake name
@@ -40,7 +55,7 @@ public class SecurableObjects {
    * @return The created metalake {@link SecurableObject}
    */
   public static SecurableObject ofMetalake(String metalake, List<Privilege> privileges) {
-    return of(SecurableObject.Type.METALAKE, Lists.newArrayList(metalake), privileges);
+    return of(MetadataObject.Type.METALAKE, Lists.newArrayList(metalake), privileges);
   }
 
   /**
@@ -51,7 +66,7 @@ public class SecurableObjects {
    * @return The created catalog {@link SecurableObject}
    */
   public static SecurableObject ofCatalog(String catalog, List<Privilege> privileges) {
-    return of(SecurableObject.Type.CATALOG, Lists.newArrayList(catalog), privileges);
+    return of(MetadataObject.Type.CATALOG, Lists.newArrayList(catalog), privileges);
   }
 
   /**
@@ -66,7 +81,7 @@ public class SecurableObjects {
   public static SecurableObject ofSchema(
       SecurableObject catalog, String schema, List<Privilege> privileges) {
     return of(
-        SecurableObject.Type.SCHEMA, Lists.newArrayList(catalog.fullName(), schema), privileges);
+        MetadataObject.Type.SCHEMA, Lists.newArrayList(catalog.fullName(), schema), privileges);
   }
 
   /**
@@ -81,7 +96,7 @@ public class SecurableObjects {
       SecurableObject schema, String table, List<Privilege> privileges) {
     List<String> names = Lists.newArrayList(DOT_SPLITTER.splitToList(schema.fullName()));
     names.add(table);
-    return of(SecurableObject.Type.TABLE, names, privileges);
+    return of(MetadataObject.Type.TABLE, names, privileges);
   }
 
   /**
@@ -96,7 +111,7 @@ public class SecurableObjects {
       SecurableObject schema, String topic, List<Privilege> privileges) {
     List<String> names = Lists.newArrayList(DOT_SPLITTER.splitToList(schema.fullName()));
     names.add(topic);
-    return of(SecurableObject.Type.TOPIC, names, privileges);
+    return of(MetadataObject.Type.TOPIC, names, privileges);
   }
 
   /**
@@ -112,7 +127,7 @@ public class SecurableObjects {
       SecurableObject schema, String fileset, List<Privilege> privileges) {
     List<String> names = Lists.newArrayList(DOT_SPLITTER.splitToList(schema.fullName()));
     names.add(fileset);
-    return of(SecurableObject.Type.FILESET, names, privileges);
+    return of(MetadataObject.Type.FILESET, names, privileges);
   }
 
   /**
@@ -125,7 +140,7 @@ public class SecurableObjects {
    * @return The created {@link SecurableObject}
    */
   public static SecurableObject ofAllMetalakes(List<Privilege> privileges) {
-    return new SecurableObjectImpl(null, "*", SecurableObject.Type.METALAKE, privileges);
+    return new SecurableObjectImpl(null, "*", MetadataObject.Type.METALAKE, privileges);
   }
 
   private static class SecurableObjectImpl extends MetadataObjects.MetadataObjectImpl

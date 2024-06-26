@@ -7,6 +7,7 @@ package com.datastrato.gravitino.authorization.chain;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
+import com.datastrato.gravitino.MetadataObject;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.authorization.AuthorizationManager;
 import com.datastrato.gravitino.authorization.AuthorizationOperations;
@@ -18,9 +19,12 @@ import com.datastrato.gravitino.authorization.chain.authorization1.TestAuthoriza
 import com.datastrato.gravitino.authorization.chain.authorization2.TestAuthorizationOperations2;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
+import com.datastrato.gravitino.meta.RoleEntity;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import java.time.Instant;
+import java.util.Arrays;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -29,17 +33,15 @@ import org.junit.jupiter.api.Test;
 public class TestAuthorizationChain {
   private static AuthorizationManager authorizationManager;
   private static Config config;
-
   private static CatalogEntity catalogTest1;
   private static CatalogEntity catalogTest2;
+  private static RoleEntity roleEntity;
+  private static SecurableObject dropTable;
+  private static AuditInfo auditInfo;
 
   @BeforeAll
   public static void setUp() throws Exception {
-    AuditInfo auditInfo1 =
-        AuditInfo.builder()
-            .withCreator("TestAuthorizationChain")
-            .withCreateTime(Instant.now())
-            .build();
+    auditInfo = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
 
     catalogTest1 =
         CatalogEntity.builder()
@@ -49,14 +51,9 @@ public class TestAuthorizationChain {
             .withType(Catalog.Type.RELATIONAL)
             .withProperties(ImmutableMap.of(AuthorizationManager.AUTHORIZATION_PROVIDER, "test1"))
             .withProvider("hive")
-            .withAuditInfo(auditInfo1)
+            .withAuditInfo(auditInfo)
             .build();
 
-    AuditInfo auditInfo2 =
-        AuditInfo.builder()
-            .withCreator("TestAuthorizationChain")
-            .withCreateTime(Instant.now())
-            .build();
     catalogTest2 =
         CatalogEntity.builder()
             .withId(2L)
@@ -65,8 +62,28 @@ public class TestAuthorizationChain {
             .withType(Catalog.Type.RELATIONAL)
             .withProperties(ImmutableMap.of(AuthorizationManager.AUTHORIZATION_PROVIDER, "test2"))
             .withProvider("hive")
-            .withAuditInfo(auditInfo2)
+            .withAuditInfo(auditInfo)
             .build();
+
+    roleEntity =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName("role1")
+            .withProperties(Maps.newHashMap())
+            .withSecurableObjects(
+                Lists.newArrayList(
+                    SecurableObjects.ofNamespace(
+                        MetadataObject.Type.TABLE,
+                        Namespace.of("catalog", "schema", "table1"),
+                        Lists.newArrayList(Privileges.ReadTable.allow()))))
+            .withAuditInfo(auditInfo)
+            .build();
+
+    dropTable =
+        SecurableObjects.ofNamespace(
+            MetadataObject.Type.TABLE,
+            Namespace.of("catalog", "schema", "table1"),
+            Lists.newArrayList(Privileges.DropTable.allow()));
 
     config = new Config(false) {};
     config.set(Configs.AUTHORIZATION_LOAD_ISOLATED, false);
@@ -83,44 +100,61 @@ public class TestAuthorizationChain {
 
   @Test
   public void testAuthorizationCatalog1() {
-    SecurableObject securableObject =
-        SecurableObjects.ofCatalog("default", Lists.newArrayList(Privileges.TabularSelect.allow()));
+    AuthorizationOperations authOps1 =
+        authorizationManager.loadAuthorizationAndWrap(catalogTest1).getOps();
+    Assertions.assertInstanceOf(TestAuthorizationOperations1.class, authOps1);
+    TestAuthorizationOperations1 operations1 = (TestAuthorizationOperations1) authOps1;
+    Assertions.assertFalse(operations1.grantRolesToUser1);
+    Assertions.assertFalse(operations1.grantRolesToGroup1);
+    Assertions.assertFalse(operations1.revokeRolesFromUser1);
+    Assertions.assertFalse(operations1.revokeRolesFromGroup1);
+    Assertions.assertFalse(operations1.updateRole1);
+    Assertions.assertFalse(operations1.deleteRoles1);
 
     authorizationManager.runAuthorizationChain(
         catalogTest1,
-        ops -> ops.createRole("role1"),
-        ops -> ops.toUser("role1", "user1"),
-        ops -> ops.toGroup("role1", "group1"),
-        ops -> ops.updateRole("role1", RoleChange.addSecurableObject(securableObject)));
+        ops -> ops.grantRolesToUser(Arrays.asList(roleEntity), "user1"),
+        ops -> ops.grantRolesToGroup(Arrays.asList(roleEntity), "group1"),
+        ops -> ops.revokeRolesFromUser(Arrays.asList(roleEntity), "user1"),
+        ops -> ops.revokeRolesFromGroup(Arrays.asList(roleEntity), "group1"),
+        ops -> ops.updateRole(roleEntity, RoleChange.addSecurableObject(dropTable)),
+        ops -> ops.deleteRoles(Arrays.asList(roleEntity)));
 
-    AuthorizationOperations authOps1 =
-        authorizationManager.loadAuthorizationAndWrap(catalogTest1).getOps();
-    Assertions.assertTrue(authOps1 instanceof TestAuthorizationOperations1);
-    TestAuthorizationOperations1 operations1 = (TestAuthorizationOperations1) authOps1;
-    Assertions.assertEquals(operations1.roleName1, "role1");
-    Assertions.assertEquals(operations1.user1, "user1");
-    Assertions.assertEquals(operations1.group1, "group1");
+    Assertions.assertTrue(operations1.grantRolesToUser1);
+    Assertions.assertTrue(operations1.grantRolesToGroup1);
+    Assertions.assertTrue(operations1.revokeRolesFromUser1);
+    Assertions.assertTrue(operations1.revokeRolesFromGroup1);
     Assertions.assertTrue(operations1.updateRole1);
+    Assertions.assertTrue(operations1.deleteRoles1);
   }
 
   @Test
   public void testAuthorizationCatalog2() {
-    SecurableObject securableObject =
-        SecurableObjects.ofCatalog("default", Lists.newArrayList(Privileges.TabularSelect.allow()));
-    authorizationManager.runAuthorizationChain(
-        catalogTest2,
-        ops -> ops.createRole("role2"),
-        ops -> ops.toUser("role2", "user2"),
-        ops -> ops.toGroup("role2", "group2"),
-        ops -> ops.updateRole("role2", RoleChange.addSecurableObject(securableObject)));
-
     AuthorizationOperations authOps2 =
         authorizationManager.loadAuthorizationAndWrap(catalogTest2).getOps();
-    Assertions.assertTrue(authOps2 instanceof TestAuthorizationOperations2);
+    Assertions.assertInstanceOf(TestAuthorizationOperations2.class, authOps2);
     TestAuthorizationOperations2 operations2 = (TestAuthorizationOperations2) authOps2;
-    Assertions.assertEquals(operations2.roleName2, "role2");
-    Assertions.assertEquals(operations2.user2, "user2");
-    Assertions.assertEquals(operations2.group2, "group2");
+    Assertions.assertFalse(operations2.grantRolesToUser2);
+    Assertions.assertFalse(operations2.grantRolesToGroup2);
+    Assertions.assertFalse(operations2.revokeRolesFromUser2);
+    Assertions.assertFalse(operations2.revokeRolesFromGroup2);
+    Assertions.assertFalse(operations2.updateRole2);
+    Assertions.assertFalse(operations2.deleteRoles2);
+
+    authorizationManager.runAuthorizationChain(
+        catalogTest2,
+        ops -> ops.grantRolesToUser(Arrays.asList(roleEntity), "user2"),
+        ops -> ops.grantRolesToGroup(Arrays.asList(roleEntity), "group2"),
+        ops -> ops.revokeRolesFromUser(Arrays.asList(roleEntity), "user2"),
+        ops -> ops.revokeRolesFromGroup(Arrays.asList(roleEntity), "group2"),
+        ops -> ops.updateRole(roleEntity, RoleChange.addSecurableObject(dropTable)),
+        ops -> ops.deleteRoles(Arrays.asList(roleEntity)));
+
+    Assertions.assertTrue(operations2.grantRolesToUser2);
+    Assertions.assertTrue(operations2.grantRolesToGroup2);
+    Assertions.assertTrue(operations2.revokeRolesFromUser2);
+    Assertions.assertTrue(operations2.revokeRolesFromGroup2);
     Assertions.assertTrue(operations2.updateRole2);
+    Assertions.assertTrue(operations2.deleteRoles2);
   }
 }

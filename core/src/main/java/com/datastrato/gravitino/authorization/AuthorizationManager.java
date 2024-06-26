@@ -129,6 +129,9 @@ public class AuthorizationManager implements Closeable {
   private AuthorizationWrapper createAuthorizationWrapper(CatalogEntity entity) {
     Map<String, String> conf = entity.getProperties();
     String provider = conf.get(AUTHORIZATION_PROVIDER);
+    if (provider == null || provider.isEmpty()) {
+      throw new NoSuchAuthorizationException("Authorization provider is not set.");
+    }
 
     IsolatedClassLoader classLoader = createClassLoader(provider, conf);
     BaseAuthorization<?> baseAuthorization = createBaseAuthorization(classLoader, entity);

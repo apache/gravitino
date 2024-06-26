@@ -7,41 +7,49 @@ package com.datastrato.gravitino.authorization.chain.authorization1;
 import com.datastrato.gravitino.authorization.AuthorizationOperations;
 import com.datastrato.gravitino.authorization.Role;
 import com.datastrato.gravitino.authorization.RoleChange;
+import java.util.List;
 
 public class TestAuthorizationOperations1 implements AuthorizationOperations {
-  public String roleName1;
-  public String user1;
-  public String group1;
   public boolean updateRole1 = false;
+  public boolean deleteRoles1 = false;
+  public boolean grantRolesToUser1 = false;
+  public boolean grantRolesToGroup1 = false;
+  public boolean revokeRolesFromUser1 = false;
+  public boolean revokeRolesFromGroup1 = false;
 
   @Override
-  public Role createRole(String name) throws UnsupportedOperationException {
-    roleName1 = name;
-    return null;
-  }
-
-  @Override
-  public Boolean dropRole(Role role) throws UnsupportedOperationException {
-    roleName1 = null;
-    return false;
-  }
-
-  @Override
-  public Boolean toUser(String roleName, String userName) throws UnsupportedOperationException {
-    user1 = userName;
-    return false;
-  }
-
-  @Override
-  public Boolean toGroup(String roleName, String groupName) throws UnsupportedOperationException {
-    group1 = groupName;
-    return false;
-  }
-
-  @Override
-  public Role updateRole(String roleName, RoleChange... changes)
-      throws UnsupportedOperationException {
+  public Boolean updateRole(Role role, RoleChange... changes) throws RuntimeException {
     updateRole1 = true;
-    return null;
+    return Boolean.TRUE;
+  }
+
+  @Override
+  public Boolean deleteRoles(List<Role> roles) throws RuntimeException {
+    deleteRoles1 = true;
+    return Boolean.TRUE;
+  }
+
+  @Override
+  public Boolean grantRolesToUser(List<Role> roles, String user) throws RuntimeException {
+    grantRolesToUser1 = true;
+    return Boolean.TRUE;
+  }
+
+  @Override
+  public Boolean grantRolesToGroup(List<Role> roles, String group) throws RuntimeException {
+    grantRolesToGroup1 = true;
+    return Boolean.TRUE;
+  }
+
+  @Override
+  public Boolean revokeRolesFromUser(List<Role> roles, String user) throws RuntimeException {
+    revokeRolesFromUser1 = true;
+    return Boolean.TRUE;
+  }
+
+  @Override
+  public Boolean revokeRolesFromGroup(List<Role> roles, String group) throws RuntimeException {
+    revokeRolesFromGroup1 = true;
+    return Boolean.TRUE;
   }
 }
