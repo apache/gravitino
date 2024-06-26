@@ -62,9 +62,9 @@ public class CatalogPaimonKerberosFilesystemIT extends CatalogPaimonBaseIT {
 
     TYPE = "filesystem";
     WAREHOUSE =
-            String.format(
-                    "hdfs://%s:%d/user/hive/paimon_catalog_warehouse/",
-                    kerberosHiveContainer.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
+        String.format(
+            "hdfs://%s:%d/user/hive/paimon_catalog_warehouse/",
+            kerberosHiveContainer.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
     catalogProperties.put(PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND, TYPE);
     catalogProperties.put(PaimonCatalogPropertiesMetadata.WAREHOUSE, WAREHOUSE);
     catalogProperties.put(AUTH_TYPE_KEY, "kerberos");
@@ -131,7 +131,7 @@ public class CatalogPaimonKerberosFilesystemIT extends CatalogPaimonBaseIT {
     kerberosHiveContainer.getContainer().copyFileFromContainer("/etc/krb5.conf", tmpKrb5Path);
 
     // Modify the krb5.conf and change the kdc and admin_server to the container IP
-    String ip = containerSuite.getKerberosHiveContainer().getContainerIpAddress();
+    String ip = kerberosHiveContainer.getContainerIpAddress();
     String content = FileUtils.readFileToString(new File(tmpKrb5Path), StandardCharsets.UTF_8);
     content = content.replace("kdc = localhost:88", "kdc = " + ip + ":88");
     content = content.replace("admin_server = localhost", "admin_server = " + ip + ":749");
