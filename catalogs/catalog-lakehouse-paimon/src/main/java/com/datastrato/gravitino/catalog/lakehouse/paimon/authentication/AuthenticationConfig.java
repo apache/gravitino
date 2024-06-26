@@ -34,15 +34,15 @@ public class AuthenticationConfig extends Config {
   public static final ConfigEntry<String> AUTH_TYPE_ENTRY =
       new ConfigBuilder(AUTH_TYPE_KEY)
           .doc(
-              "The type of authentication for Hadoop catalog, currently we only support simple and Kerberos")
-          .version(ConfigConstants.VERSION_0_5_1)
+              "The type of authentication for Paimon catalog, currently we only support simple and Kerberos")
+          .version(ConfigConstants.VERSION_0_6_0)
           .stringConf()
           .createWithDefault("simple");
 
   public static final ConfigEntry<Boolean> ENABLE_IMPERSONATION_ENTRY =
       new ConfigBuilder(IMPERSONATION_ENABLE_KEY)
-          .doc("Whether to enable impersonation for the Hadoop catalog")
-          .version(ConfigConstants.VERSION_0_5_1)
+          .doc("Whether to enable impersonation for the Paimon catalog")
+          .version(ConfigConstants.VERSION_0_6_0)
           .booleanConf()
           .createWithDefault(KerberosConfig.DEFAULT_IMPERSONATION_ENABLE);
 
@@ -68,7 +68,7 @@ public class AuthenticationConfig extends Config {
               IMPERSONATION_ENABLE_KEY,
               PropertyEntry.booleanPropertyEntry(
                   IMPERSONATION_ENABLE_KEY,
-                  "Whether to enable impersonation for the Hadoop catalog",
+                  "Whether to enable impersonation for the Paimon catalog",
                   false,
                   true,
                   KerberosConfig.DEFAULT_IMPERSONATION_ENABLE,
@@ -78,7 +78,7 @@ public class AuthenticationConfig extends Config {
               AUTH_TYPE_KEY,
               PropertyEntry.stringImmutablePropertyEntry(
                   AUTH_TYPE_KEY,
-                  "The type of authentication for Hadoop catalog, currently we only support Kerberos",
+                  "The type of authentication for Paimon catalog, currently we only support Kerberos",
                   false,
                   null,
                   false,

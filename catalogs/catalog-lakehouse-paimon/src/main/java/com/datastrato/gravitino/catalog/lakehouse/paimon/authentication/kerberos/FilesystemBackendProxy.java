@@ -14,6 +14,9 @@ import net.sf.cglib.proxy.MethodInterceptor;
 import net.sf.cglib.proxy.MethodProxy;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.paimon.catalog.FileSystemCatalog;
+import org.apache.paimon.fs.FileIO;
+import org.apache.paimon.fs.Path;
+import org.apache.paimon.options.Options;
 
 /**
  * Proxy class for FilesystemCatalog to support kerberos authentication. We can also make
@@ -67,6 +70,12 @@ public class FilesystemBackendProxy implements MethodInterceptor {
     e.setClassLoader(target.getClass().getClassLoader());
     e.setSuperclass(target.getClass());
     e.setCallback(this);
-    return (FileSystemCatalog) e.create();
+    // FileSystemCatalog does not have a no argument constructor.
+    return (FileSystemCatalog)
+        e.create(
+            new Class[] {FileIO.class, Path.class, Options.class},
+            new Object[] {
+              target.fileIO(), new Path(target.warehouse()), new Options(target.options())
+            });
   }
 }

@@ -29,7 +29,7 @@ public class KerberosConfig extends AuthenticationConfig {
   public static final ConfigEntry<String> PRINCIPAL_ENTRY =
       new ConfigBuilder(PRINCIPAL_KEY)
           .doc("The principal of the Kerberos connection")
-          .version(ConfigConstants.VERSION_0_5_1)
+          .version(ConfigConstants.VERSION_0_6_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
@@ -37,15 +37,15 @@ public class KerberosConfig extends AuthenticationConfig {
   public static final ConfigEntry<String> KEYTAB_ENTRY =
       new ConfigBuilder(KEY_TAB_URI_KEY)
           .doc("The keytab of the Kerberos connection")
-          .version(ConfigConstants.VERSION_0_5_1)
+          .version(ConfigConstants.VERSION_0_6_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<Integer> CHECK_INTERVAL_SEC_ENTRY =
       new ConfigBuilder(CHECK_INTERVAL_SEC_KEY)
-          .doc("The check interval of the Kerberos connection for Hadoop catalog")
-          .version(ConfigConstants.VERSION_0_5_1)
+          .doc("The check interval of the Kerberos connection for Paimon catalog")
+          .version(ConfigConstants.VERSION_0_6_0)
           .intConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(2);
@@ -53,7 +53,7 @@ public class KerberosConfig extends AuthenticationConfig {
   public static final ConfigEntry<Integer> FETCH_TIMEOUT_SEC_ENTRY =
       new ConfigBuilder(FETCH_TIMEOUT_SEC_KEY)
           .doc("The fetch timeout of the Kerberos connection")
-          .version(ConfigConstants.VERSION_0_5_1)
+          .version(ConfigConstants.VERSION_0_6_0)
           .intConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(2);

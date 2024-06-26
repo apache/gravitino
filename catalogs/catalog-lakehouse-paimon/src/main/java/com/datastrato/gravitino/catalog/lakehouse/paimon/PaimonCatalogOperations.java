@@ -6,7 +6,6 @@ package com.datastrato.gravitino.catalog.lakehouse.paimon;
 
 import static com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonSchema.fromPaimonSchema;
 import static com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonTable.fromPaimonTable;
-import static com.datastrato.gravitino.catalog.lakehouse.paimon.utils.TableOpsUtils.checkColumn;
 import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import com.datastrato.gravitino.NameIdentifier;
@@ -86,7 +85,6 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
 
     Map<String, String> resultConf = Maps.newHashMap(prefixMap);
     resultConf.putAll(gravitinoConfig);
-    resultConf.put("catalog_uuid", info.id().toString());
 
     this.paimonTableOps = new PaimonTableOps(new PaimonConfig(resultConf));
   }
@@ -290,7 +288,6 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
                 Arrays.stream(columns)
                     .map(
                         column -> {
-                          checkColumn(column.name(), column.defaultValue(), column.autoIncrement());
                           return PaimonColumn.builder()
                               .withName(column.name())
                               .withType(column.dataType())

@@ -20,6 +20,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.paimon.catalog.Catalog;
@@ -62,7 +63,7 @@ public class CatalogUtils {
     allConfig.forEach(configuration::set);
 
     CatalogContext catalogContext =
-        CatalogContext.create(Options.fromMap(paimonConfig.getAllConfig()));
+        CatalogContext.create(Options.fromMap(paimonConfig.getAllConfig()), configuration);
 
     AuthenticationConfig authenticationConfig = new AuthenticationConfig(allConfig);
     if (authenticationConfig.isSimpleAuth()) {
@@ -98,7 +99,8 @@ public class CatalogUtils {
       Map<String, String> properties, Configuration conf) {
     try {
       KerberosClient kerberosClient = new KerberosClient(properties, conf);
-      File keytabFile = kerberosClient.saveKeyTabFileFromUri(properties.get("catalog_uuid"));
+      File keytabFile =
+          kerberosClient.saveKeyTabFileFromUri(UUID.randomUUID().toString().replace("-", ""));
       return kerberosClient.login(keytabFile.getAbsolutePath());
     } catch (IOException e) {
       throw new RuntimeException("Failed to login with kerberos", e);
