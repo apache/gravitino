@@ -356,7 +356,7 @@ public class GravitinoEnv {
     NameIdentifier systemMetalake = NameIdentifier.of(Entity.SYSTEM_METALAKE_RESERVED_NAME);
     // We use MetalakeManager instead of MetalakeDispatcher, Because MetalakeDispatcher doesn't
     // allow us to use the reserved name.
-    if (metalakeManager.metalakeExists(systemMetalake)) {
+    if (!metalakeManager.metalakeExists(systemMetalake)) {
       metalakeManager.createMetalake(systemMetalake, null, Collections.emptyMap());
     }
   }
