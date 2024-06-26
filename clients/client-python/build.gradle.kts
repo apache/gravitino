@@ -62,9 +62,7 @@ fun waitForServerIsReady(host: String = "http://localhost", port: Int = 8090, ti
 }
 
 fun gravitinoServer(operation: String) {
-  val processBuilder = ProcessBuilder("${project.rootDir.path}/distribution/package/bin/gravitino.sh", operation)
-  processBuilder.environment()["HADOOP_USER_NAME"] = "datastrato"
-  val process = processBuilder.start()
+  val process = ProcessBuilder("${project.rootDir.path}/distribution/package/bin/gravitino.sh", operation).start()
   val exitCode = process.waitFor()
   if (exitCode == 0) {
     val currentContext = process.inputStream.bufferedReader().readText()
@@ -172,7 +170,7 @@ tasks {
     environment = mapOf(
       "PROJECT_VERSION" to project.version,
       "GRAVITINO_HOME" to project.rootDir.path + "/distribution/package",
-      "START_EXTERNAL_GRAVITINO" to "true",
+      "START_EXTERNAL_GRAVITINO" to "true"
     )
 
     doLast {

@@ -133,8 +133,10 @@ class IntegrationTestEnv(unittest.TestCase):
             )
 
         # Restart Gravitino Server
+        env_vars = {"HADOOP_USER_NAME": "datastrato"}
         result = subprocess.run(
             [gravitino_startup_script, "restart"],
+            env=env_vars,
             capture_output=True,
             text=True,
             check=False,
