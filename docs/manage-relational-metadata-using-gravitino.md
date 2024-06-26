@@ -29,6 +29,15 @@ Assuming:
  - Gravitino has just started, and the host and port is [http://localhost:8090](http://localhost:8090).
  - Metalake has been created.
 
+## Catalog properties
+
+The following are the common catalog properties for all relational catalogs:
+
+| Property Name       | Description                                                                                                                             | Default Value | Required | Since Version |
+|---------------------|-----------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `cloud.name`        | The property to specify the cloud that the catalog is running on. The valid values are `aws`, `azure`, `gcp`, `on_premise` and `other`. | (none)        | No       | 0.6.0         |
+| `cloud.region-code` | The property to specify the region code of the cloud that the caatlog is running on.                                                    | (none)        | No       | 0.6.0         |
+
 ## Catalog operations
 
 ### Create a catalog

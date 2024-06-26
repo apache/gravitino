@@ -40,7 +40,7 @@ You can check the relevant data source configuration in
 [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html) for
 more details.
 
-Here are the catalog properties defined in Gravitino for Doris catalog:
+Besides the [common catalog properties](./manage-relational-metadata-using-gravitino.md#catalog-properties), the Doris catalog has the following properties:
 
 | Configuration item   | Description                                                                         | Default value | Required | Since Version |
 |----------------------|-------------------------------------------------------------------------------------|---------------|----------|---------------|

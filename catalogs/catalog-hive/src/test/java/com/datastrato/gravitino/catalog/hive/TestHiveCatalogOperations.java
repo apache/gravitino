@@ -5,6 +5,8 @@
 
 package com.datastrato.gravitino.catalog.hive;
 
+import static com.datastrato.gravitino.Catalog.CLOUD_NAME;
+import static com.datastrato.gravitino.Catalog.CLOUD_REGION_CODE;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CHECK_INTERVAL_SEC;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE;
@@ -16,8 +18,6 @@ import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.ME
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.PRINCIPAL;
 import static com.datastrato.gravitino.catalog.hive.TestHiveCatalog.HIVE_PROPERTIES_METADATA;
 import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
-import static com.datastrato.gravitino.connector.BaseCatalogPropertiesMetadata.CLOUD_NAME;
-import static com.datastrato.gravitino.connector.BaseCatalogPropertiesMetadata.CLOUD_REGION_CODE;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.connector.BaseCatalog;

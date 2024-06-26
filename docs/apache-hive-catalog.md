@@ -28,6 +28,8 @@ The Hive catalog supports creating, updating, and deleting databases and tables 
 
 ### Catalog properties
 
+Besides the [common catalog properties](./manage-relational-metadata-using-gravitino.md#catalog-properties), the Hive catalog has the following properties:
+
 | Property Name                            | Description                                                                                                                                                                                                                                         | Default Value | Required                     | Since Version |
 |------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|------------------------------|---------------|
 | `metastore.uris`                         | The Hive metastore service URIs, separate multiple addresses with commas. Such as `thrift://127.0.0.1:9083`                                                                                                                                         | (none)        | Yes                          | 0.2.0         |

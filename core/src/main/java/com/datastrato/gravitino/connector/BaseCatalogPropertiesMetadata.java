@@ -5,8 +5,11 @@
 
 package com.datastrato.gravitino.connector;
 
+import static com.datastrato.gravitino.Catalog.CLOUD_NAME;
+import static com.datastrato.gravitino.Catalog.CLOUD_REGION_CODE;
 import static com.datastrato.gravitino.Catalog.PROPERTY_PACKAGE;
 
+import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.annotation.Evolving;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
@@ -14,10 +17,6 @@ import java.util.Map;
 
 @Evolving
 public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetadata {
-
-  public static final String CLOUD_NAME = "cloud.name";
-  public static final String CLOUD_REGION_CODE = "cloud.region-code";
-
   protected static final Map<String, PropertyEntry<?>> BASIC_CATALOG_PROPERTY_ENTRIES =
       Maps.uniqueIndex(
           ImmutableList.of(
@@ -40,7 +39,7 @@ public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetada
                   "The cloud that the catalog is running on",
                   false /* required */,
                   true /* immutable */,
-                  CloudName.class,
+                  Catalog.CloudName.class,
                   null /* The default value does not work because if the user does not set it, this property will not be displayed */,
                   false /* hidden */,
                   false /* reserved */),
@@ -51,15 +50,4 @@ public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetada
                   null /* The default value does not work because if the user does not set it, this property will not be displayed */,
                   false /* hidden */)),
           PropertyEntry::getName);
-
-  enum CloudName {
-    AWS,
-    AZURE,
-    GCP,
-    ALIBABA_CLOUD,
-    TENCENT_CLOUD,
-    HUAWEI_CLOUD,
-    ON_PREMISE,
-    OTHER
-  }
 }
