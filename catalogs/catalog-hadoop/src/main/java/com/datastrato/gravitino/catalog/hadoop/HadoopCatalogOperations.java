@@ -212,7 +212,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
 
     // Reset the current user based on the name identifier.
-    UserGroupInformation currentUser = getCurrentUser(properties, ident);
+    UserGroupInformation currentUser = getUGIByIdent(properties, ident);
     String apiLoginUser = PrincipalUtils.getCurrentPrincipal().getName();
     try {
       return currentUser.doAs(
@@ -376,7 +376,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       Path filesetPath = new Path(filesetEntity.storageLocation());
 
       // Reset the current user based on the name identifier.
-      UserGroupInformation currentUser = getCurrentUser(filesetEntity.properties(), ident);
+      UserGroupInformation currentUser = getUGIByIdent(filesetEntity.properties(), ident);
 
       return currentUser.doAs(
           (PrivilegedExceptionAction<Boolean>)
@@ -420,7 +420,13 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     }
   }
 
-  public String initKerberos(
+  /**
+   * Get the UserGroupInformation based on the NameIdentifier and properties.
+   *
+   * <p>Note: As UserGroupInformation is a static class, to avoid the thread safety issue, we need
+   * to use synchronized to ensure the thread safety: Make login and getLoginUser atomic.
+   */
+  private synchronized String initKerberos(
       String keytabPath,
       Map<String, String> properties,
       Configuration configuration,
@@ -435,7 +441,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
       try {
         KerberosClient kerberosClient = new KerberosClient(properties, configuration);
-        // Add the kerberos client to closable to close resources.
+        // Add the kerberos client to the closable to close resources.
         closeables.add(kerberosClient);
 
         File keytabFile = kerberosClient.saveKeyTabFileFromUri(keytabPath);
@@ -462,7 +468,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
     String apiLoginUser = PrincipalUtils.getCurrentPrincipal().getName();
     // Reset the current user based on the name identifier and properties.
-    UserGroupInformation currentUser = getCurrentUser(properties, ident);
+    UserGroupInformation currentUser = getUGIByIdent(properties, ident);
     try {
       return currentUser.doAs(
           (PrivilegedExceptionAction<Schema>)
@@ -596,8 +602,8 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       Map<String, String> properties =
           Optional.ofNullable(schemaEntity.properties()).orElse(Collections.emptyMap());
 
-      // Reset current user based on the name identifier.
-      UserGroupInformation user = getCurrentUser(schemaEntity.properties(), ident);
+      // Reset the current user based on the name identifier.
+      UserGroupInformation user = getUGIByIdent(schemaEntity.properties(), ident);
 
       return user.doAs(
           (PrivilegedExceptionAction<Boolean>)
@@ -745,7 +751,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     this.proxyPlugin = hadoopProxyPlugin;
   }
 
-  public UserGroupInformation getCurrentUser(Map<String, String> properties, NameIdentifier ident) {
+  private UserGroupInformation getUGIByIdent(Map<String, String> properties, NameIdentifier ident) {
     KerberosConfig kerberosConfig = new KerberosConfig(properties);
     if (kerberosConfig.isKerberosAuth()) {
       // We assume that the realm of catalog is the same as the realm of the schema and table.
@@ -754,18 +760,14 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
               GRAVITINO_KEYTAB_FORMAT, catalogInfo.id() + "-" + ident.toString().replace(".", "-"));
       initKerberos(keytabPath, properties, new Configuration(), ident);
     }
-
+    // If the kerberos is not enabled (Simple mode), we will use the current user
     return getUserBaseOnNameIdentifier(ident);
   }
 
   private UserGroupInformation getUserBaseOnNameIdentifier(NameIdentifier nameIdentifier) {
     UserInfo userInfo = getNearestUserGroupInformation(nameIdentifier);
     if (userInfo == null) {
-      try {
-        return UserGroupInformation.getCurrentUser();
-      } catch (IOException e) {
-        throw new IllegalStateException("Fail to get currentUser", e);
-      }
+      return UserGroupInformation.createRemoteUser(PrincipalUtils.getCurrentUserName());
     }
 
     UserGroupInformation ugi = userInfo.loginUser;
