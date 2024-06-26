@@ -90,6 +90,22 @@ public class TopicDTO implements Topic {
     return Objects.hash(name, comment, properties, audit);
   }
 
+  @Override
+  public String toString() {
+    return "TopicDTO{"
+        + "name='"
+        + name
+        + '\''
+        + ", comment='"
+        + comment
+        + '\''
+        + ", properties="
+        + properties
+        + ", audit="
+        + audit
+        + '}';
+  }
+
   /** A builder for constructing a Topic DTO. */
   public static class Builder {
     private String name;
