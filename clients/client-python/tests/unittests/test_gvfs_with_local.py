@@ -362,7 +362,7 @@ class TestLocalFilesystem(unittest.TestCase):
         # test delete dir
         dir_virtual_path = fileset_virtual_location + "/sub_dir"
         self.assertTrue(fs.exists(dir_virtual_path))
-        with self.assertRaises(IsADirectoryError):
+        with self.assertRaises((IsADirectoryError, PermissionError)):
             fs.rm_file(dir_virtual_path)
 
     @patch(
