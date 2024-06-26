@@ -70,7 +70,7 @@ public class Configs {
       String.join(File.separator, System.getenv("GRAVITINO_HOME"), "data", "rocksdb");
 
   public static final String DEFAULT_RELATIONAL_JDBC_BACKEND_PATH =
-      String.join(File.separator, System.getenv("GRAVITINO_HOME"), "data");
+      String.join(File.separator, System.getenv("GRAVITINO_HOME"), "data", "jdbc");
 
   public static final String DEFAULT_RELATIONAL_JDBC_BACKEND_URL = "jdbc:h2";
 

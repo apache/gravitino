@@ -310,7 +310,7 @@ public class JDBCBackend implements RelationalBackend {
       throw new IllegalArgumentException("Unknown JDBCBackend: " + name);
     }
 
-    public static JDBCBackendType getJDBCTypeFromURI(String jdbcURI) {
+    public static JDBCBackendType fromURI(String jdbcURI) {
       if (jdbcURI.startsWith("jdbc:h2")) {
         return JDBCBackendType.H2;
       } else if (jdbcURI.startsWith("jdbc:mysql")) {
@@ -324,7 +324,7 @@ public class JDBCBackend implements RelationalBackend {
   /** Start JDBC backend if necessary. For example, start H2 backend if the backend is H2. */
   private static void startJDBCDatabaseIfNecessary(Config config) {
     String jdbcUrl = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL);
-    JDBCBackendType jdbcBackendType = JDBCBackendType.getJDBCTypeFromURI(jdbcUrl);
+    JDBCBackendType jdbcBackendType = JDBCBackendType.fromURI(jdbcUrl);
 
     try {
       JDBCDatabase jdbcDatabase =
