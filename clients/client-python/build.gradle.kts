@@ -170,9 +170,9 @@ tasks {
     args = listOf("run", "--branch", "-m", "unittest")
     workingDir = projectDir.resolve("./tests/integration")
     environment = mapOf(
-            "PROJECT_VERSION" to project.version,
-            "GRAVITINO_HOME" to project.rootDir.path + "/distribution/package",
-            "START_EXTERNAL_GRAVITINO" to "true",
+      "PROJECT_VERSION" to project.version,
+      "GRAVITINO_HOME" to project.rootDir.path + "/distribution/package",
+      "START_EXTERNAL_GRAVITINO" to "true",
     )
 
     doLast {

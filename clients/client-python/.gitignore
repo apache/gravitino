@@ -29,4 +29,3 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
-it-archive/
