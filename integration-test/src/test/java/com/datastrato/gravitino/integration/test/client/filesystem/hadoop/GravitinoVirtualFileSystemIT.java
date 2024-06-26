@@ -39,7 +39,7 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 public class GravitinoVirtualFileSystemIT extends AbstractIT {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoVirtualFileSystemIT.class);
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();

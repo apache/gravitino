@@ -51,7 +51,7 @@ import org.junit.jupiter.api.condition.EnabledIf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 public class HadoopUserImpersonationIT extends AbstractIT {
   private static final Logger LOG = LoggerFactory.getLogger(HadoopCatalogIT.class);
 

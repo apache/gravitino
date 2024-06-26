@@ -36,7 +36,7 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 public class TrinoQueryIT extends TrinoQueryITBase {
   private static final Logger LOG = LoggerFactory.getLogger(TrinoQueryIT.class);
 

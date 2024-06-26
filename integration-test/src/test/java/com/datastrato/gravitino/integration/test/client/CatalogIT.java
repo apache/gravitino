@@ -25,7 +25,7 @@ import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 public class CatalogIT extends AbstractIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogIT.class);

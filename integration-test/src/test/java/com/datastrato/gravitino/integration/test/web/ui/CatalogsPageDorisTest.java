@@ -32,7 +32,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class CatalogsPageDorisTest extends AbstractWebIT {
   MetalakePage metalakePage = new MetalakePage();

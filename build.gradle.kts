@@ -184,9 +184,9 @@ allprojects {
       }
 
       param.useJUnitPlatform {
-        val DOCKER_IT_TEST = project.rootProject.extra["docker_it_test"] as? Boolean ?: false
-        if (!DOCKER_IT_TEST) {
-          excludeTags("gravitino-docker-it")
+        val dockerTest = project.rootProject.extra["dockerTest"] as? Boolean ?: false
+        if (!dockerTest) {
+          excludeTags("gravitino-docker-test")
         }
       }
     }
@@ -655,7 +655,7 @@ tasks {
 
 apply(plugin = "com.dorongold.task-tree")
 
-project.extra["docker_it_test"] = false
+project.extra["dockerTest"] = false
 project.extra["dockerRunning"] = false
 project.extra["macDockerConnector"] = false
 project.extra["isOrbStack"] = false
@@ -675,14 +675,14 @@ fun printDockerCheckInfo() {
   val isOrbStack = project.extra["isOrbStack"] as? Boolean ?: false
 
   if (extra["skipDockerTests"].toString().toBoolean()) {
-    project.extra["dockerTests"] = false
+    project.extra["dockerTest"] = false
   } else if (OperatingSystem.current().isMacOsX() &&
     dockerRunning &&
     (macDockerConnector || isOrbStack)
   ) {
-    project.extra["dockerTests"] = true
+    project.extra["dockerTest"] = true
   } else if (OperatingSystem.current().isLinux() && dockerRunning) {
-    project.extra["dockerTests"] = true
+    project.extra["dockerTest"] = true
   }
 
   println("------------------ Check Docker environment ---------------------")
@@ -692,11 +692,11 @@ fun printDockerCheckInfo() {
     println("OrbStack status ................................................. [${if (dockerRunning && isOrbStack) "yes" else "no"}]")
   }
 
-  val dockerTests = project.extra["dockerTests"] as? Boolean ?: false
-  if (dockerTests) {
+  val dockerTest = project.extra["dockerTest"] as? Boolean ?: false
+  if (dockerTest) {
     println("Using Docker container to run all tests. [$testMode test]")
   } else {
-    println("Run test cases without `gravitino-docker-it` tag ................ [$testMode test]")
+    println("Run test cases without `gravitino-docker-test` tag ................ [$testMode test]")
   }
   println("-----------------------------------------------------------------")
 
