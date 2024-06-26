@@ -170,7 +170,8 @@ class HTTPClient:
 
     def close(self):
         self._request("close", "/")
-        self.auth_data_provider.close()
+        if self.auth_data_provider is not None:
+            self.auth_data_provider.close()
 
 
 def unpack(path: str):
