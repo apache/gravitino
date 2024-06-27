@@ -7,6 +7,7 @@ from typing import List, Dict
 
 from gravitino.api.catalog import Catalog
 from gravitino.api.catalog_change import CatalogChange
+from gravitino.auth.auth_data_provider import AuthDataProvider
 from gravitino.client.gravitino_client_base import GravitinoClientBase
 from gravitino.client.gravitino_metalake import GravitinoMetalake
 from gravitino.name_identifier import NameIdentifier
@@ -26,7 +27,7 @@ class CatalogAlreadyExistsException(Exception):
 
 
 class GravitinoClient(GravitinoClientBase):
-    """Gravitino Client for an user to interact with the Gravitino API, allowing the client to list,
+    """Gravitino Client for a user to interact with the Gravitino API, allowing the client to list,
     load, create, and alter Catalog.
 
     It uses an underlying {@link RESTClient} to send HTTP requests and receive responses from the API.
@@ -34,18 +35,24 @@ class GravitinoClient(GravitinoClientBase):
 
     _metalake: GravitinoMetalake
 
-    def __init__(self, uri: str, metalake_name: str, check_version: bool = True):
+    def __init__(
+        self,
+        uri: str,
+        metalake_name: str,
+        check_version: bool = True,
+        auth_data_provider: AuthDataProvider = None,
+    ):
         """Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
 
         Args:
             uri: The base URI for the Gravitino API.
             metalake_name: The specified metalake name.
-            TODO: authDataProvider: The provider of the data which is used for authentication.
+            auth_data_provider: The provider of the data which is used for authentication.
 
         Raises:
             NoSuchMetalakeException if the metalake with specified name does not exist.
         """
-        super().__init__(uri, check_version)
+        super().__init__(uri, check_version, auth_data_provider)
         self._metalake = super().load_metalake(NameIdentifier.of(metalake_name))
 
     def get_metalake(self) -> GravitinoMetalake:

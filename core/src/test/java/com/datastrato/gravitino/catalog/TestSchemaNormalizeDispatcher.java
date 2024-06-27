@@ -4,8 +4,7 @@
  */
 package com.datastrato.gravitino.catalog;
 
-import static com.datastrato.gravitino.Entity.SECURABLE_ENTITY_RESERVED_NAME;
-
+import com.datastrato.gravitino.MetadataObjects;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.Schema;
@@ -61,7 +60,7 @@ public class TestSchemaNormalizeDispatcher extends TestOperationDispatcher {
   @Test
   public void testNameSpec() {
     NameIdentifier schemaIdent1 =
-        NameIdentifier.of(metalake, catalog, SECURABLE_ENTITY_RESERVED_NAME);
+        NameIdentifier.of(metalake, catalog, MetadataObjects.METADATA_OBJECT_RESERVED_NAME);
     Exception exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,

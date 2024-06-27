@@ -46,6 +46,36 @@
   </property>
 
   <property>
+    <name>hadoop.proxyuser.cli_schema.hosts</name>
+    <value>*</value>
+  </property>
+
+  <property>
+    <name>hadoop.proxyuser.cli_schema.groups</name>
+    <value>*</value>
+  </property>
+
+  <property>
+    <name>hadoop.proxyuser.cli_schema.users</name>
+    <value>*</value>
+  </property>
+
+  <property>
+    <name>hadoop.proxyuser.cli_fileset.hosts</name>
+    <value>*</value>
+  </property>
+
+  <property>
+    <name>hadoop.proxyuser.cli_fileset.groups</name>
+    <value>*</value>
+  </property>
+
+  <property>
+    <name>hadoop.proxyuser.cli_fileset.users</name>
+    <value>*</value>
+  </property>
+
+  <property>
     <name>hadoop.proxyuser.hadoop.hosts</name>
     <value>*</value>
   </property>
