@@ -5,7 +5,7 @@
 package com.datastrato.gravitino.server.web.filter;
 
 import com.datastrato.gravitino.Entity;
-import com.datastrato.gravitino.authorization.AuthorizationUtils;
+import com.datastrato.gravitino.authorization.PermissionChecker;
 import com.datastrato.gravitino.authorization.Privilege;
 import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.SecurableObject;
@@ -26,8 +26,7 @@ public class MetalakeAdminFilter implements BasedRoleFilter {
   @Override
   public void filter(ContainerRequestContext requestContext) throws IOException {
     try {
-      AuthorizationUtils.checkPermission(
-          getMetalakeName(requestContext), getSecurableObject(requestContext));
+      PermissionChecker.check(getMetalakeName(requestContext), getSecurableObject(requestContext));
 
     } catch (ForbiddenException fe) {
       requestContext.abortWith(
