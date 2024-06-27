@@ -281,7 +281,6 @@ public class ProxyCatalogHiveIT extends AbstractIT {
   }
 
   private static void createMetalake() {
-
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 

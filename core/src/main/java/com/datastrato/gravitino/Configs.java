@@ -97,6 +97,7 @@ public class Configs {
   public static final ConfigEntry<String> ENTITY_KV_STORE =
       new ConfigBuilder(ENTITY_KV_STORE_KEY)
           .doc("Detailed implementation of Kv storage")
+          .version(ConfigConstants.VERSION_0_1_0)
           .stringConf()
           .createWithDefault(DEFAULT_ENTITY_KV_STORE);
 
