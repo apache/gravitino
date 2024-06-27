@@ -177,8 +177,8 @@ public class TestRoleOperations extends JerseyTest {
         Privileges.DropCatalog.deny().name(),
         roleDTO.securableObjects().get(1).privileges().get(0).name());
     Assertions.assertEquals(
-        Privileges.UseCatalog.deny().accessType(),
-        roleDTO.securableObjects().get(1).privileges().get(0).accessType());
+        Privileges.UseCatalog.deny().condition(),
+        roleDTO.securableObjects().get(1).privileges().get(0).condition());
 
     Assertions.assertEquals(
         SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()))
@@ -189,8 +189,8 @@ public class TestRoleOperations extends JerseyTest {
         Privileges.UseCatalog.allow().name(),
         roleDTO.securableObjects().get(0).privileges().get(0).name());
     Assertions.assertEquals(
-        Privileges.UseCatalog.allow().accessType(),
-        roleDTO.securableObjects().get(0).privileges().get(0).accessType());
+        Privileges.UseCatalog.allow().condition(),
+        roleDTO.securableObjects().get(0).privileges().get(0).condition());
 
     // Test to a catalog which doesn't exist
     when(catalogDispatcher.catalogExists(any())).thenReturn(false);
@@ -285,8 +285,8 @@ public class TestRoleOperations extends JerseyTest {
         Privileges.UseCatalog.allow().name(),
         roleDTO.securableObjects().get(0).privileges().get(0).name());
     Assertions.assertEquals(
-        Privileges.UseCatalog.allow().accessType(),
-        roleDTO.securableObjects().get(0).privileges().get(0).accessType());
+        Privileges.UseCatalog.allow().condition(),
+        roleDTO.securableObjects().get(0).privileges().get(0).condition());
 
     // Test to throw NoSuchMetalakeException
     doThrow(new NoSuchMetalakeException("mock error")).when(manager).getRole(any(), any());

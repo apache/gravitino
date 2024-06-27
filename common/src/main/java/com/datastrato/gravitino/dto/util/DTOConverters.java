@@ -461,7 +461,7 @@ public class DTOConverters {
 
     return PrivilegeDTO.builder()
         .withName(privilege.name())
-        .withCondition(privilege.accessType())
+        .withCondition(privilege.condition())
         .build();
   }
 

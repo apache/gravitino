@@ -18,8 +18,6 @@
  */
 package com.datastrato.gravitino.utils;
 
-import com.datastrato.gravitino.Catalog;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.Closeable;
 import java.io.File;
@@ -30,7 +28,6 @@ import java.net.URLClassLoader;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.JavaVersion;
 import org.apache.commons.lang3.SystemUtils;
@@ -231,27 +228,26 @@ public class IsolatedClassLoader implements Closeable {
         || name.startsWith("org.apache.log4j")
         || name.startsWith("org.apache.logging.log4j")
         || name.startsWith("java.")
-        || !isPluginClass(name)
+        || !isCatalogClass(name)
         || sharedClasses.stream().anyMatch(name::startsWith);
   }
 
   /**
-   * Checks if a given class name belongs to a catalog or authorization class.
+   * Checks if a given class name belongs to a catalog class.
    *
    * @param name The fully qualified class name.
    * @return true if the class is a catalog class, false otherwise.
    */
-  private boolean isPluginClass(String name) {
-    return (name.startsWith("com.datastrato.gravitino.catalog")
-            && (name.startsWith("com.datastrato.gravitino.catalog.hive.")
-                || name.startsWith("com.datastrato.gravitino.catalog.lakehouse.")
-                || name.startsWith("com.datastrato.gravitino.catalog.jdbc.")
-                || name.startsWith("com.datastrato.gravitino.catalog.mysql.")
-                || name.startsWith("com.datastrato.gravitino.catalog.postgresql.")
-                || name.startsWith("com.datastrato.gravitino.catalog.doris.")
-                || name.startsWith("com.datastrato.gravitino.catalog.hadoop.")
-                || name.startsWith("com.datastrato.gravitino.catalog.kafka.")))
-        || (name.startsWith("com.datastrato.gravitino.authorization"));
+  private boolean isCatalogClass(String name) {
+    return name.startsWith("com.datastrato.gravitino.catalog")
+        && (name.startsWith("com.datastrato.gravitino.catalog.hive.")
+            || name.startsWith("com.datastrato.gravitino.catalog.lakehouse.")
+            || name.startsWith("com.datastrato.gravitino.catalog.jdbc.")
+            || name.startsWith("com.datastrato.gravitino.catalog.mysql.")
+            || name.startsWith("com.datastrato.gravitino.catalog.postgresql.")
+            || name.startsWith("com.datastrato.gravitino.catalog.doris.")
+            || name.startsWith("com.datastrato.gravitino.catalog.hadoop.")
+            || name.startsWith("com.datastrato.gravitino.catalog.kafka."));
   }
 
   /**
@@ -288,58 +284,5 @@ public class IsolatedClassLoader implements Closeable {
 
   private String classToPath(String name) {
     return name.replaceAll("\\.", "/") + ".class";
-  }
-
-  public static String buildPkgPath(
-      Map<String, String> conf, String provider, String libRootPath, String libPrefix) {
-    String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    Preconditions.checkArgument(gravitinoHome != null, "GRAVITINO_HOME not set");
-    boolean testEnv = System.getenv("GRAVITINO_TEST") != null;
-
-    String pkg = conf.get(Catalog.PROPERTY_PACKAGE);
-    String pkgPath;
-    if (pkg != null) {
-      pkgPath = String.join(File.separator, pkg, "libs");
-    } else if (testEnv) {
-      // In test, the authorization package is under the build directory.
-      pkgPath =
-          String.join(
-              File.separator, gravitinoHome, libRootPath, libPrefix + provider, "build", "libs");
-    } else {
-      // In real environment, the authorization package is under the authorization directory.
-      pkgPath = String.join(File.separator, gravitinoHome, libRootPath, provider, "libs");
-    }
-
-    return pkgPath;
-  }
-
-  /**
-   * Build the config path from the specific provider. Usually, the configuration file is under the
-   * conf and conf and package are under the same directory.
-   */
-  public static String buildConfPath(
-      Map<String, String> properties, String provider, String libsRootPath, String libPrefix) {
-    String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    Preconditions.checkArgument(gravitinoHome != null, "GRAVITINO_HOME not set");
-    boolean testEnv = System.getenv("GRAVITINO_TEST") != null;
-
-    String confPath;
-    String pkg = properties.get(Catalog.PROPERTY_PACKAGE);
-    if (pkg != null) {
-      confPath = String.join(File.separator, pkg, "conf");
-    } else if (testEnv) {
-      confPath =
-          String.join(
-              File.separator,
-              gravitinoHome,
-              libsRootPath,
-              libPrefix + provider,
-              "build",
-              "resources",
-              "main");
-    } else {
-      confPath = String.join(File.separator, gravitinoHome, libsRootPath, provider, "conf");
-    }
-    return confPath;
   }
 }

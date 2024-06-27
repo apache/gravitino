@@ -6,55 +6,46 @@ package com.datastrato.gravitino.authorization;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.Map;
 
 /**
  * The abstract base class for Authorization implementations.
  *
- * <p>A typical authorization always contain {@link AuthorizationOperations} which is used to
- * trigger the specific operations by the authorization.
+ * <p>A typical authorization always contain {@link AuthorizationHook} which is used to trigger the
+ * specific operations by the authorization.
  *
- * <p>For example, a Ranger authorization has a RangerAuthorizationOperations which manipulates
- * Ranger to management Hive and HDFS permission.
+ * <p>For example, a Ranger authorization has a RangerAuthorizationHook which manipulates Ranger to
+ * management Hive and HDFS permission.
  *
  * @param <T> The type of the concrete subclass of BaseAuthorization.
  */
 public abstract class BaseAuthorization<T extends BaseAuthorization>
     implements AuthorizationProvider, Closeable {
-  private volatile AuthorizationOperations ops = null;
-
-  private Map<String, String> conf;
-
-  public T withAuthorizationConf(Map<String, String> conf) {
-    this.conf = conf;
-    return (T) this;
-  }
+  private volatile AuthorizationHook hook = null;
 
   /**
-   * Creates a new instance of AuthorizationOperations. The child class should implement this method
-   * to provide a specific AuthorizationOperations instance regarding that authorization.
+   * Creates a new instance of AuthorizationHook. The child class should implement this method to
+   * provide a specific AuthorizationHook instance regarding that authorization.
    *
-   * @param config The configuration parameters for creating AuthorizationOperations.
-   * @return A new instance of AuthorizationOperations.
+   * @return A new instance of AuthorizationHook.
    */
-  protected abstract AuthorizationOperations newOps(Map<String, String> config);
+  protected abstract AuthorizationHook newHook();
 
-  public AuthorizationOperations ops() {
-    if (ops == null) {
+  public AuthorizationHook hook() {
+    if (hook == null) {
       synchronized (this) {
-        if (ops == null) {
-          ops = newOps(conf);
+        if (hook == null) {
+          hook = newHook();
         }
       }
     }
 
-    return ops;
+    return hook;
   }
 
   @Override
   public void close() throws IOException {
-    if (ops != null) {
-      ops = null;
+    if (hook != null) {
+      hook = null;
     }
   }
 }

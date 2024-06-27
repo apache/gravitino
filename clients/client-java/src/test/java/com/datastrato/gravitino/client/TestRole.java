@@ -243,8 +243,8 @@ public class TestRole extends TestBase {
       Assertions.assertEquals(
           expectObject.privileges().get(0).name(), actualObject.privileges().get(0).name());
       Assertions.assertEquals(
-          expectObject.privileges().get(0).accessType(),
-          actualObject.privileges().get(0).accessType());
+          expectObject.privileges().get(0).condition(),
+          actualObject.privileges().get(0).condition());
     }
     Assertions.assertEquals(
         expected.securableObjects().get(0).fullName(), actual.securableObjects().get(0).fullName());

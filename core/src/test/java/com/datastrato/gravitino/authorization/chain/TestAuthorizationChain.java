@@ -5,156 +5,75 @@
 package com.datastrato.gravitino.authorization.chain;
 
 import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.Configs;
-import com.datastrato.gravitino.MetadataObject;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.authorization.AuthorizationManager;
-import com.datastrato.gravitino.authorization.AuthorizationOperations;
-import com.datastrato.gravitino.authorization.Privileges;
-import com.datastrato.gravitino.authorization.RoleChange;
-import com.datastrato.gravitino.authorization.SecurableObject;
-import com.datastrato.gravitino.authorization.SecurableObjects;
-import com.datastrato.gravitino.authorization.chain.authorization1.TestAuthorizationOperations1;
-import com.datastrato.gravitino.authorization.chain.authorization2.TestAuthorizationOperations2;
+import com.datastrato.gravitino.TestCatalog;
+import com.datastrato.gravitino.authorization.AuthorizationHook;
+import com.datastrato.gravitino.authorization.chain.authorization1.TestAuthorizationHook1;
+import com.datastrato.gravitino.authorization.chain.authorization2.TestAuthorizationHook2;
+import com.datastrato.gravitino.connector.BaseCatalog;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
-import com.datastrato.gravitino.meta.RoleEntity;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import java.time.Instant;
-import java.util.Arrays;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 public class TestAuthorizationChain {
-  private static AuthorizationManager authorizationManager;
-  private static Config config;
-  private static CatalogEntity catalogTest1;
-  private static CatalogEntity catalogTest2;
-  private static RoleEntity roleEntity;
-  private static SecurableObject dropTable;
-  private static AuditInfo auditInfo;
+  private static TestCatalog testCatalog1;
+  private static TestCatalog testCatalog2;
 
   @BeforeAll
   public static void setUp() throws Exception {
-    auditInfo = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
 
-    catalogTest1 =
+    CatalogEntity catalogTest1 =
         CatalogEntity.builder()
             .withId(1L)
             .withName("catalog-test1")
             .withNamespace(Namespace.of("default"))
             .withType(Catalog.Type.RELATIONAL)
-            .withProperties(ImmutableMap.of(AuthorizationManager.AUTHORIZATION_PROVIDER, "test1"))
-            .withProvider("hive")
+            .withProperties(ImmutableMap.of(BaseCatalog.AUTHORIZATION_IMPL, "test1"))
+            .withProvider("test")
             .withAuditInfo(auditInfo)
             .build();
 
-    catalogTest2 =
+    testCatalog1 =
+        new TestCatalog().withCatalogConf(ImmutableMap.of()).withCatalogEntity(catalogTest1);
+
+    CatalogEntity catalogTest2 =
         CatalogEntity.builder()
             .withId(2L)
             .withName("catalog-test2")
             .withNamespace(Namespace.of("default"))
             .withType(Catalog.Type.RELATIONAL)
-            .withProperties(ImmutableMap.of(AuthorizationManager.AUTHORIZATION_PROVIDER, "test2"))
-            .withProvider("hive")
+            .withProperties(ImmutableMap.of(BaseCatalog.AUTHORIZATION_IMPL, "test2"))
+            .withProvider("test")
             .withAuditInfo(auditInfo)
             .build();
 
-    roleEntity =
-        RoleEntity.builder()
-            .withId(1L)
-            .withName("role1")
-            .withProperties(Maps.newHashMap())
-            .withSecurableObjects(
-                Lists.newArrayList(
-                    SecurableObjects.ofNamespace(
-                        MetadataObject.Type.TABLE,
-                        Namespace.of("catalog", "schema", "table1"),
-                        Lists.newArrayList(Privileges.ReadTable.allow()))))
-            .withAuditInfo(auditInfo)
-            .build();
-
-    dropTable =
-        SecurableObjects.ofNamespace(
-            MetadataObject.Type.TABLE,
-            Namespace.of("catalog", "schema", "table1"),
-            Lists.newArrayList(Privileges.DropTable.allow()));
-
-    config = new Config(false) {};
-    config.set(Configs.AUTHORIZATION_LOAD_ISOLATED, false);
-
-    authorizationManager = new AuthorizationManager(config);
-  }
-
-  @AfterAll
-  public static void tearDown() throws Exception {
-    if (authorizationManager != null) {
-      authorizationManager.close();
-    }
+    testCatalog2 =
+        new TestCatalog().withCatalogConf(ImmutableMap.of()).withCatalogEntity(catalogTest2);
   }
 
   @Test
   public void testAuthorizationCatalog1() {
-    AuthorizationOperations authOps1 =
-        authorizationManager.loadAuthorizationAndWrap(catalogTest1).getOps();
-    Assertions.assertInstanceOf(TestAuthorizationOperations1.class, authOps1);
-    TestAuthorizationOperations1 operations1 = (TestAuthorizationOperations1) authOps1;
-    Assertions.assertFalse(operations1.grantRolesToUser1);
-    Assertions.assertFalse(operations1.grantRolesToGroup1);
-    Assertions.assertFalse(operations1.revokeRolesFromUser1);
-    Assertions.assertFalse(operations1.revokeRolesFromGroup1);
-    Assertions.assertFalse(operations1.updateRole1);
-    Assertions.assertFalse(operations1.deleteRoles1);
-
-    authorizationManager.runAuthorizationChain(
-        catalogTest1,
-        ops -> ops.grantRolesToUser(Arrays.asList(roleEntity), "user1"),
-        ops -> ops.grantRolesToGroup(Arrays.asList(roleEntity), "group1"),
-        ops -> ops.revokeRolesFromUser(Arrays.asList(roleEntity), "user1"),
-        ops -> ops.revokeRolesFromGroup(Arrays.asList(roleEntity), "group1"),
-        ops -> ops.updateRole(roleEntity, RoleChange.addSecurableObject(dropTable)),
-        ops -> ops.deleteRoles(Arrays.asList(roleEntity)));
-
-    Assertions.assertTrue(operations1.grantRolesToUser1);
-    Assertions.assertTrue(operations1.grantRolesToGroup1);
-    Assertions.assertTrue(operations1.revokeRolesFromUser1);
-    Assertions.assertTrue(operations1.revokeRolesFromGroup1);
-    Assertions.assertTrue(operations1.updateRole1);
-    Assertions.assertTrue(operations1.deleteRoles1);
+    AuthorizationHook authHook1 = testCatalog1.getAuthorizationHook();
+    Assertions.assertInstanceOf(TestAuthorizationHook1.class, authHook1);
+    TestAuthorizationHook1 testAuthOps1 = (TestAuthorizationHook1) authHook1;
+    Assertions.assertFalse(testAuthOps1.callOnCreateRole1);
+    authHook1.onCreateRole(null, null);
+    Assertions.assertTrue(testAuthOps1.callOnCreateRole1);
   }
 
   @Test
   public void testAuthorizationCatalog2() {
-    AuthorizationOperations authOps2 =
-        authorizationManager.loadAuthorizationAndWrap(catalogTest2).getOps();
-    Assertions.assertInstanceOf(TestAuthorizationOperations2.class, authOps2);
-    TestAuthorizationOperations2 operations2 = (TestAuthorizationOperations2) authOps2;
-    Assertions.assertFalse(operations2.grantRolesToUser2);
-    Assertions.assertFalse(operations2.grantRolesToGroup2);
-    Assertions.assertFalse(operations2.revokeRolesFromUser2);
-    Assertions.assertFalse(operations2.revokeRolesFromGroup2);
-    Assertions.assertFalse(operations2.updateRole2);
-    Assertions.assertFalse(operations2.deleteRoles2);
-
-    authorizationManager.runAuthorizationChain(
-        catalogTest2,
-        ops -> ops.grantRolesToUser(Arrays.asList(roleEntity), "user2"),
-        ops -> ops.grantRolesToGroup(Arrays.asList(roleEntity), "group2"),
-        ops -> ops.revokeRolesFromUser(Arrays.asList(roleEntity), "user2"),
-        ops -> ops.revokeRolesFromGroup(Arrays.asList(roleEntity), "group2"),
-        ops -> ops.updateRole(roleEntity, RoleChange.addSecurableObject(dropTable)),
-        ops -> ops.deleteRoles(Arrays.asList(roleEntity)));
-
-    Assertions.assertTrue(operations2.grantRolesToUser2);
-    Assertions.assertTrue(operations2.grantRolesToGroup2);
-    Assertions.assertTrue(operations2.revokeRolesFromUser2);
-    Assertions.assertTrue(operations2.revokeRolesFromGroup2);
-    Assertions.assertTrue(operations2.updateRole2);
-    Assertions.assertTrue(operations2.deleteRoles2);
+    AuthorizationHook authHook2 = testCatalog2.getAuthorizationHook();
+    Assertions.assertInstanceOf(TestAuthorizationHook2.class, authHook2);
+    TestAuthorizationHook2 testAuthOps2 = (TestAuthorizationHook2) authHook2;
+    Assertions.assertFalse(testAuthOps2.callOnCreateRole2);
+    authHook2.onCreateRole(null, null);
+    Assertions.assertTrue(testAuthOps2.callOnCreateRole2);
   }
 }

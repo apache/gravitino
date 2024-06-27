@@ -4,9 +4,8 @@
  */
 package com.datastrato.gravitino.authorization.chain.authorization2;
 
-import com.datastrato.gravitino.authorization.AuthorizationOperations;
+import com.datastrato.gravitino.authorization.AuthorizationHook;
 import com.datastrato.gravitino.authorization.BaseAuthorization;
-import java.util.Map;
 
 public class TestAuthorization2 extends BaseAuthorization<TestAuthorization2> {
 
@@ -18,7 +17,7 @@ public class TestAuthorization2 extends BaseAuthorization<TestAuthorization2> {
   }
 
   @Override
-  protected AuthorizationOperations newOps(Map<String, String> config) {
-    return new TestAuthorizationOperations2();
+  protected AuthorizationHook newHook() {
+    return new TestAuthorizationHook2();
   }
 }
