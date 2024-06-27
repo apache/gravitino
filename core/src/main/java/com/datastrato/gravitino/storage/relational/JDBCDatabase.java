@@ -10,10 +10,10 @@ import java.io.Closeable;
 public interface JDBCDatabase extends Closeable {
 
   /**
-   * Initializes the embedded Relational Backend environment with the provided configuration.
+   * Initializes the Relational database environment with the provided configuration.
    *
-   * @param config The configuration for the backend.
+   * @param config The configuration for the database backend.
    * @throws RuntimeException
    */
-  void initialize(Config config) throws RuntimeException;
+  void initialize(Config config);
 }

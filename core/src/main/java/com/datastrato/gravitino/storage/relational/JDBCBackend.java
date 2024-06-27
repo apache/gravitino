@@ -317,7 +317,7 @@ public class JDBCBackend implements RelationalBackend {
     }
   }
 
-  /** Start JDBC backend if necessary. For example, start H2 backend if the backend is H2. */
+  /** Start JDBC database if necessary. For example, start the H2 database if the backend is H2. */
   private static JDBCDatabase startJDBCDatabaseIfNecessary(Config config) {
     String jdbcUrl = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL);
     JDBCBackendType jdbcBackendType = JDBCBackendType.fromURI(jdbcUrl);

@@ -27,7 +27,7 @@ public class H2Database implements JDBCDatabase {
   private String password;
 
   @Override
-  public void initialize(Config config) throws RuntimeException {
+  public void initialize(Config config) {
     this.h2ConnectionUri = startH2Backend(config);
   }
 
