@@ -39,6 +39,14 @@ public interface FilesetCatalog {
   Fileset loadFileset(NameIdentifier ident) throws NoSuchFilesetException;
 
   /**
+   * Load filesets metadata by {@link NameIdentifier} from the catalog.
+   *
+   * @param idents List of fileset identifier.
+   * @return The fileset metadata.
+   */
+  Fileset[] loadFilesetList(NameIdentifier[] idents);
+
+  /**
    * Check if a fileset exists using an {@link NameIdentifier} from the catalog.
    *
    * @param ident A fileset identifier.
