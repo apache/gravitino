@@ -83,7 +83,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         server_uri=None,
         metalake_name=None,
         cache_size=20,
-        cache_expired_time=300,
+        cache_expired_time=3600,
         **kwargs,
     ):
         self._metalake = metalake_name

@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.integration.test.util;
 
-import static com.datastrato.gravitino.Configs.ENTRY_RELATIONAL_JDBC_BACKEND_PATH;
+import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
 import static com.datastrato.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
 import com.datastrato.gravitino.Config;
@@ -21,7 +21,6 @@ import com.datastrato.gravitino.server.ServerConfig;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import java.io.File;
 import java.io.IOException;
-import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -35,6 +34,10 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -204,7 +207,7 @@ public class AbstractIT {
     file.deleteOnExit();
 
     serverConfig = new ServerConfig();
-    customConfigs.put(ENTRY_RELATIONAL_JDBC_BACKEND_PATH.getKey(), file.getAbsolutePath());
+    customConfigs.put(ENTITY_RELATIONAL_JDBC_BACKEND_PATH.getKey(), file.getAbsolutePath());
     if (testMode != null && testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {
       MiniGravitinoContext context =
           new MiniGravitinoContext(customConfigs, ignoreIcebergRestService);
@@ -218,10 +221,18 @@ public class AbstractIT {
 
       GravitinoITUtils.startGravitinoServer();
 
+      JettyServerConfig jettyServerConfig =
+          JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
+      String checkServerUrl =
+          "http://"
+              + jettyServerConfig.getHost()
+              + ":"
+              + jettyServerConfig.getHttpPort()
+              + "/metrics";
       Awaitility.await()
           .atMost(60, TimeUnit.SECONDS)
           .pollInterval(1, TimeUnit.SECONDS)
-          .until(() -> isGravitinoServerUp());
+          .until(() -> isHttpServerUp(checkServerUrl));
     }
 
     JettyServerConfig jettyServerConfig =
@@ -285,19 +296,22 @@ public class AbstractIT {
     }
   }
 
-  private static boolean isGravitinoServerUp() {
-    JettyServerConfig jettyServerConfig =
-        JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
-    String host = jettyServerConfig.getHost();
-    int port = jettyServerConfig.getHttpPort();
-    int timeout = 3000; // 3 second timeout
-
-    try (Socket socket = new Socket()) {
-      socket.connect(new java.net.InetSocketAddress(host, port), timeout);
-      LOG.info("Gravitino Server is up and running.");
-      return true;
+  /**
+   * Check if the http server is up, If http response status code is 200, then we're assuming the
+   * server is up. Or else we assume the server is not ready.
+   *
+   * <p>Note: The method will ignore the response body and only check the status code.
+   *
+   * @param testUrl A url that we want to test ignore the response body.
+   * @return true if the server is up, false otherwise.
+   */
+  public static boolean isHttpServerUp(String testUrl) {
+    try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+      HttpGet request = new HttpGet(testUrl);
+      ClassicHttpResponse response = httpClient.execute(request, a -> a);
+      return response.getCode() == 200;
     } catch (Exception e) {
-      LOG.warn("Gravitino Server is not accessible.");
+      LOG.warn("Check Gravitino server failed: ", e);
       return false;
     }
   }
