@@ -2,7 +2,7 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.storage.relational.backend;
+package com.datastrato.gravitino.storage.relational.database;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
