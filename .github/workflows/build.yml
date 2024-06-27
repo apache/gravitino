@@ -66,7 +66,7 @@ jobs:
           cache: 'gradle'
 
       - name: Build with Gradle
-        run: ./gradlew build -x test -PjdkVersion=8 -PskipDockerTests=false
+        run: ./gradlew build -x test -PjdkVersion=8
 
   build:
     # The type of runner that the job will run on
