@@ -6,6 +6,8 @@ package com.datastrato.gravitino.authorization;
 
 import static com.datastrato.gravitino.MetadataObjects.METADATA_OBJECT_RESERVED_NAME;
 
+import com.datastrato.gravitino.GravitinoEnv;
+import com.datastrato.gravitino.MetadataObject;
 import com.datastrato.gravitino.exceptions.ForbiddenException;
 import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.meta.RoleEntity;
