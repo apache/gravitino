@@ -7,9 +7,7 @@ from abc import ABC, abstractmethod
 
 
 class AuthDataProvider(ABC):
-    """The provider of authentication data
-
-    """
+    """The provider of authentication data"""
 
     @abstractmethod
     def has_token_data(self) -> bool:
@@ -32,6 +30,4 @@ class AuthDataProvider(ABC):
 
     @abstractmethod
     def close(self):
-        """Close the resource in the provider.
-
-        """
+        """Close the resource in the provider."""
