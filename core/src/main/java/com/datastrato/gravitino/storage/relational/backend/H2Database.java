@@ -28,10 +28,10 @@ public class H2Database implements JDBCDatabase {
 
   @Override
   public void initialize(Config config) {
-    this.h2ConnectionUri = startH2Backend(config);
+    this.h2ConnectionUri = startH2Database(config);
   }
 
-  public String startH2Backend(Config config) {
+  public String startH2Database(Config config) {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     String storagePath = getStoragePath(config);
     String originalJDBCUrl = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL);
