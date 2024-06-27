@@ -98,7 +98,7 @@ public class TestPaimonTable {
   }
 
   @Test
-  void testCreateIcebergTable() {
+  void testCreatePaimonTable() {
     String paimonTableName = "test_paimon_table";
     NameIdentifier tableIdentifier = NameIdentifier.of(paimonSchema.name(), paimonTableName);
     Map<String, String> properties = Maps.newHashMap();
@@ -172,7 +172,7 @@ public class TestPaimonTable {
   }
 
   @Test
-  void testDropIcebergTable() {
+  void testDropPaimonTable() {
     NameIdentifier tableIdentifier = NameIdentifier.of(paimonSchema.name(), genRandomName());
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");

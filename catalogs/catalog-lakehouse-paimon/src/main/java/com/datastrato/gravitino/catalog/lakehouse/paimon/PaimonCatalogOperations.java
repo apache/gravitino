@@ -317,7 +317,7 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
       throw new TableAlreadyExistsException(e, TABLE_ALREADY_EXISTS_EXCEPTION, identifier);
     }
     LOG.info(
-        "Created Paimon table: {}.\nCurrent user: {} \nComment: {}.\nMetadata: {}.",
+        "Created Paimon table: {}. Current user: {}. Comment: {}. Metadata: {}.",
         identifier,
         currentUser,
         comment,
