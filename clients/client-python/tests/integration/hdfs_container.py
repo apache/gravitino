@@ -71,7 +71,7 @@ class HDFSContainer:
                     container.kill()
                 container.remove()
         except NotFound:
-            logger.warning("Cannot find hdfs container in docker env, skip to remove.")
+            logger.warning("Cannot find hdfs container in docker env, skip remove.")
         self._container = self._docker_client.containers.run(
             image="datastrato/gravitino-ci-hive:0.1.12",
             name=self._container_name,

@@ -5,9 +5,11 @@ This software is licensed under the Apache License version 2.
 
 import logging
 import os
+import platform
 import shutil
 import subprocess
 import tarfile
+import unittest
 from random import randint
 from typing import Dict
 
@@ -123,6 +125,10 @@ def _configure_hadoop_environment():
         ) from e
 
 
+#  The Hadoop distribution package does not have native hdfs libraries for macOS / Windows systems
+#  (`libhdfs.dylib` for macOS and `libhdfs.dll` for Windows), so the integration tests cannot be run
+#  on these two systems at present.
+@unittest.skipIf(platform.system() != "Linux", "Not applicable on this platform")
 class TestGvfsWithHDFS(IntegrationTestEnv):
     metalake_name: str = "TestGvfsWithHDFS_metalake" + str(randint(1, 10000))
     catalog_name: str = "test_gvfs_catalog" + str(randint(1, 10000))
