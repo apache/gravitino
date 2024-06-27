@@ -26,7 +26,7 @@ import org.junit.jupiter.api.Test;
 
 public class TestPaimonCatalog {
 
-  public static final HasPropertyMetadata PAIMON_PROPERTIES_METADATA =
+  static final HasPropertyMetadata PAIMON_PROPERTIES_METADATA =
       new HasPropertyMetadata() {
 
         @Override

@@ -160,9 +160,11 @@ These rules only apply to the catalog properties and don't affect the schema or 
 
 Below is a list of catalog properties that will be used by all Gravitino catalogs:
 
-| Configuration item | Description                                                                                                                                                                                                                                                | Default value | Required | Since version |
-|--------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `package`          | The path of the catalog package, Gravitino leverages this path to load the related catalog libs and configurations. The package should consist two folders, `conf` (for catalog related configurations) and `libs` (for catalog related dependencies/jars) | (none)        | No       | 0.5.0         |
+| Configuration item  | Description                                                                                                                                                                                                                                                | Default value | Required | Since version |
+|---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `package`           | The path of the catalog package, Gravitino leverages this path to load the related catalog libs and configurations. The package should consist two folders, `conf` (for catalog related configurations) and `libs` (for catalog related dependencies/jars) | (none)        | No       | 0.5.0         |
+| `cloud.name`        | The property to specify the cloud that the catalog is running on. The valid values are `aws`, `azure`, `gcp`, `on_premise` and `other`.                                                                                                                    | (none)        | No       | 0.6.0         |
+| `cloud.region-code` | The property to specify the region code of the cloud that the caatlog is running on.                                                                                                                                                                       | (none)        | No       | 0.6.0         |
 
 
 The following table lists the catalog specific properties and their default paths:
