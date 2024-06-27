@@ -149,7 +149,7 @@ public interface CatalogMetaMapper {
   @Update(
       "UPDATE "
           + TABLE_NAME
-          + " SET deleted_at =(UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
           + " WHERE catalog_id = #{catalogId} AND deleted_at = 0")
   Integer softDeleteCatalogMetasByCatalogId(@Param("catalogId") Long catalogId);
 
