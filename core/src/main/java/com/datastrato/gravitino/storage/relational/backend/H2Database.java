@@ -73,7 +73,7 @@ public class H2Database implements JDBCDatabase {
     return originURI;
   }
 
-  static String getStoragePath(Config config) {
+  private static String getStoragePath(Config config) {
     String dbPath = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH);
     if (StringUtils.isBlank(dbPath)) {
       return Configs.DEFAULT_RELATIONAL_JDBC_BACKEND_PATH;
