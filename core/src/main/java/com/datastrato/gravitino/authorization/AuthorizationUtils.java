@@ -120,7 +120,7 @@ public class AuthorizationUtils {
 
   public static void checkPermission(String metalake, SecurableObject object) {
 
-    if (!satisfyPrivileges(metalake, object)) {
+    if (!satisfyOnePrivilegeOfSecurableObject(metalake, object)) {
       throw new ForbiddenException(
           "Securable object %s doesn't have the one of privileges %s",
           object,
@@ -129,7 +129,8 @@ public class AuthorizationUtils {
     }
   }
 
-  public static boolean satisfyPrivileges(String metalake, SecurableObject object) {
+  public static boolean satisfyOnePrivilegeOfSecurableObject(
+      String metalake, SecurableObject object) {
     if (object.privileges().isEmpty()) {
       return true;
     }
@@ -140,35 +141,35 @@ public class AuthorizationUtils {
     List<RoleEntity> roles;
     try {
       roles = accessControlManager.listRolesByUser(metalake, currentUser);
-
-      // If any privilege of securable object is satisfied, the operation will be allowed.
-      // For example, The `loadTable` operation will be allowed when the user has the privilege
-      // of reading table or writing table.
-      for (Privilege privilege : object.privileges()) {
-        boolean privilegeDenied = false;
-        for (RoleEntity role : roles) {
-          // The deny privilege is prior to the allow privilege. If one entity has the
-          // deny privilege and allow privilege at the same time. The entity doesn't have the
-          // privilege.
-          if (hasPrivilegeWithCondition(role, object, privilege.name(), Privilege.Condition.DENY)) {
-            privilegeDenied = true;
-            break;
-          }
-        }
-        if (privilegeDenied) {
-          continue;
-        }
-
-        for (RoleEntity role : roles) {
-          if (hasPrivilegeWithCondition(
-              role, object, privilege.name(), Privilege.Condition.ALLOW)) {
-            return true;
-          }
-        }
-      }
     } catch (NoSuchUserException noSuchUserException) {
       // If one user doesn't exist in the metalake, the user doesn't have any privilege.
       return false;
+    }
+
+    // If one privilege of securable object is satisfied, the operation will be allowed.
+    // For example, The `loadTable` operation will be allowed when the user has the privilege
+    // of reading table or writing table. If the user is allowed to read table, but he is
+    // denied to write table, he can still load table.
+    for (Privilege privilege : object.privileges()) {
+      boolean privilegeDenied = false;
+      for (RoleEntity role : roles) {
+        // The deny privilege is prior to the allow privilege. If one entity has the
+        // deny privilege and allow privilege at the same time. The entity doesn't have the
+        // privilege.
+        if (hasPrivilegeWithCondition(role, object, privilege.name(), Privilege.Condition.DENY)) {
+          privilegeDenied = true;
+          break;
+        }
+      }
+      if (privilegeDenied) {
+        continue;
+      }
+
+      for (RoleEntity role : roles) {
+        if (hasPrivilegeWithCondition(role, object, privilege.name(), Privilege.Condition.ALLOW)) {
+          return true;
+        }
+      }
     }
 
     return false;

@@ -165,8 +165,7 @@ class AdminManager {
 
       for (UserEntity userEntity : userEntities) {
         // Case 1: If the user is the service admin, we should add the system metalake manage user
-        // role
-        // for it.
+        // role for it.
         if (serviceAdmins.contains(userEntity.name())) {
           if (!userEntity.roleNames().contains(Entity.MANAGE_METALAKE_ADMIN_ROLE)) {
             List<String> newRoleNames = Lists.newArrayList(userEntity.roleNames());
