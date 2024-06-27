@@ -4,7 +4,6 @@
  */
 package com.datastrato.gravitino.metalake;
 
-import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Entity.EntityType;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.EntityStore;
@@ -59,10 +58,7 @@ public class MetalakeManager implements MetalakeDispatcher {
   @Override
   public BaseMetalake[] listMetalakes() {
     try {
-      // We filter the system metalake temporarily. If we add more features in the future, we can
-      // show it for users.
       return store.list(Namespace.empty(), BaseMetalake.class, EntityType.METALAKE).stream()
-          .filter(baseMetalake -> !baseMetalake.name().equals(Entity.SYSTEM_METALAKE_RESERVED_NAME))
           .toArray(BaseMetalake[]::new);
     } catch (IOException ioe) {
       LOG.error("Listing Metalakes failed due to storage issues.", ioe);

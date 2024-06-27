@@ -10,7 +10,6 @@ import com.datastrato.gravitino.dto.responses.OAuth2ErrorResponse;
 import com.datastrato.gravitino.exceptions.BadRequestException;
 import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
-import com.datastrato.gravitino.exceptions.ForbiddenException;
 import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
@@ -377,9 +376,6 @@ public class ErrorHandlers {
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new MetalakeAlreadyExistsException(errorMessage);
 
-        case ErrorConstants.FORBIDDEN_CODE:
-          throw new ForbiddenException(errorMessage);
-
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
 
@@ -537,9 +533,6 @@ public class ErrorHandlers {
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new UserAlreadyExistsException(errorMessage);
 
-        case ErrorConstants.FORBIDDEN_CODE:
-          throw new ForbiddenException(errorMessage);
-
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
 
@@ -574,9 +567,6 @@ public class ErrorHandlers {
 
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new GroupAlreadyExistsException(errorMessage);
-
-        case ErrorConstants.FORBIDDEN_CODE:
-          throw new ForbiddenException(errorMessage);
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
@@ -613,9 +603,6 @@ public class ErrorHandlers {
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new PrivilegesAlreadyGrantedException(errorMessage);
 
-        case ErrorConstants.FORBIDDEN_CODE:
-          throw new ForbiddenException(errorMessage);
-
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
 
@@ -650,9 +637,6 @@ public class ErrorHandlers {
 
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new RoleAlreadyExistsException(errorMessage);
-
-        case ErrorConstants.FORBIDDEN_CODE:
-          throw new ForbiddenException(errorMessage);
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
@@ -690,9 +674,6 @@ public class ErrorHandlers {
           } else {
             throw new NotFoundException(errorMessage);
           }
-
-        case ErrorConstants.FORBIDDEN_CODE:
-          throw new ForbiddenException(errorMessage);
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);

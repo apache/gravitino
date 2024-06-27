@@ -32,12 +32,6 @@ public interface Entity extends Serializable {
   /** The role schema name in the system catalog. */
   String ROLE_SCHEMA_NAME = "role";
 
-  /** The pre-created role entity of the system metalake to allow to create any metalake */
-  String METALAKE_CREATE_ROLE = "system_role_metalake_create";
-
-  /** The pre-created role entity of the system metalake to allow to manage metalake admin. */
-  String MANAGE_METALAKE_ADMIN_ROLE = "system_role_manage_metalake_admin";
-
   /** The tag schema name in the system catalog. */
   String TAG_SCHEMA_NAME = "tag";
 

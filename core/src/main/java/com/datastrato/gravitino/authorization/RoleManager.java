@@ -69,8 +69,6 @@ class RoleManager {
                             .setNameFormat("role-cleaner-%d")
                             .build())))
             .build();
-
-    initSystemRoles();
   }
 
   RoleEntity createRole(
@@ -170,58 +168,5 @@ class RoleManager {
       }
     }
     return roleEntities;
-  }
-
-  void initSystemRoles() {
-    try {
-      if (!store.exists(AuthorizationUtils.ofSystemMetalakeAddUserRole(), Entity.EntityType.ROLE)) {
-        RoleEntity roleEntity =
-            RoleEntity.builder()
-                .withId(idGenerator.nextId())
-                .withName(Entity.MANAGE_METALAKE_ADMIN_ROLE)
-                .withNamespace(
-                    AuthorizationUtils.ofRoleNamespace(Entity.SYSTEM_METALAKE_RESERVED_NAME))
-                .withSecurableObjects(
-                    Lists.newArrayList(
-                        SecurableObjects.ofMetalake(
-                            Entity.SYSTEM_METALAKE_RESERVED_NAME,
-                            Lists.newArrayList(
-                                Privileges.AddUser.allow(), Privileges.RemoveUser.allow()))))
-                .withAuditInfo(
-                    AuditInfo.builder()
-                        .withCreator(System.getProperty("user.name"))
-                        .withCreateTime(Instant.now())
-                        .build())
-                .build();
-
-        store.put(roleEntity, false /* overwritten */);
-        cache.put(roleEntity.nameIdentifier(), roleEntity);
-      }
-
-      if (!store.exists(AuthorizationUtils.ofMetalakeCreateRole(), Entity.EntityType.ROLE)) {
-        RoleEntity roleEntity =
-            RoleEntity.builder()
-                .withId(idGenerator.nextId())
-                .withNamespace(
-                    AuthorizationUtils.ofRoleNamespace(Entity.SYSTEM_METALAKE_RESERVED_NAME))
-                .withName(Entity.METALAKE_CREATE_ROLE)
-                .withSecurableObjects(
-                    Lists.newArrayList(
-                        SecurableObjects.ofAllMetalakes(
-                            Lists.newArrayList(Privileges.CreateMetalake.allow()))))
-                .withAuditInfo(
-                    AuditInfo.builder()
-                        .withCreator(System.getProperty("user.name"))
-                        .withCreateTime(Instant.now())
-                        .build())
-                .build();
-
-        store.put(roleEntity, false /* overwritten */);
-        cache.put(roleEntity.nameIdentifier(), roleEntity);
-      }
-    } catch (IOException ioe) {
-      LOG.error("Failed to init system roles due to storage issues", ioe);
-      throw new RuntimeException(ioe);
-    }
   }
 }

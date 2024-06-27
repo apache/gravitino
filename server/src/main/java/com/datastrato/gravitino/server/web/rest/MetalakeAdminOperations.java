@@ -27,7 +27,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @NameBindings.AccessControlInterfaces
-@NameBindings.MetalakeAdminInterface
 @Path("/admins")
 public class MetalakeAdminOperations {
   private static final Logger LOG = LoggerFactory.getLogger(MetalakeAdminOperations.class);

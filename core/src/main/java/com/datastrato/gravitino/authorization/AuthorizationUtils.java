@@ -40,22 +40,6 @@ public class AuthorizationUtils {
         metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME, user);
   }
 
-  public static NameIdentifier ofMetalakeCreateRole() {
-    return NameIdentifier.of(
-        Entity.SYSTEM_METALAKE_RESERVED_NAME,
-        Entity.SYSTEM_CATALOG_RESERVED_NAME,
-        Entity.ROLE_SCHEMA_NAME,
-        Entity.METALAKE_CREATE_ROLE);
-  }
-
-  public static NameIdentifier ofSystemMetalakeAddUserRole() {
-    return NameIdentifier.of(
-        Entity.SYSTEM_METALAKE_RESERVED_NAME,
-        Entity.SYSTEM_CATALOG_RESERVED_NAME,
-        Entity.ROLE_SCHEMA_NAME,
-        Entity.MANAGE_METALAKE_ADMIN_ROLE);
-  }
-
   public static Namespace ofRoleNamespace(String metalake) {
     return Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.ROLE_SCHEMA_NAME);
   }
