@@ -20,6 +20,7 @@ dependencies {
   implementation(libs.commons.io)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
+  implementation(libs.h2db)
   implementation(libs.mybatis)
   implementation(libs.protobuf.java.util) {
     exclude("com.google.guava", "guava")
@@ -36,10 +37,18 @@ dependencies {
   testCompileOnly(libs.lombok)
 
   testImplementation(libs.awaitility)
-  testImplementation(libs.h2db)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
+}
+
+tasks.test {
+  val testMode = project.properties["testMode"] as? String ?: "embedded"
+  if (testMode == "embedded") {
+    environment("GRAVITINO_HOME", project.rootDir.path)
+  } else {
+    environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package")
+  }
 }
