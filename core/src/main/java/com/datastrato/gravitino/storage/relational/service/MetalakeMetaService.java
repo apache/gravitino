@@ -56,17 +56,43 @@ public class MetalakeMetaService {
     return POConverters.fromMetalakePOs(metalakePOS);
   }
 
+  public Long getMetalakeIdByNameIdentifier(NameIdentifier nameIdentifier) {
+    NameIdentifierUtil.checkMetalake(nameIdentifier);
+    return IdNameMappingService.getInstance()
+        .get(
+            nameIdentifier,
+            ident -> {
+              Long metalakeId =
+                  SessionUtils.getWithoutCommit(
+                      MetalakeMetaMapper.class,
+                      mapper -> mapper.selectMetalakeIdMetaByName(nameIdentifier.name()));
+              if (metalakeId == null) {
+                throw new NoSuchEntityException(
+                    NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+                    Entity.EntityType.METALAKE.name().toLowerCase(),
+                    nameIdentifier.toString());
+              }
+              return metalakeId;
+            });
+  }
+
   public Long getMetalakeIdByName(String metalakeName) {
-    Long metalakeId =
-        SessionUtils.getWithoutCommit(
-            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
-    if (metalakeId == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.METALAKE.name().toLowerCase(),
-          metalakeName);
-    }
-    return metalakeId;
+    return IdNameMappingService.getInstance()
+        .get(
+            NameIdentifierUtil.ofMetalake(metalakeName),
+            ident -> {
+              Long metalakeId =
+                  SessionUtils.getWithoutCommit(
+                      MetalakeMetaMapper.class,
+                      mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
+              if (metalakeId == null) {
+                throw new NoSuchEntityException(
+                    NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+                    Entity.EntityType.METALAKE.name().toLowerCase(),
+                    metalakeName);
+              }
+              return metalakeId;
+            });
   }
 
   public BaseMetalake getMetalakeByIdentifier(NameIdentifier ident) {

@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
+import org.apache.commons.lang3.ArrayUtils;
 
 /** The service class for schema metadata. It provides the basic database operations for schema. */
 public class SchemaMetaService {
@@ -61,7 +62,7 @@ public class SchemaMetaService {
         SchemaMetaMapper.class, mapper -> mapper.selectSchemaMetaById(schemaId));
   }
 
-  public Long getSchemaIdByCatalogIdAndName(Long catalogId, String schemaName) {
+  private Long getSchemaIdByCatalogIdAndName(Long catalogId, String schemaName) {
     Long schemaId =
         SessionUtils.getWithoutCommit(
             SchemaMetaMapper.class,
@@ -74,6 +75,21 @@ public class SchemaMetaService {
           schemaName);
     }
     return schemaId;
+  }
+
+  public Long getSchemaIdByNameIdentifier(NameIdentifier identifier) {
+    return IdNameMappingService.getInstance()
+        .get(
+            identifier,
+            ident -> {
+              NameIdentifierUtil.checkSchema(ident);
+              String schemaName = ident.name();
+
+              Long catalogId =
+                  CommonMetaService.getInstance().getParentEntityIdByNamespace(ident.namespace());
+
+              return getSchemaIdByCatalogIdAndName(catalogId, schemaName);
+            });
   }
 
   public SchemaEntity getSchemaByIdentifier(NameIdentifier identifier) {
@@ -166,9 +182,9 @@ public class SchemaMetaService {
     NameIdentifierUtil.checkSchema(identifier);
 
     String schemaName = identifier.name();
-    Long catalogId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
-    Long schemaId = getSchemaIdByCatalogIdAndName(catalogId, schemaName);
+    Long schemaId = getSchemaIdByNameIdentifier(identifier);
+    // Invalidate it in the cache.
+    IdNameMappingService.getInstance().invalidate(identifier);
 
     if (schemaId != null) {
       if (cascade) {
@@ -226,26 +242,25 @@ public class SchemaMetaService {
   public int deleteSchemaMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
         SchemaMetaMapper.class,
-        mapper -> {
-          return mapper.deleteSchemaMetasByLegacyTimeline(legacyTimeline, limit);
-        });
+        mapper -> mapper.deleteSchemaMetasByLegacyTimeline(legacyTimeline, limit));
   }
 
   private void fillSchemaPOBuilderParentEntityId(SchemaPO.Builder builder, Namespace namespace) {
     NamespaceUtil.checkSchema(namespace);
-    Long parentEntityId = null;
+
+    Long entityId;
     for (int level = 0; level < namespace.levels().length; level++) {
-      String name = namespace.level(level);
+      String[] levels = ArrayUtils.subarray(namespace.levels(), 0, level + 1);
+      NameIdentifier nameIdentifier = NameIdentifier.of(levels);
       switch (level) {
         case 0:
-          parentEntityId = MetalakeMetaService.getInstance().getMetalakeIdByName(name);
-          builder.withMetalakeId(parentEntityId);
-          continue;
+          entityId =
+              MetalakeMetaService.getInstance().getMetalakeIdByNameIdentifier(nameIdentifier);
+          builder.withMetalakeId(entityId);
+          break;
         case 1:
-          parentEntityId =
-              CatalogMetaService.getInstance()
-                  .getCatalogIdByMetalakeIdAndName(parentEntityId, name);
-          builder.withCatalogId(parentEntityId);
+          entityId = CatalogMetaService.getInstance().getCatalogIdByNameIdentifier(nameIdentifier);
+          builder.withCatalogId(entityId);
           break;
       }
     }

@@ -7,6 +7,7 @@ package com.datastrato.gravitino.storage.relational.utils;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.MetadataObject;
 import com.datastrato.gravitino.MetadataObjects;
+import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.storage.relational.po.CatalogPO;
 import com.datastrato.gravitino.storage.relational.po.FilesetPO;
 import com.datastrato.gravitino.storage.relational.po.MetalakePO;
@@ -21,8 +22,8 @@ import com.datastrato.gravitino.storage.relational.service.TableMetaService;
 import com.datastrato.gravitino.storage.relational.service.TopicMetaService;
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
-import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.ArrayUtils;
 
 /**
  * MetadataObjectUtils is used for converting full name to entity id and converting entity id to
@@ -37,7 +38,7 @@ public class MetadataObjectUtils {
   private MetadataObjectUtils() {}
 
   public static long getMetadataObjectId(
-      long metalakeId, String fullName, MetadataObject.Type type) {
+      String metalakeName, String fullName, MetadataObject.Type type) {
     if (fullName.equals(MetadataObjects.METADATA_OBJECT_RESERVED_NAME)
         && type == MetadataObject.Type.METALAKE) {
       return Entity.ALL_METALAKES_ENTITY_ID;
@@ -47,25 +48,20 @@ public class MetadataObjectUtils {
       return MetalakeMetaService.getInstance().getMetalakeIdByName(fullName);
     }
 
-    List<String> names = DOT_SPLITTER.splitToList(fullName);
-    long catalogId =
-        CatalogMetaService.getInstance().getCatalogIdByMetalakeIdAndName(metalakeId, names.get(0));
+    String[] levelsWithoutMetalake = DOT_SPLITTER.splitToList(fullName).toArray(new String[0]);
+    String[] fullLevels = ArrayUtils.addFirst(levelsWithoutMetalake, metalakeName);
+    NameIdentifier identifier = NameIdentifier.of(fullLevels);
+
     if (type == MetadataObject.Type.CATALOG) {
-      return catalogId;
-    }
-
-    long schemaId =
-        SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(catalogId, names.get(1));
-    if (type == MetadataObject.Type.SCHEMA) {
-      return schemaId;
-    }
-
-    if (type == MetadataObject.Type.FILESET) {
-      return FilesetMetaService.getInstance().getFilesetIdBySchemaIdAndName(schemaId, names.get(2));
+      return CatalogMetaService.getInstance().getCatalogIdByNameIdentifier(identifier);
+    } else if (type == MetadataObject.Type.SCHEMA) {
+      return SchemaMetaService.getInstance().getSchemaIdByNameIdentifier(identifier);
+    } else if (type == MetadataObject.Type.FILESET) {
+      return FilesetMetaService.getInstance().getFilesetIdByNameIdentifier(identifier);
     } else if (type == MetadataObject.Type.TOPIC) {
-      return TopicMetaService.getInstance().getTopicIdBySchemaIdAndName(schemaId, names.get(2));
+      return TopicMetaService.getInstance().getTopicIdByNameIdentifier(identifier);
     } else if (type == MetadataObject.Type.TABLE) {
-      return TableMetaService.getInstance().getTableIdBySchemaIdAndName(schemaId, names.get(2));
+      return TableMetaService.getInstance().getTableByNameIdentifier(identifier);
     }
 
     throw new IllegalArgumentException(String.format("Doesn't support the type %s", type));

@@ -67,6 +67,19 @@ public class UserMetaService {
     return userId;
   }
 
+  private Long getUserIdByNameIdentifier(NameIdentifier identifier) {
+    AuthorizationUtils.checkUser(identifier);
+
+    return IdNameMappingService.getInstance()
+        .get(
+            identifier,
+            ident -> {
+              Long metalakeId =
+                  MetalakeMetaService.getInstance().getMetalakeIdByName(ident.namespace().level(0));
+              return getUserIdByMetalakeIdAndName(metalakeId, ident.name());
+            });
+  }
+
   public UserEntity getUserByIdentifier(NameIdentifier identifier) {
     AuthorizationUtils.checkUser(identifier);
 
@@ -123,10 +136,7 @@ public class UserMetaService {
 
   public boolean deleteUser(NameIdentifier identifier) {
     AuthorizationUtils.checkUser(identifier);
-
-    Long metalakeId =
-        MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
-    Long userId = getUserIdByMetalakeIdAndName(metalakeId, identifier.name());
+    Long userId = getUserIdByNameIdentifier(identifier);
 
     SessionUtils.doMultipleWithCommit(
         () ->

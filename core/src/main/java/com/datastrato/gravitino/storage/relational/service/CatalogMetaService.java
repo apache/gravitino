@@ -68,7 +68,7 @@ public class CatalogMetaService {
     return catalogPO;
   }
 
-  public Long getCatalogIdByMetalakeIdAndName(Long metalakeId, String catalogName) {
+  private Long getCatalogIdByMetalakeIdAndName(Long metalakeId, String catalogName) {
     Long catalogId =
         SessionUtils.getWithoutCommit(
             CatalogMetaMapper.class,
@@ -81,6 +81,20 @@ public class CatalogMetaService {
           catalogName);
     }
     return catalogId;
+  }
+
+  public Long getCatalogIdByNameIdentifier(NameIdentifier identifier) {
+    NameIdentifierUtil.checkCatalog(identifier);
+
+    return IdNameMappingService.getInstance()
+        .get(
+            identifier,
+            ident -> {
+              String catalogName = ident.name();
+              Long metalakeId =
+                  CommonMetaService.getInstance().getParentEntityIdByNamespace(ident.namespace());
+              return getCatalogIdByMetalakeIdAndName(metalakeId, catalogName);
+            });
   }
 
   public CatalogEntity getCatalogByIdentifier(NameIdentifier identifier) {
@@ -176,10 +190,7 @@ public class CatalogMetaService {
     NameIdentifierUtil.checkCatalog(identifier);
 
     String catalogName = identifier.name();
-    Long metalakeId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
-
-    Long catalogId = getCatalogIdByMetalakeIdAndName(metalakeId, catalogName);
+    Long catalogId = getCatalogIdByNameIdentifier(identifier);
 
     if (cascade) {
       SessionUtils.doMultipleWithCommit(
@@ -226,8 +237,6 @@ public class CatalogMetaService {
   public int deleteCatalogMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
         CatalogMetaMapper.class,
-        mapper -> {
-          return mapper.deleteCatalogMetasByLegacyTimeline(legacyTimeline, limit);
-        });
+        mapper -> mapper.deleteCatalogMetasByLegacyTimeline(legacyTimeline, limit));
   }
 }

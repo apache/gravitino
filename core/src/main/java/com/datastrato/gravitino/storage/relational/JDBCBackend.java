@@ -31,6 +31,7 @@ import com.datastrato.gravitino.storage.relational.database.H2Database;
 import com.datastrato.gravitino.storage.relational.service.CatalogMetaService;
 import com.datastrato.gravitino.storage.relational.service.FilesetMetaService;
 import com.datastrato.gravitino.storage.relational.service.GroupMetaService;
+import com.datastrato.gravitino.storage.relational.service.IdNameMappingService;
 import com.datastrato.gravitino.storage.relational.service.MetalakeMetaService;
 import com.datastrato.gravitino.storage.relational.service.RoleMetaService;
 import com.datastrato.gravitino.storage.relational.service.SchemaMetaService;
@@ -124,12 +125,18 @@ public class JDBCBackend implements RelationalBackend {
       throw new UnsupportedEntityTypeException(
           "Unsupported entity type: %s for insert operation", e.getClass());
     }
+
+    IdNameMappingService.getInstance().put(e.nameIdentifier(), e.id());
   }
 
   @Override
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, AlreadyExistsException {
+    // Remove all the children entities in the cache as we can't guarantee the children entities
+    // are still valid after the parent entity is updated.
+    IdNameMappingService.getInstance().invalidateWithPrefix(ident);
+
     switch (entityType) {
       case METALAKE:
         return (E) MetalakeMetaService.getInstance().updateMetalake(ident, updater);
@@ -183,28 +190,42 @@ public class JDBCBackend implements RelationalBackend {
 
   @Override
   public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade) {
-    switch (entityType) {
-      case METALAKE:
-        return MetalakeMetaService.getInstance().deleteMetalake(ident, cascade);
-      case CATALOG:
-        return CatalogMetaService.getInstance().deleteCatalog(ident, cascade);
-      case SCHEMA:
-        return SchemaMetaService.getInstance().deleteSchema(ident, cascade);
-      case TABLE:
-        return TableMetaService.getInstance().deleteTable(ident);
-      case FILESET:
-        return FilesetMetaService.getInstance().deleteFileset(ident);
-      case TOPIC:
-        return TopicMetaService.getInstance().deleteTopic(ident);
-      case USER:
-        return UserMetaService.getInstance().deleteUser(ident);
-      case GROUP:
-        return GroupMetaService.getInstance().deleteGroup(ident);
-      case ROLE:
-        return RoleMetaService.getInstance().deleteRole(ident);
-      default:
-        throw new UnsupportedEntityTypeException(
-            "Unsupported entity type: %s for delete operation", entityType);
+    // Invalidate the cache first
+    IdNameMappingService.getInstance().invalidate(ident);
+    if (cascade) {
+      // Remove all the children entities in the cache;
+      IdNameMappingService.getInstance().invalidateWithPrefix(ident);
+    }
+
+    try {
+      switch (entityType) {
+        case METALAKE:
+          return MetalakeMetaService.getInstance().deleteMetalake(ident, cascade);
+        case CATALOG:
+          return CatalogMetaService.getInstance().deleteCatalog(ident, cascade);
+        case SCHEMA:
+          return SchemaMetaService.getInstance().deleteSchema(ident, cascade);
+        case TABLE:
+          return TableMetaService.getInstance().deleteTable(ident);
+        case FILESET:
+          return FilesetMetaService.getInstance().deleteFileset(ident);
+        case TOPIC:
+          return TopicMetaService.getInstance().deleteTopic(ident);
+        case USER:
+          return UserMetaService.getInstance().deleteUser(ident);
+        case GROUP:
+          return GroupMetaService.getInstance().deleteGroup(ident);
+        case ROLE:
+          return RoleMetaService.getInstance().deleteRole(ident);
+        default:
+          throw new UnsupportedEntityTypeException(
+              "Unsupported entity type: %s for delete operation", entityType);
+      }
+    } finally {
+      // Remove the entity from the cache again because we may add the cache during the deletion
+      // process
+      IdNameMappingService.getInstance().invalidate(ident);
+      IdNameMappingService.getInstance().invalidateWithPrefix(ident);
     }
   }
 
@@ -290,6 +311,8 @@ public class JDBCBackend implements RelationalBackend {
   @Override
   public void close() throws IOException {
     SqlSessionFactoryHelper.getInstance().close();
+
+    IdNameMappingService.getInstance().close();
 
     if (jdbcDatabase != null) {
       jdbcDatabase.close();

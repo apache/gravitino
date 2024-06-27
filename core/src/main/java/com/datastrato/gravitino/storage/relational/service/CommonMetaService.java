@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.storage.relational.service;
 
+import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.google.common.base.Preconditions;
 
@@ -22,24 +23,23 @@ public class CommonMetaService {
     Preconditions.checkArgument(
         !namespace.isEmpty() && namespace.levels().length <= 3,
         "Namespace should not be empty and length should be less than or equal to 3.");
+
+    String[] level = namespace.levels();
+    NameIdentifier ident = NameIdentifier.of(level);
     Long parentEntityId = null;
-    for (int level = 0; level < namespace.levels().length; level++) {
-      String name = namespace.level(level);
-      switch (level) {
-        case 0:
-          parentEntityId = MetalakeMetaService.getInstance().getMetalakeIdByName(name);
-          continue;
-        case 1:
-          parentEntityId =
-              CatalogMetaService.getInstance()
-                  .getCatalogIdByMetalakeIdAndName(parentEntityId, name);
-          continue;
-        case 2:
-          parentEntityId =
-              SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(parentEntityId, name);
-          break;
-      }
+
+    switch (level.length) {
+      case 1:
+        parentEntityId = MetalakeMetaService.getInstance().getMetalakeIdByNameIdentifier(ident);
+        break;
+      case 2:
+        parentEntityId = CatalogMetaService.getInstance().getCatalogIdByNameIdentifier(ident);
+        break;
+      case 3:
+        parentEntityId = SchemaMetaService.getInstance().getSchemaIdByNameIdentifier(ident);
+        break;
     }
+
     Preconditions.checkState(
         parentEntityId != null && parentEntityId > 0,
         "Parent entity id should not be null and should be greater than 0.");
