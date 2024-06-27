@@ -26,23 +26,23 @@ public class CommonMetaService {
 
     String[] level = namespace.levels();
     NameIdentifier ident = NameIdentifier.of(level);
-    Long parentEntityId = null;
+    Long entityId = null;
 
     switch (level.length) {
       case 1:
-        parentEntityId = MetalakeMetaService.getInstance().getMetalakeIdByNameIdentifier(ident);
+        entityId = MetalakeMetaService.getInstance().getMetalakeIdByNameIdentifier(ident);
         break;
       case 2:
-        parentEntityId = CatalogMetaService.getInstance().getCatalogIdByNameIdentifier(ident);
+        entityId = CatalogMetaService.getInstance().getCatalogIdByNameIdentifier(ident);
         break;
       case 3:
-        parentEntityId = SchemaMetaService.getInstance().getSchemaIdByNameIdentifier(ident);
+        entityId = SchemaMetaService.getInstance().getSchemaIdByNameIdentifier(ident);
         break;
     }
 
     Preconditions.checkState(
-        parentEntityId != null && parentEntityId > 0,
+        entityId != null && entityId > 0,
         "Parent entity id should not be null and should be greater than 0.");
-    return parentEntityId;
+    return entityId;
   }
 }

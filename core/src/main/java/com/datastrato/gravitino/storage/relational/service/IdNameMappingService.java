@@ -25,7 +25,7 @@ public class IdNameMappingService implements Closeable {
   private IdNameMappingService() {
     this.ident2IdCache =
         Caffeine.newBuilder()
-            .expireAfterAccess(24 * 3600 * 1000 /* 1 day */, TimeUnit.MILLISECONDS)
+            .expireAfterAccess(24 * 3600 * 1000L /* 1 day */, TimeUnit.MILLISECONDS)
             .maximumSize(1000000)
             .initialCapacity(1000)
             .scheduler(
