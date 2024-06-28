@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
 
 /** This class use Iceberg RESTCatalog for test, and the real backend catalog is HiveCatalog. */
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class SparkIcebergCatalogRestBackendIT extends SparkIcebergCatalogIT {
 

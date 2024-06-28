@@ -57,7 +57,7 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 public class CatalogKafkaIT extends AbstractIT {
   private static final Logger LOG = LoggerFactory.getLogger(CatalogKafkaIT.class);
   private static final ContainerSuite CONTAINER_SUITE = ContainerSuite.getInstance();

@@ -142,7 +142,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
       throws IOException, EntityAlreadyExistsException {
     byte[] oldValue = get(key);
     if (oldValue != null && !overwrite) {
-      throw new EntityAlreadyExistsException("Key already exists: " + Bytes.wrap(key));
+      throw new EntityAlreadyExistsException("Key already exists: %s", Bytes.wrap(key));
     }
     putPairs
         .get()

@@ -24,7 +24,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.com.google.common.collect.Maps;
 
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 public class TestPostgreSqlSchemaOperations extends TestPostgreSql {
 
   @Test

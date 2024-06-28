@@ -5,9 +5,9 @@
 
 package com.datastrato.gravitino.storage.relational.service;
 
+import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.authorization.AuthorizationUtils;
-import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
@@ -22,6 +22,7 @@ import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelp
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -38,7 +39,7 @@ class TestGroupMetaService extends TestJDBCBackend {
   String metalakeName = "metalake";
 
   @Test
-  void getGroupByIdentifier() {
+  void getGroupByIdentifier() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
@@ -103,7 +104,7 @@ class TestGroupMetaService extends TestJDBCBackend {
   }
 
   @Test
-  void insertGroup() {
+  void insertGroup() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     BaseMetalake metalake =
@@ -138,7 +139,7 @@ class TestGroupMetaService extends TestJDBCBackend {
             "group1",
             auditInfo);
     Assertions.assertThrows(
-        AlreadyExistsException.class, () -> groupMetaService.insertGroup(group1Exist, false));
+        EntityAlreadyExistsException.class, () -> groupMetaService.insertGroup(group1Exist, false));
 
     // insert overwrite
     GroupEntity group1Overwrite =
@@ -193,7 +194,7 @@ class TestGroupMetaService extends TestJDBCBackend {
             "group2",
             auditInfo);
     Assertions.assertThrows(
-        AlreadyExistsException.class, () -> groupMetaService.insertGroup(group2Exist, false));
+        EntityAlreadyExistsException.class, () -> groupMetaService.insertGroup(group2Exist, false));
 
     // insert overwrite group with 2 roles
     GroupEntity group2Overwrite =
@@ -255,7 +256,7 @@ class TestGroupMetaService extends TestJDBCBackend {
   }
 
   @Test
-  void deleteGroup() {
+  void deleteGroup() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     BaseMetalake metalake =
@@ -332,7 +333,7 @@ class TestGroupMetaService extends TestJDBCBackend {
   }
 
   @Test
-  void updateGroup() {
+  void updateGroup() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     BaseMetalake metalake =
@@ -547,7 +548,7 @@ class TestGroupMetaService extends TestJDBCBackend {
   }
 
   @Test
-  void deleteMetalake() {
+  void deleteMetalake() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     BaseMetalake metalake =
@@ -628,7 +629,7 @@ class TestGroupMetaService extends TestJDBCBackend {
   }
 
   @Test
-  void deleteMetalakeCascade() {
+  void deleteMetalakeCascade() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     BaseMetalake metalake =
@@ -707,7 +708,7 @@ class TestGroupMetaService extends TestJDBCBackend {
   }
 
   @Test
-  void deleteGroupMetasByLegacyTimeline() {
+  void deleteGroupMetasByLegacyTimeline() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     BaseMetalake metalake =
