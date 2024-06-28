@@ -5,6 +5,7 @@
 
 package com.datastrato.gravitino.spark.connector.integration.test;
 
+import static com.datastrato.gravitino.spark.connector.PropertiesConverter.SPARK_PROPERTY_PREFIX;
 import static com.datastrato.gravitino.spark.connector.iceberg.IcebergPropertiesConstants.ICEBERG_CATALOG_CACHE_ENABLED;
 
 import com.datastrato.gravitino.Catalog;
@@ -109,6 +110,9 @@ public abstract class SparkEnvIT extends SparkUtilIT {
     AbstractIT.client.createMetalake(metalakeName, "", Collections.emptyMap());
     GravitinoMetalake metalake = AbstractIT.client.loadMetalake(metalakeName);
     Map<String, String> properties = getCatalogConfigs();
+    if (lakeHouseIcebergProvider.equalsIgnoreCase(getProvider())) {
+      properties.put(SPARK_PROPERTY_PREFIX + ICEBERG_CATALOG_CACHE_ENABLED, "true");
+    }
     metalake.createCatalog(
         getCatalogName(), Catalog.Type.RELATIONAL, getProvider(), "", properties);
   }
@@ -184,11 +188,6 @@ public abstract class SparkEnvIT extends SparkUtilIT {
             .set("hive.exec.dynamic.partition.mode", "nonstrict")
             .set("spark.sql.warehouse.dir", warehouse)
             .set("spark.sql.session.timeZone", TIME_ZONE_UTC);
-    if (lakeHouseIcebergProvider.equalsIgnoreCase(getProvider())) {
-      sparkConf.set(
-          String.format("spark.sql.catalog.%s.%s", getCatalogName(), ICEBERG_CATALOG_CACHE_ENABLED),
-          "true");
-    }
     sparkSession =
         SparkSession.builder()
             .master("local[1]")
