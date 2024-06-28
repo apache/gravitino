@@ -67,7 +67,7 @@ public class RocksDBKvBackend implements KvBackend {
 
   @VisibleForTesting
   String getStoragePath(Config config) {
-    String dbPath = config.get(Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH);
+    String dbPath = config.get(Configs.ENTITY_KV_ROCKSDB_BACKEND_PATH);
     if (StringUtils.isBlank(dbPath)) {
       return Configs.DEFAULT_KV_ROCKSDB_BACKEND_PATH;
     }

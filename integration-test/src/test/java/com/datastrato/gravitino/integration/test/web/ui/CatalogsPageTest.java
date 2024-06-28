@@ -32,6 +32,7 @@ import com.google.common.collect.Maps;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -41,6 +42,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.openqa.selenium.By;
+import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 @Tag("gravitino-docker-it")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -56,6 +58,9 @@ public class CatalogsPageTest extends AbstractWebIT {
   protected static String hdfsUri = "hdfs://127.0.0.1:9000";
   protected static String mysqlUri = "jdbc:mysql://127.0.0.1";
   protected static String postgresqlUri = "jdbc:postgresql://127.0.0.1";
+
+  private static final long MAX_WAIT_IN_SECONDS = 5;
+  private static final long WAIT_INTERVAL_IN_SECONDS = 1;
 
   private static final String WEB_TITLE = "Gravitino";
   private static final String CATALOG_TABLE_TITLE = "Schemas";
@@ -393,7 +398,10 @@ public class CatalogsPageTest extends AbstractWebIT {
     catalogsPage.clickCatalogLink(
         METALAKE_NAME, MODIFIED_HIVE_CATALOG_NAME, CATALOG_TYPE_RELATIONAL);
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(CATALOG_TABLE_TITLE));
-    Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(SCHEMA_NAME, false));
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(() -> catalogsPage.verifyShowDataItemInList(SCHEMA_NAME, false));
     Assertions.assertTrue(catalogsPage.verifySelectedNode(MODIFIED_HIVE_CATALOG_NAME));
   }
 
