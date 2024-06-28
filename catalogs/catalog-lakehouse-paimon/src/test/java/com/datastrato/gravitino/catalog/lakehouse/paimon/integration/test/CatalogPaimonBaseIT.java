@@ -266,7 +266,7 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
   }
 
   @Test
-  void testTimestampTypeConversion()
+  void testCreateTableWithTimestampColumn()
       throws org.apache.paimon.catalog.Catalog.TableNotExistException {
     Column col1 = Column.of("paimon_column_1", Types.TimestampType.withTimeZone(), "col_1_comment");
     Column col2 =

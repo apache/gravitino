@@ -131,7 +131,9 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
                 AuditInfo.builder().withCreator(currentUser).withCreateTime(Instant.now()).build())
             .build();
     try {
-      paimonCatalogOps.createDatabase(createdSchema.toPaimonProperties());
+      Pair<String, Map<String, String>> paimonSchemaProperties = createdSchema.toPaimonProperties();
+      paimonCatalogOps.createDatabase(
+          paimonSchemaProperties.getKey(), paimonSchemaProperties.getValue());
     } catch (Catalog.DatabaseAlreadyExistException e) {
       throw new SchemaAlreadyExistsException(e, SCHEMA_ALREADY_EXISTS_EXCEPTION, identifier);
     } catch (Exception e) {
@@ -292,7 +294,7 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
         "Indexes are not supported for Paimon in Gravitino.");
     Preconditions.checkArgument(
         distribution == null || distribution.strategy() == Distributions.NONE.strategy(),
-        "Distribution should be set through table options.");
+        "Distribution is not supported for Paimon in Gravitino now.");
     String currentUser = currentUser();
     GravitinoPaimonTable createdTable =
         GravitinoPaimonTable.builder()
@@ -319,7 +321,8 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
                 AuditInfo.builder().withCreator(currentUser).withCreateTime(Instant.now()).build())
             .build();
     try {
-      Pair<String, Schema> paimonTable = createdTable.toPaimonTable(nameIdentifier.toString());
+      Pair<String, Schema> paimonTable =
+          createdTable.toPaimonTableSchema(nameIdentifier.toString());
       paimonCatalogOps.createTable(paimonTable.getKey(), paimonTable.getValue());
     } catch (Catalog.DatabaseNotExistException e) {
       throw new NoSuchSchemaException(e, NO_SUCH_SCHEMA_EXCEPTION, identifier);

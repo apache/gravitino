@@ -9,7 +9,6 @@ import static com.datastrato.gravitino.catalog.lakehouse.paimon.utils.CatalogUti
 import com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonConfig;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.Catalog.DatabaseAlreadyExistException;
 import org.apache.paimon.catalog.Catalog.DatabaseNotEmptyException;
@@ -43,9 +42,9 @@ public class PaimonCatalogOps implements AutoCloseable {
     return catalog.loadDatabaseProperties(databaseName);
   }
 
-  public void createDatabase(Pair<String, Map<String, String>> database)
+  public void createDatabase(String databaseName, Map<String, String> properties)
       throws DatabaseAlreadyExistException {
-    catalog.createDatabase(database.getKey(), false, database.getRight());
+    catalog.createDatabase(databaseName, false, properties);
   }
 
   public void dropDatabase(String databaseName, boolean cascade)

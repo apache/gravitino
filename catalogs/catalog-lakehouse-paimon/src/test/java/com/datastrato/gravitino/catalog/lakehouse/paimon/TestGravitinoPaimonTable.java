@@ -288,7 +288,8 @@ public class TestGravitinoPaimonTable {
             .withComment("test_table_comment")
             .withProperties(properties)
             .build();
-    Pair<String, Schema> paimonTable = gravitinoPaimonTable.toPaimonTable(identifier.toString());
+    Pair<String, Schema> paimonTable =
+        gravitinoPaimonTable.toPaimonTableSchema(identifier.toString());
     Schema schema = paimonTable.getValue();
     Assertions.assertEquals(identifier.toString(), paimonTable.getKey());
     Assertions.assertEquals(gravitinoPaimonTable.comment(), gravitinoPaimonTable.comment());

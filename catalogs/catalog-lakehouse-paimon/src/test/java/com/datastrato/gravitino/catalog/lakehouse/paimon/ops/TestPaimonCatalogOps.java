@@ -157,7 +157,7 @@ public class TestPaimonCatalogOps {
     assertEquals(0, paimonCatalogOps.listDatabases().size());
 
     // create database
-    paimonCatalogOps.createDatabase(Pair.of(DATABASE, Maps.newHashMap()));
+    paimonCatalogOps.createDatabase(DATABASE, Maps.newHashMap());
     assertEquals(1, paimonCatalogOps.listDatabases().size());
     // load database
     assertNotNull(paimonCatalogOps.loadDatabase(DATABASE));

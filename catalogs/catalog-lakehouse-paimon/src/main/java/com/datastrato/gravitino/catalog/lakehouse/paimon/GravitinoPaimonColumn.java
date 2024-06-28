@@ -37,12 +37,12 @@ public class GravitinoPaimonColumn extends BaseColumn {
   }
 
   /**
-   * Creates new {@link GravitinoPaimonColumn} instance from inner columns.
+   * Creates new {@link GravitinoPaimonColumn} instance from Paimon columns.
    *
-   * @param rowType The {@link RowType} instance of inner column.
+   * @param rowType The {@link RowType} instance of Paimon column.
    * @return New {@link GravitinoPaimonColumn} instances.
    */
-  public static List<GravitinoPaimonColumn> fromPaimonColumn(RowType rowType) {
+  public static List<GravitinoPaimonColumn> fromPaimonRowType(RowType rowType) {
     return rowType.getFields().stream()
         .map(GravitinoPaimonColumn::fromPaimonColumn)
         .collect(Collectors.toList());

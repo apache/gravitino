@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.paimon;
 
-import static com.datastrato.gravitino.catalog.lakehouse.paimon.GravitinoPaimonColumn.fromPaimonColumn;
+import static com.datastrato.gravitino.catalog.lakehouse.paimon.GravitinoPaimonColumn.fromPaimonRowType;
 import static com.datastrato.gravitino.catalog.lakehouse.paimon.GravitinoPaimonColumn.toPaimonColumn;
 import static com.datastrato.gravitino.meta.AuditInfo.EMPTY;
 
@@ -32,11 +32,11 @@ public class GravitinoPaimonTable extends BaseTable {
   }
 
   /**
-   * Converts {@link GravitinoPaimonTable} instance to inner table.
+   * Converts {@link GravitinoPaimonTable} instance to Paimon table.
    *
-   * @return The converted inner table.
+   * @return The converted Paimon table.
    */
-  public Pair<String, Schema> toPaimonTable(String tableName) {
+  public Pair<String, Schema> toPaimonTableSchema(String tableName) {
     Schema.Builder builder = Schema.newBuilder().comment(comment).options(properties);
     for (int index = 0; index < columns.length; index++) {
       DataField dataField = toPaimonColumn(index, columns[index]);
@@ -46,15 +46,15 @@ public class GravitinoPaimonTable extends BaseTable {
   }
 
   /**
-   * Creates a new {@link GravitinoPaimonTable} instance from inner table.
+   * Creates a new {@link GravitinoPaimonTable} instance from Paimon table.
    *
-   * @param table The {@link Table} instance of inner table.
+   * @param table The {@link Table} instance of Paimon table.
    * @return A new {@link GravitinoPaimonTable} instance.
    */
   public static GravitinoPaimonTable fromPaimonTable(Table table) {
     return builder()
         .withName(table.name())
-        .withColumns(fromPaimonColumn(table.rowType()).toArray(new GravitinoPaimonColumn[0]))
+        .withColumns(fromPaimonRowType(table.rowType()).toArray(new GravitinoPaimonColumn[0]))
         .withComment(table.comment().orElse(null))
         .withProperties(table.options())
         .withAuditInfo(EMPTY)

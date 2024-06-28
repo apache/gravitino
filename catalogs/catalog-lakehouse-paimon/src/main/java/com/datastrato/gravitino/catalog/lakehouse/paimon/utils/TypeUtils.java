@@ -43,6 +43,7 @@ import org.apache.paimon.types.TimestampType;
 import org.apache.paimon.types.TinyIntType;
 import org.apache.paimon.types.VarCharType;
 
+// Referred to org/apache/paimon/spark/SparkTypeUtils.java
 /** Utilities of {@link Type} to support type conversion. */
 public class TypeUtils {
 
