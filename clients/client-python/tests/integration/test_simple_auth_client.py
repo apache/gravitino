@@ -5,7 +5,6 @@ This software is licensed under the Apache License version 2.
 
 import logging
 import os
-import unittest
 from random import randint
 from typing import Dict
 
@@ -17,11 +16,12 @@ from gravitino import (
     Fileset,
 )
 from gravitino.auth.simple_auth_provider import SimpleAuthProvider
+from tests.integration.integration_test_env import IntegrationTestEnv
 
 logger = logging.getLogger(__name__)
 
 
-class TestSimpleAuthClient(unittest.TestCase):
+class TestSimpleAuthClient(IntegrationTestEnv):
     creator: str = "test_client"
     metalake_name: str = "TestClient_metalake" + str(randint(1, 10000))
     catalog_name: str = "fileset_catalog"

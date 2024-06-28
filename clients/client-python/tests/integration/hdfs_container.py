@@ -131,6 +131,3 @@ class HDFSContainer:
             logger.warning(
                 "While removing network %s happen exception: %s", self._network_name, e
             )
-
-
-hdfs_container = HDFSContainer()

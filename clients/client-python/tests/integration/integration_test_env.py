@@ -123,6 +123,7 @@ class IntegrationTestEnv(unittest.TestCase):
 
     @classmethod
     def restart_server(cls):
+        logger.info("Restarting Gravitino server...")
         gravitino_home = os.environ.get("GRAVITINO_HOME")
         gravitino_startup_script = os.path.join(gravitino_home, "bin/gravitino.sh")
         if not os.path.exists(gravitino_startup_script):
@@ -133,7 +134,8 @@ class IntegrationTestEnv(unittest.TestCase):
             )
 
         # Restart Gravitino Server
-        env_vars = {"HADOOP_USER_NAME": "datastrato"}
+        env_vars = os.environ.copy()
+        env_vars["HADOOP_USER_NAME"] = "datastrato"
         result = subprocess.run(
             [gravitino_startup_script, "restart"],
             env=env_vars,
