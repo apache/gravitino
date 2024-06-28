@@ -655,6 +655,11 @@ tasks {
   }
 }
 
+tasks.named<Test>("test") {
+  dependsOn(":clients:client-python:test")
+  dependsOn(":flink-connector:test")
+}
+
 apply(plugin = "com.dorongold.task-tree")
 
 project.extra["docker_it_test"] = false
