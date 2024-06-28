@@ -528,7 +528,7 @@ tasks {
   val outputDir = projectDir.dir("distribution")
 
   val compileDistribution by registering {
-    dependsOn("copySubprojectDependencies", "copyCatalogLibAndConfigs", "copySubprojectLib")
+    dependsOn("copySubprojectDependencies", "copyCatalogLibAndConfigs", "copySubprojectLib", "iceberg:iceberg-rest-server:copyLibs")
 
     group = "gravitino distribution"
     outputs.dir(projectDir.dir("distribution/package"))
@@ -561,8 +561,42 @@ tasks {
     }
   }
 
+  val compileIcebergRESTServer by registering {
+    dependsOn("iceberg:iceberg-rest-server:copyLibsToStandalonePackage")
+    group = "gravitino distribution"
+    outputs.dir(projectDir.dir("distribution/iceberg-rest-server"))
+    doLast {
+      copy {
+        from(projectDir.dir("conf")) {
+          include("iceberg-rest-server.conf.template", "log4j2.properties.template")
+          into("iceberg-rest-server/conf")
+        }
+        from(projectDir.dir("bin")) {
+          include("common.sh", "iceberg-rest-server.sh")
+          into("iceberg-rest-server/bin")
+        }
+        into(outputDir)
+        rename { fileName ->
+          fileName.replace(".template", "")
+        }
+        fileMode = 0b111101101
+      }
+
+      copy {
+        from(projectDir.dir("licenses")) { into("iceberg-rest-server/licenses") }
+        from(projectDir.file("LICENSE.bin")) { into("iceberg-rest-server") }
+        from(projectDir.file("NOTICE.bin")) { into("iceberg-rest-server") }
+        from(projectDir.file("README.md")) { into("iceberg-rest-server") }
+        into(outputDir)
+        rename { fileName ->
+          fileName.replace(".bin", "")
+        }
+      }
+    }
+  }
+
   val assembleDistribution by registering(Tar::class) {
-    dependsOn("assembleTrinoConnector")
+    dependsOn("assembleTrinoConnector", "assembleIcebergRESTServer")
     group = "gravitino distribution"
     finalizedBy("checksumDistribution")
     into("${rootProject.name}-$version-bin")
@@ -583,9 +617,38 @@ tasks {
     destinationDirectory.set(projectDir.dir("distribution"))
   }
 
+  val assembleIcebergRESTServer by registering(Tar::class) {
+    dependsOn("compileIcebergRESTServer")
+    // fix gradlew assembleDistribution error
+    mustRunAfter("compileDistribution")
+    group = "gravitino distribution"
+    finalizedBy("checksumIcebergRESTServerDistribution")
+    into("${rootProject.name}-iceberg-rest-server-$version-bin")
+    from(compileIcebergRESTServer.map { it.outputs.files.single() })
+    compression = Compression.GZIP
+    archiveFileName.set("${rootProject.name}-iceberg-rest-server-$version-bin.tar.gz")
+    destinationDirectory.set(projectDir.dir("distribution"))
+  }
+
+  register("checksumIcebergRESTServerDistribution") {
+    group = "gravitino distribution"
+    dependsOn(assembleIcebergRESTServer)
+    val archiveFile = assembleIcebergRESTServer.flatMap { it.archiveFile }
+    val checksumFile = archiveFile.map { archive ->
+      archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
+    }
+    inputs.file(archiveFile)
+    outputs.file(checksumFile)
+    doLast {
+      checksumFile.get().writeText(
+        serviceOf<ChecksumService>().sha256(archiveFile.get().asFile).toString()
+      )
+    }
+  }
+
   register("checksumDistribution") {
     group = "gravitino distribution"
-    dependsOn(assembleDistribution, "checksumTrinoConnector")
+    dependsOn(assembleDistribution, "checksumTrinoConnector", "checksumIcebergRESTServerDistribution")
     val archiveFile = assembleDistribution.flatMap { it.archiveFile }
     val checksumFile = archiveFile.map { archive ->
       archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
@@ -623,7 +686,7 @@ tasks {
   register("copySubprojectDependencies", Copy::class) {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
-        !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark") && it.name != "trino-connector" &&
+        !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark") && !it.name.startsWith("iceberg-") && it.name != "trino-connector" &&
         it.name != "integration-test" && it.name != "bundled-catalog" && it.name != "flink-connector"
       ) {
         from(it.configurations.runtimeClasspath)
@@ -638,6 +701,7 @@ tasks {
         !it.name.startsWith("client") &&
         !it.name.startsWith("filesystem") &&
         !it.name.startsWith("spark") &&
+        !it.name.startsWith("iceberg-") &&
         it.name != "trino-connector" &&
         it.name != "integration-test" &&
         it.name != "bundled-catalog" &&

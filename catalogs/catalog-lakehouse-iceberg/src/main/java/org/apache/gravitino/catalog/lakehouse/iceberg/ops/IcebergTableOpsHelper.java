@@ -27,11 +27,9 @@ import com.google.common.collect.Lists;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
-import javax.ws.rs.NotSupportedException;
-import lombok.Getter;
-import lombok.Setter;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.lakehouse.iceberg.converter.IcebergDataTypeConverter;
+import org.apache.gravitino.iceberg.common.ops.IcebergTableOps.IcebergTableChange;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.TableChange.AddColumn;
 import org.apache.gravitino.rel.TableChange.After;
@@ -59,7 +57,6 @@ import org.apache.iceberg.types.Types.NestedField;
 import org.apache.iceberg.types.Types.StructType;
 
 public class IcebergTableOpsHelper {
-
   @VisibleForTesting public static final Joiner DOT = Joiner.on(".");
   private static final Set<String> IcebergReservedProperties =
       ImmutableSet.of(
@@ -74,18 +71,6 @@ public class IcebergTableOpsHelper {
 
   public IcebergTableOpsHelper(Catalog icebergCatalog) {
     this.icebergCatalog = icebergCatalog;
-  }
-
-  @Getter
-  @Setter
-  public static final class IcebergTableChange {
-    private TableIdentifier tableIdentifier;
-    private Transaction transaction;
-
-    IcebergTableChange(TableIdentifier tableIdentifier, Transaction transaction) {
-      this.tableIdentifier = tableIdentifier;
-      this.transaction = transaction;
-    }
   }
 
   private void doDeleteColumn(
@@ -142,7 +127,7 @@ public class IcebergTableOpsHelper {
     } else if (columnPosition instanceof TableChange.First) {
       icebergUpdateSchema.moveFirst(DOT.join(fieldName));
     } else {
-      throw new NotSupportedException(
+      throw new UnsupportedOperationException(
           "Iceberg doesn't support column position: " + columnPosition.getClass().getSimpleName());
     }
   }
@@ -237,7 +222,7 @@ public class IcebergTableOpsHelper {
       } else if (change instanceof SetProperty) {
         doSetProperty(icebergUpdateProperties, (SetProperty) change);
       } else {
-        throw new NotSupportedException(
+        throw new UnsupportedOperationException(
             "Iceberg doesn't support table change: "
                 + change.getClass().getSimpleName()
                 + " for now");
@@ -269,7 +254,7 @@ public class IcebergTableOpsHelper {
       } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
         throw new IllegalArgumentException("Iceberg doesn't support auto increment column");
       } else {
-        throw new NotSupportedException(
+        throw new UnsupportedOperationException(
             "Iceberg doesn't support " + change.getClass().getSimpleName() + " for now");
       }
     }
@@ -307,7 +292,8 @@ public class IcebergTableOpsHelper {
       } else if (change instanceof RenameTable) {
         throw new RuntimeException("RenameTable shouldn't use tableUpdate interface");
       } else {
-        throw new NotSupportedException("Iceberg doesn't support " + change.getClass() + "for now");
+        throw new UnsupportedOperationException(
+            "Iceberg doesn't support " + change.getClass() + "for now");
       }
     }
 
