@@ -291,7 +291,7 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
         indexes == null || indexes.length == 0,
         "Indexes are not supported for Paimon in Gravitino.");
     Preconditions.checkArgument(
-        distribution == null || distribution == Distributions.NONE,
+        distribution == null || distribution.strategy() == Distributions.NONE.strategy(),
         "Distribution should be set through table options.");
     String currentUser = currentUser();
     GravitinoPaimonTable createdTable =

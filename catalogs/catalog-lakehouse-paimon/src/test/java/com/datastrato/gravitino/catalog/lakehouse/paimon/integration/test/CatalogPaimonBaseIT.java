@@ -64,7 +64,6 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
 
   protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   protected String WAREHOUSE;
-  protected String URIS;
   protected String TYPE;
 
   private static final String provider = "lakehouse-paimon";
