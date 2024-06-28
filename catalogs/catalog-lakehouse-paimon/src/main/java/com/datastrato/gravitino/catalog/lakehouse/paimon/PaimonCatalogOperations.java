@@ -4,9 +4,9 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.paimon;
 
+import static com.datastrato.gravitino.catalog.lakehouse.paimon.GravitinoPaimonTable.fromPaimonTable;
 import static com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonSchema.fromPaimonProperties;
-import static com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonTable.fromPaimonTable;
-import static com.datastrato.gravitino.catalog.lakehouse.paimon.utils.TableOpsUtils.checkColumn;
+import static com.datastrato.gravitino.catalog.lakehouse.paimon.utils.TableOpsUtils.checkColumnCapability;
 import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import com.datastrato.gravitino.NameIdentifier;
@@ -28,6 +28,7 @@ import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
+import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
@@ -41,7 +42,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.paimon.catalog.Catalog;
+import org.apache.paimon.schema.Schema;
 import org.apache.paimon.table.Table;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -174,7 +177,7 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
   @Override
   public PaimonSchema alterSchema(NameIdentifier identifier, SchemaChange... changes)
       throws NoSuchSchemaException {
-    throw new UnsupportedOperationException("alterSchema is unsupported now for Paimon Catalog.");
+    throw new UnsupportedOperationException("AlterSchema is unsupported now for Paimon Catalog.");
   }
 
   /**
@@ -211,9 +214,6 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
    */
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
-    Preconditions.checkArgument(
-        namespace != null && namespace.levels().length > 0,
-        "Namespace can not be null or empty when listTables.");
     String[] levels = namespace.levels();
     NameIdentifier schemaIdentifier = NameIdentifier.of(levels[levels.length - 1]);
     if (!schemaExists(schemaIdentifier)) {
@@ -236,11 +236,11 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
    * Loads the table with the provided identifier.
    *
    * @param identifier The identifier of the table to load.
-   * @return The loaded {@link PaimonTable} instance representing the table.
+   * @return The loaded {@link GravitinoPaimonTable} instance representing the table.
    * @throws NoSuchTableException If the table with the provided identifier does not exist.
    */
   @Override
-  public PaimonTable loadTable(NameIdentifier identifier) throws NoSuchTableException {
+  public GravitinoPaimonTable loadTable(NameIdentifier identifier) throws NoSuchTableException {
     Table table;
     try {
       NameIdentifier tableIdentifier = buildPaimonNameIdentifier(identifier);
@@ -261,12 +261,12 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
    * @param properties The properties for the new table.
    * @param partitioning The partitioning for the new table.
    * @param indexes The indexes for the new table.
-   * @return The newly created {@link PaimonTable} instance.
+   * @return The newly created {@link GravitinoPaimonTable} instance.
    * @throws NoSuchSchemaException If the schema with the provided namespace does not exist.
    * @throws TableAlreadyExistsException If the table with the same identifier already exists.
    */
   @Override
-  public PaimonTable createTable(
+  public GravitinoPaimonTable createTable(
       NameIdentifier identifier,
       Column[] columns,
       String comment,
@@ -281,16 +281,29 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
     if (!schemaExists(schemaIdentifier)) {
       throw new NoSuchSchemaException(NO_SUCH_SCHEMA_EXCEPTION, schemaIdentifier);
     }
+    Preconditions.checkArgument(
+        partitioning == null || partitioning.length == 0,
+        "Table Partitions are not supported when creating a Paimon table in Gravitino now.");
+    Preconditions.checkArgument(
+        sortOrders == null || sortOrders.length == 0,
+        "Sort orders are not supported for Paimon in Gravitino.");
+    Preconditions.checkArgument(
+        indexes == null || indexes.length == 0,
+        "Indexes are not supported for Paimon in Gravitino.");
+    Preconditions.checkArgument(
+        distribution == null || distribution == Distributions.NONE,
+        "Distribution should be set through table options.");
     String currentUser = currentUser();
-    PaimonTable createdTable =
-        PaimonTable.builder()
+    GravitinoPaimonTable createdTable =
+        GravitinoPaimonTable.builder()
             .withName(identifier.name())
             .withColumns(
                 Arrays.stream(columns)
                     .map(
                         column -> {
-                          checkColumn(column.name(), column.defaultValue(), column.autoIncrement());
-                          return PaimonColumn.builder()
+                          checkColumnCapability(
+                              column.name(), column.defaultValue(), column.autoIncrement());
+                          return GravitinoPaimonColumn.builder()
                               .withName(column.name())
                               .withType(column.dataType())
                               .withComment(column.comment())
@@ -299,18 +312,15 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
                               .withDefaultValue(column.defaultValue())
                               .build();
                         })
-                    .toArray(PaimonColumn[]::new))
+                    .toArray(GravitinoPaimonColumn[]::new))
             .withComment(comment)
             .withProperties(properties)
-            .withPartitioning(partitioning)
-            .withDistribution(distribution)
-            .withSortOrders(sortOrders)
-            .withIndexes(indexes)
             .withAuditInfo(
                 AuditInfo.builder().withCreator(currentUser).withCreateTime(Instant.now()).build())
             .build();
     try {
-      paimonCatalogOps.createTable(createdTable.toPaimonProperties(nameIdentifier.toString()));
+      Pair<String, Schema> paimonTable = createdTable.toPaimonTable(nameIdentifier.toString());
+      paimonCatalogOps.createTable(paimonTable.getKey(), paimonTable.getValue());
     } catch (Catalog.DatabaseNotExistException e) {
       throw new NoSuchSchemaException(e, NO_SUCH_SCHEMA_EXCEPTION, identifier);
     } catch (Catalog.TableAlreadyExistException e) {
@@ -331,12 +341,12 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
    *
    * @param identifier The identifier of the table to alter.
    * @param changes The changes to apply to the table.
-   * @return The altered {@link PaimonTable} instance.
+   * @return The altered {@link GravitinoPaimonTable} instance.
    * @throws NoSuchTableException If the table with the provided identifier does not exist.
    * @throws IllegalArgumentException This exception will not be thrown in this method.
    */
   @Override
-  public PaimonTable alterTable(NameIdentifier identifier, TableChange... changes)
+  public GravitinoPaimonTable alterTable(NameIdentifier identifier, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
     throw new UnsupportedOperationException("alterTable is unsupported now for Paimon Catalog.");
   }

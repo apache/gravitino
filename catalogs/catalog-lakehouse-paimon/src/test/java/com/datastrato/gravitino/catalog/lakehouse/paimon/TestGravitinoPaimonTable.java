@@ -4,8 +4,9 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.paimon;
 
-import static com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonColumn.fromPaimonColumn;
+import static com.datastrato.gravitino.catalog.lakehouse.paimon.GravitinoPaimonColumn.fromPaimonColumn;
 import static com.datastrato.gravitino.catalog.lakehouse.paimon.TestPaimonCatalog.PAIMON_PROPERTIES_METADATA;
+import static com.datastrato.gravitino.catalog.lakehouse.paimon.utils.TableOpsUtils.checkColumnCapability;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
@@ -21,24 +22,19 @@ import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.Maps;
-import java.io.IOException;
 import java.time.Instant;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.paimon.types.DataField;
-import org.apache.paimon.types.DataTypes;
-import org.apache.paimon.types.RowType;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.paimon.schema.Schema;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-public class TestPaimonTable {
+public class TestGravitinoPaimonTable {
 
   private static final String META_LAKE_NAME = "metalake";
 
@@ -105,9 +101,9 @@ public class TestPaimonTable {
     properties.put("key1", "val1");
     properties.put("key2", "val2");
 
-    PaimonColumn col1 =
+    GravitinoPaimonColumn col1 =
         fromPaimonColumn(new DataField(0, "col_1", DataTypes.INT().nullable(), PAIMON_COMMENT));
-    PaimonColumn col2 =
+    GravitinoPaimonColumn col2 =
         fromPaimonColumn(new DataField(1, "col_2", DataTypes.DATE().notNull(), PAIMON_COMMENT));
     RowType rowTypeInside =
         RowType.builder()
@@ -120,7 +116,7 @@ public class TestPaimonTable {
             .field("string_field", DataTypes.STRING().notNull(), "string field")
             .field("struct_field", rowTypeInside.nullable(), "struct field")
             .build();
-    PaimonColumn col3 =
+    GravitinoPaimonColumn col3 =
         fromPaimonColumn(new DataField(2, "col_3", rowType.notNull(), PAIMON_COMMENT));
 
     Column[] columns = new Column[] {col1, col2, col3};
@@ -178,9 +174,9 @@ public class TestPaimonTable {
     properties.put("key1", "val1");
     properties.put("key2", "val2");
 
-    PaimonColumn col1 =
+    GravitinoPaimonColumn col1 =
         fromPaimonColumn(new DataField(0, "col_1", DataTypes.INT().nullable(), PAIMON_COMMENT));
-    PaimonColumn col2 =
+    GravitinoPaimonColumn col2 =
         fromPaimonColumn(new DataField(1, "col_2", DataTypes.DATE().nullable(), PAIMON_COMMENT));
     Column[] columns = new Column[] {col1, col2};
 
@@ -213,7 +209,7 @@ public class TestPaimonTable {
   }
 
   @Test
-  void testTableProperty() throws IOException {
+  void testTableProperty() {
     CatalogEntity entity = createDefaultCatalogEntity();
     try (PaimonCatalogOperations ops = new PaimonCatalogOperations()) {
       ops.initialize(
@@ -253,6 +249,54 @@ public class TestPaimonTable {
     }
   }
 
+  @Test
+  void testGravitinoToPaimonTable() {
+    Column[] columns = createColumns();
+    NameIdentifier identifier = NameIdentifier.of("test_schema", "test_table");
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("key1", "val1");
+
+    GravitinoPaimonTable gravitinoPaimonTable =
+        GravitinoPaimonTable.builder()
+            .withName(identifier.name())
+            .withColumns(
+                Arrays.stream(columns)
+                    .map(
+                        column -> {
+                          checkColumnCapability(
+                              column.name(), column.defaultValue(), column.autoIncrement());
+                          return GravitinoPaimonColumn.builder()
+                              .withName(column.name())
+                              .withType(column.dataType())
+                              .withComment(column.comment())
+                              .withNullable(column.nullable())
+                              .withAutoIncrement(column.autoIncrement())
+                              .withDefaultValue(column.defaultValue())
+                              .build();
+                        })
+                    .toArray(GravitinoPaimonColumn[]::new))
+            .withComment("test_table_comment")
+            .withProperties(properties)
+            .build();
+    Pair<String, Schema> paimonTable = gravitinoPaimonTable.toPaimonTable(identifier.toString());
+    Schema schema = paimonTable.getValue();
+    Assertions.assertEquals(identifier.toString(), paimonTable.getKey());
+    Assertions.assertEquals(gravitinoPaimonTable.comment(), gravitinoPaimonTable.comment());
+    Assertions.assertEquals(gravitinoPaimonTable.properties(), schema.options());
+    Assertions.assertEquals(gravitinoPaimonTable.columns().length, schema.fields().size());
+    Assertions.assertEquals(3, schema.fields().size());
+    for (int i = 0; i < gravitinoPaimonTable.columns().length; i++) {
+      Column column = gravitinoPaimonTable.columns()[i];
+      DataField dataField = schema.fields().get(i);
+      Assertions.assertEquals(column.name(), dataField.name());
+      Assertions.assertEquals(column.comment(), dataField.description());
+    }
+    Assertions.assertEquals(new IntType().nullable(), schema.fields().get(0).type());
+    Assertions.assertEquals(new DateType().nullable(), schema.fields().get(1).type());
+    Assertions.assertEquals(
+        new VarCharType(Integer.MAX_VALUE).nullable(), schema.fields().get(2).type());
+  }
+
   private static String genRandomName() {
     return UUID.randomUUID().toString().replace("-", "");
   }
@@ -281,5 +325,12 @@ public class TestPaimonTable {
       paimonCatalogOperations.dropSchema(schemaIdent, true);
     }
     paimonSchema = paimonCatalogOperations.createSchema(schemaIdent, PAIMON_COMMENT, properties);
+  }
+
+  private static Column[] createColumns() {
+    Column col1 = Column.of("col1", Types.IntegerType.get(), "col_1_comment");
+    Column col2 = Column.of("col2", Types.DateType.get(), "col_2_comment");
+    Column col3 = Column.of("col3", Types.StringType.get(), "col_3_comment");
+    return new Column[] {col1, col2, col3};
   }
 }

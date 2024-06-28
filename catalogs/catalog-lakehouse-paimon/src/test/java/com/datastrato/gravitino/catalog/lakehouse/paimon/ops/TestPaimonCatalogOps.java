@@ -99,7 +99,7 @@ public class TestPaimonCatalogOps {
                 .comment(COMMENT)
                 .options(OPTIONS)
                 .build());
-    paimonCatalogOps.createTable(tableInfo);
+    paimonCatalogOps.createTable(tableInfo.getKey(), tableInfo.getValue());
 
     // load table
     Table table = paimonCatalogOps.loadTable(IDENTIFIER.toString());
@@ -148,7 +148,7 @@ public class TestPaimonCatalogOps {
         0, paimonCatalogOps.listTables(IDENTIFIER.namespace().toString()).size());
 
     // create a new table to make database not empty to test drop database cascade
-    paimonCatalogOps.createTable(tableInfo);
+    paimonCatalogOps.createTable(tableInfo.getKey(), tableInfo.getValue());
     Assertions.assertNotNull(paimonCatalogOps.loadTable(IDENTIFIER.toString()));
   }
 

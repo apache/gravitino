@@ -12,7 +12,8 @@ import com.google.common.base.Preconditions;
 /** Utilities of {@link PaimonCatalogOps} to support table operation. */
 public class TableOpsUtils {
 
-  public static void checkColumn(String fieldName, Expression defaultValue, boolean autoIncrement) {
+  public static void checkColumnCapability(
+      String fieldName, Expression defaultValue, boolean autoIncrement) {
     checkColumnDefaultValue(fieldName, defaultValue);
     checkColumnAutoIncrement(fieldName, autoIncrement);
   }
@@ -21,7 +22,7 @@ public class TableOpsUtils {
     Preconditions.checkArgument(
         defaultValue.equals(Column.DEFAULT_VALUE_NOT_SET),
         String.format(
-            "Paimon does not support setting the column default value through column info. Instead, it should be set through table properties. See https://github.com/apache/paimon/pull/1425/files#diff-5a41731b962ed7fbf3c2623031bbc4e34dc3e8bfeb40df68c594c88a740f8800. Illegal column: %s.",
+            "Paimon set column default value through table properties instead of column info. Illegal column: %s.",
             fieldName));
   }
 

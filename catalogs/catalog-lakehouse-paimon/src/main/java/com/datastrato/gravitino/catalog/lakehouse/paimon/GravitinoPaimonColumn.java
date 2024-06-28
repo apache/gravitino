@@ -18,12 +18,12 @@ import org.apache.paimon.types.RowType;
 
 /** Implementation of {@link Column} that represents a column in the Paimon column. */
 @EqualsAndHashCode(callSuper = true)
-public class PaimonColumn extends BaseColumn {
+public class GravitinoPaimonColumn extends BaseColumn {
 
-  private PaimonColumn() {}
+  private GravitinoPaimonColumn() {}
 
   /**
-   * Converts {@link PaimonColumn} instance to inner column.
+   * Converts {@link GravitinoPaimonColumn} instance to inner column.
    *
    * @param id The id of inner column.
    * @return The converted inner column.
@@ -37,24 +37,24 @@ public class PaimonColumn extends BaseColumn {
   }
 
   /**
-   * Creates new {@link PaimonColumn} instance from inner columns.
+   * Creates new {@link GravitinoPaimonColumn} instance from inner columns.
    *
    * @param rowType The {@link RowType} instance of inner column.
-   * @return New {@link PaimonColumn} instances.
+   * @return New {@link GravitinoPaimonColumn} instances.
    */
-  public static List<PaimonColumn> fromPaimonColumn(RowType rowType) {
+  public static List<GravitinoPaimonColumn> fromPaimonColumn(RowType rowType) {
     return rowType.getFields().stream()
-        .map(PaimonColumn::fromPaimonColumn)
+        .map(GravitinoPaimonColumn::fromPaimonColumn)
         .collect(Collectors.toList());
   }
 
   /**
-   * Creates a new {@link PaimonColumn} instance from inner column.
+   * Creates a new {@link GravitinoPaimonColumn} instance from inner column.
    *
    * @param dataField The {@link DataField} instance of inner column.
-   * @return A new {@link PaimonColumn} instance.
+   * @return A new {@link GravitinoPaimonColumn} instance.
    */
-  public static PaimonColumn fromPaimonColumn(DataField dataField) {
+  public static GravitinoPaimonColumn fromPaimonColumn(DataField dataField) {
     return builder()
         .withName(dataField.name())
         .withType(fromPaimonType(dataField.type()))
@@ -63,20 +63,20 @@ public class PaimonColumn extends BaseColumn {
         .build();
   }
 
-  /** A builder class for constructing {@link PaimonColumn} instance. */
-  public static class Builder extends BaseColumnBuilder<Builder, PaimonColumn> {
+  /** A builder class for constructing {@link GravitinoPaimonColumn} instance. */
+  public static class Builder extends BaseColumnBuilder<Builder, GravitinoPaimonColumn> {
 
     /** Creates a new instance of {@link Builder}. */
     private Builder() {}
 
     /**
-     * Internal method to build a {@link PaimonColumn} instance using the provided values.
+     * Internal method to build a {@link GravitinoPaimonColumn} instance using the provided values.
      *
-     * @return A new {@link PaimonColumn} instance with the configured values.
+     * @return A new {@link GravitinoPaimonColumn} instance with the configured values.
      */
     @Override
-    protected PaimonColumn internalBuild() {
-      PaimonColumn paimonColumn = new PaimonColumn();
+    protected GravitinoPaimonColumn internalBuild() {
+      GravitinoPaimonColumn paimonColumn = new GravitinoPaimonColumn();
       paimonColumn.name = name;
       paimonColumn.comment = comment;
       paimonColumn.dataType = dataType;
