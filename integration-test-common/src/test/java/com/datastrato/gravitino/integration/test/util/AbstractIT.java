@@ -332,7 +332,7 @@ public class AbstractIT {
       ClassicHttpResponse response = httpClient.execute(request, a -> a);
       return response.getCode() == 200;
     } catch (Exception e) {
-      LOG.warn("Check Gravitino server failed: ", e);
+      LOG.warn("Check Gravitino server failed: url:{}, error message:{}", testUrl, e.getMessage());
       return false;
     }
   }

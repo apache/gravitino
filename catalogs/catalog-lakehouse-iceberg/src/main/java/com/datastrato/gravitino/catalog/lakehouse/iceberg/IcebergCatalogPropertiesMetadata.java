@@ -21,10 +21,12 @@ package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 import static com.datastrato.gravitino.connector.PropertyEntry.enumImmutablePropertyEntry;
 import static com.datastrato.gravitino.connector.PropertyEntry.stringRequiredPropertyEntry;
 
-import com.datastrato.gravitino.catalog.lakehouse.iceberg.authentication.AuthenticationConfig;
-import com.datastrato.gravitino.catalog.lakehouse.iceberg.authentication.kerberos.KerberosConfig;
 import com.datastrato.gravitino.connector.BaseCatalogPropertiesMetadata;
 import com.datastrato.gravitino.connector.PropertyEntry;
+import com.datastrato.gravitino.iceberg.common.IcebergCatalogBackend;
+import com.datastrato.gravitino.iceberg.common.IcebergConstants;
+import com.datastrato.gravitino.iceberg.common.authentication.AuthenticationConfig;
+import com.datastrato.gravitino.iceberg.common.authentication.kerberos.KerberosConfig;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;

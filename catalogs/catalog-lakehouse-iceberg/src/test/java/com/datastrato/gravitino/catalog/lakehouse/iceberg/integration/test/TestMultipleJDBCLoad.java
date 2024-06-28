@@ -24,8 +24,8 @@ import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogP
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import com.datastrato.gravitino.client.GravitinoMetalake;
+import com.datastrato.gravitino.iceberg.common.IcebergConfig;
 import com.datastrato.gravitino.integration.test.container.MySQLContainer;
 import com.datastrato.gravitino.integration.test.container.PostgreSQLContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;

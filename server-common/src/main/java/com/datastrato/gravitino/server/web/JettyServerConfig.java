@@ -39,6 +39,7 @@ import org.slf4j.LoggerFactory;
 
 public final class JettyServerConfig {
   private static final Logger LOG = LoggerFactory.getLogger(JettyServerConfig.class);
+  public static final String GRAVITINO_SERVER_CONFIG_PREFIX = "gravitino.server.webserver.";
   private static final String SPLITTER = ",";
   public static final int DEFAULT_ICEBERG_REST_SERVICE_HTTP_PORT = 9001;
   public static final int DEFAULT_ICEBERG_REST_SERVICE_HTTPS_PORT = 9433;

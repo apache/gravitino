@@ -215,22 +215,15 @@ public class MiniGravitino {
   Map<String, String> getIcebergRestServiceConfigs() throws IOException {
     Map<String, String> customConfigs = new HashMap<>();
 
-    String icebergJarPath =
-        Paths.get("catalogs", "catalog-lakehouse-iceberg", "build", "libs").toString();
+    String icebergJarPath = Paths.get("iceberg-rest-server", "build", "libs").toString();
     String icebergConfigPath =
-        Paths.get("catalogs", "catalog-lakehouse-iceberg", "src", "main", "resources").toString();
+        Paths.get("iceberg-rest-server", "src", "main", "resources").toString();
     customConfigs.put(
-        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
-            + "iceberg-rest"
-            + "."
-            + AuxiliaryServiceManager.AUX_SERVICE_CLASSPATH,
+        "gravitino.iceberg-rest." + AuxiliaryServiceManager.AUX_SERVICE_CLASSPATH,
         String.join(",", icebergJarPath, icebergConfigPath));
 
     customConfigs.put(
-        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
-            + "iceberg-rest"
-            + "."
-            + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
+        "gravitino.iceberg-rest." + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
         String.valueOf(RESTUtils.findAvailablePort(3000, 4000)));
     return customConfigs;
   }

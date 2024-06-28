@@ -24,10 +24,10 @@ import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalog.
 
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.PropertiesMetadataHelpers;
-import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOps;
 import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;
 import com.datastrato.gravitino.connector.PropertiesMetadata;
+import com.datastrato.gravitino.iceberg.common.ops.IcebergTableOps;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.google.common.collect.Maps;

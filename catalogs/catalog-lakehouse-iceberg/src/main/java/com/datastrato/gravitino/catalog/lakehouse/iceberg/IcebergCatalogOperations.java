@@ -23,7 +23,6 @@ import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREF
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.SchemaChange;
-import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOps;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper;
 import com.datastrato.gravitino.connector.CatalogInfo;
 import com.datastrato.gravitino.connector.CatalogOperations;
@@ -35,6 +34,9 @@ import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
+import com.datastrato.gravitino.iceberg.common.IcebergConfig;
+import com.datastrato.gravitino.iceberg.common.ops.IcebergTableOps;
+import com.datastrato.gravitino.iceberg.common.ops.IcebergTableOps.IcebergTableChange;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Table;
@@ -110,7 +112,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
     IcebergConfig icebergConfig = new IcebergConfig(resultConf);
 
     this.icebergTableOps = new IcebergTableOps(icebergConfig);
-    this.icebergTableOpsHelper = icebergTableOps.createIcebergTableOpsHelper();
+    this.icebergTableOpsHelper = new IcebergTableOpsHelper(icebergTableOps.getCatalog());
   }
 
   /** Closes the Iceberg catalog and releases the associated client pool. */
@@ -403,7 +405,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       throws NoSuchTableException, IllegalArgumentException {
     try {
       String[] levels = tableIdent.namespace().levels();
-      IcebergTableOpsHelper.IcebergTableChange icebergTableChange =
+      IcebergTableChange icebergTableChange =
           icebergTableOpsHelper.buildIcebergTableChanges(
               NameIdentifier.of(levels[levels.length - 1], tableIdent.name()), changes);
       LoadTableResponse loadTableResponse = icebergTableOps.updateTable(icebergTableChange);

@@ -525,14 +525,20 @@ tasks {
   val outputDir = projectDir.dir("distribution")
 
   val compileDistribution by registering {
-    dependsOn("copySubprojectDependencies", "copyCatalogLibAndConfigs", "copySubprojectLib")
+    dependsOn("copySubprojectDependencies", "copyCatalogLibAndConfigs", "copySubprojectLib", "copyIcebergRESTServer")
 
     group = "gravitino distribution"
     outputs.dir(projectDir.dir("distribution/package"))
     doLast {
       copy {
-        from(projectDir.dir("conf")) { into("package/conf") }
-        from(projectDir.dir("bin")) { into("package/bin") }
+        from(projectDir.dir("conf")) {
+          include("gravitino-env.sh.template", "gravitino.conf.template", "log4j2.properties.template")
+          into("package/conf")
+        }
+        from(projectDir.dir("bin")) {
+          include("gravitino.sh", "common.sh")
+          into("package/bin")
+        }
         from(projectDir.dir("web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web") }
         from(projectDir.dir("scripts")) { into("package/scripts") }
         into(outputDir)
@@ -558,6 +564,29 @@ tasks {
     }
   }
 
+  val copyIcebergRESTServer by registering {
+    dependsOn("iceberg-rest-server:copyLibs")
+    group = "gravitino distribution"
+    outputs.dir(projectDir.dir("distribution/package/extensions/iceberg-rest-server"))
+    doLast {
+      copy {
+        from(projectDir.dir("conf")) {
+          include("iceberg-rest-server.conf.template", "log4j2.properties.template")
+          into("package/extensions/iceberg-rest-server/conf")
+        }
+        from(projectDir.dir("bin")) {
+          include("common.sh", "iceberg-rest-server.sh")
+          into("package/extensions/iceberg-rest-server/bin")
+        }
+        into(outputDir)
+        rename { fileName ->
+          fileName.replace(".template", "")
+        }
+        fileMode = 0b111101101
+      }
+    }
+  }
+
   val assembleDistribution by registering(Tar::class) {
     dependsOn("assembleTrinoConnector")
     group = "gravitino distribution"
@@ -578,6 +607,33 @@ tasks {
     compression = Compression.GZIP
     archiveFileName.set("${rootProject.name}-trino-connector-$version.tar.gz")
     destinationDirectory.set(projectDir.dir("distribution"))
+  }
+
+  val assembleIcebergRESTServer by registering(Tar::class) {
+    dependsOn("iceberg-rest-server:copyLibs")
+    group = "gravitino distribution"
+    finalizedBy("checksumIcebergRESTServerDistribution")
+    into("${rootProject.name}-iceberg-rest-server-$version-bin")
+    from(copyIcebergRESTServer.map { it.outputs.files.single() })
+    compression = Compression.GZIP
+    archiveFileName.set("${rootProject.name}-iceberg-rest-server-$version-bin.tar.gz")
+    destinationDirectory.set(projectDir.dir("distribution"))
+  }
+
+  register("checksumIcebergRESTServerDistribution") {
+    group = "gravitino distribution"
+    dependsOn(assembleIcebergRESTServer)
+    val archiveFile = assembleIcebergRESTServer.flatMap { it.archiveFile }
+    val checksumFile = archiveFile.map { archive ->
+      archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
+    }
+    inputs.file(archiveFile)
+    outputs.file(checksumFile)
+    doLast {
+      checksumFile.get().writeText(
+        serviceOf<ChecksumService>().sha256(archiveFile.get().asFile).toString()
+      )
+    }
   }
 
   register("checksumDistribution") {
@@ -620,7 +676,7 @@ tasks {
   register("copySubprojectDependencies", Copy::class) {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
-        !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark") && it.name != "trino-connector" &&
+        !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark") && !it.name.startsWith("iceberg-") && it.name != "trino-connector" &&
         it.name != "integration-test" && it.name != "bundled-catalog" && it.name != "flink-connector"
       ) {
         from(it.configurations.runtimeClasspath)
@@ -635,6 +691,7 @@ tasks {
         !it.name.startsWith("client") &&
         !it.name.startsWith("filesystem") &&
         !it.name.startsWith("spark") &&
+        !it.name.startsWith("iceberg-") &&
         it.name != "trino-connector" &&
         it.name != "integration-test" &&
         it.name != "bundled-catalog" &&
