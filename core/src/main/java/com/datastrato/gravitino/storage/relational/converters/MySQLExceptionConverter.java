@@ -5,8 +5,8 @@
 package com.datastrato.gravitino.storage.relational.converters;
 
 import com.datastrato.gravitino.Entity;
-import com.datastrato.gravitino.exceptions.AlreadyExistsException;
-import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
+import com.datastrato.gravitino.EntityAlreadyExistsException;
+import java.io.IOException;
 import java.sql.SQLException;
 
 /**
@@ -20,13 +20,13 @@ public class MySQLExceptionConverter implements SQLExceptionConverter {
 
   @SuppressWarnings("FormatStringAnnotation")
   @Override
-  public GravitinoRuntimeException toGravitinoException(
-      SQLException se, Entity.EntityType type, String name) {
+  public void toGravitinoException(SQLException se, Entity.EntityType type, String name)
+      throws IOException {
     switch (se.getErrorCode()) {
       case DUPLICATED_ENTRY_ERROR_CODE:
-        return new AlreadyExistsException(se, se.getMessage());
+        throw new EntityAlreadyExistsException(se, se.getMessage());
       default:
-        return new GravitinoRuntimeException(se, se.getMessage());
+        throw new IOException(se);
     }
   }
 }
