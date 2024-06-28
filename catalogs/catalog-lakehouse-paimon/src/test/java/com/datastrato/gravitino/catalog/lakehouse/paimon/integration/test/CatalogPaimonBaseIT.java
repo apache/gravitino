@@ -94,9 +94,6 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     createCatalog();
     createSchema();
     initSparkEnv();
-    if (spark != null) {
-      spark.close();
-    }
   }
 
   @AfterAll
@@ -104,6 +101,9 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     clearTableAndSchema();
     metalake.dropCatalog(catalogName);
     client.dropMetalake(metalakeName);
+    if (spark != null) {
+      spark.close();
+    }
   }
 
   @AfterEach
