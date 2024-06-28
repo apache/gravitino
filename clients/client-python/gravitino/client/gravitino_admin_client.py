@@ -27,8 +27,6 @@ class GravitinoAdminClient(GravitinoClientBase):
     Normal users should use {@link GravitinoClient} to connect with the Gravitino server.
     """
 
-    # TODO: AuthDataProvider authDataProvider
-
     def list_metalakes(self) -> List[GravitinoMetalake]:
         """Retrieves a list of Metalakes from the Gravitino API.
 
