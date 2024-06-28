@@ -97,6 +97,10 @@ You can use these kinds of Docker images to facilitate integration testing of al
 You can use this kind of image to test the catalog of Apache Hive with kerberos enable
 
 Changelog
+- gravitino-ci-kerberos-hive:0.1.3
+  - Add more proxy users in the core-site.xml file.
+  - fix bugs in the `start.sh` script.
+
 - gravitino-ci-kerberos-hive:0.1.2
   - Add `${HOSTNAME} >> /root/.ssh/known_hosts` to the startup script.
   - Add check for the status of DataNode, if the DataNode is not running or ready within 100s, the container will exit.
@@ -213,6 +217,9 @@ You can use this image to test Apache Doris.
 
 Changelog
 
+- gravitino-ci-doris:0.1.4
+  - remove chmod in start.sh to accelerate the startup speed
+
 - gravitino-ci-doris:0.1.3
   - To adapt to the CI framework, don't exit container when start failed, logs are no longer printed to stdout. 
   - Add `report_disk_state_interval_seconds` config to decrease report interval.
@@ -237,6 +244,12 @@ Changelog
 You can use this image to control Trino's permissions.
 
 Changelog
+
+- gravitino-ci-ranger:0.1.1
+  - Docker image datastrato/gravitino-ci-ranger:0.1.1
+  - Use `ranger-admin` release from `datastrato/apache-ranger:2.4.0` to build docker image.
+  - Remove unnecessary hack in `start-ranger-service.sh`.
+  - Reduce docker image build time from `~1h` to `~5min`.
 
 - gravitino-ci-ranger:0.1.0
   - Docker image `datastrato/gravitino-ci-ranger:0.1.0`

@@ -4,20 +4,16 @@
  */
 package com.datastrato.gravitino.integration.test;
 
-import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
+import static com.datastrato.gravitino.Configs.ENTITY_KV_ROCKSDB_BACKEND_PATH;
 import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterruptibly;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
-import com.datastrato.gravitino.client.ErrorHandlers;
-import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.client.HTTPClient;
-import com.datastrato.gravitino.client.KerberosTokenProvider;
 import com.datastrato.gravitino.client.RESTClient;
-import com.datastrato.gravitino.dto.responses.VersionResponse;
-import com.datastrato.gravitino.exceptions.RESTException;
+import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.integration.test.util.KerberosProviderHelper;
 import com.datastrato.gravitino.integration.test.util.OAuthMockDataProvider;
@@ -28,13 +24,10 @@ import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
-import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -104,7 +97,8 @@ public class MiniGravitino {
 
     // Prepare delete the rocksdb backend storage directory
     try {
-      FileUtils.deleteDirectory(FileUtils.getFile(serverConfig.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)));
+      FileUtils.deleteDirectory(
+          FileUtils.getFile(serverConfig.get(ENTITY_KV_ROCKSDB_BACKEND_PATH)));
     } catch (Exception e) {
       // Ignore
     }
@@ -152,8 +146,10 @@ public class MiniGravitino {
             });
     long beginTime = System.currentTimeMillis();
     boolean started = false;
+
+    String url = URI + "/metrics";
     while (System.currentTimeMillis() - beginTime < 1000 * 60 * 3) {
-      started = checkIfServerIsRunning();
+      started = AbstractIT.isHttpServerUp(url);
       if (started || future.isDone()) {
         break;
       }
@@ -180,9 +176,11 @@ public class MiniGravitino {
 
     long beginTime = System.currentTimeMillis();
     boolean started = true;
+
+    String url = String.format("http://%s:%d/metrics", host, port);
     while (System.currentTimeMillis() - beginTime < 1000 * 60 * 3) {
       sleepUninterruptibly(500, TimeUnit.MILLISECONDS);
-      started = checkIfServerIsRunning();
+      started = AbstractIT.isHttpServerUp(url);
       if (!started) {
         break;
       }
@@ -191,7 +189,8 @@ public class MiniGravitino {
     restClient.close();
     try {
       FileUtils.deleteDirectory(mockConfDir);
-      FileUtils.deleteDirectory(FileUtils.getFile(serverConfig.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)));
+      FileUtils.deleteDirectory(
+          FileUtils.getFile(serverConfig.get(ENTITY_KV_ROCKSDB_BACKEND_PATH)));
     } catch (Exception e) {
       // Ignore
     }
@@ -238,70 +237,11 @@ public class MiniGravitino {
         GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
         String.valueOf(RESTUtils.findAvailablePort(2000, 3000)));
     configMap.put(
-        Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH.getKey(), "/tmp/gravitino-" + UUID.randomUUID());
+        Configs.ENTITY_KV_ROCKSDB_BACKEND_PATH.getKey(), "/tmp/gravitino-" + UUID.randomUUID());
 
     configMap.putAll(getIcebergRestServiceConfigs());
     configMap.putAll(context.customConfig);
 
     ITUtils.rewriteConfigFile(configTempFileName, configFileName, configMap);
-  }
-
-  public static boolean isPortOpen(String host, int port, int timeout) {
-    try (Socket socket = new Socket()) {
-      socket.connect(new java.net.InetSocketAddress(host, port), timeout);
-      return true;
-    } catch (Exception e) {
-      return false;
-    }
-  }
-
-  private boolean checkIfServerIsRunning() {
-    String URI = String.format("http://%s:%d", host, port);
-    LOG.info("checkIfServerIsRunning() URI: {}", URI);
-
-    // Use kerberos, we need to use sdk to check
-    if (Objects.equals(serverConfig.get(Configs.AUTHENTICATOR), "kerberos")) {
-      try {
-        KerberosTokenProvider provider =
-            KerberosTokenProvider.builder()
-                .withClientPrincipal((String) properties.get("client.kerberos.principal"))
-                .withKeyTabFile(new File((String) properties.get("client.kerberos.keytab")))
-                .build();
-        GravitinoAdminClient adminClient =
-            GravitinoAdminClient.builder(URI).withKerberosAuth(provider).build();
-
-        adminClient.listMetalakes();
-        return true;
-      } catch (Exception e) {
-        if (isPortOpen(host, port, 1000)) {
-          return true;
-        }
-
-        LOG.warn(
-            "Kerberos checkIfServerIsRunning() fails, GravitinoServer is not running {}",
-            e.getMessage());
-        return false;
-      }
-    }
-
-    // Not auth, we can use the rest client to check
-    VersionResponse response = null;
-    try {
-      response =
-          restClient.get(
-              "api/version",
-              VersionResponse.class,
-              Collections.emptyMap(),
-              ErrorHandlers.restErrorHandler());
-    } catch (RESTException e) {
-      LOG.warn("checkIfServerIsRunning() fails, GravitinoServer is not running {}", e.getMessage());
-      return false;
-    }
-    if (response != null && response.getCode() == 0) {
-      return true;
-    } else {
-      LOG.warn("checkIfServerIsRunning() fails, GravitinoServer is not running");
-      return false;
-    }
   }
 }

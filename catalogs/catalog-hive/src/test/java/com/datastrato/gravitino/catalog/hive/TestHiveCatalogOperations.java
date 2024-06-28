@@ -5,6 +5,8 @@
 
 package com.datastrato.gravitino.catalog.hive;
 
+import static com.datastrato.gravitino.Catalog.CLOUD_NAME;
+import static com.datastrato.gravitino.Catalog.CLOUD_REGION_CODE;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CHECK_INTERVAL_SEC;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE;
@@ -68,7 +70,7 @@ class TestHiveCatalogOperations {
     Map<String, PropertyEntry<?>> propertyEntryMap =
         HIVE_PROPERTIES_METADATA.catalogPropertiesMetadata().propertyEntries();
 
-    Assertions.assertEquals(12, propertyEntryMap.size());
+    Assertions.assertEquals(14, propertyEntryMap.size());
     Assertions.assertTrue(propertyEntryMap.containsKey(METASTORE_URIS));
     Assertions.assertTrue(propertyEntryMap.containsKey(Catalog.PROPERTY_PACKAGE));
     Assertions.assertTrue(propertyEntryMap.containsKey(BaseCatalog.CATALOG_OPERATION_IMPL));
@@ -86,6 +88,8 @@ class TestHiveCatalogOperations {
     Assertions.assertFalse(propertyEntryMap.get(PRINCIPAL).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(CHECK_INTERVAL_SEC).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(FETCH_TIMEOUT_SEC).isRequired());
+    Assertions.assertFalse(propertyEntryMap.get(CLOUD_NAME).isRequired());
+    Assertions.assertFalse(propertyEntryMap.get(CLOUD_REGION_CODE).isRequired());
   }
 
   @Test

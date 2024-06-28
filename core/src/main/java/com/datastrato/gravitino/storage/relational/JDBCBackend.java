@@ -27,6 +27,7 @@ import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.meta.TopicEntity;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
+import com.datastrato.gravitino.storage.relational.database.H2Database;
 import com.datastrato.gravitino.storage.relational.service.CatalogMetaService;
 import com.datastrato.gravitino.storage.relational.service.FilesetMetaService;
 import com.datastrato.gravitino.storage.relational.service.GroupMetaService;
@@ -37,8 +38,10 @@ import com.datastrato.gravitino.storage.relational.service.TableMetaService;
 import com.datastrato.gravitino.storage.relational.service.TopicMetaService;
 import com.datastrato.gravitino.storage.relational.service.UserMetaService;
 import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 
 /**
@@ -49,9 +52,17 @@ import java.util.function.Function;
  */
 public class JDBCBackend implements RelationalBackend {
 
+  private static final Map<JDBCBackendType, String> EMBEDDED_JDBC_DATABASE_MAP =
+      ImmutableMap.of(JDBCBackendType.H2, H2Database.class.getCanonicalName());
+
+  // Database instance of this JDBCBackend.
+  private JDBCDatabase jdbcDatabase;
+
   /** Initialize the jdbc backend instance. */
   @Override
   public void initialize(Config config) {
+    jdbcDatabase = startJDBCDatabaseIfNecessary(config);
+
     SqlSessionFactoryHelper.getInstance().init(config);
     SQLExceptionConverterFactory.initConverter(config);
   }
@@ -236,6 +247,7 @@ public class JDBCBackend implements RelationalBackend {
         return RoleMetaService.getInstance()
             .deleteRoleMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case TAG:
       case COLUMN:
       case AUDIT:
         return 0;
@@ -260,6 +272,7 @@ public class JDBCBackend implements RelationalBackend {
       case GROUP:
       case AUDIT:
       case ROLE:
+      case TAG:
         // These entity types have not implemented multi-versions, so we can skip.
         return 0;
 
@@ -277,5 +290,53 @@ public class JDBCBackend implements RelationalBackend {
   @Override
   public void close() throws IOException {
     SqlSessionFactoryHelper.getInstance().close();
+
+    if (jdbcDatabase != null) {
+      jdbcDatabase.close();
+    }
+  }
+
+  enum JDBCBackendType {
+    H2(true),
+    MYSQL(false);
+
+    private final boolean embedded;
+
+    JDBCBackendType(boolean embedded) {
+      this.embedded = embedded;
+    }
+
+    public static JDBCBackendType fromURI(String jdbcURI) {
+      if (jdbcURI.startsWith("jdbc:h2")) {
+        return JDBCBackendType.H2;
+      } else if (jdbcURI.startsWith("jdbc:mysql")) {
+        return JDBCBackendType.MYSQL;
+      } else {
+        throw new IllegalArgumentException("Unknown JDBC URI: " + jdbcURI);
+      }
+    }
+  }
+
+  /** Start JDBC database if necessary. For example, start the H2 database if the backend is H2. */
+  private static JDBCDatabase startJDBCDatabaseIfNecessary(Config config) {
+    String jdbcUrl = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL);
+    JDBCBackendType jdbcBackendType = JDBCBackendType.fromURI(jdbcUrl);
+
+    // Not an embedded database.
+    if (!jdbcBackendType.embedded) {
+      return null;
+    }
+
+    try {
+      JDBCDatabase jdbcDatabase =
+          (JDBCDatabase)
+              Class.forName(EMBEDDED_JDBC_DATABASE_MAP.get(jdbcBackendType))
+                  .getDeclaredConstructor()
+                  .newInstance();
+      jdbcDatabase.initialize(config);
+      return jdbcDatabase;
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to create and initialize JDBCBackend.", e);
+    }
   }
 }

@@ -7,14 +7,15 @@ package com.datastrato.gravitino.storage;
 
 import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
+import static com.datastrato.gravitino.Configs.ENTITY_KV_ROCKSDB_BACKEND_PATH;
 import static com.datastrato.gravitino.Configs.ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
 import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD;
+import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
 import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL;
 import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER;
 import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_STORE;
-import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 import static com.datastrato.gravitino.Configs.RELATIONAL_ENTITY_STORE;
 import static com.datastrato.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static com.datastrato.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
@@ -97,9 +98,9 @@ public class TestEntityStorage {
       Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
       Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
       Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
-      Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(KV_STORE_PATH);
+      Mockito.when(config.get(ENTITY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(KV_STORE_PATH);
 
-      Assertions.assertEquals(KV_STORE_PATH, config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH));
+      Assertions.assertEquals(KV_STORE_PATH, config.get(ENTITY_KV_ROCKSDB_BACKEND_PATH));
       Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
       Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
       Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
@@ -111,11 +112,18 @@ public class TestEntityStorage {
       dir.mkdirs();
       Mockito.when(config.get(ENTITY_STORE)).thenReturn(RELATIONAL_ENTITY_STORE);
       Mockito.when(config.get(ENTITY_RELATIONAL_STORE)).thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
+      Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PATH)).thenReturn(DB_DIR);
+
+      // The following properties are used to create the JDBC connection; they are just for test, in
+      // the real world,
+      // they will be set automatically by the configuration file if you set ENTITY_RELATIONAL_STORE
+      // as EMBEDDED_ENTITY_RELATIONAL_STORE.
       Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL))
           .thenReturn(String.format("jdbc:h2:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
-      Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("root");
-      Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("123");
+      Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("gravitino");
+      Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("gravitino");
       Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
+
       Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
       Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
     } else {
@@ -193,9 +201,6 @@ public class TestEntityStorage {
 
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
-      if (store instanceof RelationalEntityStore) {
-        prepareJdbcTable();
-      }
 
       BaseMetalake metalake =
           createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
@@ -380,9 +385,6 @@ public class TestEntityStorage {
 
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
-      if (store instanceof RelationalEntityStore) {
-        prepareJdbcTable();
-      }
 
       BaseMetalake metalake =
           createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
@@ -486,9 +488,6 @@ public class TestEntityStorage {
 
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
-      if (store instanceof RelationalEntityStore) {
-        prepareJdbcTable();
-      }
 
       BaseMetalake metalake = createBaseMakeLake(1L, "metalake", auditInfo);
       store.put(metalake);
@@ -535,9 +534,6 @@ public class TestEntityStorage {
 
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
-      if (store instanceof RelationalEntityStore) {
-        prepareJdbcTable();
-      }
 
       BaseMetalake metalake = createBaseMakeLake(1L, "metalake", auditInfo);
       CatalogEntity catalog = createCatalog(1L, Namespace.of("metalake"), "catalog", auditInfo);
@@ -758,9 +754,6 @@ public class TestEntityStorage {
     init(type, config);
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
-      if (store instanceof RelationalEntityStore) {
-        prepareJdbcTable();
-      }
 
       AuditInfo auditInfo =
           AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
@@ -898,9 +891,6 @@ public class TestEntityStorage {
     init(type, config);
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
-      if (store instanceof RelationalEntityStore) {
-        prepareJdbcTable();
-      }
 
       AuditInfo auditInfo =
           AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
