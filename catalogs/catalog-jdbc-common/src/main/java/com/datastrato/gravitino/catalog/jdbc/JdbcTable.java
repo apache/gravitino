@@ -22,9 +22,6 @@ public class JdbcTable extends BaseTable {
 
   @Override
   protected TableOperations newOps() {
-    if (tableOperation == null) {
-      throw new UnsupportedOperationException("Table partition operation is not supported yet");
-    }
     return tableOperation.createJdbcTablePartitionOperations(databaseName, name);
   }
 

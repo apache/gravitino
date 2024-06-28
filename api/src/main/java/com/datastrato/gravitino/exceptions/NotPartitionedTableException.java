@@ -8,7 +8,7 @@ import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 
 /** Exception thrown when a partitioned table does not exist. */
-public class NotPartitionedTableException extends NotFoundException {
+public class NotPartitionedTableException extends GravitinoRuntimeException {
 
   /**
    * Constructs a new exception with the specified detail message.

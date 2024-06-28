@@ -417,6 +417,8 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         .withProperties(jdbcTablePropertiesMetadata.convertFromJdbcProperties(resultProperties))
         .withPartitioning(partitioning)
         .withIndexes(indexes)
+        .withDatabaseName(databaseName)
+        .withTableOperation(tableOperation)
         .build();
   }
 

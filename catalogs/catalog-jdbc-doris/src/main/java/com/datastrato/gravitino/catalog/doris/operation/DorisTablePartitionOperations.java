@@ -194,7 +194,6 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
 
   private Transform getPartitionInfo(Connection connection) throws SQLException {
     String showCreateTableSql = String.format("SHOW CREATE TABLE `%s`", tableName);
-    // Note, the connection here will be reused and should not be closed.
     try (Statement statement = connection.createStatement();
         ResultSet result = statement.executeQuery(showCreateTableSql)) {
       StringBuilder createTableSql = new StringBuilder();
@@ -263,7 +262,6 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
   }
 
   private Map<String, Type> getColumnType(Connection connection) throws SQLException {
-    // Note, the connection here will be reused and should not be closed.
     DatabaseMetaData metaData = connection.getMetaData();
     try (ResultSet result =
         metaData.getColumns(connection.getCatalog(), connection.getSchema(), tableName, null)) {
