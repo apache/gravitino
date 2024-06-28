@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.com.google.common.util.concurrent.Uninterruptibles;
 
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 public class KerberosOperationsIT extends AbstractIT {
 
   private static final KerberosSecurityTestcase kdc =

@@ -44,7 +44,7 @@ import org.junit.jupiter.api.TestMethodOrder;
 import org.openqa.selenium.By;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class CatalogsPageTest extends AbstractWebIT {
   MetalakePage metalakePage = new MetalakePage();

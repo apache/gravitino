@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 public class VersionOperationsIT extends AbstractIT {
   @Test
   public void testGetVersion() {
