@@ -91,6 +91,7 @@ public class ChromeWebDriverProvider implements WebDriverProvider {
     // Display the web interface during testing
     if (Strings.isEmpty(System.getenv("DISPLAY_WEBPAGE_IN_TESTING"))) {
       chromeOptions.addArguments("--headless");
+      chromeOptions.addArguments("--no-sandbox");
     }
 
     if (SystemUtils.IS_OS_MAC_OSX) {
