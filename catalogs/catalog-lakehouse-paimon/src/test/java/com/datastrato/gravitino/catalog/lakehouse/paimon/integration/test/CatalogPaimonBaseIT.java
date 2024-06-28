@@ -94,6 +94,9 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     createCatalog();
     createSchema();
     initSparkEnv();
+    if (spark != null) {
+      spark.close();
+    }
   }
 
   @AfterAll
@@ -380,11 +383,6 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     Assertions.assertEquals(0, nameIdentifiers.length);
 
     Assertions.assertEquals(0, paimonCatalog.listTables(schemaName).size());
-  }
-
-  @Test
-  public void testAlterPaimonTable() {
-    // TODO: support alter table
   }
 
   @Test
