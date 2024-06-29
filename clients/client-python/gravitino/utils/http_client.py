@@ -145,6 +145,7 @@ class HTTPClient:
         endpoint,
         params=None,
         json=None,
+        data=None,
         headers=None,
         timeout=None,
         error_handler: ErrorHandler = None,
@@ -154,15 +155,23 @@ class HTTPClient:
 
         if headers:
             self._update_headers(headers)
-        else:
+
+        if data:
+            request_data = urlencode(data.to_dict()).encode()
             headers = {
-                "Content-Type": "application/json",
+                "Content-Type": "application/x-www-form-urlencoded",
                 "Accept": "application/vnd.gravitino.v1+json",
             }
             self._update_headers(headers)
+        else:
+            if json:
+                request_data = json.to_json().encode("utf-8")
 
-        if json:
-            request_data = json.to_json().encode("utf-8")
+            headers = {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Accept": "application/vnd.gravitino.v1+json",
+            }
+            self._update_headers(headers)
 
         opener = build_opener()
         request = Request(self._build_url(endpoint, params), data=request_data)
@@ -212,6 +221,8 @@ class HTTPClient:
         return self._request(
             "put", endpoint, json=json, error_handler=error_handler, **kwargs
         )
+    def post_form(self, endpoint, data=None, error_handler=None, **kwargs):
+        return self._request("post", endpoint, data=data, error_handler=error_handler **kwargs)
 
     def close(self):
         self._request("close", "/")
