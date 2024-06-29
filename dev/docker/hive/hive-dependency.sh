@@ -40,11 +40,11 @@ JDBC_DIVER_DOWNLOAD_URL="https://downloads.mysql.com/archives/get/p/3/file/${JDB
 ZOOKEEPER_PACKAGE_NAME="zookeeper-${ZOOKEEPER_VERSION}.tar.gz"
 ZOOKEEPER_DOWNLOAD_URL="https://archive.apache.org/dist/zookeeper/zookeeper-${ZOOKEEPER_VERSION}/${ZOOKEEPER_PACKAGE_NAME}"
 
-RANGER_HIVE_PACKAGE_NAME="ranger-distro-${RANGER_VERSION}-hive-plugin.tar.gz"
-RANGER_HIVE_DOWNLOAD_URL="https://repo.maven.apache.org/maven2/org/apache/ranger/ranger-distro/${RANGER_VERSION}/${RANGER_HIVE_PACKAGE_NAME}"
+RANGER_HIVE_PACKAGE_NAME="ranger-${RANGER_VERSION}-hive-plugin.tar.gz"
+RANGER_HIVE_DOWNLOAD_URL=https://github.com/datastrato/apache-ranger/releases/download/release-ranger-${RANGER_VERSION}/ranger-${RANGER_VERSION}-hive-plugin.tar.gz
 
-RANGER_HDFS_PACKAGE_NAME="ranger-distro-${RANGER_VERSION}-hdfs-plugin.tar.gz"
-RANGER_HDFS_DOWNLOAD_URL="https://repo.maven.apache.org/maven2/org/apache/ranger/ranger-distro/${RANGER_VERSION}/${RANGER_HDFS_PACKAGE_NAME}"
+RANGER_HDFS_PACKAGE_NAME="ranger-${RANGER_VERSION}-hdfs-plugin.tar.gz"
+RANGER_HDFS_DOWNLOAD_URL=https://github.com/datastrato/apache-ranger/releases/download/release-ranger-${RANGER_VERSION}/ranger-${RANGER_VERSION}-hdfs-plugin.tar.gz
 
 # Prepare download packages
 if [[ ! -d "${hive_dir}/packages" ]]; then
