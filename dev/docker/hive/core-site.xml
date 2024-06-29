@@ -33,4 +33,14 @@
     <name>hadoop.proxyuser.root.hosts</name>
     <value>*</value>
   </property>
+
+  <property>
+    <name>hadoop.proxyuser.datastrato.groups</name>
+    <value>*</value>
+  </property>
+
+  <property>
+    <name>hadoop.proxyuser.datastrato.hosts</name>
+    <value>*</value>
+  </property>
 </configuration>
