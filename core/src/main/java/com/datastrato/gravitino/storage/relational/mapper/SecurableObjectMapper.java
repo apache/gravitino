@@ -50,14 +50,16 @@ public interface SecurableObjectMapper {
   @Update(
       "UPDATE "
           + SECURABLE_OBJECT_TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
           + " WHERE role_id = #{roleId} AND deleted_at = 0")
   void softDeleteSecurableObjectsByRoleId(@Param("roleId") Long roleId);
 
   @Update(
       "UPDATE "
           + SECURABLE_OBJECT_TABLE_NAME
-          + " ob SET ob.deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+          + " ob SET ob.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
           + " where exists ( select * from "
           + ROLE_TABLE_NAME
           + " ro WHERE ro.metalake_id = #{metalakeId} AND ro.role_id = ob.role_id"

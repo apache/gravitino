@@ -75,7 +75,8 @@ public interface UserRoleRelMapper {
   @Update(
       "UPDATE "
           + USER_ROLE_RELATION_TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) "
+          + "+ EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
           + " WHERE user_id = #{userId} AND deleted_at = 0")
   void softDeleteUserRoleRelByUserId(@Param("userId") Long userId);
 
@@ -83,7 +84,8 @@ public interface UserRoleRelMapper {
     "<script>",
     "UPDATE "
         + USER_ROLE_RELATION_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) "
+        + "+ EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE user_id = #{userId} AND role_id in (",
     "<foreach collection='roleIds' item='roleId' separator=','>",
     "#{roleId}",
@@ -97,7 +99,8 @@ public interface UserRoleRelMapper {
   @Update(
       "UPDATE "
           + USER_ROLE_RELATION_TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) "
+          + "+ EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
           + " WHERE user_id IN (SELECT user_id FROM "
           + USER_TABLE_NAME
           + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0)"
@@ -107,7 +110,8 @@ public interface UserRoleRelMapper {
   @Update(
       "UPDATE "
           + USER_ROLE_RELATION_TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) "
+          + "+ EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
           + " WHERE role_id = #{roleId} AND deleted_at = 0")
   void softDeleteUserRoleRelByRoleId(@Param("roleId") Long roleId);
 

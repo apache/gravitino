@@ -144,21 +144,24 @@ public interface SchemaMetaMapper {
   @Update(
       "UPDATE "
           + TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
           + " WHERE schema_id = #{schemaId} AND deleted_at = 0")
   Integer softDeleteSchemaMetasBySchemaId(@Param("schemaId") Long schemaId);
 
   @Update(
       "UPDATE "
           + TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
           + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0")
   Integer softDeleteSchemaMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
 
   @Update(
       "UPDATE "
           + TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
           + " WHERE catalog_id = #{catalogId} AND deleted_at = 0")
   Integer softDeleteSchemaMetasByCatalogId(@Param("catalogId") Long catalogId);
 

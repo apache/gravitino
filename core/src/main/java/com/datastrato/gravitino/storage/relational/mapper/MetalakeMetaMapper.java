@@ -134,7 +134,8 @@ public interface MetalakeMetaMapper {
   @Update(
       "UPDATE "
           + TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
           + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0")
   Integer softDeleteMetalakeMetaByMetalakeId(@Param("metalakeId") Long metalakeId);
 

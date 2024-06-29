@@ -140,28 +140,32 @@ public interface TopicMetaMapper {
   @Update(
       "UPDATE "
           + TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
           + " WHERE topic_id = #{topicId} AND deleted_at = 0")
   Integer softDeleteTopicMetasByTopicId(@Param("topicId") Long topicId);
 
   @Update(
       "UPDATE "
           + TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
           + " WHERE catalog_id = #{catalogId} AND deleted_at = 0")
   Integer softDeleteTopicMetasByCatalogId(@Param("catalogId") Long catalogId);
 
   @Update(
       "UPDATE "
           + TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
           + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0")
   Integer softDeleteTopicMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
 
   @Update(
       "UPDATE "
           + TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
           + " WHERE schema_id = #{schemaId} AND deleted_at = 0")
   Integer softDeleteTopicMetasBySchemaId(@Param("schemaId") Long schemaId);
 
