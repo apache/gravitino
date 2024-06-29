@@ -18,6 +18,6 @@
 ---
 CREATE USER 'rangeradmin'@'localhost' IDENTIFIED BY 'PLACEHOLDER_RANGER_PASSWORD';
 CREATE DATABASE ranger;
-GRANT ALL PRIVILEGES ON ranger.* TO 'rangeradmin'@'localhost' with grant option;
-ALTER USER 'root'@'localhost' IDENTIFIED VIA mysql_native_password;
+GRANT ALL PRIVILEGES ON ranger.* TO 'rangeradmin'@'localhost';
+UPDATE mysql.user SET plugin='mysql_native_password' WHERE User='root';
 FLUSH PRIVILEGES;
