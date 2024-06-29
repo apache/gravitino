@@ -33,6 +33,24 @@ public interface Catalog extends Auditable {
     UNSUPPORTED
   }
 
+  /** The cloud that the catalog is running on. Used by the catalog property `cloud.name`. */
+  enum CloudName {
+    /** Amazon Web Services */
+    AWS,
+
+    /** Microsoft Azure */
+    AZURE,
+
+    /** Google Cloud Platform */
+    GCP,
+
+    /** Not running on cloud */
+    ON_PREMISE,
+
+    /** Other cloud providers */
+    OTHER
+  }
+
   /**
    * A reserved property to specify the package location of the catalog. The "package" is a string
    * of path to the folder where all the catalog related dependencies is located. The dependencies
@@ -43,6 +61,18 @@ public interface Catalog extends Auditable {
    * different location, the "package" property is needed.
    */
   String PROPERTY_PACKAGE = "package";
+
+  /**
+   * The property to specify the cloud that the catalog is running on. The value should be one of
+   * the {@link CloudName}.
+   */
+  String CLOUD_NAME = "cloud.name";
+
+  /**
+   * The property to specify the region code of the cloud that the catalog is running on. The value
+   * should be the region code of the cloud provider.
+   */
+  String CLOUD_REGION_CODE = "cloud.region-code";
 
   /** @return The name of the catalog. */
   String name();

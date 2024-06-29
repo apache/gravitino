@@ -195,12 +195,18 @@ tasks {
   }
 
   val test by registering(VenvTask::class) {
-    dependsOn(pipInstall, pylint, unitTests)
-
+    val skipUTs = project.hasProperty("skipTests")
     val skipPyClientITs = project.hasProperty("skipPyClientITs")
     val skipITs = project.hasProperty("skipITs")
-    if (!skipITs && !skipPyClientITs) {
-      dependsOn(integrationTest)
+    val skipAllTests = skipUTs && (skipITs || skipPyClientITs)
+    if (!skipAllTests) {
+      dependsOn(pipInstall, pylint)
+      if (!skipUTs) {
+        dependsOn(unitTests)
+      }
+      if (!skipITs && !skipPyClientITs) {
+        dependsOn(integrationTest)
+      }
     }
   }
 
@@ -243,7 +249,7 @@ tasks {
     delete("build")
     delete("dist")
     delete("docs")
-    delete("version.ini")
+    delete("gravitino/version.ini")
     delete("gravitino.egg-info")
     delete("tests/unittests/htmlcov")
     delete("tests/unittests/.coverage")

@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.integration.test;
 
-import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
+import static com.datastrato.gravitino.Configs.ENTITY_KV_ROCKSDB_BACKEND_PATH;
 import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterruptibly;
 
 import com.datastrato.gravitino.Config;
@@ -97,7 +97,8 @@ public class MiniGravitino {
 
     // Prepare delete the rocksdb backend storage directory
     try {
-      FileUtils.deleteDirectory(FileUtils.getFile(serverConfig.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)));
+      FileUtils.deleteDirectory(
+          FileUtils.getFile(serverConfig.get(ENTITY_KV_ROCKSDB_BACKEND_PATH)));
     } catch (Exception e) {
       // Ignore
     }
@@ -188,7 +189,8 @@ public class MiniGravitino {
     restClient.close();
     try {
       FileUtils.deleteDirectory(mockConfDir);
-      FileUtils.deleteDirectory(FileUtils.getFile(serverConfig.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)));
+      FileUtils.deleteDirectory(
+          FileUtils.getFile(serverConfig.get(ENTITY_KV_ROCKSDB_BACKEND_PATH)));
     } catch (Exception e) {
       // Ignore
     }
@@ -235,7 +237,7 @@ public class MiniGravitino {
         GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
         String.valueOf(RESTUtils.findAvailablePort(2000, 3000)));
     configMap.put(
-        Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH.getKey(), "/tmp/gravitino-" + UUID.randomUUID());
+        Configs.ENTITY_KV_ROCKSDB_BACKEND_PATH.getKey(), "/tmp/gravitino-" + UUID.randomUUID());
 
     configMap.putAll(getIcebergRestServiceConfigs());
     configMap.putAll(context.customConfig);

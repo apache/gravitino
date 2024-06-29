@@ -23,6 +23,7 @@ import com.datastrato.gravitino.storage.relational.utils.MetadataObjectUtils;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
 import com.google.common.collect.Lists;
+import java.io.IOException;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,7 +80,7 @@ public class RoleMetaService {
         RoleMetaMapper.class, mapper -> mapper.listRolesByGroupId(groupId));
   }
 
-  public void insertRole(RoleEntity roleEntity, boolean overwritten) {
+  public void insertRole(RoleEntity roleEntity, boolean overwritten) throws IOException {
     try {
       AuthorizationUtils.checkRole(roleEntity.nameIdentifier());
 

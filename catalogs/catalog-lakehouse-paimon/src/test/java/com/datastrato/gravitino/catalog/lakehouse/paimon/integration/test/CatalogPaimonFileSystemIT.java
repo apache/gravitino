@@ -4,13 +4,14 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.paimon.integration.test;
 
+import com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
 
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class CatalogPaimonFileSystemIT extends CatalogPaimonBaseIT {
 
@@ -21,9 +22,9 @@ public class CatalogPaimonFileSystemIT extends CatalogPaimonBaseIT {
     catalogProperties.put("key1", "val1");
     catalogProperties.put("key2", "val2");
 
-    catalogProperties.put("metastore", "filesystem");
+    catalogProperties.put(PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND, "filesystem");
     catalogProperties.put(
-        "warehouse",
+        PaimonCatalogPropertiesMetadata.WAREHOUSE,
         String.format(
             "hdfs://%s:%d/user/hive/warehouse-catalog-paimon/",
             containerSuite.getHiveContainer().getContainerIpAddress(),

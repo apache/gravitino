@@ -28,6 +28,8 @@ from urllib.parse import urlencode
 from urllib.error import HTTPError
 import json as _json
 
+from gravitino.auth.auth_constants import AuthConstants
+from gravitino.auth.auth_data_provider import AuthDataProvider
 from gravitino.typing import JSONType
 from gravitino.utils.exceptions import handle_error
 from gravitino.constants.timeout import TIMEOUT
@@ -77,11 +79,13 @@ class HTTPClient:
         request_headers=None,
         timeout=TIMEOUT,
         is_debug=False,
+        auth_data_provider: AuthDataProvider = None,
     ) -> None:
         self.host = host
         self.request_headers = request_headers or {}
         self.timeout = timeout
         self.is_debug = is_debug
+        self.auth_data_provider = auth_data_provider
 
     def _build_url(self, endpoint=None, params=None):
         url = self.host
@@ -144,7 +148,11 @@ class HTTPClient:
                 request.add_header(key, value)
         if request_data and ("Content-Type" not in self.request_headers):
             request.add_header("Content-Type", "application/json")
-
+        if self.auth_data_provider is not None:
+            request.add_header(
+                AuthConstants.HTTP_HEADER_AUTHORIZATION,
+                self.auth_data_provider.get_token_data().decode("utf-8"),
+            )
         request.get_method = lambda: method
         return Response(self._make_request(opener, request, timeout=timeout))
 
@@ -162,6 +170,8 @@ class HTTPClient:
 
     def close(self):
         self._request("close", "/")
+        if self.auth_data_provider is not None:
+            self.auth_data_provider.close()
 
 
 def unpack(path: str):

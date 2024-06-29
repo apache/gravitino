@@ -40,7 +40,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import sun.security.krb5.KrbException;
 
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 public class HadoopUserAuthenticationIT extends AbstractIT {
   private static final Logger LOG = LoggerFactory.getLogger(HadoopUserAuthenticationIT.class);
 

@@ -83,7 +83,8 @@ public class FilesetCatalog extends BaseSchemaCatalog
   }
 
   /**
-   * Load fileset metadata by {@link NameIdentifier} from the catalog.
+   * Load fileset metadata by {@link NameIdentifier} from the catalog, which should be a
+   * "schema.fileset" style.
    *
    * @param ident A fileset identifier.
    * @return The fileset metadata.
@@ -113,7 +114,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
    *
    * <p>If the type of the fileset object is "EXTERNAL", the underlying storageLocation must be set.
    *
-   * @param ident A fileset identifier.
+   * @param ident A fileset identifier, which should be a "schema.fileset" style.
    * @param comment The comment of the fileset.
    * @param type The type of the fileset.
    * @param storageLocation The storage location of the fileset.
@@ -157,7 +158,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
   /**
    * Update a fileset metadata in the catalog.
    *
-   * @param ident A fileset identifier.
+   * @param ident A fileset identifier, which should be a "schema.fileset" style.
    * @param changes The changes to apply to the fileset.
    * @return The updated fileset metadata.
    * @throws NoSuchFilesetException If the fileset does not exist.
@@ -194,7 +195,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
    * <p>The underlying files will be deleted if this fileset type is managed, otherwise, only the
    * metadata will be dropped.
    *
-   * @param ident A fileset identifier.
+   * @param ident A fileset identifier, which should be a "schema.fileset" style.
    * @return true If the fileset is dropped, false the fileset did not exist.
    */
   @Override
@@ -251,6 +252,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
   private Namespace getFilesetFullNamespace(Namespace tableNamespace) {
     return Namespace.of(this.catalogNamespace().level(0), this.name(), tableNamespace.level(0));
   }
+
   /**
    * Create a new builder for the fileset catalog.
    *
