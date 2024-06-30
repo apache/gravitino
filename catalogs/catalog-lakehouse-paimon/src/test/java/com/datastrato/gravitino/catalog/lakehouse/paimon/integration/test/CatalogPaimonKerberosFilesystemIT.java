@@ -7,7 +7,6 @@ package com.datastrato.gravitino.catalog.lakehouse.paimon.integration.test;
 import static com.datastrato.gravitino.catalog.lakehouse.paimon.authentication.AuthenticationConfig.AUTH_TYPE_KEY;
 import static com.datastrato.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosConfig.KEY_TAB_URI_KEY;
 import static com.datastrato.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosConfig.PRINCIPAL_KEY;
-import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
@@ -210,8 +209,6 @@ public class CatalogPaimonKerberosFilesystemIT extends AbstractIT {
     properties.put(AUTH_TYPE_KEY, "kerberos");
     properties.put(KEY_TAB_URI_KEY, TMP_DIR + HDFS_CLIENT_KEYTAB);
     properties.put(PRINCIPAL_KEY, HDFS_CLIENT_PRINCIPAL);
-    properties.put(CATALOG_BYPASS_PREFIX + "fs.defaultFS", defaultBaseLocation());
-    properties.put(CATALOG_BYPASS_PREFIX + "fs.hdfs.impl.disable.cache", "true");
 
     properties.put(PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND, TYPE);
     properties.put(PaimonCatalogPropertiesMetadata.WAREHOUSE, WAREHOUSE);
@@ -222,21 +219,20 @@ public class CatalogPaimonKerberosFilesystemIT extends AbstractIT {
 
     // The FilesystemCatalog would create the warehouse directory if it doesn't exist
     // So we need to create the warehouse directory first to avoid the permission denied error for
-    // user 'cli'
+    // user 'cli' when initializing the FilesystemCatalog
     kerberosHiveContainer.executeInContainer(
         "hadoop", "fs", "-mkdir", "/user/hive/paimon_catalog_warehouse");
 
-    //    // Test create schema
-    //    Exception exception =
-    //        Assertions.assertThrows(
-    //            Exception.class,
-    //            () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment",
-    // ImmutableMap.of()));
-    //    String exceptionMessage = Throwables.getStackTraceAsString(exception);
-    //
-    //    // Make sure the real user is 'cli'
-    //    Assertions.assertTrue(exceptionMessage.contains("Permission denied: user=cli,
-    // access=WRITE"));
+    // Test create schema
+    Exception exception =
+        Assertions.assertThrows(
+            Exception.class,
+            () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
+    String exceptionMessage = Throwables.getStackTraceAsString(exception);
+
+    // Make sure the real user is 'cli'
+    Assertions.assertTrue(
+        exceptionMessage.contains("Permission denied: user=gravitino_client, access=WRITE"));
 
     // Now try to permit the user to create the schema again
     kerberosHiveContainer.executeInContainer(
@@ -260,8 +256,6 @@ public class CatalogPaimonKerberosFilesystemIT extends AbstractIT {
     // Load table
     Table loadTable = catalog.asTableCatalog().loadTable(tableNameIdentifier);
     Assertions.assertEquals(loadTable.name(), tableNameIdentifier.name());
-
-    // TODO: Alter table is unsupported now.
 
     // Drop table
     catalog.asTableCatalog().dropTable(tableNameIdentifier);
@@ -296,8 +290,6 @@ public class CatalogPaimonKerberosFilesystemIT extends AbstractIT {
     // Not user impersonation here
     properties.put(KEY_TAB_URI_KEY, TMP_DIR + HDFS_CLIENT_KEYTAB);
     properties.put(PRINCIPAL_KEY, HDFS_CLIENT_PRINCIPAL);
-    properties.put(CATALOG_BYPASS_PREFIX + "fs.defaultFS", defaultBaseLocation());
-    properties.put(CATALOG_BYPASS_PREFIX + "fs.hdfs.impl.disable.cache", "true");
 
     properties.put(PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND, TYPE);
     properties.put(PaimonCatalogPropertiesMetadata.WAREHOUSE, WAREHOUSE);
@@ -341,8 +333,6 @@ public class CatalogPaimonKerberosFilesystemIT extends AbstractIT {
     Table loadTable = catalog.asTableCatalog().loadTable(tableNameIdentifier);
     Assertions.assertEquals(loadTable.name(), tableNameIdentifier.name());
 
-    // TODO: Alter table is unsupported now.
-
     // Drop table
     catalog.asTableCatalog().dropTable(tableNameIdentifier);
     Assertions.assertFalse(catalog.asTableCatalog().tableExists(tableNameIdentifier));
@@ -360,12 +350,5 @@ public class CatalogPaimonKerberosFilesystemIT extends AbstractIT {
     Column col2 = Column.of(FILESYSTEM_COL_NAME2, Types.DateType.get(), "col_2_comment");
     Column col3 = Column.of(FILESYSTEM_COL_NAME3, Types.StringType.get(), "col_3_comment");
     return new Column[] {col1, col2, col3};
-  }
-
-  private static String defaultBaseLocation() {
-    return String.format(
-        "hdfs://%s:%d",
-        containerSuite.getKerberosHiveContainer().getContainerIpAddress(),
-        HiveContainer.HDFS_DEFAULTFS_PORT);
   }
 }

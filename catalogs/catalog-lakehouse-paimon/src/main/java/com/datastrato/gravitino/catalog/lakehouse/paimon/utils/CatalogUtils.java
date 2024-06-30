@@ -78,7 +78,7 @@ public class CatalogUtils {
           Catalog catalog = CatalogFactory.createCatalog(catalogContext);
           if (authenticationConfig.isImpersonationEnabled()) {
             FilesystemBackendProxy proxyFilesystemCatalog =
-                new FilesystemBackendProxy((FileSystemCatalog) catalog, realm);
+                new FilesystemBackendProxy((FileSystemCatalog) catalog, catalogContext, realm);
             return proxyFilesystemCatalog.getProxy();
           }
           return catalog;
