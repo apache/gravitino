@@ -8,8 +8,7 @@ from unittest.mock import patch
 
 from gravitino.auth.auth_constants import AuthConstants
 from gravitino.auth.default_oauth_to_token_provider import DefaultOAuth2TokenProvider
-from gravitino.dto.responses.oauth2_token_response import OAuth2TokenResponse
-import tests.unittests.auth.mock_base as mock_base
+from tests.unittests.auth import mock_base
 
 OAUTH_PORT = 1082
 
@@ -19,15 +18,13 @@ class TestOAuth2TokenProvider(unittest.TestCase):
     def test_provider_init_exception(self):
 
         with self.assertRaises(AssertionError):
-            token_provider1 = DefaultOAuth2TokenProvider(uri="test")
+            _ = DefaultOAuth2TokenProvider(uri="test")
 
         with self.assertRaises(AssertionError):
-            token_provider2 = DefaultOAuth2TokenProvider(uri="test", credential="xx")
+            _ = DefaultOAuth2TokenProvider(uri="test", credential="xx")
 
         with self.assertRaises(AssertionError):
-            token_provider3 = DefaultOAuth2TokenProvider(
-                uri="test", credential="xx", scope="test"
-            )
+            _ = DefaultOAuth2TokenProvider(uri="test", credential="xx", scope="test")
 
     # TODO
     # Error Test
@@ -39,7 +36,7 @@ class TestOAuth2TokenProvider(unittest.TestCase):
     def test_authentication_with_error_authentication_type(self, mock_method1):
 
         with self.assertRaises(AssertionError):
-            token_provider = DefaultOAuth2TokenProvider(
+            _ = DefaultOAuth2TokenProvider(
                 uri=f"http://127.0.0.1:{OAUTH_PORT}",
                 credential="yy:xx",
                 path="oauth/token",
