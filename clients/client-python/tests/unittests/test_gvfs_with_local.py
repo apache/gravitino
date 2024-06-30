@@ -7,12 +7,14 @@ import random
 import string
 import time
 import unittest
-import mock_base
+from unittest.mock import patch
+
 import pandas
 import pyarrow as pa
 import pyarrow.dataset as dt
 import pyarrow.parquet as pq
-from unittest.mock import patch
+from fsspec.implementations.local import LocalFileSystem
+from llama_index.core import SimpleDirectoryReader
 
 from gravitino import gvfs
 from gravitino import NameIdentifier
@@ -20,8 +22,8 @@ from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.fileset_dto import FilesetDTO
 from gravitino.filesystem.gvfs import FilesetContext, StorageType
 from gravitino.exceptions.gravitino_runtime_exception import GravitinoRuntimeException
-from fsspec.implementations.local import LocalFileSystem
-from llama_index.core import SimpleDirectoryReader
+
+from tests.unittests import mock_base
 
 
 def generate_unique_random_string(length):
@@ -53,7 +55,7 @@ class TestLocalFilesystem(unittest.TestCase):
             "test_cache", f"{_fileset_dir}/test_cache"
         ),
     )
-    def test_cache(self, mock_method1, mock_method2, mock_method3, mock_method4):
+    def test_cache(self, *mock_methods):
         local_fs = LocalFileSystem()
         fileset_storage_location = f"{self._fileset_dir}/test_cache"
         fileset_virtual_location = "fileset/fileset_catalog/tmp/test_cache"
@@ -70,7 +72,7 @@ class TestLocalFilesystem(unittest.TestCase):
         # wait 2 seconds
         time.sleep(2)
         self.assertIsNone(
-            fs._cache.get(
+            fs.cache.get(
                 NameIdentifier.of_fileset(
                     "metalake_demo", "fileset_catalog", "tmp", "test_cache"
                 )
@@ -81,7 +83,7 @@ class TestLocalFilesystem(unittest.TestCase):
         "gravitino.catalog.fileset_catalog.FilesetCatalog.load_fileset",
         return_value=mock_base.mock_load_fileset("test_ls", f"{_fileset_dir}/test_ls"),
     )
-    def test_ls(self, mock_method1, mock_method2, mock_method3, mock_method4):
+    def test_ls(self, *mock_methods):
         local_fs = LocalFileSystem()
         fileset_storage_location = f"{self._fileset_dir}/test_ls"
         fileset_virtual_location = "fileset/fileset_catalog/tmp/test_ls"
@@ -127,7 +129,7 @@ class TestLocalFilesystem(unittest.TestCase):
             "test_info", f"{_fileset_dir}/test_info"
         ),
     )
-    def test_info(self, mock_method1, mock_method2, mock_method3, mock_method4):
+    def test_info(self, *mock_methods):
         local_fs = LocalFileSystem()
         fileset_storage_location = f"{self._fileset_dir}/test_info"
         fileset_virtual_location = "fileset/fileset_catalog/tmp/test_info"
@@ -158,7 +160,7 @@ class TestLocalFilesystem(unittest.TestCase):
             "test_exist", f"{_fileset_dir}/test_exist"
         ),
     )
-    def test_exist(self, mock_method1, mock_method2, mock_method3, mock_method4):
+    def test_exist(self, *mock_methods):
         local_fs = LocalFileSystem()
         fileset_storage_location = f"{self._fileset_dir}/test_exist"
         fileset_virtual_location = "fileset/fileset_catalog/tmp/test_exist"
@@ -187,7 +189,7 @@ class TestLocalFilesystem(unittest.TestCase):
             "test_cp_file", f"{_fileset_dir}/test_cp_file"
         ),
     )
-    def test_cp_file(self, mock_method1, mock_method2, mock_method3, mock_method4):
+    def test_cp_file(self, *mock_methods):
         local_fs = LocalFileSystem()
         fileset_storage_location = f"{self._fileset_dir}/test_cp_file"
         local_fs.mkdir(fileset_storage_location)
@@ -234,7 +236,7 @@ class TestLocalFilesystem(unittest.TestCase):
         "gravitino.catalog.fileset_catalog.FilesetCatalog.load_fileset",
         return_value=mock_base.mock_load_fileset("test_mv", f"{_fileset_dir}/test_mv"),
     )
-    def test_mv(self, mock_method1, mock_method2, mock_method3, mock_method4):
+    def test_mv(self, *args):
         local_fs = LocalFileSystem()
         fileset_storage_location = f"{self._fileset_dir}/test_mv"
         local_fs.mkdir(fileset_storage_location)
@@ -291,7 +293,7 @@ class TestLocalFilesystem(unittest.TestCase):
         "gravitino.catalog.fileset_catalog.FilesetCatalog.load_fileset",
         return_value=mock_base.mock_load_fileset("test_rm", f"{_fileset_dir}/test_rm"),
     )
-    def test_rm(self, mock_method1, mock_method2, mock_method3, mock_method4):
+    def test_rm(self, *args):
         local_fs = LocalFileSystem()
         fileset_storage_location = f"{self._fileset_dir}/test_rm"
         local_fs.mkdir(fileset_storage_location)
@@ -333,7 +335,7 @@ class TestLocalFilesystem(unittest.TestCase):
             "test_rm_file", f"{_fileset_dir}/test_rm_file"
         ),
     )
-    def test_rm_file(self, mock_method1, mock_method2, mock_method3, mock_method4):
+    def test_rm_file(self, *mock_methods):
         local_fs = LocalFileSystem()
         fileset_storage_location = f"{self._fileset_dir}/test_rm_file"
         local_fs.mkdir(fileset_storage_location)
@@ -371,7 +373,7 @@ class TestLocalFilesystem(unittest.TestCase):
             "test_rmdir", f"{_fileset_dir}/test_rmdir"
         ),
     )
-    def test_rmdir(self, mock_method1, mock_method2, mock_method3, mock_method4):
+    def test_rmdir(self, *mock_methods):
         local_fs = LocalFileSystem()
         fileset_storage_location = f"{self._fileset_dir}/test_rmdir"
         local_fs.mkdir(fileset_storage_location)
@@ -409,7 +411,7 @@ class TestLocalFilesystem(unittest.TestCase):
             "test_open", f"{_fileset_dir}/test_open"
         ),
     )
-    def test_open(self, mock_method1, mock_method2, mock_method3, mock_method4):
+    def test_open(self, *mock_methods):
         local_fs = LocalFileSystem()
         fileset_storage_location = f"{self._fileset_dir}/test_open"
         local_fs.mkdir(fileset_storage_location)
@@ -452,7 +454,7 @@ class TestLocalFilesystem(unittest.TestCase):
             "test_mkdir", f"{_fileset_dir}/test_mkdir"
         ),
     )
-    def test_mkdir(self, mock_method1, mock_method2, mock_method3, mock_method4):
+    def test_mkdir(self, *mock_methods):
         local_fs = LocalFileSystem()
         fileset_storage_location = f"{self._fileset_dir}/test_mkdir"
         local_fs.mkdir(fileset_storage_location)
@@ -492,7 +494,7 @@ class TestLocalFilesystem(unittest.TestCase):
             "test_makedirs", f"{_fileset_dir}/test_makedirs"
         ),
     )
-    def test_makedirs(self, mock_method1, mock_method2, mock_method3, mock_method4):
+    def test_makedirs(self, *mock_methods):
         local_fs = LocalFileSystem()
         fileset_storage_location = f"{self._fileset_dir}/test_makedirs"
         local_fs.mkdir(fileset_storage_location)
@@ -526,7 +528,7 @@ class TestLocalFilesystem(unittest.TestCase):
             "test_created", f"{_fileset_dir}/test_created"
         ),
     )
-    def test_created(self, mock_method1, mock_method2, mock_method3, mock_method4):
+    def test_created(self, *mock_methods):
         local_fs = LocalFileSystem()
         fileset_storage_location = f"{self._fileset_dir}/test_created"
         local_fs.mkdir(fileset_storage_location)
@@ -553,7 +555,7 @@ class TestLocalFilesystem(unittest.TestCase):
             "test_modified", f"{_fileset_dir}/test_modified"
         ),
     )
-    def test_modified(self, mock_method1, mock_method2, mock_method3, mock_method4):
+    def test_modified(self, *mock_methods):
         local_fs = LocalFileSystem()
         fileset_storage_location = f"{self._fileset_dir}/test_modified"
         local_fs.mkdir(fileset_storage_location)
@@ -580,7 +582,7 @@ class TestLocalFilesystem(unittest.TestCase):
             "test_cat_file", f"{_fileset_dir}/test_cat_file"
         ),
     )
-    def test_cat_file(self, mock_method1, mock_method2, mock_method3, mock_method4):
+    def test_cat_file(self, *mock_methods):
         local_fs = LocalFileSystem()
         fileset_storage_location = f"{self._fileset_dir}/test_cat_file"
         local_fs.mkdir(fileset_storage_location)
@@ -623,7 +625,7 @@ class TestLocalFilesystem(unittest.TestCase):
             "test_get_file", f"{_fileset_dir}/test_get_file"
         ),
     )
-    def test_get_file(self, mock_method1, mock_method2, mock_method3, mock_method4):
+    def test_get_file(self, *mock_methods):
         local_fs = LocalFileSystem()
         fileset_storage_location = f"{self._fileset_dir}/test_get_file"
         local_fs.mkdir(fileset_storage_location)
@@ -669,7 +671,8 @@ class TestLocalFilesystem(unittest.TestCase):
         with self.assertRaises(GravitinoRuntimeException):
             fs.get_file(file_virtual_path, remote_path)
 
-    def test_convert_actual_path(self, mock_method1, mock_method2, mock_method3):
+    # pylint: disable=protected-access
+    def test_convert_actual_path(self, *mock_methods):
         # test convert actual hdfs path
         audit_dto = AuditDTO(
             _creator="test",
@@ -750,7 +753,7 @@ class TestLocalFilesystem(unittest.TestCase):
             "fileset/test_catalog/test_schema/test_f1/actual_path", virtual_path
         )
 
-    def test_convert_info(self, mock_method1, mock_method2, mock_method3):
+    def test_convert_info(self, *mock_methods3):
         # test convert actual hdfs path
         audit_dto = AuditDTO(
             _creator="test",
@@ -831,7 +834,7 @@ class TestLocalFilesystem(unittest.TestCase):
             "fileset/test_catalog/test_schema/test_f1/actual_path", virtual_path
         )
 
-    def test_extract_identifier(self, mock_method1, mock_method2, mock_method3):
+    def test_extract_identifier(self, *mock_methods):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:9090", metalake_name="metalake_demo"
         )
@@ -855,7 +858,7 @@ class TestLocalFilesystem(unittest.TestCase):
             "test_pandas", f"{_fileset_dir}/test_pandas"
         ),
     )
-    def test_pandas(self, mock_method1, mock_method2, mock_method3, mock_method4):
+    def test_pandas(self, *mock_methods):
         local_fs = LocalFileSystem()
         fileset_storage_location = f"{self._fileset_dir}/test_pandas"
         local_fs.mkdir(fileset_storage_location)
@@ -898,7 +901,7 @@ class TestLocalFilesystem(unittest.TestCase):
             "test_pyarrow", f"{_fileset_dir}/test_pyarrow"
         ),
     )
-    def test_pyarrow(self, mock_method1, mock_method2, mock_method3, mock_method4):
+    def test_pyarrow(self, *mock_methods):
         local_fs = LocalFileSystem()
         fileset_storage_location = f"{self._fileset_dir}/test_pyarrow"
         local_fs.mkdir(fileset_storage_location)
@@ -934,7 +937,7 @@ class TestLocalFilesystem(unittest.TestCase):
             "test_llama_index", f"{_fileset_dir}/test_llama_index"
         ),
     )
-    def test_llama_index(self, mock_method1, mock_method2, mock_method3, mock_method4):
+    def test_llama_index(self, *mock_methods):
         local_fs = LocalFileSystem()
         fileset_storage_location = f"{self._fileset_dir}/test_llama_index"
         local_fs.mkdir(fileset_storage_location)
