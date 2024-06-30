@@ -236,7 +236,7 @@ class TestLocalFilesystem(unittest.TestCase):
         "gravitino.catalog.fileset_catalog.FilesetCatalog.load_fileset",
         return_value=mock_base.mock_load_fileset("test_mv", f"{_fileset_dir}/test_mv"),
     )
-    def test_mv(self, *args):
+    def test_mv(self, *mock_methods):
         local_fs = LocalFileSystem()
         fileset_storage_location = f"{self._fileset_dir}/test_mv"
         local_fs.mkdir(fileset_storage_location)
@@ -293,7 +293,7 @@ class TestLocalFilesystem(unittest.TestCase):
         "gravitino.catalog.fileset_catalog.FilesetCatalog.load_fileset",
         return_value=mock_base.mock_load_fileset("test_rm", f"{_fileset_dir}/test_rm"),
     )
-    def test_rm(self, *args):
+    def test_rm(self, *mock_methods):
         local_fs = LocalFileSystem()
         fileset_storage_location = f"{self._fileset_dir}/test_rm"
         local_fs.mkdir(fileset_storage_location)
