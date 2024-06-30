@@ -13,6 +13,7 @@ import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.google.common.collect.Maps;
+import java.io.File;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Map;
@@ -37,7 +38,7 @@ public class TestPaimonSchema {
   }
 
   @Test
-  public void testCreateIcebergSchema() {
+  public void testCreatePaimonSchema() {
     PaimonCatalog paimonCatalog = initPaimonCatalog("testCreatePaimonSchema");
     PaimonCatalogOperations paimonCatalogOperations = (PaimonCatalogOperations) paimonCatalog.ops();
 
@@ -110,7 +111,7 @@ public class TestPaimonSchema {
         paimonCatalogOperations.createSchema(ident, COMMENT_VALUE, properties);
     Assertions.assertTrue(paimonCatalogOperations.schemaExists(ident));
     properties.forEach(
-        (k, v) -> Assertions.assertEquals(v, paimonSchema.toPaimonSchema().getValue().get(k)));
+        (k, v) -> Assertions.assertEquals(v, paimonSchema.toPaimonProperties().getValue().get(k)));
 
     // schema properties of FilesystemCatalog is empty when loadDatabase.
     Map<String, String> properties1 = paimonCatalogOperations.loadSchema(ident).properties();
@@ -157,7 +158,10 @@ public class TestPaimonSchema {
 
     Map<String, String> conf = Maps.newHashMap();
     conf.put(PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND, "filesystem");
-    conf.put(PaimonCatalogPropertiesMetadata.WAREHOUSE, "/tmp/paimon_catalog_warehouse");
+    conf.put(
+        PaimonCatalogPropertiesMetadata.WAREHOUSE,
+        String.join(
+            File.separator, System.getProperty("java.io.tmpdir"), "paimon_catalog_warehouse"));
     return new PaimonCatalog().withCatalogConf(conf).withCatalogEntity(entity);
   }
 }

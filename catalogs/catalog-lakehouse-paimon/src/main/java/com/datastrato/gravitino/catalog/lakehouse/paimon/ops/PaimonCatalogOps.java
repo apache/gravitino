@@ -20,11 +20,11 @@ import org.apache.paimon.schema.Schema;
 import org.apache.paimon.table.Table;
 
 /** Table operation proxy that handles table operations of an underlying Paimon catalog. */
-public class PaimonTableOps implements AutoCloseable {
+public class PaimonCatalogOps implements AutoCloseable {
 
   protected Catalog catalog;
 
-  public PaimonTableOps(PaimonConfig paimonConfig) {
+  public PaimonCatalogOps(PaimonConfig paimonConfig) {
     catalog = loadCatalogBackend(paimonConfig);
   }
 
@@ -43,9 +43,9 @@ public class PaimonTableOps implements AutoCloseable {
     return catalog.loadDatabaseProperties(databaseName);
   }
 
-  public void createDatabase(Pair<String, Map<String, String>> database)
+  public void createDatabase(String databaseName, Map<String, String> properties)
       throws DatabaseAlreadyExistException {
-    catalog.createDatabase(database.getKey(), false, database.getRight());
+    catalog.createDatabase(databaseName, false, properties);
   }
 
   public void dropDatabase(String databaseName, boolean cascade)
@@ -61,9 +61,9 @@ public class PaimonTableOps implements AutoCloseable {
     return catalog.getTable(tableIdentifier(tableName));
   }
 
-  public void createTable(Pair<String, Schema> table)
+  public void createTable(String tablename, Schema schema)
       throws Catalog.TableAlreadyExistException, DatabaseNotExistException {
-    catalog.createTable(tableIdentifier(table.getKey()), table.getValue(), false);
+    catalog.createTable(tableIdentifier(tablename), schema, false);
   }
 
   public void dropTable(String tableName) throws TableNotExistException {

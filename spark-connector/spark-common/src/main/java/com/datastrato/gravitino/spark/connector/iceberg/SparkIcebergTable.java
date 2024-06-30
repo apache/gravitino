@@ -10,6 +10,7 @@ import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
 import com.datastrato.gravitino.spark.connector.SparkTypeConverter;
 import com.datastrato.gravitino.spark.connector.utils.GravitinoTableInfoHelper;
+import java.lang.reflect.Field;
 import java.util.Map;
 import org.apache.iceberg.spark.SparkCatalog;
 import org.apache.iceberg.spark.source.SparkTable;
@@ -36,10 +37,7 @@ public class SparkIcebergTable extends SparkTable {
       PropertiesConverter propertiesConverter,
       SparkTransformConverter sparkTransformConverter,
       SparkTypeConverter sparkTypeConverter) {
-    super(
-        sparkTable.table(), true
-        /** refreshEagerly */
-        );
+    super(sparkTable.table(), !isCacheEnabled(sparkCatalog));
     this.gravitinoTableInfoHelper =
         new GravitinoTableInfoHelper(
             true,
@@ -79,5 +77,15 @@ public class SparkIcebergTable extends SparkTable {
   @Override
   public ScanBuilder newScanBuilder(CaseInsensitiveStringMap options) {
     return ((SparkTable) sparkTable).newScanBuilder(options);
+  }
+
+  private static boolean isCacheEnabled(SparkCatalog sparkCatalog) {
+    try {
+      Field cacheEnabled = sparkCatalog.getClass().getDeclaredField("cacheEnabled");
+      cacheEnabled.setAccessible(true);
+      return cacheEnabled.getBoolean(sparkCatalog);
+    } catch (NoSuchFieldException | IllegalAccessException e) {
+      throw new RuntimeException("Failed to get cacheEnabled field from SparkCatalog", e);
+    }
   }
 }

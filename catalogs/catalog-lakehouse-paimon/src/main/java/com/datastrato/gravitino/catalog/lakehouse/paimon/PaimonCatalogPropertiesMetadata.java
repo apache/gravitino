@@ -25,15 +25,14 @@ import java.util.Map;
  */
 public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
 
-  public static final String GRAVITINO_CATALOG_BACKEND = "catalog-backend";
-  public static final String PAIMON_METASTORE = "metastore";
-  public static final String WAREHOUSE = "warehouse";
-  public static final String URI = "uri";
-
-  private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
+  @VisibleForTesting public static final String GRAVITINO_CATALOG_BACKEND = "catalog-backend";
+  @VisibleForTesting public static final String PAIMON_METASTORE = "metastore";
+  @VisibleForTesting public static final String WAREHOUSE = "warehouse";
+  @VisibleForTesting public static final String URI = "uri";
 
   public static final Map<String, String> GRAVITINO_CONFIG_TO_PAIMON =
       ImmutableMap.of(GRAVITINO_CATALOG_BACKEND, PAIMON_METASTORE, WAREHOUSE, WAREHOUSE, URI, URI);
+  private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
   private static final Map<String, String> KERBEROS_CONFIGURATION =
       ImmutableMap.of(
           KerberosConfig.PRINCIPAL_KEY,

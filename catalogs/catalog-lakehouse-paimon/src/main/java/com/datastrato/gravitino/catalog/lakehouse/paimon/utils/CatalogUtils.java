@@ -49,10 +49,7 @@ public class CatalogUtils {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(warehouse), "Paimon Catalog warehouse can not be null or empty.");
 
-    if (!PaimonCatalogBackend.FILESYSTEM
-        .name()
-        .toLowerCase(Locale.ROOT)
-        .equals(metastore.toLowerCase(Locale.ROOT))) {
+    if (!PaimonCatalogBackend.FILESYSTEM.name().equalsIgnoreCase(metastore)) {
       String uri = paimonConfig.get(CATALOG_URI);
       Preconditions.checkArgument(
           StringUtils.isNotBlank(uri), "Paimon Catalog uri can not be null or empty.");

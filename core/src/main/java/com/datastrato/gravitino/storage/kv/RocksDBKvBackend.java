@@ -7,7 +7,7 @@ package com.datastrato.gravitino.storage.kv;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
-import com.datastrato.gravitino.exceptions.AlreadyExistsException;
+import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.utils.ByteUtils;
 import com.datastrato.gravitino.utils.Bytes;
 import com.google.common.annotations.VisibleForTesting;
@@ -67,7 +67,7 @@ public class RocksDBKvBackend implements KvBackend {
 
   @VisibleForTesting
   String getStoragePath(Config config) {
-    String dbPath = config.get(Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH);
+    String dbPath = config.get(Configs.ENTITY_KV_ROCKSDB_BACKEND_PATH);
     if (StringUtils.isBlank(dbPath)) {
       return Configs.DEFAULT_KV_ROCKSDB_BACKEND_PATH;
     }
@@ -95,7 +95,7 @@ public class RocksDBKvBackend implements KvBackend {
   public void put(byte[] key, byte[] value, boolean overwrite) throws IOException {
     try {
       handlePut(key, value, overwrite);
-    } catch (AlreadyExistsException e) {
+    } catch (EntityAlreadyExistsException e) {
       throw e;
     } catch (Exception e) {
       throw new IOException(e);
@@ -110,7 +110,7 @@ public class RocksDBKvBackend implements KvBackend {
     }
     byte[] existKey = db.get(key);
     if (existKey != null) {
-      throw new AlreadyExistsException(
+      throw new EntityAlreadyExistsException(
           "Key %s already exists in the database, please use overwrite option to overwrite it",
           ByteUtils.formatByteArray(key));
     }

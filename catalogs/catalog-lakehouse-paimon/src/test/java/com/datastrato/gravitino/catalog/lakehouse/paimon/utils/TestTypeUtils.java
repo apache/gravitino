@@ -32,7 +32,7 @@ import org.junit.jupiter.api.Test;
 public class TestTypeUtils {
 
   @Test
-  void testFromToPaimonType() {
+  void testFromAndToPaimonType() {
     // Test supported data types.
     RowType rowType =
         RowType.builder()
@@ -51,13 +51,27 @@ public class TestTypeUtils {
                 DataTypes.DATE(),
                 DataTypes.TIME(),
                 DataTypes.TIMESTAMP(),
-                DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE())
+                DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(),
+                DataTypes.MAP(DataTypes.INT(), DataTypes.STRING()),
+                DataTypes.ARRAY(DataTypes.INT()))
             .build();
-    assertEquals(rowType, toPaimonType(assertDataType(rowType)));
-    // Test UnparsedType with CharType, VarBinaryType for fromPaimonType.
+
+    Type gravitinoDataType = toGravitinoDataType(rowType);
+
+    DataType paimonDataType = toPaimonType(gravitinoDataType);
+
+    assertEquals(rowType, paimonDataType);
+  }
+
+  @Test
+  void testUnparsedType() {
     Arrays.asList(
             DataTypes.CHAR(CharType.MAX_LENGTH), DataTypes.VARBINARY(VarBinaryType.MAX_LENGTH))
-        .forEach(this::assertDataType);
+        .forEach(this::toGravitinoDataType);
+  }
+
+  @Test
+  void testUnsupportedType() {
     // Test UnsupportedOperationException with IntervalYearType, IntervalDayType, FixedCharType,
     // UUIDType, FixedType, UnionType, NullType for toPaimonType.
     Arrays.asList(
@@ -69,16 +83,16 @@ public class TestTypeUtils {
             Types.UnionType.of(Types.IntegerType.get()),
             Types.NullType.get(),
             Types.UnparsedType.of("unparsed"))
-        .forEach(this::assertUnsupportedType);
+        .forEach(this::checkUnsupportedType);
   }
 
-  private Type assertDataType(DataType dataType) {
+  private Type toGravitinoDataType(DataType dataType) {
     switch (dataType.getTypeRoot()) {
       case VARCHAR:
         if (((VarCharType) dataType).getLength() == Integer.MAX_VALUE) {
-          return assertDataType(dataType, Name.STRING);
+          return checkDataType(dataType, Name.STRING);
         } else {
-          return assertDataType(
+          return checkDataType(
               dataType,
               Name.VARCHAR,
               type ->
@@ -86,11 +100,11 @@ public class TestTypeUtils {
                       ((VarCharType) dataType).getLength(), ((Types.VarCharType) type).length()));
         }
       case BOOLEAN:
-        return assertDataType(dataType, Name.BOOLEAN);
+        return checkDataType(dataType, Name.BOOLEAN);
       case BINARY:
-        return assertDataType(dataType, Name.BINARY);
+        return checkDataType(dataType, Name.BINARY);
       case DECIMAL:
-        return assertDataType(
+        return checkDataType(
             dataType,
             Name.DECIMAL,
             type -> {
@@ -99,38 +113,38 @@ public class TestTypeUtils {
               assertEquals(((DecimalType) dataType).getScale(), ((Types.DecimalType) type).scale());
             });
       case TINYINT:
-        return assertDataType(dataType, Name.BYTE);
+        return checkDataType(dataType, Name.BYTE);
       case SMALLINT:
-        return assertDataType(dataType, Name.SHORT);
+        return checkDataType(dataType, Name.SHORT);
       case INTEGER:
-        return assertDataType(dataType, Name.INTEGER);
+        return checkDataType(dataType, Name.INTEGER);
       case BIGINT:
-        return assertDataType(dataType, Name.LONG);
+        return checkDataType(dataType, Name.LONG);
       case FLOAT:
-        return assertDataType(dataType, Name.FLOAT);
+        return checkDataType(dataType, Name.FLOAT);
       case DOUBLE:
-        return assertDataType(dataType, Name.DOUBLE);
+        return checkDataType(dataType, Name.DOUBLE);
       case DATE:
-        return assertDataType(dataType, Name.DATE);
+        return checkDataType(dataType, Name.DATE);
       case TIME_WITHOUT_TIME_ZONE:
-        return assertDataType(dataType, Name.TIME);
+        return checkDataType(dataType, Name.TIME);
       case TIMESTAMP_WITHOUT_TIME_ZONE:
-        return assertDataType(
+        return checkDataType(
             dataType,
             Name.TIMESTAMP,
             type -> assertFalse(((Types.TimestampType) type).hasTimeZone()));
       case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-        return assertDataType(
+        return checkDataType(
             dataType,
             Name.TIMESTAMP,
             type -> assertTrue(((Types.TimestampType) type).hasTimeZone()));
       case ARRAY:
-        return assertDataType(
+        return checkDataType(
             dataType,
             Name.LIST,
             type -> assertTrue(((Types.ListType) type).elementType() instanceof Types.IntegerType));
       case MULTISET:
-        return assertDataType(
+        return checkDataType(
             dataType,
             Name.MAP,
             type -> {
@@ -140,7 +154,7 @@ public class TestTypeUtils {
               assertTrue(((Types.MapType) type).valueType() instanceof Types.IntegerType);
             });
       case MAP:
-        return assertDataType(
+        return checkDataType(
             dataType,
             Name.MAP,
             type -> {
@@ -152,27 +166,27 @@ public class TestTypeUtils {
                   ((Types.MapType) type).valueType());
             });
       case ROW:
-        return assertDataType(
+        return checkDataType(
             dataType,
             Name.STRUCT,
-            type -> ((RowType) dataType).getFieldTypes().forEach(this::assertDataType));
+            type -> ((RowType) dataType).getFieldTypes().forEach(this::toGravitinoDataType));
       default:
-        return assertDataType(dataType, Name.UNPARSED);
+        return checkDataType(dataType, Name.UNPARSED);
     }
   }
 
-  private Type assertDataType(DataType dataType, Name expected) {
-    return assertDataType(dataType, expected, type -> {});
+  private Type checkDataType(DataType dataType, Name expected) {
+    return checkDataType(dataType, expected, type -> {});
   }
 
-  private Type assertDataType(DataType dataType, Name expected, Consumer<Type> consumer) {
+  private Type checkDataType(DataType dataType, Name expected, Consumer<Type> consumer) {
     Type actual = fromPaimonType(dataType);
     assertEquals(expected, actual.name());
     consumer.accept(actual);
     return actual;
   }
 
-  private void assertUnsupportedType(Type type) {
+  private void checkUnsupportedType(Type type) {
     UnsupportedOperationException exception =
         assertThrowsExactly(UnsupportedOperationException.class, () -> toPaimonType(type));
     assertEquals(

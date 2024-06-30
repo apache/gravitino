@@ -23,9 +23,9 @@ dependencies {
     exclude("com.sun.jersey")
     exclude("javax.servlet")
   }
-  implementation(libs.guava)
   implementation(libs.commons.lang3)
   implementation(libs.bundles.log4j)
+  implementation(libs.guava)
   implementation(libs.hadoop2.common) {
     exclude("com.github.spotbugs")
     exclude("com.sun.jersey")
@@ -60,11 +60,11 @@ dependencies {
   testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
     exclude("org.apache.hadoop")
   }
-  testImplementation(libs.bundles.log4j)
-  testImplementation(libs.junit.jupiter.api)
-  testImplementation(libs.junit.jupiter.params)
-  testImplementation(libs.mysql.driver)
   testImplementation(libs.slf4j.api)
+  testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.mysql.driver)
+  testImplementation(libs.bundles.log4j)
+  testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.testcontainers)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
