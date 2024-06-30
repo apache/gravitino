@@ -58,7 +58,7 @@ class DefaultOAuth2TokenProvider(OAuth2TokenProvider):
         if expires is None:
             return None
 
-        if expires > time.time():
+        if expires > time.time() * 1000:
             return self._token
 
         self._token = self._fetch_token()
@@ -115,4 +115,4 @@ class DefaultOAuth2TokenProvider(OAuth2TokenProvider):
         if JWT_EXPIRE not in jwt or not isinstance(jwt[JWT_EXPIRE], int):
             return None
 
-        return jwt[JWT_EXPIRE]
+        return jwt[JWT_EXPIRE] * 1000
