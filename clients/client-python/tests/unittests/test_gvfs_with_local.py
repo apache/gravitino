@@ -3,6 +3,8 @@ Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
 
+# pylint: disable=protected-access
+
 import random
 import string
 import time
@@ -671,7 +673,6 @@ class TestLocalFilesystem(unittest.TestCase):
         with self.assertRaises(GravitinoRuntimeException):
             fs.get_file(file_virtual_path, remote_path)
 
-    # pylint: disable=protected-access
     def test_convert_actual_path(self, *mock_methods):
         # test convert actual hdfs path
         audit_dto = AuditDTO(
