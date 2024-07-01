@@ -271,15 +271,15 @@ public class Privileges {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof GenericPrivilege)) return false;
-        GenericPrivilege<?> that = (GenericPrivilege<?>) o;
-        return condition == that.condition && name == that.name;
+      if (this == o) return true;
+      if (!(o instanceof GenericPrivilege)) return false;
+      GenericPrivilege<?> that = (GenericPrivilege<?>) o;
+      return condition == that.condition && name == that.name;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(condition, name);
+      return Objects.hash(condition, name);
     }
   }
 
@@ -861,4 +861,3 @@ public class Privileges {
     }
   }
 }
-
