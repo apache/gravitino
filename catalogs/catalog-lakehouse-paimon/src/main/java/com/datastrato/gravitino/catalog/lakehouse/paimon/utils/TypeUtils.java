@@ -155,6 +155,12 @@ public class TypeUtils {
 
     @Override
     public Type visit(MultisetType multisetType) {
+      // Unlike a Java Set, MultisetType allows for multiple instances for each of its
+      // elements with a common subtype. And a conversion is possible through a map
+      // that assigns each value to an integer to represent the multiplicity of the values.
+      // For example, a `MULTISET<INT>` is converted to a `MAP<Integer, Integer>`, the key of the
+      // map represents the elements of the Multiset and the value represents the multiplicity of
+      // the elements in the Multiset.
       return Types.MapType.of(
           multisetType.getElementType().accept(this), Types.IntegerType.get(), false);
     }

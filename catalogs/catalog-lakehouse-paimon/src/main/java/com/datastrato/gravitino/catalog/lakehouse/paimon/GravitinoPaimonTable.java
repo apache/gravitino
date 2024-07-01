@@ -13,7 +13,6 @@ import com.datastrato.gravitino.connector.TableOperations;
 import com.google.common.collect.Maps;
 import lombok.Getter;
 import lombok.ToString;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.paimon.schema.Schema;
 import org.apache.paimon.table.Table;
 import org.apache.paimon.types.DataField;
@@ -36,13 +35,13 @@ public class GravitinoPaimonTable extends BaseTable {
    *
    * @return The converted Paimon table.
    */
-  public Pair<String, Schema> toPaimonTableSchema(String tableName) {
+  public Schema toPaimonTableSchema() {
     Schema.Builder builder = Schema.newBuilder().comment(comment).options(properties);
     for (int index = 0; index < columns.length; index++) {
       DataField dataField = toPaimonColumn(index, columns[index]);
       builder.column(dataField.name(), dataField.type(), dataField.description());
     }
-    return Pair.of(tableName, builder.build());
+    return builder.build();
   }
 
   /**

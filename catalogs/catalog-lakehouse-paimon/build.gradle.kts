@@ -23,8 +23,8 @@ dependencies {
     exclude("com.sun.jersey")
     exclude("javax.servlet")
   }
-  implementation(libs.commons.lang3)
   implementation(libs.bundles.log4j)
+  implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.hadoop2.common) {
     exclude("com.github.spotbugs")
