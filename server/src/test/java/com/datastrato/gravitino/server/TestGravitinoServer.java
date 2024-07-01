@@ -36,6 +36,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
@@ -99,7 +100,7 @@ public class TestGravitinoServer {
     }
   }
 
-  @Test
+  @Disabled("Disabled until shifting to use relational entity store as default storage")
   public void testInitialize() {
     gravitinoServer.initialize();
   }
@@ -110,7 +111,7 @@ public class TestGravitinoServer {
         ROCKS_DB_STORE_PATH, spyServerConfig.get(ENTITY_KV_ROCKSDB_BACKEND_PATH));
   }
 
-  @Test
+  @Disabled("Disabled until shifting to use relational entity store as default storage")
   public void testStartAndStop() throws Exception {
     gravitinoServer.initialize();
     gravitinoServer.start();

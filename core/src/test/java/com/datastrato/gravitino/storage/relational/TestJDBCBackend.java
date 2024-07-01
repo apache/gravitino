@@ -58,6 +58,7 @@ import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.datastrato.gravitino.storage.relational.mapper.GroupMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.UserMetaMapper;
 import com.datastrato.gravitino.storage.relational.service.RoleMetaService;
+import com.datastrato.gravitino.storage.relational.service.TagMetaService;
 import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
 import com.datastrato.gravitino.tag.TagManager;
