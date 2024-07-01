@@ -229,26 +229,66 @@ public class Privileges {
     }
   }
 
+  /**
+   * Abstract class representing a generic privilege.
+   *
+   * @param <T> the type of the privilege
+   */
   public abstract static class GenericPrivilege<T extends GenericPrivilege<T>>
       implements Privilege {
+
+    /**
+     * Functional interface for creating instances of GenericPrivilege.
+     *
+     * @param <T> the type of the privilege
+     */
     @FunctionalInterface
     public interface GenericPrivilegeFactory<T extends GenericPrivilege<T>> {
+      /**
+       * Creates a new instance of the privilege.
+       *
+       * @param condition the condition of the privilege
+       * @param name the name of the privilege
+       * @return the created privilege instance
+       */
       T create(Condition condition, Name name);
     }
 
     private final Condition condition;
     private final Name name;
 
+    /**
+     * Constructor for GenericPrivilege.
+     *
+     * @param condition the condition of the privilege
+     * @param name the name of the privilege
+     */
     protected GenericPrivilege(Condition condition, Name name) {
       this.condition = condition;
       this.name = name;
     }
 
+    /**
+     * Creates an allowed privilege.
+     *
+     * @param <T> the type of the privilege
+     * @param name the name of the privilege
+     * @param factory the factory to create the privilege
+     * @return the created privilege instance
+     */
     public static <T extends GenericPrivilege<T>> T allow(
         Name name, GenericPrivilegeFactory<T> factory) {
       return factory.create(Condition.ALLOW, name);
     }
 
+    /**
+     * Creates a denied privilege.
+     *
+     * @param <T> the type of the privilege
+     * @param name the name of the privilege
+     * @param factory the factory to create the privilege
+     * @return the created privilege instance
+     */
     public static <T extends GenericPrivilege<T>> T deny(
         Name name, GenericPrivilegeFactory<T> factory) {
       return factory.create(Condition.DENY, name);
