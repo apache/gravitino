@@ -15,6 +15,7 @@ jersey = "2.41"
 mockito = "4.11.0"
 airlift-json = "237"
 airlift-log = "231"
+airlift-resolver = "1.6"
 airlift-units = "1.8"
 hive2 = "2.3.9"
 hadoop2 = "2.10.2"
@@ -121,6 +122,7 @@ hadoop3-client = { group = "org.apache.hadoop", name = "hadoop-client", version.
 hadoop3-mapreduce-client-core = { group = "org.apache.hadoop", name = "hadoop-mapreduce-client-core", version.ref = "hadoop3"}
 hadoop3-minicluster = { group = "org.apache.hadoop", name = "hadoop-minicluster", version.ref = "hadoop-minikdc"}
 airlift-json = { group = "io.airlift", name = "json", version.ref = "airlift-json"}
+airlift-resolver = { group = "io.airlift.resolver", name = "resolver", version.ref = "airlift-resolver"}
 airlift-units = { group = "io.airlift", name = "units", version.ref = "airlift-units"}
 airlift-log = { group = "io.airlift", name = "log", version.ref = "airlift-log"}
 httpclient5 = { group = "org.apache.httpcomponents.client5", name = "httpclient5", version.ref = "httpclient5" }

@@ -30,7 +30,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.paimon.schema.Schema;
 import org.apache.paimon.types.DataField;
 import org.apache.paimon.types.DataTypes;
@@ -288,24 +287,22 @@ public class TestGravitinoPaimonTable {
             .withComment("test_table_comment")
             .withProperties(properties)
             .build();
-    Pair<String, Schema> paimonTable =
-        gravitinoPaimonTable.toPaimonTableSchema(identifier.toString());
-    Schema schema = paimonTable.getValue();
-    Assertions.assertEquals(identifier.toString(), paimonTable.getKey());
+    Schema paimonTableSchema = gravitinoPaimonTable.toPaimonTableSchema();
     Assertions.assertEquals(gravitinoPaimonTable.comment(), gravitinoPaimonTable.comment());
-    Assertions.assertEquals(gravitinoPaimonTable.properties(), schema.options());
-    Assertions.assertEquals(gravitinoPaimonTable.columns().length, schema.fields().size());
-    Assertions.assertEquals(3, schema.fields().size());
+    Assertions.assertEquals(gravitinoPaimonTable.properties(), paimonTableSchema.options());
+    Assertions.assertEquals(
+        gravitinoPaimonTable.columns().length, paimonTableSchema.fields().size());
+    Assertions.assertEquals(3, paimonTableSchema.fields().size());
     for (int i = 0; i < gravitinoPaimonTable.columns().length; i++) {
       Column column = gravitinoPaimonTable.columns()[i];
-      DataField dataField = schema.fields().get(i);
+      DataField dataField = paimonTableSchema.fields().get(i);
       Assertions.assertEquals(column.name(), dataField.name());
       Assertions.assertEquals(column.comment(), dataField.description());
     }
-    Assertions.assertEquals(new IntType().nullable(), schema.fields().get(0).type());
-    Assertions.assertEquals(new DateType().nullable(), schema.fields().get(1).type());
+    Assertions.assertEquals(new IntType().nullable(), paimonTableSchema.fields().get(0).type());
+    Assertions.assertEquals(new DateType().nullable(), paimonTableSchema.fields().get(1).type());
     Assertions.assertEquals(
-        new VarCharType(Integer.MAX_VALUE).nullable(), schema.fields().get(2).type());
+        new VarCharType(Integer.MAX_VALUE).nullable(), paimonTableSchema.fields().get(2).type());
   }
 
   private static String genRandomName() {

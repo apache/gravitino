@@ -23,6 +23,7 @@ dependencies {
     exclude("com.sun.jersey")
     exclude("javax.servlet")
   }
+  implementation(libs.bundles.log4j)
   implementation(libs.commons.lang3)
   implementation(libs.bundles.log4j)
   implementation(libs.guava)

@@ -42,7 +42,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.schema.Schema;
 import org.apache.paimon.table.Table;
@@ -131,9 +130,8 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
                 AuditInfo.builder().withCreator(currentUser).withCreateTime(Instant.now()).build())
             .build();
     try {
-      Pair<String, Map<String, String>> paimonSchemaProperties = createdSchema.toPaimonProperties();
-      paimonCatalogOps.createDatabase(
-          paimonSchemaProperties.getKey(), paimonSchemaProperties.getValue());
+      Map<String, String> paimonSchemaProperties = createdSchema.toPaimonProperties();
+      paimonCatalogOps.createDatabase(identifier.name(), paimonSchemaProperties);
     } catch (Catalog.DatabaseAlreadyExistException e) {
       throw new SchemaAlreadyExistsException(e, SCHEMA_ALREADY_EXISTS_EXCEPTION, identifier);
     } catch (Exception e) {
@@ -321,9 +319,8 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
                 AuditInfo.builder().withCreator(currentUser).withCreateTime(Instant.now()).build())
             .build();
     try {
-      Pair<String, Schema> paimonTable =
-          createdTable.toPaimonTableSchema(nameIdentifier.toString());
-      paimonCatalogOps.createTable(paimonTable.getKey(), paimonTable.getValue());
+      Schema paimonTableSchema = createdTable.toPaimonTableSchema();
+      paimonCatalogOps.createTable(nameIdentifier.toString(), paimonTableSchema);
     } catch (Catalog.DatabaseNotExistException e) {
       throw new NoSuchSchemaException(e, NO_SUCH_SCHEMA_EXCEPTION, identifier);
     } catch (Catalog.TableAlreadyExistException e) {

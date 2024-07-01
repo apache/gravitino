@@ -96,6 +96,10 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         super().__init__(**kwargs)
 
     @property
+    def cache(self):
+        return self._cache
+
+    @property
     def fsid(self):
         return PROTOCOL_NAME
 
