@@ -15,7 +15,6 @@ import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.UnsupportedEntityTypeException;
-import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;
@@ -69,7 +68,7 @@ public class JDBCBackend implements RelationalBackend {
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace, Entity.EntityType entityType) {
+      Namespace namespace, Entity.EntityType entityType) throws IOException {
     switch (entityType) {
       case METALAKE:
         return (List<E>) MetalakeMetaService.getInstance().listMetalakes();
@@ -90,7 +89,7 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
-  public boolean exists(NameIdentifier ident, Entity.EntityType entityType) {
+  public boolean exists(NameIdentifier ident, Entity.EntityType entityType) throws IOException {
     try {
       Entity entity = get(ident, entityType);
       return entity != null;
@@ -101,7 +100,7 @@ public class JDBCBackend implements RelationalBackend {
 
   @Override
   public <E extends Entity & HasIdentifier> void insert(E e, boolean overwritten)
-      throws EntityAlreadyExistsException {
+      throws EntityAlreadyExistsException, IOException {
     if (e instanceof BaseMetalake) {
       MetalakeMetaService.getInstance().insertMetalake((BaseMetalake) e, overwritten);
     } else if (e instanceof CatalogEntity) {
@@ -129,7 +128,7 @@ public class JDBCBackend implements RelationalBackend {
   @Override
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Entity.EntityType entityType, Function<E, E> updater)
-      throws IOException, NoSuchEntityException, AlreadyExistsException {
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     switch (entityType) {
       case METALAKE:
         return (E) MetalakeMetaService.getInstance().updateMetalake(ident, updater);
@@ -155,7 +154,8 @@ public class JDBCBackend implements RelationalBackend {
 
   @Override
   public <E extends Entity & HasIdentifier> E get(
-      NameIdentifier ident, Entity.EntityType entityType) throws NoSuchEntityException {
+      NameIdentifier ident, Entity.EntityType entityType)
+      throws NoSuchEntityException, IOException {
     switch (entityType) {
       case METALAKE:
         return (E) MetalakeMetaService.getInstance().getMetalakeByIdentifier(ident);
@@ -182,7 +182,8 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
-  public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade) {
+  public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
+      throws IOException {
     switch (entityType) {
       case METALAKE:
         return MetalakeMetaService.getInstance().deleteMetalake(ident, cascade);
@@ -209,7 +210,8 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
-  public int hardDeleteLegacyData(Entity.EntityType entityType, long legacyTimeline) {
+  public int hardDeleteLegacyData(Entity.EntityType entityType, long legacyTimeline)
+      throws IOException {
     switch (entityType) {
       case METALAKE:
         return MetalakeMetaService.getInstance()
@@ -260,7 +262,8 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
-  public int deleteOldVersionData(Entity.EntityType entityType, long versionRetentionCount) {
+  public int deleteOldVersionData(Entity.EntityType entityType, long versionRetentionCount)
+      throws IOException {
     switch (entityType) {
       case METALAKE:
       case CATALOG:

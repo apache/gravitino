@@ -95,14 +95,6 @@ public class MiniGravitino {
 
     serverConfig.loadFromProperties(properties);
 
-    // Prepare delete the rocksdb backend storage directory
-    try {
-      FileUtils.deleteDirectory(
-          FileUtils.getFile(serverConfig.get(ENTITY_KV_ROCKSDB_BACKEND_PATH)));
-    } catch (Exception e) {
-      // Ignore
-    }
-
     // Initialize the REST client
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, GravitinoServer.WEBSERVER_CONF_PREFIX);

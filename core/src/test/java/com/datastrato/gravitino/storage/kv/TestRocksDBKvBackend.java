@@ -8,7 +8,7 @@ package com.datastrato.gravitino.storage.kv;
 import static com.datastrato.gravitino.Configs.ENTITY_KV_ROCKSDB_BACKEND_PATH;
 
 import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.exceptions.AlreadyExistsException;
+import com.datastrato.gravitino.EntityAlreadyExistsException;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -66,7 +66,7 @@ public class TestRocksDBKvBackend {
     Assertions.assertEquals("testValue", new String(bytes, StandardCharsets.UTF_8));
 
     Assertions.assertThrowsExactly(
-        AlreadyExistsException.class,
+        EntityAlreadyExistsException.class,
         () ->
             kvBackend.put(
                 "testKey".getBytes(StandardCharsets.UTF_8),

@@ -33,7 +33,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 public class FlinkHiveCatalogIT extends FlinkEnvIT {
 
   private static final String DEFAULT_CATALOG = "default_catalog";

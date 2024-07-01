@@ -44,7 +44,7 @@ import org.junit.jupiter.api.TestMethodOrder;
 import org.openqa.selenium.By;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class CatalogsPageTest extends AbstractWebIT {
   MetalakePage metalakePage = new MetalakePage();
@@ -219,7 +219,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     catalog_fileset
         .asFilesetCatalog()
         .createFileset(
-            NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName),
+            NameIdentifier.of(schemaName, filesetName),
             "comment",
             Fileset.Type.MANAGED,
             storageLocation,

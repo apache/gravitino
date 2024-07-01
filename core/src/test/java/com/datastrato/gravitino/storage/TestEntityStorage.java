@@ -26,6 +26,7 @@ import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Entity.EntityType;
+import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.EntityStoreFactory;
 import com.datastrato.gravitino.NameIdentifier;
@@ -34,7 +35,6 @@ import com.datastrato.gravitino.authorization.AuthorizationUtils;
 import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.SecurableObjects;
-import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
 import com.datastrato.gravitino.file.Fileset;
@@ -1854,7 +1854,7 @@ public class TestEntityStorage {
   private void validateAlreadyExistEntity(EntityStore store, SchemaEntity schema) {
     // The updated entities already existed, should throw exception
     Assertions.assertThrowsExactly(
-        AlreadyExistsException.class,
+        EntityAlreadyExistsException.class,
         () ->
             store.update(
                 NameIdentifier.of("metalakeChanged", "catalogChanged", "schema2"),

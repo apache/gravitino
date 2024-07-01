@@ -11,7 +11,6 @@ import com.datastrato.gravitino.connector.BaseSchema;
 import java.util.Map;
 import java.util.Optional;
 import lombok.ToString;
-import org.apache.commons.lang3.tuple.Pair;
 
 /**
  * Implementation of {@link Schema} that represents a Paimon Schema (Database) entity in the Paimon
@@ -27,8 +26,8 @@ public class PaimonSchema extends BaseSchema {
    *
    * @return The converted inner schema.
    */
-  public Pair<String, Map<String, String>> toPaimonProperties() {
-    return Pair.of(name, properties);
+  public Map<String, String> toPaimonProperties() {
+    return properties;
   }
 
   /**
