@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.integration.test.util;
 
-import static com.datastrato.gravitino.Configs.ENTITY_KV_ROCKSDB_BACKEND_PATH;
+import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
 import static com.datastrato.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
 import com.datastrato.gravitino.Config;
@@ -201,7 +201,13 @@ public class AbstractIT {
       setMySQLBackend();
     }
 
+    File baseDir = new File(System.getProperty("java.io.tmpdir"));
+    File file = Files.createTempDirectory(baseDir.toPath(), "test").toFile();
+    file.mkdir();
+    file.deleteOnExit();
+
     serverConfig = new ServerConfig();
+    customConfigs.put(ENTITY_RELATIONAL_JDBC_BACKEND_PATH.getKey(), file.getAbsolutePath());
     if (testMode != null && testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {
       MiniGravitinoContext context =
           new MiniGravitinoContext(customConfigs, ignoreIcebergRestService);
@@ -212,12 +218,6 @@ public class AbstractIT {
       rewriteGravitinoServerConfig();
       serverConfig.loadFromFile(GravitinoServer.CONF_FILE);
       downLoadJDBCDriver();
-      try {
-        FileUtils.deleteDirectory(
-            FileUtils.getFile(serverConfig.get(ENTITY_KV_ROCKSDB_BACKEND_PATH)));
-      } catch (Exception e) {
-        // Ignore
-      }
 
       GravitinoITUtils.startGravitinoServer();
 
