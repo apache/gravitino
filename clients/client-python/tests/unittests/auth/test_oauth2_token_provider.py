@@ -33,7 +33,7 @@ class TestOAuth2TokenProvider(unittest.TestCase):
         "gravitino.utils.http_client.HTTPClient.post_form",
         return_value=mock_base.mock_authentication_with_error_authentication_type(),
     )
-    def test_authentication_with_error_authentication_type(self, mock_method1):
+    def test_authentication_with_error_authentication_type(self, *mock_methods):
 
         with self.assertRaises(AssertionError):
             _ = DefaultOAuth2TokenProvider(
@@ -47,7 +47,7 @@ class TestOAuth2TokenProvider(unittest.TestCase):
         "gravitino.utils.http_client.HTTPClient.post_form",
         return_value=mock_base.mock_authentication_with_non_jwt(),
     )
-    def test_authentication_with_non_jwt(self, mock_method1):
+    def test_authentication_with_non_jwt(self, *mock_methods):
         token_provider = DefaultOAuth2TokenProvider(
             uri=f"http://127.0.0.1:{OAUTH_PORT}",
             credential="yy:xx",
@@ -62,7 +62,7 @@ class TestOAuth2TokenProvider(unittest.TestCase):
         "gravitino.utils.http_client.HTTPClient.post_form",
         side_effect=mock_base.mock_authentication_with_jwt(),
     )
-    def test_authentication_with_jwt(self, mock_method1):
+    def test_authentication_with_jwt(self, *mock_methods):
         old_access_token, new_access_token = mock_base.mock_old_new_jwt()
 
         token_provider = DefaultOAuth2TokenProvider(
