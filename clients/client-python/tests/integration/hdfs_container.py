@@ -5,6 +5,7 @@ This software is licensed under the Apache License version 2.
 
 import asyncio
 import logging
+import os
 import time
 
 import docker
@@ -32,15 +33,17 @@ async def check_hdfs_status(hive_container):
                 exec_result = hive_container.exec_run(output_status_command)
                 logger.info("HDFS report, output: %s", exec_result.output)
             else:
-                logger.info("HDFS startup success!")
+                logger.info("HDFS startup successfully!")
                 return True
         except Exception as e:
-            logger.error("While checking HDFS container status happen exception: %s", e)
+            logger.error(
+                "Exception occurred while checking HDFS container status: %s", e
+            )
         time.sleep(10)
     return False
 
 
-async def check_hive_container_status(hive_container):
+async def check_hdfs_container_status(hive_container):
     timeout_sec = 150
     try:
         result = await asyncio.wait_for(
@@ -72,14 +75,19 @@ class HDFSContainer:
                 container.remove()
         except NotFound:
             logger.warning("Cannot find hdfs container in docker env, skip remove.")
+        image_name = os.environ.get("GRAVITINO_CI_HIVE_DOCKER_IMAGE")
+        if image_name is None:
+            raise GravitinoRuntimeException(
+                "GRAVITINO_CI_HIVE_DOCKER_IMAGE env variable is not set."
+            )
         self._container = self._docker_client.containers.run(
-            image="datastrato/gravitino-ci-hive:0.1.12",
+            image=image_name,
             name=self._container_name,
             detach=True,
             environment={"HADOOP_USER_NAME": "datastrato"},
             network=self._network_name,
         )
-        asyncio.run(check_hive_container_status(self._container))
+        asyncio.run(check_hdfs_container_status(self._container))
 
         self._fetch_ip()
 
@@ -113,7 +121,7 @@ class HDFSContainer:
             self._container.kill()
         except RuntimeError as e:
             logger.warning(
-                "While killing container %s happen exception: %s",
+                "Exception occurred while killing container %s : %s",
                 self._container_name,
                 e,
             )
@@ -121,7 +129,7 @@ class HDFSContainer:
             self._container.remove()
         except RuntimeError as e:
             logger.warning(
-                "While removing container %s happen exception: %s",
+                "Exception occurred while removing container %s : %s",
                 self._container_name,
                 e,
             )
@@ -129,5 +137,7 @@ class HDFSContainer:
             self._network.remove()
         except RuntimeError as e:
             logger.warning(
-                "While removing network %s happen exception: %s", self._network_name, e
+                "Exception occurred while removing network %s : %s",
+                self._network_name,
+                e,
             )

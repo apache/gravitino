@@ -42,15 +42,15 @@ HADOOP_DIR_NAME = f"hadoop-{HADOOP_VERSION}"
 HADOOP_DOWNLOAD_URL = f"https://archive.apache.org/dist/hadoop/core/hadoop-{HADOOP_VERSION}/{HADOOP_PACK_NAME}"
 LOCAL_BASE_DIR = "/tmp/gravitino"
 LOCAL_HADOOP_DIR = f"{LOCAL_BASE_DIR}/python_its/hadoop"
-DOCKER_IT_TEST = os.environ.get("DOCKER_IT_TEST")
+DOCKER_TEST = os.environ.get("DOCKER_TEST")
 
 
 #  The Hadoop distribution package does not have native hdfs libraries for macOS / Windows systems
 #  (`libhdfs.dylib` for macOS and `libhdfs.dll` for Windows), so the integration tests cannot be run
 #  on these two systems at present.
 @unittest.skipIf(
-    DOCKER_IT_TEST == "false" or platform.system() != "Linux",
-    "Skipping tests on non-Linux systems or when DOCKER_IT_TEST=false",
+    DOCKER_TEST == "false" or platform.system() != "Linux",
+    "Skipping tests on non-Linux systems or when DOCKER_TEST=false",
 )
 class TestGvfsWithHDFS(IntegrationTestEnv):
     hdfs_container: HDFSContainer = HDFSContainer()

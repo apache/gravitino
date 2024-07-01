@@ -167,12 +167,13 @@ tasks {
     venvExec = "coverage"
     args = listOf("run", "--branch", "-m", "unittest")
     workingDir = projectDir.resolve("./tests/integration")
-    val dockerItTest = project.rootProject.extra["docker_it_test"] as? Boolean ?: false
+    val dockerTest = project.rootProject.extra["dockerTest"] as? Boolean ?: false
     environment = mapOf(
       "PROJECT_VERSION" to project.version,
       "GRAVITINO_HOME" to project.rootDir.path + "/distribution/package",
       "START_EXTERNAL_GRAVITINO" to "true",
-      "DOCKER_IT_TEST" to dockerItTest.toString()
+      "DOCKER_TEST" to dockerTest.toString(),
+      "GRAVITINO_CI_HIVE_DOCKER_IMAGE" to "datastrato/gravitino-ci-hive:0.1.12"
     )
 
     doLast {
