@@ -51,14 +51,17 @@ import com.datastrato.gravitino.meta.RoleEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
+import com.datastrato.gravitino.meta.TagEntity;
 import com.datastrato.gravitino.meta.TopicEntity;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.datastrato.gravitino.storage.relational.mapper.GroupMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.UserMetaMapper;
 import com.datastrato.gravitino.storage.relational.service.RoleMetaService;
+import com.datastrato.gravitino.storage.relational.service.TagMetaService;
 import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
+import com.datastrato.gravitino.tag.TagManager;
 import com.datastrato.gravitino.utils.NamespaceUtil;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -520,6 +523,16 @@ public class TestJDBCBackend {
             Lists.newArrayList(role.id()));
     backend.insert(group, false);
 
+    TagEntity tag =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("tag")
+            .withNamespace(TagManager.ofTagNamespace("metalake"))
+            .withComment("tag comment")
+            .withAuditInfo(auditInfo)
+            .build();
+    backend.insert(tag, false);
+
     // another meta data creation
     BaseMetalake anotherMetaLake =
         createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "another-metalake", auditInfo);
@@ -598,6 +611,16 @@ public class TestJDBCBackend {
             Lists.newArrayList(anotherRole.id()));
     backend.insert(anotherGroup, false);
 
+    TagEntity anotherTagEntity =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("another-tag")
+            .withNamespace(TagManager.ofTagNamespace("another-metalake"))
+            .withComment("another-tag comment")
+            .withAuditInfo(auditInfo)
+            .build();
+    backend.insert(anotherTagEntity, false);
+
     // meta data list
     List<BaseMetalake> metaLakes = backend.list(metalake.namespace(), Entity.EntityType.METALAKE);
     assertTrue(metaLakes.contains(metalake));
@@ -640,6 +663,12 @@ public class TestJDBCBackend {
                 GroupMetaMapper.class, mapper -> mapper.listGroupsByRoleId(role.id()))
             .size());
 
+    TagEntity tagEntity = backend.get(tag.nameIdentifier(), Entity.EntityType.TAG);
+    assertEquals(tag, tagEntity);
+    List<TagEntity> tags = backend.list(tag.namespace(), Entity.EntityType.TAG);
+    assertTrue(tags.contains(tag));
+    assertEquals(1, tags.size());
+
     // meta data soft delete
     backend.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE, true);
 
@@ -680,6 +709,9 @@ public class TestJDBCBackend {
             .size());
     assertTrue(backend.exists(anotherGroup.nameIdentifier(), Entity.EntityType.GROUP));
 
+    assertFalse(backend.exists(tag.nameIdentifier(), Entity.EntityType.TAG));
+    assertTrue(backend.exists(anotherTagEntity.nameIdentifier(), Entity.EntityType.TAG));
+
     // check legacy record after soft delete
     assertTrue(legacyRecordExistsInDB(metalake.id(), Entity.EntityType.METALAKE));
     assertTrue(legacyRecordExistsInDB(catalog.id(), Entity.EntityType.CATALOG));
@@ -694,6 +726,7 @@ public class TestJDBCBackend {
     assertEquals(2, countRoleRels(anotherRole.id()));
     assertEquals(2, listFilesetVersions(fileset.id()).size());
     assertEquals(3, listFilesetVersions(anotherFileset.id()).size());
+    assertTrue(legacyRecordExistsInDB(tag.id(), Entity.EntityType.TAG));
 
     // meta data hard delete
     for (Entity.EntityType entityType : Entity.EntityType.values()) {
@@ -711,6 +744,7 @@ public class TestJDBCBackend {
     assertEquals(0, countRoleRels(role.id()));
     assertEquals(2, countRoleRels(anotherRole.id()));
     assertEquals(0, listFilesetVersions(fileset.id()).size());
+    assertFalse(legacyRecordExistsInDB(tag.id(), Entity.EntityType.TAG));
 
     // soft delete for old version fileset
     assertEquals(3, listFilesetVersions(anotherFileset.id()).size());
@@ -767,6 +801,10 @@ public class TestJDBCBackend {
       case GROUP:
         tableName = "group_meta";
         idColumnName = "group_id";
+        break;
+      case TAG:
+        tableName = "tag_meta";
+        idColumnName = "tag_id";
         break;
       default:
         throw new IllegalArgumentException("Unsupported entity type: " + entityType);
