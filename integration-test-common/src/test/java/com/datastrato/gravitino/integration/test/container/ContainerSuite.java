@@ -98,6 +98,7 @@ public class ContainerSuite implements Closeable {
                   .withNetwork(network);
           HiveContainer container = closer.register(hiveBuilder.build());
           container.start();
+          container.executeInContainer("hadoop", "fs", "-chown", "-R", "anonymous", "/user/");
           hiveContainer = container;
         }
       }
