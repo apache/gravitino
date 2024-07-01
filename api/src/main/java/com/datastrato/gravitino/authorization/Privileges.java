@@ -229,24 +229,14 @@ public class Privileges {
     }
   }
 
-  /**
-   * Abstract class representing a generic privilege.
-   *
-   * @param <T> the type of the privilege
-   */
+  /**@param <T> the type of the privilege*/
   public abstract static class GenericPrivilege<T extends GenericPrivilege<T>>
       implements Privilege {
 
-    /**
-     * Functional interface for creating instances of GenericPrivilege.
-     *
-     * @param <T> the type of the privilege
-     */
+    /**@param <T> the type of the privilege */
     @FunctionalInterface
     public interface GenericPrivilegeFactory<T extends GenericPrivilege<T>> {
       /**
-       * Creates a new instance of the privilege.
-       *
        * @param condition the condition of the privilege
        * @param name the name of the privilege
        * @return the created privilege instance
@@ -258,8 +248,6 @@ public class Privileges {
     private final Name name;
 
     /**
-     * Constructor for GenericPrivilege.
-     *
      * @param condition the condition of the privilege
      * @param name the name of the privilege
      */
@@ -269,8 +257,6 @@ public class Privileges {
     }
 
     /**
-     * Creates an allowed privilege.
-     *
      * @param <T> the type of the privilege
      * @param name the name of the privilege
      * @param factory the factory to create the privilege
@@ -282,8 +268,6 @@ public class Privileges {
     }
 
     /**
-     * Creates a denied privilege.
-     *
      * @param <T> the type of the privilege
      * @param name the name of the privilege
      * @param factory the factory to create the privilege
