@@ -83,6 +83,7 @@ public class TestJDBCBackend {
   @BeforeAll
   public static void setup() {
     File dir = new File(DB_DIR);
+    dir.deleteOnExit();
     if (dir.exists() || !dir.isDirectory()) {
       dir.delete();
     }

@@ -62,7 +62,7 @@ public class FilesetMetaServiceIT {
 
   @BeforeAll
   public static void setup() {
-    Assumptions.assumeTrue("true".equals(System.getenv("jdbcBackend")));
+    Assumptions.assumeTrue("MySQL".equals(System.getenv("jdbcBackend")));
     TestDatabaseName META_DATA = TestDatabaseName.MYSQL_JDBC_BACKEND;
     containerSuite.startMySQLContainer(META_DATA);
     MySQLContainer MYSQL_CONTAINER = containerSuite.getMySQLContainer();
@@ -109,7 +109,7 @@ public class FilesetMetaServiceIT {
 
   @Test
   public void testDeleteFilesetVersionsByRetentionCount() throws IOException {
-    Assumptions.assumeTrue("true".equals(System.getenv("jdbcBackend")));
+    Assumptions.assumeTrue("MySQL".equals(System.getenv("jdbcBackend")));
     IdGenerator idGenerator = new RandomIdGenerator();
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();

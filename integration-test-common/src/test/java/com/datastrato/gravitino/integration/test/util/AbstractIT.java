@@ -192,7 +192,7 @@ public class AbstractIT {
 
     LOG.info("Running Gravitino Server in {} mode", testMode);
 
-    if ("true".equals(System.getenv("jdbcBackend"))) {
+    if ("MySQL".equalsIgnoreCase(System.getenv("jdbcBackend"))) {
       // Start MySQL docker instance.
       META_DATA = TestDatabaseName.MYSQL_JDBC_BACKEND;
       containerSuite.startMySQLContainer(META_DATA);

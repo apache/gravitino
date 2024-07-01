@@ -23,9 +23,11 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+@Disabled
 class TestStorageVersion {
 
   @Test

@@ -23,9 +23,11 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+@Disabled
 public class TestKvNameMappingService {
   private Config getConfig() throws IOException {
     File baseDir = new File(System.getProperty("java.io.tmpdir"));

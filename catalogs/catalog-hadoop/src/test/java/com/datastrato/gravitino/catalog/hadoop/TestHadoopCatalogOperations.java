@@ -38,6 +38,7 @@ import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.datastrato.gravitino.utils.NameIdentifierUtil;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.Arrays;
@@ -108,6 +109,8 @@ public class TestHadoopCatalogOperations {
     Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
     Mockito.when(config.get(ENTITY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(ROCKS_DB_STORE_PATH);
+    File f = FileUtils.getFile(ROCKS_DB_STORE_PATH);
+    f.deleteOnExit();
 
     Assertions.assertEquals(ROCKS_DB_STORE_PATH, config.get(ENTITY_KV_ROCKSDB_BACKEND_PATH));
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
@@ -122,7 +125,6 @@ public class TestHadoopCatalogOperations {
   @AfterAll
   public static void tearDown() throws IOException {
     store.close();
-    FileUtils.deleteDirectory(FileUtils.getFile(ROCKS_DB_STORE_PATH));
     new Path(TEST_ROOT_PATH)
         .getFileSystem(new Configuration())
         .delete(new Path(TEST_ROOT_PATH), true);

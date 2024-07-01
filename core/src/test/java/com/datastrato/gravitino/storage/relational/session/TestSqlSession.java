@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.sql.SQLException;
 import java.util.UUID;
 import org.apache.commons.dbcp2.BasicDataSource;
+import org.apache.commons.io.FileUtils;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -71,8 +72,9 @@ public class TestSqlSession {
   public static void tearDown() throws IOException {
     File dir = new File(DB_DIR);
     if (dir.exists()) {
-      dir.delete();
+      FileUtils.deleteDirectory(FileUtils.getFile(DB_DIR));
     }
+
     SqlSessionFactoryHelper.getInstance().close();
   }
 

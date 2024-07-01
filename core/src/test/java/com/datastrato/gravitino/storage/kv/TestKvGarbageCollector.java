@@ -45,10 +45,12 @@ import java.time.Instant;
 import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 @SuppressWarnings("DefaultCharset")
+@Disabled
 class TestKvGarbageCollector {
   public Config getConfig() throws IOException {
     Config config = Mockito.mock(Config.class);

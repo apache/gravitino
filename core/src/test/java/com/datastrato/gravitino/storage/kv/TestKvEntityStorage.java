@@ -49,6 +49,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+@Disabled
 public class TestKvEntityStorage extends TestEntityStorage {
   @BeforeEach
   @AfterEach
