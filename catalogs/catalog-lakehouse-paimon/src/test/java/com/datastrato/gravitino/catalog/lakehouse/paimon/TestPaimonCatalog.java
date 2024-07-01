@@ -6,6 +6,7 @@ package com.datastrato.gravitino.catalog.lakehouse.paimon;
 
 import static com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonCatalog.CATALOG_PROPERTIES_META;
 import static com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonCatalog.SCHEMA_PROPERTIES_META;
+import static com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonCatalog.TABLE_PROPERTIES_META;
 
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.PropertiesMetadataHelpers;
@@ -30,7 +31,7 @@ public class TestPaimonCatalog {
 
         @Override
         public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
-          throw new UnsupportedOperationException("Table properties are not supported");
+          return TABLE_PROPERTIES_META;
         }
 
         @Override
