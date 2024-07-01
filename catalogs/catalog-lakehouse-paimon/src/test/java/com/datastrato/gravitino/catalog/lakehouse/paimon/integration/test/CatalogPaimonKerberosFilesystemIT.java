@@ -230,7 +230,7 @@ public class CatalogPaimonKerberosFilesystemIT extends AbstractIT {
             () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
     String exceptionMessage = Throwables.getStackTraceAsString(exception);
 
-    // Make sure the real user is 'cli'
+    // Make sure the real user is 'gravitino_client'
     Assertions.assertTrue(
         exceptionMessage.contains("Permission denied: user=gravitino_client, access=WRITE"));
 
@@ -269,6 +269,10 @@ public class CatalogPaimonKerberosFilesystemIT extends AbstractIT {
 
     // Drop catalog
     Assertions.assertTrue(gravitinoMetalake.dropCatalog(CATALOG_NAME));
+
+    // Drop warehouse path
+    kerberosHiveContainer.executeInContainer(
+        "hadoop", "fs", "-rm", "-r", "/user/hive/paimon_catalog_warehouse");
   }
 
   @Test
@@ -343,6 +347,10 @@ public class CatalogPaimonKerberosFilesystemIT extends AbstractIT {
 
     // Drop catalog
     Assertions.assertTrue(gravitinoMetalake.dropCatalog(CATALOG_NAME));
+
+    // Drop warehouse path
+    kerberosHiveContainer.executeInContainer(
+        "hadoop", "fs", "-rm", "-r", "/user/hive/paimon_catalog_warehouse");
   }
 
   private static Column[] createColumns() {
