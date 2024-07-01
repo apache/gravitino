@@ -204,141 +204,122 @@ public class DorisTableOperations extends JdbcTableOperations {
     Preconditions.checkArgument(
         partitioning.length == 1, "Composite partition type is not supported");
 
-    StringBuilder partitionSqlBuilder = new StringBuilder();
+    StringBuilder partitionSqlBuilder;
     Set<String> columnNames =
         Arrays.stream(columns).map(JdbcColumn::name).collect(Collectors.toSet());
 
     if (partitioning[0] instanceof Transforms.RangeTransform) {
-      partitionSqlBuilder.append(NEW_LINE).append(" PARTITION BY RANGE(");
-      // TODO support multi-column range partitioning in doris
+      // We do not support multi-column range partitioning in doris for now
       Transforms.RangeTransform rangePartition = (Transforms.RangeTransform) partitioning[0];
-
-      Preconditions.checkArgument(
-          rangePartition.fieldName().length == 1, "Doris partition does not support nested field");
-      Preconditions.checkArgument(
-          columnNames.contains(rangePartition.fieldName()[0]),
-          "The partition field must be one of the columns");
-
-      String partitionColumn = BACK_QUOTE + rangePartition.fieldName()[0] + BACK_QUOTE;
-      partitionSqlBuilder.append(partitionColumn).append(") ").append(NEW_LINE).append("(");
-
-      RangePartition[] assignments = rangePartition.assignments();
-      if (!ArrayUtils.isEmpty(assignments)) {
-        ImmutableList.Builder<String> partitions = ImmutableList.builder();
-        for (RangePartition part : assignments) {
-          StringBuilder partitionAssignSqlBuilder = new StringBuilder();
-          partitionAssignSqlBuilder
-              .append(" PARTITION ")
-              .append(BACK_QUOTE)
-              .append(part.name())
-              .append(BACK_QUOTE)
-              .append(" VALUES ");
-          Literal<?> upper = part.upper();
-          Literal<?> lower = part.lower();
-          if (Literals.NULL.equals(upper) && Literals.NULL.equals(lower)) {
-            partitionAssignSqlBuilder.append("LESS THAN MAXVALUE");
-          } else if (Literals.NULL.equals(lower)) {
-            partitionAssignSqlBuilder
-                .append("LESS THAN (")
-                .append(DOUBLE_QUOTE)
-                .append(upper.value())
-                .append(DOUBLE_QUOTE)
-                .append(")");
-          } else if (Literals.NULL.equals(upper)) {
-            partitionAssignSqlBuilder
-                .append("[(")
-                .append(DOUBLE_QUOTE)
-                .append(lower.value())
-                .append(DOUBLE_QUOTE)
-                .append("), (MAXVALUE))");
-          } else {
-            partitionAssignSqlBuilder
-                .append("[(")
-                .append(DOUBLE_QUOTE)
-                .append(lower.value())
-                .append(DOUBLE_QUOTE)
-                .append("), (")
-                .append(DOUBLE_QUOTE)
-                .append(upper.value())
-                .append(DOUBLE_QUOTE)
-                .append("))");
-          }
-          partitions.add(partitionAssignSqlBuilder.toString());
-        }
-        partitionSqlBuilder
-            .append(NEW_LINE)
-            .append(partitions.build().stream().collect(Collectors.joining("," + NEW_LINE)));
-      }
-
-      partitionSqlBuilder.append(NEW_LINE).append(")");
+      partitionSqlBuilder = generateRangePartitionSql(rangePartition, columnNames);
     } else if (partitioning[0] instanceof Transforms.ListTransform) {
       Transforms.ListTransform listPartition = (Transforms.ListTransform) partitioning[0];
-      partitionSqlBuilder.append(NEW_LINE).append(" PARTITION BY LIST(");
-
-      ImmutableList.Builder<String> partitionColumnsBuilder = ImmutableList.builder();
-      String[][] filedNames = listPartition.fieldNames();
-      for (String[] filedName : filedNames) {
-        Preconditions.checkArgument(
-            filedName.length == 1, "Doris partition does not support nested field");
-        Preconditions.checkArgument(
-            columnNames.contains(filedName[0]), "The partition field must be one of the columns");
-
-        partitionColumnsBuilder.add(BACK_QUOTE + filedName[0] + BACK_QUOTE);
-      }
-      String partitionColumns =
-          partitionColumnsBuilder.build().stream().collect(Collectors.joining(","));
-      partitionSqlBuilder.append(partitionColumns).append(") ").append(NEW_LINE).append("(");
-
-      ListPartition[] assignments = listPartition.assignments();
-      if (!ArrayUtils.isEmpty(assignments)) {
-        ImmutableList.Builder<String> partitions = ImmutableList.builder();
-        for (ListPartition parts : assignments) {
-          StringBuilder partitionAssignSqlBuilder = new StringBuilder();
-          partitionAssignSqlBuilder
-              .append(" PARTITION ")
-              .append(BACK_QUOTE)
-              .append(parts.name())
-              .append(BACK_QUOTE)
-              .append(" VALUES IN ")
-              .append("(");
-          ImmutableList.Builder<String> partitionValues = ImmutableList.builder();
-          for (Literal<?>[] part : parts.lists()) {
-            Preconditions.checkArgument(
-                part.length == filedNames.length,
-                "The number of partitioning columns must be consistent.");
-            StringBuilder partitionValuesSqlBuilder = new StringBuilder();
-            if (part.length > 1) {
-              partitionValuesSqlBuilder
-                  .append("(")
-                  .append(
-                      Arrays.stream(part)
-                          .map(p -> DOUBLE_QUOTE + p.value() + DOUBLE_QUOTE)
-                          .collect(Collectors.joining(",")))
-                  .append(")");
-            } else {
-              partitionValuesSqlBuilder
-                  .append(DOUBLE_QUOTE)
-                  .append(part[0].value())
-                  .append(DOUBLE_QUOTE);
-            }
-            partitionValues.add(partitionValuesSqlBuilder.toString());
-          }
-          partitionAssignSqlBuilder
-              .append(partitionValues.build().stream().collect(Collectors.joining(",")))
-              .append(")");
-          partitions.add(partitionAssignSqlBuilder.toString());
-        }
-        partitionSqlBuilder
-            .append(NEW_LINE)
-            .append(partitions.build().stream().collect(Collectors.joining("," + NEW_LINE)));
-      }
-
-      partitionSqlBuilder.append(NEW_LINE).append(")");
+      partitionSqlBuilder = generateListPartitionSql(listPartition, columnNames);
     } else {
       throw new IllegalArgumentException("Unsupported partition type of Doris");
     }
 
     sqlBuilder.append(partitionSqlBuilder);
+  }
+
+  private static StringBuilder generateRangePartitionSql(
+      Transforms.RangeTransform rangePartition, Set<String> columnNames) {
+    Preconditions.checkArgument(
+        rangePartition.fieldName().length == 1, "Doris partition does not support nested field");
+    Preconditions.checkArgument(
+        columnNames.contains(rangePartition.fieldName()[0]),
+        "The partition field must be one of the columns");
+
+    StringBuilder partitionSqlBuilder = new StringBuilder(NEW_LINE);
+    String partitionDefinition =
+        String.format(" PARTITION BY RANGE(`%s`) ", rangePartition.fieldName()[0]);
+    partitionSqlBuilder.append(partitionDefinition).append(NEW_LINE).append("(");
+
+    // Assign range partitions
+    RangePartition[] assignments = rangePartition.assignments();
+    if (!ArrayUtils.isEmpty(assignments)) {
+      ImmutableList.Builder<String> partitions = ImmutableList.builder();
+      for (RangePartition part : assignments) {
+        StringBuilder partitionAssignSqlBuilder = new StringBuilder();
+        partitionAssignSqlBuilder.append(String.format(" PARTITION `%s` VALUES", part.name()));
+        Literal<?> upper = part.upper();
+        Literal<?> lower = part.lower();
+        if (Literals.NULL.equals(upper) && Literals.NULL.equals(lower)) {
+          partitionAssignSqlBuilder.append(" LESS THAN MAXVALUE");
+        } else if (Literals.NULL.equals(lower)) {
+          partitionAssignSqlBuilder.append(String.format(" LESS THAN (\"%s\")", upper.value()));
+        } else if (Literals.NULL.equals(upper)) {
+          partitionAssignSqlBuilder.append(String.format(" [(\"%s\"), (MAXVALUE))", lower.value()));
+        } else {
+          partitionAssignSqlBuilder.append(
+              String.format(" [(\"%s\"), (\"%s\"))", lower.value(), upper.value()));
+        }
+        partitions.add(partitionAssignSqlBuilder.toString());
+      }
+      partitionSqlBuilder
+          .append(NEW_LINE)
+          .append(partitions.build().stream().collect(Collectors.joining("," + NEW_LINE)));
+    }
+
+    partitionSqlBuilder.append(NEW_LINE).append(")");
+    return partitionSqlBuilder;
+  }
+
+  private static StringBuilder generateListPartitionSql(
+      Transforms.ListTransform listPartition, Set<String> columnNames) {
+    ImmutableList.Builder<String> partitionColumnsBuilder = ImmutableList.builder();
+    String[][] filedNames = listPartition.fieldNames();
+    for (String[] filedName : filedNames) {
+      Preconditions.checkArgument(
+          filedName.length == 1, "Doris partition does not support nested field");
+      Preconditions.checkArgument(
+          columnNames.contains(filedName[0]), "The partition field must be one of the columns");
+
+      partitionColumnsBuilder.add(BACK_QUOTE + filedName[0] + BACK_QUOTE);
+    }
+    String partitionColumns =
+        partitionColumnsBuilder.build().stream().collect(Collectors.joining(","));
+
+    StringBuilder partitionSqlBuilder = new StringBuilder(NEW_LINE);
+    String partitionDefinition = String.format(" PARTITION BY LIST(%s) ", partitionColumns);
+    partitionSqlBuilder.append(partitionDefinition).append(NEW_LINE).append("(");
+
+    // Assign list partitions
+    ListPartition[] assignments = listPartition.assignments();
+    if (!ArrayUtils.isEmpty(assignments)) {
+      ImmutableList.Builder<String> partitions = ImmutableList.builder();
+      for (ListPartition parts : assignments) {
+        ImmutableList.Builder<String> partitionValues = ImmutableList.builder();
+        for (Literal<?>[] part : parts.lists()) {
+          Preconditions.checkArgument(
+              part.length == filedNames.length,
+              "The number of partitioning columns must be consistent.");
+          String partitionValuesSql;
+          if (part.length > 1) {
+            partitionValuesSql =
+                String.format(
+                    "(%s)",
+                    Arrays.stream(part)
+                        .map(p -> DOUBLE_QUOTE + p.value() + DOUBLE_QUOTE)
+                        .collect(Collectors.joining(",")));
+          } else {
+            partitionValuesSql = String.format("`%s`", part[0].value());
+          }
+          partitionValues.add(partitionValuesSql);
+        }
+        String partitionAssignSql =
+            String.format(
+                " PARTITION `%s` VALUES IN (%s)",
+                parts.name(), partitionValues.build().stream().collect(Collectors.joining(",")));
+        partitions.add(partitionAssignSql);
+      }
+      partitionSqlBuilder
+          .append(NEW_LINE)
+          .append(partitions.build().stream().collect(Collectors.joining("," + NEW_LINE)));
+    }
+
+    partitionSqlBuilder.append(NEW_LINE).append(")");
+    return partitionSqlBuilder;
   }
 
   @Override
@@ -453,7 +434,7 @@ public class DorisTableOperations extends JdbcTableOperations {
             "Table {}.{} schema-change execution status: {}",
             databaseName,
             tableName,
-            jobStatus.toString());
+            jobStatus);
       }
 
     } catch (SQLException e) {
