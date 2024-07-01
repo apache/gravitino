@@ -12,6 +12,7 @@ import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.SchemaChange;
 import com.datastrato.gravitino.catalog.hadoop.HadoopCatalogOperations.UserInfo;
+import com.datastrato.gravitino.catalog.hadoop.authentication.kerberos.KerberosConfig;
 import com.datastrato.gravitino.connector.CatalogInfo;
 import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;
@@ -29,6 +30,7 @@ import com.datastrato.gravitino.file.FilesetChange;
 import com.datastrato.gravitino.meta.FilesetEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.utils.PrincipalUtils;
+import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.UndeclaredThrowableException;
@@ -37,6 +39,7 @@ import java.security.PrivilegedExceptionAction;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -89,7 +92,7 @@ public class SecureHadoopCatalogOperations
     String apiUser = PrincipalUtils.getCurrentUserName();
     hadoopCatalogOperations.setCurrentUser(apiUser);
 
-    UserGroupInformation currentUser = hadoopCatalogOperations.getUGIByIdent(properties, ident);
+    UserGroupInformation currentUser = getUGIByIdent(properties, ident);
     try {
       return currentUser.doAs(
           (PrivilegedExceptionAction<Fileset>)
@@ -129,12 +132,15 @@ public class SecureHadoopCatalogOperations
     }
 
     // Reset the current user based on the name identifier.
-    UserGroupInformation currentUser =
-        hadoopCatalogOperations.getUGIByIdent(filesetEntity.properties(), ident);
+    UserGroupInformation currentUser = getUGIByIdent(filesetEntity.properties(), ident);
 
     try {
-      return currentUser.doAs(
-          (PrivilegedExceptionAction<Boolean>) () -> hadoopCatalogOperations.dropFileset(ident));
+      boolean r =
+          currentUser.doAs(
+              (PrivilegedExceptionAction<Boolean>)
+                  () -> hadoopCatalogOperations.dropFileset(ident));
+      cleanUserInfo(ident);
+      return r;
     } catch (IOException | InterruptedException ioe) {
       throw new RuntimeException("Failed to create fileset " + ident, ioe);
     } catch (UndeclaredThrowableException e) {
@@ -157,7 +163,7 @@ public class SecureHadoopCatalogOperations
       String apiUser = PrincipalUtils.getCurrentUserName();
       hadoopCatalogOperations.setCurrentUser(apiUser);
       // Reset the current user based on the name identifier and properties.
-      UserGroupInformation currentUser = hadoopCatalogOperations.getUGIByIdent(properties, ident);
+      UserGroupInformation currentUser = getUGIByIdent(properties, ident);
 
       return currentUser.doAs(
           (PrivilegedExceptionAction<Schema>)
@@ -189,11 +195,15 @@ public class SecureHadoopCatalogOperations
           Optional.ofNullable(schemaEntity.properties()).orElse(Collections.emptyMap());
 
       // Reset the current user based on the name identifier.
-      UserGroupInformation user = hadoopCatalogOperations.getUGIByIdent(properties, ident);
+      UserGroupInformation user = getUGIByIdent(properties, ident);
 
-      return user.doAs(
-          (PrivilegedExceptionAction<Boolean>)
-              () -> hadoopCatalogOperations.dropSchema(ident, cascade));
+      boolean r =
+          user.doAs(
+              (PrivilegedExceptionAction<Boolean>)
+                  () -> hadoopCatalogOperations.dropSchema(ident, cascade));
+      cleanUserInfo(ident);
+      return r;
+
     } catch (IOException | InterruptedException ioe) {
       throw new RuntimeException("Failed to create fileset " + ident, ioe);
     } catch (UndeclaredThrowableException e) {
@@ -267,5 +277,78 @@ public class SecureHadoopCatalogOperations
   @Override
   public void close() throws IOException {
     hadoopCatalogOperations.close();
+  }
+
+  private UserGroupInformation getUGIByIdent(Map<String, String> properties, NameIdentifier ident) {
+    KerberosConfig kerberosConfig = new KerberosConfig(properties);
+    if (kerberosConfig.isKerberosAuth()) {
+      // We assume that the realm of catalog is the same as the realm of the schema and table.
+      hadoopCatalogOperations.initKerberos(properties, new Configuration(), ident);
+    }
+    // If the kerberos is not enabled (Simple mode), we will use the current user
+    return getUserBaseOnNameIdentifier(ident);
+  }
+
+  private UserGroupInformation getUserBaseOnNameIdentifier(NameIdentifier nameIdentifier) {
+    UserInfo userInfo = getNearestUserGroupInformation(nameIdentifier);
+    if (userInfo == null) {
+
+      // TODO(yuqi) comment the following code if the user in the docker hive image is the same as
+      //  the user `anonymous` see: https://github.com/datastrato/gravitino/issues/4013
+      try {
+        return UserGroupInformation.getLoginUser();
+      } catch (IOException e) {
+        throw new RuntimeException("Failed to get login user", e);
+      }
+    }
+
+    UserGroupInformation ugi = userInfo.loginUser;
+    boolean userImpersonation = userInfo.enableUserImpersonation;
+    if (userImpersonation) {
+      String proxyKerberosPrincipalName = PrincipalUtils.getCurrentUserName();
+      if (!proxyKerberosPrincipalName.contains("@")) {
+        proxyKerberosPrincipalName =
+            String.format("%s@%s", proxyKerberosPrincipalName, userInfo.realm);
+      }
+
+      ugi = UserGroupInformation.createProxyUser(proxyKerberosPrincipalName, ugi);
+    }
+
+    return ugi;
+  }
+
+  private UserInfo getNearestUserGroupInformation(NameIdentifier nameIdentifier) {
+    NameIdentifier currentNameIdentifier = nameIdentifier;
+    while (currentNameIdentifier != null) {
+      if (hadoopCatalogOperations.getUserInfoMap().containsKey(currentNameIdentifier)) {
+        return hadoopCatalogOperations.getUserInfoMap().get(currentNameIdentifier);
+      }
+
+      String[] levels = currentNameIdentifier.namespace().levels();
+      // The ident is catalog level.
+      if (levels.length <= 1) {
+        return null;
+      }
+      currentNameIdentifier = NameIdentifier.of(currentNameIdentifier.namespace().levels());
+    }
+    return null;
+  }
+
+  private void cleanUserInfo(NameIdentifier identifier) {
+    UserInfo userInfo = hadoopCatalogOperations.getUserInfoMap().remove(identifier);
+    if (userInfo != null) {
+      removeFile(userInfo.keytabPath);
+    }
+  }
+
+  private void removeFile(String filePath) {
+    if (filePath == null) {
+      return;
+    }
+
+    File file = new File(filePath);
+    if (file.exists()) {
+      file.delete();
+    }
   }
 }

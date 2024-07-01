@@ -121,13 +121,18 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     UserGroupInformation loginUser;
     boolean enableUserImpersonation;
     String keytabPath;
+    String realm;
 
     static UserInfo of(
-        UserGroupInformation loginUser, boolean enableUserImpersonation, String keytabPath) {
+        UserGroupInformation loginUser,
+        boolean enableUserImpersonation,
+        String keytabPath,
+        String kerberosRealm) {
       UserInfo userInfo = new UserInfo();
       userInfo.loginUser = loginUser;
       userInfo.enableUserImpersonation = enableUserImpersonation;
       userInfo.keytabPath = keytabPath;
+      userInfo.realm = kerberosRealm;
       return userInfo;
     }
   }
@@ -165,20 +170,18 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     AuthenticationConfig config = new AuthenticationConfig(conf);
 
     if (config.isKerberosAuth()) {
-      String catalogKeyTablePath = String.format(GRAVITINO_KEYTAB_FORMAT, catalogInfo.id());
       this.kerberosRealm =
           initKerberos(
-              catalogKeyTablePath,
-              conf,
-              hadoopConf,
-              NameIdentifier.of(catalogInfo.namespace(), catalogInfo.name()));
+              conf, hadoopConf, NameIdentifier.of(catalogInfo.namespace(), catalogInfo.name()));
     } else if (config.isSimpleAuth()) {
-      // If the catalog is simple authentication, set api login user as the current user
-      UserGroupInformation u =
-          UserGroupInformation.createRemoteUser(PrincipalUtils.getCurrentUserName());
-      userInfoMap.put(
-          NameIdentifier.of(catalogInfo.namespace(), catalogInfo.name()),
-          UserInfo.of(u, false, null));
+      // TODO: change the user 'datastrato' to 'anonymous' and uncomment the following code;
+      //  uncomment the following code after the user 'datastrato' is removed from the codebase.
+      //  for more, please see https://github.com/datastrato/gravitino/issues/4013
+      // UserGroupInformation u =
+      //    UserGroupInformation.createRemoteUser(PrincipalUtils.getCurrentUserName());
+      // userInfoMap.put(
+      //    NameIdentifier.of(catalogInfo.namespace(), catalogInfo.name()),
+      //    UserInfo.of(u, false, null, null));
     }
   }
 
@@ -260,8 +263,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     }
 
     // Either catalog property "location", or schema property "location", or
-    // storageLocation must be
-    // set for managed fileset.
+    // storageLocation must be set for managed fileset.
     Path schemaPath = getSchemaPath(schemaIdent.name(), schemaEntity.properties());
     if (schemaPath == null && StringUtils.isBlank(storageLocation)) {
       throw new IllegalArgumentException(
@@ -373,7 +375,6 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   @Override
   public boolean dropFileset(NameIdentifier ident) {
-
     try {
       FilesetEntity filesetEntity =
           store.get(ident, Entity.EntityType.FILESET, FilesetEntity.class);
@@ -393,14 +394,12 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
         }
       }
 
-      boolean success = store.delete(ident, Entity.EntityType.FILESET);
-      cleanUserInfo(ident);
-      return success;
+      return store.delete(ident, Entity.EntityType.FILESET);
     } catch (NoSuchEntityException ne) {
       LOG.warn("Fileset {} does not exist", ident);
       return false;
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to delete fileset " + ident, e);
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to delete fileset " + ident, ioe);
     }
   }
 
@@ -424,11 +423,11 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
    * to use synchronized to ensure the thread safety: Make login and getLoginUser atomic.
    */
   public synchronized String initKerberos(
-      String keytabPath,
-      Map<String, String> properties,
-      Configuration configuration,
-      NameIdentifier ident) {
+      Map<String, String> properties, Configuration configuration, NameIdentifier ident) {
     // Init schema level kerberos authentication.
+    String keytabPath =
+        String.format(
+            GRAVITINO_KEYTAB_FORMAT, catalogInfo.id() + "-" + ident.toString().replace(".", "-"));
     KerberosConfig kerberosConfig = new KerberosConfig(properties);
     if (kerberosConfig.isKerberosAuth()) {
       configuration.set(
@@ -449,7 +448,8 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
             UserInfo.of(
                 UserGroupInformation.getLoginUser(),
                 kerberosConfig.isImpersonationEnabled(),
-                keytabPath));
+                keytabPath,
+                kerberosRealm));
         return kerberosRealm;
       } catch (IOException e) {
         throw new RuntimeException("Failed to login with Kerberos", e);
@@ -606,7 +606,6 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
         fs.delete(schemaPath, true);
       }
 
-      cleanUserInfo(ident);
       LOG.info("Deleted schema {} location {}", ident, schemaPath);
       return true;
     } catch (IOException ioe) {
@@ -727,74 +726,5 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   void setProxyPlugin(HadoopProxyPlugin hadoopProxyPlugin) {
     this.proxyPlugin = hadoopProxyPlugin;
-  }
-
-  UserGroupInformation getUGIByIdent(Map<String, String> properties, NameIdentifier ident) {
-    KerberosConfig kerberosConfig = new KerberosConfig(properties);
-    if (kerberosConfig.isKerberosAuth()) {
-      // We assume that the realm of catalog is the same as the realm of the schema and table.
-      String keytabPath =
-          String.format(
-              GRAVITINO_KEYTAB_FORMAT, catalogInfo.id() + "-" + ident.toString().replace(".", "-"));
-      initKerberos(keytabPath, properties, new Configuration(), ident);
-    }
-    // If the kerberos is not enabled (Simple mode), we will use the current user
-    return getUserBaseOnNameIdentifier(ident);
-  }
-
-  private UserGroupInformation getUserBaseOnNameIdentifier(NameIdentifier nameIdentifier) {
-    UserInfo userInfo = getNearestUserGroupInformation(nameIdentifier);
-    if (userInfo == null) {
-      throw new RuntimeException("Failed to get get current user: " + nameIdentifier);
-    }
-
-    UserGroupInformation ugi = userInfo.loginUser;
-    boolean userImpersonation = userInfo.enableUserImpersonation;
-    if (userImpersonation) {
-      String proxyKerberosPrincipalName = PrincipalUtils.getCurrentUserName();
-      if (!proxyKerberosPrincipalName.contains("@")) {
-        proxyKerberosPrincipalName =
-            String.format("%s@%s", proxyKerberosPrincipalName, kerberosRealm);
-      }
-
-      ugi = UserGroupInformation.createProxyUser(proxyKerberosPrincipalName, ugi);
-    }
-
-    return ugi;
-  }
-
-  private UserInfo getNearestUserGroupInformation(NameIdentifier nameIdentifier) {
-    NameIdentifier currentNameIdentifier = nameIdentifier;
-    while (currentNameIdentifier != null) {
-      if (userInfoMap.containsKey(currentNameIdentifier)) {
-        return userInfoMap.get(currentNameIdentifier);
-      }
-
-      String[] levels = currentNameIdentifier.namespace().levels();
-      // The ident is catalog level.
-      if (levels.length <= 1) {
-        return null;
-      }
-      currentNameIdentifier = NameIdentifier.of(currentNameIdentifier.namespace().levels());
-    }
-    return null;
-  }
-
-  private void cleanUserInfo(NameIdentifier identifier) {
-    UserInfo userInfo = userInfoMap.remove(identifier);
-    if (userInfo != null) {
-      removeFile(userInfo.keytabPath);
-    }
-  }
-
-  private void removeFile(String filePath) {
-    if (filePath == null) {
-      return;
-    }
-
-    File file = new File(filePath);
-    if (file.exists()) {
-      file.delete();
-    }
   }
 }

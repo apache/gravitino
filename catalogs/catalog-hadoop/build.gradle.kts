@@ -15,7 +15,6 @@ dependencies {
   implementation(project(":core"))
   implementation(project(":common"))
 
-  implementation(libs.cglib)
   implementation(libs.guava)
   implementation(libs.hadoop3.common) {
     exclude("com.sun.jersey")
