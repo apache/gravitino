@@ -83,7 +83,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         server_uri=None,
         metalake_name=None,
         cache_size=20,
-        cache_expired_time=300,
+        cache_expired_time=3600,
         **kwargs,
     ):
         self._metalake = metalake_name
@@ -94,6 +94,10 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         self._cache_lock = rwlock.RWLockFair()
 
         super().__init__(**kwargs)
+
+    @property
+    def cache(self):
+        return self._cache
 
     @property
     def fsid(self):

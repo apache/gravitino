@@ -60,7 +60,7 @@ class GravitinoVirtualFileSystemConfiguration {
       "fs.gravitino.fileset.cache.evictionMillsAfterAccess";
 
   public static final long FS_GRAVITINO_FILESET_CACHE_EVICTION_MILLS_AFTER_ACCESS_DEFAULT =
-      1000L * 60 * 5;
+      1000L * 60 * 60;
 
   private GravitinoVirtualFileSystemConfiguration() {}
 }

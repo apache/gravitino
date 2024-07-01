@@ -7,6 +7,7 @@ import logging
 import configparser
 import os.path
 
+from gravitino.auth.auth_data_provider import AuthDataProvider
 from gravitino.client.gravitino_metalake import GravitinoMetalake
 from gravitino.client.gravitino_version import GravitinoVersion
 from gravitino.dto.version_dto import VersionDTO
@@ -35,8 +36,13 @@ class GravitinoClientBase:
     API_METALAKES_IDENTIFIER_PATH = f"{API_METALAKES_LIST_PATH}/"
     """The REST API path prefix for load a specific metalake"""
 
-    def __init__(self, uri: str, check_version: bool = True):
-        self._rest_client = HTTPClient(uri)
+    def __init__(
+        self,
+        uri: str,
+        check_version: bool = True,
+        auth_data_provider: AuthDataProvider = None,
+    ):
+        self._rest_client = HTTPClient(uri, auth_data_provider=auth_data_provider)
         if check_version:
             self.check_version()
 

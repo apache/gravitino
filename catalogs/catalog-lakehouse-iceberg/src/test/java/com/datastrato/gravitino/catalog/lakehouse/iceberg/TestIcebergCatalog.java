@@ -100,7 +100,7 @@ public class TestIcebergCatalog {
     try (IcebergCatalogOperations ops = new IcebergCatalogOperations()) {
       ops.initialize(conf, entity.toCatalogInfo(), ICEBERG_PROPERTIES_METADATA);
       Map<String, String> map1 = Maps.newHashMap();
-      map1.put(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND_NAME, "test");
+      map1.put(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND, "test");
       PropertiesMetadata metadata = ICEBERG_PROPERTIES_METADATA.catalogPropertiesMetadata();
       Assertions.assertThrows(
           IllegalArgumentException.class,
@@ -109,7 +109,7 @@ public class TestIcebergCatalog {
           });
 
       Map<String, String> map2 = Maps.newHashMap();
-      map2.put(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND_NAME, "hive");
+      map2.put(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND, "hive");
       map2.put(IcebergCatalogPropertiesMetadata.URI, "127.0.0.1");
       map2.put(IcebergCatalogPropertiesMetadata.WAREHOUSE, "test");
       Assertions.assertDoesNotThrow(
@@ -124,7 +124,7 @@ public class TestIcebergCatalog {
               () -> PropertiesMetadataHelpers.validatePropertyForCreate(metadata, map3));
 
       Assertions.assertTrue(
-          throwable.getMessage().contains(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND_NAME));
+          throwable.getMessage().contains(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND));
     }
   }
 }

@@ -55,7 +55,7 @@ import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 public class FilesetMetaServiceIT {
   private static final Logger LOG = LoggerFactory.getLogger(FilesetMetaServiceIT.class);
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();

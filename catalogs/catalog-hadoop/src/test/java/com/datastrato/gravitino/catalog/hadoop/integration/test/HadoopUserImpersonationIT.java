@@ -45,11 +45,13 @@ import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@Tag("gravitino-docker-test")
 public class HadoopUserImpersonationIT extends AbstractIT {
   private static final Logger LOG = LoggerFactory.getLogger(HadoopCatalogIT.class);
 
@@ -291,11 +293,7 @@ public class HadoopUserImpersonationIT extends AbstractIT {
     return catalog
         .asFilesetCatalog()
         .createFileset(
-            NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName),
-            comment,
-            type,
-            storageLocation,
-            properties);
+            NameIdentifier.of(schemaName, filesetName), comment, type, storageLocation, properties);
   }
 
   private boolean checkFilePathExists(String pathString) throws Exception {

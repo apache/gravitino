@@ -17,10 +17,10 @@ class TestMetalake(unittest.TestCase):
         )
         metalake_response = MetalakeResponse.from_json(str_json, infer_missing=True)
         self.assertEqual(metalake_response.code(), 0)
-        self.assertIsNotNone(metalake_response._metalake)
-        self.assertEqual(metalake_response._metalake.name(), "example_name18")
+        self.assertIsNotNone(metalake_response.metalake())
+        self.assertEqual(metalake_response.metalake().name(), "example_name18")
         self.assertEqual(
-            metalake_response._metalake.audit_info().creator(), "anonymous"
+            metalake_response.metalake().audit_info().creator(), "anonymous"
         )
 
     def test_from_error_json_metalake_response(self):
@@ -32,8 +32,8 @@ class TestMetalake(unittest.TestCase):
         )
         metalake_response = MetalakeResponse.from_json(str_json, infer_missing=True)
         self.assertEqual(metalake_response.code(), 0)
-        self.assertIsNotNone(metalake_response._metalake)
-        self.assertEqual(metalake_response._metalake.name(), "example_name18")
+        self.assertIsNotNone(metalake_response.metalake())
+        self.assertEqual(metalake_response.metalake().name(), "example_name18")
         self.assertEqual(
-            metalake_response._metalake.audit_info().creator(), "anonymous"
+            metalake_response.metalake().audit_info().creator(), "anonymous"
         )

@@ -20,6 +20,7 @@ dependencies {
   implementation(libs.commons.collections4)
   implementation(libs.commons.lang3)
   implementation(libs.trino.jdbc)
+  compileOnly(libs.airlift.resolver)
   compileOnly(libs.trino.spi) {
     exclude("org.apache.logging.log4j")
   }

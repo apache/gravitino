@@ -11,6 +11,7 @@ import static org.apache.hc.core5.http.HttpStatus.SC_SERVER_ERROR;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.messaging.TopicDTO;
@@ -96,11 +97,13 @@ public class TestMessagingCatalog extends TestBase {
     EntityListResponse entityListResponse =
         new EntityListResponse(new NameIdentifier[] {topic1, topic2});
     buildMockResource(Method.GET, topicPath, null, entityListResponse, SC_OK);
-    NameIdentifier[] topics = ((MessagingCatalog) catalog).listTopics(topic1.namespace());
+    NameIdentifier[] topics = ((MessagingCatalog) catalog).listTopics(Namespace.of("schema1"));
 
+    NameIdentifier expectedResultTopic1 = NameIdentifier.of("schema1", "topic1");
+    NameIdentifier expectedResultTopic2 = NameIdentifier.of("schema1", "topic2");
     Assertions.assertEquals(2, topics.length);
-    Assertions.assertEquals(topic1, topics[0]);
-    Assertions.assertEquals(topic2, topics[1]);
+    Assertions.assertEquals(expectedResultTopic1, topics[0]);
+    Assertions.assertEquals(expectedResultTopic2, topics[1]);
 
     // Throw schema not found exception
     ErrorResponse errResp =
@@ -108,7 +111,7 @@ public class TestMessagingCatalog extends TestBase {
     buildMockResource(Method.GET, topicPath, null, errResp, SC_NOT_FOUND);
     Assertions.assertThrows(
         NoSuchSchemaException.class,
-        () -> catalog.asTopicCatalog().listTopics(topic1.namespace()),
+        () -> catalog.asTopicCatalog().listTopics(expectedResultTopic1.namespace()),
         "schema not found");
 
     // Throw Runtime exception
@@ -116,15 +119,19 @@ public class TestMessagingCatalog extends TestBase {
     buildMockResource(Method.GET, topicPath, null, errResp2, SC_SERVER_ERROR);
     Assertions.assertThrows(
         RuntimeException.class,
-        () -> catalog.asTopicCatalog().listTopics(topic1.namespace()),
+        () -> catalog.asTopicCatalog().listTopics(expectedResultTopic1.namespace()),
         "internal error");
   }
 
   @Test
   public void testLoadTopic() throws JsonProcessingException {
-    NameIdentifier topic = NameIdentifier.of(metalakeName, catalogName, "schema1", "topic1");
+    NameIdentifier topic = NameIdentifier.of("schema1", "topic1");
     String topicPath =
-        withSlash(MessagingCatalog.formatTopicRequestPath(topic.namespace()) + "/" + topic.name());
+        withSlash(
+            MessagingCatalog.formatTopicRequestPath(
+                    Namespace.of(metalakeName, catalogName, "schema1"))
+                + "/"
+                + topic.name());
 
     TopicDTO mockTopic = mockTopicDTO(topic.name(), "comment", ImmutableMap.of("k1", "k2"));
     TopicResponse topicResponse = new TopicResponse(mockTopic);
@@ -146,8 +153,11 @@ public class TestMessagingCatalog extends TestBase {
 
   @Test
   public void testCreateTopic() throws JsonProcessingException {
-    NameIdentifier topic = NameIdentifier.of(metalakeName, catalogName, "schema1", "topic1");
-    String topicPath = withSlash(MessagingCatalog.formatTopicRequestPath(topic.namespace()));
+    NameIdentifier topic = NameIdentifier.of("schema1", "topic1");
+    String topicPath =
+        withSlash(
+            MessagingCatalog.formatTopicRequestPath(
+                Namespace.of(metalakeName, catalogName, "schema1")));
 
     TopicDTO mockTopic = mockTopicDTO(topic.name(), "comment", ImmutableMap.of("k1", "k2"));
 
@@ -204,9 +214,13 @@ public class TestMessagingCatalog extends TestBase {
 
   @Test
   public void testAlterTopic() throws JsonProcessingException {
-    NameIdentifier topic = NameIdentifier.of(metalakeName, catalogName, "schema1", "topic1");
+    NameIdentifier topic = NameIdentifier.of("schema1", "topic1");
     String topicPath =
-        withSlash(MessagingCatalog.formatTopicRequestPath(topic.namespace()) + "/" + topic.name());
+        withSlash(
+            MessagingCatalog.formatTopicRequestPath(
+                    Namespace.of(metalakeName, catalogName, "schema1"))
+                + "/"
+                + topic.name());
 
     // test alter topic comment
     TopicUpdateRequest req1 = new TopicUpdateRequest.UpdateTopicCommentRequest("new comment");
@@ -271,9 +285,13 @@ public class TestMessagingCatalog extends TestBase {
 
   @Test
   public void testDropTopic() throws JsonProcessingException {
-    NameIdentifier topic = NameIdentifier.of(metalakeName, catalogName, "schema1", "topic1");
+    NameIdentifier topic = NameIdentifier.of("schema1", "topic1");
     String topicPath =
-        withSlash(MessagingCatalog.formatTopicRequestPath(topic.namespace()) + "/" + topic.name());
+        withSlash(
+            MessagingCatalog.formatTopicRequestPath(
+                    Namespace.of(metalakeName, catalogName, "schema1"))
+                + "/"
+                + topic.name());
     DropResponse resp = new DropResponse(true);
     buildMockResource(Method.DELETE, topicPath, null, resp, SC_OK);
 

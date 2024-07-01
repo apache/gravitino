@@ -86,16 +86,16 @@ For example:
 Some integration test cases depend on the Gravitino CI Docker image.
 
 If an integration test relies on the specific Gravitino CI Docker image,
-set the `@tag(gravitino-docker-it)` annotation in the test class.
+set the `@tag(gravitino-docker-test)` annotation in the test class.
 For example, the `integration-test/src/test/.../CatalogHiveIT.java` test needs to connect to
 the `datastrato/gravitino-ci-hive` Docker container for testing the Hive data source.
-Therefore, it should have the following `@tag` annotation:`@tag(gravitino-docker-it)`. This annotation
+Therefore, it should have the following `@tag` annotation:`@tag(gravitino-docker-test)`. This annotation
 helps identify the specific Docker container required for the integration test.
 
 For example:
 
 ```java
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 public class CatalogHiveIT extends AbstractIT {
 ...
 }
@@ -105,7 +105,7 @@ public class CatalogHiveIT extends AbstractIT {
 
 :::note
 * Make sure that the `Docker server` is running before running all the
-  integration tests. Otherwise, it only runs the integration tests without the `gravitino-docker-it` tag.
+  integration tests. Otherwise, it only runs the integration tests without the `gravitino-docker-test` tag.
 * On macOS, be sure to run the `${GRAVITINO_HOME}/dev/docker/tools/mac-docker-connector.sh`
   script before running the integration tests; or make sure that
   [OrbStack](https://orbstack.dev/) is running.
@@ -124,7 +124,7 @@ Using Gravitino IT Docker container to run all integration tests. [deploy test]
 ```
 
 Complete integration tests only run when all the required environments are met. Otherwise,
-only parts of them without the `gravitino-docker-it` tag run.
+only parts of them without the `gravitino-docker-test` tag run.
 
 ## How to debug Gravitino server and integration tests in embedded mode
 
