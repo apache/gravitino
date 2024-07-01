@@ -4,6 +4,8 @@
  */
 package com.datastrato.gravitino.authorization;
 
+import java.util.Objects;
+
 /** The helper class for {@link Privilege}. */
 public class Privileges {
 
@@ -265,6 +267,19 @@ public class Privileges {
     @Override
     public String simpleString() {
       return condition.name() + " " + name.name().toLowerCase().replace('_', ' ');
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof GenericPrivilege)) return false;
+        GenericPrivilege<?> that = (GenericPrivilege<?>) o;
+        return condition == that.condition && name == that.name;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(condition, name);
     }
   }
 
