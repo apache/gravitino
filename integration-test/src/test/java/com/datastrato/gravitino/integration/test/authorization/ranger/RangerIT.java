@@ -18,7 +18,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 public class RangerIT {
   private static final String serviceName = "trino-test";
   private static final String trinoType = "trino";

@@ -199,24 +199,26 @@ const TableView = () => {
 
         return (
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Typography
-              noWrap
-              {...(path
-                ? {
-                    component: Link,
-                    href: path
-                  }
-                : {})}
-              onClick={() => handleClickUrl(path)}
-              sx={{
-                fontWeight: 400,
-                color: 'primary.main',
-                textDecoration: 'none',
-                '&:hover': { color: 'primary.main', textDecoration: 'underline' }
-              }}
-            >
-              {name}
-            </Typography>
+            <Tooltip title={row.comment} placement='right'>
+              <Typography
+                noWrap
+                {...(path
+                  ? {
+                      component: Link,
+                      href: path
+                    }
+                  : {})}
+                onClick={() => handleClickUrl(path)}
+                sx={{
+                  fontWeight: 400,
+                  color: 'primary.main',
+                  textDecoration: 'none',
+                  '&:hover': { color: 'primary.main', textDecoration: 'underline' }
+                }}
+              >
+                {name}
+              </Typography>
+            </Tooltip>
           </Box>
         )
       }

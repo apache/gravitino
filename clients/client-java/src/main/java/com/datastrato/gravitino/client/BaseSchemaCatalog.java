@@ -37,14 +37,12 @@ import java.util.stream.Collectors;
 abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, SupportsSchemas {
   /** The REST client to send the requests. */
   protected final RESTClient restClient;
-  /** The namespace of current catalog, which is the metalake name. */
-  protected final Namespace namespace;
 
-  /** The namespace of the schemas, which is the metalake name with catalog name. */
-  protected final Namespace schemaNamespace;
+  /** The namespace of current catalog, which is the metalake name. */
+  private final Namespace catalogNamespace;
 
   BaseSchemaCatalog(
-      Namespace namespace,
+      Namespace catalogNamespace,
       String name,
       Catalog.Type type,
       String provider,
@@ -55,11 +53,10 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
     super(name, type, provider, comment, properties, auditDTO);
     this.restClient = restClient;
     Namespace.check(
-        namespace != null && namespace.length() == 1,
+        catalogNamespace != null && catalogNamespace.length() == 1,
         "Catalog namespace must be non-null and have 1 level, the input namespace is %s",
-        namespace);
-    this.namespace = namespace;
-    this.schemaNamespace = Namespace.of(namespace.level(0), name);
+        catalogNamespace);
+    this.catalogNamespace = catalogNamespace;
   }
 
   @Override
@@ -78,7 +75,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
 
     EntityListResponse resp =
         restClient.get(
-            formatSchemaRequestPath(schemaNamespace),
+            formatSchemaRequestPath(schemaNamespace()),
             EntityListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.schemaErrorHandler());
@@ -107,7 +104,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
 
     SchemaResponse resp =
         restClient.post(
-            formatSchemaRequestPath(schemaNamespace),
+            formatSchemaRequestPath(schemaNamespace()),
             req,
             SchemaResponse.class,
             Collections.emptyMap(),
@@ -129,7 +126,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
 
     SchemaResponse resp =
         restClient.get(
-            formatSchemaRequestPath(schemaNamespace) + "/" + RESTUtils.encodeString(schemaName),
+            formatSchemaRequestPath(schemaNamespace()) + "/" + RESTUtils.encodeString(schemaName),
             SchemaResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.schemaErrorHandler());
@@ -159,7 +156,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
 
     SchemaResponse resp =
         restClient.put(
-            formatSchemaRequestPath(schemaNamespace) + "/" + RESTUtils.encodeString(schemaName),
+            formatSchemaRequestPath(schemaNamespace()) + "/" + RESTUtils.encodeString(schemaName),
             updatesRequest,
             SchemaResponse.class,
             Collections.emptyMap(),
@@ -181,13 +178,31 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
   public boolean dropSchema(String schemaName, boolean cascade) throws NonEmptySchemaException {
     DropResponse resp =
         restClient.delete(
-            formatSchemaRequestPath(schemaNamespace) + "/" + RESTUtils.encodeString(schemaName),
+            formatSchemaRequestPath(schemaNamespace()) + "/" + RESTUtils.encodeString(schemaName),
             Collections.singletonMap("cascade", String.valueOf(cascade)),
             DropResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.schemaErrorHandler());
     resp.validate();
     return resp.dropped();
+  }
+
+  /**
+   * Get the namespace of the current catalog, which is "metalake".
+   *
+   * @return The namespace of the current catalog.
+   */
+  protected Namespace catalogNamespace() {
+    return catalogNamespace;
+  }
+
+  /**
+   * Get the namespace of the schemas, which is "metalake.catalog".
+   *
+   * @return The namespace of the schemas in this catalog.
+   */
+  protected Namespace schemaNamespace() {
+    return Namespace.of(catalogNamespace.level(0), this.name());
   }
 
   static String formatSchemaRequestPath(Namespace ns) {

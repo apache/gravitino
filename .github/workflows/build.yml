@@ -96,7 +96,7 @@ jobs:
           dev/ci/util_free_space.sh
 
       - name: Build with Gradle
-        run: ./gradlew build -PskipITs -PjdkVersion=${{ matrix.java-version }} -x :clients:client-python:build
+        run: ./gradlew build -PskipITs -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false -x :clients:client-python:build
 
       - name: Upload unit tests report
         uses: actions/upload-artifact@v3

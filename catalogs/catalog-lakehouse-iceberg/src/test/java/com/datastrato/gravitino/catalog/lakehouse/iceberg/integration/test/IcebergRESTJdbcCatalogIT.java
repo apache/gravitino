@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
 
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
 public class IcebergRESTJdbcCatalogIT extends IcebergRESTServiceIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();

@@ -38,7 +38,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 public class TestDorisTableOperations extends TestDoris {
   private static final Type VARCHAR_255 = Types.VarCharType.of(255);
   private static final Type VARCHAR_1024 = Types.VarCharType.of(1024);

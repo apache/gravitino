@@ -6,7 +6,7 @@ package com.datastrato.gravitino.catalog.doris.integration.test;
 
 import org.junit.jupiter.api.Tag;
 
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 public class CatalogDorisDriverIT extends CatalogDorisIT {
   public CatalogDorisDriverIT() {
     super();

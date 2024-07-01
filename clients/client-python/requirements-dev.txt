@@ -10,3 +10,5 @@ pandas==2.0.3
 pyarrow==15.0.2
 llama-index==0.10.40
 tenacity==8.3.0
+cachetools==5.3.3
+readerwriterlock==1.0.9

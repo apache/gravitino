@@ -3,13 +3,13 @@ Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
 
+from unittest.mock import patch
+
 from gravitino import GravitinoMetalake, Catalog, Fileset
 from gravitino.catalog.fileset_catalog import FilesetCatalog
 from gravitino.dto.fileset_dto import FilesetDTO
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.metalake_dto import MetalakeDTO
-
-from unittest.mock import patch
 
 
 def mock_load_metalake():

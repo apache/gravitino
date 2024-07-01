@@ -94,7 +94,7 @@ public class TableMetaService {
     return POConverters.fromTablePOs(tablePOs, namespace);
   }
 
-  public void insertTable(TableEntity tableEntity, boolean overwrite) {
+  public void insertTable(TableEntity tableEntity, boolean overwrite) throws IOException {
     try {
       NameIdentifierUtil.checkTable(tableEntity.nameIdentifier());
 

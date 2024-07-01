@@ -15,7 +15,6 @@ import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.utils.Executable;
 import com.google.common.collect.ImmutableMap;
@@ -88,7 +87,7 @@ public class RelationalEntityStore implements EntityStore {
   @Override
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Class<E> type, Entity.EntityType entityType, Function<E, E> updater)
-      throws IOException, NoSuchEntityException, AlreadyExistsException {
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     return backend.update(ident, entityType, updater);
   }
 

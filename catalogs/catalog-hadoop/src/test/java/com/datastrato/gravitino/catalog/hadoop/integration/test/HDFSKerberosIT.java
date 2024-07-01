@@ -27,7 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 public class HDFSKerberosIT {
   private static final Logger LOG = LoggerFactory.getLogger(HDFSKerberosIT.class);
 

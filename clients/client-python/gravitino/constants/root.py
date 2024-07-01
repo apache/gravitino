@@ -7,4 +7,4 @@ from pathlib import Path
 
 MODULE_NAME = "gravitino"
 PROJECT_HOME = Path(__file__).parent.parent.parent
-GRAVITNO_DIR = PROJECT_HOME / MODULE_NAME
+GRAVITINO_DIR = PROJECT_HOME / MODULE_NAME

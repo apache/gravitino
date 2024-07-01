@@ -8,7 +8,7 @@ import os
 import shutil
 
 from gravitino.constants.doc import DOC_DIR
-from gravitino.constants.root import GRAVITNO_DIR, MODULE_NAME
+from gravitino.constants.root import GRAVITINO_DIR, MODULE_NAME
 
 if __name__ == "__main__":
 
@@ -25,4 +25,4 @@ if __name__ == "__main__":
     pydoc.writedoc(MODULE_NAME)
 
     # Write doc for submodules
-    pydoc.writedocs(GRAVITNO_DIR.as_posix(), MODULE_NAME + ".")
+    pydoc.writedocs(GRAVITINO_DIR.as_posix(), MODULE_NAME + ".")

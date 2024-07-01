@@ -4,8 +4,7 @@
  */
 package com.datastrato.gravitino.catalog;
 
-import static com.datastrato.gravitino.Entity.SECURABLE_ENTITY_RESERVED_NAME;
-
+import com.datastrato.gravitino.MetadataObjects;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
@@ -83,7 +82,8 @@ public class TestFilesetNormalizeDispatcher extends TestOperationDispatcher {
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     schemaNormalizeDispatcher.createSchema(NameIdentifier.of(filesetNs.levels()), "comment", props);
 
-    NameIdentifier filesetIdent = NameIdentifier.of(filesetNs, SECURABLE_ENTITY_RESERVED_NAME);
+    NameIdentifier filesetIdent =
+        NameIdentifier.of(filesetNs, MetadataObjects.METADATA_OBJECT_RESERVED_NAME);
     Exception exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,

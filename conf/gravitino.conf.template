@@ -27,15 +27,19 @@ gravitino.server.webserver.requestHeaderSize = 131072
 gravitino.server.webserver.responseHeaderSize = 131072
 
 # THE CONFIGURATION FOR Gravitino ENTITY STORE
-# The entity store to use, kv or relational
-gravitino.entity.store = kv
+# The entity store to use, we only supports relational
+gravitino.entity.store = relational
+# The backend for the entity store, we only supports JDBC
+gravitino.entity.store.relational = JDBCBackend
 
-# The RocksDB entity store
-gravitino.entity.store.kv = RocksDBKvBackend
-# The storage path for RocksDB storage implementation, it supports both absolute and relative path,
-# If the value is a relative path, the final path is "${GRAVITINO_HOME}/${PATH_YOU_HAVA_SET}", default value
-# is "${GRAVITINO_HOME}/data/rocksdb", please uncomment and change it in your production environment.
-# gravitino.entity.store.kv.rocksdbPath = data/rocksdb
+# The JDBC URL for the entity store
+gravitino.entity.store.relational.jdbcUrl = jdbc:h2
+# The JDBC driver class name
+gravitino.entity.store.relational.jdbcDriver = org.h2.Driver
+# The JDBC user name
+gravitino.entity.store.relational.jdbcUser = gravitino
+# The JDBC password
+gravitino.entity.store.relational.jdbcPassword = gravitino
 
 # THE CONFIGURATION FOR Gravitino CATALOG
 # The interval in milliseconds to evict the catalog cache
