@@ -26,7 +26,7 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class SparkHiveCatalogIT extends SparkCommonIT {
 

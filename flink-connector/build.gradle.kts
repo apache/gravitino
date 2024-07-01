@@ -14,6 +14,7 @@ repositories {
 
 val flinkVersion: String = libs.versions.flink.get()
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
+val artifactName = "gravitino-${project.name}-$scalaVersion"
 
 dependencies {
   implementation(project(":api"))
@@ -65,6 +66,7 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
+  testImplementation(libs.mysql.driver)
   testImplementation(libs.sqlite.jdbc)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.junit.jupiter)
@@ -140,5 +142,17 @@ tasks.test {
 
     val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
     init(this)
+  }
+}
+
+tasks.withType<Jar> {
+  archiveBaseName.set(artifactName)
+}
+
+publishing {
+  publications {
+    withType<MavenPublication>().configureEach {
+      artifactId = artifactName
+    }
   }
 }

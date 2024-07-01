@@ -5,12 +5,12 @@
 package com.datastrato.gravitino.catalog;
 
 import static com.datastrato.gravitino.Catalog.Type.RELATIONAL;
-import static com.datastrato.gravitino.Entity.SECURABLE_ENTITY_RESERVED_NAME;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.EntityStore;
+import com.datastrato.gravitino.MetadataObjects;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
@@ -92,7 +92,8 @@ public class TestCatalogNormalizeDispatcher {
     }
 
     // Test for illegal and reserved names
-    NameIdentifier catalogIdent1 = NameIdentifier.of(metalake, SECURABLE_ENTITY_RESERVED_NAME);
+    NameIdentifier catalogIdent1 =
+        NameIdentifier.of(metalake, MetadataObjects.METADATA_OBJECT_RESERVED_NAME);
     Exception exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,

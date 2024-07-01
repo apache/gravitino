@@ -5,7 +5,6 @@
 package com.datastrato.gravitino;
 
 import com.datastrato.gravitino.Entity.EntityType;
-import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.utils.Executable;
 import java.io.Closeable;
@@ -110,11 +109,11 @@ public interface EntityStore extends Closeable {
    * @return E the updated entity
    * @throws IOException if the store operation fails
    * @throws NoSuchEntityException if the entity does not exist
-   * @throws AlreadyExistsException if the updated entity already existed.
+   * @throws EntityAlreadyExistsException if the updated entity already existed.
    */
   <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Class<E> type, EntityType entityType, Function<E, E> updater)
-      throws IOException, NoSuchEntityException, AlreadyExistsException;
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException;
 
   /**
    * Get the entity from the underlying storage.

@@ -105,7 +105,7 @@ public class FilesetMetaService {
     return POConverters.fromFilesetPOs(filesetPOs, namespace);
   }
 
-  public void insertFileset(FilesetEntity filesetEntity, boolean overwrite) {
+  public void insertFileset(FilesetEntity filesetEntity, boolean overwrite) throws IOException {
     try {
       NameIdentifierUtil.checkFileset(filesetEntity.nameIdentifier());
 

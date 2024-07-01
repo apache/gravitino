@@ -30,8 +30,10 @@ import org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOptions;
 import org.apache.flink.types.Row;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+@Tag("gravitino-docker-test")
 public class FlinkHiveCatalogIT extends FlinkEnvIT {
 
   private static final String DEFAULT_CATALOG = "default_catalog";

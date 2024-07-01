@@ -4,8 +4,7 @@
  */
 package com.datastrato.gravitino.catalog;
 
-import static com.datastrato.gravitino.Entity.SECURABLE_ENTITY_RESERVED_NAME;
-
+import com.datastrato.gravitino.MetadataObjects;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.messaging.Topic;
@@ -22,7 +21,7 @@ public class TestTopicNormalizeDispatcher extends TestOperationDispatcher {
   private static SchemaNormalizeDispatcher schemaNormalizeDispatcher;
 
   @BeforeAll
-  public static void initialize() throws IOException {
+  public static void initialize() throws IOException, IllegalAccessException {
     TestTopicOperationDispatcher.initialize();
     schemaNormalizeDispatcher =
         new SchemaNormalizeDispatcher(TestTopicOperationDispatcher.schemaOperationDispatcher);
@@ -69,7 +68,8 @@ public class TestTopicNormalizeDispatcher extends TestOperationDispatcher {
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     schemaNormalizeDispatcher.createSchema(NameIdentifier.of(topicNs.levels()), "comment", props);
 
-    NameIdentifier topicIdent = NameIdentifier.of(topicNs, SECURABLE_ENTITY_RESERVED_NAME);
+    NameIdentifier topicIdent =
+        NameIdentifier.of(topicNs, MetadataObjects.METADATA_OBJECT_RESERVED_NAME);
     Exception exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,

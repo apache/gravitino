@@ -35,9 +35,10 @@ public interface RelationalBackend extends Closeable {
    *     if the entities does not exist.
    * @throws NoSuchEntityException If the corresponding parent entity of these list entities cannot
    *     be found.
+   * @throws IOException If the store operation fails
    */
   <E extends Entity & HasIdentifier> List<E> list(Namespace namespace, Entity.EntityType entityType)
-      throws NoSuchEntityException;
+      throws NoSuchEntityException, IOException;
 
   /**
    * Checks the entity associated with the given identifier and entityType whether exists.
@@ -45,8 +46,9 @@ public interface RelationalBackend extends Closeable {
    * @param ident The identifier of the entity.
    * @param entityType The type of the entity.
    * @return True, if the entity can be found, else return false.
+   * @throws IOException If the store operation fails
    */
-  boolean exists(NameIdentifier ident, Entity.EntityType entityType);
+  boolean exists(NameIdentifier ident, Entity.EntityType entityType) throws IOException;
 
   /**
    * Stores the entity, possibly overwriting an existing entity if specified.
@@ -54,9 +56,10 @@ public interface RelationalBackend extends Closeable {
    * @param e The entity which need be stored.
    * @param overwritten If true, overwrites the existing value.
    * @throws EntityAlreadyExistsException If the entity already exists and overwrite is false.
+   * @throws IOException If the store operation fails
    */
   <E extends Entity & HasIdentifier> void insert(E e, boolean overwritten)
-      throws EntityAlreadyExistsException;
+      throws EntityAlreadyExistsException, IOException;
 
   /**
    * Updates the entity.
@@ -90,8 +93,10 @@ public interface RelationalBackend extends Closeable {
    * @param entityType The type of the entity.
    * @param cascade True, If you need to cascade delete entities, else false.
    * @return True, if the entity was successfully deleted, else false.
+   * @throws IOException If the store operation fails
    */
-  boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade);
+  boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
+      throws IOException;
 
   /**
    * Permanently deletes the legacy data that has been marked as deleted before the given legacy
@@ -100,8 +105,9 @@ public interface RelationalBackend extends Closeable {
    * @param entityType The type of the entity.
    * @param legacyTimeline The time before which the data has been marked as deleted.
    * @return The count of the deleted data.
+   * @throws IOException If the store operation fails
    */
-  int hardDeleteLegacyData(Entity.EntityType entityType, long legacyTimeline);
+  int hardDeleteLegacyData(Entity.EntityType entityType, long legacyTimeline) throws IOException;
 
   /**
    * Soft deletes the old version data that is older than or equal to the given version retention
@@ -110,6 +116,8 @@ public interface RelationalBackend extends Closeable {
    * @param entityType The type of the entity.
    * @param versionRetentionCount The count of versions to retain.
    * @return The count of the deleted data.
+   * @throws IOException If the store operation fails
    */
-  int deleteOldVersionData(Entity.EntityType entityType, long versionRetentionCount);
+  int deleteOldVersionData(Entity.EntityType entityType, long versionRetentionCount)
+      throws IOException;
 }

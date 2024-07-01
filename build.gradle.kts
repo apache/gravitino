@@ -10,12 +10,10 @@ import com.github.jk1.license.render.InventoryHtmlReportRenderer
 import com.github.jk1.license.render.ReportRenderer
 import com.github.vlsi.gradle.dsl.configureEach
 import net.ltgt.gradle.errorprone.errorprone
-import org.gradle.api.tasks.testing.Test
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.internal.hash.ChecksumService
 import org.gradle.internal.os.OperatingSystem
 import org.gradle.kotlin.dsl.support.serviceOf
-import java.io.File
 import java.io.IOException
 import java.util.Locale
 
@@ -186,9 +184,9 @@ allprojects {
       }
 
       param.useJUnitPlatform {
-        val DOCKER_IT_TEST = project.rootProject.extra["docker_it_test"] as? Boolean ?: false
-        if (!DOCKER_IT_TEST) {
-          excludeTags("gravitino-docker-it")
+        val dockerTest = project.rootProject.extra["dockerTest"] as? Boolean ?: false
+        if (!dockerTest) {
+          excludeTags("gravitino-docker-test")
         }
       }
     }
@@ -466,7 +464,7 @@ tasks.rat {
     "web/dist/**/*",
     "web/node_modules/**/*",
     "web/src/lib/utils/axios/**/*",
-    "web/src/lib/enums/httpEnum.ts",
+    "web/src/lib/enums/httpEnum.js",
     "web/src/types/axios.d.ts",
     "web/yarn.lock",
     "web/package-lock.json",
@@ -641,6 +639,7 @@ tasks {
     dependsOn(
       ":catalogs:catalog-hive:copyLibAndConfig",
       ":catalogs:catalog-lakehouse-iceberg:copyLibAndConfig",
+      ":catalogs:catalog-lakehouse-paimon:copyLibAndConfig",
       ":catalogs:catalog-jdbc-doris:copyLibAndConfig",
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig",
@@ -656,7 +655,7 @@ tasks {
 
 apply(plugin = "com.dorongold.task-tree")
 
-project.extra["docker_it_test"] = false
+project.extra["dockerTest"] = false
 project.extra["dockerRunning"] = false
 project.extra["macDockerConnector"] = false
 project.extra["isOrbStack"] = false
@@ -675,13 +674,15 @@ fun printDockerCheckInfo() {
   val macDockerConnector = project.extra["macDockerConnector"] as? Boolean ?: false
   val isOrbStack = project.extra["isOrbStack"] as? Boolean ?: false
 
-  if (OperatingSystem.current().isMacOsX() &&
+  if (extra["skipDockerTests"].toString().toBoolean()) {
+    project.extra["dockerTest"] = false
+  } else if (OperatingSystem.current().isMacOsX() &&
     dockerRunning &&
     (macDockerConnector || isOrbStack)
   ) {
-    project.extra["docker_it_test"] = true
+    project.extra["dockerTest"] = true
   } else if (OperatingSystem.current().isLinux() && dockerRunning) {
-    project.extra["docker_it_test"] = true
+    project.extra["dockerTest"] = true
   }
 
   println("------------------ Check Docker environment ---------------------")
@@ -691,11 +692,11 @@ fun printDockerCheckInfo() {
     println("OrbStack status ................................................. [${if (dockerRunning && isOrbStack) "yes" else "no"}]")
   }
 
-  val docker_it_test = project.extra["docker_it_test"] as? Boolean ?: false
-  if (!docker_it_test) {
-    println("Run test cases without `gravitino-docker-it` tag ................ [$testMode test]")
+  val dockerTest = project.extra["dockerTest"] as? Boolean ?: false
+  if (dockerTest) {
+    println("Using Docker container to run all tests. [$testMode test]")
   } else {
-    println("Using Gravitino IT Docker container to run all integration tests. [$testMode test]")
+    println("Run test cases without `gravitino-docker-test` tag ................ [$testMode test]")
   }
   println("-----------------------------------------------------------------")
 

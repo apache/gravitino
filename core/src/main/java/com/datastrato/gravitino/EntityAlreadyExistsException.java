@@ -4,28 +4,37 @@
  */
 package com.datastrato.gravitino;
 
+import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
+import com.google.errorprone.annotations.FormatMethod;
+import com.google.errorprone.annotations.FormatString;
+
 /**
  * Exception class indicating that an entity already exists. This exception is thrown when an
  * attempt is made to create an entity that already exists within the Gravitino framework.
  */
-public class EntityAlreadyExistsException extends RuntimeException {
+public class EntityAlreadyExistsException extends GravitinoRuntimeException {
 
   /**
    * Constructs an EntityAlreadyExistsException.
    *
-   * @param message The detail message explaining the exception.
+   * @param message the detail message.
+   * @param args the arguments to the message.
    */
-  public EntityAlreadyExistsException(String message) {
-    super(message);
+  @FormatMethod
+  public EntityAlreadyExistsException(@FormatString String message, Object... args) {
+    super(message, args);
   }
 
   /**
    * Constructs an EntityAlreadyExistsException.
    *
-   * @param message The detail message explaining the exception.
-   * @param cause The cause of the exception.
+   * @param cause the cause.
+   * @param message the detail message.
+   * @param args the arguments to the message.
    */
-  public EntityAlreadyExistsException(String message, Throwable cause) {
-    super(message, cause);
+  @FormatMethod
+  public EntityAlreadyExistsException(
+      Throwable cause, @FormatString String message, Object... args) {
+    super(cause, message, args);
   }
 }
