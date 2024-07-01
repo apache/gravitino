@@ -168,7 +168,7 @@ class HTTPClient:
                 request_data = json.to_json().encode("utf-8")
 
             headers = {
-                "Content-Type": "application/x-www-form-urlencoded",
+                "Content-Type": "application/json",
                 "Accept": "application/vnd.gravitino.v1+json",
             }
             self._update_headers(headers)
