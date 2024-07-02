@@ -80,6 +80,7 @@ public class TestEntityStorage {
   private static final String JDBC_STORE_PATH =
       "/tmp/gravitino_jdbc_entityStore_" + UUID.randomUUID().toString().replace("-", "");
   private static final String DB_DIR = JDBC_STORE_PATH + "/testdb";
+  private static final String H2_FILE = DB_DIR + ".mv.db";
 
   static Object[] storageProvider() {
     return new Object[] {Configs.RELATIONAL_ENTITY_STORE};
@@ -143,6 +144,8 @@ public class TestEntityStorage {
       if (dir.exists()) {
         dir.delete();
       }
+
+      FileUtils.deleteQuietly(new File(H2_FILE));
     } else {
       throw new UnsupportedOperationException("Unsupported entity store type: " + type);
     }

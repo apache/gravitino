@@ -62,6 +62,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterAll;
@@ -74,6 +75,7 @@ public class TestJDBCBackend {
   private static final String JDBC_STORE_PATH =
       "/tmp/gravitino_jdbc_entityStore_" + UUID.randomUUID().toString().replace("-", "");
   private static final String DB_DIR = JDBC_STORE_PATH + "/testdb";
+  private static final String H2_FILE = DB_DIR + ".mv.db";
   private static final Config config = Mockito.mock(Config.class);
   public static final ImmutableMap<String, String> RELATIONAL_BACKENDS =
       ImmutableMap.of(
@@ -116,6 +118,8 @@ public class TestJDBCBackend {
     if (dir.exists()) {
       dir.delete();
     }
+    FileUtils.deleteQuietly(new File(H2_FILE));
+
     backend.close();
   }
 

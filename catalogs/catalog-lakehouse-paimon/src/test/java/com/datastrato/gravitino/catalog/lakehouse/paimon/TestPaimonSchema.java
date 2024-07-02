@@ -14,11 +14,14 @@ import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.google.common.collect.Maps;
 import java.io.File;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.commons.io.FileUtils;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -35,6 +38,16 @@ public class TestPaimonSchema {
     Assertions.assertTrue(paimonCatalogOperations.dropSchema(ident, false));
     Assertions.assertThrowsExactly(
         NoSuchSchemaException.class, () -> paimonCatalogOperations.loadSchema(ident));
+  }
+
+  @AfterAll
+  static void cleanUpFile() {
+    try {
+      FileUtils.deleteDirectory(
+          new File(System.getProperty("java.io.tmpdir") + "/paimon_catalog_warehouse"));
+    } catch (IOException e) {
+      // Ignore
+    }
   }
 
   @Test

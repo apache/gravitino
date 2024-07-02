@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.file.Fileset;
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -23,6 +24,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -66,6 +68,12 @@ public class TestGvfsBase extends GravitinoMockServerBase {
   @AfterAll
   public static void tearDown() {
     GravitinoMockServerBase.tearDown();
+
+    try {
+      FileUtils.deleteDirectory(new File(FileSystemTestUtils.localRootPrefix()));
+    } catch (Exception e) {
+      // Ignore
+    }
   }
 
   @BeforeEach
