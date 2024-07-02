@@ -108,16 +108,22 @@ jobs:
             catalogs/**/*.log
             catalogs/**/*.tar
 
+      - name: Get Jacoco report paths
+        id: jacoco-paths
+        run: |
+          paths=$(find ${{ github.workspace }} -name jacocoTestReport.xml | tr '\n' ',')
+          echo "paths=$paths" >> "$GITHUB_OUTPUT"
       - name: Jacoco Report to PR
         id: jacoco
-        uses: madrapps/jacoco-report@v1.6.1
+        uses: yijhenlin/jacoco-report@summary_mode
         with:
-          paths: ${{ github.workspace }}/**/build/reports/jacoco/test/jacocoTestReport.xml
+          paths: ${{ steps.jacoco-paths.outputs.paths }}
           token: ${{ secrets.GITHUB_TOKEN }}
           min-coverage-overall: 40
           min-coverage-changed-files: 60
           title: 'Code Coverage Report'
           debug-mode: false
+          summary-mode: true
           update-comment: true
           pass-emoji: ':green_circle:'
           fail-emoji: ':red_circle:'
