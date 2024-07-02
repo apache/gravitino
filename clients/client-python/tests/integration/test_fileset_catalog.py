@@ -72,7 +72,7 @@ class TestFilesetCatalog(IntegrationTestEnv):
             self.gravitino_client = GravitinoClient(
                 uri="http://localhost:8090", metalake_name=self.metalake_name
             )
-            catalog = self.gravitino_client.load_catalog(ident=self.catalog_ident)
+            catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
             logger.info(
                 "Drop fileset %s[%s]",
                 self.fileset_ident,
@@ -91,7 +91,7 @@ class TestFilesetCatalog(IntegrationTestEnv):
             logger.info(
                 "Drop catalog %s[%s]",
                 self.catalog_ident,
-                self.gravitino_client.drop_catalog(ident=self.catalog_ident),
+                self.gravitino_client.drop_catalog(name=self.catalog_name),
             )
             logger.info(
                 "Drop metalake %s[%s]",
@@ -109,7 +109,7 @@ class TestFilesetCatalog(IntegrationTestEnv):
             uri="http://localhost:8090", metalake_name=self.metalake_name
         )
         catalog = self.gravitino_client.create_catalog(
-            ident=self.catalog_ident,
+            name=self.catalog_name,
             catalog_type=Catalog.Type.FILESET,
             provider=self.catalog_provider,
             comment="",
@@ -120,7 +120,7 @@ class TestFilesetCatalog(IntegrationTestEnv):
         )
 
     def create_fileset(self) -> Fileset:
-        catalog = self.gravitino_client.load_catalog(ident=self.catalog_ident)
+        catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
         return catalog.as_fileset_catalog().create_fileset(
             ident=self.fileset_ident,
             fileset_type=Fileset.Type.MANAGED,
@@ -138,14 +138,14 @@ class TestFilesetCatalog(IntegrationTestEnv):
 
     def test_drop_fileset(self):
         self.create_fileset()
-        catalog = self.gravitino_client.load_catalog(ident=self.catalog_ident)
+        catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
         self.assertTrue(
             catalog.as_fileset_catalog().drop_fileset(ident=self.fileset_ident)
         )
 
     def test_list_fileset(self):
         self.create_fileset()
-        catalog = self.gravitino_client.load_catalog(ident=self.catalog_ident)
+        catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
         fileset_list: List[NameIdentifier] = catalog.as_fileset_catalog().list_filesets(
             namespace=self.fileset_ident.namespace()
         )
@@ -154,7 +154,7 @@ class TestFilesetCatalog(IntegrationTestEnv):
     def test_load_fileset(self):
         self.create_fileset()
         fileset = (
-            self.gravitino_client.load_catalog(ident=self.catalog_ident)
+            self.gravitino_client.load_catalog(name=self.catalog_name)
             .as_fileset_catalog()
             .load_fileset(ident=self.fileset_ident)
         )
@@ -174,7 +174,7 @@ class TestFilesetCatalog(IntegrationTestEnv):
                 self.fileset_properties_key2, fileset_propertie_new_value
             ),
         )
-        catalog = self.gravitino_client.load_catalog(ident=self.catalog_ident)
+        catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
         fileset_new = catalog.as_fileset_catalog().alter_fileset(
             self.fileset_ident, *changes
         )

@@ -70,7 +70,7 @@ class TestSchema(IntegrationTestEnv):
             uri="http://localhost:8090", metalake_name=self.metalake_name
         )
         self.gravitino_client.create_catalog(
-            ident=self.catalog_ident,
+            name=self.catalog_name,
             catalog_type=Catalog.Type.FILESET,
             provider=self.catalog_provider,
             comment="",
@@ -82,7 +82,7 @@ class TestSchema(IntegrationTestEnv):
             self.gravitino_client = GravitinoClient(
                 uri="http://localhost:8090", metalake_name=self.metalake_name
             )
-            catalog = self.gravitino_client.load_catalog(ident=self.catalog_ident)
+            catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
             logger.info(
                 "Drop schema %s[%s]",
                 self.schema_ident,
@@ -96,7 +96,7 @@ class TestSchema(IntegrationTestEnv):
             logger.info(
                 "Drop catalog %s[%s]",
                 self.catalog_ident,
-                self.gravitino_client.drop_catalog(ident=self.catalog_ident),
+                self.gravitino_client.drop_catalog(name=self.catalog_name),
             )
             logger.info(
                 "Drop metalake %s[%s]",
@@ -107,7 +107,7 @@ class TestSchema(IntegrationTestEnv):
             logger.error("Clean test data failed: %s", e)
 
     def create_schema(self) -> Schema:
-        catalog = self.gravitino_client.load_catalog(ident=self.catalog_ident)
+        catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
         return catalog.as_schemas().create_schema(
             ident=self.schema_ident,
             comment=self.schema_comment,
@@ -123,14 +123,14 @@ class TestSchema(IntegrationTestEnv):
 
     def test_drop_schema(self):
         self.create_schema()
-        catalog = self.gravitino_client.load_catalog(ident=self.catalog_ident)
+        catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
         self.assertTrue(
             catalog.as_schemas().drop_schema(ident=self.schema_ident, cascade=True)
         )
 
     def test_list_schema(self):
         self.create_schema()
-        catalog = self.gravitino_client.load_catalog(ident=self.catalog_ident)
+        catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
         schema_list: List[NameIdentifier] = catalog.as_schemas().list_schemas(
             namespace=self.schema_ident.namespace()
         )
@@ -138,7 +138,7 @@ class TestSchema(IntegrationTestEnv):
 
     def test_load_schema(self):
         self.create_schema()
-        catalog = self.gravitino_client.load_catalog(ident=self.catalog_ident)
+        catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
         schema = catalog.as_schemas().load_schema(ident=self.schema_ident)
         self.assertIsNotNone(schema)
         self.assertEqual(schema.name(), self.schema_name)
@@ -156,7 +156,7 @@ class TestSchema(IntegrationTestEnv):
                 self.schema_properties_key2, schema_propertie_new_value
             ),
         )
-        catalog = self.gravitino_client.load_catalog(ident=self.catalog_ident)
+        catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
         schema_new = catalog.as_schemas().alter_schema(self.schema_ident, *changes)
         self.assertEqual(
             schema_new.properties().get(self.schema_properties_key2),

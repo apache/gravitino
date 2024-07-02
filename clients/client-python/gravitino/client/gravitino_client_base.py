@@ -16,6 +16,7 @@ from gravitino.dto.responses.version_response import VersionResponse
 from gravitino.utils import HTTPClient
 from gravitino.exceptions.gravitino_runtime_exception import GravitinoRuntimeException
 from gravitino.constants.version import VERSION_INI, Version
+from gravitino.name_identifier import NameIdentifier
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,7 @@ class GravitinoClientBase:
             NoSuchMetalakeException If the specified Metalake does not exist.
         """
 
+        self.check_metalake_name(name)
         response = self._rest_client.get(
             GravitinoClientBase.API_METALAKES_IDENTIFIER_PATH + name
         )
@@ -123,3 +125,12 @@ class GravitinoClientBase:
                 self._rest_client.close()
             except Exception as e:
                 logger.warning("Failed to close the HTTP REST client: %s", e)
+
+    def check_metalake_name(self, metalake_name: str):
+        identifier = NameIdentifier.parse(metalake_name)
+        namespace = identifier.namespace()
+
+        if not namespace:
+            raise ValueError(
+                f"Metalake namespace must be empty, the input namespace is {namespace}"
+            )
