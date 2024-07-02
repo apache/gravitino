@@ -65,10 +65,7 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
 
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
-    // The constraints of the name spec may be more strict than underlying catalog,
-    // and for compatibility reasons, we only apply case-sensitive capabilities here.
-    return dispatcher.dropSchema(
-        applyCaseSensitive(ident, Capability.Scope.SCHEMA, dispatcher), cascade);
+    return dispatcher.dropSchema(normalizeNameIdentifier(ident), cascade);
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier ident) {

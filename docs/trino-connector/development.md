@@ -65,7 +65,7 @@ then you can see the `gravitino-trino-connecor` source files and directories in 
 
     <artifactId>trino-gravitino</artifactId>
     <packaging>trino-plugin</packaging>
-    <description>Trino - Graviton Connector</description>
+    <description>Trino - Gravitino Connector</description>
 
     <properties>
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>

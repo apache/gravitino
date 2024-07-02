@@ -50,10 +50,8 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
       properties.put("gravitino.metalake", "test");
       properties.put("gravitino.uri", "http://127.0.0.1:8090");
       properties.put(
-          "trino.catalog.store", queryRunner.getCoordinator().getBaseDataDir().toString());
-      properties.put(
-          "trino.jdbc.uri",
-          queryRunner.getCoordinator().getBaseUrl().toString().replace("http", "jdbc:trino"));
+          "catalog.config-dir", queryRunner.getCoordinator().getBaseDataDir().toString());
+      properties.put("discovery.uri", queryRunner.getCoordinator().getBaseUrl().toString());
       queryRunner.createCatalog("gravitino", "gravitino", properties);
 
       GravitinoConnectorPluginManager.instance(this.getClass().getClassLoader())

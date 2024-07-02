@@ -12,7 +12,8 @@ venv
 dist
 build
 README.md
-version.ini
+gravitino/version.ini
+docs
 
 # Unit test / coverage reports
 htmlcov/

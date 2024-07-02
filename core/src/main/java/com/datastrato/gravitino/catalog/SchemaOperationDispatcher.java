@@ -20,6 +20,8 @@ import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
+import com.datastrato.gravitino.lock.LockType;
+import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.storage.IdGenerator;
@@ -159,47 +161,21 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
    */
   @Override
   public Schema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
-    NameIdentifier catalogIdentifier = getCatalogIdentifier(ident);
-    Schema schema =
-        doWithCatalog(
-            catalogIdentifier,
-            c -> c.doWithSchemaOps(s -> s.loadSchema(ident)),
-            NoSuchSchemaException.class);
+    // Load the schema and check if this schema is already imported.
+    EntityCombinedSchema schema =
+        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadSchema(ident));
 
-    // If the Schema is maintained by the Gravitino's store, we don't have to load again.
-    boolean isManagedSchema = isManagedEntity(catalogIdentifier, Capability.Scope.SCHEMA);
-    if (isManagedSchema) {
-      return EntityCombinedSchema.of(schema)
-          .withHiddenPropertiesSet(
-              getHiddenPropertyNames(
-                  catalogIdentifier,
-                  HasPropertyMetadata::schemaPropertiesMetadata,
-                  schema.properties()));
+    if (!schema.imported()) {
+      TreeLockUtils.doWithTreeLock(
+          NameIdentifier.of(ident.namespace().levels()),
+          LockType.WRITE,
+          () -> {
+            importSchema(ident);
+            return null;
+          });
     }
 
-    StringIdentifier stringId = getStringIdFromProperties(schema.properties());
-    // Case 1: The schema is not created by Gravitino.
-    if (stringId == null) {
-      return EntityCombinedSchema.of(schema)
-          .withHiddenPropertiesSet(
-              getHiddenPropertyNames(
-                  catalogIdentifier,
-                  HasPropertyMetadata::schemaPropertiesMetadata,
-                  schema.properties()));
-    }
-
-    SchemaEntity schemaEntity =
-        operateOnEntity(
-            ident,
-            identifier -> store.get(identifier, SCHEMA, SchemaEntity.class),
-            "GET",
-            stringId.id());
-    return EntityCombinedSchema.of(schema, schemaEntity)
-        .withHiddenPropertiesSet(
-            getHiddenPropertyNames(
-                catalogIdentifier,
-                HasPropertyMetadata::schemaPropertiesMetadata,
-                schema.properties()));
+    return schema;
   }
 
   /**
@@ -280,6 +256,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                             .build()),
             "UPDATE",
             stringId.id());
+
     return EntityCombinedSchema.of(alteredSchema, updatedSchemaEntity)
         .withHiddenPropertiesSet(
             getHiddenPropertyNames(
@@ -329,5 +306,107 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     return isManagedEntity(catalogIdent, Capability.Scope.SCHEMA)
         ? droppedFromStore
         : droppedFromCatalog;
+  }
+
+  private void importSchema(NameIdentifier identifier) {
+    EntityCombinedSchema schema = internalLoadSchema(identifier);
+    if (schema.imported()) {
+      return;
+    }
+
+    StringIdentifier stringId = null;
+    try {
+      stringId = schema.stringIdentifier();
+    } catch (IllegalArgumentException ie) {
+      LOG.warn(FormattedErrorMessages.STRING_ID_PARSE_ERROR, ie.getMessage());
+    }
+
+    long uid;
+    if (stringId != null) {
+      // If the entity in the store doesn't match the one in the external system, we use the data
+      // of external system to correct it.
+      LOG.warn(
+          "The Schema uid {} existed but still needs to be imported, this could be happened "
+              + "when Schema is renamed by external systems not controlled by Gravitino. In this case, "
+              + "we need to overwrite the stored entity to keep consistency.",
+          stringId);
+      uid = stringId.id();
+    } else {
+      // If entity doesn't exist, we import the entity from the external system.
+      uid = idGenerator.nextId();
+    }
+
+    SchemaEntity schemaEntity =
+        SchemaEntity.builder()
+            .withId(uid)
+            .withName(identifier.name())
+            .withNamespace(identifier.namespace())
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator(schema.auditInfo().creator())
+                    .withCreateTime(schema.auditInfo().createTime())
+                    .withLastModifier(schema.auditInfo().lastModifier())
+                    .withLastModifiedTime(schema.auditInfo().lastModifiedTime())
+                    .build())
+            .build();
+    try {
+      store.put(schemaEntity, true);
+    } catch (Exception e) {
+      LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
+      throw new RuntimeException("Fail to import schema entity to the store.", e);
+    }
+  }
+
+  private EntityCombinedSchema internalLoadSchema(NameIdentifier ident) {
+    NameIdentifier catalogIdentifier = getCatalogIdentifier(ident);
+    Schema schema =
+        doWithCatalog(
+            catalogIdentifier,
+            c -> c.doWithSchemaOps(s -> s.loadSchema(ident)),
+            NoSuchSchemaException.class);
+
+    // If the Schema is maintained by the entity store, we don't have to import.
+    boolean isManagedSchema = isManagedEntity(catalogIdentifier, Capability.Scope.SCHEMA);
+    if (isManagedSchema) {
+      return EntityCombinedSchema.of(schema)
+          .withHiddenPropertiesSet(
+              getHiddenPropertyNames(
+                  catalogIdentifier,
+                  HasPropertyMetadata::schemaPropertiesMetadata,
+                  schema.properties()))
+          // The meta of managed schema is stored by Gravitino, we don't need to import it.
+          .withImported(true /* imported */);
+    }
+
+    StringIdentifier stringId = getStringIdFromProperties(schema.properties());
+    // Case 1: The schema is not created by Gravitino or the external system does not support
+    // storing string identifiers.
+    if (stringId == null) {
+      return EntityCombinedSchema.of(schema)
+          .withHiddenPropertiesSet(
+              getHiddenPropertyNames(
+                  catalogIdentifier,
+                  HasPropertyMetadata::schemaPropertiesMetadata,
+                  schema.properties()))
+          // For some catalogs like PG, the identifier information is not stored in the schema's
+          // metadata, we need to check if this schema is existed in the store, if so we don't
+          // need to import.
+          .withImported(isEntityExist(ident, SCHEMA));
+    }
+
+    SchemaEntity schemaEntity =
+        operateOnEntity(
+            ident,
+            identifier -> store.get(identifier, SCHEMA, SchemaEntity.class),
+            "GET",
+            stringId.id());
+
+    return EntityCombinedSchema.of(schema, schemaEntity)
+        .withHiddenPropertiesSet(
+            getHiddenPropertyNames(
+                catalogIdentifier,
+                HasPropertyMetadata::schemaPropertiesMetadata,
+                schema.properties()))
+        .withImported(schemaEntity != null);
   }
 }

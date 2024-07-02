@@ -5,12 +5,12 @@
 
 package com.datastrato.gravitino.storage.relational.service;
 
+import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.authorization.AuthorizationUtils;
 import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.SecurableObjects;
-import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
@@ -28,6 +28,7 @@ import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelp
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -43,7 +44,7 @@ class TestRoleMetaService extends TestJDBCBackend {
   String metalakeName = "metalake";
 
   @Test
-  void getRoleByIdentifier() {
+  void getRoleByIdentifier() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
@@ -87,7 +88,7 @@ class TestRoleMetaService extends TestJDBCBackend {
   }
 
   @Test
-  void insertRole() {
+  void insertRole() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     BaseMetalake metalake =
@@ -148,7 +149,7 @@ class TestRoleMetaService extends TestJDBCBackend {
                 "catalog", Lists.newArrayList(Privileges.UseCatalog.allow())),
             ImmutableMap.of("k1", "v1"));
     Assertions.assertThrows(
-        AlreadyExistsException.class, () -> roleMetaService.insertRole(role1Exist, false));
+        EntityAlreadyExistsException.class, () -> roleMetaService.insertRole(role1Exist, false));
 
     // insert overwrite
     RoleEntity role1Overwrite =
@@ -169,7 +170,7 @@ class TestRoleMetaService extends TestJDBCBackend {
   }
 
   @Test
-  void deleteRole() {
+  void deleteRole() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     BaseMetalake metalake =
@@ -283,7 +284,7 @@ class TestRoleMetaService extends TestJDBCBackend {
   }
 
   @Test
-  void deleteMetalake() {
+  void deleteMetalake() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     BaseMetalake metalake =
@@ -396,7 +397,7 @@ class TestRoleMetaService extends TestJDBCBackend {
   }
 
   @Test
-  void deleteMetalakeCascade() {
+  void deleteMetalakeCascade() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     BaseMetalake metalake =
@@ -505,7 +506,7 @@ class TestRoleMetaService extends TestJDBCBackend {
   }
 
   @Test
-  void deleteRoleMetasByLegacyTimeLine() {
+  void deleteRoleMetasByLegacyTimeline() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     BaseMetalake metalake =
@@ -559,7 +560,7 @@ class TestRoleMetaService extends TestJDBCBackend {
 
     // hard delete before soft delete
     int deletedCount =
-        roleMetaService.deleteRoleMetasByLegacyTimeLine(Instant.now().toEpochMilli() + 1000, 4);
+        roleMetaService.deleteRoleMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 4);
     Assertions.assertEquals(0, deletedCount);
 
     Assertions.assertEquals(role1, roleMetaService.getRoleByIdentifier(role1.nameIdentifier()));
@@ -598,21 +599,21 @@ class TestRoleMetaService extends TestJDBCBackend {
 
     // hard delete after soft delete
     deletedCount =
-        roleMetaService.deleteRoleMetasByLegacyTimeLine(Instant.now().toEpochMilli() + 1000, 1);
+        roleMetaService.deleteRoleMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 1);
     Assertions.assertEquals(3, deletedCount); // delete 1 role + 1 userRoleRel + 1 groupRoleRel
     Assertions.assertEquals(1, countRoles(metalake.id())); // 2 - 1
     Assertions.assertEquals(1, countUserRoleRels()); // 2 - 1
     Assertions.assertEquals(1, countGroupRoleRels()); // 2 - 1
 
     deletedCount =
-        roleMetaService.deleteRoleMetasByLegacyTimeLine(Instant.now().toEpochMilli() + 1000, 1);
+        roleMetaService.deleteRoleMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 1);
     Assertions.assertEquals(3, deletedCount);
     Assertions.assertEquals(0, countRoles(metalake.id()));
     Assertions.assertEquals(0, countUserRoleRels());
     Assertions.assertEquals(0, countGroupRoleRels());
 
     deletedCount =
-        roleMetaService.deleteRoleMetasByLegacyTimeLine(Instant.now().toEpochMilli() + 1000, 1);
+        roleMetaService.deleteRoleMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 1);
     Assertions.assertEquals(0, deletedCount); // no more to delete
   }
 

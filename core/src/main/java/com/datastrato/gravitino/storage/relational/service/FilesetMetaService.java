@@ -105,7 +105,7 @@ public class FilesetMetaService {
     return POConverters.fromFilesetPOs(filesetPOs, namespace);
   }
 
-  public void insertFileset(FilesetEntity filesetEntity, boolean overwrite) {
+  public void insertFileset(FilesetEntity filesetEntity, boolean overwrite) throws IOException {
     try {
       NameIdentifierUtil.checkFileset(filesetEntity.nameIdentifier());
 
@@ -228,18 +228,18 @@ public class FilesetMetaService {
     return true;
   }
 
-  public int deleteFilesetAndVersionMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
+  public int deleteFilesetAndVersionMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     int filesetDeletedCount =
         SessionUtils.doWithCommitAndFetchResult(
             FilesetMetaMapper.class,
             mapper -> {
-              return mapper.deleteFilesetMetasByLegacyTimeLine(legacyTimeLine, limit);
+              return mapper.deleteFilesetMetasByLegacyTimeline(legacyTimeline, limit);
             });
     int filesetVersionDeletedCount =
         SessionUtils.doWithCommitAndFetchResult(
             FilesetVersionMapper.class,
             mapper -> {
-              return mapper.deleteFilesetVersionsByLegacyTimeLine(legacyTimeLine, limit);
+              return mapper.deleteFilesetVersionsByLegacyTimeline(legacyTimeline, limit);
             });
     return filesetDeletedCount + filesetVersionDeletedCount;
   }

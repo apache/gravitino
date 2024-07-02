@@ -6,9 +6,9 @@
 package com.datastrato.gravitino.storage.kv;
 
 import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_KV_STORE;
+import static com.datastrato.gravitino.Configs.ENTITY_KV_ROCKSDB_BACKEND_PATH;
 import static com.datastrato.gravitino.Configs.ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_STORE;
-import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 import static com.datastrato.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static com.datastrato.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
 import static com.datastrato.gravitino.storage.kv.TestKvEntityStorage.createBaseMakeLake;
@@ -58,7 +58,7 @@ class TestKvGarbageCollector {
     Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
     Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
-    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(file.getAbsolutePath());
+    Mockito.when(config.get(ENTITY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(file.getAbsolutePath());
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(3L);
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
     return config;
@@ -74,17 +74,17 @@ class TestKvGarbageCollector {
   void testScheduler() throws IOException {
     Config config = getConfig();
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L); // 20 minutes
-    long dateTimeLineMinute = config.get(STORE_DELETE_AFTER_TIME) / 1000 / 60;
-    Assertions.assertEquals(10, Math.max(dateTimeLineMinute / 10, 10));
+    long dateTimelineMinute = config.get(STORE_DELETE_AFTER_TIME) / 1000 / 60;
+    Assertions.assertEquals(10, Math.max(dateTimelineMinute / 10, 10));
 
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(2 * 60 * 60 * 1000L); // 2 hours
-    dateTimeLineMinute = config.get(STORE_DELETE_AFTER_TIME) / 1000 / 60;
-    Assertions.assertEquals(12, Math.max(dateTimeLineMinute / 10, 10));
+    dateTimelineMinute = config.get(STORE_DELETE_AFTER_TIME) / 1000 / 60;
+    Assertions.assertEquals(12, Math.max(dateTimelineMinute / 10, 10));
 
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME))
         .thenReturn(2 * 60 * 60 * 24 * 1000L); // 2 days
-    dateTimeLineMinute = config.get(STORE_DELETE_AFTER_TIME) / 1000 / 60;
-    Assertions.assertEquals(288, Math.max(dateTimeLineMinute / 10, 10));
+    dateTimelineMinute = config.get(STORE_DELETE_AFTER_TIME) / 1000 / 60;
+    Assertions.assertEquals(288, Math.max(dateTimelineMinute / 10, 10));
   }
 
   @Test

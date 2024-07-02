@@ -71,6 +71,6 @@ public final class GravitinoColumnHandle implements ColumnHandle, GravitinoHandl
 
   @Override
   public String toString() {
-    return columnName;
+    return columnName + "->" + getInternalHandle().toString();
   }
 }

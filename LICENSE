@@ -247,6 +247,9 @@
    ./clients/client-java/src/main/java/com/datastrato/gravitino/client/OAuth2ClientUtil.java
    ./gradlew
 
+   Apache Paimon
+   ./catalogs/catalog-lakehouse-paimon/src/main/java/com/datastrato/gravitino/catalog/lakehouse/paimon/utils/TypeUtils.java
+
    Apache Hive
    ./catalogs/catalog-hive/src/test/resources/hive-schema-3.1.0.derby.sql
 

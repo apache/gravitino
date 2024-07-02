@@ -4,6 +4,10 @@
  */
 package com.datastrato.gravitino.catalog;
 
+import static com.datastrato.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
+import static com.datastrato.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
+import static com.datastrato.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
+import static com.datastrato.gravitino.Entity.EntityType.SCHEMA;
 import static com.datastrato.gravitino.Entity.EntityType.TABLE;
 import static com.datastrato.gravitino.StringIdentifier.ID_KEY;
 import static com.datastrato.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
@@ -11,13 +15,17 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 
+import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.TestColumn;
 import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
+import com.datastrato.gravitino.lock.LockManager;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.rel.Column;
@@ -32,6 +40,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -41,11 +50,19 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   static SchemaOperationDispatcher schemaOperationDispatcher;
 
   @BeforeAll
-  public static void initialize() throws IOException {
+  public static void initialize() throws IOException, IllegalAccessException {
     schemaOperationDispatcher =
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
     tableOperationDispatcher =
         new TableOperationDispatcher(catalogManager, entityStore, idGenerator);
+
+    Config config = mock(Config.class);
+    doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
+    doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
+    doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "schemaDispatcher", schemaOperationDispatcher, true);
   }
 
   @Test
@@ -154,15 +171,25 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
 
     // Case 2: Test if the table entity is not found in the entity store
     reset(entityStore);
+    entityStore.delete(tableIdent1, TABLE);
+    entityStore.delete(NameIdentifier.of(tableNs.levels()), SCHEMA);
     doThrow(new NoSuchEntityException("")).when(entityStore).get(any(), any(), any());
     Table loadedTable2 = tableOperationDispatcher.loadTable(tableIdent1);
+    // Succeed to import the topic entity
+    Assertions.assertTrue(entityStore.exists(NameIdentifier.of(tableNs.levels()), SCHEMA));
+    Assertions.assertTrue(entityStore.exists(tableIdent1, TABLE));
     // Audit info is gotten from the catalog, not from the entity store
     Assertions.assertEquals("test", loadedTable2.auditInfo().creator());
 
     // Case 3: Test if the entity store is failed to get the table entity
     reset(entityStore);
+    entityStore.delete(tableIdent1, TABLE);
+    entityStore.delete(NameIdentifier.of(tableNs.levels()), SCHEMA);
     doThrow(new IOException()).when(entityStore).get(any(), any(), any());
     Table loadedTable3 = tableOperationDispatcher.loadTable(tableIdent1);
+    // Succeed to import the topic entity
+    Assertions.assertTrue(entityStore.exists(NameIdentifier.of(tableNs.levels()), SCHEMA));
+    Assertions.assertTrue(entityStore.exists(tableIdent1, TABLE));
     // Audit info is gotten from the catalog, not from the entity store
     Assertions.assertEquals("test", loadedTable3.auditInfo().creator());
 
@@ -178,6 +205,10 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
             .build();
     doReturn(tableEntity).when(entityStore).get(any(), any(), any());
     Table loadedTable4 = tableOperationDispatcher.loadTable(tableIdent1);
+    // Succeed to import the topic entity
+    reset(entityStore);
+    TableEntity tableImportedEntity = entityStore.get(tableIdent1, TABLE, TableEntity.class);
+    Assertions.assertEquals("test", tableImportedEntity.auditInfo().creator());
     // Audit info is gotten from the catalog, not from the entity store
     Assertions.assertEquals("test", loadedTable4.auditInfo().creator());
   }

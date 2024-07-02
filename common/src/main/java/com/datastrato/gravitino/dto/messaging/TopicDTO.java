@@ -90,13 +90,30 @@ public class TopicDTO implements Topic {
     return Objects.hash(name, comment, properties, audit);
   }
 
+  @Override
+  public String toString() {
+    return "TopicDTO{"
+        + "name='"
+        + name
+        + '\''
+        + ", comment='"
+        + comment
+        + '\''
+        + ", properties="
+        + properties
+        + ", audit="
+        + audit
+        + '}';
+  }
+
   /** A builder for constructing a Topic DTO. */
   public static class Builder {
-    private final TopicDTO topic;
+    private String name;
+    private String comment;
+    private Map<String, String> properties;
+    private AuditDTO audit;
 
-    private Builder() {
-      topic = new TopicDTO();
-    }
+    private Builder() {}
 
     /**
      * Sets the name of the topic.
@@ -105,7 +122,7 @@ public class TopicDTO implements Topic {
      * @return The builder instance.
      */
     public Builder withName(String name) {
-      topic.name = name;
+      this.name = name;
       return this;
     }
 
@@ -116,7 +133,7 @@ public class TopicDTO implements Topic {
      * @return The builder instance.
      */
     public Builder withComment(String comment) {
-      topic.comment = comment;
+      this.comment = comment;
       return this;
     }
 
@@ -127,7 +144,7 @@ public class TopicDTO implements Topic {
      * @return The builder instance.
      */
     public Builder withProperties(Map<String, String> properties) {
-      topic.properties = properties;
+      this.properties = properties;
       return this;
     }
 
@@ -138,13 +155,13 @@ public class TopicDTO implements Topic {
      * @return The builder instance.
      */
     public Builder withAudit(AuditDTO audit) {
-      topic.audit = audit;
+      this.audit = audit;
       return this;
     }
 
     /** @return The constructed Topic DTO. */
     public TopicDTO build() {
-      return topic;
+      return new TopicDTO(name, comment, properties, audit);
     }
   }
 }

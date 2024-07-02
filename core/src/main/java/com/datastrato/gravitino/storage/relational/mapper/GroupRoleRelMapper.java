@@ -75,7 +75,8 @@ public interface GroupRoleRelMapper {
   @Update(
       "UPDATE "
           + GROUP_ROLE_RELATION_TABLE_NAME
-          + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
+          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
           + " WHERE group_id = #{groupId} AND deleted_at = 0")
   void softDeleteGroupRoleRelByGroupId(@Param("groupId") Long groupId);
 
@@ -83,7 +84,8 @@ public interface GroupRoleRelMapper {
     "<script>",
     "UPDATE "
         + GROUP_ROLE_RELATION_TABLE_NAME
-        + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE group_id = #{groupId} AND role_id in (",
     "<foreach collection='roleIds' item='roleId' separator=','>",
     "#{roleId}",
@@ -97,7 +99,8 @@ public interface GroupRoleRelMapper {
   @Update(
       "UPDATE "
           + GROUP_ROLE_RELATION_TABLE_NAME
-          + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
+          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
           + " WHERE group_id IN (SELECT group_id FROM "
           + GROUP_TABLE_NAME
           + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0)"
@@ -107,14 +110,15 @@ public interface GroupRoleRelMapper {
   @Update(
       "UPDATE "
           + GROUP_ROLE_RELATION_TABLE_NAME
-          + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
+          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
           + " WHERE role_id = #{roleId} AND deleted_at = 0")
   void softDeleteGroupRoleRelByRoleId(Long roleId);
 
   @Delete(
       "DELETE FROM "
           + GROUP_ROLE_RELATION_TABLE_NAME
-          + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeLine} LIMIT #{limit}")
-  Integer deleteGroupRoleRelMetasByLegacyTimeLine(
-      @Param("legacyTimeLine") Long legacyTimeLine, @Param("limit") int limit);
+          + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}")
+  Integer deleteGroupRoleRelMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 }

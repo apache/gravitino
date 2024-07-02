@@ -21,6 +21,7 @@ import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -78,7 +79,7 @@ public class GroupMetaService {
     return POConverters.fromGroupPO(groupPO, rolePOs, identifier.namespace());
   }
 
-  public void insertGroup(GroupEntity groupEntity, boolean overwritten) {
+  public void insertGroup(GroupEntity groupEntity, boolean overwritten) throws IOException {
     try {
       AuthorizationUtils.checkGroup(groupEntity.nameIdentifier());
 
@@ -140,7 +141,7 @@ public class GroupMetaService {
   }
 
   public <E extends Entity & HasIdentifier> GroupEntity updateGroup(
-      NameIdentifier identifier, Function<E, E> updater) {
+      NameIdentifier identifier, Function<E, E> updater) throws IOException {
     AuthorizationUtils.checkGroup(identifier);
 
     Long metalakeId =
@@ -209,7 +210,7 @@ public class GroupMetaService {
     return newEntity;
   }
 
-  public int deleteGroupMetasByLegacyTimeLine(long legacyTimeLine, int limit) {
+  public int deleteGroupMetasByLegacyTimeline(long legacyTimeline, int limit) {
     int[] groupDeletedCount = new int[] {0};
     int[] groupRoleRelDeletedCount = new int[] {0};
 
@@ -218,13 +219,13 @@ public class GroupMetaService {
             groupDeletedCount[0] =
                 SessionUtils.doWithoutCommitAndFetchResult(
                     GroupMetaMapper.class,
-                    mapper -> mapper.deleteGroupMetasByLegacyTimeLine(legacyTimeLine, limit)),
+                    mapper -> mapper.deleteGroupMetasByLegacyTimeline(legacyTimeline, limit)),
         () ->
             groupRoleRelDeletedCount[0] =
                 SessionUtils.doWithoutCommitAndFetchResult(
                     GroupRoleRelMapper.class,
                     mapper ->
-                        mapper.deleteGroupRoleRelMetasByLegacyTimeLine(legacyTimeLine, limit)));
+                        mapper.deleteGroupRoleRelMetasByLegacyTimeline(legacyTimeline, limit)));
 
     return groupDeletedCount[0] + groupRoleRelDeletedCount[0];
   }

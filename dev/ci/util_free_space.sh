@@ -23,12 +23,6 @@ set -eux
 
 if [ "${GITHUB_ACTIONS}" = "true" ]; then
   df -h
-  echo "::group::/usr/local/*"
-  du -hsc /usr/local/*
-  echo "::endgroup::"
-  echo "::group::/usr/local/bin/*"
-  du -hsc /usr/local/bin/*
-  echo "::endgroup::"
   # ~1GB (From 1.2GB to 214MB)
   sudo rm -rf \
     /usr/local/bin/aliyun \
@@ -45,17 +39,8 @@ if [ "${GITHUB_ACTIONS}" = "true" ]; then
     /usr/local/bin/pulumi* \
     /usr/local/bin/stack \
     /usr/local/bin/terraform || :
-  echo "::group::/usr/local/share/*"
-  du -hsc /usr/local/share/*
-  echo "::endgroup::"
   # 1.3GB
   sudo rm -rf /usr/local/share/powershell || :
-  echo "::group::/opt/*"
-  du -hsc /opt/*
-  echo "::endgroup::"
-  echo "::group::/opt/hostedtoolcache/*"
-  du -hsc /opt/hostedtoolcache/*
-  echo "::endgroup::"
   # 5.3GB
   sudo rm -rf /opt/hostedtoolcache/CodeQL || :
   # 1.4GB

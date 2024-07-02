@@ -36,7 +36,7 @@ public class TopicMetaService {
 
   private TopicMetaService() {}
 
-  public void insertTopic(TopicEntity topicEntity, boolean overwrite) {
+  public void insertTopic(TopicEntity topicEntity, boolean overwrite) throws IOException {
     try {
       NameIdentifierUtil.checkTopic(topicEntity.nameIdentifier());
 
@@ -186,11 +186,11 @@ public class TopicMetaService {
     return true;
   }
 
-  public int deleteTopicMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
+  public int deleteTopicMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
         TopicMetaMapper.class,
         mapper -> {
-          return mapper.deleteTopicMetasByLegacyTimeLine(legacyTimeLine, limit);
+          return mapper.deleteTopicMetasByLegacyTimeline(legacyTimeline, limit);
         });
   }
 

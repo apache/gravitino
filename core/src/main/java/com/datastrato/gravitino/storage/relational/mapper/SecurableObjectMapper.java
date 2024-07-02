@@ -50,14 +50,16 @@ public interface SecurableObjectMapper {
   @Update(
       "UPDATE "
           + SECURABLE_OBJECT_TABLE_NAME
-          + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
+          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
           + " WHERE role_id = #{roleId} AND deleted_at = 0")
   void softDeleteSecurableObjectsByRoleId(@Param("roleId") Long roleId);
 
   @Update(
       "UPDATE "
           + SECURABLE_OBJECT_TABLE_NAME
-          + " ob SET ob.deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
+          + " ob SET ob.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
           + " where exists ( select * from "
           + ROLE_TABLE_NAME
           + " ro WHERE ro.metalake_id = #{metalakeId} AND ro.role_id = ob.role_id"
@@ -77,7 +79,7 @@ public interface SecurableObjectMapper {
   @Delete(
       "DELETE FROM "
           + SECURABLE_OBJECT_TABLE_NAME
-          + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeLine} LIMIT #{limit}")
-  Integer deleteSecurableObjectsByLegacyTimeLine(
-      @Param("legacyTimeLine") Long legacyTimeLine, @Param("limit") int limit);
+          + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}")
+  Integer deleteSecurableObjectsByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 }

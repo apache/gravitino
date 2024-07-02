@@ -99,7 +99,7 @@ public class SchemaMetaService {
     return POConverters.fromSchemaPOs(schemaPOs, namespace);
   }
 
-  public void insertSchema(SchemaEntity schemaEntity, boolean overwrite) {
+  public void insertSchema(SchemaEntity schemaEntity, boolean overwrite) throws IOException {
     try {
       NameIdentifierUtil.checkSchema(schemaEntity.nameIdentifier());
 
@@ -223,11 +223,11 @@ public class SchemaMetaService {
     return true;
   }
 
-  public int deleteSchemaMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
+  public int deleteSchemaMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
         SchemaMetaMapper.class,
         mapper -> {
-          return mapper.deleteSchemaMetasByLegacyTimeLine(legacyTimeLine, limit);
+          return mapper.deleteSchemaMetasByLegacyTimeline(legacyTimeline, limit);
         });
   }
 

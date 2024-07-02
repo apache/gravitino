@@ -4,7 +4,7 @@
  */
 package com.datastrato.gravitino.integration.test.util;
 
-import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
+import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
 import static com.datastrato.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
 import com.datastrato.gravitino.Config;
@@ -30,9 +30,14 @@ import java.sql.DriverManager;
 import java.sql.Statement;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,6 +45,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 @ExtendWith({PrintFuncNameExtension.class, CloseContainerExtension.class})
 public class AbstractIT {
@@ -195,7 +201,13 @@ public class AbstractIT {
       setMySQLBackend();
     }
 
+    File baseDir = new File(System.getProperty("java.io.tmpdir"));
+    File file = Files.createTempDirectory(baseDir.toPath(), "test").toFile();
+    file.mkdir();
+    file.deleteOnExit();
+
     serverConfig = new ServerConfig();
+    customConfigs.put(ENTITY_RELATIONAL_JDBC_BACKEND_PATH.getKey(), file.getAbsolutePath());
     if (testMode != null && testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {
       MiniGravitinoContext context =
           new MiniGravitinoContext(customConfigs, ignoreIcebergRestService);
@@ -206,14 +218,21 @@ public class AbstractIT {
       rewriteGravitinoServerConfig();
       serverConfig.loadFromFile(GravitinoServer.CONF_FILE);
       downLoadJDBCDriver();
-      try {
-        FileUtils.deleteDirectory(
-            FileUtils.getFile(serverConfig.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)));
-      } catch (Exception e) {
-        // Ignore
-      }
 
       GravitinoITUtils.startGravitinoServer();
+
+      JettyServerConfig jettyServerConfig =
+          JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
+      String checkServerUrl =
+          "http://"
+              + jettyServerConfig.getHost()
+              + ":"
+              + jettyServerConfig.getHttpPort()
+              + "/metrics";
+      Awaitility.await()
+          .atMost(60, TimeUnit.SECONDS)
+          .pollInterval(1, TimeUnit.SECONDS)
+          .until(() -> isHttpServerUp(checkServerUrl));
     }
 
     JettyServerConfig jettyServerConfig =
@@ -274,6 +293,26 @@ public class AbstractIT {
     } catch (IOException e) {
       LOG.warn("Can't get git commit id for:", e);
       return "";
+    }
+  }
+
+  /**
+   * Check if the http server is up, If http response status code is 200, then we're assuming the
+   * server is up. Or else we assume the server is not ready.
+   *
+   * <p>Note: The method will ignore the response body and only check the status code.
+   *
+   * @param testUrl A url that we want to test ignore the response body.
+   * @return true if the server is up, false otherwise.
+   */
+  public static boolean isHttpServerUp(String testUrl) {
+    try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+      HttpGet request = new HttpGet(testUrl);
+      ClassicHttpResponse response = httpClient.execute(request, a -> a);
+      return response.getCode() == 200;
+    } catch (Exception e) {
+      LOG.warn("Check Gravitino server failed: ", e);
+      return false;
     }
   }
 }

@@ -6,6 +6,7 @@ package com.datastrato.gravitino.storage.relational.service;
 
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.MetadataObject;
+import com.datastrato.gravitino.MetadataObjects;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.authorization.AuthorizationUtils;
 import com.datastrato.gravitino.authorization.SecurableObject;
@@ -22,6 +23,7 @@ import com.datastrato.gravitino.storage.relational.utils.MetadataObjectUtils;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
 import com.google.common.collect.Lists;
+import java.io.IOException;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,7 +80,7 @@ public class RoleMetaService {
         RoleMetaMapper.class, mapper -> mapper.listRolesByGroupId(groupId));
   }
 
-  public void insertRole(RoleEntity roleEntity, boolean overwritten) {
+  public void insertRole(RoleEntity roleEntity, boolean overwritten) throws IOException {
     try {
       AuthorizationUtils.checkRole(roleEntity.nameIdentifier());
 
@@ -92,8 +94,7 @@ public class RoleMetaService {
             POConverters.initializeSecurablePOBuilderWithVersion(
                 roleEntity.id(), object, getEntityType(object));
         objectBuilder.withEntityId(
-            MetadataObjectUtils.getSecurableObjectEntityId(
-                metalakeId, object.fullName(), object.type()));
+            MetadataObjectUtils.getMetadataObjectId(metalakeId, object.fullName(), object.type()));
         securableObjectPOs.add(objectBuilder.build());
       }
 
@@ -139,7 +140,7 @@ public class RoleMetaService {
 
     for (SecurableObjectPO securableObjectPO : securableObjectPOs) {
       String fullName =
-          MetadataObjectUtils.getSecurableObjectFullName(
+          MetadataObjectUtils.getMetadataObjectFullName(
               securableObjectPO.getType(), securableObjectPO.getEntityId());
       if (fullName != null) {
         securableObjects.add(
@@ -185,7 +186,7 @@ public class RoleMetaService {
         SecurableObjectMapper.class, mapper -> mapper.listSecurableObjectsByRoleId(roleId));
   }
 
-  public int deleteRoleMetasByLegacyTimeLine(long legacyTimeLine, int limit) {
+  public int deleteRoleMetasByLegacyTimeline(long legacyTimeline, int limit) {
     int[] roleDeletedCount = new int[] {0};
     int[] userRoleRelDeletedCount = new int[] {0};
     int[] groupRoleRelDeletedCount = new int[] {0};
@@ -196,24 +197,24 @@ public class RoleMetaService {
             roleDeletedCount[0] =
                 SessionUtils.doWithoutCommitAndFetchResult(
                     RoleMetaMapper.class,
-                    mapper -> mapper.deleteRoleMetasByLegacyTimeLine(legacyTimeLine, limit)),
+                    mapper -> mapper.deleteRoleMetasByLegacyTimeline(legacyTimeline, limit)),
         () ->
             userRoleRelDeletedCount[0] =
                 SessionUtils.doWithoutCommitAndFetchResult(
                     UserRoleRelMapper.class,
-                    mapper -> mapper.deleteUserRoleRelMetasByLegacyTimeLine(legacyTimeLine, limit)),
+                    mapper -> mapper.deleteUserRoleRelMetasByLegacyTimeline(legacyTimeline, limit)),
         () ->
             groupRoleRelDeletedCount[0] =
                 SessionUtils.doWithoutCommitAndFetchResult(
                     GroupRoleRelMapper.class,
                     mapper ->
-                        mapper.deleteGroupRoleRelMetasByLegacyTimeLine(legacyTimeLine, limit)),
+                        mapper.deleteGroupRoleRelMetasByLegacyTimeline(legacyTimeline, limit)),
         () ->
             securableObjectsCount[0] =
                 SessionUtils.doWithoutCommitAndFetchResult(
                     SecurableObjectMapper.class,
                     mapper ->
-                        mapper.deleteSecurableObjectsByLegacyTimeLine(legacyTimeLine, limit)));
+                        mapper.deleteSecurableObjectsByLegacyTimeline(legacyTimeline, limit)));
 
     return roleDeletedCount[0]
         + userRoleRelDeletedCount[0]
@@ -230,7 +231,7 @@ public class RoleMetaService {
 
   private String getEntityType(SecurableObject securableObject) {
     if (securableObject.type() == MetadataObject.Type.METALAKE
-        && securableObject.name().equals(Entity.SECURABLE_ENTITY_RESERVED_NAME)) {
+        && securableObject.name().equals(MetadataObjects.METADATA_OBJECT_RESERVED_NAME)) {
       return Entity.ALL_METALAKES_ENTITY_TYPE;
     }
     return securableObject.type().name();

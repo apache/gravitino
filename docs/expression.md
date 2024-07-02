@@ -17,7 +17,7 @@ Gravitino expression system divides expressions into three basic parts: field re
 Field reference is a reference to a field in a table.
 The following is an example of creating a field reference expression, demonstrating how to create a reference for the `student` field.
 
-<Tabs>
+<Tabs groupId='language' queryString>
   <TabItem value="Json" label="Json">
 
 ```json
@@ -46,7 +46,7 @@ NamedReference field = NamedReference.field("student");
 Literal is a constant value.
 The following is an example of creating a literal expression, demonstrating how to create a `NULL` literal and three different data types of literal expressions for the value `1024`.
 
-<Tabs>
+<Tabs groupId='language' queryString>
   <TabItem value="Json" label="Json">
 
 ```json
@@ -95,7 +95,7 @@ Literal<?>[] literals =
 Function expression represents a function call with/without arguments. The arguments can be field references, literals, or other function expressions.
 The following is an example of creating a function expression, demonstrating how to create function expressions for `rand()` and `date_trunc('year', birthday)`.
 
-<Tabs>
+<Tabs groupId='language' queryString>
   <TabItem value="Json" label="Json">
 
 ```json
@@ -144,7 +144,7 @@ FunctionExpression[] functionExpressions =
 Unparsed expression is a special type of expression, currently serves exclusively for presenting the default value of a column when it's unsolvable.
 The following shows the data structure of an unparsed expression in JSON and Java, enabling easy retrieval of its value.
 
-<Tabs>
+<Tabs groupId='language' queryString>
   <TabItem value="Json" label="Json">
 
 ```json

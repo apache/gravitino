@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 public class CatalogMysqlVersion5IT extends CatalogMysqlIT {
   public CatalogMysqlVersion5IT() {
     super();
@@ -65,11 +65,7 @@ public class CatalogMysqlVersion5IT extends CatalogMysqlIT {
         catalog
             .asTableCatalog()
             .createTable(
-                NameIdentifier.of(
-                    metalakeName,
-                    catalogName,
-                    schemaName,
-                    GravitinoITUtils.genRandomName("mysql_it_table")),
+                NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("mysql_it_table")),
                 newColumns,
                 null,
                 ImmutableMap.of());

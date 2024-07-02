@@ -11,6 +11,7 @@ import static org.apache.hc.core5.http.HttpStatus.SC_SERVER_ERROR;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.file.FilesetDTO;
@@ -87,11 +88,20 @@ public class TestFilesetCatalog extends TestBase {
 
   @Test
   public void testListFileset() throws JsonProcessingException {
-    NameIdentifier fileset1 = NameIdentifier.of(metalakeName, catalogName, "schema1", "fileset1");
-    NameIdentifier fileset2 = NameIdentifier.of(metalakeName, catalogName, "schema1", "fileset2");
-    String filesetPath = withSlash(FilesetCatalog.formatFilesetRequestPath(fileset1.namespace()));
+    NameIdentifier fileset1 = NameIdentifier.of("schema1", "fileset1");
+    NameIdentifier fileset2 = NameIdentifier.of("schema1", "fileset2");
+    NameIdentifier expectedResultFileset1 =
+        NameIdentifier.of(metalakeName, catalogName, "schema1", "fileset1");
+    NameIdentifier expectedResultFileset2 =
+        NameIdentifier.of(metalakeName, catalogName, "schema1", "fileset2");
+    String filesetPath =
+        withSlash(
+            FilesetCatalog.formatFilesetRequestPath(
+                Namespace.of(metalakeName, catalogName, "schema1")));
 
-    EntityListResponse resp = new EntityListResponse(new NameIdentifier[] {fileset1, fileset2});
+    EntityListResponse resp =
+        new EntityListResponse(
+            new NameIdentifier[] {expectedResultFileset1, expectedResultFileset2});
     buildMockResource(Method.GET, filesetPath, null, resp, SC_OK);
     NameIdentifier[] filesets = catalog.asFilesetCatalog().listFilesets(fileset1.namespace());
 
@@ -128,9 +138,12 @@ public class TestFilesetCatalog extends TestBase {
 
   @Test
   public void testLoadFileset() throws JsonProcessingException {
-    NameIdentifier fileset = NameIdentifier.of(metalakeName, catalogName, "schema1", "fileset1");
+    NameIdentifier fileset = NameIdentifier.of("schema1", "fileset1");
     String filesetPath =
-        withSlash(FilesetCatalog.formatFilesetRequestPath(fileset.namespace()) + "/fileset1");
+        withSlash(
+            FilesetCatalog.formatFilesetRequestPath(
+                    Namespace.of(metalakeName, catalogName, "schema1"))
+                + "/fileset1");
 
     FilesetDTO mockFileset =
         mockFilesetDTO(
@@ -172,8 +185,11 @@ public class TestFilesetCatalog extends TestBase {
 
   @Test
   public void testCreateFileset() throws JsonProcessingException {
-    NameIdentifier fileset = NameIdentifier.of(metalakeName, catalogName, "schema1", "fileset1");
-    String filesetPath = withSlash(FilesetCatalog.formatFilesetRequestPath(fileset.namespace()));
+    NameIdentifier fileset = NameIdentifier.of("schema1", "fileset1");
+    String filesetPath =
+        withSlash(
+            FilesetCatalog.formatFilesetRequestPath(
+                Namespace.of(metalakeName, catalogName, "schema1")));
 
     FilesetDTO mockFileset =
         mockFilesetDTO(
@@ -241,9 +257,12 @@ public class TestFilesetCatalog extends TestBase {
 
   @Test
   public void testDropFileset() throws JsonProcessingException {
-    NameIdentifier fileset = NameIdentifier.of(metalakeName, catalogName, "schema1", "fileset1");
+    NameIdentifier fileset = NameIdentifier.of("schema1", "fileset1");
     String filesetPath =
-        withSlash(FilesetCatalog.formatFilesetRequestPath(fileset.namespace()) + "/fileset1");
+        withSlash(
+            FilesetCatalog.formatFilesetRequestPath(
+                    Namespace.of(metalakeName, catalogName, "schema1"))
+                + "/fileset1");
 
     DropResponse resp = new DropResponse(true);
     buildMockResource(Method.DELETE, filesetPath, null, resp, SC_OK);
@@ -266,9 +285,12 @@ public class TestFilesetCatalog extends TestBase {
 
   @Test
   public void testAlterFileset() throws JsonProcessingException {
-    NameIdentifier fileset = NameIdentifier.of(metalakeName, catalogName, "schema1", "fileset1");
+    NameIdentifier fileset = NameIdentifier.of("schema1", "fileset1");
     String filesetPath =
-        withSlash(FilesetCatalog.formatFilesetRequestPath(fileset.namespace()) + "/fileset1");
+        withSlash(
+            FilesetCatalog.formatFilesetRequestPath(
+                    Namespace.of(metalakeName, catalogName, "schema1"))
+                + "/fileset1");
 
     // Test alter fileset name
     FilesetUpdateRequest req = new FilesetUpdateRequest.RenameFilesetRequest("new name");

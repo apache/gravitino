@@ -94,7 +94,7 @@ public class TableMetaService {
     return POConverters.fromTablePOs(tablePOs, namespace);
   }
 
-  public void insertTable(TableEntity tableEntity, boolean overwrite) {
+  public void insertTable(TableEntity tableEntity, boolean overwrite) throws IOException {
     try {
       NameIdentifierUtil.checkTable(tableEntity.nameIdentifier());
 
@@ -173,11 +173,11 @@ public class TableMetaService {
     return true;
   }
 
-  public int deleteTableMetasByLegacyTimeLine(Long legacyTimeLine, int limit) {
+  public int deleteTableMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
         TableMetaMapper.class,
         mapper -> {
-          return mapper.deleteTableMetasByLegacyTimeLine(legacyTimeLine, limit);
+          return mapper.deleteTableMetasByLegacyTimeline(legacyTimeline, limit);
         });
   }
 
