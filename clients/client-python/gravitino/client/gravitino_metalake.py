@@ -67,7 +67,7 @@ class GravitinoMetalake(MetalakeDTO):
         response = self.rest_client.get(url)
         entity_list = EntityListResponse.from_json(response.body, infer_missing=True)
         entity_list.validate()
-        return [identifier.name for identifier in entity_list.identifiers()]
+        return [identifier.name() for identifier in entity_list.identifiers()]
 
     def list_catalogs_info(self) -> List[Catalog]:
         """List all the catalogs with their information under this metalake.
