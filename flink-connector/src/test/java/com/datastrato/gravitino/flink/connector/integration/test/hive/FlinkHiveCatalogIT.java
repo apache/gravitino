@@ -56,25 +56,20 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-@Tag("gravitino-docker-test")
 public class FlinkHiveCatalogIT extends FlinkCommonIT {
   private static final String DEFAULT_HIVE_CATALOG = "test_flink_hive_schema_catalog";
-  private static final String DEFAULT_HIVE_SCHEMA = "test_flink_hive_schema";
 
   private static com.datastrato.gravitino.Catalog hiveCatalog;
 
   @BeforeAll
   static void hiveStartUp() {
     initDefaultHiveCatalog();
-    initDefaultHiveSchema();
   }
 
   @AfterAll
   static void hiveStop() {
-    hiveCatalog.asSchemas().dropSchema(DEFAULT_HIVE_SCHEMA, true);
     metalake.dropCatalog(DEFAULT_HIVE_CATALOG);
   }
 
@@ -87,14 +82,6 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
             "hive",
             null,
             ImmutableMap.of("metastore.uris", hiveMetastoreUri));
-  }
-
-  protected static void initDefaultHiveSchema() {
-    Preconditions.checkNotNull(metalake);
-    Preconditions.checkNotNull(hiveCatalog);
-    if (!hiveCatalog.asSchemas().schemaExists(DEFAULT_HIVE_SCHEMA)) {
-      hiveCatalog.asSchemas().createSchema(DEFAULT_HIVE_SCHEMA, null, ImmutableMap.of());
-    }
   }
 
   @Test
@@ -306,9 +293,9 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
 
   @Test
   public void testCreateNoPartitionTable() {
-    String tableName, comment;
-    tableName = "test_create_no_partition_table";
-    comment = "test comment";
+    String databaseName = "test_create_no_partition_table_db";
+    String tableName = "test_create_no_partition_table";
+    String comment = "test comment";
     String key = "test key";
     String value = "test value";
 
@@ -318,24 +305,20 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
     // 3. Flink SQL only support to create Interval Month and Second(3).
     doWithSchema(
         hiveCatalog,
-        DEFAULT_HIVE_SCHEMA,
+        databaseName,
         catalog -> {
           TableResult result =
               sql(
                   "CREATE TABLE %s "
                       + "(string_type STRING COMMENT 'string_type', "
-                      + " double_type DOUBLE COMMENT 'double_type'"
+                      + " double_type DOUBLE COMMENT 'double_type')"
                       + " COMMENT '%s' WITH ("
                       + "'%s' = '%s')",
                   tableName, comment, key, value);
           TestUtils.assertTableResult(result, ResultKind.SUCCESS);
 
           Table table =
-              catalog
-                  .asTableCatalog()
-                  .loadTable(
-                      NameIdentifier.of(
-                          metalake.name(), DEFAULT_HIVE_CATALOG, DEFAULT_HIVE_SCHEMA, tableName));
+              catalog.asTableCatalog().loadTable(NameIdentifier.of(databaseName, tableName));
           Assertions.assertNotNull(table);
           Assertions.assertEquals(comment, table.comment());
           Assertions.assertEquals(value, table.properties().get(key));
@@ -346,70 +329,66 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
               };
           assertColumns(columns, table.columns());
           Assertions.assertArrayEquals(EMPTY_TRANSFORM, table.partitioning());
-        });
+        },
+        true);
   }
 
   @Test
   public void testListTables() {
-    com.datastrato.gravitino.Catalog currentCatalog = metalake.loadCatalog(DEFAULT_HIVE_CATALOG);
     String newSchema = "test_list_table_catalog";
-    try {
-      Column[] columns = new Column[] {Column.of("user_id", Types.IntegerType.get(), "USER_ID")};
-      doWithSchema(
-          currentCatalog,
-          newSchema,
-          catalog -> {
-            catalog
-                .asTableCatalog()
-                .createTable(
-                    NameIdentifier.of(
-                        metalake.name(), DEFAULT_HIVE_CATALOG, newSchema, "test_table1"),
-                    columns,
-                    "comment1",
-                    ImmutableMap.of());
-            catalog
-                .asTableCatalog()
-                .createTable(
-                    NameIdentifier.of(
-                        metalake.name(), DEFAULT_HIVE_CATALOG, newSchema, "test_table2"),
-                    columns,
-                    "comment2",
-                    ImmutableMap.of());
-            TableResult result = sql("SHOW TABLES");
-            TestUtils.assertTableResult(
-                result,
-                ResultKind.SUCCESS_WITH_CONTENT,
-                Row.of("test_table1"),
-                Row.of("test_table2"));
-          });
-    } finally {
-      currentCatalog.asSchemas().dropSchema(newSchema, true);
-    }
+    Column[] columns = new Column[] {Column.of("user_id", Types.IntegerType.get(), "USER_ID")};
+    doWithSchema(
+        hiveCatalog,
+        newSchema,
+        catalog -> {
+          catalog
+              .asTableCatalog()
+              .createTable(
+                  NameIdentifier.of(newSchema, "test_table1"),
+                  columns,
+                  "comment1",
+                  ImmutableMap.of());
+          catalog
+              .asTableCatalog()
+              .createTable(
+                  NameIdentifier.of(newSchema, "test_table2"),
+                  columns,
+                  "comment2",
+                  ImmutableMap.of());
+          TableResult result = sql("SHOW TABLES");
+          TestUtils.assertTableResult(
+              result,
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of("test_table1"),
+              Row.of("test_table2"));
+        },
+        true);
   }
 
   @Test
   public void testDropTable() {
+    String databaseName = "test_drop_table_db";
     doWithSchema(
-        metalake.loadCatalog(DEFAULT_HIVE_CATALOG),
-        DEFAULT_HIVE_SCHEMA,
+        hiveCatalog,
+        databaseName,
         catalog -> {
           String tableName = "test_drop_table";
           Column[] columns =
               new Column[] {Column.of("user_id", Types.IntegerType.get(), "USER_ID")};
-          NameIdentifier identifier =
-              NameIdentifier.of(
-                  metalake.name(), DEFAULT_HIVE_CATALOG, DEFAULT_HIVE_SCHEMA, tableName);
+          NameIdentifier identifier = NameIdentifier.of(databaseName, tableName);
           catalog.asTableCatalog().createTable(identifier, columns, "comment1", ImmutableMap.of());
           Assertions.assertTrue(catalog.asTableCatalog().tableExists(identifier));
 
           TableResult result = sql("DROP TABLE %s", tableName);
           TestUtils.assertTableResult(result, ResultKind.SUCCESS);
           Assertions.assertFalse(catalog.asTableCatalog().tableExists(identifier));
-        });
+        },
+        true);
   }
 
   @Test
   public void testGetTable() {
+    String databaseName = "test_get_hive_table";
     Column[] columns =
         new Column[] {
           Column.of("string_type", Types.StringType.get(), "string_type", true, false, null),
@@ -417,19 +396,15 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
         };
 
     doWithSchema(
-        metalake.loadCatalog(DEFAULT_HIVE_CATALOG),
-        DEFAULT_HIVE_SCHEMA,
+        hiveCatalog,
+        databaseName,
         catalog -> {
           String tableName = "test_desc_table";
           String comment = "comment1";
           catalog
               .asTableCatalog()
               .createTable(
-                  NameIdentifier.of(
-                      metalake.name(),
-                      DEFAULT_HIVE_CATALOG,
-                      DEFAULT_HIVE_SCHEMA,
-                      "test_desc_table"),
+                  NameIdentifier.of(databaseName, "test_desc_table"),
                   columns,
                   comment,
                   ImmutableMap.of("k1", "v1"));
@@ -439,7 +414,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
           Assertions.assertTrue(flinkCatalog.isPresent());
           try {
             CatalogBaseTable table =
-                flinkCatalog.get().getTable(new ObjectPath(DEFAULT_HIVE_SCHEMA, tableName));
+                flinkCatalog.get().getTable(new ObjectPath(databaseName, tableName));
             Assertions.assertNotNull(table);
             Assertions.assertEquals(CatalogBaseTable.TableKind.TABLE, table.getTableKind());
             Assertions.assertEquals(comment, table.getComment());
@@ -460,7 +435,8 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
           } catch (TableNotExistException e) {
             Assertions.fail(e);
           }
-        });
+        },
+        true);
   }
 
   @Override

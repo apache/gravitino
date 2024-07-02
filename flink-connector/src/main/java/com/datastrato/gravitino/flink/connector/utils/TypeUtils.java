@@ -21,6 +21,8 @@ public class TypeUtils {
         return Types.StringType.get();
       case DOUBLE:
         return Types.DoubleType.get();
+      case INTEGER:
+        return Types.IntegerType.get();
       default:
         throw new UnsupportedOperationException(
             "Not support type: " + logicalType.asSummaryString());
@@ -32,6 +34,8 @@ public class TypeUtils {
       return DataTypes.DOUBLE();
     } else if (gravitinoType instanceof Types.StringType) {
       return DataTypes.STRING();
+    } else if (gravitinoType instanceof Types.IntegerType) {
+      return DataTypes.INT();
     }
     throw new UnsupportedOperationException("Not support " + gravitinoType.toString());
   }

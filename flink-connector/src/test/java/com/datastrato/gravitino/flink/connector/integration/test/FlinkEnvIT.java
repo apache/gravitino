@@ -155,15 +155,22 @@ public abstract class FlinkEnvIT extends AbstractIT {
     return tableEnv.executeSql(String.format(sql, args));
   }
 
-  protected static void doWithSchema(Catalog catalog, String schemaName, Consumer<Catalog> action) {
-    Preconditions.checkNotNull(catalog);
-    Preconditions.checkNotNull(schemaName);
-    tableEnv.useCatalog(catalog.name());
-    if (!catalog.asSchemas().schemaExists(schemaName)) {
-      catalog.asSchemas().createSchema(schemaName, null, ImmutableMap.of());
+  protected static void doWithSchema(
+      Catalog catalog, String schemaName, Consumer<Catalog> action, boolean dropSchema) {
+    try {
+      Preconditions.checkNotNull(catalog);
+      Preconditions.checkNotNull(schemaName);
+      tableEnv.useCatalog(catalog.name());
+      if (!catalog.asSchemas().schemaExists(schemaName)) {
+        catalog.asSchemas().createSchema(schemaName, null, ImmutableMap.of());
+      }
+      tableEnv.useDatabase(schemaName);
+      action.accept(catalog);
+    } finally {
+      if (dropSchema) {
+        catalog.asSchemas().dropSchema(schemaName, true);
+      }
     }
-    tableEnv.useDatabase(schemaName);
-    action.accept(catalog);
   }
 
   protected static void doWithCatalog(Catalog catalog, Consumer<Catalog> action) {

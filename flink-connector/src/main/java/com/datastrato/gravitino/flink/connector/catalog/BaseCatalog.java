@@ -164,10 +164,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
   public List<String> listTables(String databaseName)
       throws DatabaseNotExistException, CatalogException {
     try {
-      return Stream.of(
-              catalog()
-                  .asTableCatalog()
-                  .listTables(Namespace.of(metalakeName(), catalogName(), databaseName)))
+      return Stream.of(catalog().asTableCatalog().listTables(Namespace.of(databaseName)))
           .map(NameIdentifier::name)
           .collect(Collectors.toList());
     } catch (NoSuchSchemaException e) {
@@ -187,12 +184,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
       Table table =
           catalog()
               .asTableCatalog()
-              .loadTable(
-                  NameIdentifier.of(
-                      metalakeName(),
-                      catalogName(),
-                      tablePath.getDatabaseName(),
-                      tablePath.getObjectName()));
+              .loadTable(NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName()));
       return toFlinkTable(table);
     } catch (NoSuchCatalogException e) {
       throw new CatalogException(e);
@@ -203,12 +195,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
   public boolean tableExists(ObjectPath tablePath) throws CatalogException {
     return catalog()
         .asTableCatalog()
-        .tableExists(
-            NameIdentifier.of(
-                metalakeName(),
-                catalogName(),
-                tablePath.getDatabaseName(),
-                tablePath.getObjectName()));
+        .tableExists(NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName()));
   }
 
   @Override
@@ -217,12 +204,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
     boolean dropped =
         catalog()
             .asTableCatalog()
-            .dropTable(
-                NameIdentifier.of(
-                    metalakeName(),
-                    catalogName(),
-                    tablePath.getDatabaseName(),
-                    tablePath.getObjectName()));
+            .dropTable(NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName()));
     if (!dropped && !ignoreIfNotExists) {
       throw new TableNotExistException(catalogName(), tablePath);
     }
@@ -232,8 +214,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
   public void renameTable(ObjectPath tablePath, String newTableName, boolean ignoreIfNotExists)
       throws TableNotExistException, TableAlreadyExistException, CatalogException {
     NameIdentifier identifier =
-        NameIdentifier.of(
-            Namespace.of(metalakeName(), catalogName(), tablePath.getDatabaseName()), newTableName);
+        NameIdentifier.of(Namespace.of(tablePath.getDatabaseName()), newTableName);
 
     if (catalog().asTableCatalog().tableExists(identifier)) {
       throw new TableAlreadyExistException(
@@ -244,11 +225,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
       catalog()
           .asTableCatalog()
           .alterTable(
-              NameIdentifier.of(
-                  metalakeName(),
-                  catalogName(),
-                  tablePath.getDatabaseName(),
-                  tablePath.getObjectName()),
+              NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName()),
               TableChange.rename(newTableName));
     } catch (NoSuchCatalogException e) {
       if (!ignoreIfNotExists) {
@@ -261,8 +238,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
   public void createTable(ObjectPath tablePath, CatalogBaseTable table, boolean ignoreIfExists)
       throws TableAlreadyExistException, DatabaseNotExistException, CatalogException {
     NameIdentifier identifier =
-        NameIdentifier.of(
-            metalakeName(), catalogName(), tablePath.getDatabaseName(), tablePath.getObjectName());
+        NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName());
 
     ResolvedCatalogBaseTable<?> resolvedTable = (ResolvedCatalogBaseTable<?>) table;
     Column[] columns =
@@ -501,9 +477,5 @@ public abstract class BaseCatalog extends AbstractCatalog {
 
   private String catalogName() {
     return getName();
-  }
-
-  private String metalakeName() {
-    return GravitinoCatalogManager.get().getMetalakeName();
   }
 }
