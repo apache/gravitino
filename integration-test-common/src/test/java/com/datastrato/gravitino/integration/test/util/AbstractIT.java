@@ -42,6 +42,7 @@ import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -179,7 +180,11 @@ public class AbstractIT {
                       + String.format(
                           "/scripts/mysql/schema-%s-mysql.sql", ConfigConstants.VERSION_0_6_0)),
               "UTF-8");
-      String[] initMySQLBackendSqls = mysqlContent.split(";");
+      String[] initMySQLBackendSqls =
+          Arrays.stream(mysqlContent.split(";"))
+              .map(String::trim)
+              .filter(s -> !s.isEmpty())
+              .toArray(String[]::new);
       initMySQLBackendSqls = ArrayUtils.addFirst(initMySQLBackendSqls, "use " + META_DATA + ";");
       for (String sql : initMySQLBackendSqls) {
         statement.execute(sql);

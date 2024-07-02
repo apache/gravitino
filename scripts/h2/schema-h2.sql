@@ -217,7 +217,6 @@ CREATE TABLE IF NOT EXISTS `group_role_rel` (
     KEY `idx_gid` (`group_id`)
     ) ENGINE=InnoDB;
 
-
 CREATE TABLE IF NOT EXISTS `tag_meta` (
     `tag_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tag id',
     `tag_name` VARCHAR(128) NOT NULL COMMENT 'tag name',
