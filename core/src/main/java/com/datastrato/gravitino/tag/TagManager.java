@@ -52,9 +52,10 @@ public class TagManager {
 
   public TagManager(IdGenerator idGenerator, EntityStore entityStore) {
     if (entityStore instanceof KvEntityStore) {
-      LOG.warn(
-          "TagManager cannot run with kv entity store, please configure the entity store to "
-              + "use relational entity store and restart the Gravitino server");
+      String errorMsg = "TagManager cannot run with kv entity store, please configure the entity " +
+          "store to use relational entity store and restart the Gravitino server";
+      LOG.error(errorMsg);
+      throw new RuntimeException(errorMsg);
 
       throw new RuntimeException(
           "TagManager cannot run with kv entity store, please configure "

@@ -99,7 +99,7 @@ public class TagMetaService {
                 oldTagEntity.id());
 
             result.set(
-                SessionUtils.doWithCommitAndFetchResult(
+                SessionUtils.doWithoutCommitAndFetchResult(
                     TagMetaMapper.class,
                     mapper ->
                         mapper.updateTagMeta(
