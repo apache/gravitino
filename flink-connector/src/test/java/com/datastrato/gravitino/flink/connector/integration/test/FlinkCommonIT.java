@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 public abstract class FlinkCommonIT extends FlinkEnvIT {
 
   protected abstract Catalog currentCatalog();
