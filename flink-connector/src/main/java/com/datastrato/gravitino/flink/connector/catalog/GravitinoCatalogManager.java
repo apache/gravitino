@@ -64,9 +64,11 @@ public class GravitinoCatalogManager {
    * <p>After close, GravitinoCatalogManager can not be used anymore.
    */
   public void close() {
-    Preconditions.checkState(!isClosed, "Gravitino Catalog is already closed");
-    isClosed = true;
-    gravitinoClient.close();
+    if (!isClosed) {
+      isClosed = true;
+      gravitinoClient.close();
+      gravitinoCatalogManager = null;
+    }
   }
 
   /**
