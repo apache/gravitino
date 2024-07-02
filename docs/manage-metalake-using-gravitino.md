@@ -54,7 +54,7 @@ GravitinoMetalake newMetalake = gravitinoAdminClient.createMetalake(
 
 ```python
 gravitino_admin_client: GravitinoAdminClient = GravitinoAdminClient(uri="http://localhost:8090")
-gravitino_admin_client.create_metalake(ident=NameIdentifier.of("metalake"), 
+gravitino_admin_client.create_metalake(name="metalake", 
                                        comment="This is a new metalake", 
                                        properties={})
 ```
@@ -88,7 +88,7 @@ GravitinoMetalake loaded = gravitinoAdminClient.loadMetalake(
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_admin_client.load_metalake(NameIdentifier.of("metalake"))
+gravitino_admin_client.load_metalake("metalake")
 ```
 
 </TabItem>
@@ -141,7 +141,7 @@ changes = (
     MetalakeChange.set_property("metalake_properties_key2", "metalake_propertie_new_value"),
 )
 
-metalake = gravitino_admin_client.alter_metalake(NameIdentifier.of("metalake_name"), *changes)
+metalake = gravitino_admin_client.alter_metalake("metalake_name", *changes)
 ```
 
 </TabItem>
@@ -175,9 +175,7 @@ curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 // ...
-boolean success = gravitinoAdminClient.dropMetalake(
-    NameIdentifier.of("metalake")
-);
+boolean success = gravitinoAdminClient.dropMetalake("metalake");
 // ...
 ```
 
@@ -185,7 +183,7 @@ boolean success = gravitinoAdminClient.dropMetalake(
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_admin_client.drop_metalake(NameIdentifier.of("metalake"))
+gravitino_admin_client.drop_metalake("metalake")
 ```
 
 </TabItem>

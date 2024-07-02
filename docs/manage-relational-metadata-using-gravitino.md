@@ -299,8 +299,8 @@ Schema schema = supportsSchemas.createSchema("schema",
 
 ```python
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
-catalog: Catalog = gravitino_client.load_catalog(ident=NameIdentifier.of("metalake", "hive_catalog"))
-catalog.as_schemas().create_schema(ident=NameIdentifier.of("metalake", "hive_catalog", "schema"),
+catalog: Catalog = gravitino_client.load_catalog(name="hive_catalog")
+catalog.as_schemas().create_schema(name="schema",
                                    comment="This is a schema",
                                    properties={})
 ```
@@ -348,8 +348,8 @@ Schema schema = supportsSchemas.loadSchema("schema");
 
 ```python
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
-catalog: Catalog = gravitino_client.load_catalog(ident=NameIdentifier.of("metalake", "hive_catalog"))
-schema: Schema = catalog.as_schemas().load_schema(ident=NameIdentifier.of("metalake", "hive_catalog", "schema"))
+catalog: Catalog = gravitino_client.load_catalog(name="hive_catalog")
+schema: Schema = catalog.as_schemas().load_schema(name="schema")
 ```
 
 </TabItem>
@@ -399,13 +399,13 @@ Schema schema = supportsSchemas.alterSchema("schema",
 
 ```python
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
-catalog: Catalog = gravitino_client.load_catalog(ident=NameIdentifier.of("metalake", "hive_catalog"))
+catalog: Catalog = gravitino_client.load_catalog(name="hive_catalog")
 
 changes = (
     SchemaChange.remove_property("schema_properties_key1"),
     SchemaChange.set_property("schema_properties_key2", "schema_propertie_new_value"),
 )
-schema_new: Schema = catalog.as_schemas().alter_schema(NameIdentifier.of("metalake", "hive_catalog", "schema"), 
+schema_new: Schema = catalog.as_schemas().alter_schema("schema", 
                                                        *changes)
 ```
 
@@ -450,9 +450,9 @@ supportsSchemas.dropSchema("schema", true);
 
 ```python
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
-catalog: Catalog = gravitino_client.load_catalog(ident=NameIdentifier.of("metalake", "hive_catalog"))
+catalog: Catalog = gravitino_client.load_catalog(name="hive_catalog")
 
-catalog.as_schemas().drop_schema(NameIdentifier.of("metalake", "hive_catalog", "schema"), cascade=True)
+catalog.as_schemas().drop_schema("schema", cascade=True)
 ```
 
 </TabItem>
@@ -492,9 +492,9 @@ String[] schemas = supportsSchemas.listSchemas();
 
 ```python
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
-catalog: Catalog = gravitino_client.load_catalog(ident=NameIdentifier.of("metalake", "hive_catalog"))
+catalog: Catalog = gravitino_client.load_catalog(name="hive_catalog")
 
-schema_list: List[NameIdentifier] = catalog.as_schemas().list_schemas(Namespace.of_schema("metalake", "hive_catalog"))
+schema_list: List[NameIdentifier] = catalog.as_schemas().list_schemas()
 ```
 
 </TabItem>
