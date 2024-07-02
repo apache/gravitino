@@ -75,7 +75,7 @@ class TestLocalFilesystem(unittest.TestCase):
         time.sleep(2)
         self.assertIsNone(
             fs.cache.get(
-                NameIdentifier.of_fileset(
+                NameIdentifier.of(
                     "metalake_demo", "fileset_catalog", "tmp", "test_cache"
                 )
             )
@@ -690,7 +690,7 @@ class TestLocalFilesystem(unittest.TestCase):
             _properties={},
         )
         mock_hdfs_context: FilesetContext = FilesetContext(
-            name_identifier=NameIdentifier.of_fileset(
+            name_identifier=NameIdentifier.of(
                 "test_metalake", "test_catalog", "test_schema", "test_f1"
             ),
             storage_type=StorageType.HDFS,
@@ -730,7 +730,7 @@ class TestLocalFilesystem(unittest.TestCase):
             _properties={},
         )
         mock_local_context: FilesetContext = FilesetContext(
-            name_identifier=NameIdentifier.of_fileset(
+            name_identifier=NameIdentifier.of(
                 "test_metalake", "test_catalog", "test_schema", "test_f1"
             ),
             storage_type=StorageType.LOCAL,
@@ -771,7 +771,7 @@ class TestLocalFilesystem(unittest.TestCase):
             _properties={},
         )
         mock_hdfs_context: FilesetContext = FilesetContext(
-            name_identifier=NameIdentifier.of_fileset(
+            name_identifier=NameIdentifier.of(
                 "test_metalake", "test_catalog", "test_schema", "test_f1"
             ),
             storage_type=StorageType.HDFS,
@@ -811,7 +811,7 @@ class TestLocalFilesystem(unittest.TestCase):
             _properties={},
         )
         mock_local_context: FilesetContext = FilesetContext(
-            name_identifier=NameIdentifier.of_fileset(
+            name_identifier=NameIdentifier.of(
                 "test_metalake", "test_catalog", "test_schema", "test_f1"
             ),
             storage_type=StorageType.LOCAL,

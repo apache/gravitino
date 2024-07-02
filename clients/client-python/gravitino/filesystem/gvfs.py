@@ -556,7 +556,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
 
         match = self._identifier_pattern.match(path)
         if match and len(match.groups()) == 3:
-            return NameIdentifier.of_fileset(
+            return NameIdentifier.of(
                 self._metalake, match.group(1), match.group(2), match.group(3)
             )
         raise GravitinoRuntimeException(
@@ -570,11 +570,14 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         :return The fileset
         """
         catalog: Catalog = self._client.load_catalog(
-            NameIdentifier.of_catalog(
+            NameIdentifier.of(
                 identifier.namespace().level(0), identifier.namespace().level(1)
             )
         )
-        return catalog.as_fileset_catalog().load_fileset(identifier)
+
+        return catalog.as_fileset_catalog().load_fileset(
+            NameIdentifier.of(identifier.namespace().level(2), identifier.name())
+        )
 
     def _get_actual_path_by_ident(
         self,

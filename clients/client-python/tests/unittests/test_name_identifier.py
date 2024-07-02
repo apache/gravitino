@@ -10,10 +10,10 @@ from gravitino import NameIdentifier
 
 class TestNameIdentifier(unittest.TestCase):
     def test_name_identifier_hash(self):
-        name_identifier1: NameIdentifier = NameIdentifier.of_fileset(
+        name_identifier1: NameIdentifier = NameIdentifier.of(
             "test_metalake", "test_catalog", "test_schema", "test_fileset1"
         )
-        name_identifier2: NameIdentifier = NameIdentifier.of_fileset(
+        name_identifier2: NameIdentifier = NameIdentifier.of(
             "test_metalake", "test_catalog", "test_schema", "test_fileset2"
         )
         identifier_dict = {name_identifier1: "test1", name_identifier2: "test2"}

@@ -75,7 +75,7 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
              A list of schema names under the given catalog namespace.
         """
         resp = self.rest_client.get(
-            BaseSchemaCatalog.format_schema_request_path(self._catalog_namespace())
+            BaseSchemaCatalog.format_schema_request_path(self._schema_namespace())
         )
         entity_list_response = EntityListResponse.from_json(
             resp.body, infer_missing=True

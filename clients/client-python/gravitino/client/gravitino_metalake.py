@@ -104,7 +104,9 @@ class GravitinoMetalake(MetalakeDTO):
         response = self.rest_client.get(url)
         catalog_resp = CatalogResponse.from_json(response.body, infer_missing=True)
 
-        return DTOConverters.to_catalog(self.name(), catalog_resp.catalog(), self.rest_client)
+        return DTOConverters.to_catalog(
+            self.name(), catalog_resp.catalog(), self.rest_client
+        )
 
     def create_catalog(
         self,
@@ -144,7 +146,9 @@ class GravitinoMetalake(MetalakeDTO):
         response = self.rest_client.post(url, json=catalog_create_request)
         catalog_resp = CatalogResponse.from_json(response.body, infer_missing=True)
 
-        return DTOConverters.to_catalog(self.name(), catalog_resp.catalog(), self.rest_client)
+        return DTOConverters.to_catalog(
+            self.name(), catalog_resp.catalog(), self.rest_client
+        )
 
     def alter_catalog(self, name: str, *changes: CatalogChange) -> Catalog:
         """Alter the catalog with specified name by applying the changes.
@@ -170,7 +174,9 @@ class GravitinoMetalake(MetalakeDTO):
         catalog_response = CatalogResponse.from_json(response.body, infer_missing=True)
         catalog_response.validate()
 
-        return DTOConverters.to_catalog(self.name(), catalog_response.catalog(), self.rest_client)
+        return DTOConverters.to_catalog(
+            self.name(), catalog_response.catalog(), self.rest_client
+        )
 
     def drop_catalog(self, name: str) -> bool:
         """Drop the catalog with specified name.
