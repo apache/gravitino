@@ -41,7 +41,6 @@ class TestSchema(IntegrationTestEnv):
         schema_properties_key2: schema_properties_value2,
     }
 
-    metalake_ident: NameIdentifier = NameIdentifier.of(metalake_name)
     catalog_ident: NameIdentifier = NameIdentifier.of_catalog(
         metalake_name, catalog_name
     )
@@ -65,7 +64,7 @@ class TestSchema(IntegrationTestEnv):
 
     def init_test_env(self):
         self.gravitino_admin_client.create_metalake(
-            ident=self.metalake_ident, comment="", properties={}
+            self.metalake_name, comment="", properties={}
         )
         self.gravitino_client = GravitinoClient(
             uri="http://localhost:8090", metalake_name=self.metalake_name
@@ -101,8 +100,8 @@ class TestSchema(IntegrationTestEnv):
             )
             logger.info(
                 "Drop metalake %s[%s]",
-                self.metalake_ident,
-                self.gravitino_admin_client.drop_metalake(self.metalake_ident),
+                self.metalake_name,
+                self.gravitino_admin_client.drop_metalake(self.metalake_name),
             )
         except Exception as e:
             logger.error("Clean test data failed: %s", e)

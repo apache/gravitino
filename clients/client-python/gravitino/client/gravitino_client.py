@@ -53,7 +53,7 @@ class GravitinoClient(GravitinoClientBase):
             NoSuchMetalakeException if the metalake with specified name does not exist.
         """
         super().__init__(uri, check_version, auth_data_provider)
-        self._metalake = super().load_metalake(NameIdentifier.of(metalake_name))
+        self._metalake = super().load_metalake(metalake_name)
 
     def get_metalake(self) -> GravitinoMetalake:
         """Get the current metalake object

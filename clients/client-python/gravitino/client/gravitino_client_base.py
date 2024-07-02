@@ -13,7 +13,6 @@ from gravitino.client.gravitino_version import GravitinoVersion
 from gravitino.dto.version_dto import VersionDTO
 from gravitino.dto.responses.metalake_response import MetalakeResponse
 from gravitino.dto.responses.version_response import VersionResponse
-from gravitino.name_identifier import NameIdentifier
 from gravitino.utils import HTTPClient
 from gravitino.exceptions.gravitino_runtime_exception import GravitinoRuntimeException
 from gravitino.constants.version import VERSION_INI, Version
@@ -46,11 +45,11 @@ class GravitinoClientBase:
         if check_version:
             self.check_version()
 
-    def load_metalake(self, ident: NameIdentifier) -> GravitinoMetalake:
+    def load_metalake(self, name: str) -> GravitinoMetalake:
         """Loads a specific Metalake from the Gravitino API.
 
         Args:
-            ident The identifier of the Metalake to be loaded.
+            name: The name of the Metalake to be loaded.
 
         Returns:
             A GravitinoMetalake instance representing the loaded Metalake.
@@ -59,10 +58,8 @@ class GravitinoClientBase:
             NoSuchMetalakeException If the specified Metalake does not exist.
         """
 
-        NameIdentifier.check_metalake(ident)
-
         response = self._rest_client.get(
-            GravitinoClientBase.API_METALAKES_IDENTIFIER_PATH + ident.name()
+            GravitinoClientBase.API_METALAKES_IDENTIFIER_PATH + name
         )
         metalake_response = MetalakeResponse.from_json(
             response.body, infer_missing=True

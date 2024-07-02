@@ -85,14 +85,14 @@ class TestSimpleAuthClient(unittest.TestCase):
             logger.info(
                 "Drop metalake %s[%s]",
                 self.metalake_ident,
-                self.gravitino_admin_client.drop_metalake(self.metalake_ident),
+                self.gravitino_admin_client.drop_metalake(self.metalake_ident.name()),
             )
         except Exception as e:
             logger.error("Clean test data failed: %s", e)
 
     def init_test_env(self):
         self.gravitino_admin_client.create_metalake(
-            ident=self.metalake_ident, comment="", properties={}
+            self.metalake_ident.name(), comment="", properties={}
         )
         self.gravitino_client = GravitinoClient(
             uri="http://localhost:8090",
@@ -118,9 +118,7 @@ class TestSimpleAuthClient(unittest.TestCase):
         )
 
     def test_metalake_creator(self):
-        metalake = self.gravitino_admin_client.load_metalake(
-            NameIdentifier.of_metalake(self.metalake_ident.name())
-        )
+        metalake = self.gravitino_admin_client.load_metalake(self.metalake_name)
         self.assertEqual(metalake.audit_info().creator(), self.creator)
 
     def test_catalog_creator(self):
