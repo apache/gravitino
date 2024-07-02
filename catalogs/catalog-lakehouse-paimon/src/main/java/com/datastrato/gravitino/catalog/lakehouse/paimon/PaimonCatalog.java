@@ -20,6 +20,9 @@ public class PaimonCatalog extends BaseCatalog<PaimonCatalog> {
   static final PaimonSchemaPropertiesMetadata SCHEMA_PROPERTIES_META =
       new PaimonSchemaPropertiesMetadata();
 
+  static final PaimonTablePropertiesMetadata TABLE_PROPERTIES_META =
+      new PaimonTablePropertiesMetadata();
+
   /** @return The short name of the catalog. */
   @Override
   public String shortName() {
@@ -44,8 +47,7 @@ public class PaimonCatalog extends BaseCatalog<PaimonCatalog> {
 
   @Override
   public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
-    throw new UnsupportedOperationException(
-        "The catalog does not support table properties metadata");
+    return TABLE_PROPERTIES_META;
   }
 
   @Override
