@@ -3,6 +3,7 @@ Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
 
+import json
 from unittest.mock import patch
 
 from gravitino import GravitinoMetalake, Catalog, Fileset
@@ -88,3 +89,8 @@ def mock_data(cls):
         pass
 
     return Wrapper
+
+
+def mock_name_identifier_json(name, namespace):
+
+    return json.dumps({"name": name, "namespace": namespace}).encode("utf-8")
