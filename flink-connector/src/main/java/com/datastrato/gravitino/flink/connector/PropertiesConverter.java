@@ -62,20 +62,10 @@ public interface PropertiesConverter {
   }
 
   /**
-   * Converts properties from Flink connector table properties to Gravitino table properties.
+   * Converts properties from Gravitino database properties to Flink connector schema properties.
    *
-   * @param flinkProperties The table properties provided by Flink.
-   * @return The table properties for the Gravitino.
-   */
-  default Map<String, String> toGravitinoTableProperties(Map<String, String> flinkProperties) {
-    return flinkProperties;
-  }
-
-  /**
-   * Converts properties from Gravitino schema properties to Flink connector database properties.
-   *
-   * @param gravitinoProperties The schema properties provided by Gravitino.
-   * @return The database properties for the Flink connector.
+   * @param gravitinoProperties The database properties provided by Gravitino.
+   * @return The schema properties for the Flink connector.
    */
   default Map<String, String> toFlinkDatabaseProperties(Map<String, String> gravitinoProperties) {
     return gravitinoProperties;
@@ -89,5 +79,15 @@ public interface PropertiesConverter {
    */
   default Map<String, String> toFlinkTableProperties(Map<String, String> gravitinoProperties) {
     return gravitinoProperties;
+  }
+
+  /**
+   * Converts properties from Flink connector table properties to Gravitino table properties.
+   *
+   * @param flinkProperties The table properties provided by Flink.
+   * @return The table properties for the Gravitino.
+   */
+  default Map<String, String> toGravitinoTableProperties(Map<String, String> flinkProperties) {
+    return flinkProperties;
   }
 }
