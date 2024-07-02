@@ -6,14 +6,10 @@ This software is licensed under the Apache License version 2.
 import logging
 import os
 import platform
-import shutil
-import subprocess
-import tarfile
 import unittest
 from random import randint
 from typing import Dict
 
-import requests
 import pandas
 import pyarrow as pa
 import pyarrow.dataset as dt
@@ -33,15 +29,10 @@ from gravitino import (
 from gravitino.exceptions.gravitino_runtime_exception import GravitinoRuntimeException
 from tests.integration.integration_test_env import IntegrationTestEnv
 from tests.integration.hdfs_container import HDFSContainer
+from tests.integration.base_hadoop_env import BaseHadoopEnvironment
 
 logger = logging.getLogger(__name__)
 
-HADOOP_VERSION = "2.7.3"
-HADOOP_PACK_NAME = f"hadoop-{HADOOP_VERSION}.tar.gz"
-HADOOP_DIR_NAME = f"hadoop-{HADOOP_VERSION}"
-HADOOP_DOWNLOAD_URL = f"https://archive.apache.org/dist/hadoop/core/hadoop-{HADOOP_VERSION}/{HADOOP_PACK_NAME}"
-LOCAL_BASE_DIR = "/tmp/gravitino"
-LOCAL_HADOOP_DIR = f"{LOCAL_BASE_DIR}/python_its/hadoop"
 DOCKER_TEST = os.environ.get("DOCKER_TEST")
 
 
@@ -53,7 +44,8 @@ DOCKER_TEST = os.environ.get("DOCKER_TEST")
     "Skipping tests on non-Linux systems or when DOCKER_TEST=false",
 )
 class TestGvfsWithHDFS(IntegrationTestEnv):
-    hdfs_container: HDFSContainer = HDFSContainer()
+    hdfs_container: HDFSContainer = None
+    config: Dict = None
     metalake_name: str = "TestGvfsWithHDFS_metalake" + str(randint(1, 10000))
     catalog_name: str = "test_gvfs_catalog" + str(randint(1, 10000))
     catalog_provider: str = "hadoop"
@@ -90,16 +82,17 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
 
     @classmethod
     def setUpClass(cls):
+        cls.hdfs_container = HDFSContainer()
         # append the hadoop conf to server
-        cls._append_server_hadoop_conf()
+        hdfs_container_ip = cls.hdfs_container.get_ip()
+        cls.config = {
+            "gravitino.bypass.fs.defaultFS": f"hdfs://{hdfs_container_ip}:9000"
+        }
+        cls._append_server_hadoop_conf(cls.config)
         # restart the server
         cls.restart_server()
-        # download hadoop pack and unzip
-        if not os.path.exists(LOCAL_HADOOP_DIR):
-            os.makedirs(LOCAL_HADOOP_DIR)
-        cls._download_and_unzip_hadoop_pack()
-        # configure hadoop env
-        cls._configure_hadoop_environment()
+        # init hadoop env
+        BaseHadoopEnvironment.init_hadoop_env()
         # create entity
         cls._init_test_entities()
 
@@ -108,97 +101,14 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         try:
             cls._clean_test_data()
             # reset server conf
-            cls._reset_server_hadoop_conf()
+            cls._reset_server_hadoop_conf(cls.config)
             # restart server
             cls.restart_server()
+            # clear hadoop env
+            BaseHadoopEnvironment.clear_hadoop_env()
         finally:
             # close hdfs container
             cls.hdfs_container.close()
-
-    @classmethod
-    def _append_server_hadoop_conf(cls):
-        logger.info("Append server hadoop conf.")
-        gravitino_home = os.environ.get("GRAVITINO_HOME")
-        if gravitino_home is None:
-            raise GravitinoRuntimeException("Cannot find GRAVITINO_HOME env.")
-        hadoop_conf_path = f"{gravitino_home}/catalogs/hadoop/conf/hadoop.conf"
-        if not os.path.exists(hadoop_conf_path):
-            raise GravitinoRuntimeException(
-                f"Hadoop conf file is not found at `{hadoop_conf_path}`."
-            )
-        hdfs_container_ip = cls.hdfs_container.get_ip()
-        with open(hadoop_conf_path, mode="a", encoding="utf-8") as f:
-            key = "gravitino.bypass.fs.defaultFS"
-            value = f"hdfs://{hdfs_container_ip}:9000"
-            f.write(f"\n{key} = {value}")
-
-    @classmethod
-    def _reset_server_hadoop_conf(cls):
-        logger.info("Reset server hadoop conf.")
-        gravitino_home = os.environ.get("GRAVITINO_HOME")
-        if gravitino_home is None:
-            raise GravitinoRuntimeException("Cannot find GRAVITINO_HOME env.")
-        hadoop_conf_path = f"{gravitino_home}/catalogs/hadoop/conf/hadoop.conf"
-        if not os.path.exists(hadoop_conf_path):
-            raise GravitinoRuntimeException(
-                f"Hadoop conf file is not found at `{hadoop_conf_path}`."
-            )
-        with open(hadoop_conf_path, mode="r", encoding="utf-8") as file:
-            lines = file.readlines()
-        hdfs_container_ip = cls.hdfs_container.get_ip()
-        key = "gravitino.bypass.fs.defaultFS"
-        value = f"hdfs://{hdfs_container_ip}:9000"
-        key_to_delete = f"{key} = {value}"
-        filtered_lines = [line for line in lines if not line.startswith(key_to_delete)]
-        with open(hadoop_conf_path, mode="w", encoding="utf-8") as file:
-            file.writelines(filtered_lines)
-
-    @classmethod
-    def _download_and_unzip_hadoop_pack(cls):
-        logger.info("Download and unzip hadoop pack from %s.", HADOOP_DOWNLOAD_URL)
-        local_tar_path = f"{LOCAL_HADOOP_DIR}/{HADOOP_PACK_NAME}"
-        # will download from remote if we do not find the pack locally
-        if not os.path.exists(local_tar_path):
-            response = requests.get(HADOOP_DOWNLOAD_URL)
-            with open(local_tar_path, "wb") as f:
-                f.write(response.content)
-        # unzip the pack
-        try:
-            with tarfile.open(local_tar_path) as tar:
-                tar.extractall(path=LOCAL_HADOOP_DIR)
-        except Exception as e:
-            raise GravitinoRuntimeException(
-                f"Failed to extract file '{local_tar_path}': {e}"
-            ) from e
-
-    @classmethod
-    def _configure_hadoop_environment(cls):
-        logger.info("Configure hadoop environment.")
-        os.putenv("HADOOP_USER_NAME", "datastrato")
-        os.putenv("HADOOP_HOME", f"{LOCAL_HADOOP_DIR}/{HADOOP_DIR_NAME}")
-        os.putenv(
-            "HADOOP_CONF_DIR",
-            f"{LOCAL_HADOOP_DIR}/{HADOOP_DIR_NAME}/etc/hadoop",
-        )
-        hadoop_shell_path = f"{LOCAL_HADOOP_DIR}/{HADOOP_DIR_NAME}/bin/hadoop"
-        # get the classpath
-        try:
-            result = subprocess.run(
-                [hadoop_shell_path, "classpath", "--glob"],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            if result.returncode == 0:
-                os.putenv("CLASSPATH", str(result.stdout))
-            else:
-                raise GravitinoRuntimeException(
-                    f"Command failed with return code is not 0, stdout: {result.stdout}, stderr:{result.stderr}"
-                )
-        except subprocess.CalledProcessError as e:
-            raise GravitinoRuntimeException(
-                f"Command failed with return code {e.returncode}, stderr:{e.stderr}"
-            ) from e
 
     @classmethod
     def _init_test_entities(cls):
@@ -238,10 +148,6 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
 
     @classmethod
     def _clean_test_data(cls):
-        try:
-            shutil.rmtree(LOCAL_BASE_DIR)
-        except OSError as e:
-            logger.warning("Failed to delete directory '%s': %s", LOCAL_BASE_DIR, e)
         try:
             cls.gravitino_client = GravitinoClient(
                 uri="http://localhost:8090", metalake_name=cls.metalake_name
