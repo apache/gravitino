@@ -14,6 +14,8 @@ from gravitino.exceptions.illegal_name_identifier_exception import (
 )
 from gravitino.namespace import Namespace
 
+# TODO: delete redundant methods
+
 
 @dataclass
 class NameIdentifier(DataClassJsonMixin):

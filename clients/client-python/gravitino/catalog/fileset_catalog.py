@@ -20,6 +20,7 @@ from gravitino.dto.responses.fileset_response import FilesetResponse
 from gravitino.name_identifier import NameIdentifier
 from gravitino.namespace import Namespace
 from gravitino.utils import HTTPClient
+from gravitino.rest.rest_utils import encode_string
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ class FilesetCatalog(BaseSchemaCatalog):
 
     def __init__(
         self,
+        namespace: Namespace,
         name: str = None,
         catalog_type: Catalog.Type = Catalog.Type.UNSUPPORTED,
         provider: str = None,
@@ -42,7 +44,14 @@ class FilesetCatalog(BaseSchemaCatalog):
     ):
 
         super().__init__(
-            name, catalog_type, provider, comment, properties, audit, rest_client
+            namespace,
+            name,
+            catalog_type,
+            provider,
+            comment,
+            properties,
+            audit,
+            rest_client,
         )
 
     def as_fileset_catalog(self):
@@ -52,23 +61,29 @@ class FilesetCatalog(BaseSchemaCatalog):
         """List the filesets in a schema namespace from the catalog.
 
         Args:
-            namespace A schema namespace.
+            namespace: A schema namespace. This namespace should have 1 level, which is the schema name
 
         Raises:
             NoSuchSchemaException If the schema does not exist.
 
         Returns:
-            An array of fileset identifiers in the namespace.
+            A list of NameIdentifier of filesets under the given namespace.
         """
-        Namespace.check_fileset(namespace)
 
-        resp = self.rest_client.get(self.format_fileset_request_path(namespace))
+        self.check_fileset_namespace(namespace)
+
+        full_namespace = self._get_fileset_full_namespace(namespace)
+
+        resp = self.rest_client.get(self.format_fileset_request_path(full_namespace))
         entity_list_resp = EntityListResponse.from_json(resp.body, infer_missing=True)
         entity_list_resp.validate()
 
-        return entity_list_resp.identifiers()
+        return [
+            NameIdentifier.of(ident.namespace().level(2), ident.name())
+            for ident in entity_list_resp.identifiers()
+        ]
 
-    def load_fileset(self, ident) -> Fileset:
+    def load_fileset(self, ident: NameIdentifier) -> Fileset:
         """Load fileset metadata by {@link NameIdentifier} from the catalog.
 
         Args:
@@ -80,10 +95,12 @@ class FilesetCatalog(BaseSchemaCatalog):
         Returns:
             The fileset metadata.
         """
-        NameIdentifier.check_fileset(ident)
+        self.check_fileset_name_identifier(ident)
+
+        full_namespace = self._get_fileset_full_namespace(ident.namespace())
 
         resp = self.rest_client.get(
-            f"{self.format_fileset_request_path(ident.namespace())}/{ident.name()}"
+            f"{self.format_fileset_request_path(full_namespace)}/{encode_string(ident.name())}"
         )
         fileset_resp = FilesetResponse.from_json(resp.body, infer_missing=True)
         fileset_resp.validate()
@@ -119,10 +136,12 @@ class FilesetCatalog(BaseSchemaCatalog):
         Returns:
             The created fileset metadata
         """
-        NameIdentifier.check_fileset(ident)
+        self.check_fileset_name_identifier(ident)
+
+        full_namespace = self._get_fileset_full_namespace(ident.namespace())
 
         req = FilesetCreateRequest(
-            name=ident.name(),
+            name=encode_string(ident.name()),
             comment=comment,
             fileset_type=fileset_type,
             storage_location=storage_location,
@@ -130,14 +149,14 @@ class FilesetCatalog(BaseSchemaCatalog):
         )
 
         resp = self.rest_client.post(
-            self.format_fileset_request_path(ident.namespace()), req
+            self.format_fileset_request_path(full_namespace), req
         )
         fileset_resp = FilesetResponse.from_json(resp.body, infer_missing=True)
         fileset_resp.validate()
 
         return fileset_resp.fileset()
 
-    def alter_fileset(self, ident, *changes) -> Fileset:
+    def alter_fileset(self, ident: NameIdentifier, *changes) -> Fileset:
         """Update a fileset metadata in the catalog.
 
         Args:
@@ -151,7 +170,9 @@ class FilesetCatalog(BaseSchemaCatalog):
         Returns:
             The updated fileset metadata.
         """
-        NameIdentifier.check_fileset(ident)
+        self.check_fileset_name_identifier(ident)
+
+        full_namespace = self._get_fileset_full_namespace(ident.namespace())
 
         updates = [
             FilesetCatalog.to_fileset_update_request(change) for change in changes
@@ -160,7 +181,7 @@ class FilesetCatalog(BaseSchemaCatalog):
         req.validate()
 
         resp = self.rest_client.put(
-            f"{self.format_fileset_request_path(ident.namespace())}/{ident.name()}", req
+            f"{self.format_fileset_request_path(full_namespace)}/{ident.name()}", req
         )
         fileset_resp = FilesetResponse.from_json(resp.body, infer_missing=True)
         fileset_resp.validate()
@@ -180,10 +201,12 @@ class FilesetCatalog(BaseSchemaCatalog):
              true If the fileset is dropped, false the fileset did not exist.
         """
         try:
-            NameIdentifier.check_fileset(ident)
+            self.check_fileset_name_identifier(ident)
+
+            full_namespace = self._get_fileset_full_namespace(ident.namespace())
 
             resp = self.rest_client.delete(
-                f"{self.format_fileset_request_path(ident.namespace())}/{ident.name()}",
+                f"{self.format_fileset_request_path(full_namespace)}/{ident.name()}",
             )
             drop_resp = DropResponse.from_json(resp.body, infer_missing=True)
             drop_resp.validate()
@@ -194,9 +217,30 @@ class FilesetCatalog(BaseSchemaCatalog):
             return False
 
     @staticmethod
+    def check_fileset_namespace(namespace: Namespace):
+        Namespace.check(
+            namespace is not None and namespace.length() == 1,
+            f"Fileset namespace must be non-null and have 1 level, the input namespace is {namespace}",
+        )
+
+    @staticmethod
+    def check_fileset_name_identifier(ident: NameIdentifier):
+        NameIdentifier.check(ident is not None, "NameIdentifier must not be None")
+        NameIdentifier.check(
+            ident.name() is not None and len(ident.name()) != 0,
+            "NameIdentifier name must not be empty",
+        )
+        FilesetCatalog.check_fileset_namespace(ident.namespace())
+
+    def _get_fileset_full_namespace(self, table_namespace: Namespace) -> Namespace:
+        return Namespace.of(
+            self._catalog_namespace.level(0), self.name(), table_namespace.level(0)
+        )
+
+    @staticmethod
     def format_fileset_request_path(namespace: Namespace) -> str:
         schema_ns = Namespace.of(namespace.level(0), namespace.level(1))
-        return f"{BaseSchemaCatalog.format_schema_request_path(schema_ns)}/{namespace.level(2)}/filesets"
+        return f"{BaseSchemaCatalog.format_schema_request_path(schema_ns)}/{encode_string(namespace.level(2))}/filesets"
 
     @staticmethod
     def to_fileset_update_request(change: FilesetChange):

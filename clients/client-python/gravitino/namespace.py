@@ -5,6 +5,8 @@ This software is licensed under the Apache License version 2.
 
 from typing import List, ClassVar
 
+# TODO: delete redundant methods
+
 
 class Namespace:
     """A namespace is a sequence of levels separated by dots. It's used to identify a metalake, a
