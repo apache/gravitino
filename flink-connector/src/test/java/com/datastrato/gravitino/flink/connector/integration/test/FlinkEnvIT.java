@@ -157,9 +157,9 @@ public abstract class FlinkEnvIT extends AbstractIT {
 
   protected static void doWithSchema(
       Catalog catalog, String schemaName, Consumer<Catalog> action, boolean dropSchema) {
+    Preconditions.checkNotNull(catalog);
+    Preconditions.checkNotNull(schemaName);
     try {
-      Preconditions.checkNotNull(catalog);
-      Preconditions.checkNotNull(schemaName);
       tableEnv.useCatalog(catalog.name());
       if (!catalog.asSchemas().schemaExists(schemaName)) {
         catalog.asSchemas().createSchema(schemaName, null, ImmutableMap.of());
