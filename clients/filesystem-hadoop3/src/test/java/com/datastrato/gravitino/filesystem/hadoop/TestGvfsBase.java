@@ -68,9 +68,9 @@ public class TestGvfsBase extends GravitinoMockServerBase {
   @AfterAll
   public static void tearDown() {
     GravitinoMockServerBase.tearDown();
-
+    String fileName = FileSystemTestUtils.localRootPrefix().replace("file:", "");
     try {
-      FileUtils.deleteDirectory(new File(FileSystemTestUtils.localRootPrefix()));
+      FileUtils.deleteDirectory(new File(fileName));
     } catch (Exception e) {
       // Ignore
     }

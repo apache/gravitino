@@ -21,6 +21,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.datastrato.gravitino.Config;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.util.UUID;
 import org.apache.commons.dbcp2.BasicDataSource;
@@ -37,7 +39,6 @@ public class TestSqlSession {
   private static final String MYSQL_STORE_PATH =
       "/tmp/gravitino_test_entityStore_" + UUID.randomUUID().toString().replace("-", "");
   private static final String DB_DIR = MYSQL_STORE_PATH + "/testdb";
-  private static final String H2_FILE = DB_DIR + ".mv.db";
 
   private static Config config;
 
@@ -76,7 +77,7 @@ public class TestSqlSession {
       FileUtils.deleteDirectory(FileUtils.getFile(DB_DIR));
     }
 
-    FileUtils.deleteQuietly(new File(H2_FILE));
+    Files.delete(Paths.get(MYSQL_STORE_PATH));
 
     SqlSessionFactoryHelper.getInstance().close();
   }

@@ -51,6 +51,8 @@ import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -62,7 +64,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterAll;
@@ -116,10 +117,11 @@ public class TestJDBCBackend {
     dropAllTables();
     File dir = new File(DB_DIR);
     if (dir.exists()) {
-      dir.delete();
+      Files.delete(Paths.get(DB_DIR));
     }
-    FileUtils.deleteQuietly(new File(H2_FILE));
 
+    Files.delete(Paths.get(H2_FILE));
+    Files.delete(Paths.get(JDBC_STORE_PATH));
     backend.close();
   }
 
