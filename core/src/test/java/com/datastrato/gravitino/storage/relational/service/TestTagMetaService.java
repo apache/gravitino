@@ -1,3 +1,7 @@
+/*
+ * Copyright 2024 Datastrato Pvt Ltd.
+ * This software is licensed under the Apache License version 2.
+ */
 package com.datastrato.gravitino.storage.relational.service;
 
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
@@ -8,13 +12,12 @@ import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.datastrato.gravitino.storage.relational.TestJDBCBackend;
 import com.datastrato.gravitino.tag.TagManager;
 import com.google.common.collect.ImmutableMap;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 public class TestTagMetaService extends TestJDBCBackend {
 
@@ -26,17 +29,17 @@ public class TestTagMetaService extends TestJDBCBackend {
   private final Map<String, String> props = ImmutableMap.of("k1", "v1");
 
   @Test
-  public void testInsertAndGetTagByIdentifier() {
+  public void testInsertAndGetTagByIdentifier() throws IOException {
     BaseMetalake metalake =
         createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
     backend.insert(metalake, false);
 
     // Test no tag entity.
     TagMetaService tagMetaService = TagMetaService.getInstance();
-    Exception excep = Assertions.assertThrows(
-        NoSuchEntityException.class,
-        () -> tagMetaService.getTagByIdentifier(
-            TagManager.ofTagIdent(metalakeName, "tag1")));
+    Exception excep =
+        Assertions.assertThrows(
+            NoSuchEntityException.class,
+            () -> tagMetaService.getTagByIdentifier(TagManager.ofTagIdent(metalakeName, "tag1")));
     Assertions.assertEquals("No such tag entity: tag1", excep.getMessage());
 
     // Test get tag entity
@@ -82,8 +85,7 @@ public class TestTagMetaService extends TestJDBCBackend {
             .withAuditInfo(auditInfo)
             .build();
 
-    Assertions.assertThrows(Exception.class,
-        () -> tagMetaService.insertTag(tagEntity2, false));
+    Assertions.assertThrows(Exception.class, () -> tagMetaService.insertTag(tagEntity2, false));
 
     tagMetaService.insertTag(tagEntity2, true);
 
@@ -93,7 +95,7 @@ public class TestTagMetaService extends TestJDBCBackend {
   }
 
   @Test
-  public void testCreateAndListTags() {
+  public void testCreateAndListTags() throws IOException {
     BaseMetalake metalake =
         createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
     backend.insert(metalake, false);
@@ -147,10 +149,12 @@ public class TestTagMetaService extends TestJDBCBackend {
     tagMetaService.insertTag(tagEntity1, false);
 
     // Update with no tag entity.
-    Exception excep = Assertions.assertThrows(
-        NoSuchEntityException.class,
-        () -> tagMetaService.updateTag(
-            TagManager.ofTagIdent(metalakeName, "tag2"), tagEntity -> tagEntity));
+    Exception excep =
+        Assertions.assertThrows(
+            NoSuchEntityException.class,
+            () ->
+                tagMetaService.updateTag(
+                    TagManager.ofTagIdent(metalakeName, "tag2"), tagEntity -> tagEntity));
     Assertions.assertEquals("No such tag entity: tag2", excep.getMessage());
 
     // Update tag entity.
@@ -183,13 +187,18 @@ public class TestTagMetaService extends TestJDBCBackend {
             .withAuditInfo(auditInfo)
             .build();
 
-    Exception excep1 = Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> tagMetaService.updateTag(
-            TagManager.ofTagIdent(metalakeName, "tag1"), tagEntity -> tagEntity3));
+    Exception excep1 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tagMetaService.updateTag(
+                    TagManager.ofTagIdent(metalakeName, "tag1"), tagEntity -> tagEntity3));
     Assertions.assertEquals(
-        "The updated tag entity id: " + tagEntity3.id() + " must have the same id as the old " +
-            "entity id " + tagEntity2.id(),
+        "The updated tag entity id: "
+            + tagEntity3.id()
+            + " must have the same id as the old "
+            + "entity id "
+            + tagEntity2.id(),
         excep1.getMessage());
 
     TagEntity loadedTagEntity1 =
@@ -198,7 +207,7 @@ public class TestTagMetaService extends TestJDBCBackend {
   }
 
   @Test
-  public void testDeleteTag() {
+  public void testDeleteTag() throws IOException {
     BaseMetalake metalake =
         createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
     backend.insert(metalake, false);
@@ -221,15 +230,15 @@ public class TestTagMetaService extends TestJDBCBackend {
     deleted = tagMetaService.deleteTag(TagManager.ofTagIdent(metalakeName, "tag1"));
     Assertions.assertFalse(deleted);
 
-    Exception excep = Assertions.assertThrows(
-        NoSuchEntityException.class,
-        () -> tagMetaService.getTagByIdentifier(
-            TagManager.ofTagIdent(metalakeName, "tag1")));
+    Exception excep =
+        Assertions.assertThrows(
+            NoSuchEntityException.class,
+            () -> tagMetaService.getTagByIdentifier(TagManager.ofTagIdent(metalakeName, "tag1")));
     Assertions.assertEquals("No such tag entity: tag1", excep.getMessage());
   }
 
   @Test
-  public void testDeleteMetalake() {
+  public void testDeleteMetalake() throws IOException {
     BaseMetalake metalake =
         createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
     backend.insert(metalake, false);
@@ -250,8 +259,7 @@ public class TestTagMetaService extends TestJDBCBackend {
         MetalakeMetaService.getInstance().deleteMetalake(metalake.nameIdentifier(), false));
     Assertions.assertThrows(
         NoSuchEntityException.class,
-        () -> tagMetaService.getTagByIdentifier(
-            TagManager.ofTagIdent(metalakeName, "tag1")));
+        () -> tagMetaService.getTagByIdentifier(TagManager.ofTagIdent(metalakeName, "tag1")));
 
     // Test delete metalake with cascade.
     BaseMetalake metalake1 =
@@ -273,7 +281,6 @@ public class TestTagMetaService extends TestJDBCBackend {
         MetalakeMetaService.getInstance().deleteMetalake(metalake1.nameIdentifier(), true));
     Assertions.assertThrows(
         NoSuchEntityException.class,
-        () -> tagMetaService.getTagByIdentifier(
-            TagManager.ofTagIdent(metalakeName + "1", "tag2")));
+        () -> tagMetaService.getTagByIdentifier(TagManager.ofTagIdent(metalakeName + "1", "tag2")));
   }
 }

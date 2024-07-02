@@ -135,7 +135,8 @@ public interface TagMetaMapper {
   @Update(
       "UPDATE "
           + TAG_TABLE_NAME
-          + " tm SET tm.deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
+          + " tm SET tm.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
           + " WHERE tm.metalake_id IN ("
           + " SELECT mm.metalake_id FROM "
           + MetalakeMetaMapper.TABLE_NAME
@@ -147,7 +148,8 @@ public interface TagMetaMapper {
   @Update(
       "UPDATE "
           + TAG_TABLE_NAME
-          + " SET deleted_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000.0"
+          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
           + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0")
   void softDeleteTagMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
 

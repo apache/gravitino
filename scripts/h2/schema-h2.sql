@@ -216,3 +216,33 @@ CREATE TABLE IF NOT EXISTS `group_role_rel` (
     CONSTRAINT `uk_gi_ri_del` UNIQUE (`group_id`, `role_id`, `deleted_at`),
     KEY `idx_gid` (`group_id`)
     ) ENGINE=InnoDB;
+
+
+CREATE TABLE IF NOT EXISTS `tag_meta` (
+    `tag_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tag id',
+    `tag_name` VARCHAR(128) NOT NULL COMMENT 'tag name',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `tag_comment` VARCHAR(256) DEFAULT '' COMMENT 'tag comment',
+    `properties` MEDIUMTEXT DEFAULT NULL COMMENT 'tag properties',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'tag audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'tag current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'tag last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'tag deleted at',
+    PRIMARY KEY (`tag_id`),
+    UNIQUE KEY `uk_mn_tn_del` (`metalake_id`, `tag_name`, `deleted_at`)
+    ) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `tag_relation_meta` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `tag_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tag id',
+    `metadata_object_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metadata object id',
+    `metadata_object_type` VARCHAR(64) NOT NULL COMMENT 'metadata object type',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'tag relation audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'tag relation current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'tag relation last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'tag relation deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_ti_mi_del` (`tag_id`, `metadata_object_id`, `deleted_at`),
+    KEY `idx_tid` (`tag_id`),
+    KEY `idx_mid` (`metadata_object_id`)
+    ) ENGINE=InnoDB;
