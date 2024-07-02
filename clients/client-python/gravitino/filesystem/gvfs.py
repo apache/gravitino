@@ -104,7 +104,6 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             self._client = GravitinoClient(
                 uri=server_uri,
                 metalake_name=metalake_name,
-                check_version=False,
                 auth_data_provider=SimpleAuthProvider(),
             )
         else:

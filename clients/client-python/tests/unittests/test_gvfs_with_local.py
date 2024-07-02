@@ -3,7 +3,7 @@ Copyright 2024 Datastrato Pvt Ltd.
 This software is licensed under the Apache License version 2.
 """
 
-# pylint: disable=protected-access
+# pylint: disable=protected-access,too-many-lines
 
 import base64
 import os
