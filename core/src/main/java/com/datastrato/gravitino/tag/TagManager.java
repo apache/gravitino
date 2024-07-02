@@ -134,7 +134,7 @@ public class TagManager {
 
     try {
       return entityStore.update(
-          NameIdentifier.of(ofTagNamespace(metalake), name),
+          ofTagIdent(metalake, name),
           TagEntity.class,
           Entity.EntityType.TAG,
           tagEntity -> updateTagEntity(tagEntity, changes));
