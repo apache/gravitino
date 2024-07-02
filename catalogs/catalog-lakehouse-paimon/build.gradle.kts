@@ -10,6 +10,11 @@ plugins {
   id("idea")
 }
 
+val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
+val sparkVersion: String = libs.versions.spark34.get()
+val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
+val paimonVersion: String = libs.versions.paimon.get()
+
 dependencies {
   implementation(project(":api"))
   implementation(project(":common"))
@@ -18,6 +23,7 @@ dependencies {
     exclude("com.sun.jersey")
     exclude("javax.servlet")
   }
+  implementation(libs.bundles.log4j)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.hadoop2.common) {
@@ -41,6 +47,19 @@ dependencies {
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
+  testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion") {
+    exclude("org.apache.hadoop")
+  }
+  testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion") {
+    exclude("org.apache.avro")
+    exclude("org.apache.hadoop")
+    exclude("org.apache.zookeeper")
+    exclude("io.dropwizard.metrics")
+    exclude("org.rocksdb")
+  }
+  testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
+    exclude("org.apache.hadoop")
+  }
   testImplementation(libs.slf4j.api)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mysql.driver)

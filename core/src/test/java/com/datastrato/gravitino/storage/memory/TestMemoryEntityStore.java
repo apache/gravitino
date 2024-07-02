@@ -90,7 +90,7 @@ public class TestMemoryEntityStore {
         executeInTransaction(
             () -> {
               if (exists(e.nameIdentifier(), e.type())) {
-                throw new EntityAlreadyExistsException("Entity " + ident + " already exists");
+                throw new EntityAlreadyExistsException("Entity %s already exists", ident);
               }
               entityMap.put(ident, e);
               return null;

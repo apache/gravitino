@@ -36,7 +36,7 @@ public class TopicMetaService {
 
   private TopicMetaService() {}
 
-  public void insertTopic(TopicEntity topicEntity, boolean overwrite) {
+  public void insertTopic(TopicEntity topicEntity, boolean overwrite) throws IOException {
     try {
       NameIdentifierUtil.checkTopic(topicEntity.nameIdentifier());
 

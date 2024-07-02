@@ -54,7 +54,7 @@ import org.slf4j.LoggerFactory;
 
 @Disabled
 @Deprecated
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 public class TrinoConnectorIT extends AbstractIT {
   public static final Logger LOG = LoggerFactory.getLogger(TrinoConnectorIT.class);
 

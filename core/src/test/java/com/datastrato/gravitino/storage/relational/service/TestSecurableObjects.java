@@ -21,6 +21,7 @@ import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.datastrato.gravitino.storage.relational.TestJDBCBackend;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import java.io.IOException;
 import java.time.Instant;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -29,7 +30,7 @@ public class TestSecurableObjects extends TestJDBCBackend {
   RoleMetaService roleMetaService = RoleMetaService.getInstance();
 
   @Test
-  public void testAllTypeSecurableObjects() {
+  public void testAllTypeSecurableObjects() throws IOException {
     String metalakeName = "metalake";
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();

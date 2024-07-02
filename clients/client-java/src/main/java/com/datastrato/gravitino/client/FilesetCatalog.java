@@ -59,27 +59,32 @@ public class FilesetCatalog extends BaseSchemaCatalog
   /**
    * List the filesets in a schema namespace from the catalog.
    *
-   * @param namespace A schema namespace.
-   * @return An array of fileset identifiers in the namespace.
+   * @param namespace A schema namespace. This namespace should have 1 level, which is the schema
+   *     name;
+   * @return An array of {@link NameIdentifier} of filesets under the given namespace.
    * @throws NoSuchSchemaException If the schema does not exist.
    */
   @Override
   public NameIdentifier[] listFilesets(Namespace namespace) throws NoSuchSchemaException {
     checkFilesetNamespace(namespace);
 
+    Namespace fullNamespace = getFilesetFullNamespace(namespace);
     EntityListResponse resp =
         restClient.get(
-            formatFilesetRequestPath(namespace),
+            formatFilesetRequestPath(fullNamespace),
             EntityListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.filesetErrorHandler());
     resp.validate();
 
-    return resp.identifiers();
+    return Arrays.stream(resp.identifiers())
+        .map(ident -> NameIdentifier.of(ident.namespace().level(2), ident.name()))
+        .toArray(NameIdentifier[]::new);
   }
 
   /**
-   * Load fileset metadata by {@link NameIdentifier} from the catalog.
+   * Load fileset metadata by {@link NameIdentifier} from the catalog, which should be a
+   * "schema.fileset" style.
    *
    * @param ident A fileset identifier.
    * @return The fileset metadata.
@@ -87,12 +92,12 @@ public class FilesetCatalog extends BaseSchemaCatalog
    */
   @Override
   public Fileset loadFileset(NameIdentifier ident) throws NoSuchFilesetException {
-    checkFilesetNameIdentifer(ident);
+    checkFilesetNameIdentifier(ident);
+
+    Namespace fullNamespace = getFilesetFullNamespace(ident.namespace());
     FilesetResponse resp =
         restClient.get(
-            formatFilesetRequestPath(ident.namespace())
-                + "/"
-                + RESTUtils.encodeString(ident.name()),
+            formatFilesetRequestPath(fullNamespace) + "/" + RESTUtils.encodeString(ident.name()),
             FilesetResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.filesetErrorHandler());
@@ -109,7 +114,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
    *
    * <p>If the type of the fileset object is "EXTERNAL", the underlying storageLocation must be set.
    *
-   * @param ident A fileset identifier.
+   * @param ident A fileset identifier, which should be a "schema.fileset" style.
    * @param comment The comment of the fileset.
    * @param type The type of the fileset.
    * @param storageLocation The storage location of the fileset.
@@ -126,7 +131,9 @@ public class FilesetCatalog extends BaseSchemaCatalog
       String storageLocation,
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
-    checkFilesetNameIdentifer(ident);
+    checkFilesetNameIdentifier(ident);
+
+    Namespace fullNamespace = getFilesetFullNamespace(ident.namespace());
     FilesetCreateRequest req =
         FilesetCreateRequest.builder()
             .name(RESTUtils.encodeString(ident.name()))
@@ -138,7 +145,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
 
     FilesetResponse resp =
         restClient.post(
-            formatFilesetRequestPath(ident.namespace()),
+            formatFilesetRequestPath(fullNamespace),
             req,
             FilesetResponse.class,
             Collections.emptyMap(),
@@ -151,7 +158,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
   /**
    * Update a fileset metadata in the catalog.
    *
-   * @param ident A fileset identifier.
+   * @param ident A fileset identifier, which should be a "schema.fileset" style.
    * @param changes The changes to apply to the fileset.
    * @return The updated fileset metadata.
    * @throws NoSuchFilesetException If the fileset does not exist.
@@ -160,7 +167,9 @@ public class FilesetCatalog extends BaseSchemaCatalog
   @Override
   public Fileset alterFileset(NameIdentifier ident, FilesetChange... changes)
       throws NoSuchFilesetException, IllegalArgumentException {
-    checkFilesetNameIdentifer(ident);
+    checkFilesetNameIdentifier(ident);
+
+    Namespace fullNamespace = getFilesetFullNamespace(ident.namespace());
     List<FilesetUpdateRequest> updates =
         Arrays.stream(changes)
             .map(DTOConverters::toFilesetUpdateRequest)
@@ -170,7 +179,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
 
     FilesetResponse resp =
         restClient.put(
-            formatFilesetRequestPath(ident.namespace()) + "/" + ident.name(),
+            formatFilesetRequestPath(fullNamespace) + "/" + ident.name(),
             req,
             FilesetResponse.class,
             Collections.emptyMap(),
@@ -186,15 +195,17 @@ public class FilesetCatalog extends BaseSchemaCatalog
    * <p>The underlying files will be deleted if this fileset type is managed, otherwise, only the
    * metadata will be dropped.
    *
-   * @param ident A fileset identifier.
+   * @param ident A fileset identifier, which should be a "schema.fileset" style.
    * @return true If the fileset is dropped, false the fileset did not exist.
    */
   @Override
   public boolean dropFileset(NameIdentifier ident) {
-    checkFilesetNameIdentifer(ident);
+    checkFilesetNameIdentifier(ident);
+
+    Namespace fullNamespace = getFilesetFullNamespace(ident.namespace());
     DropResponse resp =
         restClient.delete(
-            formatFilesetRequestPath(ident.namespace()) + "/" + ident.name(),
+            formatFilesetRequestPath(fullNamespace) + "/" + ident.name(),
             DropResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.filesetErrorHandler());
@@ -221,8 +232,8 @@ public class FilesetCatalog extends BaseSchemaCatalog
    */
   static void checkFilesetNamespace(Namespace namespace) {
     Namespace.check(
-        namespace != null && namespace.length() == 3,
-        "Fileset namespace must be non-null and have 3 level, the input namespace is %s",
+        namespace != null && namespace.length() == 1,
+        "Fileset namespace must be non-null and have 1 level, the input namespace is %s",
         namespace);
   }
 
@@ -231,11 +242,15 @@ public class FilesetCatalog extends BaseSchemaCatalog
    *
    * @param ident The NameIdentifier to check
    */
-  static void checkFilesetNameIdentifer(NameIdentifier ident) {
-    NameIdentifier.check(ident != null, "NameIdentifer must not be null");
+  static void checkFilesetNameIdentifier(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "NameIdentifier must not be null");
     NameIdentifier.check(
-        ident.name() != null && !ident.name().isEmpty(), "NameIdentifer name must not be empty");
+        ident.name() != null && !ident.name().isEmpty(), "NameIdentifier name must not be empty");
     checkFilesetNamespace(ident.namespace());
+  }
+
+  private Namespace getFilesetFullNamespace(Namespace tableNamespace) {
+    return Namespace.of(this.catalogNamespace().level(0), this.name(), tableNamespace.level(0));
   }
 
   /**
