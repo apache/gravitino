@@ -85,7 +85,7 @@ public class KerberosClient {
 
     File keytabsDir = new File("keytabs");
     if (!keytabsDir.exists()) {
-      // Ignore the return value, because there exists many Hadoop catalog operations making
+      // Ignore the return value, because there exists many Paimon catalog operations making
       // this directory.
       keytabsDir.mkdir();
     }
