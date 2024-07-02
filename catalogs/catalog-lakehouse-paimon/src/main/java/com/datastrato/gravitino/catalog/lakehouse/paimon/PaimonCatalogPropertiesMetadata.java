@@ -74,7 +74,7 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
     return PROPERTIES_METADATA;
   }
 
-  public Map<String, String> transformProperties(Map<String, String> properties) {
+  protected Map<String, String> transformProperties(Map<String, String> properties) {
     Map<String, String> gravitinoConfig = Maps.newHashMap();
     properties.forEach(
         (key, value) -> {

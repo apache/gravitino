@@ -65,7 +65,7 @@ public class AuthenticationConfig extends Config {
               AUTH_TYPE_KEY,
               PropertyEntry.stringImmutablePropertyEntry(
                   AUTH_TYPE_KEY,
-                  "The type of authentication for Hadoop catalog, currently we only support Kerberos",
+                  "The type of authentication for Hadoop catalog, currently we only support simple and Kerberos",
                   false,
                   null,
                   false,

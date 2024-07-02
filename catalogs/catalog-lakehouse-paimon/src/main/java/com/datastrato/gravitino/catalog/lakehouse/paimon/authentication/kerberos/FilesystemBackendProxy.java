@@ -10,16 +10,20 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.security.PrivilegedExceptionAction;
+import java.util.Map;
 import net.sf.cglib.proxy.Enhancer;
 import net.sf.cglib.proxy.MethodInterceptor;
 import net.sf.cglib.proxy.MethodProxy;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.paimon.catalog.CatalogContext;
 import org.apache.paimon.catalog.FileSystemCatalog;
 import org.apache.paimon.fs.FileIO;
 import org.apache.paimon.fs.Path;
+import org.apache.paimon.fs.hadoop.HadoopFileIO;
 import org.apache.paimon.options.CatalogOptions;
 import org.apache.paimon.options.Options;
+import org.apache.paimon.utils.Pair;
 import org.apache.paimon.utils.Preconditions;
 
 /**
@@ -32,7 +36,6 @@ public class FilesystemBackendProxy implements MethodInterceptor {
   private final CatalogContext catalogContext;
   private final String kerberosRealm;
   private final UserGroupInformation proxyUser;
-  private boolean hasUpdatedFileIO = false;
 
   public FilesystemBackendProxy(
       FileSystemCatalog target, CatalogContext catalogContext, String kerberosRealm) {
@@ -96,22 +99,39 @@ public class FilesystemBackendProxy implements MethodInterceptor {
   private void updateFileIO(CatalogContext catalogContext)
       throws IOException, NoSuchFieldException, IllegalAccessException {
 
-    if (hasUpdatedFileIO) {
-      return;
-    }
-
     String warehouse =
         Preconditions.checkNotNull(
             catalogContext.options().get(CatalogOptions.WAREHOUSE),
-            "Paimon '" + CatalogOptions.WAREHOUSE.key() + "' path must be set");
+            String.format("Paimon %s path must be set.", CatalogOptions.WAREHOUSE.key()));
     Path warehousePath = new Path(warehouse);
     FileIO newFileIO = FileIO.get(warehousePath, catalogContext);
 
     Class<?> superclass = target.getClass().getSuperclass();
     Field oldFileIO = superclass.getDeclaredField("fileIO");
     oldFileIO.setAccessible(true);
+    HadoopFileIO oldHadoopFileIO = (HadoopFileIO) oldFileIO.get(target);
+    closeFileSystem(oldHadoopFileIO);
     oldFileIO.set(target, newFileIO);
+  }
 
-    hasUpdatedFileIO = true;
+  private void closeFileSystem(HadoopFileIO hadoopFileIO)
+      throws NoSuchFieldException, IllegalAccessException {
+    Field fsMapField = hadoopFileIO.getClass().getDeclaredField("fsMap");
+    fsMapField.setAccessible(true);
+    @SuppressWarnings("unchecked")
+    Map<Pair<String, String>, FileSystem> fsMap =
+        (Map<Pair<String, String>, FileSystem>) fsMapField.get(hadoopFileIO);
+    fsMap
+        .values()
+        .forEach(
+            fs -> {
+              if (fs != null) {
+                try {
+                  fs.close();
+                } catch (IOException e) {
+                  throw new RuntimeException("Failed to close Hadoop Filesystem client", e);
+                }
+              }
+            });
   }
 }
