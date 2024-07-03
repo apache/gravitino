@@ -1,8 +1,7 @@
 ---
 title: How to use Gravitino Virtual File System with Filesets
 slug: /how-to-use-gvfs
-license: "Copyright 2024 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
 ## Introduction
