@@ -194,4 +194,5 @@ class IntegrationTestEnv(unittest.TestCase):
                 filtered_lines.append(line)
 
         with open(hadoop_conf_path, mode="w", encoding="utf-8") as file:
-            file.writelines(filtered_lines)
+            for line in filtered_lines:
+                file.write(line + "\n")

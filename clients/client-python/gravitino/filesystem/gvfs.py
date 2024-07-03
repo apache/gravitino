@@ -569,11 +569,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         :param identifier: The fileset identifier
         :return The fileset
         """
-        catalog: Catalog = self._client.load_catalog(
-            NameIdentifier.of_catalog(
-                identifier.namespace().level(0), identifier.namespace().level(1)
-            )
-        )
+        catalog: Catalog = self._client.load_catalog(identifier.namespace().level(1))
         return catalog.as_fileset_catalog().load_fileset(identifier)
 
     def _get_actual_path_by_ident(

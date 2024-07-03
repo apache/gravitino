@@ -64,10 +64,6 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fileset_properties_key2: fileset_properties_value2,
     }
 
-    metalake_ident: NameIdentifier = NameIdentifier.of(metalake_name)
-    catalog_ident: NameIdentifier = NameIdentifier.of_catalog(
-        metalake_name, catalog_name
-    )
     schema_ident: NameIdentifier = NameIdentifier.of_schema(
         metalake_name, catalog_name, schema_name
     )
@@ -113,13 +109,13 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
     @classmethod
     def _init_test_entities(cls):
         cls.gravitino_admin_client.create_metalake(
-            ident=cls.metalake_ident, comment="", properties={}
+            name=cls.metalake_name, comment="", properties={}
         )
         cls.gravitino_client = GravitinoClient(
             uri="http://localhost:8090", metalake_name=cls.metalake_name
         )
         catalog = cls.gravitino_client.create_catalog(
-            ident=cls.catalog_ident,
+            name=cls.catalog_name,
             catalog_type=Catalog.Type.FILESET,
             provider=cls.catalog_provider,
             comment="",
@@ -152,7 +148,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             cls.gravitino_client = GravitinoClient(
                 uri="http://localhost:8090", metalake_name=cls.metalake_name
             )
-            catalog = cls.gravitino_client.load_catalog(ident=cls.catalog_ident)
+            catalog = cls.gravitino_client.load_catalog(name=cls.catalog_name)
             logger.info(
                 "Drop fileset %s[%s]",
                 cls.fileset_ident,
@@ -165,13 +161,13 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             )
             logger.info(
                 "Drop catalog %s[%s]",
-                cls.catalog_ident,
-                cls.gravitino_client.drop_catalog(ident=cls.catalog_ident),
+                cls.catalog_name,
+                cls.gravitino_client.drop_catalog(name=cls.catalog_name),
             )
             logger.info(
                 "Drop metalake %s[%s]",
-                cls.metalake_ident,
-                cls.gravitino_admin_client.drop_metalake(cls.metalake_ident),
+                cls.metalake_name,
+                cls.gravitino_admin_client.drop_metalake(cls.metalake_name),
             )
         except Exception as e:
             logger.error("Clean test data failed: %s", e)
