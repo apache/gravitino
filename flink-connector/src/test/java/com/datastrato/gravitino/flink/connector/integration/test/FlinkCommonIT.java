@@ -42,10 +42,8 @@ import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.types.Row;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-@Tag("gravitino-docker-test")
 public abstract class FlinkCommonIT extends FlinkEnvIT {
 
   protected abstract Catalog currentCatalog();
@@ -184,8 +182,8 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
     String databaseName = "test_create_no_partition_table_db";
     String tableName = "test_create_no_partition_table";
     String comment = "test comment";
-    String key = "connector";
-    String value = "hive";
+    String key = "test key";
+    String value = "test value";
 
     doWithSchema(
         currentCatalog(),

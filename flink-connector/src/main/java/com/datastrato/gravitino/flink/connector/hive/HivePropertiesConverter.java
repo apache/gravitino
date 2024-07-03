@@ -81,19 +81,22 @@ public class HivePropertiesConverter implements PropertiesConverter {
 
   @Override
   public Map<String, String> toFlinkTableProperties(Map<String, String> gravitinoProperties) {
-    return gravitinoProperties.entrySet().stream()
-        .collect(
-            Collectors.toMap(
-                entry -> {
-                  String key = entry.getKey();
-                  if (key.startsWith(HiveTablePropertiesMetadata.SERDE_PARAMETER_PREFIX)) {
-                    return key.substring(
-                        HiveTablePropertiesMetadata.SERDE_PARAMETER_PREFIX.length());
-                  } else {
-                    return key;
-                  }
-                },
-                Map.Entry::getValue,
-                (existingValue, newValue) -> newValue));
+    Map<String, String> properties =
+        gravitinoProperties.entrySet().stream()
+            .collect(
+                Collectors.toMap(
+                    entry -> {
+                      String key = entry.getKey();
+                      if (key.startsWith(HiveTablePropertiesMetadata.SERDE_PARAMETER_PREFIX)) {
+                        return key.substring(
+                            HiveTablePropertiesMetadata.SERDE_PARAMETER_PREFIX.length());
+                      } else {
+                        return key;
+                      }
+                    },
+                    Map.Entry::getValue,
+                    (existingValue, newValue) -> newValue));
+    properties.put("connector", "hive");
+    return properties;
   }
 }

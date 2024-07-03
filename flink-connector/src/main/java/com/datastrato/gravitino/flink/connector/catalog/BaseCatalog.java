@@ -71,6 +71,7 @@ import org.apache.flink.table.catalog.exceptions.TablePartitionedException;
 import org.apache.flink.table.catalog.stats.CatalogColumnStatistics;
 import org.apache.flink.table.catalog.stats.CatalogTableStatistics;
 import org.apache.flink.table.expressions.Expression;
+import org.apache.flink.table.types.DataType;
 
 /**
  * The BaseCatalog that provides a default implementation for all methods in the {@link
@@ -440,8 +441,9 @@ public abstract class BaseCatalog extends AbstractCatalog {
     org.apache.flink.table.api.Schema.Builder builder =
         org.apache.flink.table.api.Schema.newBuilder();
     for (Column column : table.columns()) {
+      DataType flinkType = TypeUtils.toFlinkType(column.dataType());
       builder
-          .column(column.name(), TypeUtils.toFlinkType(column.dataType()))
+          .column(column.name(), column.nullable() ? flinkType.nullable() : flinkType.notNull())
           .withComment(column.comment());
     }
     Map<String, String> flinkTableProperties =
