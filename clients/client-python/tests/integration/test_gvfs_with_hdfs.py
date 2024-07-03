@@ -81,9 +81,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
     schema_ident: NameIdentifier = NameIdentifier.of(
         metalake_name, catalog_name, schema_name
     )
-    fileset_ident: NameIdentifier = NameIdentifier.of(
-        metalake_name, catalog_name, schema_name, fileset_name
-    )
+    fileset_ident: NameIdentifier = NameIdentifier.of(schema_name, fileset_name)
 
     gravitino_admin_client: GravitinoAdminClient = GravitinoAdminClient(
         uri="http://localhost:8090"
