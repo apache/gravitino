@@ -1,8 +1,7 @@
 ---
 title: How to use relational backend storage
 slug: /how-to-use-relational-backend-storage
-license: "Copyright 2024 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
 ## Introduction

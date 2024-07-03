@@ -3,8 +3,7 @@ title: "Hadoop catalog"
 slug: /hadoop-catalog
 date: 2024-4-2
 keyword: hadoop catalog
-license: "Copyright 2024 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
 ## Introduction
