@@ -1,6 +1,19 @@
 /*
- *  Copyright 2024 Datastrato Pvt Ltd.
- *  This software is licensed under the Apache License version 2.
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
 package com.datastrato.gravitino.spark.connector.plugin;
@@ -11,10 +24,12 @@ import static com.datastrato.gravitino.spark.connector.utils.ConnectorUtil.remov
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.spark.connector.GravitinoSparkConfig;
 import com.datastrato.gravitino.spark.connector.catalog.GravitinoCatalogManager;
+import com.datastrato.gravitino.spark.connector.iceberg.extensions.GravitinoIcebergSparkSessionExtensions;
 import com.datastrato.gravitino.spark.connector.version.CatalogNameAdaptor;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -36,13 +51,16 @@ public class GravitinoDriverPlugin implements DriverPlugin {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoDriverPlugin.class);
 
-  private GravitinoCatalogManager catalogManager;
-  private List<String> gravitinoDriverExtensions = new ArrayList<>();
-  private boolean enableIcebergSupport = false;
-
   @VisibleForTesting
   static final String ICEBERG_SPARK_EXTENSIONS =
       "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions";
+
+  private GravitinoCatalogManager catalogManager;
+  private final List<String> gravitinoIcebergExtensions =
+      Arrays.asList(
+          GravitinoIcebergSparkSessionExtensions.class.getName(), ICEBERG_SPARK_EXTENSIONS);
+  private final List<String> gravitinoDriverExtensions = new ArrayList<>();
+  private boolean enableIcebergSupport = false;
 
   @Override
   public Map<String, String> init(SparkContext sc, PluginContext pluginContext) {
@@ -61,7 +79,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
     this.enableIcebergSupport =
         conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT, false);
     if (enableIcebergSupport) {
-      gravitinoDriverExtensions.add(ICEBERG_SPARK_EXTENSIONS);
+      gravitinoDriverExtensions.addAll(gravitinoIcebergExtensions);
     }
 
     this.catalogManager = GravitinoCatalogManager.create(gravitinoUri, metalake);

@@ -1,8 +1,24 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 import io.github.piyushroshan.python.VenvTask
+import java.net.HttpURLConnection
+import java.net.URL
 
 plugins {
   id("io.github.piyushroshan.python-gradle-miniforge-plugin") version "1.0.0"
@@ -21,11 +37,52 @@ fun deleteCacheDir(targetDir: String) {
   }
 }
 
+
+fun waitForServerIsReady(host: String = "http://localhost", port: Int = 8090, timeout: Long = 30000) {
+  val startTime = System.currentTimeMillis()
+  var exception: java.lang.Exception?
+  val urlString = "$host:$port/metrics"
+  val successPattern = Regex("\"version\"\\s*:")
+
+  while (true) {
+    try {
+      val url = URL(urlString)
+      val connection = url.openConnection() as HttpURLConnection
+      connection.requestMethod = "GET"
+      connection.connectTimeout = 1000
+      connection.readTimeout = 1000
+
+      val responseCode = connection.responseCode
+      if (responseCode == 200) {
+        val response = connection.inputStream.bufferedReader().use { it.readText() }
+        if (successPattern.containsMatchIn(response)) {
+          return  // If this succeeds, the API is up and running
+        } else {
+          exception = RuntimeException("API returned unexpected response: $response")
+        }
+      } else {
+        exception = RuntimeException("Received non-200 response code: $responseCode")
+      }
+    } catch (e: Exception) {
+      // API is not available yet, continue to wait
+      exception = e
+    }
+
+    if (System.currentTimeMillis() - startTime > timeout) {
+      throw RuntimeException("Timed out waiting for API to be available", exception)
+    }
+    Thread.sleep(500)  // Wait for 0.5 second before checking again
+  }
+}
+
 fun gravitinoServer(operation: String) {
     val process = ProcessBuilder("${project.rootDir.path}/distribution/package/bin/gravitino.sh", operation).start()
     val exitCode = process.waitFor()
     if (exitCode == 0) {
       val currentContext = process.inputStream.bufferedReader().readText()
+      if (operation == "start") {
+        waitForServerIsReady()
+      }
       println("Gravitino server status: $currentContext")
     } else {
       println("Gravitino server execution failed with exit code $exitCode")
@@ -152,12 +209,18 @@ tasks {
   }
 
   val test by registering(VenvTask::class) {
-    dependsOn(pipInstall, pylint, unitTests)
-
+    val skipUTs = project.hasProperty("skipTests")
     val skipPyClientITs = project.hasProperty("skipPyClientITs")
     val skipITs = project.hasProperty("skipITs")
-    if (!skipITs && !skipPyClientITs) {
-      dependsOn(integrationTest)
+    val skipAllTests = skipUTs && (skipITs || skipPyClientITs)
+    if (!skipAllTests) {
+      dependsOn(pipInstall, pylint)
+      if (!skipUTs) {
+        dependsOn(unitTests)
+      }
+      if (!skipITs && !skipPyClientITs) {
+        dependsOn(integrationTest)
+      }
     }
   }
 
@@ -200,7 +263,7 @@ tasks {
     delete("build")
     delete("dist")
     delete("docs")
-    delete("version.ini")
+    delete("gravitino/version.ini")
     delete("gravitino.egg-info")
     delete("tests/unittests/htmlcov")
     delete("tests/unittests/.coverage")

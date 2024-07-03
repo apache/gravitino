@@ -1,6 +1,20 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.catalog;
 
@@ -11,14 +25,20 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 
+import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.Configs;
+import com.datastrato.gravitino.Entity;
+import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.SchemaChange;
 import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
+import com.datastrato.gravitino.lock.LockManager;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.google.common.collect.ImmutableMap;
@@ -28,6 +48,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -37,8 +58,14 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
   static SchemaOperationDispatcher dispatcher;
 
   @BeforeAll
-  public static void initialize() throws IOException {
+  public static void initialize() throws IOException, IllegalAccessException {
     dispatcher = new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
+
+    Config config = mock(Config.class);
+    doReturn(100000L).when(config).get(Configs.TREE_LOCK_MAX_NODE_IN_MEMORY);
+    doReturn(1000L).when(config).get(Configs.TREE_LOCK_MIN_NODE_IN_MEMORY);
+    doReturn(36000L).when(config).get(Configs.TREE_LOCK_CLEAN_INTERVAL);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
   }
 
   @Test
@@ -105,6 +132,74 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
 
     // Audit info is gotten from the catalog, not from the entity store
     Assertions.assertEquals("test", schema2.auditInfo().creator());
+  }
+
+  @Test
+  public void testCreateAndLoadSchema() throws IOException {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema20");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    Schema schema = dispatcher.createSchema(schemaIdent, "comment", props);
+    Assertions.assertEquals("schema20", schema.name());
+    Assertions.assertEquals("comment", schema.comment());
+    testProperties(props, schema.properties());
+
+    Schema loadedSchema = dispatcher.loadSchema(schemaIdent);
+    Assertions.assertEquals(loadedSchema.name(), schema.name());
+    Assertions.assertEquals(loadedSchema.comment(), schema.comment());
+    testProperties(loadedSchema.properties(), schema.properties());
+    // Audit info is gotten from the entity store
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, loadedSchema.auditInfo().creator());
+
+    // Case 2: Test if the schema is not found in entity store
+    doThrow(new NoSuchEntityException("mock error")).when(entityStore).get(any(), any(), any());
+    entityStore.delete(schemaIdent, Entity.EntityType.SCHEMA);
+    Schema loadedSchema1 = dispatcher.loadSchema(schemaIdent);
+    Assertions.assertEquals(schema.name(), loadedSchema1.name());
+    Assertions.assertEquals(schema.comment(), loadedSchema1.comment());
+    testProperties(props, loadedSchema1.properties());
+    // Succeed to import the topic entity
+    Assertions.assertTrue(entityStore.exists(schemaIdent, SCHEMA));
+
+    // Audit info is gotten from catalog, not from the entity store
+    Assertions.assertEquals("test", loadedSchema1.auditInfo().creator());
+
+    // Case 3: Test if entity store is failed to get the schema entity
+    reset(entityStore);
+    doThrow(new IOException()).when(entityStore).get(any(), any(), any());
+    entityStore.delete(schemaIdent, Entity.EntityType.SCHEMA);
+    Schema loadedSchema2 = dispatcher.loadSchema(schemaIdent);
+    // Succeed to import the topic entity
+    Assertions.assertTrue(entityStore.exists(schemaIdent, SCHEMA));
+    Assertions.assertEquals(schema.name(), loadedSchema2.name());
+    Assertions.assertEquals(schema.comment(), loadedSchema2.comment());
+    testProperties(props, loadedSchema2.properties());
+    // Audit info is gotten from catalog, not from the entity store
+    Assertions.assertEquals("test", loadedSchema2.auditInfo().creator());
+
+    // Case 4: Test if the fetched schema entity is matched.
+    reset(entityStore);
+    SchemaEntity unmatchedEntity =
+        SchemaEntity.builder()
+            .withId(1L)
+            .withName("schema21")
+            .withNamespace(Namespace.of(metalake, catalog))
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator(AuthConstants.ANONYMOUS_USER)
+                    .withCreateTime(Instant.now())
+                    .build())
+            .build();
+    doReturn(unmatchedEntity).when(entityStore).get(any(), any(), any());
+    Schema loadedSchema3 = dispatcher.loadSchema(schemaIdent);
+    // Succeed to import the schema entity
+    reset(entityStore);
+    SchemaEntity schemaEntity = entityStore.get(schemaIdent, SCHEMA, SchemaEntity.class);
+    Assertions.assertEquals("test", schemaEntity.auditInfo().creator());
+    Assertions.assertEquals(schema.name(), loadedSchema3.name());
+    Assertions.assertEquals(schema.comment(), loadedSchema3.comment());
+    testProperties(props, loadedSchema3.properties());
+    // Audit info is gotten from catalog, not from the entity store
+    Assertions.assertEquals("test", loadedSchema3.auditInfo().creator());
   }
 
   @Test

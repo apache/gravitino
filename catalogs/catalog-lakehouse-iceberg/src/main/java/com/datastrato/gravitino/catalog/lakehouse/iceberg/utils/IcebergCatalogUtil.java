@@ -1,6 +1,20 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.utils;
 
@@ -34,10 +48,12 @@ public class IcebergCatalogUtil {
   private static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogUtil.class);
 
   private static InMemoryCatalog loadMemoryCatalog(Map<String, String> properties) {
+    IcebergConfig icebergConfig = new IcebergConfig(properties);
+    String icebergCatalogName = icebergConfig.getCatalogBackendName("memory");
     InMemoryCatalog memoryCatalog = new InMemoryCatalog();
     Map<String, String> resultProperties = new HashMap<>(properties);
     resultProperties.put(CatalogProperties.WAREHOUSE_LOCATION, "/tmp");
-    memoryCatalog.initialize("memory", resultProperties);
+    memoryCatalog.initialize(icebergCatalogName, resultProperties);
     return memoryCatalog;
   }
 
@@ -45,11 +61,13 @@ public class IcebergCatalogUtil {
     HiveCatalog hiveCatalog = new HiveCatalog();
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
     properties.forEach(hdfsConfiguration::set);
+    IcebergConfig icebergConfig = new IcebergConfig(properties);
+    String icebergCatalogName = icebergConfig.getCatalogBackendName("hive");
 
     AuthenticationConfig authenticationConfig = new AuthenticationConfig(properties);
     if (authenticationConfig.isSimpleAuth()) {
       hiveCatalog.setConf(hdfsConfiguration);
-      hiveCatalog.initialize("hive", properties);
+      hiveCatalog.initialize(icebergCatalogName, properties);
       return hiveCatalog;
     } else if (authenticationConfig.isKerberosAuth()) {
       Map<String, String> resultProperties = new HashMap<>(properties);
@@ -57,7 +75,7 @@ public class IcebergCatalogUtil {
       hdfsConfiguration.set(HADOOP_SECURITY_AUTHORIZATION, "true");
       hdfsConfiguration.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
       hiveCatalog.setConf(hdfsConfiguration);
-      hiveCatalog.initialize("hive", properties);
+      hiveCatalog.initialize(icebergCatalogName, properties);
 
       String realm = initKerberosAndReturnRealm(properties, hdfsConfiguration);
       if (authenticationConfig.isImpersonationEnabled()) {
@@ -88,6 +106,7 @@ public class IcebergCatalogUtil {
   private static JdbcCatalog loadJdbcCatalog(Map<String, String> properties) {
     IcebergConfig icebergConfig = new IcebergConfig(properties);
     String driverClassName = icebergConfig.getJdbcDriver();
+    String icebergCatalogName = icebergConfig.getCatalogBackendName("jdbc");
 
     icebergConfig.get(IcebergConfig.JDBC_USER);
     icebergConfig.get(IcebergConfig.JDBC_PASSWORD);
@@ -106,16 +125,18 @@ public class IcebergCatalogUtil {
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
     properties.forEach(hdfsConfiguration::set);
     jdbcCatalog.setConf(hdfsConfiguration);
-    jdbcCatalog.initialize("jdbc", properties);
+    jdbcCatalog.initialize(icebergCatalogName, properties);
     return jdbcCatalog;
   }
 
   private static Catalog loadRestCatalog(Map<String, String> properties) {
+    IcebergConfig icebergConfig = new IcebergConfig(properties);
+    String icebergCatalogName = icebergConfig.getCatalogBackendName("rest");
     RESTCatalog restCatalog = new RESTCatalog();
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
     properties.forEach(hdfsConfiguration::set);
     restCatalog.setConf(hdfsConfiguration);
-    restCatalog.initialize("rest", properties);
+    restCatalog.initialize(icebergCatalogName, properties);
     return restCatalog;
   }
 

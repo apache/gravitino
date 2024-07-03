@@ -1,6 +1,20 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.server.web.rest;
 
@@ -19,6 +33,11 @@ import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.Role;
 import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.SecurableObjects;
+import com.datastrato.gravitino.catalog.CatalogDispatcher;
+import com.datastrato.gravitino.catalog.FilesetDispatcher;
+import com.datastrato.gravitino.catalog.SchemaDispatcher;
+import com.datastrato.gravitino.catalog.TableDispatcher;
+import com.datastrato.gravitino.catalog.TopicDispatcher;
 import com.datastrato.gravitino.dto.authorization.RoleDTO;
 import com.datastrato.gravitino.dto.authorization.SecurableObjectDTO;
 import com.datastrato.gravitino.dto.requests.RoleCreateRequest;
@@ -33,6 +52,7 @@ import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
 import com.datastrato.gravitino.lock.LockManager;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.RoleEntity;
+import com.datastrato.gravitino.metalake.MetalakeDispatcher;
 import com.datastrato.gravitino.rest.RESTUtils;
 import com.google.common.collect.Lists;
 import java.io.IOException;
@@ -43,6 +63,7 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
@@ -55,6 +76,12 @@ import org.mockito.Mockito;
 public class TestRoleOperations extends JerseyTest {
 
   private static final AccessControlManager manager = mock(AccessControlManager.class);
+  private static final MetalakeDispatcher metalakeDispatcher = mock(MetalakeDispatcher.class);
+  private static final CatalogDispatcher catalogDispatcher = mock(CatalogDispatcher.class);
+  private static final SchemaDispatcher schemaDispatcher = mock(SchemaDispatcher.class);
+  private static final TableDispatcher tableDispatcher = mock(TableDispatcher.class);
+  private static final TopicDispatcher topicDispatcher = mock(TopicDispatcher.class);
+  private static final FilesetDispatcher filesetDispatcher = mock(FilesetDispatcher.class);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
@@ -66,13 +93,22 @@ public class TestRoleOperations extends JerseyTest {
   }
 
   @BeforeAll
-  public static void setup() {
+  public static void setup() throws IllegalAccessException {
     Config config = mock(Config.class);
     Mockito.doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
     Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
-    GravitinoEnv.getInstance().setLockManager(new LockManager(config));
-    GravitinoEnv.getInstance().setAccessControlManager(manager);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "accessControlManager", manager, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "metalakeDispatcher", metalakeDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "metalakeDispatcher", metalakeDispatcher, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogDispatcher", catalogDispatcher, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "schemaDispatcher", schemaDispatcher, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", tableDispatcher, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "topicDispatcher", topicDispatcher, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "filesetDispatcher", filesetDispatcher, true);
   }
 
   @Override
@@ -115,6 +151,7 @@ public class TestRoleOperations extends JerseyTest {
     Role role = buildRole("role1");
 
     when(manager.createRole(any(), any(), any(), any())).thenReturn(role);
+    when(catalogDispatcher.catalogExists(any())).thenReturn(true);
 
     Response resp =
         target("/metalakes/metalake1/roles")
@@ -155,7 +192,20 @@ public class TestRoleOperations extends JerseyTest {
         Privileges.UseCatalog.allow().condition(),
         roleDTO.securableObjects().get(0).privileges().get(0).condition());
 
+    // Test to a catalog which doesn't exist
+    when(catalogDispatcher.catalogExists(any())).thenReturn(false);
+    Response respNotExist =
+        target("/metalakes/metalake1/roles")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), respNotExist.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, respNotExist.getMediaType());
+    ErrorResponse notExistResponse = respNotExist.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, notExistResponse.getCode());
+
     // Test to throw NoSuchMetalakeException
+    when(catalogDispatcher.catalogExists(any())).thenReturn(true);
     doThrow(new NoSuchMetalakeException("mock error"))
         .when(manager)
         .createRole(any(), any(), any(), any());
@@ -340,5 +390,86 @@ public class TestRoleOperations extends JerseyTest {
     ErrorResponse errorResponse = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
+  }
+
+  @Test
+  public void testCheckSecurableObjects() {
+    // check all metalakes
+    SecurableObject allMetalake =
+        SecurableObjects.ofAllMetalakes(Lists.newArrayList(Privileges.UseMetalake.allow()));
+    when(metalakeDispatcher.metalakeExists(any())).thenReturn(true);
+    Assertions.assertDoesNotThrow(
+        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(allMetalake)));
+    when(metalakeDispatcher.metalakeExists(any())).thenReturn(false);
+    Assertions.assertDoesNotThrow(
+        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(allMetalake)));
+
+    // check the metalake
+    SecurableObject metalake =
+        SecurableObjects.ofMetalake("metalake", Lists.newArrayList(Privileges.UseMetalake.allow()));
+    when(metalakeDispatcher.metalakeExists(any())).thenReturn(true);
+    Assertions.assertDoesNotThrow(
+        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(metalake)));
+    when(metalakeDispatcher.metalakeExists(any())).thenReturn(false);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(metalake)));
+
+    // check the catalog
+    SecurableObject catalog =
+        SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
+    when(catalogDispatcher.catalogExists(any())).thenReturn(true);
+    Assertions.assertDoesNotThrow(
+        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(catalog)));
+    when(catalogDispatcher.catalogExists(any())).thenReturn(false);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(catalog)));
+
+    // check the schema
+    SecurableObject schema =
+        SecurableObjects.ofSchema(
+            catalog, "schema", Lists.newArrayList(Privileges.UseSchema.allow()));
+    when(schemaDispatcher.schemaExists(any())).thenReturn(true);
+    Assertions.assertDoesNotThrow(
+        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(schema)));
+    when(schemaDispatcher.schemaExists(any())).thenReturn(false);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(schema)));
+
+    // check the table
+    SecurableObject table =
+        SecurableObjects.ofTable(schema, "table", Lists.newArrayList(Privileges.ReadTable.allow()));
+    when(tableDispatcher.tableExists(any())).thenReturn(true);
+    Assertions.assertDoesNotThrow(
+        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(table)));
+    when(tableDispatcher.tableExists(any())).thenReturn(false);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(table)));
+
+    // check the topic
+    SecurableObject topic =
+        SecurableObjects.ofTopic(schema, "topic", Lists.newArrayList(Privileges.ReadTopic.allow()));
+    when(topicDispatcher.topicExists(any())).thenReturn(true);
+    Assertions.assertDoesNotThrow(
+        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(topic)));
+    when(topicDispatcher.topicExists(any())).thenReturn(false);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(topic)));
+
+    // check the fileset
+    SecurableObject fileset =
+        SecurableObjects.ofFileset(
+            schema, "fileset", Lists.newArrayList(Privileges.ReadFileset.allow()));
+    when(filesetDispatcher.filesetExists(any())).thenReturn(true);
+    Assertions.assertDoesNotThrow(
+        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(fileset)));
+    when(filesetDispatcher.filesetExists(any())).thenReturn(false);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(fileset)));
   }
 }

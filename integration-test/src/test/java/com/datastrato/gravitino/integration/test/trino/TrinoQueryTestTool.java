@@ -1,6 +1,20 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.integration.test.trino;
 
@@ -26,6 +40,8 @@ public class TrinoQueryTestTool {
           "Start the test containers and gravitino server automatically, the values are 'all','gravitation','none'."
               + "The default value is 'all'. If the value is 'gravitino', only the gravitino server will be started automatically.");
 
+      options.addOption(
+          "ignore_failed", false, "Ignore the failed test cases, the default value is 'false'");
       options.addOption(
           "gen_output",
           false,
@@ -101,6 +117,10 @@ public class TrinoQueryTestTool {
         }
       }
 
+      if (commandLine.hasOption("ignore_failed")) {
+        TrinoQueryIT.exitOnFailed = false;
+      }
+
       TrinoQueryIT.ciTestsets.clear();
 
       String gravitinoUri = commandLine.getOptionValue("gravitino_uri");
@@ -171,12 +191,11 @@ public class TrinoQueryTestTool {
       if (testSet == null) {
         testerRunner.testSql();
       } else {
-        String catalogFileName = catalog.isEmpty() ? "" : "catalog_" + catalog + "_prepare.sql";
-        testerRunner.testSql(testSetDir, catalogFileName, testerId);
+        testerRunner.testSql(testSetDir, catalog, testerId);
       }
       System.out.printf(
-          "All the testers completed (%d/%d)%n",
-          testerRunner.testCount.get(), testerRunner.totalCount.get());
+          "All testers have finished. Total:%s, Pass: %s\n%s",
+          testerRunner.totalCount, testerRunner.passCount, testerRunner.generateTestStatus());
     } catch (Exception e) {
       System.out.println(e.getMessage());
       e.printStackTrace();

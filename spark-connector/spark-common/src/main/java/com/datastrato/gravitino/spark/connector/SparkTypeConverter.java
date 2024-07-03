@@ -1,6 +1,19 @@
 /*
- *  Copyright 2024 Datastrato Pvt Ltd.
- *  This software is licensed under the Apache License version 2.
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
 package com.datastrato.gravitino.spark.connector;
@@ -97,13 +110,29 @@ public class SparkTypeConverter {
 
   public DataType toSparkType(Type gravitinoType) {
     if (gravitinoType instanceof Types.ByteType) {
-      return DataTypes.ByteType;
+      if (((Types.ByteType) gravitinoType).signed()) {
+        return DataTypes.ByteType;
+      } else {
+        return DataTypes.ShortType;
+      }
     } else if (gravitinoType instanceof Types.ShortType) {
-      return DataTypes.ShortType;
+      if (((Types.ShortType) gravitinoType).signed()) {
+        return DataTypes.ShortType;
+      } else {
+        return DataTypes.IntegerType;
+      }
     } else if (gravitinoType instanceof Types.IntegerType) {
-      return DataTypes.IntegerType;
+      if (((Types.IntegerType) gravitinoType).signed()) {
+        return DataTypes.IntegerType;
+      } else {
+        return DataTypes.LongType;
+      }
     } else if (gravitinoType instanceof Types.LongType) {
-      return DataTypes.LongType;
+      if (((Types.LongType) gravitinoType).signed()) {
+        return DataTypes.LongType;
+      } else {
+        return DataTypes.createDecimalType(20, 0);
+      }
     } else if (gravitinoType instanceof Types.FloatType) {
       return DataTypes.FloatType;
     } else if (gravitinoType instanceof Types.DoubleType) {

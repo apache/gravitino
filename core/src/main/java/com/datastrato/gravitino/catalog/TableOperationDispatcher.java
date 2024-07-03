@@ -1,6 +1,20 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.catalog;
 
@@ -10,6 +24,7 @@ import static com.datastrato.gravitino.catalog.PropertiesMetadataHelpers.validat
 import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
 
 import com.datastrato.gravitino.EntityStore;
+import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
@@ -19,6 +34,8 @@ import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
+import com.datastrato.gravitino.lock.LockType;
+import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.rel.Column;
@@ -79,37 +96,26 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    */
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
-    NameIdentifier catalogIdentifier = getCatalogIdentifier(ident);
-    Table table =
-        doWithCatalog(
-            catalogIdentifier,
-            c -> c.doWithTableOps(t -> t.loadTable(ident)),
-            NoSuchTableException.class);
+    EntityCombinedTable table =
+        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
 
-    StringIdentifier stringId = getStringIdFromProperties(table.properties());
-    // Case 1: The table is not created by Gravitino.
-    if (stringId == null) {
-      return EntityCombinedTable.of(table)
-          .withHiddenPropertiesSet(
-              getHiddenPropertyNames(
-                  catalogIdentifier,
-                  HasPropertyMetadata::tablePropertiesMetadata,
-                  table.properties()));
+    if (!table.imported()) {
+      // Load the schema to make sure the schema is imported.
+      SchemaDispatcher schemaDispatcher = GravitinoEnv.getInstance().schemaDispatcher();
+      NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
+      schemaDispatcher.loadSchema(schemaIdent);
+
+      // Import the table.
+      TreeLockUtils.doWithTreeLock(
+          schemaIdent,
+          LockType.WRITE,
+          () -> {
+            importTable(ident);
+            return null;
+          });
     }
 
-    TableEntity tableEntity =
-        operateOnEntity(
-            ident,
-            identifier -> store.get(identifier, TABLE, TableEntity.class),
-            "GET",
-            stringId.id());
-
-    return EntityCombinedTable.of(table, tableEntity)
-        .withHiddenPropertiesSet(
-            getHiddenPropertyNames(
-                catalogIdentifier,
-                HasPropertyMetadata::tablePropertiesMetadata,
-                table.properties()));
+    return table;
   }
 
   /**
@@ -378,5 +384,95 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     return isManagedEntity(catalogIdent, Capability.Scope.TABLE)
         ? droppedFromStore
         : droppedFromCatalog;
+  }
+
+  private void importTable(NameIdentifier identifier) {
+    EntityCombinedTable table = internalLoadTable(identifier);
+
+    if (table.imported()) {
+      return;
+    }
+
+    StringIdentifier stringId = null;
+    try {
+      stringId = table.stringIdentifier();
+    } catch (IllegalArgumentException ie) {
+      LOG.warn(FormattedErrorMessages.STRING_ID_PARSE_ERROR, ie.getMessage());
+    }
+
+    long uid;
+    if (stringId != null) {
+      // If the entity in the store doesn't match the external system, we use the data
+      // of external system to correct it.
+      LOG.warn(
+          "The Table uid {} existed but still need to be imported, this could be happened "
+              + "when Table is renamed by external systems not controlled by Gravitino. In this case, "
+              + "we need to overwrite the stored entity to keep the consistency.",
+          stringId);
+      uid = stringId.id();
+    } else {
+      // If entity doesn't exist, we import the entity from the external system.
+      uid = idGenerator.nextId();
+    }
+
+    TableEntity tableEntity =
+        TableEntity.builder()
+            .withId(uid)
+            .withName(identifier.name())
+            .withNamespace(identifier.namespace())
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator(table.auditInfo().creator())
+                    .withCreateTime(table.auditInfo().createTime())
+                    .withLastModifier(table.auditInfo().lastModifier())
+                    .withLastModifiedTime(table.auditInfo().lastModifiedTime())
+                    .build())
+            .build();
+    try {
+      store.put(tableEntity, true);
+    } catch (Exception e) {
+      LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
+      throw new RuntimeException("Fail to import the table entity to the store.", e);
+    }
+  }
+
+  private EntityCombinedTable internalLoadTable(NameIdentifier ident) {
+    NameIdentifier catalogIdentifier = getCatalogIdentifier(ident);
+    Table table =
+        doWithCatalog(
+            catalogIdentifier,
+            c -> c.doWithTableOps(t -> t.loadTable(ident)),
+            NoSuchTableException.class);
+
+    StringIdentifier stringId = getStringIdFromProperties(table.properties());
+    // Case 1: The table is not created by Gravitino or the external system does not support storing
+    // string identifier.
+    if (stringId == null) {
+      return EntityCombinedTable.of(table)
+          .withHiddenPropertiesSet(
+              getHiddenPropertyNames(
+                  catalogIdentifier,
+                  HasPropertyMetadata::tablePropertiesMetadata,
+                  table.properties()))
+          // Some tables don't have properties or are not created by Gravitino,
+          // we can't use stringIdentifier to judge whether schema is ever imported or not.
+          // We need to check whether the entity exists.
+          .withImported(isEntityExist(ident, TABLE));
+    }
+
+    TableEntity tableEntity =
+        operateOnEntity(
+            ident,
+            identifier -> store.get(identifier, TABLE, TableEntity.class),
+            "GET",
+            stringId.id());
+
+    return EntityCombinedTable.of(table, tableEntity)
+        .withHiddenPropertiesSet(
+            getHiddenPropertyNames(
+                catalogIdentifier,
+                HasPropertyMetadata::tablePropertiesMetadata,
+                table.properties()))
+        .withImported(tableEntity != null);
   }
 }

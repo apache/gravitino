@@ -1,21 +1,43 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.catalog;
 
+import static com.datastrato.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
+import static com.datastrato.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
+import static com.datastrato.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static com.datastrato.gravitino.StringIdentifier.ID_KEY;
 import static com.datastrato.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 
+import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.Entity;
+import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
+import com.datastrato.gravitino.lock.LockManager;
 import com.datastrato.gravitino.messaging.Topic;
 import com.datastrato.gravitino.messaging.TopicChange;
 import com.datastrato.gravitino.meta.AuditInfo;
@@ -24,6 +46,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -34,11 +57,19 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
   static TopicOperationDispatcher topicOperationDispatcher;
 
   @BeforeAll
-  public static void initialize() throws IOException {
+  public static void initialize() throws IOException, IllegalAccessException {
     schemaOperationDispatcher =
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
     topicOperationDispatcher =
         new TopicOperationDispatcher(catalogManager, entityStore, idGenerator);
+
+    Config config = mock(Config.class);
+    doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
+    doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
+    doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "schemaDispatcher", schemaOperationDispatcher, true);
   }
 
   @Test
@@ -90,15 +121,27 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
 
     // Case 2: Test if the topic entity is not found in the entity store
     reset(entityStore);
+    entityStore.delete(topicIdent1, Entity.EntityType.TOPIC);
+    entityStore.delete(NameIdentifier.of(topicNs.levels()), Entity.EntityType.SCHEMA);
     doThrow(new NoSuchEntityException("")).when(entityStore).get(any(), any(), any());
     Topic loadedTopic2 = topicOperationDispatcher.loadTopic(topicIdent1);
+    // Succeed to import the topic entity
+    Assertions.assertTrue(entityStore.exists(topicIdent1, Entity.EntityType.TOPIC));
+    Assertions.assertTrue(
+        entityStore.exists(NameIdentifier.of(topicNs.levels()), Entity.EntityType.SCHEMA));
     // Audit info is gotten from the catalog, not from the entity store
     Assertions.assertEquals("test", loadedTopic2.auditInfo().creator());
 
     // Case 3: Test if the entity store is failed to get the topic entity
     reset(entityStore);
+    entityStore.delete(topicIdent1, Entity.EntityType.TOPIC);
+    entityStore.delete(NameIdentifier.of(topicNs.levels()), Entity.EntityType.SCHEMA);
     doThrow(new IOException()).when(entityStore).get(any(), any(), any());
     Topic loadedTopic3 = topicOperationDispatcher.loadTopic(topicIdent1);
+    // Succeed to import the topic entity
+    Assertions.assertTrue(
+        entityStore.exists(NameIdentifier.of(topicNs.levels()), Entity.EntityType.SCHEMA));
+    Assertions.assertTrue(entityStore.exists(topicIdent1, Entity.EntityType.TOPIC));
     // Audit info is gotten from the catalog, not from the entity store
     Assertions.assertEquals("test", loadedTopic3.auditInfo().creator());
 
@@ -114,6 +157,11 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
             .build();
     doReturn(unmatchedEntity).when(entityStore).get(any(), any(), any());
     Topic loadedTopic4 = topicOperationDispatcher.loadTopic(topicIdent1);
+    // Succeed to import the topic entity
+    reset(entityStore);
+    TopicEntity topicEntity =
+        entityStore.get(topicIdent1, Entity.EntityType.TOPIC, TopicEntity.class);
+    Assertions.assertEquals("test", topicEntity.auditInfo().creator());
     // Audit info is gotten from the catalog, not from the entity store
     Assertions.assertEquals("test", loadedTopic4.auditInfo().creator());
   }

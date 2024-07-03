@@ -1,6 +1,20 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.integration.test.trino;
 
@@ -17,6 +31,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
@@ -29,20 +44,23 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.logging.log4j.util.Strings;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 public class TrinoQueryIT extends TrinoQueryITBase {
   private static final Logger LOG = LoggerFactory.getLogger(TrinoQueryIT.class);
 
   protected static String testsetsDir = "";
-  protected AtomicInteger testCount = new AtomicInteger(0);
+  protected AtomicInteger passCount = new AtomicInteger(0);
   protected AtomicInteger totalCount = new AtomicInteger(0);
+  protected static boolean exitOnFailed = true;
+
+  // key: tester name, value: tester result
+  private static Map<String, TestStatus> allTestStatus = new TreeMap<>();
 
   private static int testParallelism = 2;
 
@@ -102,18 +120,31 @@ public class TrinoQueryIT extends TrinoQueryITBase {
   }
 
   public void runOneTestSetWithCatalog(
-      String testSetDirName, String catalogFileName, String testFilterPrefix) throws Exception {
+      String testSetDirName, String catalog, String testFilterPrefix) throws Exception {
     String[] testerNames = getTesterNames(testSetDirName, testFilterPrefix);
     if (testerNames.length == 0) return;
 
-    String catalog = catalogFileName.replace("_prepare.sql", "").replace("catalog_", "");
-    String catalogPrefix = catalogFileName.replace("prepare.sql", "");
+    String catalogPrefix = "catalog_" + catalog + "_";
     TrinoQueryRunner queryRunner = new TrinoQueryRunner(TrinoQueryITBase.trinoUri);
     executeSqlFile(testSetDirName, catalogPrefix + "prepare.sql", queryRunner, catalog);
 
     Arrays.sort(testerNames);
     for (String testerName : testerNames) {
-      executeSqlFileWithCheckResult(testSetDirName, testerName, queryRunner, catalog);
+      try {
+        executeSqlFileWithCheckResult(testSetDirName, testerName, queryRunner, catalog);
+      } catch (Exception e) {
+        TestStatus testStatus =
+            allTestStatus.get(
+                TestStatus.testName(ITUtils.joinPath(testSetDirName, testerName), catalog));
+        testStatus.endTime = System.currentTimeMillis();
+        testStatus.status = false;
+        testStatus.error = e.getMessage();
+
+        if (exitOnFailed) {
+          throw e;
+        }
+        LOG.error(e.getMessage());
+      }
     }
 
     executeSqlFile(testSetDirName, catalogPrefix + "cleanup.sql", queryRunner, catalog);
@@ -192,6 +223,8 @@ public class TrinoQueryIT extends TrinoQueryITBase {
         Pattern.compile("((\".*?\")\\n{2,})|((\\S.*?)\\n{2,})", Pattern.DOTALL | Pattern.UNIX_LINES)
             .matcher(testResults);
 
+    TestStatus testStatus = allTestStatus.get(TestStatus.testName(path, catalog));
+    testStatus.startTime = System.currentTimeMillis();
     while (sqlMatcher.find()) {
       String sql = sqlMatcher.group(1);
       sql = resolveParameters(sql);
@@ -223,11 +256,14 @@ public class TrinoQueryIT extends TrinoQueryITBase {
                 "Execute sql in the tester %s under catalog %s failed.\nSql:\n%s;\nExpect:\n%s\nActual:\n%s",
                 simpleTesterName(path), catalog, sql, expectResult, result);
         LOG.error(errorMessage);
-        Assertions.fail(errorMessage);
+        throw new Exception(errorMessage);
       }
     }
-    testCount.incrementAndGet();
-    LOG.info("Test progress {}/{}", testCount.get(), totalCount.get());
+    testStatus.endTime = System.currentTimeMillis();
+    testStatus.status = true;
+    testStatus.error = "";
+    passCount.incrementAndGet();
+    LOG.info("Test progress {}/{}", passCount.get(), totalCount.get());
   }
 
   /**
@@ -316,14 +352,13 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     waitForCompleted(executor, completionService, allFutures);
   }
 
-  public void testSql(String testSetDirName, String catalogFileName, String testerPrefix)
-      throws Exception {
+  public void testSql(String testSetDirName, String catalog, String testerPrefix) throws Exception {
     ExecutorService executor = Executors.newFixedThreadPool(testParallelism);
     CompletionService completionService = new ExecutorCompletionService<>(executor);
 
-    totalCount.addAndGet(getTesterCount(testSetDirName, catalogFileName, testerPrefix));
+    totalCount.addAndGet(getTesterCount(testSetDirName, catalog, testerPrefix));
     List<Future<Integer>> futures =
-        runOneTestset(completionService, testSetDirName, catalogFileName, testerPrefix);
+        runOneTestset(completionService, testSetDirName, catalog, testerPrefix);
     List<Future<Integer>> allFutures = new ArrayList<>(futures);
 
     waitForCompleted(executor, completionService, allFutures);
@@ -343,16 +378,36 @@ public class TrinoQueryIT extends TrinoQueryITBase {
       }
     }
     executor.shutdownNow();
-    LOG.info("All testers completed ({}/{})", testCount, totalCount);
+    LOG.info(
+        "All testers have finished. Total:{}, Pass: {}\n{}",
+        totalCount,
+        passCount,
+        generateTestStatus());
+  }
+
+  public String generateTestStatus() {
+    StringBuilder builder = new StringBuilder();
+    for (Map.Entry<String, TestStatus> entry : allTestStatus.entrySet()) {
+      TestStatus testStatus = entry.getValue();
+      String status = testStatus.status ? "PASS" : "FAIL";
+      builder.append(
+          String.format(
+              "%s, %s, %.3f, %s\n",
+              testStatus.testerName,
+              status,
+              (testStatus.endTime - testStatus.startTime) / 1000.0,
+              testStatus.error));
+    }
+    return builder.toString();
   }
 
   public List<Future<Integer>> runOneTestset(
       CompletionService completionService,
       String testSetDirName,
-      String catalogFileName,
+      String catalog,
       String testerFilter)
       throws Exception {
-    String[] testCatalogs = getTesterCatalogNames(testSetDirName, catalogFileName);
+    String[] testCatalogs = getTesterCatalogNames(testSetDirName, catalog);
 
     List<Future<Integer>> futures = new ArrayList<>();
     for (int i = 0; i < testCatalogs.length; i++) {
@@ -375,7 +430,10 @@ public class TrinoQueryIT extends TrinoQueryITBase {
                           "Failed to run the test %s's catalog %s: %s",
                           simpleTesterName(testSetDirName), testCatalogs[finalI], e.getMessage());
                   LOG.error(msg);
-                  throw new RuntimeException(msg, e);
+                  if (exitOnFailed) {
+                    throw new RuntimeException(msg, e);
+                  }
+                  return finalI;
                 }
               }));
     }
@@ -383,16 +441,15 @@ public class TrinoQueryIT extends TrinoQueryITBase {
   }
 
   public void runOneTestSetAndGenOutput(
-      String testSetDirName, String catalogFileName, String testFilterPrefix) throws Exception {
+      String testSetDirName, String catalog, String testFilterPrefix) throws Exception {
     String[] testerNames = getTesterNames(testSetDirName, testFilterPrefix);
-    String[] catalogNames = getTesterCatalogNames(testSetDirName, catalogFileName);
+    String[] catalogNames = getTesterCatalogNames(testSetDirName, catalog);
     if (testerNames.length == 0 || catalogNames.length == 0) {
       return;
     }
-    catalogFileName = catalogNames[0];
+    catalog = catalogNames[0];
 
-    String catalog = catalogFileName.replace("_prepare.sql", "").replace("catalog_", "");
-    String catalogPrefix = catalogFileName.replace("prepare.sql", "");
+    String catalogPrefix = catalog.replace("prepare.sql", "");
     TrinoQueryRunner queryRunner = new TrinoQueryRunner(TrinoQueryITBase.trinoUri);
     executeSqlFile(testSetDirName, catalogPrefix + "prepare.sql", queryRunner, catalog);
 
@@ -441,15 +498,31 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     outputStream.close();
   }
 
-  static int getTesterCount(String testSetDirName, String catalogFileName, String testFilterPrefix)
+  static int getTesterCount(String testSetDirName, String catalog, String testFilterPrefix)
       throws Exception {
     String[] testerNames = getTesterNames(testSetDirName, testFilterPrefix);
 
-    if (Strings.isNotEmpty(catalogFileName)) {
+    if (Strings.isNotEmpty(catalog)) {
+      Arrays.stream(testerNames)
+          .forEach(
+              name -> {
+                TestStatus testStatus =
+                    new TestStatus(ITUtils.joinPath(testSetDirName, name), catalog);
+                allTestStatus.put(testStatus.testerName, testStatus);
+              });
       return testerNames.length;
     }
 
     String[] testCatalogs = getTesterCatalogNames(testSetDirName, "");
+    for (String testCatalog : testCatalogs) {
+      Arrays.stream(testerNames)
+          .forEach(
+              name -> {
+                TestStatus testStatus =
+                    new TestStatus(ITUtils.joinPath(testSetDirName, name), testCatalog);
+                allTestStatus.put(testStatus.testerName, testStatus);
+              });
+    }
 
     return testerNames.length * testCatalogs.length;
   }
@@ -461,15 +534,31 @@ public class TrinoQueryIT extends TrinoQueryITBase {
         .toArray(String[]::new);
   }
 
-  static String[] getTesterCatalogNames(String testSetDirName, String catalogFileName)
-      throws Exception {
+  static String[] getTesterCatalogNames(String testSetDirName, String catalog) throws Exception {
     return Arrays.stream(listDirectory(testSetDirName))
         .filter(s -> s.matches("catalog_.*_prepare.sql"))
-        .filter(s -> catalogFileName.isEmpty() || s.equals(catalogFileName))
+        .filter(s -> catalog.isEmpty() || s.equals("catalog_" + catalog + "_prepare.sql"))
+        .map(s -> s.replace("catalog_", "").replace("_prepare.sql", ""))
         .toArray(String[]::new);
   }
 
   static String simpleTesterName(String testerName) {
     return testerName.replace(testsetsDir + "/", "");
+  }
+
+  static class TestStatus {
+    final String testerName;
+    String error = "Tester Failed in the preparation stage";
+    long startTime = 0;
+    long endTime = 0;
+    boolean status = false;
+
+    TestStatus(String filename, String catalog) {
+      testerName = testName(filename, catalog);
+    }
+
+    public static String testName(String filename, String catalog) {
+      return catalog + ":" + simpleTesterName(filename);
+    }
   }
 }

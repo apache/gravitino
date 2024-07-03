@@ -5,8 +5,7 @@ keywords:
 - jdbc
 - MySQL
 - metadata
-license: "Copyright 2023 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
 import Tabs from '@theme/Tabs';
@@ -40,6 +39,7 @@ Check the relevant data source configuration in [data source properties](https:/
 When you use the Gravitino with Trino. You can pass the Trino MySQL connector configuration using prefix `trino.bypass.`. For example, using `trino.bypass.join-pushdown.strategy` to pass the `join-pushdown.strategy` to the Gravitino MySQL catalog in Trino runtime.
 
 If you use a JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user` and `jdbc-password` to catalog properties.
+Besides the [common catalog properties](./gravitino-server-config.md#gravitino-catalog-properties-configuration), the MySQL catalog has the following properties:
 
 | Configuration item   | Description                                                                                            | Default value | Required | Since Version |
 |----------------------|--------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
@@ -87,22 +87,26 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 #### Table column types
 
-| Gravitino Type   | MySQL Type  |
-|------------------|-------------|
-| `Byte`           | `Tinyint`   |
-| `Short`          | `Smallint`  |
-| `Integer`        | `Int`       |
-| `Long`           | `Bigint`    |
-| `Float`          | `Float`     |
-| `Double`         | `Double`    |
-| `String`         | `Text`      |
-| `Date`           | `Date`      |
-| `Time`           | `Time`      |
-| `Timestamp`      | `Timestamp` |
-| `Decimal`        | `Decimal`   |
-| `VarChar`        | `VarChar`   |
-| `FixedChar`      | `FixedChar` |
-| `Binary`         | `Binary`    |
+| Gravitino Type   | MySQL Type          |
+|------------------|---------------------|
+| `Byte`           | `Tinyint`           |
+| `Byte(false)`    | `Tinyint Unsigned`  |
+| `Short`          | `Smallint`          |
+| `Short(false)`   | `Smallint Unsigned` |
+| `Integer`        | `Int`               |
+| `Integer(false)` | `Int Unsigned`      |
+| `Long`           | `Bigint`            |
+| `Long(false)`    | `Bigint Unsigned`   | 
+| `Float`          | `Float`             |
+| `Double`         | `Double`            |
+| `String`         | `Text`              |
+| `Date`           | `Date`              |
+| `Time`           | `Time`              |
+| `Timestamp`      | `Timestamp`         |
+| `Decimal`        | `Decimal`           |
+| `VarChar`        | `VarChar`           |
+| `FixedChar`      | `FixedChar`         |
+| `Binary`         | `Binary`            |
 
 :::info
 MySQL doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
@@ -115,7 +119,7 @@ Meanwhile, the data types other than listed above are mapped to Gravitino **[Ext
 MySQL setting an auto-increment column requires simultaneously setting a unique index; otherwise, an error will occur.
 :::
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="json" label="Json">
 
 ```json
@@ -182,7 +186,7 @@ The index name of the PRIMARY_KEY must be PRIMARY
 [Create table index](https://dev.mysql.com/doc/refman/8.0/en/create-table.html)
 :::
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="json" label="Json">
 
 ```json

@@ -1,6 +1,20 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.catalog;
 
@@ -24,6 +38,11 @@ import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
+import com.datastrato.gravitino.rel.partitions.IdentityPartition;
+import com.datastrato.gravitino.rel.partitions.ListPartition;
+import com.datastrato.gravitino.rel.partitions.Partition;
+import com.datastrato.gravitino.rel.partitions.Partitions;
+import com.datastrato.gravitino.rel.partitions.RangePartition;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 
@@ -108,6 +127,39 @@ public class CapabilityHelpers {
       return Namespace.of(metalake, catalog, schema);
     }
     return namespace;
+  }
+
+  public static Partition[] applyCaseSensitive(Partition[] partitions, Capability capabilities) {
+    return Arrays.stream(partitions)
+        .map(p -> applyCaseSensitive(p, capabilities))
+        .toArray(Partition[]::new);
+  }
+
+  public static Partition applyCaseSensitive(Partition partition, Capability capabilities) {
+    String newName =
+        capabilities.caseSensitiveOnName(Capability.Scope.PARTITION).supported()
+            ? partition.name()
+            : partition.name().toLowerCase();
+    if (partition instanceof IdentityPartition) {
+      IdentityPartition identityPartition = (IdentityPartition) partition;
+      return Partitions.identity(
+          newName,
+          identityPartition.fieldNames(),
+          identityPartition.values(),
+          identityPartition.properties());
+
+    } else if (partition instanceof ListPartition) {
+      ListPartition listPartition = (ListPartition) partition;
+      return Partitions.list(newName, listPartition.lists(), listPartition.properties());
+
+    } else if (partition instanceof RangePartition) {
+      RangePartition rangePartition = (RangePartition) partition;
+      return Partitions.range(
+          newName, rangePartition.upper(), rangePartition.lower(), rangePartition.properties());
+
+    } else {
+      throw new IllegalArgumentException("Unknown partition type: " + partition.getClass());
+    }
   }
 
   public static Transform[] applyCapabilities(Transform[] transforms, Capability capabilities) {
@@ -198,12 +250,22 @@ public class CapabilityHelpers {
           applyCapabilities(truncateTransform.fieldName(), capabilities));
 
     } else if (transform instanceof Transforms.ListTransform) {
+      Transforms.ListTransform listTransform = (Transforms.ListTransform) transform;
+      ListPartition[] assignments =
+          Arrays.stream(listTransform.assignments())
+              .map(l -> applyCaseSensitive(l, capabilities))
+              .toArray(ListPartition[]::new);
       return Transforms.list(
-          applyCapabilities(((Transforms.ListTransform) transform).fieldNames(), capabilities));
+          applyCapabilities(listTransform.fieldNames(), capabilities), assignments);
 
     } else if (transform instanceof Transforms.RangeTransform) {
+      Transforms.RangeTransform rangeTransform = (Transforms.RangeTransform) transform;
+      RangePartition[] assignments =
+          Arrays.stream(rangeTransform.assignments())
+              .map(r -> applyCaseSensitive(r, capabilities))
+              .toArray(RangePartition[]::new);
       return Transforms.range(
-          applyCapabilities(((Transforms.RangeTransform) transform).fieldName(), capabilities));
+          applyCapabilities(rangeTransform.fieldName(), capabilities), assignments);
 
     } else if (transform instanceof Transforms.ApplyTransform) {
       return Transforms.apply(

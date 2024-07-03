@@ -1,6 +1,20 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.client;
 
@@ -40,7 +54,7 @@ public class RelationalTable implements Table, SupportsPartitions {
   /**
    * Creates a new RelationalTable.
    *
-   * @param namespace The namespace of the table.
+   * @param namespace The full namespace of the table, including metalake, catalog and schema.
    * @param tableDTO The table data transfer object.
    * @param restClient The REST client.
    * @return A new RelationalTable.
@@ -57,23 +71,14 @@ public class RelationalTable implements Table, SupportsPartitions {
   /**
    * Creates a new RelationalTable.
    *
-   * @param namespace The namespace of the table.
+   * @param namespace The full namespace of the table, including metalake, catalog and schema
    * @param tableDTO The table data transfer object.
    * @param restClient The REST client.
    */
-  public RelationalTable(Namespace namespace, TableDTO tableDTO, RESTClient restClient) {
+  private RelationalTable(Namespace namespace, TableDTO tableDTO, RESTClient restClient) {
     this.namespace = namespace;
     this.restClient = restClient;
     this.table = fromDTO(tableDTO);
-  }
-
-  /**
-   * Returns the namespace of the table.
-   *
-   * @return The namespace of the table.
-   */
-  public Namespace namespace() {
-    return namespace;
   }
 
   /**

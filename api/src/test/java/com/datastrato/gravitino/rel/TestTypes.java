@@ -1,6 +1,20 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.rel;
 
@@ -26,23 +40,43 @@ public class TestTypes {
 
     Types.ByteType byteType = Types.ByteType.get();
     Assertions.assertEquals(Type.Name.BYTE, byteType.name());
-    Assertions.assertSame(byteType, Types.ByteType.get());
     Assertions.assertEquals("byte", byteType.simpleString());
+
+    Types.ByteType unsignByteType = Types.ByteType.unsigned();
+    Assertions.assertEquals(Type.Name.BYTE, unsignByteType.name());
+    Assertions.assertFalse(unsignByteType.signed());
+    Assertions.assertEquals("byte unsigned", unsignByteType.simpleString());
 
     Types.ShortType shortType = Types.ShortType.get();
     Assertions.assertEquals(Type.Name.SHORT, shortType.name());
     Assertions.assertSame(shortType, Types.ShortType.get());
     Assertions.assertEquals("short", shortType.simpleString());
 
+    Types.ShortType unsignShortType = Types.ShortType.unsigned();
+    Assertions.assertEquals(Type.Name.SHORT, unsignShortType.name());
+    Assertions.assertFalse(unsignShortType.signed());
+    Assertions.assertEquals("short unsigned", unsignShortType.simpleString());
+
     Types.IntegerType integerType = Types.IntegerType.get();
     Assertions.assertEquals(Type.Name.INTEGER, integerType.name());
     Assertions.assertSame(integerType, Types.IntegerType.get());
     Assertions.assertEquals("integer", integerType.simpleString());
 
+    Types.IntegerType unsignIntegerType = Types.IntegerType.unsigned();
+    Assertions.assertEquals(Type.Name.INTEGER, unsignIntegerType.name());
+    Assertions.assertFalse(unsignIntegerType.signed());
+    Assertions.assertEquals("integer unsigned", unsignIntegerType.simpleString());
+
     Types.LongType longType = Types.LongType.get();
     Assertions.assertEquals(Type.Name.LONG, longType.name());
     Assertions.assertSame(longType, Types.LongType.get());
     Assertions.assertEquals("long", longType.simpleString());
+
+    Types.LongType unsignLongType = Types.LongType.unsigned();
+    Assertions.assertEquals(Type.Name.LONG, unsignLongType.name());
+    Assertions.assertFalse(unsignLongType.signed());
+    Assertions.assertNotSame(unsignLongType, Types.LongType.get());
+    Assertions.assertEquals("long unsigned", unsignLongType.simpleString());
 
     Types.FloatType floatType = Types.FloatType.get();
     Assertions.assertEquals(Type.Name.FLOAT, floatType.name());

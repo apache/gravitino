@@ -1,7 +1,21 @@
 #!/bin/bash
 #
-# Copyright 2024 Datastrato Pvt Ltd.
-# This software is licensed under the Apache License version 2.
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
 #
 
 # start ssh
@@ -84,14 +98,14 @@ while [[ ${retry_times} -lt 10 ]]; do
   hdfs_ready=$(hdfs dfsadmin -report | grep "Live datanodes" | awk '{print $3}')
   if [[ ${hdfs_ready} == "(1):" ]]; then
     echo "HDFS is ready, retry_times = ${retry_times}"
-    let "ready=0"
+    let "ready=1"
     break
   fi
   sleep 10
   retry_times=$((retry_times+1))
 done
 
-if [[ ${ready} -ne 0 ]]; then
+if [[ ${ready} -ne 1 ]]; then
   echo "HDFS is not ready"
   ehco "HDFS DataNode log start---------------------------"
   cat ${HADOOP_HOME}/bin/logs/hadoop-root-datanode-*.log

@@ -1,9 +1,26 @@
 """
-Copyright 2024 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2.
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
 """
 
+import json
 from typing import List, ClassVar
+
+# TODO: delete redundant methods
 
 
 class Namespace:
@@ -14,10 +31,20 @@ class Namespace:
 
     _DOT: ClassVar[str] = "."
 
-    _levels: List[str] = []
+    _levels: List[str]
 
     def __init__(self, levels: List[str]):
         self._levels = levels
+
+    def to_json(self):
+        return json.dumps(self._levels)
+
+    @classmethod
+    def from_json(cls, levels):
+        assert levels is not None and isinstance(
+            levels, list
+        ), f"Cannot parse name identifier from invalid JSON: {levels}"
+        return cls(levels)
 
     @staticmethod
     def empty() -> "Namespace":
@@ -51,160 +78,6 @@ class Namespace:
             )
 
         return Namespace(list(levels))
-
-    @staticmethod
-    def of_metalake() -> "Namespace":
-        """Create a namespace for metalake.
-
-        Returns:
-            A namespace for metalake
-        """
-        return Namespace.empty()
-
-    @staticmethod
-    def of_catalog(metalake: str) -> "Namespace":
-        """Create a namespace for catalog.
-
-        Args:
-            metalake: The metalake name
-
-        Returns:
-            A namespace for catalog
-        """
-        return Namespace.of(metalake)
-
-    @staticmethod
-    def of_schema(metalake: str, catalog: str) -> "Namespace":
-        """Create a namespace for schema.
-
-        Args:
-            metalake: The metalake name
-            catalog: The catalog name
-
-        Returns:
-             A namespace for schema
-        """
-        return Namespace.of(metalake, catalog)
-
-    @staticmethod
-    def of_table(metalake: str, catalog: str, schema: str) -> "Namespace":
-        """Create a namespace for table.
-
-        Args:
-            metalake: The metalake name
-            catalog: The catalog name
-            schema: The schema name
-
-        Returns:
-             A namespace for table
-        """
-        return Namespace.of(metalake, catalog, schema)
-
-    @staticmethod
-    def of_fileset(metalake: str, catalog: str, schema: str) -> "Namespace":
-        """Create a namespace for fileset.
-
-        Args:
-            metalake: The metalake name
-            catalog: The catalog name
-            schema: The schema name
-
-        Returns:
-             A namespace for fileset
-        """
-        return Namespace.of(metalake, catalog, schema)
-
-    @staticmethod
-    def of_topic(metalake: str, catalog: str, schema: str) -> "Namespace":
-        """Create a namespace for topic.
-
-        Args:
-            metalake: The metalake name
-            catalog: The catalog name
-            schema: The schema name
-
-        Returns:
-             A namespace for topic
-        """
-        return Namespace.of(metalake, catalog, schema)
-
-    @staticmethod
-    def check_metalake(namespace: "Namespace") -> None:
-        """Check if the given metalake namespace is legal, throw an IllegalNamespaceException if
-        it's illegal.
-
-        Args:
-            namespace: The metalake namespace
-        """
-        Namespace.check(
-            namespace is not None and namespace.is_empty(),
-            f"Metalake namespace must be non-null and empty, the input namespace is {namespace}",
-        )
-
-    @staticmethod
-    def check_catalog(namespace: "Namespace") -> None:
-        """Check if the given catalog namespace is legal, throw an IllegalNamespaceException if
-        it's illegal.
-
-        Args:
-            namespace: The catalog namespace
-        """
-        Namespace.check(
-            namespace is not None and namespace.length() == 1,
-            f"Catalog namespace must be non-null and have 1 level, the input namespace is {namespace}",
-        )
-
-    @staticmethod
-    def check_schema(namespace: "Namespace") -> None:
-        """Check if the given schema namespace is legal, throw an IllegalNamespaceException if
-        it's illegal.
-
-        Args:
-            namespace: The schema namespace
-        """
-        Namespace.check(
-            namespace is not None and namespace.length() == 2,
-            f"Schema namespace must be non-null and have 2 levels, the input namespace is {namespace}",
-        )
-
-    @staticmethod
-    def check_table(namespace: "Namespace") -> None:
-        """Check if the given table namespace is legal, throw an IllegalNamespaceException if it's
-        illegal.
-
-        Args:
-            namespace: The table namespace
-        """
-        Namespace.check(
-            namespace is not None and namespace.length() == 3,
-            f"Table namespace must be non-null and have 3 levels, the input namespace is {namespace}",
-        )
-
-    @staticmethod
-    def check_fileset(namespace: "Namespace") -> None:
-        """Check if the given fileset namespace is legal, throw an IllegalNamespaceException if
-        it's illegal.
-
-        Args:
-            namespace: The fileset namespace
-        """
-        Namespace.check(
-            namespace is not None and namespace.length() == 3,
-            f"Fileset namespace must be non-null and have 3 levels, the input namespace is {namespace}",
-        )
-
-    @staticmethod
-    def check_topic(namespace: "Namespace") -> None:
-        """Check if the given topic namespace is legal, throw an IllegalNamespaceException if it's
-        illegal.
-
-        Args:
-            namespace: The topic namespace
-        """
-        Namespace.check(
-            namespace is not None and namespace.length() == 3,
-            f"Topic namespace must be non-null and have 3 levels, the input namespace is {namespace}",
-        )
 
     def levels(self) -> List[str]:
         """Get the levels of the namespace.

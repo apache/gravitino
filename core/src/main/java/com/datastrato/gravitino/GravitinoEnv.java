@@ -1,6 +1,20 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino;
 
@@ -40,7 +54,7 @@ import com.datastrato.gravitino.metrics.MetricsSystem;
 import com.datastrato.gravitino.metrics.source.JVMMetricsSource;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
-import com.google.common.annotations.VisibleForTesting;
+import com.datastrato.gravitino.tag.TagManager;
 import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,7 +95,10 @@ public class GravitinoEnv {
   private MetricsSystem metricsSystem;
 
   private LockManager lockManager;
+
   private EventListenerManager eventListenerManager;
+
+  private TagManager tagManager;
 
   private GravitinoEnv() {}
 
@@ -96,40 +113,6 @@ public class GravitinoEnv {
    */
   public static GravitinoEnv getInstance() {
     return InstanceHolder.INSTANCE;
-  }
-
-  /**
-   * This method is used for testing purposes only to set the lock manager for test in package
-   * `com.datastrato.gravitino.server.web.rest`, as tree lock depends on the lock manager and we did
-   * not mock the lock manager in the test, so we need to set the lock manager for test.
-   *
-   * @param lockManager The lock manager to be set.
-   */
-  @VisibleForTesting
-  public void setLockManager(LockManager lockManager) {
-    this.lockManager = lockManager;
-  }
-
-  /**
-   * This method is used for testing purposes only to set the access manager for test in package
-   * `com.datastrato.gravitino.server.web.rest` and `com.datastrato.gravitino.authorization`.
-   *
-   * @param accessControlManager The access control manager to be set.
-   */
-  @VisibleForTesting
-  public void setAccessControlManager(AccessControlManager accessControlManager) {
-    this.accessControlManager = accessControlManager;
-  }
-
-  /**
-   * This method is used for testing purposes only to set the entity store for test in package
-   * `com.datastrato.gravitino.authorization`.
-   *
-   * @param entityStore The entity store to be set.
-   */
-  @VisibleForTesting
-  public void setEntityStore(EntityStore entityStore) {
-    this.entityStore = entityStore;
   }
 
   /**
@@ -211,6 +194,10 @@ public class GravitinoEnv {
 
     // Tree lock
     this.lockManager = new LockManager(config);
+
+    // Tag manager
+    this.tagManager = new TagManager(idGenerator, entityStore);
+
     LOG.info("Gravitino Environment is initialized.");
   }
 
@@ -320,6 +307,15 @@ public class GravitinoEnv {
    */
   public AccessControlManager accessControlManager() {
     return accessControlManager;
+  }
+
+  /**
+   * Get the TagManager associated with the Gravitino environment.
+   *
+   * @return The TagManager instance.
+   */
+  public TagManager tagManager() {
+    return tagManager;
   }
 
   public void start() {

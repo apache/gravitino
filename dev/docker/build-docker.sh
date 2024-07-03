@@ -1,7 +1,21 @@
 #!/bin/bash
 #
-# Copyright 2023 Datastrato Pvt Ltd.
-# This software is licensed under the Apache License version 2.
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
 #
 #set -ex
 script_dir="$(dirname "${BASH_SOURCE-$0}")"
@@ -85,8 +99,8 @@ elif [ "${component_type}" == "doris" ]; then
   . ${script_dir}/doris/doris-dependency.sh --platform ${platform_type}
   build_args="--build-arg DORIS_VERSION=${DORIS_VERSION}"
 elif [ "${component_type}" == "ranger" ]; then
-  # Multiple plugins can be passed using commas, e.g. `plugin-trino,plugin-hive`
-  build_args="--build-arg RANGER_VERSION=2.4.0 --build-arg RANGER_PLUGINS=plugin-trino,plugin-hive"
+  . ${script_dir}/ranger/ranger-dependency.sh
+  build_args="--build-arg RANGER_PACKAGE_NAME=${RANGER_PACKAGE_NAME} --build-arg MYSQL_CONNECTOR_PACKAGE_NAME=${MYSQL_CONNECTOR_PACKAGE_NAME} --build-arg LOG4JDBC_PACKAGE_NAME=${LOG4JDBC_PACKAGE_NAME} --build-arg RANGER_VERSION=${RANGER_VERSION}"
 else
   echo "ERROR : ${component_type} is not a valid component type"
   usage

@@ -1,6 +1,20 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
 package com.datastrato.gravitino.flink.connector.catalog;
@@ -74,10 +88,10 @@ public abstract class BaseCatalog extends AbstractCatalog {
     try {
       Schema schema = catalog().asSchemas().loadSchema(databaseName);
       Map<String, String> properties =
-          propertiesConverter.toFlinkSchemaProperties(schema.properties());
+          propertiesConverter.toFlinkDatabaseProperties(schema.properties());
       return new CatalogDatabaseImpl(properties, schema.comment());
     } catch (NoSuchSchemaException e) {
-      throw new DatabaseNotExistException(getName(), databaseName);
+      throw new DatabaseNotExistException(catalogName(), databaseName);
     }
   }
 
@@ -96,7 +110,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
       catalog().asSchemas().createSchema(databaseName, catalogDatabase.getComment(), properties);
     } catch (SchemaAlreadyExistsException e) {
       if (!ignoreIfExists) {
-        throw new DatabaseAlreadyExistException(getName(), databaseName);
+        throw new DatabaseAlreadyExistException(catalogName(), databaseName);
       }
     } catch (NoSuchCatalogException e) {
       throw new CatalogException(e);
@@ -109,10 +123,10 @@ public abstract class BaseCatalog extends AbstractCatalog {
     try {
       boolean dropped = catalog().asSchemas().dropSchema(databaseName, cascade);
       if (!dropped && !ignoreIfNotExists) {
-        throw new DatabaseNotExistException(getName(), databaseName);
+        throw new DatabaseNotExistException(catalogName(), databaseName);
       }
     } catch (NonEmptySchemaException e) {
-      throw new DatabaseNotEmptyException(getName(), databaseName);
+      throw new DatabaseNotEmptyException(catalogName(), databaseName);
     } catch (NoSuchCatalogException e) {
       throw new CatalogException(e);
     }
@@ -127,7 +141,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
       catalog().asSchemas().alterSchema(databaseName, schemaChanges);
     } catch (NoSuchSchemaException e) {
       if (!ignoreIfNotExists) {
-        throw new DatabaseNotExistException(getName(), databaseName);
+        throw new DatabaseNotExistException(catalogName(), databaseName);
       }
     } catch (NoSuchCatalogException e) {
       throw new CatalogException(e);
@@ -362,5 +376,9 @@ public abstract class BaseCatalog extends AbstractCatalog {
 
   private Catalog catalog() {
     return GravitinoCatalogManager.get().getGravitinoCatalogInfo(getName());
+  }
+
+  private String catalogName() {
+    return getName();
   }
 }

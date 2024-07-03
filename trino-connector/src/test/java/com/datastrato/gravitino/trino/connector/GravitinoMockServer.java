@@ -1,6 +1,20 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.trino.connector;
 
@@ -405,12 +419,7 @@ public class GravitinoMockServer implements AutoCloseable {
                 ConnectorMetadata metadata = memoryConnector.getMetadata(null, null);
                 ArrayList<NameIdentifier> tableNames = new ArrayList<>();
                 for (SchemaTableName tableName : metadata.listTables(null, Optional.empty())) {
-                  tableNames.add(
-                      NameIdentifier.of(
-                          schemaName.level(0),
-                          schemaName.level(1),
-                          schemaName.level(2),
-                          tableName.getTableName()));
+                  tableNames.add(NameIdentifier.of(schemaName.level(0), tableName.getTableName()));
                 }
                 return tableNames.toArray(new NameIdentifier[tableNames.size()]);
               }
@@ -593,13 +602,13 @@ public class GravitinoMockServer implements AutoCloseable {
 
     TableName(NameIdentifier nameIdentifier) {
       Preconditions.checkArgument(
-          nameIdentifier.namespace().length() == 3,
+          nameIdentifier.namespace().length() == 1,
           "Not a table nameIdentifier: " + nameIdentifier);
       this.nameIdentifier = nameIdentifier;
     }
 
     String schema() {
-      return nameIdentifier.namespace().level(2);
+      return nameIdentifier.namespace().level(0);
     }
 
     String table() {

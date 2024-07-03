@@ -1,6 +1,19 @@
 /*
- *  Copyright 2024 Datastrato Pvt Ltd.
- *  This software is licensed under the Apache License version 2.
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
 package com.datastrato.gravitino.spark.connector.catalog;
@@ -67,13 +80,11 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
 
   // The Gravitino catalog client to do schema operations.
   private Catalog gravitinoCatalogClient;
-  private final String metalakeName;
   private String catalogName;
   private final GravitinoCatalogManager gravitinoCatalogManager;
 
   protected BaseCatalog() {
     gravitinoCatalogManager = GravitinoCatalogManager.get();
-    metalakeName = gravitinoCatalogManager.getMetalakeName();
   }
 
   /**
@@ -164,9 +175,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
     }
     try {
       NameIdentifier[] identifiers =
-          gravitinoCatalogClient
-              .asTableCatalog()
-              .listTables(Namespace.of(metalakeName, catalogName, gravitinoNamespace));
+          gravitinoCatalogClient.asTableCatalog().listTables(Namespace.of(gravitinoNamespace));
       return Arrays.stream(identifiers)
           .map(
               identifier ->
@@ -181,8 +190,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
   public Table createTable(
       Identifier ident, StructType schema, Transform[] transforms, Map<String, String> properties)
       throws TableAlreadyExistsException, NoSuchNamespaceException {
-    NameIdentifier gravitinoIdentifier =
-        NameIdentifier.of(metalakeName, catalogName, getDatabase(ident), ident.name());
+    NameIdentifier gravitinoIdentifier = NameIdentifier.of(getDatabase(ident), ident.name());
     com.datastrato.gravitino.rel.Column[] gravitinoColumns =
         Arrays.stream(schema.fields())
             .map(structField -> createGravitinoColumn(structField))
@@ -252,12 +260,12 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
             .map(sparkTableChangeConverter::toGravitinoTableChange)
             .toArray(com.datastrato.gravitino.rel.TableChange[]::new);
     try {
+      sparkCatalog.invalidateTable(ident);
       com.datastrato.gravitino.rel.Table gravitinoTable =
           gravitinoCatalogClient
               .asTableCatalog()
               .alterTable(
-                  NameIdentifier.of(metalakeName, catalogName, getDatabase(ident), ident.name()),
-                  gravitinoTableChanges);
+                  NameIdentifier.of(getDatabase(ident), ident.name()), gravitinoTableChanges);
       org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident);
       return createSparkTable(
           ident,
@@ -274,16 +282,18 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
 
   @Override
   public boolean dropTable(Identifier ident) {
+    sparkCatalog.invalidateTable(ident);
     return gravitinoCatalogClient
         .asTableCatalog()
-        .dropTable(NameIdentifier.of(metalakeName, catalogName, getDatabase(ident), ident.name()));
+        .dropTable(NameIdentifier.of(getDatabase(ident), ident.name()));
   }
 
   @Override
   public boolean purgeTable(Identifier ident) {
+    sparkCatalog.invalidateTable(ident);
     return gravitinoCatalogClient
         .asTableCatalog()
-        .purgeTable(NameIdentifier.of(metalakeName, catalogName, getDatabase(ident), ident.name()));
+        .purgeTable(NameIdentifier.of(getDatabase(ident), ident.name()));
   }
 
   @Override
@@ -296,11 +306,10 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
     com.datastrato.gravitino.rel.TableChange rename =
         com.datastrato.gravitino.rel.TableChange.rename(newIdent.name());
     try {
+      sparkCatalog.invalidateTable(oldIdent);
       gravitinoCatalogClient
           .asTableCatalog()
-          .alterTable(
-              NameIdentifier.of(metalakeName, catalogName, getDatabase(oldIdent), oldIdent.name()),
-              rename);
+          .alterTable(NameIdentifier.of(getDatabase(oldIdent), oldIdent.name()), rename);
     } catch (com.datastrato.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(oldIdent);
     }
@@ -395,7 +404,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
       String database = getDatabase(ident);
       return gravitinoCatalogClient
           .asTableCatalog()
-          .loadTable(NameIdentifier.of(metalakeName, catalogName, database, ident.name()));
+          .loadTable(NameIdentifier.of(database, ident.name()));
     } catch (com.datastrato.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(ident);
     }
@@ -436,9 +445,9 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
 
   private String getDatabase(NameIdentifier gravitinoIdentifier) {
     Preconditions.checkArgument(
-        gravitinoIdentifier.namespace().length() == 3,
-        "Only support 3 level namespace," + gravitinoIdentifier.namespace());
-    return gravitinoIdentifier.namespace().level(2);
+        gravitinoIdentifier.namespace().length() == 1,
+        "Only support 1 level namespace," + gravitinoIdentifier.namespace());
+    return gravitinoIdentifier.namespace().level(0);
   }
 
   private Table loadSparkTable(Identifier ident) {

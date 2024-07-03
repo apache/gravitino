@@ -5,8 +5,7 @@ keywords:
 - jdbc
 - Apache Doris
 - metadata
-license: "Copyright 2024 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
 import Tabs from '@theme/Tabs';
@@ -40,7 +39,7 @@ You can check the relevant data source configuration in
 [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html) for
 more details.
 
-Here are the catalog properties defined in Gravitino for Doris catalog:
+Besides the [common catalog properties](./gravitino-server-config.md#gravitino-catalog-properties-configuration), the Doris catalog has the following properties:
 
 | Configuration item   | Description                                                                         | Default value | Required | Since Version |
 |----------------------|-------------------------------------------------------------------------------------|---------------|----------|---------------|
@@ -121,7 +120,7 @@ Unsupported for now.
 
     Please be aware that the index can only apply to a single column.
 
-    <Tabs>
+    <Tabs groupId='language' queryString>
     <TabItem value="json" label="Json">
 
     ```json

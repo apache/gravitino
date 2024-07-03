@@ -1,17 +1,36 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
 package com.datastrato.gravitino.dto.util;
 
 import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.ListPartitioningDTO;
+import com.datastrato.gravitino.dto.rel.partitioning.RangePartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.ListPartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.PartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.RangePartitionDTO;
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
 import com.datastrato.gravitino.rel.expressions.literals.Literals;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
+import com.datastrato.gravitino.rel.partitions.IdentityPartition;
 import com.datastrato.gravitino.rel.partitions.ListPartition;
 import com.datastrato.gravitino.rel.partitions.Partition;
 import com.datastrato.gravitino.rel.partitions.Partitions;
@@ -37,6 +56,10 @@ public class TestDTOConverters {
         LiteralDTO.builder().withDataType(Types.StringType.get()).withValue("us").build();
     String[][] fieldNames = {field1, field2};
     LiteralDTO[] values = {literal1, literal2};
+    Literal<?>[] expectedValues = {
+      (Literal<?>) DTOConverters.fromFunctionArg(literal1),
+      (Literal<?>) DTOConverters.fromFunctionArg(literal2)
+    };
 
     Map<String, String> properties = Collections.singletonMap("key", "value");
     PartitionDTO identityPartitionDTO =
@@ -47,14 +70,13 @@ public class TestDTOConverters {
             .withProperties(properties)
             .build();
     // when
-    com.datastrato.gravitino.rel.partitions.IdentityPartition identityPartition =
-        (com.datastrato.gravitino.rel.partitions.IdentityPartition)
-            DTOConverters.fromDTO(identityPartitionDTO);
+    IdentityPartition identityPartition =
+        (IdentityPartition) DTOConverters.fromDTO(identityPartitionDTO);
 
     // then
     Assertions.assertTrue(Arrays.equals(fieldNames, identityPartition.fieldNames()));
     Assertions.assertEquals("IdentityPartition", identityPartition.name());
-    Assertions.assertTrue(Arrays.equals(values, identityPartition.values()));
+    Assertions.assertTrue(Arrays.equals(expectedValues, identityPartition.values()));
     Assertions.assertEquals(properties, identityPartition.properties());
   }
 
@@ -66,6 +88,8 @@ public class TestDTOConverters {
         LiteralDTO.builder().withDataType(Types.DateType.get()).withValue("2008-08-08").build();
     LiteralDTO upper =
         LiteralDTO.builder().withDataType(Types.StringType.get()).withValue("us").build();
+    Literal<?> expectedLower = (Literal<?>) DTOConverters.fromFunctionArg(lower);
+    Literal<?> expectedUpper = (Literal<?>) DTOConverters.fromFunctionArg(upper);
 
     Map<String, String> properties = Collections.singletonMap("key", "value");
     PartitionDTO rangePartitionDTO =
@@ -80,8 +104,8 @@ public class TestDTOConverters {
 
     // then
     Assertions.assertEquals("RangePartition", rangePartition.name());
-    Assertions.assertEquals(lower, rangePartition.lower());
-    Assertions.assertEquals(upper, rangePartition.upper());
+    Assertions.assertEquals(expectedLower, rangePartition.lower());
+    Assertions.assertEquals(expectedUpper, rangePartition.upper());
     Assertions.assertEquals(properties, rangePartition.properties());
   }
 
@@ -96,6 +120,10 @@ public class TestDTOConverters {
 
     Map<String, String> properties = Collections.singletonMap("key", "value");
     LiteralDTO[][] literalDTOS = {new LiteralDTO[] {literal1}, new LiteralDTO[] {literal2}};
+    Literal<?>[][] expectedValues = {
+      new Literal<?>[] {(Literal<?>) DTOConverters.fromFunctionArg(literal1)},
+      new Literal<?>[] {(Literal<?>) DTOConverters.fromFunctionArg(literal2)}
+    };
     ListPartitionDTO listPartitionDTO =
         ListPartitionDTO.builder()
             .withName("ListPartition")
@@ -108,7 +136,7 @@ public class TestDTOConverters {
 
     // then
     Assertions.assertEquals("ListPartition", listPartition.name());
-    Assertions.assertTrue(Arrays.equals(literalDTOS, listPartition.lists()));
+    Assertions.assertTrue(Arrays.deepEquals(expectedValues, listPartition.lists()));
     Assertions.assertEquals(properties, listPartition.properties());
   }
 
@@ -180,5 +208,42 @@ public class TestDTOConverters {
     Assertions.assertEquals(PartitionDTO.Type.LIST, listPartitionDTO.type());
     Assertions.assertEquals(values.length, listPartitionDTO.lists().length);
     Assertions.assertEquals(properties, listPartitionDTO.properties());
+  }
+
+  @Test
+  void testPartitionDTOConvert() {
+    Literal<?> lower = Literals.stringLiteral("2008-08-08");
+    Literal<?> upper = Literals.stringLiteral("us");
+    Map<String, String> properties = Collections.singletonMap("key", "value");
+    RangePartition rangePartition = Partitions.range("range", upper, lower, properties);
+    Transform rangeTransform =
+        Transforms.range(new String[] {"col1"}, new RangePartition[] {rangePartition});
+
+    RangePartitioningDTO rangePartitioning =
+        (RangePartitioningDTO) DTOConverters.toDTO(rangeTransform);
+    String[] rangePartitionFieldName = rangePartitioning.fieldName();
+    RangePartitionDTO[] rangePartitionAssignments = rangePartitioning.assignments();
+
+    Assertions.assertEquals("col1", rangePartitionFieldName[0]);
+    Assertions.assertEquals(lower.dataType(), rangePartitionAssignments[0].lower().dataType());
+    Assertions.assertEquals("2008-08-08", rangePartitionAssignments[0].lower().value());
+    Assertions.assertEquals(upper.dataType(), rangePartitionAssignments[0].upper().dataType());
+    Assertions.assertEquals("us", rangePartitionAssignments[0].upper().value());
+    Assertions.assertEquals(properties, rangePartitionAssignments[0].properties());
+
+    Literal<?> value = Literals.stringLiteral(Types.StringType.get().simpleString());
+    Literal<?>[][] values = {new Literal[] {value}};
+    ListPartition listPartition = Partitions.list("list", values, properties);
+    Transform listTransform =
+        Transforms.list(new String[][] {{"col2"}}, new ListPartition[] {listPartition});
+    ListPartitioningDTO listPartitioning = (ListPartitioningDTO) DTOConverters.toDTO(listTransform);
+    String[][] listPartitionFieldNames = listPartitioning.fieldNames();
+    ListPartitionDTO[] listPartitionAssignments = listPartitioning.assignments();
+
+    Assertions.assertEquals("col2", listPartitionFieldNames[0][0]);
+    Assertions.assertEquals(value.dataType(), listPartitionAssignments[0].lists()[0][0].dataType());
+    Assertions.assertEquals(
+        Types.StringType.get().simpleString(), listPartitionAssignments[0].lists()[0][0].value());
+    Assertions.assertEquals(properties, listPartitionAssignments[0].properties());
   }
 }

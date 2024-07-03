@@ -1,11 +1,24 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.catalog;
 
-import static com.datastrato.gravitino.Entity.SECURABLE_ENTITY_RESERVED_NAME;
-
+import com.datastrato.gravitino.MetadataObjects;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.TestColumn;
@@ -17,12 +30,15 @@ import com.datastrato.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
+import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
+import com.datastrato.gravitino.rel.partitions.Partitions;
+import com.datastrato.gravitino.rel.partitions.RangePartition;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -37,7 +53,7 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
   private static SchemaNormalizeDispatcher schemaNormalizeDispatcher;
 
   @BeforeAll
-  public static void initialize() throws IOException {
+  public static void initialize() throws IOException, IllegalAccessException {
     TestTableOperationDispatcher.initialize();
     tableNormalizeDispatcher =
         new TableNormalizeDispatcher(TestTableOperationDispatcher.tableOperationDispatcher);
@@ -58,7 +74,17 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
           TestColumn.builder().withName("colNAME1").withType(Types.StringType.get()).build(),
           TestColumn.builder().withName("colNAME2").withType(Types.StringType.get()).build()
         };
-    Transform[] transforms = new Transform[] {Transforms.identity(columns[0].name())};
+    RangePartition assignedPartition =
+        Partitions.range(
+            "partition_V1",
+            Literals.stringLiteral("value1"),
+            Literals.stringLiteral("value2"),
+            null);
+    Transform[] transforms =
+        new Transform[] {
+          Transforms.range(
+              new String[] {columns[0].name()}, new RangePartition[] {assignedPartition})
+        };
     Distribution distribution =
         Distributions.fields(Strategy.HASH, 5, new String[] {columns[0].name()});
     SortOrder[] sortOrders =
@@ -68,10 +94,12 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
         tableNormalizeDispatcher.createTable(
             tableIdent, columns, "comment", props, transforms, distribution, sortOrders, indexes);
     assertTableCaseInsensitive(tableIdent, columns, createdTable);
-
     // test case-insensitive in loading
     Table loadedTable = tableNormalizeDispatcher.loadTable(tableIdent);
     assertTableCaseInsensitive(tableIdent, columns, loadedTable);
+    Assertions.assertEquals(
+        assignedPartition.name().toLowerCase(),
+        loadedTable.partitioning()[0].assignments()[0].name());
 
     // test case-insensitive in listing
     NameIdentifier[] tableIdents = tableNormalizeDispatcher.listTables(tableNs);
@@ -107,7 +135,8 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     schemaNormalizeDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
 
-    NameIdentifier tableIdent1 = NameIdentifier.of(tableNs, SECURABLE_ENTITY_RESERVED_NAME);
+    NameIdentifier tableIdent1 =
+        NameIdentifier.of(tableNs, MetadataObjects.METADATA_OBJECT_RESERVED_NAME);
     Column[] columns =
         new Column[] {
           TestColumn.builder().withName("colNAME1").withType(Types.StringType.get()).build(),
@@ -132,7 +161,7 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
     Column[] columns1 =
         new Column[] {
           TestColumn.builder()
-              .withName(SECURABLE_ENTITY_RESERVED_NAME)
+              .withName(MetadataObjects.METADATA_OBJECT_RESERVED_NAME)
               .withType(Types.StringType.get())
               .build()
         };

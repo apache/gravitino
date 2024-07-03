@@ -1,6 +1,20 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.rel.partitions;
 
@@ -24,7 +38,7 @@ public class Partitions {
    * @param properties The properties of the partition.
    * @return The created partition.
    */
-  public static Partition range(
+  public static RangePartition range(
       String name, Literal<?> upper, Literal<?> lower, Map<String, String> properties) {
     return new RangePartitionImpl(name, upper, lower, properties);
   }
@@ -37,7 +51,8 @@ public class Partitions {
    * @param properties The properties of the partition.
    * @return The created partition.
    */
-  public static Partition list(String name, Literal<?>[][] lists, Map<String, String> properties) {
+  public static ListPartition list(
+      String name, Literal<?>[][] lists, Map<String, String> properties) {
     return new ListPartitionImpl(name, lists, properties);
   }
 
@@ -52,7 +67,7 @@ public class Partitions {
    * @param properties The properties of the partition.
    * @return The created partition.
    */
-  public static Partition identity(
+  public static IdentityPartition identity(
       String name, String[][] fieldNames, Literal<?>[] values, Map<String, String> properties) {
     return new IdentityPartitionImpl(name, fieldNames, values, properties);
   }
@@ -64,7 +79,7 @@ public class Partitions {
    * @param values The values of the identity partition.
    * @return The created partition.
    */
-  public static Partition identity(String[][] fieldNames, Literal<?>[] values) {
+  public static IdentityPartition identity(String[][] fieldNames, Literal<?>[] values) {
     return identity(null, fieldNames, values, null);
   }
 

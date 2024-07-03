@@ -1,6 +1,19 @@
 /*
- *  Copyright 2024 Datastrato Pvt Ltd.
- *  This software is licensed under the Apache License version 2.
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
 package com.datastrato.gravitino.spark.connector.iceberg;
@@ -13,6 +26,7 @@ import com.datastrato.gravitino.spark.connector.catalog.BaseCatalog;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.spark.SparkCatalog;
 import org.apache.iceberg.spark.procedures.SparkProcedures;
@@ -43,10 +57,14 @@ public class GravitinoIcebergCatalog extends BaseCatalog
   @Override
   protected TableCatalog createAndInitSparkCatalog(
       String name, CaseInsensitiveStringMap options, Map<String, String> properties) {
+    String catalogBackendName =
+        Optional.ofNullable(
+                properties.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND_NAME))
+            .orElse(name);
     Map<String, String> all =
         getPropertiesConverter().toSparkCatalogProperties(options, properties);
     TableCatalog icebergCatalog = new SparkCatalog();
-    icebergCatalog.initialize(name, new CaseInsensitiveStringMap(all));
+    icebergCatalog.initialize(catalogBackendName, new CaseInsensitiveStringMap(all));
     return icebergCatalog;
   }
 

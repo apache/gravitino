@@ -1,6 +1,19 @@
 /*
- *  Copyright 2024 Datastrato Pvt Ltd.
- *  This software is licensed under the Apache License version 2.
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
 package com.datastrato.gravitino.spark.connector.iceberg;
@@ -10,6 +23,7 @@ import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
 import com.datastrato.gravitino.spark.connector.SparkTypeConverter;
 import com.datastrato.gravitino.spark.connector.utils.GravitinoTableInfoHelper;
+import java.lang.reflect.Field;
 import java.util.Map;
 import org.apache.iceberg.spark.SparkCatalog;
 import org.apache.iceberg.spark.source.SparkTable;
@@ -36,10 +50,7 @@ public class SparkIcebergTable extends SparkTable {
       PropertiesConverter propertiesConverter,
       SparkTransformConverter sparkTransformConverter,
       SparkTypeConverter sparkTypeConverter) {
-    super(
-        sparkTable.table(), true
-        /** refreshEagerly */
-        );
+    super(sparkTable.table(), !isCacheEnabled(sparkCatalog));
     this.gravitinoTableInfoHelper =
         new GravitinoTableInfoHelper(
             true,
@@ -79,5 +90,15 @@ public class SparkIcebergTable extends SparkTable {
   @Override
   public ScanBuilder newScanBuilder(CaseInsensitiveStringMap options) {
     return ((SparkTable) sparkTable).newScanBuilder(options);
+  }
+
+  private static boolean isCacheEnabled(SparkCatalog sparkCatalog) {
+    try {
+      Field cacheEnabled = sparkCatalog.getClass().getDeclaredField("cacheEnabled");
+      cacheEnabled.setAccessible(true);
+      return cacheEnabled.getBoolean(sparkCatalog);
+    } catch (NoSuchFieldException | IllegalAccessException e) {
+      throw new RuntimeException("Failed to get cacheEnabled field from SparkCatalog", e);
+    }
   }
 }

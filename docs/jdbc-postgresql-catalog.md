@@ -5,8 +5,7 @@ keywords:
 - jdbc
 - PostgreSQL
 - metadata
-license: "Copyright 2023 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
 import Tabs from '@theme/Tabs';
@@ -38,6 +37,7 @@ You can check the relevant data source configuration in [data source properties]
 When you use the Gravitino with Trino. You can pass the Trino PostgreSQL connector configuration using prefix `trino.bypass.`. For example, using `trino.bypass.join-pushdown.strategy` to pass the `join-pushdown.strategy` to the Gravitino PostgreSQL catalog in Trino runtime.
 
 If you use JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-database`, `jdbc-user` and `jdbc-password` to catalog properties.
+Besides the [common catalog properties](./gravitino-server-config.md#gravitino-catalog-properties-configuration), the PostgreSQL catalog has the following properties:
 
 | Configuration item   | Description                                                                                                                                                        | Default value | Required | Since Version |
 |----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
@@ -126,7 +126,7 @@ Meanwhile, the data types other than listed above are mapped to Gravitino **[Ext
 
 - Supports PRIMARY_KEY and UNIQUE_KEY.
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="json" label="Json">
 
 ```json

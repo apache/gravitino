@@ -3,7 +3,7 @@ title: "Manage massaging metadata using Gravitino"
 slug: /manage-massaging-metadata-using-gravitino
 date: 2024-4-22
 keyword: Gravitino massaging metadata manage
-license: Copyright 2024 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2.
+license: This software is licensed under the Apache License version 2.
 ---
 
 import Tabs from '@theme/Tabs';
@@ -29,7 +29,7 @@ For a messaging catalog, you must specify the `type` as `messaging` when creatin
 You can create a catalog by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs`
 endpoint or just use the Gravitino Java client. The following is an example of creating a messaging catalog:
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -148,7 +148,7 @@ You can create a topic by sending a `POST` request to the `/api/metalakes/{metal
 endpoint or just use the Gravitino Java client. The following is an example of creating a topic:
 
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -197,7 +197,7 @@ You can modify a topic by sending a `PUT` request to the `/api/metalakes/{metala
 endpoint or just use the Gravitino Java client. The following is an example of altering a topic:
 
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -248,7 +248,7 @@ You can remove a topic by sending a `DELETE` request to the `/api/metalakes/{met
 /catalogs/{catalog_name}/schemas/{schema_name}/topics/{topic_name}` endpoint or by using the
 Gravitino Java client. The following is an example of dropping a topic:
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -281,7 +281,7 @@ You can list all topics in a schema by sending a `GET` request to the `/api/meta
 {metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/topics` endpoint or by using the
 Gravitino Java client. The following is an example of listing all the topics in a schema:
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell

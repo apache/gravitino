@@ -1,10 +1,25 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.catalog;
 
 import com.datastrato.gravitino.Audit;
+import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.rel.Column;
@@ -31,9 +46,17 @@ public final class EntityCombinedTable implements Table {
   // Sets of properties that should be hidden from the user.
   private Set<String> hiddenProperties;
 
+  // Field "imported" is used to indicate whether the entity has been imported to Gravitino
+  // managed storage backend. If "imported" is true, it means that storage backend have stored
+  // the correct entity. Otherwise, we should import the external entity to the storage backend.
+  // This is used for tag/access control related purposes, only the imported entities have the
+  // unique id, and based on this id, we can label and control the access to the entities.
+  private boolean imported;
+
   private EntityCombinedTable(Table table, TableEntity tableEntity) {
     this.table = table;
     this.tableEntity = tableEntity;
+    this.imported = false;
   }
 
   public static EntityCombinedTable of(Table table, TableEntity tableEntity) {
@@ -46,6 +69,11 @@ public final class EntityCombinedTable implements Table {
 
   public EntityCombinedTable withHiddenPropertiesSet(Set<String> hiddenProperties) {
     this.hiddenProperties = hiddenProperties;
+    return this;
+  }
+
+  public EntityCombinedTable withImported(boolean imported) {
+    this.imported = imported;
     return this;
   }
 
@@ -96,6 +124,10 @@ public final class EntityCombinedTable implements Table {
     return table.index();
   }
 
+  public boolean imported() {
+    return imported;
+  }
+
   @Override
   public Audit auditInfo() {
     AuditInfo mergedAudit =
@@ -109,5 +141,9 @@ public final class EntityCombinedTable implements Table {
     return tableEntity == null
         ? table.auditInfo()
         : mergedAudit.merge(tableEntity.auditInfo(), true /* overwrite */);
+  }
+
+  StringIdentifier stringIdentifier() {
+    return StringIdentifier.fromProperties(table.properties());
   }
 }

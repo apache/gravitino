@@ -1,6 +1,20 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
@@ -19,7 +33,7 @@ import java.util.List;
 import java.util.Map;
 
 public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
-  public static final String CATALOG_BACKEND_NAME = "catalog-backend";
+  public static final String CATALOG_BACKEND = "catalog-backend";
 
   public static final String GRAVITINO_JDBC_USER = "jdbc-user";
   public static final String ICEBERG_JDBC_USER = "jdbc.user";
@@ -31,6 +45,7 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
   public static final String GRAVITINO_JDBC_DRIVER = "jdbc-driver";
   public static final String WAREHOUSE = "warehouse";
   public static final String URI = "uri";
+  public static final String CATALOG_BACKEND_NAME = "catalog-backend-name";
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
@@ -39,8 +54,8 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
   // change it to `catalogType` automatically and pass it to Iceberg.
   public static final Map<String, String> GRAVITINO_CONFIG_TO_ICEBERG =
       ImmutableMap.of(
-          CATALOG_BACKEND_NAME,
-          CATALOG_BACKEND_NAME,
+          CATALOG_BACKEND,
+          CATALOG_BACKEND,
           GRAVITINO_JDBC_DRIVER,
           GRAVITINO_JDBC_DRIVER,
           GRAVITINO_JDBC_USER,
@@ -50,7 +65,9 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
           URI,
           URI,
           WAREHOUSE,
-          WAREHOUSE);
+          WAREHOUSE,
+          CATALOG_BACKEND_NAME,
+          CATALOG_BACKEND_NAME);
 
   public static final Map<String, String> KERBEROS_CONFIGURATION_FOR_HIVE_BACKEND =
       ImmutableMap.of(
@@ -71,7 +88,7 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
     List<PropertyEntry<?>> propertyEntries =
         ImmutableList.of(
             enumImmutablePropertyEntry(
-                CATALOG_BACKEND_NAME,
+                CATALOG_BACKEND,
                 "Iceberg catalog type choose properties",
                 true,
                 IcebergCatalogBackend.class,

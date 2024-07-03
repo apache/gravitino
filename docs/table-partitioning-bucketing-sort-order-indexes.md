@@ -3,7 +3,7 @@ title: "Table partitioning, bucketing and sort ordering and indexes"
 slug: /table-partitioning-bucketing-sort-order-indexes
 date: 2023-12-25
 keyword: Table Partition Bucket Distribute Sort By
-license: Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2.
+license: This software is licensed under the Apache License version 2.
 last_update:
   date: 2024-02-02
   author: Clearvive
@@ -60,7 +60,7 @@ To create a bucketed table, you should use the following three components to con
 - number. It defines how many buckets you use to bucket the table.
 - funcArgs. It defines the arguments of the strategy, the argument must be an [expression](./expression.md).
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="Json" label="Json">
 
 ```json
@@ -109,7 +109,7 @@ Note: If the direction value is `ascending`, the default ordering value is `null
 
 - sortTerm. It shows which field or function Gravitino uses to sort the table, must be an [expression](./expression.md).
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="Json" label="Json">
 
 ```json
@@ -140,7 +140,7 @@ SortOrders.of(NamedReference.field("score"), SortDirection.ASCENDING, NullOrderi
 
 The following is an example of creating a partitioned, bucketed table, and sorted order table:
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -251,7 +251,7 @@ To define an indexed table, you should utilize the following three components to
 
 - FieldNames. It defines which table fields Gravitino uses to index the table.
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="Json" label="Json">
 
 ```json
@@ -274,7 +274,7 @@ Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"col_1"}, {"col_2"}
 
 The following is an example of creating a index table:
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
