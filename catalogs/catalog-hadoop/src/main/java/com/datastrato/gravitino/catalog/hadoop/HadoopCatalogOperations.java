@@ -59,7 +59,6 @@ import com.google.common.collect.Maps;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
-import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -106,6 +105,8 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-%s";
 
+  private final ThreadLocal<String> currentUser = ThreadLocal.withInitial(() -> null);
+
   HadoopCatalogOperations(EntityStore store) {
     this.store = store;
   }
@@ -118,17 +119,34 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     return kerberosRealm;
   }
 
+  public EntityStore getStore() {
+    return store;
+  }
+
+  public void setCurrentUser(String userName) {
+    currentUser.set(userName);
+  }
+
+  public Map<NameIdentifier, UserInfo> getUserInfoMap() {
+    return userInfoMap;
+  }
+
   static class UserInfo {
     UserGroupInformation loginUser;
     boolean enableUserImpersonation;
     String keytabPath;
+    String realm;
 
     static UserInfo of(
-        UserGroupInformation loginUser, boolean enableUserImpersonation, String keytabPath) {
+        UserGroupInformation loginUser,
+        boolean enableUserImpersonation,
+        String keytabPath,
+        String kerberosRealm) {
       UserInfo userInfo = new UserInfo();
       userInfo.loginUser = loginUser;
       userInfo.enableUserImpersonation = enableUserImpersonation;
       userInfo.keytabPath = keytabPath;
+      userInfo.realm = kerberosRealm;
       return userInfo;
     }
   }
@@ -166,13 +184,18 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     AuthenticationConfig config = new AuthenticationConfig(conf);
 
     if (config.isKerberosAuth()) {
-      String catalogKeyTablePath = String.format(GRAVITINO_KEYTAB_FORMAT, catalogInfo.id());
       this.kerberosRealm =
           initKerberos(
-              catalogKeyTablePath,
-              conf,
-              hadoopConf,
-              NameIdentifier.of(catalogInfo.namespace(), catalogInfo.name()));
+              conf, hadoopConf, NameIdentifier.of(catalogInfo.namespace(), catalogInfo.name()));
+    } else if (config.isSimpleAuth()) {
+      // TODO: change the user 'datastrato' to 'anonymous' and uncomment the following code;
+      //  uncomment the following code after the user 'datastrato' is removed from the codebase.
+      //  for more, please see https://github.com/datastrato/gravitino/issues/4013
+      // UserGroupInformation u =
+      //    UserGroupInformation.createRemoteUser(PrincipalUtils.getCurrentUserName());
+      // userInfoMap.put(
+      //    NameIdentifier.of(catalogInfo.namespace(), catalogInfo.name()),
+      //    UserInfo.of(u, false, null, null));
     }
   }
 
@@ -225,121 +248,104 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
 
+    String apiUser =
+        currentUser.get() == null ? PrincipalUtils.getCurrentUserName() : currentUser.get();
+
     // Reset the current user based on the name identifier.
-    UserGroupInformation currentUser = getUGIByIdent(properties, ident);
-    String apiLoginUser = PrincipalUtils.getCurrentPrincipal().getName();
     try {
-      return currentUser.doAs(
-          (PrivilegedExceptionAction<Fileset>)
-              () -> {
-                try {
-                  if (store.exists(ident, Entity.EntityType.FILESET)) {
-                    throw new FilesetAlreadyExistsException("Fileset %s already exists", ident);
-                  }
-                } catch (IOException ioe) {
-                  throw new RuntimeException(
-                      "Failed to check if fileset " + ident + " exists", ioe);
-                }
-
-                SchemaEntity schemaEntity;
-                NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
-                try {
-                  schemaEntity =
-                      store.get(schemaIdent, Entity.EntityType.SCHEMA, SchemaEntity.class);
-                } catch (NoSuchEntityException exception) {
-                  throw new NoSuchSchemaException(
-                      exception, SCHEMA_DOES_NOT_EXIST_MSG, schemaIdent);
-                } catch (IOException ioe) {
-                  throw new RuntimeException("Failed to load schema " + schemaIdent, ioe);
-                }
-
-                // For external fileset, the storageLocation must be set.
-                if (type == Fileset.Type.EXTERNAL && StringUtils.isBlank(storageLocation)) {
-                  throw new IllegalArgumentException(
-                      "Storage location must be set for external fileset " + ident);
-                }
-
-                // Either catalog property "location", or schema property "location", or
-                // storageLocation must be
-                // set for managed fileset.
-                Path schemaPath = getSchemaPath(schemaIdent.name(), schemaEntity.properties());
-                if (schemaPath == null && StringUtils.isBlank(storageLocation)) {
-                  throw new IllegalArgumentException(
-                      "Storage location must be set for fileset "
-                          + ident
-                          + " when it's catalog and schema location are not set");
-                }
-
-                // The specified storageLocation will take precedence over the calculated one.
-                Path filesetPath =
-                    StringUtils.isNotBlank(storageLocation)
-                        ? new Path(storageLocation)
-                        : new Path(schemaPath, ident.name());
-
-                try {
-                  // formalize the path to avoid path without scheme, uri, authority, etc.
-                  filesetPath = formalizePath(filesetPath, hadoopConf);
-                  FileSystem fs = filesetPath.getFileSystem(hadoopConf);
-                  if (!fs.exists(filesetPath)) {
-                    if (!fs.mkdirs(filesetPath)) {
-                      throw new RuntimeException(
-                          "Failed to create fileset " + ident + " location " + filesetPath);
-                    }
-
-                    LOG.info("Created fileset {} location {}", ident, filesetPath);
-                  } else {
-                    LOG.info("Fileset {} manages the existing location {}", ident, filesetPath);
-                  }
-
-                } catch (IOException ioe) {
-                  throw new RuntimeException(
-                      "Failed to create fileset " + ident + " location " + filesetPath, ioe);
-                }
-
-                StringIdentifier stringId = StringIdentifier.fromProperties(properties);
-                Preconditions.checkArgument(
-                    stringId != null, "Property String identifier should not be null");
-
-                FilesetEntity filesetEntity =
-                    FilesetEntity.builder()
-                        .withName(ident.name())
-                        .withId(stringId.id())
-                        .withNamespace(ident.namespace())
-                        .withComment(comment)
-                        .withFilesetType(type)
-                        // Store the storageLocation to the store. If the "storageLocation" is null
-                        // for
-                        // managed fileset, Gravitino will get and store the location based on the
-                        // catalog/schema's location and store it to the store.
-                        .withStorageLocation(filesetPath.toString())
-                        .withProperties(properties)
-                        .withAuditInfo(
-                            AuditInfo.builder()
-                                .withCreator(apiLoginUser)
-                                .withCreateTime(Instant.now())
-                                .build())
-                        .build();
-
-                try {
-                  store.put(filesetEntity, true /* overwrite */);
-                } catch (IOException ioe) {
-                  throw new RuntimeException("Failed to create fileset " + ident, ioe);
-                }
-
-                return HadoopFileset.builder()
-                    .withName(ident.name())
-                    .withComment(comment)
-                    .withType(type)
-                    .withStorageLocation(filesetPath.toString())
-                    .withProperties(filesetEntity.properties())
-                    .withAuditInfo(filesetEntity.auditInfo())
-                    .build();
-              });
-    } catch (InterruptedException e) {
-      throw new RuntimeException("Failed to create fileset " + ident, e);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
+      if (store.exists(ident, Entity.EntityType.FILESET)) {
+        throw new FilesetAlreadyExistsException("Fileset %s already exists", ident);
+      }
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to check if fileset " + ident + " exists", ioe);
     }
+
+    SchemaEntity schemaEntity;
+    NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
+    try {
+      schemaEntity = store.get(schemaIdent, Entity.EntityType.SCHEMA, SchemaEntity.class);
+    } catch (NoSuchEntityException exception) {
+      throw new NoSuchSchemaException(exception, SCHEMA_DOES_NOT_EXIST_MSG, schemaIdent);
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to load schema " + schemaIdent, ioe);
+    }
+
+    // For external fileset, the storageLocation must be set.
+    if (type == Fileset.Type.EXTERNAL && StringUtils.isBlank(storageLocation)) {
+      throw new IllegalArgumentException(
+          "Storage location must be set for external fileset " + ident);
+    }
+
+    // Either catalog property "location", or schema property "location", or
+    // storageLocation must be set for managed fileset.
+    Path schemaPath = getSchemaPath(schemaIdent.name(), schemaEntity.properties());
+    if (schemaPath == null && StringUtils.isBlank(storageLocation)) {
+      throw new IllegalArgumentException(
+          "Storage location must be set for fileset "
+              + ident
+              + " when it's catalog and schema location are not set");
+    }
+
+    // The specified storageLocation will take precedence over the calculated one.
+    Path filesetPath =
+        StringUtils.isNotBlank(storageLocation)
+            ? new Path(storageLocation)
+            : new Path(schemaPath, ident.name());
+
+    try {
+      // formalize the path to avoid path without scheme, uri, authority, etc.
+      filesetPath = formalizePath(filesetPath, hadoopConf);
+      FileSystem fs = filesetPath.getFileSystem(hadoopConf);
+      if (!fs.exists(filesetPath)) {
+        if (!fs.mkdirs(filesetPath)) {
+          throw new RuntimeException(
+              "Failed to create fileset " + ident + " location " + filesetPath);
+        }
+
+        LOG.info("Created fileset {} location {}", ident, filesetPath);
+      } else {
+        LOG.info("Fileset {} manages the existing location {}", ident, filesetPath);
+      }
+
+    } catch (IOException ioe) {
+      throw new RuntimeException(
+          "Failed to create fileset " + ident + " location " + filesetPath, ioe);
+    }
+
+    StringIdentifier stringId = StringIdentifier.fromProperties(properties);
+    Preconditions.checkArgument(stringId != null, "Property String identifier should not be null");
+
+    FilesetEntity filesetEntity =
+        FilesetEntity.builder()
+            .withName(ident.name())
+            .withId(stringId.id())
+            .withNamespace(ident.namespace())
+            .withComment(comment)
+            .withFilesetType(type)
+            // Store the storageLocation to the store. If the "storageLocation" is null
+            // for
+            // managed fileset, Gravitino will get and store the location based on the
+            // catalog/schema's location and store it to the store.
+            .withStorageLocation(filesetPath.toString())
+            .withProperties(properties)
+            .withAuditInfo(
+                AuditInfo.builder().withCreator(apiUser).withCreateTime(Instant.now()).build())
+            .build();
+
+    try {
+      store.put(filesetEntity, true /* overwrite */);
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to create fileset " + ident, ioe);
+    }
+
+    return HadoopFileset.builder()
+        .withName(ident.name())
+        .withComment(comment)
+        .withType(type)
+        .withStorageLocation(filesetPath.toString())
+        .withProperties(filesetEntity.properties())
+        .withAuditInfo(filesetEntity.auditInfo())
+        .build();
   }
 
   @Override
@@ -383,41 +389,31 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   @Override
   public boolean dropFileset(NameIdentifier ident) {
-
     try {
       FilesetEntity filesetEntity =
           store.get(ident, Entity.EntityType.FILESET, FilesetEntity.class);
       Path filesetPath = new Path(filesetEntity.storageLocation());
 
-      // Reset the current user based on the name identifier.
-      UserGroupInformation currentUser = getUGIByIdent(filesetEntity.properties(), ident);
+      // For managed fileset, we should delete the related files.
+      if (filesetEntity.filesetType() == Fileset.Type.MANAGED) {
+        FileSystem fs = filesetPath.getFileSystem(hadoopConf);
+        if (fs.exists(filesetPath)) {
+          if (!fs.delete(filesetPath, true)) {
+            LOG.warn("Failed to delete fileset {} location {}", ident, filesetPath);
+            return false;
+          }
 
-      return currentUser.doAs(
-          (PrivilegedExceptionAction<Boolean>)
-              () -> {
-                // For managed fileset, we should delete the related files.
-                if (filesetEntity.filesetType() == Fileset.Type.MANAGED) {
-                  FileSystem fs = filesetPath.getFileSystem(hadoopConf);
-                  if (fs.exists(filesetPath)) {
-                    if (!fs.delete(filesetPath, true)) {
-                      LOG.warn("Failed to delete fileset {} location {}", ident, filesetPath);
-                      return false;
-                    }
+        } else {
+          LOG.warn("Fileset {} location {} does not exist", ident, filesetPath);
+        }
+      }
 
-                  } else {
-                    LOG.warn("Fileset {} location {} does not exist", ident, filesetPath);
-                  }
-                }
-
-                boolean success = store.delete(ident, Entity.EntityType.FILESET);
-                cleanUserInfo(ident);
-                return success;
-              });
+      return store.delete(ident, Entity.EntityType.FILESET);
     } catch (NoSuchEntityException ne) {
       LOG.warn("Fileset {} does not exist", ident);
       return false;
-    } catch (IOException | InterruptedException e) {
-      throw new RuntimeException("Failed to delete fileset " + ident, e);
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to delete fileset " + ident, ioe);
     }
   }
 
@@ -440,12 +436,12 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
    * <p>Note: As UserGroupInformation is a static class, to avoid the thread safety issue, we need
    * to use synchronized to ensure the thread safety: Make login and getLoginUser atomic.
    */
-  private synchronized String initKerberos(
-      String keytabPath,
-      Map<String, String> properties,
-      Configuration configuration,
-      NameIdentifier ident) {
+  public synchronized String initKerberos(
+      Map<String, String> properties, Configuration configuration, NameIdentifier ident) {
     // Init schema level kerberos authentication.
+    String keytabPath =
+        String.format(
+            GRAVITINO_KEYTAB_FORMAT, catalogInfo.id() + "-" + ident.toString().replace(".", "-"));
     KerberosConfig kerberosConfig = new KerberosConfig(properties);
     if (kerberosConfig.isKerberosAuth()) {
       configuration.set(
@@ -466,7 +462,8 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
             UserInfo.of(
                 UserGroupInformation.getLoginUser(),
                 kerberosConfig.isImpersonationEnabled(),
-                keytabPath));
+                keytabPath,
+                kerberosRealm));
         return kerberosRealm;
       } catch (IOException e) {
         throw new RuntimeException("Failed to login with Kerberos", e);
@@ -480,75 +477,63 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
 
-    String apiLoginUser = PrincipalUtils.getCurrentPrincipal().getName();
-    // Reset the current user based on the name identifier and properties.
-    UserGroupInformation currentUser = getUGIByIdent(properties, ident);
+    String apiUser =
+        currentUser.get() == null ? PrincipalUtils.getCurrentUserName() : currentUser.get();
+
     try {
-      return currentUser.doAs(
-          (PrivilegedExceptionAction<Schema>)
-              () -> {
-                try {
-                  if (store.exists(ident, Entity.EntityType.SCHEMA)) {
-                    throw new SchemaAlreadyExistsException("Schema %s already exists", ident);
-                  }
-                } catch (IOException ioe) {
-                  throw new RuntimeException("Failed to check if schema " + ident + " exists", ioe);
-                }
-
-                Path schemaPath = getSchemaPath(ident.name(), properties);
-                if (schemaPath != null) {
-                  try {
-                    FileSystem fs = schemaPath.getFileSystem(hadoopConf);
-                    if (!fs.exists(schemaPath)) {
-                      if (!fs.mkdirs(schemaPath)) {
-                        // Fail the operation when failed to create the schema path.
-                        throw new RuntimeException(
-                            "Failed to create schema " + ident + " location " + schemaPath);
-                      }
-                      LOG.info("Created schema {} location {}", ident, schemaPath);
-                    } else {
-                      LOG.info("Schema {} manages the existing location {}", ident, schemaPath);
-                    }
-
-                  } catch (IOException ioe) {
-                    throw new RuntimeException(
-                        "Failed to create schema " + ident + " location " + schemaPath, ioe);
-                  }
-                }
-
-                StringIdentifier stringId = StringIdentifier.fromProperties(properties);
-                Preconditions.checkNotNull(
-                    stringId, "Property String identifier should not be null");
-
-                SchemaEntity schemaEntity =
-                    SchemaEntity.builder()
-                        .withName(ident.name())
-                        .withId(stringId.id())
-                        .withNamespace(ident.namespace())
-                        .withComment(comment)
-                        .withProperties(properties)
-                        .withAuditInfo(
-                            AuditInfo.builder()
-                                .withCreator(apiLoginUser)
-                                .withCreateTime(Instant.now())
-                                .build())
-                        .build();
-                try {
-                  store.put(schemaEntity, true /* overwrite */);
-                } catch (IOException ioe) {
-                  throw new RuntimeException("Failed to create schema " + ident, ioe);
-                }
-
-                return HadoopSchema.builder()
-                    .withName(ident.name())
-                    .withComment(comment)
-                    .withProperties(schemaEntity.properties())
-                    .withAuditInfo(schemaEntity.auditInfo())
-                    .build();
-              });
-    } catch (IOException | InterruptedException e) {
-      throw new RuntimeException("Failed to create schema " + ident, e);
+      if (store.exists(ident, Entity.EntityType.SCHEMA)) {
+        throw new SchemaAlreadyExistsException("Schema %s already exists", ident);
+      }
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to check if schema " + ident + " exists", ioe);
     }
+
+    Path schemaPath = getSchemaPath(ident.name(), properties);
+    if (schemaPath != null) {
+      try {
+        FileSystem fs = schemaPath.getFileSystem(hadoopConf);
+        if (!fs.exists(schemaPath)) {
+          if (!fs.mkdirs(schemaPath)) {
+            // Fail the operation when failed to create the schema path.
+            throw new RuntimeException(
+                "Failed to create schema " + ident + " location " + schemaPath);
+          }
+          LOG.info("Created schema {} location {}", ident, schemaPath);
+        } else {
+          LOG.info("Schema {} manages the existing location {}", ident, schemaPath);
+        }
+
+      } catch (IOException ioe) {
+        throw new RuntimeException(
+            "Failed to create schema " + ident + " location " + schemaPath, ioe);
+      }
+    }
+
+    StringIdentifier stringId = StringIdentifier.fromProperties(properties);
+    Preconditions.checkNotNull(stringId, "Property String identifier should not be null");
+
+    SchemaEntity schemaEntity =
+        SchemaEntity.builder()
+            .withName(ident.name())
+            .withId(stringId.id())
+            .withNamespace(ident.namespace())
+            .withComment(comment)
+            .withProperties(properties)
+            .withAuditInfo(
+                AuditInfo.builder().withCreator(apiUser).withCreateTime(Instant.now()).build())
+            .build();
+    try {
+      store.put(schemaEntity, true /* overwrite */);
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to create schema " + ident, ioe);
+    }
+
+    return HadoopSchema.builder()
+        .withName(ident.name())
+        .withComment(comment)
+        .withProperties(schemaEntity.properties())
+        .withAuditInfo(schemaEntity.auditInfo())
+        .build();
   }
 
   @Override
@@ -616,37 +601,29 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       Map<String, String> properties =
           Optional.ofNullable(schemaEntity.properties()).orElse(Collections.emptyMap());
 
-      // Reset the current user based on the name identifier.
-      UserGroupInformation user = getUGIByIdent(schemaEntity.properties(), ident);
+      Path schemaPath = getSchemaPath(ident.name(), properties);
+      // Nothing to delete if the schema path is not set.
+      if (schemaPath == null) {
+        return false;
+      }
 
-      return user.doAs(
-          (PrivilegedExceptionAction<Boolean>)
-              () -> {
-                Path schemaPath = getSchemaPath(ident.name(), properties);
-                // Nothing to delete if the schema path is not set.
-                if (schemaPath == null) {
-                  return false;
-                }
+      FileSystem fs = schemaPath.getFileSystem(hadoopConf);
+      // Nothing to delete if the schema path does not exist.
+      if (!fs.exists(schemaPath)) {
+        return false;
+      }
 
-                FileSystem fs = schemaPath.getFileSystem(hadoopConf);
-                // Nothing to delete if the schema path does not exist.
-                if (!fs.exists(schemaPath)) {
-                  return false;
-                }
+      if (fs.listStatus(schemaPath).length > 0 && !cascade) {
+        throw new NonEmptySchemaException(
+            "Schema %s with location %s is not empty", ident, schemaPath);
+      } else {
+        fs.delete(schemaPath, true);
+      }
 
-                if (fs.listStatus(schemaPath).length > 0 && !cascade) {
-                  throw new NonEmptySchemaException(
-                      "Schema %s with location %s is not empty", ident, schemaPath);
-                } else {
-                  fs.delete(schemaPath, true);
-                }
-
-                cleanUserInfo(ident);
-                LOG.info("Deleted schema {} location {}", ident, schemaPath);
-                return true;
-              });
-    } catch (IOException | InterruptedException e) {
-      throw new RuntimeException("Failed to delete schema " + ident + " location", e);
+      LOG.info("Deleted schema {} location {}", ident, schemaPath);
+      return true;
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to delete schema " + ident + " location", ioe);
     }
   }
 
@@ -763,78 +740,5 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   void setProxyPlugin(HadoopProxyPlugin hadoopProxyPlugin) {
     this.proxyPlugin = hadoopProxyPlugin;
-  }
-
-  private UserGroupInformation getUGIByIdent(Map<String, String> properties, NameIdentifier ident) {
-    KerberosConfig kerberosConfig = new KerberosConfig(properties);
-    if (kerberosConfig.isKerberosAuth()) {
-      // We assume that the realm of catalog is the same as the realm of the schema and table.
-      String keytabPath =
-          String.format(
-              GRAVITINO_KEYTAB_FORMAT, catalogInfo.id() + "-" + ident.toString().replace(".", "-"));
-      initKerberos(keytabPath, properties, new Configuration(), ident);
-    }
-    // If the kerberos is not enabled (Simple mode), we will use the current user
-    return getUserBaseOnNameIdentifier(ident);
-  }
-
-  private UserGroupInformation getUserBaseOnNameIdentifier(NameIdentifier nameIdentifier) {
-    UserInfo userInfo = getNearestUserGroupInformation(nameIdentifier);
-    if (userInfo == null) {
-      try {
-        return UserGroupInformation.getCurrentUser();
-      } catch (IOException e) {
-        throw new RuntimeException("Failed to get login user", e);
-      }
-    }
-
-    UserGroupInformation ugi = userInfo.loginUser;
-    boolean userImpersonation = userInfo.enableUserImpersonation;
-    if (userImpersonation) {
-      String proxyKerberosPrincipalName = PrincipalUtils.getCurrentUserName();
-      if (!proxyKerberosPrincipalName.contains("@")) {
-        proxyKerberosPrincipalName =
-            String.format("%s@%s", proxyKerberosPrincipalName, kerberosRealm);
-      }
-
-      ugi = UserGroupInformation.createProxyUser(proxyKerberosPrincipalName, ugi);
-    }
-
-    return ugi;
-  }
-
-  private UserInfo getNearestUserGroupInformation(NameIdentifier nameIdentifier) {
-    NameIdentifier currentNameIdentifier = nameIdentifier;
-    while (currentNameIdentifier != null) {
-      if (userInfoMap.containsKey(currentNameIdentifier)) {
-        return userInfoMap.get(currentNameIdentifier);
-      }
-
-      String[] levels = currentNameIdentifier.namespace().levels();
-      // The ident is catalog level.
-      if (levels.length <= 1) {
-        return null;
-      }
-      currentNameIdentifier = NameIdentifier.of(currentNameIdentifier.namespace().levels());
-    }
-    return null;
-  }
-
-  private void cleanUserInfo(NameIdentifier identifier) {
-    UserInfo userInfo = userInfoMap.remove(identifier);
-    if (userInfo != null) {
-      removeFile(userInfo.keytabPath);
-    }
-  }
-
-  private void removeFile(String filePath) {
-    if (filePath == null) {
-      return;
-    }
-
-    File file = new File(filePath);
-    if (file.exists()) {
-      file.delete();
-    }
   }
 }

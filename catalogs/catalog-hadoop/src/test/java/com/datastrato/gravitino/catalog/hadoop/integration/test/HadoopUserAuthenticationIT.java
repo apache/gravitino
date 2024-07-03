@@ -387,7 +387,7 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
     catalog
         .asFilesetCatalog()
         .createFileset(
-            NameIdentifier.of(metalakeName, catalogName, SCHEMA_NAME, TABLE_NAME),
+            NameIdentifier.of(SCHEMA_NAME, TABLE_NAME),
             "comment",
             Fileset.Type.MANAGED,
             null,
@@ -440,7 +440,7 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
     catalog
         .asFilesetCatalog()
         .createFileset(
-            NameIdentifier.of(metalakeName, catalogName, SCHEMA_NAME, TABLE_NAME),
+            NameIdentifier.of(SCHEMA_NAME, TABLE_NAME),
             "comment",
             Fileset.Type.MANAGED,
             null,
@@ -461,7 +461,7 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
                 catalog
                     .asFilesetCatalog()
                     .createFileset(
-                        NameIdentifier.of(metalakeName, catalogName, SCHEMA_NAME, fileset1),
+                        NameIdentifier.of(SCHEMA_NAME, fileset1),
                         "comment",
                         Fileset.Type.MANAGED,
                         null,
@@ -478,7 +478,7 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
             catalog
                 .asFilesetCatalog()
                 .createFileset(
-                    NameIdentifier.of(metalakeName, catalogName, SCHEMA_NAME, fileset1),
+                    NameIdentifier.of(SCHEMA_NAME, fileset1),
                     "comment",
                     Fileset.Type.MANAGED,
                     null,
@@ -494,7 +494,7 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
                 catalog
                     .asFilesetCatalog()
                     .createFileset(
-                        NameIdentifier.of(metalakeName, catalogName, SCHEMA_NAME, fileset2),
+                        NameIdentifier.of(SCHEMA_NAME, fileset2),
                         "comment",
                         Fileset.Type.MANAGED,
                         null,
@@ -511,7 +511,7 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
             catalog
                 .asFilesetCatalog()
                 .createFileset(
-                    NameIdentifier.of(metalakeName, catalogName, SCHEMA_NAME, fileset2),
+                    NameIdentifier.of(SCHEMA_NAME, fileset2),
                     "comment",
                     Fileset.Type.MANAGED,
                     null,
@@ -521,32 +521,20 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
     // cli_fileset.
     Assertions.assertThrows(
         Exception.class,
-        () ->
-            catalog
-                .asFilesetCatalog()
-                .dropFileset(NameIdentifier.of(metalakeName, catalogName, SCHEMA_NAME, fileset1)));
+        () -> catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(SCHEMA_NAME, fileset1)));
     kerberosHiveContainer.executeInContainer(
         "hadoop", "fs", "-chown", "-R", "cli_fileset", "/user/hadoop/" + catalogName);
     // Now try to drop fileset
     Assertions.assertDoesNotThrow(
-        () ->
-            catalog
-                .asFilesetCatalog()
-                .dropFileset(NameIdentifier.of(metalakeName, catalogName, SCHEMA_NAME, fileset1)));
+        () -> catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(SCHEMA_NAME, fileset1)));
 
     Assertions.assertThrows(
         Exception.class,
-        () ->
-            catalog
-                .asFilesetCatalog()
-                .dropFileset(NameIdentifier.of(metalakeName, catalogName, SCHEMA_NAME, fileset2)));
+        () -> catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(SCHEMA_NAME, fileset2)));
     kerberosHiveContainer.executeInContainer(
         "hadoop", "fs", "-chown", "-R", "gravitino_client", "/user/hadoop/" + catalogName);
     Assertions.assertDoesNotThrow(
-        () ->
-            catalog
-                .asFilesetCatalog()
-                .dropFileset(NameIdentifier.of(metalakeName, catalogName, SCHEMA_NAME, fileset2)));
+        () -> catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(SCHEMA_NAME, fileset2)));
 
     Assertions.assertThrows(
         Exception.class, () -> catalog.asSchemas().dropSchema(SCHEMA_NAME, true));
