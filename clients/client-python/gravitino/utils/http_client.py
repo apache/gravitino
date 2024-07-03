@@ -78,6 +78,17 @@ class Response:
 
 
 class HTTPClient:
+
+    FORMDATA_HEADER = {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Accept": "application/vnd.gravitino.v1+json",
+    }
+
+    JSON_HEADER = {
+        "Content-Type": "application/json",
+        "Accept": "application/vnd.gravitino.v1+json",
+    }
+
     def __init__(
         self,
         host,
@@ -153,24 +164,16 @@ class HTTPClient:
         method = method.upper()
         request_data = None
 
-        if headers:
-            self._update_headers(headers)
-
         if data:
             request_data = urlencode(data.to_dict()).encode()
-            headers = {
-                "Content-Type": "application/x-www-form-urlencoded",
-                "Accept": "application/vnd.gravitino.v1+json",
-            }
-            self._update_headers(headers)
+            self._update_headers(self.FORMDATA_HEADER)
         else:
             if json:
                 request_data = json.to_json().encode("utf-8")
 
-            headers = {
-                "Content-Type": "application/json",
-                "Accept": "application/vnd.gravitino.v1+json",
-            }
+            self._update_headers(self.JSON_HEADER)
+
+        if headers:
             self._update_headers(headers)
 
         opener = build_opener()
