@@ -203,8 +203,12 @@ class IntegrationTestEnv(unittest.TestCase):
                 # append annotations directly
                 filtered_lines.append(line)
             else:
-                key, value = line.split("=")
-                existed_config[key.strip()] = value.strip()
+                try:
+                    key, value = line.split("=")
+                    existed_config[key.strip()] = value.strip()
+                except ValueError:
+                    # cannot split to key, value, so just append
+                    filtered_lines.append(lines)
 
         for key, value in existed_config.items():
             if config[key] is None:

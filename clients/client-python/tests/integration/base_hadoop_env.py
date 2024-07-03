@@ -78,7 +78,14 @@ class BaseHadoopEnvironment:
             ) from e
         # move to the hadoop dir
         src_dir = f"{LOCAL_DOWNLOAD_TEMP_DIR}/{HADOOP_DIR_NAME}"
-        dst_dir = f"{LOCAL_HADOOP_DIR}/{HADOOP_DIR_NAME}"
+        dst_dir = f"{LOCAL_HADOOP_DIR}"
+        if os.path.exists(dst_dir):
+            try:
+                shutil.rmtree(dst_dir)
+            except OSError as e:
+                raise GravitinoRuntimeException(
+                    f"Failed to delete directory '{dst_dir}': {e}"
+                ) from e
         try:
             shutil.move(src_dir, dst_dir)
         except Exception as e:
