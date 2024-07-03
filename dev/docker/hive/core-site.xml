@@ -35,12 +35,12 @@
   </property>
 
   <property>
-    <name>hadoop.proxyuser.datastrato.groups</name>
+    <name>hadoop.proxyuser.gravitino.groups</name>
     <value>*</value>
   </property>
 
   <property>
-    <name>hadoop.proxyuser.datastrato.hosts</name>
+    <name>hadoop.proxyuser.gravitino.hosts</name>
     <value>*</value>
   </property>
 </configuration>

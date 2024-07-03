@@ -104,7 +104,6 @@ dependencies {
     exclude("org.eclipse.jetty.aggregate", "jetty-all")
     exclude("org.eclipse.jetty.orbit", "javax.servlet")
   }
-  testImplementation("org.apache.hive:hive-jdbc:2.3.9")
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mysql.driver)

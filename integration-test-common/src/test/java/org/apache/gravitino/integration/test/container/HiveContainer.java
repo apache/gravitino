@@ -41,10 +41,14 @@ public class HiveContainer extends BaseContainer {
   public static final String DEFAULT_IMAGE = System.getenv("GRAVITINO_CI_HIVE_DOCKER_IMAGE");
   public static final String KERBEROS_IMAGE =
       System.getenv("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE");
+
+  public static final String RANGER_IMAGE = System.getenv("GRAVITINO_CI_RANGER_HIVE_DOCKER_IMAGE");
   public static final String HOST_NAME = "gravitino-ci-hive";
+  public static final String HADOOP_USER_NAME = "HADOOP_USER_NAME";
   private static final int MYSQL_PORT = 3306;
   public static final int HDFS_DEFAULTFS_PORT = 9000;
   public static final int HIVE_METASTORE_PORT = 9083;
+  public static final int HIVE_SERVICE_PORT = 10000;
 
   private static final String HIVE_LOG_PATH = "/tmp/root/";
   private static final String HDFS_LOG_PATH = "/usr/local/hadoop/logs/";
@@ -201,17 +205,45 @@ public class HiveContainer extends BaseContainer {
   }
 
   public static class Builder extends BaseContainer.Builder<Builder, HiveContainer> {
+    boolean rangerEnablePlugin = false;
+
     private Builder() {
       this.image = DEFAULT_IMAGE;
       this.hostName = HOST_NAME;
-      this.exposePorts = ImmutableSet.of(MYSQL_PORT, HDFS_DEFAULTFS_PORT, HIVE_METASTORE_PORT);
+      this.exposePorts =
+          ImmutableSet.of(MYSQL_PORT, HDFS_DEFAULTFS_PORT, HIVE_METASTORE_PORT, HIVE_SERVICE_PORT);
+    }
+
+    public Builder withEnableRangerPlugin(Boolean enable) {
+      this.rangerEnablePlugin = enable;
+      return this;
+    }
+
+    private String generateImageName() {
+      String hiveDockerImageName = image;
+      if (kerberosEnabled) {
+        hiveDockerImageName = KERBEROS_IMAGE;
+      } else if (rangerEnablePlugin) {
+        hiveDockerImageName = RANGER_IMAGE;
+      }
+      return hiveDockerImageName;
+    }
+
+    private String generateHostName() {
+      String hiveContainerHostName = hostName;
+      if (kerberosEnabled) {
+        hiveContainerHostName = "kerberos-" + hostName;
+      } else if (rangerEnablePlugin) {
+        hiveContainerHostName = "ranger-" + hostName;
+      }
+      return hiveContainerHostName;
     }
 
     @Override
     public HiveContainer build() {
       return new HiveContainer(
-          kerberosEnabled ? KERBEROS_IMAGE : image,
-          kerberosEnabled ? "kerberos-" + hostName : hostName,
+          generateImageName(),
+          generateHostName(),
           exposePorts,
           extraHosts,
           filesToMount,

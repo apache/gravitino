@@ -26,7 +26,7 @@ HADOOP_VERSION=${HADOOP_VERSION:-"2.7.3"}
 HIVE_VERSION=${HIVE_VERSION:-"2.3.9"}
 MYSQL_JDBC_DRIVER_VERSION=${MYSQL_VERSION:-"8.0.15"}
 ZOOKEEPER_VERSION=${ZOOKEEPER_VERSION:-"3.4.13"}
-RANGER_VERSION=${RANGER_VERSION:-"2.4.0"} # NOTE: Currently only tested Ranger 2.4.0 in the Hadoop 2.7.3 and Hive 2.3.9
+RANGER_VERSION=${RANGER_VERSION:-"2.4.0"} # Notice: Currently only tested Ranger plugin 2.4.0 in the Hadoop 3.1.0 and Hive 3.1.3
 
 HADOOP_PACKAGE_NAME="hadoop-${HADOOP_VERSION}.tar.gz"
 HADOOP_DOWNLOAD_URL="https://archive.apache.org/dist/hadoop/core/hadoop-${HADOOP_VERSION}/${HADOOP_PACKAGE_NAME}"

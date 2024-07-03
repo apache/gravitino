@@ -34,7 +34,7 @@ if [[ -n "${RANGER_HIVE_REPOSITORY_NAME}" && -n "${RANGER_SERVER_URL}" ]]; then
   ${RANGER_HIVE_PLUGIN_HOME}/enable-hive-plugin.sh
 
   # Reduce poll policy interval in the ranger plugin configuration
-  sed -i '/<name>ranger.plugin.hive.policy.pollIntervalMs<\/name>/{n;s/<value>30000<\/value>/<value>1000<\/value>/}' ${HIVE_HOME}/conf/ranger-hive-security.xml
+  sed -i '/<name>ranger.plugin.hive.policy.pollIntervalMs<\/name>/{n;s/<value>30000<\/value>/<value>500<\/value>/}' ${HIVE_HOME}/conf/ranger-hive-security.xml
 
   # Enable audit log in hive
   cp ${HIVE_HOME}/conf/hive-log4j2.properties.template ${HIVE_HOME}/conf/hive-log4j2.properties
@@ -68,7 +68,7 @@ if [[ -n "${RANGER_HDFS_REPOSITORY_NAME}" && -n "${RANGER_SERVER_URL}" ]]; then
   ${RANGER_HDFS_PLUGIN_HOME}/enable-hdfs-plugin.sh
 
   # Reduce poll policy interval in the ranger plugin configuration
-  sed -i '/<name>ranger.plugin.hive.policy.pollIntervalMs<\/name>/{n;s/<value>30000<\/value>/<value>1000<\/value>/}' ${HADOOP_HOME}/etc/hadoop/ranger-hdfs-security.xml
+  sed -i '/<name>ranger.plugin.hdfs.policy.pollIntervalMs<\/name>/{n;s/<value>30000<\/value>/<value>500<\/value>/}' ${HADOOP_HOME}/etc/hadoop/ranger-hdfs-security.xml
 
   # Enable Ranger audit log in hdfs
 cat <<'EOF' >> ${HADOOP_HOME}/etc/hadoop/log4j.properties
