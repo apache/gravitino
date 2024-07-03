@@ -43,7 +43,6 @@ class TestSimpleAuthClient(unittest.TestCase):
         fileset_properties_key2: fileset_properties_value2,
     }
 
-    metalake_ident: NameIdentifier = NameIdentifier.of(metalake_name)
     catalog_ident: NameIdentifier = NameIdentifier.of_catalog(
         metalake_name, catalog_name
     )
@@ -66,7 +65,7 @@ class TestSimpleAuthClient(unittest.TestCase):
 
     def clean_test_data(self):
         try:
-            catalog = self.gravitino_client.load_catalog(ident=self.catalog_ident)
+            catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
             logger.info(
                 "Drop fileset %s[%s]",
                 self.fileset_ident,
@@ -80,19 +79,19 @@ class TestSimpleAuthClient(unittest.TestCase):
             logger.info(
                 "Drop catalog %s[%s]",
                 self.catalog_ident,
-                self.gravitino_client.drop_catalog(ident=self.catalog_ident),
+                self.gravitino_client.drop_catalog(name=self.catalog_name),
             )
             logger.info(
                 "Drop metalake %s[%s]",
-                self.metalake_ident,
-                self.gravitino_admin_client.drop_metalake(self.metalake_ident),
+                self.metalake_name,
+                self.gravitino_admin_client.drop_metalake(self.metalake_name),
             )
         except Exception as e:
             logger.error("Clean test data failed: %s", e)
 
     def init_test_env(self):
         self.gravitino_admin_client.create_metalake(
-            ident=self.metalake_ident, comment="", properties={}
+            self.metalake_name, comment="", properties={}
         )
         self.gravitino_client = GravitinoClient(
             uri="http://localhost:8090",
@@ -100,7 +99,7 @@ class TestSimpleAuthClient(unittest.TestCase):
             auth_data_provider=SimpleAuthProvider(),
         )
         catalog = self.gravitino_client.create_catalog(
-            ident=self.catalog_ident,
+            name=self.catalog_name,
             catalog_type=Catalog.Type.FILESET,
             provider=self.catalog_provider,
             comment="",
@@ -118,21 +117,19 @@ class TestSimpleAuthClient(unittest.TestCase):
         )
 
     def test_metalake_creator(self):
-        metalake = self.gravitino_admin_client.load_metalake(
-            NameIdentifier.of_metalake(self.metalake_ident.name())
-        )
+        metalake = self.gravitino_admin_client.load_metalake(self.metalake_name)
         self.assertEqual(metalake.audit_info().creator(), self.creator)
 
     def test_catalog_creator(self):
-        catalog = self.gravitino_client.load_catalog(self.catalog_ident)
+        catalog = self.gravitino_client.load_catalog(self.catalog_name)
         self.assertEqual(catalog.audit_info().creator(), self.creator)
 
     def test_schema_creator(self):
-        catalog = self.gravitino_client.load_catalog(self.catalog_ident)
+        catalog = self.gravitino_client.load_catalog(self.catalog_name)
         schema = catalog.as_schemas().load_schema(self.schema_ident)
         self.assertEqual(schema.audit_info().creator(), self.creator)
 
     def test_fileset_creator(self):
-        catalog = self.gravitino_client.load_catalog(self.catalog_ident)
+        catalog = self.gravitino_client.load_catalog(self.catalog_name)
         fileset = catalog.as_fileset_catalog().load_fileset(self.fileset_ident)
         self.assertEqual(fileset.audit_info().creator(), self.creator)
