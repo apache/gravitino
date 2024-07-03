@@ -3,7 +3,7 @@ title: "Table partitioning, bucketing and sort ordering and indexes"
 slug: /table-partitioning-bucketing-sort-order-indexes
 date: 2023-12-25
 keyword: Table Partition Bucket Distribute Sort By
-license: Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2.
+license: This software is licensed under the Apache License version 2.
 last_update:
   date: 2024-02-02
   author: Clearvive

@@ -461,7 +461,7 @@ tasks.rat {
   inputDir.set(project.rootDir)
 
   val exclusions = mutableListOf(
-    // Ignore files we track but do not need headers
+    // Ignore files we track but do not need full headers
     "**/.github/**/*",
     "dev/docker/**/*.xml",
     "dev/docker/**/*.conf",
@@ -470,6 +470,7 @@ tasks.rat {
     "**/licenses/*.txt",
     "**/licenses/*.md",
     "integration-test/**",
+    "docs/**/*.md",
     "web/.**",
     "web/next-env.d.ts",
     "web/dist/**/*",
