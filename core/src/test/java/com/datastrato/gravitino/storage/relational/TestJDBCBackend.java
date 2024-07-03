@@ -90,9 +90,9 @@ public class TestJDBCBackend {
     Mockito.when(config.get(ENTITY_STORE)).thenReturn(RELATIONAL_ENTITY_STORE);
     Mockito.when(config.get(ENTITY_RELATIONAL_STORE)).thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL))
-        .thenReturn(String.format("jdbc:h2:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
+        .thenReturn(String.format("jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("root");
-    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("123");
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("123456");
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
 
     String backendName = config.get(ENTITY_RELATIONAL_STORE);
@@ -106,8 +106,6 @@ public class TestJDBCBackend {
       throw new RuntimeException(
           "Failed to create and initialize RelationalBackend by name: " + backendName, e);
     }
-
-    prepareJdbcTable();
   }
 
   @AfterAll

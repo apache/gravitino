@@ -74,10 +74,10 @@ public abstract class BaseCatalog extends AbstractCatalog {
     try {
       Schema schema = catalog().asSchemas().loadSchema(databaseName);
       Map<String, String> properties =
-          propertiesConverter.toFlinkSchemaProperties(schema.properties());
+          propertiesConverter.toFlinkDatabaseProperties(schema.properties());
       return new CatalogDatabaseImpl(properties, schema.comment());
     } catch (NoSuchSchemaException e) {
-      throw new DatabaseNotExistException(getName(), databaseName);
+      throw new DatabaseNotExistException(catalogName(), databaseName);
     }
   }
 
@@ -96,7 +96,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
       catalog().asSchemas().createSchema(databaseName, catalogDatabase.getComment(), properties);
     } catch (SchemaAlreadyExistsException e) {
       if (!ignoreIfExists) {
-        throw new DatabaseAlreadyExistException(getName(), databaseName);
+        throw new DatabaseAlreadyExistException(catalogName(), databaseName);
       }
     } catch (NoSuchCatalogException e) {
       throw new CatalogException(e);
@@ -109,10 +109,10 @@ public abstract class BaseCatalog extends AbstractCatalog {
     try {
       boolean dropped = catalog().asSchemas().dropSchema(databaseName, cascade);
       if (!dropped && !ignoreIfNotExists) {
-        throw new DatabaseNotExistException(getName(), databaseName);
+        throw new DatabaseNotExistException(catalogName(), databaseName);
       }
     } catch (NonEmptySchemaException e) {
-      throw new DatabaseNotEmptyException(getName(), databaseName);
+      throw new DatabaseNotEmptyException(catalogName(), databaseName);
     } catch (NoSuchCatalogException e) {
       throw new CatalogException(e);
     }
@@ -127,7 +127,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
       catalog().asSchemas().alterSchema(databaseName, schemaChanges);
     } catch (NoSuchSchemaException e) {
       if (!ignoreIfNotExists) {
-        throw new DatabaseNotExistException(getName(), databaseName);
+        throw new DatabaseNotExistException(catalogName(), databaseName);
       }
     } catch (NoSuchCatalogException e) {
       throw new CatalogException(e);
@@ -362,5 +362,9 @@ public abstract class BaseCatalog extends AbstractCatalog {
 
   private Catalog catalog() {
     return GravitinoCatalogManager.get().getGravitinoCatalogInfo(getName());
+  }
+
+  private String catalogName() {
+    return getName();
   }
 }

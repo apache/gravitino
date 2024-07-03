@@ -73,10 +73,7 @@ public class CatalogsPageKafkaTest extends AbstractWebIT {
     catalog_kafka
         .asTopicCatalog()
         .createTopic(
-            NameIdentifier.of(metalakeName, catalogName, schemaName, topicName),
-            "comment",
-            null,
-            Collections.emptyMap());
+            NameIdentifier.of(schemaName, topicName), "comment", null, Collections.emptyMap());
   }
 
   /**
@@ -89,9 +86,7 @@ public class CatalogsPageKafkaTest extends AbstractWebIT {
    */
   void dropTopic(String metalakeName, String catalogName, String schemaName, String topicName) {
     Catalog catalog_kafka = metalake.loadCatalog(catalogName);
-    catalog_kafka
-        .asTopicCatalog()
-        .dropTopic(NameIdentifier.of(metalakeName, catalogName, schemaName, topicName));
+    catalog_kafka.asTopicCatalog().dropTopic(NameIdentifier.of(schemaName, topicName));
   }
 
   @Test
