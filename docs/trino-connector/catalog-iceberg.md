@@ -2,8 +2,7 @@
 title: "Gravitino connector - Iceberg catalog"
 slug: /trino-connector/catalog-iceberg
 keyword: gravitino connector trino
-license: "Copyright 2023 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
 Apache Iceberg is an open table format for huge analytic datasets. 

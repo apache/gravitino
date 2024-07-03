@@ -1,6 +1,21 @@
 """
-Copyright 2024 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2.
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+
 """
 
 from enum import Enum
@@ -556,7 +571,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
 
         match = self._identifier_pattern.match(path)
         if match and len(match.groups()) == 3:
-            return NameIdentifier.of_fileset(
+            return NameIdentifier.of(
                 self._metalake, match.group(1), match.group(2), match.group(3)
             )
         raise GravitinoRuntimeException(
@@ -569,12 +584,11 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         :param identifier: The fileset identifier
         :return The fileset
         """
-        catalog: Catalog = self._client.load_catalog(
-            NameIdentifier.of_catalog(
-                identifier.namespace().level(0), identifier.namespace().level(1)
-            )
+        catalog: Catalog = self._client.load_catalog(identifier.namespace().level(1))
+
+        return catalog.as_fileset_catalog().load_fileset(
+            NameIdentifier.of(identifier.namespace().level(2), identifier.name())
         )
-        return catalog.as_fileset_catalog().load_fileset(identifier)
 
     def _get_actual_path_by_ident(
         self,

@@ -3,7 +3,7 @@ title: "Manage table partition using Gravitino"
 slug: /manage-table-partition-using-gravitino
 date: 2024-02-03
 keyword: table partition management
-license: Copyright 2024 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2.
+license: This software is licensed under the Apache License version 2.
 ---
 
 import Tabs from '@theme/Tabs';
