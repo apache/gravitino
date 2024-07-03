@@ -2,10 +2,10 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.authorization.chain.authorization1;
+package com.datastrato.gravitino.connector.authorization.authorization1;
 
-import com.datastrato.gravitino.authorization.AuthorizationHook;
-import com.datastrato.gravitino.authorization.BaseAuthorization;
+import com.datastrato.gravitino.connector.authorization.AuthorizationHook;
+import com.datastrato.gravitino.connector.authorization.BaseAuthorization;
 
 public class TestAuthorization1 extends BaseAuthorization<TestAuthorization1> {
 

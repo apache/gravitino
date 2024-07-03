@@ -2,15 +2,14 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.authorization.chain;
+package com.datastrato.gravitino.connector.authorization;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.TestCatalog;
-import com.datastrato.gravitino.authorization.AuthorizationHook;
-import com.datastrato.gravitino.authorization.chain.authorization1.TestAuthorizationHook1;
-import com.datastrato.gravitino.authorization.chain.authorization2.TestAuthorizationHook2;
 import com.datastrato.gravitino.connector.BaseCatalog;
+import com.datastrato.gravitino.connector.authorization.authorization1.TestAuthorizationHook1;
+import com.datastrato.gravitino.connector.authorization.authorization2.TestAuthorizationHook2;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.google.common.collect.ImmutableMap;
@@ -19,7 +18,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-public class TestAuthorizationChain {
+public class TestAuthorization {
   private static TestCatalog testCatalog1;
   private static TestCatalog testCatalog2;
 

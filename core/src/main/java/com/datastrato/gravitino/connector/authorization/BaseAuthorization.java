@@ -2,8 +2,9 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.authorization;
+package com.datastrato.gravitino.connector.authorization;
 
+import com.datastrato.gravitino.authorization.AuthorizationProvider;
 import java.io.Closeable;
 import java.io.IOException;
 
@@ -45,7 +46,7 @@ public abstract class BaseAuthorization<T extends BaseAuthorization>
   @Override
   public void close() throws IOException {
     if (hook != null) {
-      hook = null;
+      hook.close();
     }
   }
 }

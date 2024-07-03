@@ -2,14 +2,15 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.authorization.chain.authorization1;
+package com.datastrato.gravitino.connector.authorization.authorization1;
 
-import com.datastrato.gravitino.authorization.AuthorizationHook;
 import com.datastrato.gravitino.authorization.Group;
 import com.datastrato.gravitino.authorization.Role;
 import com.datastrato.gravitino.authorization.RoleChange;
 import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.User;
+import com.datastrato.gravitino.connector.authorization.AuthorizationHook;
+import java.io.IOException;
 import java.util.List;
 
 public class TestAuthorizationHook1 implements AuthorizationHook {
@@ -23,7 +24,7 @@ public class TestAuthorizationHook1 implements AuthorizationHook {
   }
 
   @Override
-  public Role onGetRole(String role) throws RuntimeException {
+  public Boolean onCheckRole(String role) throws RuntimeException {
     return null;
   }
 
@@ -48,7 +49,7 @@ public class TestAuthorizationHook1 implements AuthorizationHook {
   }
 
   @Override
-  public User onGetUser(String user) throws RuntimeException {
+  public Boolean onCheckUser(String user) throws RuntimeException {
     return null;
   }
 
@@ -63,7 +64,7 @@ public class TestAuthorizationHook1 implements AuthorizationHook {
   }
 
   @Override
-  public Group onGetGroup(String group) {
+  public Boolean onCheckGroup(String group) {
     return null;
   }
 
@@ -86,4 +87,7 @@ public class TestAuthorizationHook1 implements AuthorizationHook {
   public Boolean onRevokeRolesFromGroup(List<Role> roles, Group group) throws RuntimeException {
     return null;
   }
+
+  @Override
+  public void close() throws IOException {}
 }

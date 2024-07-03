@@ -2,8 +2,11 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.authorization;
+package com.datastrato.gravitino.connector.authorization;
 
+import com.datastrato.gravitino.authorization.Group;
+import com.datastrato.gravitino.authorization.Role;
+import com.datastrato.gravitino.authorization.User;
 import java.util.List;
 
 /**
@@ -30,15 +33,16 @@ public interface AuthorizationUserHook {
   Boolean onRemoveUser(String user) throws RuntimeException;
 
   /**
-   * Gets a User from underlying access control system. Because User information already storage in
-   * the Gravition, so we don't need to get the User from the underlying access control system. We
-   * only need to check if the User exists in the underlying access control system.
+   * Check a User if exist from underlying access control system. Because User information already
+   * storage in the Gravition, so we don't need to get the User from the underlying access control
+   * system. We only need to check if the User exists in the underlying access control system.
    *
    * @param user The name of the User.
-   * @return The getting User instance.
-   * @throws RuntimeException If getting the User encounters storage issues.
+   * @return IF exist return true, else return false.
+   * @throws RuntimeException If getting the User encounters underlying access control system
+   *     issues.
    */
-  User onGetUser(String user) throws RuntimeException;
+  Boolean onCheckUser(String user) throws RuntimeException;
 
   /**
    * Adds a new Group to underlying access control system.
@@ -60,15 +64,16 @@ public interface AuthorizationUserHook {
   Boolean onRemoveGroup(String group) throws RuntimeException;
 
   /**
-   * Gets a Group from underlying access control system. Because Group information already storage
-   * in the Gravition, so we don't need to get the Group from the underlying access control system.
-   * We only need to check if the Group exists in the underlying access control system.
+   * Check a Group if exist from underlying access control system. Because Group information already
+   * storage in the Gravition, so we don't need to get the Group from the underlying access control
+   * system. We only need to check if the Group exists in the underlying access control system.
    *
    * @param group The name of the Group.
-   * @return The getting Group instance.
-   * @throws RuntimeException If getting the Group encounters storage issues.
+   * @return If exist return true, else return false.
+   * @throws RuntimeException If getting the Group encounters underlying access control system
+   *     issues.
    */
-  Group onGetGroup(String group);
+  Boolean onCheckGroup(String group);
 
   /**
    * Grant roles to a user into underlying access control system.

@@ -2,8 +2,11 @@
  * Copyright 2024 Datastrato Pvt Ltd.
  * This software is licensed under the Apache License version 2.
  */
-package com.datastrato.gravitino.authorization;
+package com.datastrato.gravitino.connector.authorization;
 
+import com.datastrato.gravitino.authorization.Role;
+import com.datastrato.gravitino.authorization.RoleChange;
+import com.datastrato.gravitino.authorization.SecurableObject;
 import java.util.List;
 
 /** Interface for authorization Role hooks operation of the underlying access control system */
@@ -19,13 +22,14 @@ public interface AuthorizationRoleHook {
   Boolean onCreateRole(Role role, List<SecurableObject> securableObjects) throws RuntimeException;
 
   /**
-   * Gets a Role from underlying access control system.
+   * Check a Role if exist in the underlying access control system.
    *
    * @param role The name of the Role.
-   * @return The getting Role instance.
-   * @throws RuntimeException If getting the Role encounters storage issues.
+   * @return IF exist return true, else return false.
+   * @throws RuntimeException If getting the Role encounters underlying access control system
+   *     issues.
    */
-  Role onGetRole(String role) throws RuntimeException;
+  Boolean onCheckRole(String role) throws RuntimeException;
 
   /**
    * Deletes a Role from underlying access control system.
