@@ -19,12 +19,27 @@
 
 package com.datastrato.gravitino.flink.connector.integration.test;
 
+import static com.datastrato.gravitino.flink.connector.integration.test.utils.TestUtils.assertColumns;
+import static com.datastrato.gravitino.flink.connector.integration.test.utils.TestUtils.toFlinkPhysicalColumn;
+import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
+
 import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
 import com.datastrato.gravitino.flink.connector.integration.test.utils.TestUtils;
+import com.datastrato.gravitino.rel.Column;
+import com.datastrato.gravitino.rel.Table;
+import com.datastrato.gravitino.rel.types.Types;
+import com.google.common.collect.ImmutableMap;
+import java.util.Optional;
+import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.ResultKind;
 import org.apache.flink.table.api.TableResult;
+import org.apache.flink.table.catalog.CatalogBaseTable;
+import org.apache.flink.table.catalog.CatalogTable;
+import org.apache.flink.table.catalog.ObjectPath;
+import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.types.Row;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
@@ -162,5 +177,157 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
             catalog.asSchemas().dropSchema(schema, true);
           }
         });
+  }
+
+  @Test
+  public void testCreateSimpleTable() {
+    String databaseName = "test_create_no_partition_table_db";
+    String tableName = "test_create_no_partition_table";
+    String comment = "test comment";
+    String key = "test key";
+    String value = "test value";
+
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          TableResult result =
+              sql(
+                  "CREATE TABLE %s "
+                      + "(string_type STRING COMMENT 'string_type', "
+                      + " double_type DOUBLE COMMENT 'double_type')"
+                      + " COMMENT '%s' WITH ("
+                      + "'%s' = '%s')",
+                  tableName, comment, key, value);
+          TestUtils.assertTableResult(result, ResultKind.SUCCESS);
+
+          Table table =
+              catalog.asTableCatalog().loadTable(NameIdentifier.of(databaseName, tableName));
+          Assertions.assertNotNull(table);
+          Assertions.assertEquals(comment, table.comment());
+          Assertions.assertEquals(value, table.properties().get(key));
+          Column[] columns =
+              new Column[] {
+                Column.of("string_type", Types.StringType.get(), "string_type", true, false, null),
+                Column.of("double_type", Types.DoubleType.get(), "double_type")
+              };
+          assertColumns(columns, table.columns());
+          Assertions.assertArrayEquals(EMPTY_TRANSFORM, table.partitioning());
+
+          TestUtils.assertTableResult(
+              sql("INSERT INTO %s VALUES ('A', 1.0), ('B', 2.0)", tableName), ResultKind.SUCCESS);
+          TestUtils.assertTableResult(
+              sql("SELECT * FROM %s", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of("A", 1.0),
+              Row.of("B", 2.0));
+        },
+        true);
+  }
+
+  @Test
+  public void testListTables() {
+    String newSchema = "test_list_table_catalog";
+    Column[] columns = new Column[] {Column.of("user_id", Types.IntegerType.get(), "USER_ID")};
+    doWithSchema(
+        currentCatalog(),
+        newSchema,
+        catalog -> {
+          catalog
+              .asTableCatalog()
+              .createTable(
+                  NameIdentifier.of(newSchema, "test_table1"),
+                  columns,
+                  "comment1",
+                  ImmutableMap.of());
+          catalog
+              .asTableCatalog()
+              .createTable(
+                  NameIdentifier.of(newSchema, "test_table2"),
+                  columns,
+                  "comment2",
+                  ImmutableMap.of());
+          TableResult result = sql("SHOW TABLES");
+          TestUtils.assertTableResult(
+              result,
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of("test_table1"),
+              Row.of("test_table2"));
+        },
+        true);
+  }
+
+  @Test
+  public void testDropTable() {
+    String databaseName = "test_drop_table_db";
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          String tableName = "test_drop_table";
+          Column[] columns =
+              new Column[] {Column.of("user_id", Types.IntegerType.get(), "USER_ID")};
+          NameIdentifier identifier = NameIdentifier.of(databaseName, tableName);
+          catalog.asTableCatalog().createTable(identifier, columns, "comment1", ImmutableMap.of());
+          Assertions.assertTrue(catalog.asTableCatalog().tableExists(identifier));
+
+          TableResult result = sql("DROP TABLE %s", tableName);
+          TestUtils.assertTableResult(result, ResultKind.SUCCESS);
+          Assertions.assertFalse(catalog.asTableCatalog().tableExists(identifier));
+        },
+        true);
+  }
+
+  @Test
+  public void testGetSimpleTable() {
+    String databaseName = "test_get_simple_table";
+    Column[] columns =
+        new Column[] {
+          Column.of("string_type", Types.StringType.get(), "string_type", true, false, null),
+          Column.of("double_type", Types.DoubleType.get(), "double_type")
+        };
+
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          String tableName = "test_desc_table";
+          String comment = "comment1";
+          catalog
+              .asTableCatalog()
+              .createTable(
+                  NameIdentifier.of(databaseName, "test_desc_table"),
+                  columns,
+                  comment,
+                  ImmutableMap.of("k1", "v1"));
+
+          Optional<org.apache.flink.table.catalog.Catalog> flinkCatalog =
+              tableEnv.getCatalog(catalog.name());
+          Assertions.assertTrue(flinkCatalog.isPresent());
+          try {
+            CatalogBaseTable table =
+                flinkCatalog.get().getTable(new ObjectPath(databaseName, tableName));
+            Assertions.assertNotNull(table);
+            Assertions.assertEquals(CatalogBaseTable.TableKind.TABLE, table.getTableKind());
+            Assertions.assertEquals(comment, table.getComment());
+
+            org.apache.flink.table.catalog.Column[] expected =
+                new org.apache.flink.table.catalog.Column[] {
+                  org.apache.flink.table.catalog.Column.physical("string_type", DataTypes.STRING())
+                      .withComment("string_type"),
+                  org.apache.flink.table.catalog.Column.physical("double_type", DataTypes.DOUBLE())
+                      .withComment("double_type")
+                };
+            org.apache.flink.table.catalog.Column[] actual =
+                toFlinkPhysicalColumn(table.getUnresolvedSchema().getColumns());
+            Assertions.assertArrayEquals(expected, actual);
+
+            CatalogTable catalogTable = (CatalogTable) table;
+            Assertions.assertFalse(catalogTable.isPartitioned());
+          } catch (TableNotExistException e) {
+            Assertions.fail(e);
+          }
+        },
+        true);
   }
 }

@@ -26,6 +26,7 @@ import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.SchemaChange;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
+import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
@@ -168,7 +169,9 @@ public abstract class BaseCatalog extends AbstractCatalog {
           .map(NameIdentifier::name)
           .collect(Collectors.toList());
     } catch (NoSuchSchemaException e) {
-      throw new DatabaseNotExistException(catalogName(), databaseName);
+      throw new DatabaseNotExistException(catalogName(), databaseName, e);
+    } catch (Exception e) {
+      throw new CatalogException(e);
     }
   }
 
@@ -186,16 +189,22 @@ public abstract class BaseCatalog extends AbstractCatalog {
               .asTableCatalog()
               .loadTable(NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName()));
       return toFlinkTable(table);
-    } catch (NoSuchCatalogException e) {
+    } catch (NoSuchTableException e) {
+      throw new TableNotExistException(catalogName(), tablePath, e);
+    } catch (Exception e) {
       throw new CatalogException(e);
     }
   }
 
   @Override
   public boolean tableExists(ObjectPath tablePath) throws CatalogException {
-    return catalog()
-        .asTableCatalog()
-        .tableExists(NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName()));
+    try {
+      return catalog()
+          .asTableCatalog()
+          .tableExists(NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName()));
+    } catch (Exception e) {
+      throw new CatalogException(e);
+    }
   }
 
   @Override
@@ -227,10 +236,12 @@ public abstract class BaseCatalog extends AbstractCatalog {
           .alterTable(
               NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName()),
               TableChange.rename(newTableName));
-    } catch (NoSuchCatalogException e) {
+    } catch (NoSuchTableException e) {
       if (!ignoreIfNotExists) {
-        throw new TableNotExistException(catalogName(), tablePath);
+        throw new TableNotExistException(catalogName(), tablePath, e);
       }
+    } catch (Exception e) {
+      throw new CatalogException(e);
     }
   }
 
@@ -426,7 +437,6 @@ public abstract class BaseCatalog extends AbstractCatalog {
   protected abstract PropertiesConverter getPropertiesConverter();
 
   protected CatalogBaseTable toFlinkTable(Table table) {
-
     org.apache.flink.table.api.Schema.Builder builder =
         org.apache.flink.table.api.Schema.newBuilder();
     for (Column column : table.columns()) {
@@ -434,8 +444,10 @@ public abstract class BaseCatalog extends AbstractCatalog {
           .column(column.name(), TypeUtils.toFlinkType(column.dataType()))
           .withComment(column.comment());
     }
+    Map<String, String> flinkTableProperties =
+        propertiesConverter.toFlinkTableProperties(table.properties());
     return CatalogTable.of(
-        builder.build(), table.comment(), ImmutableList.of(), table.properties());
+        builder.build(), table.comment(), ImmutableList.of(), flinkTableProperties);
   }
 
   private Column toGravitinoColumn(org.apache.flink.table.catalog.Column column) {

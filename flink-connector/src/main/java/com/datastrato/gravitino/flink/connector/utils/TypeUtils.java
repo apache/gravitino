@@ -30,13 +30,15 @@ public class TypeUtils {
   }
 
   public static DataType toFlinkType(Type gravitinoType) {
-    if (gravitinoType instanceof Types.DoubleType) {
-      return DataTypes.DOUBLE();
-    } else if (gravitinoType instanceof Types.StringType) {
-      return DataTypes.STRING();
-    } else if (gravitinoType instanceof Types.IntegerType) {
-      return DataTypes.INT();
+    switch (gravitinoType.name()) {
+      case DOUBLE:
+        return DataTypes.DOUBLE();
+      case STRING:
+        return DataTypes.STRING();
+      case INTEGER:
+        return DataTypes.INT();
+      default:
+        throw new UnsupportedOperationException("Not support " + gravitinoType.toString());
     }
-    throw new UnsupportedOperationException("Not support " + gravitinoType.toString());
   }
 }
