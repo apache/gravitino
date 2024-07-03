@@ -22,6 +22,7 @@ import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -79,7 +80,7 @@ public class UserMetaService {
     return POConverters.fromUserPO(userPO, rolePOs, identifier.namespace());
   }
 
-  public void insertUser(UserEntity userEntity, boolean overwritten) {
+  public void insertUser(UserEntity userEntity, boolean overwritten) throws IOException {
     try {
       AuthorizationUtils.checkUser(userEntity.nameIdentifier());
 
@@ -139,7 +140,7 @@ public class UserMetaService {
   }
 
   public <E extends Entity & HasIdentifier> UserEntity updateUser(
-      NameIdentifier identifier, Function<E, E> updater) {
+      NameIdentifier identifier, Function<E, E> updater) throws IOException {
     AuthorizationUtils.checkUser(identifier);
 
     Long schemaId =

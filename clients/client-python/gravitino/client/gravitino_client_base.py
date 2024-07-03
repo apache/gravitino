@@ -7,15 +7,16 @@ import logging
 import configparser
 import os.path
 
+from gravitino.auth.auth_data_provider import AuthDataProvider
 from gravitino.client.gravitino_metalake import GravitinoMetalake
 from gravitino.client.gravitino_version import GravitinoVersion
 from gravitino.dto.version_dto import VersionDTO
 from gravitino.dto.responses.metalake_response import MetalakeResponse
 from gravitino.dto.responses.version_response import VersionResponse
-from gravitino.name_identifier import NameIdentifier
 from gravitino.utils import HTTPClient
 from gravitino.exceptions.gravitino_runtime_exception import GravitinoRuntimeException
 from gravitino.constants.version import VERSION_INI, Version
+from gravitino.name_identifier import NameIdentifier
 
 logger = logging.getLogger(__name__)
 
@@ -35,16 +36,21 @@ class GravitinoClientBase:
     API_METALAKES_IDENTIFIER_PATH = f"{API_METALAKES_LIST_PATH}/"
     """The REST API path prefix for load a specific metalake"""
 
-    def __init__(self, uri: str, check_version: bool = True):
-        self._rest_client = HTTPClient(uri)
+    def __init__(
+        self,
+        uri: str,
+        check_version: bool = True,
+        auth_data_provider: AuthDataProvider = None,
+    ):
+        self._rest_client = HTTPClient(uri, auth_data_provider=auth_data_provider)
         if check_version:
             self.check_version()
 
-    def load_metalake(self, ident: NameIdentifier) -> GravitinoMetalake:
+    def load_metalake(self, name: str) -> GravitinoMetalake:
         """Loads a specific Metalake from the Gravitino API.
 
         Args:
-            ident The identifier of the Metalake to be loaded.
+            name: The name of the Metalake to be loaded.
 
         Returns:
             A GravitinoMetalake instance representing the loaded Metalake.
@@ -53,10 +59,9 @@ class GravitinoClientBase:
             NoSuchMetalakeException If the specified Metalake does not exist.
         """
 
-        NameIdentifier.check_metalake(ident)
-
+        self.check_metalake_name(name)
         response = self._rest_client.get(
-            GravitinoClientBase.API_METALAKES_IDENTIFIER_PATH + ident.name()
+            GravitinoClientBase.API_METALAKES_IDENTIFIER_PATH + name
         )
         metalake_response = MetalakeResponse.from_json(
             response.body, infer_missing=True
@@ -120,3 +125,12 @@ class GravitinoClientBase:
                 self._rest_client.close()
             except Exception as e:
                 logger.warning("Failed to close the HTTP REST client: %s", e)
+
+    def check_metalake_name(self, metalake_name: str):
+        identifier = NameIdentifier.parse(metalake_name)
+        namespace = identifier.namespace()
+
+        if not namespace:
+            raise ValueError(
+                f"Metalake namespace must be empty, the input namespace is {namespace}"
+            )

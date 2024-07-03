@@ -176,17 +176,20 @@ public class TestRelationalCatalog extends TestBase {
 
   @Test
   public void testCreateSchema() throws JsonProcessingException {
-    NameIdentifier schemaId = NameIdentifier.of(metalakeName, catalogName, "schema1");
-    String schemaPath = withSlash(RelationalCatalog.formatSchemaRequestPath(schemaId.namespace()));
-    SchemaDTO schema = createMockSchema("schema1", "comment", Collections.emptyMap());
+    String schemaName = "schema1";
+    String schemaPath =
+        withSlash(
+            RelationalCatalog.formatSchemaRequestPath(Namespace.of(metalakeName, catalogName)));
+    SchemaDTO schema = createMockSchema(schemaName, "comment", Collections.emptyMap());
 
-    SchemaCreateRequest req = new SchemaCreateRequest("schema1", "comment", Collections.emptyMap());
+    SchemaCreateRequest req =
+        new SchemaCreateRequest(schemaName, "comment", Collections.emptyMap());
     SchemaResponse resp = new SchemaResponse(schema);
     buildMockResource(Method.POST, schemaPath, req, resp, SC_OK);
 
     Schema createdSchema =
-        catalog.asSchemas().createSchema(schemaId.name(), "comment", Collections.emptyMap());
-    Assertions.assertEquals("schema1", createdSchema.name());
+        catalog.asSchemas().createSchema(schemaName, "comment", Collections.emptyMap());
+    Assertions.assertEquals(schemaName, createdSchema.name());
     Assertions.assertEquals("comment", createdSchema.comment());
     Assertions.assertEquals(Collections.emptyMap(), createdSchema.properties());
 
@@ -200,7 +203,7 @@ public class TestRelationalCatalog extends TestBase {
     Throwable ex =
         Assertions.assertThrows(
             NoSuchCatalogException.class,
-            () -> schemas.createSchema(schemaId.name(), "comment", emptyMap));
+            () -> schemas.createSchema(schemaName, "comment", emptyMap));
     Assertions.assertTrue(ex.getMessage().contains("catalog not found"));
 
     // Test throw SchemaAlreadyExistsException
@@ -212,16 +215,16 @@ public class TestRelationalCatalog extends TestBase {
     Throwable ex1 =
         Assertions.assertThrows(
             SchemaAlreadyExistsException.class,
-            () -> schemas.createSchema(schemaId.name(), "comment", emptyMap));
+            () -> schemas.createSchema(schemaName, "comment", emptyMap));
     Assertions.assertTrue(ex1.getMessage().contains("schema already exists"));
   }
 
   @Test
   public void testLoadSchema() throws JsonProcessingException {
-    NameIdentifier schemaId = NameIdentifier.of(metalakeName, catalogName, "schema1");
+    NameIdentifier schemaId = NameIdentifier.of("schema1");
     String schemaPath =
         withSlash(
-            RelationalCatalog.formatSchemaRequestPath(schemaId.namespace())
+            RelationalCatalog.formatSchemaRequestPath(Namespace.of(metalakeName, catalogName))
                 + "/"
                 + schemaId.name());
     SchemaDTO schema = createMockSchema("schema1", "comment", Collections.emptyMap());
@@ -306,11 +309,14 @@ public class TestRelationalCatalog extends TestBase {
 
     EntityListResponse resp = new EntityListResponse(new NameIdentifier[] {table1, table2});
     buildMockResource(Method.GET, tablePath, null, resp, SC_OK);
-    NameIdentifier[] tables = catalog.asTableCatalog().listTables(table1.namespace());
+    NameIdentifier[] tables = catalog.asTableCatalog().listTables(Namespace.of("schema1"));
 
     Assertions.assertEquals(2, tables.length);
-    Assertions.assertEquals(table1, tables[0]);
-    Assertions.assertEquals(table2, tables[1]);
+
+    NameIdentifier expectedResult1 = NameIdentifier.of("schema1", "table1");
+    NameIdentifier expectedResult2 = NameIdentifier.of("schema1", "table2");
+    Assertions.assertEquals(expectedResult1, tables[0]);
+    Assertions.assertEquals(expectedResult2, tables[1]);
 
     // Test throw NoSuchSchemaException
     ErrorResponse errorResp =
@@ -318,7 +324,7 @@ public class TestRelationalCatalog extends TestBase {
     buildMockResource(Method.GET, tablePath, null, errorResp, SC_NOT_FOUND);
 
     TableCatalog tableCatalog = catalog.asTableCatalog();
-    Namespace namespace1 = table1.namespace();
+    Namespace namespace1 = Namespace.of("schema1");
     Throwable ex =
         Assertions.assertThrows(
             NoSuchSchemaException.class, () -> tableCatalog.listTables(namespace1));
@@ -341,8 +347,9 @@ public class TestRelationalCatalog extends TestBase {
 
   @Test
   public void testCreateTable() throws JsonProcessingException {
-    NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
-    String tablePath = withSlash(RelationalCatalog.formatTableRequestPath(tableId.namespace()));
+    NameIdentifier tableId = NameIdentifier.of("schema1", "table1");
+    Namespace fullNamespace = Namespace.of(metalakeName, catalogName, tableId.namespace().level(0));
+    String tablePath = withSlash(RelationalCatalog.formatTableRequestPath(fullNamespace));
 
     ColumnDTO[] columns =
         new ColumnDTO[] {
@@ -449,8 +456,9 @@ public class TestRelationalCatalog extends TestBase {
 
   @Test
   public void testCreatePartitionedTable() throws JsonProcessingException {
-    NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
-    String tablePath = withSlash(RelationalCatalog.formatTableRequestPath(tableId.namespace()));
+    NameIdentifier tableId = NameIdentifier.of("schema1", "table1");
+    Namespace fullNamespace = Namespace.of(metalakeName, catalogName, tableId.namespace().level(0));
+    String tablePath = withSlash(RelationalCatalog.formatTableRequestPath(fullNamespace));
 
     ColumnDTO[] columns =
         new ColumnDTO[] {
@@ -616,8 +624,9 @@ public class TestRelationalCatalog extends TestBase {
 
   @Test
   public void testCreateIndexTable() throws JsonProcessingException {
-    NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "index1");
-    String tablePath = withSlash(RelationalCatalog.formatTableRequestPath(tableId.namespace()));
+    NameIdentifier tableId = NameIdentifier.of("schema1", "index1");
+    Namespace fullNamespace = Namespace.of(metalakeName, catalogName, tableId.namespace().level(0));
+    String tablePath = withSlash(RelationalCatalog.formatTableRequestPath(fullNamespace));
 
     ColumnDTO[] columns =
         new ColumnDTO[] {
@@ -713,10 +722,10 @@ public class TestRelationalCatalog extends TestBase {
 
   @Test
   public void testLoadTable() throws JsonProcessingException {
-    NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
+    NameIdentifier tableId = NameIdentifier.of("schema1", "table1");
+    Namespace fullNamespace = Namespace.of(metalakeName, catalogName, tableId.namespace().level(0));
     String tablePath =
-        withSlash(
-            RelationalCatalog.formatTableRequestPath(tableId.namespace()) + "/" + tableId.name());
+        withSlash(RelationalCatalog.formatTableRequestPath(fullNamespace) + "/" + tableId.name());
     ColumnDTO[] columns =
         new ColumnDTO[] {
           createMockColumn("col1", Types.ByteType.get(), "comment1"),
@@ -755,7 +764,7 @@ public class TestRelationalCatalog extends TestBase {
 
   @Test
   public void testRenameTable() throws JsonProcessingException {
-    NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
+    NameIdentifier tableId = NameIdentifier.of("schema1", "table1");
     ColumnDTO[] columns =
         new ColumnDTO[] {createMockColumn("col1", Types.ByteType.get(), "comment1")};
 
@@ -779,7 +788,7 @@ public class TestRelationalCatalog extends TestBase {
 
   @Test
   public void testUpdateTableComment() throws JsonProcessingException {
-    NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
+    NameIdentifier tableId = NameIdentifier.of("schema1", "table1");
     ColumnDTO[] columns =
         new ColumnDTO[] {createMockColumn("col1", Types.ByteType.get(), "comment1")};
 
@@ -803,7 +812,7 @@ public class TestRelationalCatalog extends TestBase {
 
   @Test
   public void testSetTableProperty() throws JsonProcessingException {
-    NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
+    NameIdentifier tableId = NameIdentifier.of("schema1", "table1");
     ColumnDTO[] columns =
         new ColumnDTO[] {createMockColumn("col1", Types.ByteType.get(), "comment1")};
     Map<String, String> properties = ImmutableMap.of("k1", "v1");
@@ -828,7 +837,7 @@ public class TestRelationalCatalog extends TestBase {
 
   @Test
   public void testRemoveTableProperty() throws JsonProcessingException {
-    NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
+    NameIdentifier tableId = NameIdentifier.of("schema1", "table1");
     ColumnDTO[] columns =
         new ColumnDTO[] {createMockColumn("col1", Types.ByteType.get(), "comment1")};
 
@@ -851,7 +860,7 @@ public class TestRelationalCatalog extends TestBase {
 
   @Test
   public void testAddTableColumn() throws JsonProcessingException {
-    NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
+    NameIdentifier tableId = NameIdentifier.of("schema1", "table1");
     ColumnDTO[] columns =
         new ColumnDTO[] {
           createMockColumn("col1", Types.ByteType.get(), "comment1"),
@@ -886,7 +895,7 @@ public class TestRelationalCatalog extends TestBase {
 
   @Test
   public void testRenameTableColumn() throws JsonProcessingException {
-    NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
+    NameIdentifier tableId = NameIdentifier.of("schema1", "table1");
     ColumnDTO[] columns =
         new ColumnDTO[] {
           createMockColumn("col1", Types.ByteType.get(), "comment1"),
@@ -914,7 +923,7 @@ public class TestRelationalCatalog extends TestBase {
 
   @Test
   public void testUpdateTableColumnComment() throws JsonProcessingException {
-    NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
+    NameIdentifier tableId = NameIdentifier.of("schema1", "table1");
     ColumnDTO[] columns =
         new ColumnDTO[] {createMockColumn("col1", Types.ByteType.get(), "comment2")};
 
@@ -938,7 +947,7 @@ public class TestRelationalCatalog extends TestBase {
 
   @Test
   public void testUpdateTableColumnDataType() throws JsonProcessingException {
-    NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
+    NameIdentifier tableId = NameIdentifier.of("schema1", "table1");
     ColumnDTO[] columns =
         new ColumnDTO[] {createMockColumn("col1", Types.StringType.get(), "comment1")};
 
@@ -962,7 +971,7 @@ public class TestRelationalCatalog extends TestBase {
 
   @Test
   public void testUpdateTableColumnNullability() throws JsonProcessingException {
-    NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
+    NameIdentifier tableId = NameIdentifier.of("schema1", "table1");
     ColumnDTO[] columns =
         new ColumnDTO[] {createMockColumn("col1", Types.StringType.get(), "comment1")};
 
@@ -985,7 +994,7 @@ public class TestRelationalCatalog extends TestBase {
 
   @Test
   public void testUpdateTableColumnPosition() throws JsonProcessingException {
-    NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
+    NameIdentifier tableId = NameIdentifier.of("schema1", "table1");
     ColumnDTO[] columns =
         new ColumnDTO[] {
           createMockColumn("col1", Types.ByteType.get(), "comment1"),
@@ -1032,7 +1041,7 @@ public class TestRelationalCatalog extends TestBase {
 
   @Test
   public void testDeleteTableColumn() throws JsonProcessingException {
-    NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
+    NameIdentifier tableId = NameIdentifier.of("schema1", "table1");
     ColumnDTO[] columns =
         new ColumnDTO[] {createMockColumn("col2", Types.StringType.get(), "comment2")};
 
@@ -1055,10 +1064,10 @@ public class TestRelationalCatalog extends TestBase {
 
   @Test
   public void testDropTable() throws JsonProcessingException {
-    NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
+    NameIdentifier tableId = NameIdentifier.of("schema1", "table1");
+    Namespace fullNamespace = Namespace.of(metalakeName, catalogName, tableId.namespace().level(0));
     String tablePath =
-        withSlash(
-            RelationalCatalog.formatTableRequestPath(tableId.namespace()) + "/" + tableId.name());
+        withSlash(RelationalCatalog.formatTableRequestPath(fullNamespace) + "/" + tableId.name());
     DropResponse resp = new DropResponse(true);
     buildMockResource(Method.DELETE, tablePath, null, resp, SC_OK);
 
@@ -1081,10 +1090,10 @@ public class TestRelationalCatalog extends TestBase {
 
   @Test
   public void testPurgeTable() throws JsonProcessingException {
-    NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
+    NameIdentifier tableId = NameIdentifier.of("schema1", "table1");
+    Namespace fullNamespace = Namespace.of(metalakeName, catalogName, tableId.namespace().level(0));
     String tablePath =
-        withSlash(
-            RelationalCatalog.formatTableRequestPath(tableId.namespace()) + "/" + tableId.name());
+        withSlash(RelationalCatalog.formatTableRequestPath(fullNamespace) + "/" + tableId.name());
     DropResponse resp = new DropResponse(true);
     buildMockResource(Method.DELETE, tablePath, null, resp, SC_OK);
 
@@ -1104,10 +1113,10 @@ public class TestRelationalCatalog extends TestBase {
 
   @Test
   public void testPurgeExternalTable() throws JsonProcessingException {
-    NameIdentifier tableId = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
+    NameIdentifier tableId = NameIdentifier.of("schema1", "table1");
+    Namespace fullNamespace = Namespace.of(metalakeName, catalogName, tableId.namespace().level(0));
     String tablePath =
-        withSlash(
-            RelationalCatalog.formatTableRequestPath(tableId.namespace()) + "/" + tableId.name());
+        withSlash(RelationalCatalog.formatTableRequestPath(fullNamespace) + "/" + tableId.name());
     DropResponse resp = new DropResponse(true);
     buildMockResource(Method.DELETE, tablePath, null, resp, SC_OK);
 
@@ -1131,8 +1140,9 @@ public class TestRelationalCatalog extends TestBase {
 
   private void testAlterTable(NameIdentifier ident, TableUpdateRequest req, TableDTO updatedTable)
       throws JsonProcessingException {
+    Namespace fullNamespace = Namespace.of(metalakeName, catalogName, ident.namespace().level(0));
     String tablePath =
-        withSlash(RelationalCatalog.formatTableRequestPath(ident.namespace()) + "/" + ident.name());
+        withSlash(RelationalCatalog.formatTableRequestPath(fullNamespace) + "/" + ident.name());
     TableUpdatesRequest updatesRequest = new TableUpdatesRequest(ImmutableList.of(req));
     TableResponse resp = new TableResponse(updatedTable);
     buildMockResource(Method.PUT, tablePath, updatesRequest, resp, SC_OK);

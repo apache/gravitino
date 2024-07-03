@@ -11,6 +11,7 @@ import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.util.Collections;
@@ -25,7 +26,7 @@ import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 public class CatalogIT extends AbstractIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogIT.class);
@@ -121,7 +122,27 @@ public class CatalogIT extends AbstractIT {
     Assertions.assertEquals("hadoop", catalog.provider());
     Assertions.assertEquals("catalog comment", catalog.comment());
     Assertions.assertTrue(catalog.properties().isEmpty());
+    metalake.dropCatalog(catalogName);
 
+    // test cloud related properties
+    ImmutableMap<String, String> illegalProps = ImmutableMap.of("cloud.name", "myCloud");
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                metalake.createCatalog(
+                    catalogName, Catalog.Type.FILESET, "hadoop", "catalog comment", illegalProps));
+    Assertions.assertTrue(exception.getMessage().contains("Invalid value [myCloud]"));
+
+    ImmutableMap<String, String> props =
+        ImmutableMap.of("cloud.name", "aws", "cloud.region-code", "us-west-2");
+    catalog =
+        metalake.createCatalog(
+            catalogName, Catalog.Type.FILESET, "hadoop", "catalog comment", props);
+    Assertions.assertTrue(metalake.catalogExists(catalogName));
+    Assertions.assertFalse(catalog.properties().isEmpty());
+    Assertions.assertEquals("aws", catalog.properties().get("cloud.name"));
+    Assertions.assertEquals("us-west-2", catalog.properties().get("cloud.region-code"));
     metalake.dropCatalog(catalogName);
   }
 

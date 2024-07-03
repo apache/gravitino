@@ -9,9 +9,11 @@ import com.datastrato.gravitino.integration.test.web.ui.utils.AbstractWebIT;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 
+@Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class MetalakePageTest extends AbstractWebIT {
   private static final String WEB_TITLE = "Gravitino";
@@ -20,9 +22,8 @@ public class MetalakePageTest extends AbstractWebIT {
   private static final String FOOTER_LINK_DATASTRATO = "https://datastrato.ai/";
   private static final String FOOTER_LINK_DOCS = "https://datastrato.ai/docs/";
   private static final String FOOTER_LINK_LICENSE =
-      "https://github.com/datastrato/gravitino/blob/main/LICENSE";
-  private static final String FOOTER_LINK_SUPPORT =
-      "https://github.com/datastrato/gravitino/issues";
+      "https://github.com/apache/gravitino/blob/main/LICENSE";
+  private static final String FOOTER_LINK_SUPPORT = "https://github.com/apache/gravitino/issues";
   MetalakePage metalakePage = new MetalakePage();
 
   // Create a metalake by name, set the default comment and properties.

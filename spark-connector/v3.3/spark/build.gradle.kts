@@ -32,22 +32,31 @@ dependencies {
 
   testImplementation(project(":api")) {
     exclude("org.apache.logging.log4j")
+    exclude("org.slf4j")
   }
   testImplementation(project(":clients:client-java")) {
     exclude("org.apache.logging.log4j")
+    exclude("org.slf4j")
   }
   testImplementation(project(":core")) {
     exclude("org.apache.logging.log4j")
+    exclude("org.slf4j")
   }
   testImplementation(project(":common")) {
     exclude("org.apache.logging.log4j")
+    exclude("org.slf4j")
   }
-  testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":integration-test-common", "testArtifacts")) {
+    exclude("org.apache.logging.log4j")
+    exclude("org.slf4j")
+  }
   testImplementation(project(":server")) {
     exclude("org.apache.logging.log4j")
+    exclude("org.slf4j")
   }
   testImplementation(project(":server-common")) {
     exclude("org.apache.logging.log4j")
+    exclude("org.slf4j")
   }
   testImplementation(project(":spark-connector:spark-common", "testArtifacts")) {
     exclude("com.fasterxml.jackson")
@@ -61,6 +70,7 @@ dependencies {
     exclude("org.apache.logging.log4j")
     exclude("org.eclipse.jetty.aggregate", "jetty-all")
     exclude("org.eclipse.jetty.orbit", "javax.servlet")
+    exclude("org.slf4j")
   }
 
   testImplementation(libs.hive2.metastore) {

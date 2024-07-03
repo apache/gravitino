@@ -112,7 +112,7 @@ public class CatalogMetaService {
     return POConverters.fromCatalogPOs(catalogPOS, namespace);
   }
 
-  public void insertCatalog(CatalogEntity catalogEntity, boolean overwrite) {
+  public void insertCatalog(CatalogEntity catalogEntity, boolean overwrite) throws IOException {
     try {
       NameIdentifierUtil.checkCatalog(catalogEntity.nameIdentifier());
 

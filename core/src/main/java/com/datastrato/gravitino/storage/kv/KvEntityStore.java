@@ -24,7 +24,6 @@ import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
 import com.datastrato.gravitino.storage.EntityKeyEncoder;
@@ -168,7 +167,7 @@ public class KvEntityStore implements EntityStore {
   @Override
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Class<E> type, EntityType entityType, Function<E, E> updater)
-      throws IOException, NoSuchEntityException, AlreadyExistsException {
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     return executeInTransaction(
         () -> {
           byte[] key = entityKeyEncoder.encode(ident, entityType);
@@ -188,7 +187,7 @@ public class KvEntityStore implements EntityStore {
           // Check whether the new entities already existed
           boolean newEntityExist = exists(updatedE.nameIdentifier(), entityType);
           if (newEntityExist) {
-            throw new AlreadyExistsException(
+            throw new EntityAlreadyExistsException(
                 "Entity %s already exist, please check again", updatedE.nameIdentifier());
           }
 

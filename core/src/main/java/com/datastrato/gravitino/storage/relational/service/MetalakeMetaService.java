@@ -93,7 +93,7 @@ public class MetalakeMetaService {
     return metalakePO;
   }
 
-  public void insertMetalake(BaseMetalake baseMetalake, boolean overwrite) {
+  public void insertMetalake(BaseMetalake baseMetalake, boolean overwrite) throws IOException {
     try {
       NameIdentifierUtil.checkMetalake(baseMetalake.nameIdentifier());
 

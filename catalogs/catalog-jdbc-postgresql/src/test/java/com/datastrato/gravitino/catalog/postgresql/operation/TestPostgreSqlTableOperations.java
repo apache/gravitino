@@ -35,7 +35,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.com.google.common.collect.Maps;
 
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 public class TestPostgreSqlTableOperations extends TestPostgreSql {
 
   private static Type VARCHAR = Types.VarCharType.of(255);

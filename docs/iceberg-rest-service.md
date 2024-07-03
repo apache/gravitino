@@ -80,23 +80,28 @@ specify a Hive or JDBC catalog backend for production environment.
 
 #### Hive backend configuration
 
-| Configuration item                                  | Description                                                                                                     | Default value | Required   | Since Version |
-|-----------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|---------------|------------|---------------|
-| `gravitino.auxService.iceberg-rest.catalog-backend` | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`hive`** for a Hive catalog. | `memory`      | Yes        | 0.2.0         |
-| `gravitino.auxService.iceberg-rest.uri`             | The Hive metadata address, such as `thrift://127.0.0.1:9083`.                                                   | (none)        | Yes        | 0.2.0         |
-| `gravitino.auxService.iceberg-rest.warehouse `      | The warehouse directory of the Hive catalog, such as `/user/hive/warehouse-hive/`.                              | (none)        | Yes        | 0.2.0         |
+| Configuration item                                       | Description                                                                                                                                  | Default value                                                                 | Required | Since Version |
+|----------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------|----------|---------------|
+| `gravitino.auxService.iceberg-rest.catalog-backend`      | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`hive`** for a Hive catalog.                              | `memory`                                                                      | Yes      | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.uri`                  | The Hive metadata address, such as `thrift://127.0.0.1:9083`.                                                                                | (none)                                                                        | Yes      | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.warehouse`            | The warehouse directory of the Hive catalog, such as `/user/hive/warehouse-hive/`.                                                           | (none)                                                                        | Yes      | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.catalog-backend-name` | The catalog backend name passed to underlying Iceberg catalog backend. Catalog name in JDBC backend is used to isolate namespace and tables. | `hive` for Hive backend, `jdbc` for JDBC backend, `memory` for memory backend | No       | 0.5.2         |
+
 
 #### JDBC backend configuration
 
-| Configuration item                                  | Description                                                                                                                          | Default value | Required | Since Version |
-|-----------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `gravitino.auxService.iceberg-rest.catalog-backend` | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`jdbc`** for a JDBC catalog.                      | `memory`      | Yes      | 0.2.0         |
-| `gravitino.auxService.iceberg-rest.uri`             | The JDBC connection address, such as `jdbc:postgresql://127.0.0.1:5432` for Postgres, or `jdbc:mysql://127.0.0.1:3306/` for mysql.   | (none)        | Yes      | 0.2.0         |
-| `gravitino.auxService.iceberg-rest.warehouse `      | The warehouse directory of JDBC catalog. Set the HDFS prefix if using HDFS, such as `hdfs://127.0.0.1:9000/user/hive/warehouse-jdbc` | (none)        | Yes      | 0.2.0         |
-| `gravitino.auxService.iceberg-rest.jdbc.user`       | The username of the JDBC connection.                                                                                                 | (none)        | Yes      | 0.2.0         |
-| `gravitino.auxService.iceberg-rest.jdbc.password`   | The password of the JDBC connection.                                                                                                 | (none)        | Yes      | 0.2.0         |
-| `gravitino.auxService.iceberg-rest.jdbc-initialize` | Whether to initialize the meta tables when creating the JDBC catalog.                                                                | `true`        | No       | 0.2.0         |
-| `gravitino.auxService.iceberg-rest.jdbc-driver`     | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL.                             | (none)        | Yes      | 0.3.0         |
+| Configuration item                                       | Description                                                                                                                          | Default value           | Required | Since Version |
+|----------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------|-------------------------|----------|---------------|
+| `gravitino.auxService.iceberg-rest.catalog-backend`      | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`jdbc`** for a JDBC catalog.                      | `memory`                | Yes      | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.uri`                  | The JDBC connection address, such as `jdbc:postgresql://127.0.0.1:5432` for Postgres, or `jdbc:mysql://127.0.0.1:3306/` for mysql.   | (none)                  | Yes      | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.warehouse `           | The warehouse directory of JDBC catalog. Set the HDFS prefix if using HDFS, such as `hdfs://127.0.0.1:9000/user/hive/warehouse-jdbc` | (none)                  | Yes      | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.catalog-backend-name` | The catalog name passed to underlying Iceberg catalog backend. Catalog name in JDBC backend is used to isolate namespace and tables. | `jdbc` for JDBC backend | No       | 0.5.2         |
+| `gravitino.auxService.iceberg-rest.jdbc.user`            | The username of the JDBC connection.                                                                                                 | (none)                  | Yes      | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.jdbc.password`        | The password of the JDBC connection.                                                                                                 | (none)                  | Yes      | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.jdbc-initialize`      | Whether to initialize the meta tables when creating the JDBC catalog.                                                                | `true`                  | No       | 0.2.0         |
+| `gravitino.auxService.iceberg-rest.jdbc-driver`          | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL.                             | (none)                  | Yes      | 0.3.0         |
+
+If you have a JDBC Iceberg catalog prior, you must set `catalog-backend-name` to keep consistent with your Jdbc Iceberg catalog name to operate the prior namespace and tables.
 
 :::caution
 You must download the corresponding JDBC driver to the `catalogs/lakehouse-iceberg/libs` directory.
