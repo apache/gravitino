@@ -154,7 +154,6 @@ This mode is closer to the actual environment, but more complex to debug. To deb
 * View the test results in the `Actions` tab of the pull request page.
 * Run the integration tests in several steps:
   * The Gravitino integration tests pull the CI Docker image from the Docker Hub repository. This step typically takes around 15 seconds.
-  * If you set the `debug action` label in the pull request, GitHub actions runs an SSH server with `csexton/debugger-action@master`, allowing you to log into the GitHub actions environment for remote debugging.
   * The Gravitino project compiles and packages in the `distribution` directory using the `./gradlew compileDistribution` command.
   * Run the `./gradlew test -PtestMode=[embedded|deploy]` command.
 
