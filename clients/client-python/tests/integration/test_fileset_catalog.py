@@ -58,18 +58,12 @@ class TestFilesetCatalog(IntegrationTestEnv):
     }
     fileset_new_name = fileset_name + "_new"
 
-    catalog_ident: NameIdentifier = NameIdentifier.of_catalog(
-        metalake_name, catalog_name
-    )
-    schema_ident: NameIdentifier = NameIdentifier.of_schema(
+    catalog_ident: NameIdentifier = NameIdentifier.of(metalake_name, catalog_name)
+    schema_ident: NameIdentifier = NameIdentifier.of(
         metalake_name, catalog_name, schema_name
     )
-    fileset_ident: NameIdentifier = NameIdentifier.of_fileset(
-        metalake_name, catalog_name, schema_name, fileset_name
-    )
-    fileset_new_ident: NameIdentifier = NameIdentifier.of_fileset(
-        metalake_name, catalog_name, schema_name, fileset_new_name
-    )
+    fileset_ident: NameIdentifier = NameIdentifier.of(schema_name, fileset_name)
+    fileset_new_ident: NameIdentifier = NameIdentifier.of(schema_name, fileset_new_name)
 
     gravitino_admin_client: GravitinoAdminClient = GravitinoAdminClient(
         uri="http://localhost:8090"
@@ -101,7 +95,9 @@ class TestFilesetCatalog(IntegrationTestEnv):
             logger.info(
                 "Drop schema %s[%s]",
                 self.schema_ident,
-                catalog.as_schemas().drop_schema(ident=self.schema_ident, cascade=True),
+                catalog.as_schemas().drop_schema(
+                    schema_name=self.schema_name, cascade=True
+                ),
             )
             logger.info(
                 "Drop catalog %s[%s]",
@@ -131,7 +127,7 @@ class TestFilesetCatalog(IntegrationTestEnv):
             properties={self.catalog_location_prop: "/tmp/test1"},
         )
         catalog.as_schemas().create_schema(
-            ident=self.schema_ident, comment="", properties={}
+            schema_name=self.schema_name, comment="", properties={}
         )
 
     def create_fileset(self) -> Fileset:

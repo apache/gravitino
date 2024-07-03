@@ -28,6 +28,8 @@ from gravitino.exceptions.illegal_name_identifier_exception import (
 )
 from gravitino.namespace import Namespace
 
+# TODO: delete redundant methods
+
 
 @dataclass
 class NameIdentifier(DataClassJsonMixin):
@@ -40,7 +42,13 @@ class NameIdentifier(DataClassJsonMixin):
     _DOT: ClassVar[str] = "."
 
     _name: str = field(metadata=config(field_name="name"))
-    _namespace: Namespace = field(metadata=config(field_name="namespace"))
+    _namespace: Namespace = field(
+        metadata=config(
+            field_name="namespace",
+            encoder=Namespace.to_json,
+            decoder=Namespace.from_json,
+        )
+    )
 
     @classmethod
     def builder(cls, namespace: Namespace, name: str):
@@ -71,176 +79,6 @@ class NameIdentifier(DataClassJsonMixin):
         )
 
         return NameIdentifier.builder(Namespace.of(*names[:-1]), names[-1])
-
-    @staticmethod
-    def of_namespace(namespace: Namespace, name: str) -> "NameIdentifier":
-        """Create the NameIdentifier with the given Namespace and name.
-
-        Args:
-            namespace: The namespace of the identifier
-            name: The name of the identifier
-
-        Returns:
-            The created NameIdentifier
-        """
-        return NameIdentifier.builder(namespace, name)
-
-    @staticmethod
-    def of_metalake(metalake: str) -> "NameIdentifier":
-        """Create the metalake NameIdentifier with the given name.
-
-        Args:
-            metalake: The metalake name
-
-        Returns:
-            The created metalake NameIdentifier
-        """
-        return NameIdentifier.of(metalake)
-
-    @staticmethod
-    def of_catalog(metalake: str, catalog: str) -> "NameIdentifier":
-        """Create the catalog NameIdentifier with the given metalake and catalog name.
-
-        Args:
-            metalake: The metalake name
-            catalog: The catalog name
-
-        Returns:
-            The created catalog NameIdentifier
-        """
-        return NameIdentifier.of(metalake, catalog)
-
-    @staticmethod
-    def of_schema(metalake: str, catalog: str, schema: str) -> "NameIdentifier":
-        """Create the schema NameIdentifier with the given metalake, catalog and schema name.
-
-        Args:
-            metalake: The metalake name
-            catalog: The catalog name
-            schema: The schema name
-
-        Returns:
-            The created schema NameIdentifier
-        """
-        return NameIdentifier.of(metalake, catalog, schema)
-
-    @staticmethod
-    def of_table(
-        metalake: str, catalog: str, schema: str, table: str
-    ) -> "NameIdentifier":
-        """Create the table NameIdentifier with the given metalake, catalog, schema and table name.
-
-        Args:
-            metalake: The metalake name
-            catalog: The catalog name
-            schema: The schema name
-            table: The table name
-
-        Returns:
-            The created table NameIdentifier
-        """
-        return NameIdentifier.of(metalake, catalog, schema, table)
-
-    @staticmethod
-    def of_fileset(
-        metalake: str, catalog: str, schema: str, fileset: str
-    ) -> "NameIdentifier":
-        """Create the fileset NameIdentifier with the given metalake, catalog, schema and fileset name.
-
-        Args:
-            metalake: The metalake name
-            catalog: The catalog name
-            schema: The schema name
-            fileset: The fileset name
-
-        Returns:
-            The created fileset NameIdentifier
-        """
-        return NameIdentifier.of(metalake, catalog, schema, fileset)
-
-    @staticmethod
-    def of_topic(
-        metalake: str, catalog: str, schema: str, topic: str
-    ) -> "NameIdentifier":
-        """Create the topic NameIdentifier with the given metalake, catalog, schema and topic
-        name.
-
-        Args:
-            metalake: The metalake name
-            catalog: The catalog name
-            schema: The schema name
-            topic: The topic name
-
-        Returns:
-            The created topic NameIdentifier
-        """
-        return NameIdentifier.of(metalake, catalog, schema, topic)
-
-    @staticmethod
-    def check_metalake(ident: "NameIdentifier") -> None:
-        """Check the given NameIdentifier is a metalake identifier. Throw an {@link
-        IllegalNameIdentifierException} if it's not.
-
-        Args:
-            ident: The metalake NameIdentifier to check.
-        """
-        NameIdentifier.check(ident is not None, "Metalake identifier must not be null")
-        Namespace.check_metalake(ident.namespace())
-
-    @staticmethod
-    def check_catalog(ident: "NameIdentifier") -> None:
-        """Check the given NameIdentifier is a catalog identifier. Throw an {@link
-        IllegalNameIdentifierException} if it's not.
-
-        Args:
-            ident: The catalog NameIdentifier to check.
-        """
-        NameIdentifier.check(ident is not None, "Catalog identifier must not be null")
-        Namespace.check_catalog(ident.namespace())
-
-    @staticmethod
-    def check_schema(ident: "NameIdentifier") -> None:
-        """Check the given NameIdentifier is a schema identifier. Throw an {@link
-        IllegalNameIdentifierException} if it's not.
-
-        Args:
-            ident: The schema NameIdentifier to check.
-        """
-        NameIdentifier.check(ident is not None, "Schema identifier must not be null")
-        Namespace.check_schema(ident.namespace())
-
-    @staticmethod
-    def check_table(ident: "NameIdentifier") -> None:
-        """Check the given NameIdentifier is a table identifier. Throw an {@link
-        IllegalNameIdentifierException} if it's not.
-
-        Args:
-            ident: The table NameIdentifier to check.
-        """
-        NameIdentifier.check(ident is not None, "Table identifier must not be null")
-        Namespace.check_table(ident.namespace())
-
-    @staticmethod
-    def check_fileset(ident: "NameIdentifier") -> None:
-        """Check the given NameIdentifier is a fileset identifier. Throw an {@link
-        IllegalNameIdentifierException} if it's not.
-
-        Args:
-            ident: The fileset NameIdentifier to check.
-        """
-        NameIdentifier.check(ident is not None, "Fileset identifier must not be null")
-        Namespace.check_fileset(ident.namespace())
-
-    @staticmethod
-    def check_topic(ident: "NameIdentifier") -> None:
-        """Check the given NameIdentifier is a topic identifier. Throw an {@link
-        IllegalNameIdentifierException} if it's not.
-
-        Args:
-            ident: The topic NameIdentifier to check.
-        """
-        NameIdentifier.check(ident is not None, "Topic identifier must not be null")
-        Namespace.check_topic(ident.namespace())
 
     @staticmethod
     def parse(identifier: str) -> "NameIdentifier":

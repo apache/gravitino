@@ -39,9 +39,7 @@ class TestCatalog(IntegrationTestEnv):
     catalog_location_prop: str = "location"  # Fileset Catalog must set `location`
     catalog_provider: str = "hadoop"
 
-    catalog_ident: NameIdentifier = NameIdentifier.of_catalog(
-        metalake_name, catalog_name
-    )
+    catalog_ident: NameIdentifier = NameIdentifier.of(metalake_name, catalog_name)
 
     gravitino_admin_client: GravitinoAdminClient = GravitinoAdminClient(
         uri="http://localhost:8090"
