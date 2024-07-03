@@ -154,7 +154,7 @@ public interface TagMetaMapper {
           + " SELECT mm.metalake_id FROM "
           + MetalakeMetaMapper.TABLE_NAME
           + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0)"
-          + " AND tm.tag_name = #{tagName} AND tm.deleted_at = 0 AND mm.deleted_at = 0")
+          + " AND tm.tag_name = #{tagName} AND tm.deleted_at = 0")
   Integer softDeleteTagMetaByMetalakeAndTagName(
       @Param("metalakeName") String metalakeName, @Param("tagName") String tagName);
 
