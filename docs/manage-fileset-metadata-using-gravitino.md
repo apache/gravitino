@@ -3,7 +3,7 @@ title: Manage fileset metadata using Gravitino
 slug: /manage-fileset-metadata-using-gravitino
 date: 2024-4-2
 keyword: Gravitino fileset metadata manage
-license: Copyright 2024 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2.
+license: This software is licensed under the Apache License version 2.
 ---
 
 import Tabs from '@theme/Tabs';

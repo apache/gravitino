@@ -3,7 +3,7 @@ title: "Expression system of Gravitino"
 slug: /expression
 date: 2024-02-02
 keyword: expression function field literal reference
-license: Copyright 2024 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2.
+license: This software is licensed under the Apache License version 2.
 ---
 
 import Tabs from '@theme/Tabs';

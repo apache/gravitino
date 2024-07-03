@@ -1,8 +1,7 @@
 ---
 title: How to install Gravitino
 slug: /how-to-install
-license: "Copyright 2023 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
 ## Install Gravitino from scratch

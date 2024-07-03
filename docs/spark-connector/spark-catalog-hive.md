@@ -2,8 +2,7 @@
 title: "Spark connector hive catalog"
 slug: /spark-connector/spark-catalog-hive
 keyword: spark connector hive catalog
-license: "Copyright 2024 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
 With the Gravitino Spark connector, accessing data or managing metadata in Hive catalogs becomes straightforward, enabling seamless federation queries across different Hive catalogs.

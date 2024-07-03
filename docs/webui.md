@@ -5,7 +5,7 @@ keyword: webui
 last_update:
   date: 2024-04-12
   author: ch3yne
-license: 'Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2.'
+license: 'This software is licensed under the Apache License version 2.'
 ---
 
 This document primarily outlines how users can manage metadata within Gravitino using the web UI, the graphical interface is accessible through a web browser as an alternative to writing code or using the REST interface.

@@ -3,7 +3,7 @@ title: "Manage relational metadata using Gravitino"
 slug: /manage-relational-metadata-using-gravitino
 date: 2023-12-10
 keyword: Gravitino relational metadata manage
-license: Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2.
+license: This software is licensed under the Apache License version 2.
 ---
 
 import Tabs from '@theme/Tabs';

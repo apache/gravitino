@@ -1,6 +1,20 @@
 """
-Copyright 2024 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2.
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
 """
 
 import logging
@@ -84,7 +98,7 @@ class GravitinoMetalake(MetalakeDTO):
         catalog_list = CatalogListResponse.from_json(response.body, infer_missing=True)
 
         return [
-            DTOConverters.to_catalog(catalog, self.rest_client)
+            DTOConverters.to_catalog(self.name(), catalog, self.rest_client)
             for catalog in catalog_list.catalogs()
         ]
 
@@ -104,7 +118,9 @@ class GravitinoMetalake(MetalakeDTO):
         response = self.rest_client.get(url)
         catalog_resp = CatalogResponse.from_json(response.body, infer_missing=True)
 
-        return DTOConverters.to_catalog(catalog_resp.catalog(), self.rest_client)
+        return DTOConverters.to_catalog(
+            self.name(), catalog_resp.catalog(), self.rest_client
+        )
 
     def create_catalog(
         self,
@@ -144,7 +160,9 @@ class GravitinoMetalake(MetalakeDTO):
         response = self.rest_client.post(url, json=catalog_create_request)
         catalog_resp = CatalogResponse.from_json(response.body, infer_missing=True)
 
-        return DTOConverters.to_catalog(catalog_resp.catalog(), self.rest_client)
+        return DTOConverters.to_catalog(
+            self.name(), catalog_resp.catalog(), self.rest_client
+        )
 
     def alter_catalog(self, name: str, *changes: CatalogChange) -> Catalog:
         """Alter the catalog with specified name by applying the changes.
@@ -170,7 +188,9 @@ class GravitinoMetalake(MetalakeDTO):
         catalog_response = CatalogResponse.from_json(response.body, infer_missing=True)
         catalog_response.validate()
 
-        return DTOConverters.to_catalog(catalog_response.catalog(), self.rest_client)
+        return DTOConverters.to_catalog(
+            self.name(), catalog_response.catalog(), self.rest_client
+        )
 
     def drop_catalog(self, name: str) -> bool:
         """Drop the catalog with specified name.

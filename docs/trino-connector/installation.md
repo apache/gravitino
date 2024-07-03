@@ -2,8 +2,7 @@
 title: "Gravitino connector installation"
 slug: /trino-connector/installation
 keyword: gravitino connector trino
-license: "Copyright 2023 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
 To install the Gravitino connector, you should first deploy the Trino environment, and then install the Gravitino connector plugin into Trino.
