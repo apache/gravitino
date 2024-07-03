@@ -268,32 +268,6 @@ public class Privileges {
       this.name = name;
     }
 
-    /**
-     * Creates an allowed privilege.
-     *
-     * @param <T> the type of the privilege
-     * @param name the name of the privilege
-     * @param factory the factory to create the privilege
-     * @return the created privilege instance
-     */
-    public static <T extends GenericPrivilege<T>> T allow(
-        Name name, GenericPrivilegeFactory<T> factory) {
-      return factory.create(Condition.ALLOW, name);
-    }
-
-    /**
-     * Creates a denied privilege.
-     *
-     * @param <T> the type of the privilege
-     * @param name the name of the privilege
-     * @param factory the factory to create the privilege
-     * @return the created privilege instance
-     */
-    public static <T extends GenericPrivilege<T>> T deny(
-        Name name, GenericPrivilegeFactory<T> factory) {
-      return factory.create(Condition.DENY, name);
-    }
-
     @Override
     public Name name() {
       return name;
