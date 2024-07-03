@@ -167,7 +167,7 @@ class IntegrationTestEnv(unittest.TestCase):
 
     @classmethod
     def _append_catalog_hadoop_conf(cls, config):
-        logger.info("Append server hadoop conf.")
+        logger.info("Append catalog hadoop conf.")
         gravitino_home = os.environ.get("GRAVITINO_HOME")
         if gravitino_home is None:
             raise GravitinoRuntimeException("Cannot find GRAVITINO_HOME env.")
@@ -183,7 +183,7 @@ class IntegrationTestEnv(unittest.TestCase):
 
     @classmethod
     def _reset_catalog_hadoop_conf(cls, config):
-        logger.info("Reset server hadoop conf.")
+        logger.info("Reset catalog hadoop conf.")
         gravitino_home = os.environ.get("GRAVITINO_HOME")
         if gravitino_home is None:
             raise GravitinoRuntimeException("Cannot find GRAVITINO_HOME env.")
