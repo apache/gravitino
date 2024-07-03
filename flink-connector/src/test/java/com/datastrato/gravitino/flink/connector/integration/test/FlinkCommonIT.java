@@ -184,8 +184,8 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
     String databaseName = "test_create_no_partition_table_db";
     String tableName = "test_create_no_partition_table";
     String comment = "test comment";
-    String key = "test key";
-    String value = "test value";
+    String key = "connector";
+    String value = "hive";
 
     doWithSchema(
         currentCatalog(),

@@ -32,11 +32,19 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.function.Consumer;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.runtime.client.JobStatusMessage;
+import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.TableResult;
+import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.api.internal.TableEnvironmentImpl;
+import org.apache.flink.test.util.MiniClusterWithClientResource;
 import org.apache.hadoop.fs.FileSystem;
+import org.junit.ClassRule;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,8 +52,18 @@ import org.slf4j.LoggerFactory;
 public abstract class FlinkEnvIT extends AbstractIT {
   private static final Logger LOG = LoggerFactory.getLogger(FlinkEnvIT.class);
   private static final ContainerSuite CONTAINER_SUITE = ContainerSuite.getInstance();
+  private static final int DEFAULT_PARALLELISM = 4;
+
   protected static final String GRAVITINO_METALAKE = "flink";
   protected static final String DEFAULT_CATALOG = "default_catalog";
+
+  @ClassRule
+  public static final MiniClusterWithClientResource MINI_CLUSTER_RESOURCE =
+      new MiniClusterWithClientResource(
+          new MiniClusterResourceConfiguration.Builder()
+              .setNumberTaskManagers(1)
+              .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
+              .build());
 
   protected static GravitinoMetalake metalake;
   protected static TableEnvironment tableEnv;
@@ -65,7 +83,7 @@ public abstract class FlinkEnvIT extends AbstractIT {
     initMetalake();
     initHiveEnv();
     initHdfsEnv();
-    initFlinkEnv();
+    initFlinkEnv(true);
     LOG.info("Startup Flink env successfully, Gravitino uri: {}.", gravitinoUri);
   }
 
@@ -74,6 +92,25 @@ public abstract class FlinkEnvIT extends AbstractIT {
     stopFlinkEnv();
     stopHdfsEnv();
     LOG.info("Stop Flink env successfully.");
+  }
+
+  @AfterEach
+  public final void cleanupRunningJobs() throws Exception {
+    if (!MINI_CLUSTER_RESOURCE.getMiniCluster().isRunning()) {
+      // do nothing if the MiniCluster is not running
+      LOG.warn("Mini cluster is not running after the test!");
+      return;
+    }
+
+    for (JobStatusMessage path : MINI_CLUSTER_RESOURCE.getClusterClient().listJobs().get()) {
+      if (!path.getJobState().isTerminalState()) {
+        try {
+          MINI_CLUSTER_RESOURCE.getClusterClient().cancel(path.getJobId()).get();
+        } catch (Exception ignored) {
+          // ignore exceptions when cancelling dangling jobs
+        }
+      }
+    }
   }
 
   protected String flinkByPass(String key) {
@@ -120,13 +157,23 @@ public abstract class FlinkEnvIT extends AbstractIT {
     }
   }
 
-  private static void initFlinkEnv() {
+  protected static void initFlinkEnv(boolean isBatchMode) {
     final Configuration configuration = new Configuration();
     configuration.setString(
         "table.catalog-store.kind", GravitinoCatalogStoreFactoryOptions.GRAVITINO);
     configuration.setString("table.catalog-store.gravitino.gravitino.metalake", GRAVITINO_METALAKE);
     configuration.setString("table.catalog-store.gravitino.gravitino.uri", gravitinoUri);
-    tableEnv = TableEnvironment.create(configuration);
+
+    EnvironmentSettings.Builder builder =
+        EnvironmentSettings.newInstance().withConfiguration(configuration);
+    if (isBatchMode) {
+      tableEnv = TableEnvironment.create(builder.inBatchMode().build());
+    } else {
+      StreamExecutionEnvironment env =
+          StreamExecutionEnvironment.getExecutionEnvironment(
+              MINI_CLUSTER_RESOURCE.getClientConfiguration());
+      tableEnv = StreamTableEnvironment.create(env, builder.inStreamingMode().build());
+    }
   }
 
   private static void stopHdfsEnv() {
@@ -162,7 +209,10 @@ public abstract class FlinkEnvIT extends AbstractIT {
     try {
       tableEnv.useCatalog(catalog.name());
       if (!catalog.asSchemas().schemaExists(schemaName)) {
-        catalog.asSchemas().createSchema(schemaName, null, ImmutableMap.of());
+        catalog
+            .asSchemas()
+            .createSchema(
+                schemaName, null, ImmutableMap.of("location", warehouse + "/" + schemaName));
       }
       tableEnv.useDatabase(schemaName);
       action.accept(catalog);
