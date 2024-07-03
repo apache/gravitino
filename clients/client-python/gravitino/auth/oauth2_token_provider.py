@@ -12,7 +12,11 @@ from gravitino.auth.auth_constants import AuthConstants
 
 
 class OAuth2TokenProvider(AuthDataProvider):
+    """OAuth2TokenProvider will request the access token from the authorization server and then provide
+    the access token for every request.
+    """
 
+    # The HTTP client used to request the access token from the authorization server.
     _client: HTTPClient
 
     def __init__(self, uri: str):
