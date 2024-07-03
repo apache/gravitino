@@ -6,12 +6,7 @@ This software is licensed under the Apache License version 2.
 import logging
 from typing import Dict, List
 
-from gravitino import (
-    GravitinoAdminClient,
-    GravitinoMetalake,
-    MetalakeChange,
-    NameIdentifier,
-)
+from gravitino import GravitinoAdminClient, GravitinoMetalake, MetalakeChange
 from gravitino.dto.dto_converters import DTOConverters
 from gravitino.dto.requests.metalake_updates_request import MetalakeUpdatesRequest
 from tests.integration.integration_test_env import IntegrationTestEnv
@@ -61,7 +56,7 @@ class TestMetalake(IntegrationTestEnv):
 
     def create_metalake(self, metalake_name) -> GravitinoMetalake:
         return self.gravitino_admin_client.create_metalake(
-            NameIdentifier.of(metalake_name),
+            metalake_name,
             self.metalake_comment,
             self.metalake_properties,
         )
@@ -83,7 +78,7 @@ class TestMetalake(IntegrationTestEnv):
         )
 
         metalake = self.gravitino_admin_client.alter_metalake(
-            NameIdentifier.of(self.metalake_name), *changes
+            self.metalake_name, *changes
         )
         self.assertEqual(metalake.name(), metalake_new_name)
         self.assertEqual(metalake.comment(), metalake_new_comment)
@@ -94,8 +89,7 @@ class TestMetalake(IntegrationTestEnv):
         self.assertTrue(self.metalake_properties_key1 not in metalake.properties())
 
     def drop_metalake(self, metalake_name: str) -> bool:
-        ident = NameIdentifier.of(metalake_name)
-        return self.gravitino_admin_client.drop_metalake(ident)
+        return self.gravitino_admin_client.drop_metalake(metalake_name)
 
     def test_drop_metalake(self):
         self.create_metalake(self.metalake_name)
@@ -125,9 +119,7 @@ class TestMetalake(IntegrationTestEnv):
 
     def test_load_metalakes(self):
         self.create_metalake(self.metalake_name)
-        metalake = self.gravitino_admin_client.load_metalake(
-            NameIdentifier.of(self.metalake_name)
-        )
+        metalake = self.gravitino_admin_client.load_metalake(self.metalake_name)
         self.assertIsNotNone(metalake)
         self.assertEqual(metalake.name(), self.metalake_name)
         self.assertEqual(metalake.comment(), self.metalake_comment)
