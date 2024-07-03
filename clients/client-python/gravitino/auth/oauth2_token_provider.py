@@ -19,9 +19,21 @@ class OAuth2TokenProvider(AuthDataProvider):
         self._client = HTTPClient(uri)
 
     def has_token_data(self) -> bool:
+        """Judge whether AuthDataProvider can provide token data.
+
+        Returns:
+            true if the AuthDataProvider can provide token data otherwise false.
+        """
         return True
 
     def get_token_data(self) -> Optional[bytes]:
+        """Acquire the data of token for authentication. The client will set the token data as HTTP header
+        Authorization directly. So the return value should ensure token data contain the token header
+        (eg: Bearer, Basic) if necessary.
+
+        Returns:
+            the token data is used for authentication.
+        """
         access_token = self._get_access_token()
 
         if access_token is None:
@@ -32,6 +44,7 @@ class OAuth2TokenProvider(AuthDataProvider):
         )
 
     def close(self):
+        """Closes the OAuth2TokenProvider and releases any underlying resources."""
         if self._client is not None:
             self._client.close()
 

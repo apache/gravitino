@@ -21,7 +21,8 @@ JWT_EXPIRE = "exp"
 
 
 class DefaultOAuth2TokenProvider(OAuth2TokenProvider):
-
+    """This class is the default implement of OAuth2TokenProvider."""
+    
     _credential: Optional[str]
     _scope: Optional[str]
     _path: Optional[str]
