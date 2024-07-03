@@ -2,8 +2,7 @@
 title: "Gravitino connector SQL support"
 slug: /trino-connector/sql-support
 keyword: gravitino connector trino
-license: "Copyright 2023 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
 The connector provides read access and write access to data and metadata stored in Gravitino.
