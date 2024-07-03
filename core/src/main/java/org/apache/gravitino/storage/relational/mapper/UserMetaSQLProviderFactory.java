@@ -85,6 +85,10 @@ public class UserMetaSQLProviderFactory {
     return getProvider().listUsersByRoleId(roleId);
   }
 
+  public static String listUserPOsByMetalake(@Param("metalakeName") String metalakeName) {
+    return getProvider().listUserPOsByMetalake(metalakeName);
+  }
+
   public static String deleteUserMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteUserMetasByLegacyTimeline(legacyTimeline, limit);

@@ -54,6 +54,9 @@ public interface UserMetaMapper {
   @InsertProvider(type = UserMetaSQLProviderFactory.class, method = "insertUserMeta")
   void insertUserMeta(@Param("userMeta") UserPO userPO);
 
+  @SelectProvider(type = UserMetaSQLProviderFactory.class, method = "listUserPOsByMetalake")
+  List<UserPO> listUserPOsByMetalake(@Param("metalakeName") String metalakeName);
+
   @InsertProvider(
       type = UserMetaSQLProviderFactory.class,
       method = "insertUserMetaOnDuplicateKeyUpdate")

@@ -20,8 +20,10 @@ package org.apache.gravitino.client.integration.test.authorization;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.Group;
@@ -73,11 +75,27 @@ public class AccessControlIT extends AbstractIT {
     Assertions.assertEquals(username, user.name());
     Assertions.assertTrue(user.roles().isEmpty());
 
+    // List users
+    String anotherUser = "another-user";
+    metalake.addUser(anotherUser);
+    String[] usernames = metalake.listUserNames();
+    Assertions.assertEquals(
+        Lists.newArrayList(AuthConstants.ANONYMOUS_USER, anotherUser, username),
+        Arrays.asList(usernames));
+    User[] users = metalake.listUsers();
+    Assertions.assertEquals(
+        Lists.newArrayList(AuthConstants.ANONYMOUS_USER, anotherUser, username),
+        Arrays.stream(users).map(User::name).collect(Collectors.toList()));
+
     // Get a not-existed user
     Assertions.assertThrows(NoSuchUserException.class, () -> metalake.getUser("not-existed"));
 
     Assertions.assertTrue(metalake.removeUser(username));
+
     Assertions.assertFalse(metalake.removeUser(username));
+
+    // clean up
+    metalake.removeUser(anotherUser);
   }
 
   @Test

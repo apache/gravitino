@@ -76,6 +76,15 @@ public class TestAccessControlManager {
           .withVersion(SchemaVersion.V_0_1)
           .build();
 
+  private static BaseMetalake listMetalakeEntity =
+      BaseMetalake.builder()
+          .withId(1L)
+          .withName("metalake_list")
+          .withAuditInfo(
+              AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+          .withVersion(SchemaVersion.V_0_1)
+          .build();
+
   @BeforeAll
   public static void setUp() throws Exception {
     config = new Config(false) {};
@@ -86,6 +95,7 @@ public class TestAccessControlManager {
     entityStore.setSerDe(null);
 
     entityStore.put(metalakeEntity, true);
+    entityStore.put(listMetalakeEntity, true);
 
     accessControlManager = new AccessControlManager(entityStore, new RandomIdGenerator(), config);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
@@ -160,6 +170,21 @@ public class TestAccessControlManager {
     // Test to remove non-existed user
     boolean removed1 = accessControlManager.removeUser("metalake", "no-exist");
     Assertions.assertFalse(removed1);
+  }
+
+  @Test
+  public void testListUsers() {
+    accessControlManager.addUser("metalake_list", "testList1");
+    accessControlManager.addUser("metalake_list", "testList2");
+
+    // Test to list users
+    Assertions.assertArrayEquals(
+        new String[] {"testList2", "testList1"},
+        accessControlManager.listUserNames("metalake_list"));
+    User[] users = accessControlManager.listUsers("metalake_list");
+    Assertions.assertEquals(2, users.length);
+    Assertions.assertEquals("testList1", users[1].name());
+    Assertions.assertEquals("testList2", users[0].name());
   }
 
   @Test

@@ -119,6 +119,37 @@ class TestUserMetaService extends TestJDBCBackend {
   }
 
   @Test
+  void testListUsers() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    backend.insert(metalake, false);
+
+    UserEntity user1 =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "user1",
+            auditInfo);
+
+    UserEntity user2 =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "user2",
+            auditInfo);
+
+    backend.insert(user1, false);
+    backend.insert(user2, false);
+
+    UserMetaService userMetaService = UserMetaService.getInstance();
+    Assertions.assertEquals(
+        Lists.newArrayList(user1, user2),
+        userMetaService.listUsersByNamespace(AuthorizationUtils.ofUserNamespace(metalakeName)));
+  }
+
+  @Test
   void insertUser() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();

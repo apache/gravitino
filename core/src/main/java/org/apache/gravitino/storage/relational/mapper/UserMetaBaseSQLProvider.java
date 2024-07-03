@@ -138,6 +138,21 @@ public class UserMetaBaseSQLProvider {
         + " AND us.deleted_at = 0 AND re.deleted_at = 0";
   }
 
+  public String listUserPOsByMetalake(@Param("metalakeName") String metalakeName) {
+    return "SELECT ut.user_id as userId, ut.user_name as userName,"
+        + " ut.metalake_id as metalakeId,"
+        + " ut.audit_info as auditInfo,"
+        + " ut.current_version as currentVersion, ut.last_version as lastVersion,"
+        + " ut.deleted_at as deletedAt"
+        + " FROM "
+        + USER_TABLE_NAME
+        + " ut JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mt ON ut.metalake_id = mt.metalake_id"
+        + " WHERE mt.metalake_name = #{metalakeName}"
+        + " AND ut.deleted_at = 0 AND mt.deleted_at = 0";
+  }
+
   public String deleteUserMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return "DELETE FROM "
