@@ -459,7 +459,7 @@ tasks.rat {
     "**/licenses/*.txt",
     "**/licenses/*.md",
     "integration-test/**",
-    "docs/*.md",
+    "docs/**/*.md",
     "web/.**",
     "web/next-env.d.ts",
     "web/dist/**/*",
