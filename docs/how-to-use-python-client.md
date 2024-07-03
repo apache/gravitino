@@ -3,7 +3,7 @@ title: "How to use Gravitino Python client"
 slug: /how-to-use-gravitino-python-client
 date: 2024-05-09
 keyword: Gravitino Python client
-license: Copyright 2024 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2.
+license: This software is licensed under the Apache License version 2.
 ---
 ## Introduction
 
