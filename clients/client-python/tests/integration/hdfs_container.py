@@ -31,12 +31,12 @@ from gravitino.exceptions.gravitino_runtime_exception import GravitinoRuntimeExc
 logger = logging.getLogger(__name__)
 
 
-async def check_hdfs_status(hive_container):
+async def check_hdfs_status(hdfs_container):
     retry_limit = 15
     for _ in range(retry_limit):
         try:
             command_and_args = ["bash", "/tmp/check-status.sh"]
-            exec_result = hive_container.exec_run(command_and_args)
+            exec_result = hdfs_container.exec_run(command_and_args)
             if exec_result.exit_code != 0:
                 message = (
                     f"Command {command_and_args} exited with {exec_result.exit_code}"
@@ -44,7 +44,7 @@ async def check_hdfs_status(hive_container):
                 logger.warning(message)
                 logger.warning("output: %s", exec_result.output)
                 output_status_command = ["hdfs", "dfsadmin", "-report"]
-                exec_result = hive_container.exec_run(output_status_command)
+                exec_result = hdfs_container.exec_run(output_status_command)
                 logger.info("HDFS report, output: %s", exec_result.output)
             else:
                 logger.info("HDFS startup successfully!")
@@ -57,11 +57,11 @@ async def check_hdfs_status(hive_container):
     return False
 
 
-async def check_hdfs_container_status(hive_container):
+async def check_hdfs_container_status(hdfs_container):
     timeout_sec = 150
     try:
         result = await asyncio.wait_for(
-            check_hdfs_status(hive_container), timeout=timeout_sec
+            check_hdfs_status(hdfs_container), timeout=timeout_sec
         )
         assert result is True, "HDFS container startup failed!"
     except asyncio.TimeoutError as e:
@@ -84,23 +84,24 @@ class HDFSContainer:
         try:
             container = self._docker_client.containers.get(self._container_name)
             if container is not None:
-                if container.status == "running":
-                    container.kill()
-                container.remove()
+                if container.status != "running":
+                    container.restart()
+                self._container = container
         except NotFound:
             logger.warning("Cannot find hdfs container in docker env, skip remove.")
-        image_name = os.environ.get("GRAVITINO_CI_HIVE_DOCKER_IMAGE")
-        if image_name is None:
-            raise GravitinoRuntimeException(
-                "GRAVITINO_CI_HIVE_DOCKER_IMAGE env variable is not set."
+        if self._container is None:
+            image_name = os.environ.get("GRAVITINO_CI_HIVE_DOCKER_IMAGE")
+            if image_name is None:
+                raise GravitinoRuntimeException(
+                    "GRAVITINO_CI_HIVE_DOCKER_IMAGE env variable is not set."
+                )
+            self._container = self._docker_client.containers.run(
+                image=image_name,
+                name=self._container_name,
+                detach=True,
+                environment={"HADOOP_USER_NAME": "datastrato"},
+                network=self._network_name,
             )
-        self._container = self._docker_client.containers.run(
-            image=image_name,
-            name=self._container_name,
-            detach=True,
-            environment={"HADOOP_USER_NAME": "datastrato"},
-            network=self._network_name,
-        )
         asyncio.run(check_hdfs_container_status(self._container))
 
         self._fetch_ip()

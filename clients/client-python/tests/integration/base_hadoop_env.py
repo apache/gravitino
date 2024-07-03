@@ -22,6 +22,7 @@ import os
 import shutil
 import subprocess
 import tarfile
+from random import randint
 
 import requests
 
@@ -35,6 +36,7 @@ HADOOP_DIR_NAME = f"hadoop-{HADOOP_VERSION}"
 HADOOP_DOWNLOAD_URL = f"https://archive.apache.org/dist/hadoop/core/hadoop-{HADOOP_VERSION}/{HADOOP_PACK_NAME}"
 LOCAL_BASE_DIR = "/tmp/gravitino"
 LOCAL_HADOOP_DIR = f"{LOCAL_BASE_DIR}/python_its/hadoop"
+LOCAL_DOWNLOAD_TEMP_DIR = f"{LOCAL_HADOOP_DIR}/" + str(randint(1, 10000))
 
 
 class BaseHadoopEnvironment:
@@ -44,6 +46,8 @@ class BaseHadoopEnvironment:
         # download hadoop pack and unzip
         if not os.path.exists(LOCAL_HADOOP_DIR):
             os.makedirs(LOCAL_HADOOP_DIR)
+        if not os.path.exists(LOCAL_DOWNLOAD_TEMP_DIR):
+            os.makedirs(LOCAL_DOWNLOAD_TEMP_DIR)
         cls._download_and_unzip_hadoop_pack()
         # configure hadoop env
         cls._configure_hadoop_environment()
@@ -58,7 +62,7 @@ class BaseHadoopEnvironment:
     @classmethod
     def _download_and_unzip_hadoop_pack(cls):
         logger.info("Download and unzip hadoop pack from %s.", HADOOP_DOWNLOAD_URL)
-        local_tar_path = f"{LOCAL_HADOOP_DIR}/{HADOOP_PACK_NAME}"
+        local_tar_path = f"{LOCAL_DOWNLOAD_TEMP_DIR}/{HADOOP_PACK_NAME}"
         # will download from remote if we do not find the pack locally
         if not os.path.exists(local_tar_path):
             response = requests.get(HADOOP_DOWNLOAD_URL)
@@ -67,10 +71,19 @@ class BaseHadoopEnvironment:
         # unzip the pack
         try:
             with tarfile.open(local_tar_path) as tar:
-                tar.extractall(path=LOCAL_HADOOP_DIR)
+                tar.extractall(path=LOCAL_DOWNLOAD_TEMP_DIR)
         except Exception as e:
             raise GravitinoRuntimeException(
                 f"Failed to extract file '{local_tar_path}': {e}"
+            ) from e
+        # move to the hadoop dir
+        src_dir = f"{LOCAL_DOWNLOAD_TEMP_DIR}/{HADOOP_DIR_NAME}"
+        dst_dir = f"{LOCAL_HADOOP_DIR}/{HADOOP_DIR_NAME}"
+        try:
+            shutil.move(src_dir, dst_dir)
+        except Exception as e:
+            raise GravitinoRuntimeException(
+                f"Failed to move dir '{src_dir}' to {dst_dir}: {e}"
             ) from e
 
     @classmethod

@@ -166,7 +166,7 @@ class IntegrationTestEnv(unittest.TestCase):
             raise GravitinoRuntimeException("ERROR: Can't start Gravitino server!")
 
     @classmethod
-    def _append_server_hadoop_conf(cls, config):
+    def _append_catalog_hadoop_conf(cls, config):
         logger.info("Append server hadoop conf.")
         gravitino_home = os.environ.get("GRAVITINO_HOME")
         if gravitino_home is None:
@@ -182,7 +182,7 @@ class IntegrationTestEnv(unittest.TestCase):
                 f.write(f"\n{key} = {value}")
 
     @classmethod
-    def _reset_server_hadoop_conf(cls, config):
+    def _reset_catalog_hadoop_conf(cls, config):
         logger.info("Reset server hadoop conf.")
         gravitino_home = os.environ.get("GRAVITINO_HOME")
         if gravitino_home is None:
@@ -195,17 +195,21 @@ class IntegrationTestEnv(unittest.TestCase):
         filtered_lines = []
         with open(hadoop_conf_path, mode="r", encoding="utf-8") as file:
             lines = file.readlines()
-            for line in lines:
-                line = line.strip()
-                find_config = False
-                for key, value in config.items():
-                    key_to_delete = f"{key} = {value}"
-                    if line.startswith(key_to_delete):
-                        find_config = True
-                        break
-                if find_config:
-                    continue
+
+        existed_config = {}
+        for line in lines:
+            line = line.strip()
+            if line.startswith("#"):
+                # append annotations directly
                 filtered_lines.append(line)
+            else:
+                key, value = line.split("=")
+                existed_config[key.strip()] = value.strip()
+
+        for key, value in existed_config.items():
+            if config[key] is None:
+                append_line = f"{key} = {value}"
+                filtered_lines.append(append_line)
 
         with open(hadoop_conf_path, mode="w", encoding="utf-8") as file:
             for line in filtered_lines:

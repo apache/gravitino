@@ -78,10 +78,10 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fileset_properties_key2: fileset_properties_value2,
     }
 
-    schema_ident: NameIdentifier = NameIdentifier.of_schema(
+    schema_ident: NameIdentifier = NameIdentifier.of(
         metalake_name, catalog_name, schema_name
     )
-    fileset_ident: NameIdentifier = NameIdentifier.of_fileset(
+    fileset_ident: NameIdentifier = NameIdentifier.of(
         metalake_name, catalog_name, schema_name, fileset_name
     )
 
@@ -98,7 +98,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         cls.config = {
             "gravitino.bypass.fs.defaultFS": f"hdfs://{hdfs_container_ip}:9000"
         }
-        cls._append_server_hadoop_conf(cls.config)
+        cls._append_catalog_hadoop_conf(cls.config)
         # restart the server
         cls.restart_server()
         # init hadoop env
@@ -111,7 +111,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         try:
             cls._clean_test_data()
             # reset server conf
-            cls._reset_server_hadoop_conf(cls.config)
+            cls._reset_catalog_hadoop_conf(cls.config)
             # restart server
             cls.restart_server()
             # clear hadoop env
@@ -136,7 +136,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             properties={},
         )
         catalog.as_schemas().create_schema(
-            ident=cls.schema_ident, comment="", properties={}
+            schema_name=cls.schema_name, comment="", properties={}
         )
 
         cls.fileset_storage_location: str = (
@@ -171,7 +171,9 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             logger.info(
                 "Drop schema %s[%s]",
                 cls.schema_ident,
-                catalog.as_schemas().drop_schema(ident=cls.schema_ident, cascade=True),
+                catalog.as_schemas().drop_schema(
+                    schema_name=cls.schema_name, cascade=True
+                ),
             )
             logger.info(
                 "Drop catalog %s[%s]",
