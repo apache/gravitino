@@ -32,7 +32,7 @@ github:
     - opendatacatalog
   features:
     # Enable wiki for documentation
-    wiki: true
+    wiki: false
     # Enable issues management
     issues: true
     # Enable projects for project management boards
@@ -40,9 +40,15 @@ github:
   enabled_merge_buttons:
     squash: true
     merge: false
-    rebase: false
+    rebase: true
   protected_branches:
     main:
+      required_status_checks:
+        strict: true
+      required_pull_request_reviews:
+        dismiss_stale_reviews: true
+        required_approving_review_count: 1
+    branch-*:
       required_status_checks:
         strict: true
       required_pull_request_reviews:
