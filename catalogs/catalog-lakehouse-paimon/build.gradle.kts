@@ -25,6 +25,7 @@ dependencies {
   }
   implementation(libs.bundles.log4j)
   implementation(libs.commons.lang3)
+  implementation(libs.caffeine)
   implementation(libs.guava)
   implementation(libs.hadoop2.common) {
     exclude("com.github.spotbugs")

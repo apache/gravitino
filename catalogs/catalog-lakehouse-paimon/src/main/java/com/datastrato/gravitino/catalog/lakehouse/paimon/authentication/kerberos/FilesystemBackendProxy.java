@@ -6,25 +6,33 @@
 package com.datastrato.gravitino.catalog.lakehouse.paimon.authentication.kerberos;
 
 import com.datastrato.gravitino.utils.PrincipalUtils;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.Scheduler;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.security.PrivilegedExceptionAction;
 import java.util.Map;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import net.sf.cglib.proxy.Enhancer;
 import net.sf.cglib.proxy.MethodInterceptor;
 import net.sf.cglib.proxy.MethodProxy;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.paimon.catalog.CatalogContext;
+import org.apache.paimon.catalog.CatalogFactory;
 import org.apache.paimon.catalog.FileSystemCatalog;
 import org.apache.paimon.fs.FileIO;
 import org.apache.paimon.fs.Path;
 import org.apache.paimon.fs.hadoop.HadoopFileIO;
-import org.apache.paimon.options.CatalogOptions;
 import org.apache.paimon.options.Options;
 import org.apache.paimon.utils.Pair;
-import org.apache.paimon.utils.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Proxy class for FilesystemCatalog to support kerberos authentication. We can also make
@@ -32,10 +40,21 @@ import org.apache.paimon.utils.Preconditions;
  */
 public class FilesystemBackendProxy implements MethodInterceptor {
 
+  public static final Logger LOG = LoggerFactory.getLogger(FilesystemBackendProxy.class);
+
+  // modified by gravitino.bypass.paimon.catalog.cache.max.capacity
+  private static final String PAIMON_CATALOG_CACHE_MAX_CAPACITY_KEY =
+      "paimon.catalog.cache.max.capacity";
+  private static final int catalogCacheMaxCapacity = 100;
+  // modified by gravitino.bypass.paimon.catalog.cache.expire.after.access
+  private static final String PAIMON_CATALOG_CACHE_EXPIRE_AFTER_ACCESS_KEY =
+      "paimon.catalog.cache.expire.after.access";
+  private static final long catalogCacheExpireAfterAccess = 1000L * 60 * 60 * 3;
   private FileSystemCatalog target;
   private final CatalogContext catalogContext;
   private final String kerberosRealm;
   private final UserGroupInformation proxyUser;
+  private final Cache<String, FileSystemCatalog> fileSystemCatalogCache;
 
   public FilesystemBackendProxy(
       FileSystemCatalog target, CatalogContext catalogContext, String kerberosRealm) {
@@ -44,6 +63,47 @@ public class FilesystemBackendProxy implements MethodInterceptor {
     this.kerberosRealm = kerberosRealm;
     try {
       proxyUser = UserGroupInformation.getCurrentUser();
+      ScheduledThreadPoolExecutor scheduler =
+          new ScheduledThreadPoolExecutor(1, newDaemonThreadFactory());
+      Options options = catalogContext.options();
+      long maxCapacity =
+          Long.parseLong(
+              options.getString(
+                  PAIMON_CATALOG_CACHE_MAX_CAPACITY_KEY, String.valueOf(catalogCacheMaxCapacity)));
+      long expireAfterAccess =
+          Long.parseLong(
+              options.getString(
+                  PAIMON_CATALOG_CACHE_EXPIRE_AFTER_ACCESS_KEY,
+                  String.valueOf(catalogCacheExpireAfterAccess)));
+      this.fileSystemCatalogCache =
+          Caffeine.newBuilder()
+              .maximumSize(maxCapacity)
+              .expireAfterAccess(expireAfterAccess, TimeUnit.MILLISECONDS)
+              .scheduler(Scheduler.forScheduledExecutorService(scheduler))
+              .removalListener(
+                  (key, value, cause) -> {
+                    try {
+                      FileSystemCatalog fileSystemCatalog = (FileSystemCatalog) value;
+                      if (fileSystemCatalog != null) {
+                        // TODO:
+                        // If a large number of users access the Paimon catalog in a short period of
+                        // time,
+                        // it is easy to cause the FilesystemCatalog instance to be removed from the
+                        // cache.
+                        // When the FilesystemCatalog instance is removed from the cache,
+                        // the Filesystem client is still in use.
+                        // Closing immediately the Filesystem clients may cause exceptions.
+                        closeFileSystem(fileSystemCatalog);
+                      }
+                    } catch (NoSuchFieldException | IllegalAccessException e) {
+                      LOG.warn(
+                          String.format(
+                              "Cannot close the file system for Paimon catalog when removing cache. Removal cause: %s",
+                              cause),
+                          e);
+                    }
+                  })
+              .build();
     } catch (IOException e) {
       throw new RuntimeException("Failed to get current user", e);
     }
@@ -61,13 +121,16 @@ public class FilesystemBackendProxy implements MethodInterceptor {
 
     UserGroupInformation realUser =
         UserGroupInformation.createProxyUser(proxyKerberosPrincipalName, proxyUser);
+    String finalProxyKerberosPrincipalName = proxyKerberosPrincipalName;
 
     return realUser.doAs(
         (PrivilegedExceptionAction<Object>)
             () -> {
               try {
-                updateFileIO(catalogContext);
-                return methodProxy.invoke(target, objects);
+                FileSystemCatalog catalogWithRealUser =
+                    fileSystemCatalogCache.get(
+                        finalProxyKerberosPrincipalName, this::createFileSystemCatalog);
+                return methodProxy.invoke(catalogWithRealUser, objects);
               } catch (Throwable e) {
                 if (RuntimeException.class.isAssignableFrom(e.getClass())) {
                   throw (RuntimeException) e;
@@ -91,36 +154,25 @@ public class FilesystemBackendProxy implements MethodInterceptor {
             });
   }
 
+  private ThreadFactory newDaemonThreadFactory() {
+    return new ThreadFactoryBuilder()
+        .setDaemon(true)
+        .setNameFormat("paimon-fileSystemCatalog-cache-cleaner" + "-%d")
+        .build();
+  }
+
   /**
    * Before invoking the doAs method, a Filesystem client has been created when initializing the
    * FilesystemCatalog. Therefore, the Filesystem client should be recreated within the doAs method
    * to ensure the ugi corresponds to the impersonated user.
    */
-  private void updateFileIO(CatalogContext catalogContext)
-      throws IOException, NoSuchFieldException, IllegalAccessException {
-
-    String warehouse =
-        Preconditions.checkNotNull(
-            catalogContext.options().get(CatalogOptions.WAREHOUSE),
-            String.format("Paimon %s path must be set.", CatalogOptions.WAREHOUSE.key()));
-    Path warehousePath = new Path(warehouse);
-    FileIO newFileIO = FileIO.get(warehousePath, catalogContext);
-
-    Class<?> superclass = target.getClass().getSuperclass();
-    Field oldFileIO = superclass.getDeclaredField("fileIO");
-    oldFileIO.setAccessible(true);
-    HadoopFileIO oldHadoopFileIO = (HadoopFileIO) oldFileIO.get(target);
-    closeFileSystem(oldHadoopFileIO);
-    oldFileIO.set(target, newFileIO);
+  private FileSystemCatalog createFileSystemCatalog(String proxyKerberosPrincipalName) {
+    return (FileSystemCatalog) CatalogFactory.createCatalog(catalogContext);
   }
 
-  private void closeFileSystem(HadoopFileIO hadoopFileIO)
+  private void closeFileSystem(FileSystemCatalog catalog)
       throws NoSuchFieldException, IllegalAccessException {
-    Field fsMapField = hadoopFileIO.getClass().getDeclaredField("fsMap");
-    fsMapField.setAccessible(true);
-    @SuppressWarnings("unchecked")
-    Map<Pair<String, String>, FileSystem> fsMap =
-        (Map<Pair<String, String>, FileSystem>) fsMapField.get(hadoopFileIO);
+    Map<Pair<String, String>, FileSystem> fsMap = getPairFileSystemMap(catalog);
     fsMap
         .values()
         .forEach(
@@ -129,9 +181,23 @@ public class FilesystemBackendProxy implements MethodInterceptor {
                 try {
                   fs.close();
                 } catch (IOException e) {
-                  throw new RuntimeException("Failed to close Hadoop Filesystem client", e);
+                  LOG.warn("Failed to close Hadoop Filesystem client", e);
                 }
               }
             });
+  }
+
+  private static Map<Pair<String, String>, FileSystem> getPairFileSystemMap(
+      FileSystemCatalog catalog) throws NoSuchFieldException, IllegalAccessException {
+    Class<?> superclass = catalog.getClass().getSuperclass();
+    Field fileIO = superclass.getDeclaredField("fileIO");
+    fileIO.setAccessible(true);
+    HadoopFileIO hadoopFileIO = (HadoopFileIO) fileIO.get(catalog);
+    Field fsMapField = hadoopFileIO.getClass().getDeclaredField("fsMap");
+    fsMapField.setAccessible(true);
+    @SuppressWarnings("unchecked")
+    Map<Pair<String, String>, FileSystem> fsMap =
+        (Map<Pair<String, String>, FileSystem>) fsMapField.get(hadoopFileIO);
+    return fsMap;
   }
 }
