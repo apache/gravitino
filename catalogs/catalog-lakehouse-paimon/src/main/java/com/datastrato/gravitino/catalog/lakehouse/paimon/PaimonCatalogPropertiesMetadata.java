@@ -58,8 +58,6 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
           KerberosConfig.CHECK_INTERVAL_SEC_KEY,
           KerberosConfig.FETCH_TIMEOUT_SEC_KEY,
           KerberosConfig.FETCH_TIMEOUT_SEC_KEY,
-          AuthenticationConfig.IMPERSONATION_ENABLE_KEY,
-          AuthenticationConfig.IMPERSONATION_ENABLE_KEY,
           AuthenticationConfig.AUTH_TYPE_KEY,
           AuthenticationConfig.AUTH_TYPE_KEY);
 
