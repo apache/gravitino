@@ -22,87 +22,65 @@ import os
 import shutil
 import subprocess
 import tarfile
-from random import randint
-
-import requests
 
 from gravitino.exceptions.gravitino_runtime_exception import GravitinoRuntimeException
 
 logger = logging.getLogger(__name__)
 
-HADOOP_VERSION = "2.7.3"
-HADOOP_PACK_NAME = f"hadoop-{HADOOP_VERSION}.tar.gz"
-HADOOP_DIR_NAME = f"hadoop-{HADOOP_VERSION}"
-HADOOP_DOWNLOAD_URL = f"https://archive.apache.org/dist/hadoop/core/hadoop-{HADOOP_VERSION}/{HADOOP_PACK_NAME}"
-LOCAL_BASE_DIR = "/tmp/gravitino"
-LOCAL_HADOOP_DIR = f"{LOCAL_BASE_DIR}/python_its/hadoop"
-LOCAL_DOWNLOAD_TEMP_DIR = f"{LOCAL_BASE_DIR}/python_its/" + str(randint(1, 10000))
+HADOOP_VERSION = os.environ.get("HADOOP_VERSION")
+PYTHON_BUILD_PATH = os.environ.get("PYTHON_BUILD_PATH")
 
 
 class BaseHadoopEnvironment:
 
     @classmethod
     def init_hadoop_env(cls):
-        # download hadoop pack and unzip
-        if not os.path.exists(LOCAL_HADOOP_DIR):
-            os.makedirs(LOCAL_HADOOP_DIR)
-        if not os.path.exists(LOCAL_DOWNLOAD_TEMP_DIR):
-            os.makedirs(LOCAL_DOWNLOAD_TEMP_DIR)
-        cls._download_and_unzip_hadoop_pack()
+        cls._unzip_hadoop_pack()
         # configure hadoop env
         cls._configure_hadoop_environment()
 
     @classmethod
     def clear_hadoop_env(cls):
         try:
-            shutil.rmtree(LOCAL_BASE_DIR)
-        except OSError as e:
-            logger.warning("Failed to delete directory '%s': %s", LOCAL_BASE_DIR, e)
+            shutil.rmtree(f"{PYTHON_BUILD_PATH}/hadoop")
+        except Exception as e:
+            raise GravitinoRuntimeException(
+                f"Failed to delete dir '{PYTHON_BUILD_PATH}/hadoop': {e}"
+            ) from e
 
     @classmethod
-    def _download_and_unzip_hadoop_pack(cls):
-        logger.info("Download and unzip hadoop pack from %s.", HADOOP_DOWNLOAD_URL)
-        local_tar_path = f"{LOCAL_DOWNLOAD_TEMP_DIR}/{HADOOP_PACK_NAME}"
-        # will download from remote if we do not find the pack locally
-        if not os.path.exists(local_tar_path):
-            response = requests.get(HADOOP_DOWNLOAD_URL)
-            with open(local_tar_path, "wb") as f:
-                f.write(response.content)
+    def _unzip_hadoop_pack(cls):
+        hadoop_pack = f"{PYTHON_BUILD_PATH}/tmp/hadoop-{HADOOP_VERSION}.tar.gz"
+        unzip_dir = f"{PYTHON_BUILD_PATH}/hadoop"
+        logger.info("Unzip hadoop pack from %s.", hadoop_pack)
         # unzip the pack
-        try:
-            with tarfile.open(local_tar_path) as tar:
-                tar.extractall(path=f"{LOCAL_DOWNLOAD_TEMP_DIR}/{HADOOP_DIR_NAME}")
-        except Exception as e:
-            raise GravitinoRuntimeException(
-                f"Failed to extract file '{local_tar_path}': {e}"
-            ) from e
-        # move to the hadoop dir
-        src_dir = f"{LOCAL_DOWNLOAD_TEMP_DIR}/{HADOOP_DIR_NAME}"
-        dst_dir = f"{LOCAL_HADOOP_DIR}"
-        if os.path.exists(dst_dir):
+        if os.path.exists(unzip_dir):
             try:
-                shutil.rmtree(dst_dir)
-            except OSError as e:
+                shutil.rmtree(unzip_dir)
+            except Exception as e:
                 raise GravitinoRuntimeException(
-                    f"Failed to delete directory '{dst_dir}': {e}"
+                    f"Failed to delete dir '{unzip_dir}': {e}"
                 ) from e
         try:
-            shutil.move(src_dir, dst_dir)
+            with tarfile.open(hadoop_pack) as tar:
+                tar.extractall(path=unzip_dir)
         except Exception as e:
             raise GravitinoRuntimeException(
-                f"Failed to move dir '{src_dir}' to {dst_dir}: {e}"
+                f"Failed to extract file '{hadoop_pack}': {e}"
             ) from e
 
     @classmethod
     def _configure_hadoop_environment(cls):
         logger.info("Configure hadoop environment.")
         os.putenv("HADOOP_USER_NAME", "datastrato")
-        os.putenv("HADOOP_HOME", f"{LOCAL_HADOOP_DIR}/{HADOOP_DIR_NAME}")
+        os.putenv("HADOOP_HOME", f"{PYTHON_BUILD_PATH}/hadoop/hadoop-{HADOOP_VERSION}")
         os.putenv(
             "HADOOP_CONF_DIR",
-            f"{LOCAL_HADOOP_DIR}/{HADOOP_DIR_NAME}/etc/hadoop",
+            f"{PYTHON_BUILD_PATH}/hadoop/hadoop-{HADOOP_VERSION}/etc/hadoop",
         )
-        hadoop_shell_path = f"{LOCAL_HADOOP_DIR}/{HADOOP_DIR_NAME}/bin/hadoop"
+        hadoop_shell_path = (
+            f"{PYTHON_BUILD_PATH}/hadoop/hadoop-{HADOOP_VERSION}/bin/hadoop"
+        )
         # get the classpath
         try:
             result = subprocess.run(
