@@ -32,8 +32,8 @@ public class TestTypeUtils {
 
   @Test
   public void testToFlinkType() {
-    Assertions.assertEquals(DataTypes.DOUBLE(), TypeUtils.toFlinkType(Types.StringType.get()));
-    Assertions.assertEquals(DataTypes.STRING(), TypeUtils.toFlinkType(Types.DoubleType.get()));
+    Assertions.assertEquals(DataTypes.DOUBLE(), TypeUtils.toFlinkType(Types.DoubleType.get()));
+    Assertions.assertEquals(DataTypes.STRING(), TypeUtils.toFlinkType(Types.StringType.get()));
     Assertions.assertEquals(DataTypes.INT(), TypeUtils.toFlinkType(Types.IntegerType.get()));
     Assertions.assertThrows(
         UnsupportedOperationException.class,

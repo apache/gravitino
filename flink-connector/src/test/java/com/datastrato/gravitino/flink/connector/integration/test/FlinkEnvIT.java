@@ -20,7 +20,6 @@ package com.datastrato.gravitino.flink.connector.integration.test;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.flink.connector.PropertiesConverter;
-import com.datastrato.gravitino.flink.connector.integration.test.utils.MiniClusterExtension;
 import com.datastrato.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
@@ -33,20 +32,16 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.function.Consumer;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.TableResult;
-import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.api.internal.TableEnvironmentImpl;
 import org.apache.hadoop.fs.FileSystem;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@ExtendWith(MiniClusterExtension.class)
 public abstract class FlinkEnvIT extends AbstractIT {
   private static final Logger LOG = LoggerFactory.getLogger(FlinkEnvIT.class);
   private static final ContainerSuite CONTAINER_SUITE = ContainerSuite.getInstance();
@@ -72,7 +67,7 @@ public abstract class FlinkEnvIT extends AbstractIT {
     initMetalake();
     initHiveEnv();
     initHdfsEnv();
-    initFlinkEnv(true);
+    initFlinkEnv();
     LOG.info("Startup Flink env successfully, Gravitino uri: {}.", gravitinoUri);
   }
 
@@ -109,6 +104,10 @@ public abstract class FlinkEnvIT extends AbstractIT {
             "hdfs://%s:%d/user/hive/warehouse",
             CONTAINER_SUITE.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HDFS_DEFAULTFS_PORT);
+    LOG.info(
+        "Startup Hive env successfully, metastore uri: {}, warehouse: {}",
+        hiveMetastoreUri,
+        warehouse);
   }
 
   private static void initHdfsEnv() {
@@ -127,7 +126,7 @@ public abstract class FlinkEnvIT extends AbstractIT {
     }
   }
 
-  protected static void initFlinkEnv(boolean isBatchMode) {
+  protected static void initFlinkEnv() {
     final Configuration configuration = new Configuration();
     configuration.setString(
         "table.catalog-store.kind", GravitinoCatalogStoreFactoryOptions.GRAVITINO);
@@ -136,12 +135,7 @@ public abstract class FlinkEnvIT extends AbstractIT {
 
     EnvironmentSettings.Builder builder =
         EnvironmentSettings.newInstance().withConfiguration(configuration);
-    if (isBatchMode) {
-      tableEnv = TableEnvironment.create(builder.inBatchMode().build());
-    } else {
-      StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-      tableEnv = StreamTableEnvironment.create(env, builder.inStreamingMode().build());
-    }
+    tableEnv = TableEnvironment.create(builder.inBatchMode().build());
   }
 
   private static void stopHdfsEnv() {

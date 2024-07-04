@@ -213,7 +213,9 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
           Assertions.assertArrayEquals(EMPTY_TRANSFORM, table.partitioning());
 
           TestUtils.assertTableResult(
-              sql("INSERT INTO %s VALUES ('A', 1.0), ('B', 2.0)", tableName), ResultKind.SUCCESS);
+              sql("INSERT INTO %s VALUES ('A', 1.0), ('B', 2.0)", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(-1L));
           TestUtils.assertTableResult(
               sql("SELECT * FROM %s", tableName),
               ResultKind.SUCCESS_WITH_CONTENT,
