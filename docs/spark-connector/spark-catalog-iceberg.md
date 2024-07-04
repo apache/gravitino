@@ -95,7 +95,7 @@ DESC EXTENDED employee;
 
 For more details about `CALL`, please refer to the [Spark Procedures description](https://iceberg.apache.org/docs/latest/spark-procedures/#spark-procedures) in Iceberg official document. 
 
-## Iceberg backend-catalog support
+## Apache Iceberg backend-catalog support
 - HiveCatalog
 - JdbcCatalog
 - RESTCatalog

@@ -52,7 +52,7 @@ The playground consists of multiple Docker images.
 
 The Docker images of the playground have suitable configurations for users to experience.
 
-### Hive image
+### Apache Hive image
 
 Changelog
 

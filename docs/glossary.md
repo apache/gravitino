@@ -168,15 +168,15 @@ license: "This software is licensed under the Apache License version 2."
 
 - The port number on which a server listens for incoming connections.
 
-## Iceberg Hive catalog
+## Apache Iceberg Hive catalog
 
 - The **Iceberg Hive catalog** is a specialized metadata service designed for the Apache Iceberg table format, allowing external systems to interact with Iceberg metadata via a Hive metastore thrift client.
 
-## Iceberg REST catalog
+## Apache Iceberg REST catalog
 
 - The **Iceberg REST Catalog** is a specialized metadata service designed for the Apache Iceberg table format, allowing external systems to interact with Iceberg metadata via a RESTful API.
 
-## Iceberg JDBC catalog
+## Apache Iceberg JDBC catalog
 
 - The **Iceberg JDBC Catalog** is a specialized metadata service designed for the Apache Iceberg table format, allowing external systems to interact with Iceberg metadata using JDBC (Java Database Connectivity).
 

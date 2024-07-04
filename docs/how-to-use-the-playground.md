@@ -184,7 +184,7 @@ WHERE e.employee_id = p.employee_id AND p.employee_id = s.employee_id
 GROUP BY e.employee_id,  given_name, family_name;
 ```
 
-### Using Iceberg REST service
+### Using Apache Iceberg REST service
 
 If you want to migrate your business from Hive to Iceberg. Some tables will use Hive, and the other tables will use Iceberg.
 Gravitino provides an Iceberg REST catalog service, too. You can use Spark to access REST catalog to write the table data.

@@ -200,7 +200,7 @@ Both the Gravitino server and Iceberg REST service can configure HTTPS.
 | `gravitino.server.webserver.trustStorePassword`     | Password to the trust store.                                       | (none)        | Yes if use HTTPS and the authentication of client | 0.3.0         |
 | `gravitino.server.webserver.trustStoreType`         | The type to the trust store.                                       | `JKS`         | No                                                | 0.3.0         |
 
-### Iceberg REST service's configuration
+### Apache Iceberg REST service's configuration
 
 | Configuration item                                         | Description                                                        | Default value | Required                                          | Since version |
 |------------------------------------------------------------|--------------------------------------------------------------------|---------------|---------------------------------------------------|---------------|
@@ -309,7 +309,7 @@ curl -v -X GET --cacert ./certificate.pem -H "Accept: application/vnd.gravitino.
 | `gravitino.server.webserver.exposedHeaders`        | A comma separated list of allowed HTTP headers exposed on the client. The default value is the empty list.                                                                                                                             | ``                                            | No       | 0.4.0         |
 | `gravitino.server.webserver.chainPreflight`        | If true chained preflight requests for normal handling (as an OPTION request). Otherwise, the filter responds to the preflight. The default is true.                                                                                   | `true`                                        | No       | 0.4.0         |
 
-### Iceberg REST service's configuration
+### Apache Iceberg REST service's configuration
 
 | Configuration item                                        | Description                                                                                                                                                                                                  | Default value                                 | Required | Since version |
 |-----------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------|----------|---------------|

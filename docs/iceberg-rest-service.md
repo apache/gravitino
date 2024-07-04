@@ -58,7 +58,7 @@ Please refer to the following sections for details.
 The filter in `customFilters` should be a standard javax servlet filter.
 You can also specify filter parameters by setting configuration entries in the style `gravitino.auxService.iceberg-rest.<class name of filter>.param.<param name>=<value>`.
 
-### Iceberg metrics store configuration
+### Apache Iceberg metrics store configuration
 
 Gravitino provides a pluggable metrics store interface to store and delete Iceberg metrics. You can develop a class that implements `com.datastrato.gravitino.catalog.lakehouse.iceberg.web.metrics` and add the corresponding jar file to the Iceberg REST service classpath directory.
 
@@ -77,7 +77,7 @@ The Gravitino Iceberg REST catalog service uses the memory catalog backend by de
 specify a Hive or JDBC catalog backend for production environment.
 :::
 
-#### Hive backend configuration
+#### Apache Hive backend configuration
 
 | Configuration item                                       | Description                                                                                                                                  | Default value                                                                 | Required | Since Version |
 |----------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------|----------|---------------|
