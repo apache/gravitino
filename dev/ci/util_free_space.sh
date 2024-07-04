@@ -49,6 +49,16 @@ if [ "${GITHUB_ACTIONS}" = "true" ]; then
   sudo rm -rf /opt/hostedtoolcache/PyPy || :
   # 376MB
   sudo rm -rf /opt/hostedtoolcache/node || :
+  # Add Google Chrome and Microsoft Edge repository if not found
+  if ! grep -q "http://dl.google.com/linux/chrome/deb/" /etc/apt/sources.list.d/*.list 2>/dev/null; then
+    wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/google-linux-signing-key.gpg > /dev/null
+    sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
+  fi
+  if ! grep -q "https://packages.microsoft.com/repos/edge" /etc/apt/sources.list.d/*.list 2>/dev/null; then
+    wget -q -O - https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc.gpg > /dev/null
+    sudo add-apt-repository "deb [arch=amd64] https://packages.microsoft.com/repos/edge stable main" -y
+  fi
+  sudo apt-get update
   # Remove Web browser packages
   sudo apt purge -y \
     firefox \
