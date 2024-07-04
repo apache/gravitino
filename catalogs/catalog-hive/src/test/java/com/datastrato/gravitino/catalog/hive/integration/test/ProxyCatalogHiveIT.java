@@ -106,7 +106,7 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     HiveConf hiveConf = new HiveConf();
     hiveConf.set(HiveConf.ConfVars.METASTOREURIS.varname, HIVE_METASTORE_URIS);
 
-    // Check if hive client can connect to hive metastore
+    // Check if Hive client can connect to Hive metastore
     hiveClientPool = new HiveClientPool(1, hiveConf);
 
     Configuration conf = new Configuration();

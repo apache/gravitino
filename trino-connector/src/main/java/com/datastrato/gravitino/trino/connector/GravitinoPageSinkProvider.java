@@ -27,7 +27,7 @@ import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.ConnectorTransactionHandle;
 import org.apache.commons.lang3.NotImplementedException;
 
-/** This class provides a ConnectorPageSink for trino to write data to internal connector. */
+/** This class provides a ConnectorPageSink for Trino to write data to internal connector. */
 public class GravitinoPageSinkProvider implements ConnectorPageSinkProvider {
 
   ConnectorPageSinkProvider pageSinkProvider;

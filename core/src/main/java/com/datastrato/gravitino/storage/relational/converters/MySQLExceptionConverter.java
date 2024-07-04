@@ -24,8 +24,8 @@ import java.io.IOException;
 import java.sql.SQLException;
 
 /**
- * Exception converter to Gravitino exception for MySQL. The definition of error codes can be found
- * in the document: <a
+ * Exception converter to Apache Gravitino exception for MySQL. The definition of error codes can be
+ * found in the document: <a
  * href="https://dev.mysql.com/doc/connector-j/en/connector-j-reference-error-sqlstates.html"></a>
  */
 public class MySQLExceptionConverter implements SQLExceptionConverter {

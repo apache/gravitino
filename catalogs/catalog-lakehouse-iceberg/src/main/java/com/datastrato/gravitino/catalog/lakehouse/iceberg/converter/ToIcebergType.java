@@ -24,7 +24,7 @@ import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
 
 /**
- * Convert Gravitino types to iceberg types.
+ * Convert Apache Gravitino types to Apache Iceberg types.
  *
  * <p>Referred from core/src/main/java/org/apache/iceberg/spark/SparkTypeToType.java
  */

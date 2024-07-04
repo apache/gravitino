@@ -45,9 +45,9 @@ import org.apache.spark.sql.connector.iceberg.catalog.ProcedureCatalog;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
 /**
- * The GravitinoIcebergCatalog class extends the BaseCatalog to integrate with the Iceberg table
- * format, providing specialized support for Iceberg-specific functionalities within Spark's
- * ecosystem. This implementation can further adapt to specific interfaces such as
+ * The GravitinoIcebergCatalog class extends the BaseCatalog to integrate with the Apache Iceberg
+ * table format, providing specialized support for Iceberg-specific functionalities within Apache
+ * Spark's ecosystem. This implementation can further adapt to specific interfaces such as
  * StagingTableCatalog and FunctionCatalog, allowing for advanced operations like table staging and
  * function management tailored to the needs of Iceberg tables.
  */

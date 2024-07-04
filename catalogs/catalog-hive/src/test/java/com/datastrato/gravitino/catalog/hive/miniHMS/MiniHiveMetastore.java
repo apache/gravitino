@@ -119,7 +119,7 @@ public class MiniHiveMetastore {
                     }
                   }));
     } catch (Exception e) {
-      throw new RuntimeException("Failed to setup local dir for hive metastore", e);
+      throw new RuntimeException("Failed to setup local dir for Hive metastore", e);
     }
   }
 
@@ -160,7 +160,7 @@ public class MiniHiveMetastore {
    * Starts a TestHiveMetastore with the default connection pool size (5) with the provided Hive
    * configuration.
    *
-   * @param conf The hive configuration to use.
+   * @param conf The Hive configuration to use.
    */
   public void start(HiveConf conf) {
     start(conf, DEFAULT_POOL_SIZE);
@@ -169,7 +169,7 @@ public class MiniHiveMetastore {
   /**
    * Starts a TestHiveMetastore with a provided connection pool size and Hive configuration.
    *
-   * @param conf The hive configuration to use.
+   * @param conf The Hive configuration to use.
    * @param poolSize The number of threads in the executor pool.
    */
   public void start(HiveConf conf, int poolSize) {

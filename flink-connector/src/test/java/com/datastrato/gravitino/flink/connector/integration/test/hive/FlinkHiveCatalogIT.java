@@ -252,7 +252,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
     Assertions.assertEquals(
         numCatalogs + 1, tableEnv.listCatalogs().length, "Should create a new catalog");
 
-    // get the catalog from gravitino.
+    // get the catalog from Gravitino.
     Optional<Catalog> flinkHiveCatalog = tableEnv.getCatalog(catalogName);
     Assertions.assertTrue(flinkHiveCatalog.isPresent());
     Assertions.assertInstanceOf(GravitinoHiveCatalog.class, flinkHiveCatalog.get());

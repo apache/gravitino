@@ -99,7 +99,7 @@ import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Operations for interacting with the Hive catalog in Gravitino. */
+/** Operations for interacting with an Apache Hive catalog in Apache Gravitino. */
 public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
 
   public static final Logger LOG = LoggerFactory.getLogger(HiveCatalogOperations.class);
@@ -159,7 +159,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     mergeConfig.putAll(gravitinoConfig);
 
     Configuration hadoopConf = new Configuration();
-    // Set byPass first to make gravitino config overwrite it, only keys in byPassConfig
+    // Set byPass first to make Gravitino config overwrite it, only keys in byPassConfig
     // and gravitinoConfig will be passed to Hive config, and gravitinoConfig has higher priority
     mergeConfig.forEach(hadoopConf::set);
     hiveConf = new HiveConf(hadoopConf, HiveCatalogOperations.class);
@@ -466,7 +466,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         }
       }
 
-      // alter the hive database parameters
+      // alter the Hive database parameters
       Database alteredDatabase = database.deepCopy();
       alteredDatabase.setParameters(properties);
 

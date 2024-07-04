@@ -31,7 +31,10 @@ import org.apache.paimon.schema.Schema;
 import org.apache.paimon.table.Table;
 import org.apache.paimon.types.DataField;
 
-/** Implementation of {@link Table} that represents a Paimon Table entity in the Paimon table. */
+/**
+ * Implementation of {@link Table} that represents an Apache Paimon Table entity in the Paimon
+ * table.
+ */
 @ToString
 @Getter
 public class GravitinoPaimonTable extends BaseTable {

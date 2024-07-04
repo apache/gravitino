@@ -44,9 +44,9 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 
 /**
- * Gravitino Metalake is the top-level metadata repository for users. It contains a list of catalogs
- * as sub-level metadata collections. With {@link GravitinoMetalake}, users can list, create, load,
- * alter and drop a catalog with specified identifier.
+ * Apache Gravitino Metalake is the top-level metadata repository for users. It contains a list of
+ * catalogs as sub-level metadata collections. With {@link GravitinoMetalake}, users can list,
+ * create, load, alter and drop a catalog with specified identifier.
  */
 public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
   private static final String API_METALAKES_CATALOGS_PATH = "api/metalakes/%s/catalogs/%s";

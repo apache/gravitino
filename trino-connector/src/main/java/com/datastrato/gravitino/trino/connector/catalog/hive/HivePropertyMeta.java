@@ -33,7 +33,7 @@ import io.trino.spi.session.PropertyMetadata;
 import io.trino.spi.type.ArrayType;
 import java.util.List;
 
-/** Implementation of {@link HasPropertyMeta} for Hive catalog. */
+/** Implementation of {@link HasPropertyMeta} for Apache Hive catalog. */
 public class HivePropertyMeta implements HasPropertyMeta {
 
   static final String HIVE_SCHEMA_LOCATION = "location";
@@ -151,7 +151,7 @@ public class HivePropertyMeta implements HasPropertyMeta {
   }
 
   // Hive catalog properties contain '.' and PropertyMetadata does not allow '.'
-  // Those configurations are referred from Trino hive connector
+  // Those configurations are referred from Trino Hive connector
   private static final List<PropertyMetadata<?>> CATALOG_PROPERTY_META =
       ImmutableList.of(
           enumProperty(

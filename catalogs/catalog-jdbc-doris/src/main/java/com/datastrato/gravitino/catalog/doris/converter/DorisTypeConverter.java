@@ -22,7 +22,7 @@ import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.rel.types.Type;
 import com.datastrato.gravitino.rel.types.Types;
 
-/** Type converter for Doris. */
+/** Type converter for Apache Doris. */
 public class DorisTypeConverter extends JdbcTypeConverter {
   static final String BOOLEAN = "boolean";
   static final String TINYINT = "tinyint";

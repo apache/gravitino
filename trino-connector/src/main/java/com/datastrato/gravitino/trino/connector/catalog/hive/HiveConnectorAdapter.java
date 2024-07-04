@@ -31,7 +31,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Transforming Hive connector configuration and components into Gravitino connector. */
+/**
+ * Transforming Apache Hive connector configuration and components into Apache Gravitino connector.
+ */
 public class HiveConnectorAdapter implements CatalogConnectorAdapter {
 
   private final HasPropertyMeta propertyMetadata;

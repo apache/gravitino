@@ -34,7 +34,7 @@ import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
 /**
- * For spark-connector in Iceberg, it explicitly uses SparkTable to identify whether it is an
+ * For spark-connector in Iceberg, it explicitly uses SparkTable to identify whether it is an Apache
  * Iceberg table, so the SparkIcebergTable must extend SparkTable.
  */
 public class SparkIcebergTable extends SparkTable {

@@ -64,7 +64,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Implementation of {@link CatalogOperations} that represents operations for interacting with the
- * Paimon catalog in Gravitino.
+ * Apache Paimon catalog in Apache Gravitino.
  */
 public class PaimonCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
 

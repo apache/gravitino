@@ -29,7 +29,10 @@ import io.trino.spi.session.PropertyMetadata;
 import java.util.List;
 import java.util.Map;
 
-/** Transforming Iceberg connector configuration and components into Gravitino connector. */
+/**
+ * Transforming Apache Iceberg connector configuration and components into Apache Gravitino
+ * connector.
+ */
 public class IcebergConnectorAdapter implements CatalogConnectorAdapter {
 
   private final IcebergPropertyMeta propertyMetadata;

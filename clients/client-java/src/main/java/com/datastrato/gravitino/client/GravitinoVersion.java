@@ -24,7 +24,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Gravitino version information. */
+/** Apache Gravitino version information. */
 public class GravitinoVersion extends VersionDTO implements Comparable {
 
   private static final int VERSION_PART_NUMBER = 3;
