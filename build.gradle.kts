@@ -484,6 +484,8 @@ tasks.rat {
     "web/src/lib/icons/svg/**/*.svg",
     "**/LICENSE.*",
     "**/NOTICE.*",
+    "DISCLAIMER_WIP.txt",
+    "DISCLAIMER.txt",
     "ROADMAP.md",
     "clients/client-python/.pytest_cache/*",
     "clients/client-python/gravitino.egg-info/*",
