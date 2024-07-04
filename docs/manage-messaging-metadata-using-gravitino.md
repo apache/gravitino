@@ -1,5 +1,5 @@
 ---
-title: "Manage massaging metadata using Gravitino"
+title: "Manage massaging metadata using Apache Gravitino"
 slug: /manage-massaging-metadata-using-gravitino
 date: 2024-4-22
 keyword: Gravitino massaging metadata manage
@@ -9,7 +9,7 @@ license: This software is licensed under the Apache License version 2.
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-This page introduces how to manage messaging metadata using Gravitino. Messaging metadata refers to 
+This page introduces how to manage messaging metadata using Apache Gravitino. Messaging metadata refers to 
 the topic metadata of the messaging system such as Apache Kafka, Apache Pulsar, Apache RocketMQ, etc.
 Through Gravitino, you can create, update, delete, and list topics via unified RESTful APIs or Java client.
 

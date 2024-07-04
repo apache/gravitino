@@ -24,7 +24,7 @@ import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.connector.capability.Capability;
 import java.util.Map;
 
-/** Implementation of an Iceberg catalog in Gravitino. */
+/** Implementation of an Apache Iceberg catalog in Apache Gravitino. */
 public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
 
   static final IcebergCatalogPropertiesMetadata CATALOG_PROPERTIES_META =

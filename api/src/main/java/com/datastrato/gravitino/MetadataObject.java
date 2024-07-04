@@ -24,7 +24,7 @@ import javax.annotation.Nullable;
 
 /**
  * The MetadataObject is the basic unit of the Gravitino system. It represents the metadata object
- * in the Gravitino system. The object can be a metalake, catalog, schema, table, topic, etc.
+ * in the Apache Gravitino system. The object can be a metalake, catalog, schema, table, topic, etc.
  */
 @Unstable
 public interface MetadataObject {

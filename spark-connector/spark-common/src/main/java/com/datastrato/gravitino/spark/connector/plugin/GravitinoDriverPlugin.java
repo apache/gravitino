@@ -44,8 +44,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * GravitinoDriverPlugin creates GravitinoCatalogManager to fetch catalogs from Gravitino and
- * register Gravitino catalogs to Spark.
+ * GravitinoDriverPlugin creates GravitinoCatalogManager to fetch catalogs from Apache Gravitino and
+ * register Gravitino catalogs to Apache Spark.
  */
 public class GravitinoDriverPlugin implements DriverPlugin {
 

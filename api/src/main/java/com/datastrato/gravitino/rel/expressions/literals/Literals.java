@@ -26,7 +26,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Objects;
 
-/** The helper class to create literals to pass into Gravitino. */
+/** The helper class to create literals to pass into Apache Gravitino. */
 public class Literals {
 
   /** Used to represent a null literal. */

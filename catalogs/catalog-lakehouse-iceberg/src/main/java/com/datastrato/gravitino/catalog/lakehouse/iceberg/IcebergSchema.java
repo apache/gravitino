@@ -26,7 +26,7 @@ import org.apache.commons.collections4.MapUtils;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 
-/** Represents an Iceberg Schema (Database) entity in the Iceberg schema. */
+/** Represents an Apache Iceberg Schema (Database) entity in the Iceberg schema. */
 @ToString
 public class IcebergSchema extends BaseSchema {
 

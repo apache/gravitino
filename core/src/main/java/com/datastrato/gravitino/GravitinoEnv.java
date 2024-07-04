@@ -60,7 +60,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /*
- * This class manages the Gravitino environment.
+ * This class manages the Apache Gravitino environment.
  */
 public class GravitinoEnv {
 

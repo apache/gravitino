@@ -1,5 +1,5 @@
 ---
-title: Gravitino metrics
+title: Apache Gravitino metrics
 slug: /metrics
 keywords:
   - metrics
@@ -8,7 +8,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Introduction
 
-Gravitino Metrics builds upon the [Dropwizard Metrics](https://metrics.dropwizard.io/). It exports these metrics through both JMX and an HTTP server, supporting JSON and Prometheus formats. You can retrieve them via HTTP requests, as illustrated below:
+Apache Gravitino Metrics builds upon the [Dropwizard Metrics](https://metrics.dropwizard.io/). It exports these metrics through both JMX and an HTTP server, supporting JSON and Prometheus formats. You can retrieve them via HTTP requests, as illustrated below:
 
 ```shell
 // Use Gravitino Server address or Iceberg REST server address to replace 127.0.0.1:8090

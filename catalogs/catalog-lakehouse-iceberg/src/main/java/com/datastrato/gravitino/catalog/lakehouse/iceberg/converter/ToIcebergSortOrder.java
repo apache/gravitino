@@ -34,7 +34,7 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.expressions.UnboundTerm;
 
-/** Implement gravitino sort order converter to iceberg sort order. */
+/** Implement Apache Gravitino sort order converter to Apache Iceberg sort order. */
 public class ToIcebergSortOrder {
 
   private ToIcebergSortOrder() {}

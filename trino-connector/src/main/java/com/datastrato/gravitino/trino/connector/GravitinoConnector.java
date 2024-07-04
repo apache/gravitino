@@ -40,8 +40,8 @@ import java.util.Set;
 
 /**
  * GravitinoConnector serves as the entry point for operations on the connector managed by Trino and
- * Gravitino. It provides a standard entry point for Trino connectors and delegates their operations
- * to internal connectors.
+ * Apache Gravitino. It provides a standard entry point for Trino connectors and delegates their
+ * operations to internal connectors.
  */
 public class GravitinoConnector implements Connector {
 

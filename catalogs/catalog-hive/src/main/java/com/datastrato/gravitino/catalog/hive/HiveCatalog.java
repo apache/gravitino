@@ -26,7 +26,7 @@ import com.datastrato.gravitino.connector.capability.Capability;
 import java.util.Map;
 import java.util.Optional;
 
-/** Implementation of a Hive catalog in Gravitino. */
+/** Implementation of an Apache Hive catalog in Apache Gravitino. */
 public class HiveCatalog extends BaseCatalog<HiveCatalog> {
 
   static final HiveCatalogPropertiesMeta CATALOG_PROPERTIES_METADATA =

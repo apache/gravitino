@@ -52,7 +52,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-/** This class is used to transform datatype between gravitino and trino */
+/** This class is used to transform datatype between Apache Gravitino and Trino */
 public class GeneralDataTypeTransformer {
 
   public Type getTrinoType(com.datastrato.gravitino.rel.types.Type type) {

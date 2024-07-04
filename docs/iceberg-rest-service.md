@@ -8,7 +8,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Background
 
-The Gravitino Iceberg REST Server follows the [Apache Iceberg REST API specification](https://github.com/apache/iceberg/blob/main/open-api/rest-catalog-open-api.yaml) and acts as an Iceberg REST catalog server.
+The Apache Gravitino Iceberg REST Server follows the [Apache Iceberg REST API specification](https://github.com/apache/iceberg/blob/main/open-api/rest-catalog-open-api.yaml) and acts as an Iceberg REST catalog server.
 
 ### Capabilities
 
@@ -23,7 +23,7 @@ Builds with Apache Iceberg `1.3.1`. The Apache Iceberg table format version is `
 Builds with Hadoop 2.10.x. There may be compatibility issues when accessing Hadoop 3.x clusters.
 :::
 
-## Gravitino Iceberg REST catalog service configuration
+## Apache Gravitino Iceberg REST catalog service configuration
 
 Assuming the Gravitino server is deployed in the `GRAVITINO_HOME` directory, you can locate the configuration options in [`$GRAVITINO_HOME/conf/gravitino.conf`](gravitino-server-config.md). There are four configuration properties for the Iceberg REST catalog service:
 
@@ -58,7 +58,7 @@ Please refer to the following sections for details.
 The filter in `customFilters` should be a standard javax servlet filter.
 You can also specify filter parameters by setting configuration entries in the style `gravitino.auxService.iceberg-rest.<class name of filter>.param.<param name>=<value>`.
 
-### Iceberg metrics store configuration
+### Apache Iceberg metrics store configuration
 
 Gravitino provides a pluggable metrics store interface to store and delete Iceberg metrics. You can develop a class that implements `com.datastrato.gravitino.catalog.lakehouse.iceberg.web.metrics` and add the corresponding jar file to the Iceberg REST service classpath directory.
 
@@ -70,14 +70,14 @@ Gravitino provides a pluggable metrics store interface to store and delete Icebe
 | `gravitino.auxService.iceberg-rest.metricsQueueCapacity`   | The size of queue to store metrics temporally before storing to the persistent storage. Metrics will be dropped when queue is full. | 1000          | No       | 0.4.0         |
 
 
-### Gravitino Iceberg catalog backend configuration
+### Apache Gravitino Iceberg catalog backend configuration
 
 :::info
 The Gravitino Iceberg REST catalog service uses the memory catalog backend by default. You can 
 specify a Hive or JDBC catalog backend for production environment.
 :::
 
-#### Hive backend configuration
+#### Apache Hive backend configuration
 
 | Configuration item                                       | Description                                                                                                                                  | Default value                                                                 | Required | Since Version |
 |----------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------|----------|---------------|
@@ -123,7 +123,7 @@ The `clients` property for example:
 
 The Gravitino Iceberg REST catalog service adds the HDFS configuration files `core-site.xml` and `hdfs-site.xml` from the directory defined by `gravitino.auxService.iceberg-rest.classpath`, for example, `catalogs/lakehouse-iceberg/conf`, to the classpath.
 
-## Starting the Gravitino Iceberg REST catalog service
+## Starting the Apache Gravitino Iceberg REST catalog service
 
 To start the service:
 
@@ -139,7 +139,7 @@ curl  http://127.0.0.1:9001/iceberg/v1/config
 
 Normally you will see the output like `{"defaults":{},"overrides":{}}%`.
 
-## Exploring the Gravitino and Apache Iceberg REST catalog service with Apache Spark
+## Exploring the Apache Gravitino and Apache Iceberg REST catalog service with Apache Spark
 
 ### Deploying Apache Spark with Apache Iceberg support
 

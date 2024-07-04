@@ -1,5 +1,5 @@
 ---
-title: "Manage metalake using Gravitino"
+title: "Manage metalake using Apache Gravitino"
 slug: /manage-metalake-using-gravitino
 date: 2023-12-10
 keyword: Gravitino metalake manage
@@ -9,7 +9,7 @@ license: This software is licensed under the Apache License version 2.
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-This page introduces how to manage metalake by Gravitino. Metalake is a tenant-like concept in
+This page introduces how to manage metalake by Apache Gravitino. Metalake is a tenant-like concept in
 Gravitino, all the catalogs, users and roles are under a metalake. Typically, a metalake is
 mapping to a organization or a company.
 

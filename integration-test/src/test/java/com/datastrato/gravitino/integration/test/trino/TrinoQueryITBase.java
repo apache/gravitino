@@ -45,10 +45,10 @@ import org.testcontainers.shaded.org.apache.commons.io.FileUtils;
 public class TrinoQueryITBase {
   private static final Logger LOG = LoggerFactory.getLogger(TrinoQueryITBase.class);
 
-  // Auto start docker containers and gravitino server
+  // Auto start docker containers and Gravitino server
   protected static boolean autoStart = true;
 
-  // Auto start gravitino server
+  // Auto start Gravitino server
   protected static boolean autoStartGravitino = true;
 
   protected static boolean started = false;
