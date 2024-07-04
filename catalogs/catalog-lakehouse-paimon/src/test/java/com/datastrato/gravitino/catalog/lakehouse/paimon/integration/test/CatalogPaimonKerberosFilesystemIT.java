@@ -86,7 +86,6 @@ public class CatalogPaimonKerberosFilesystemIT extends AbstractIT {
 
   private static GravitinoAdminClient adminClient;
 
-  private static final String METALAKE_NAME = GravitinoITUtils.genRandomName("test_metalake");
   private static final String CATALOG_NAME = GravitinoITUtils.genRandomName("test_catalog");
   private static final String SCHEMA_NAME = GravitinoITUtils.genRandomName("test_schema");
   private static final String TABLE_NAME = GravitinoITUtils.genRandomName("test_table");
