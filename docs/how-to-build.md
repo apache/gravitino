@@ -248,7 +248,7 @@ These commands add a repository that provides the latest Python versions and the
 **On Ubuntu (WSL):**
 
 ```shell
-git clone https://github.com/datastrato/gravitino.git
+git clone https://github.com/apache/gravitino.git
 cd gravitino
 ./gradlew compileDistribution -x test
 cd distribution/package/

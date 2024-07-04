@@ -104,7 +104,7 @@ two ways:
 
 2. Compile from the source code:
 
-   Download or clone the [Gravitino source code](https://github.com/datastrato/gravitino), and compile it
+   Download or clone the [Gravitino source code](https://github.com/apache/gravitino), and compile it
    locally using the following command in the Gravitino source code directory:
 
     ```shell

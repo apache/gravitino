@@ -388,7 +388,7 @@ subprojects {
             }
           }
           scm {
-            url.set("https://github.com/datastrato/gravitino")
+            url.set("https://github.com/apache/gravitino")
             connection.set("scm:git:git://github.com/datastrato/gravitino.git")
           }
         }

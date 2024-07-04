@@ -14,7 +14,7 @@ metadata access for data and AI assets.
 
 ## Downloading
 
-You can get Gravitino from the [GitHub release page](https://github.com/datastrato/gravitino/releases),
+You can get Gravitino from the [GitHub release page](https://github.com/apache/gravitino/releases),
 or you can build Gravitino from source code. See [How to build Gravitino](./how-to-build.md).
 
 Gravitino runs on both Linux and macOS platforms, and it requires the installation of Java 8, Java 11, or Java 17. Gravitino trino-connector runs with
@@ -29,7 +29,7 @@ Pull the image and run it. For details of the Gravitino Docker image, see
 [Docker image details](./docker-image-details.md).
 
 Gravitino also provides a playground to experience the whole Gravitino system with other components.
-See the [Gravitino playground repository](https://github.com/datastrato/gravitino-playground)
+See the [Gravitino playground repository](https://github.com/apache/gravitino-playground)
 and [How to use the playground](./how-to-use-the-playground.md).
 
 ## Getting started

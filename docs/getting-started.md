@@ -223,7 +223,7 @@ newgrp docker
 ```
 
 You can install and run all the programs as Docker containers by using the
-[gravitino-playground](https://github.com/datastrato/gravitino-playground). For details about
+[gravitino-playground](https://github.com/apache/gravitino-playground). For details about
 how to run the playground, see [how-to-use-the-playground](./how-to-use-the-playground.md)
 
 ## Installing Gravitino playground locally

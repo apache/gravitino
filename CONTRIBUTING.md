@@ -55,13 +55,13 @@ Before you get started, please read and follow these guidelines to ensure a smoo
 Either click the "Fork" button at the top right of the repository's page on GitHub OR create a fork on your local machine using `git clone`.
 
 ```bash
-git clone https://github.com/datastrato/gravitino.git
+git clone https://github.com/apache/gravitino.git
 cd gravitino
 ```
 
 ### Development Setup
 
-Once you have cloned the [GitHub repository](https://github.com/datastrato/gravitino), see [how to build](/docs/how-to-build.md) for instructions on how to build, or you can use the provided docker images at [Datastrato's DockerHub repository](https://hub.docker.com/u/datastrato).
+Once you have cloned the [GitHub repository](https://github.com/apache/gravitino), see [how to build](/docs/how-to-build.md) for instructions on how to build, or you can use the provided docker images at [Datastrato's DockerHub repository](https://hub.docker.com/u/datastrato).
 
 To stop and start a local Gravitino server via `bin/gravitino.sh start` and `bin/gravitino.sh stop` in a Gravitino distribution, see [how to build](/docs/how-to-build.md) for more instructions.
 
@@ -225,7 +225,7 @@ If you have ideas for enhancements or new features, feel free to create an issue
 
 ### Good First Issues
 
-If you are new to open source or can't find something to work on, check out the [Good First Issues list](https://github.com/datastrato/gravitino/contribute).
+If you are new to open source or can't find something to work on, check out the [Good First Issues list](https://github.com/apache/gravitino/contribute).
 
 ### Working on Issues
 

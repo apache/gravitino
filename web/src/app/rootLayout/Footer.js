@@ -41,7 +41,7 @@ const Footer = props => {
             <Link
               className={'twc-no-underline twc-text-primary-main'}
               target='_blank'
-              href='https://github.com/datastrato/gravitino/blob/main/LICENSE'
+              href='https://github.com/apache/gravitino/blob/main/LICENSE'
               data-refer='footer-link-license'
             >
               License
@@ -57,7 +57,7 @@ const Footer = props => {
             <Link
               className={'twc-no-underline twc-text-primary-main'}
               target='_blank'
-              href='https://github.com/datastrato/gravitino/issues'
+              href='https://github.com/apache/gravitino/issues'
               data-refer='footer-link-support'
             >
               Support
