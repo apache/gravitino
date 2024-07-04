@@ -321,17 +321,16 @@ After completing these steps, you should be able to access the Gravitino REST in
 
 2. **Community engagement:**
    - Join the Gravitino community forums to connect with other users, share experiences, and seek assistance if needed.
-   - Check out our GitHub repository: https://github.com/datastrato
-   - Check out our Discourse group: https://gravitino.discourse.group/
+   - Check out our GitHub repository: https://github.com/apache/gravitino
+   - Check out our Slack channel in ASF Slack: https://the-asf.slack.com
    
 3. **Read our blogs:**
-   - Check out: https://datastrato.ai/blog
+   - Check out: https://gravitino.apache.org/blog (coming soon)
 
 4. **Continuous updates:**
    - Stay informed about Gravitino updates and new releases to benefit from the latest features, optimizations, and security       
      enhancements.
-   - Check out our Website: https://datastrato.ai/
-   - Check out our page on X (formerly Twitter): https://twitter.com/datastrato
+   - Check out our Website: https://gravitino.apache.org (coming soon)
   
 
-This document is just the beginning. You're welcome to customize your Gravitino setup based on your requirements and to explore the vast possibilities this powerful tool offers. If you encounter any issues or have questions, you can always connect with the Gravitino community for assistance. 
+This document is just the beginning. You're welcome to customize your Gravitino setup based on your requirements and to explore the vast possibilities this powerful tool offers. If you encounter any issues or have questions, you can always connect with the Gravitino community for assistance.
