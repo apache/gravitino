@@ -1,5 +1,5 @@
 ---
-title: "How to use Gravitino Python client"
+title: "How to use Apache Gravitino Python client"
 slug: /how-to-use-gravitino-python-client
 date: 2024-05-09
 keyword: Gravitino Python client
@@ -7,7 +7,7 @@ license: This software is licensed under the Apache License version 2.
 ---
 ## Introduction
 
-Gravitino is a high-performance, geo-distributed, and federated metadata lake.
+Apache Gravitino is a high-performance, geo-distributed, and federated metadata lake.
 It manages the metadata directly in different sources, types, and regions, also provides users
 the unified metadata access for data and AI assets.
 
@@ -23,7 +23,7 @@ First of all, You must have a Gravitino server set up and run, You can refer doc
 [How to install Gravitino](./how-to-install.md) to build Gravitino server from source code and
 install it in your local.
 
-### Gravitino Python client API
+### Apache Gravitino Python client API
 
 ```shell
 pip install gravitino
@@ -32,7 +32,7 @@ pip install gravitino
 1. [Manage metalake using Gravitino Python API](./manage-metalake-using-gravitino.md?language=python)
 2. [Manage fileset metadata using Gravitino Python API](./manage-fileset-metadata-using-gravitino.md?language=python)
 
-### Gravitino Fileset Example
+### Apache Gravitino Fileset Example
 
 We offer a playground environment to help you quickly understand how to use Gravitino Python
 client to manage non-tabular data on HDFS via Fileset in Gravitino. You can refer to the
@@ -63,7 +63,7 @@ contains the following code snippets:
 11. Drop this `Fileset.Type.EXTERNAL` type fileset and check if the fileset location was
     not deleted in HDFS.
 
-## How to development Gravitino Python Client
+## How to development Apache Gravitino Python Client
 
 You can ues any IDE to develop Gravitino Python Client. Directly open the client-python module project in the IDE.
 

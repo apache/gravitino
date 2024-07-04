@@ -1,5 +1,5 @@
 ---
-title: "Gravitino Glossary"
+title: "Apache Gravitino Glossary"
 date: 2023-11-28
 license: "This software is licensed under the Apache License version 2."
 ---
@@ -144,11 +144,11 @@ license: "This software is licensed under the Apache License version 2."
 
 - A Gradle wrapper script, used for executing Gradle commands without installing Gradle separately.
 
-## Gravitino
+## Apache Gravitino
 
 - An open-source software platform created by Datastrato for high-performance, geo-distributed, and federated metadata lakes. Designed to manage metadata directly in different sources, types, and regions, providing unified metadata access for data and AI assets.
 
-## Gravitino configuration file (gravitino.conf)
+## Apache Gravitino configuration file (gravitino.conf)
 
 - The configuration file for the Gravitino server, located in the `conf` directory. It follows the standard property file format and contains settings for the Gravitino server.
 
@@ -364,7 +364,7 @@ license: "This software is licensed under the Apache License version 2."
 
 - A connector module for integrating Gravitino with Trino.
 
-## Trino Gravitino connector documentation
+## Trino Apache Gravitino connector documentation
 
 -  Documentation providing information on using the Trino connector to access metadata in Gravitino.
 

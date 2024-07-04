@@ -1,5 +1,5 @@
 ---
-title: "Gravitino connector - PostgreSQL catalog"
+title: "Apache Gravitino connector - PostgreSQL catalog"
 slug: /trino-connector/catalog-postgresql
 keyword: gravitino connector trino
 license: "This software is licensed under the Apache License version 2."
@@ -16,7 +16,7 @@ To connect to PostgreSQL, you need:
 
 ## Create table
 
-At present, the Gravitino connector only supports basic PostgreSQL table creation statements, which involve fields, null allowances, and comments. 
+At present, the Apache Gravitino connector only supports basic PostgreSQL table creation statements, which involve fields, null allowances, and comments. 
 However, it does not support advanced features like primary keys, indexes, default values, and auto-increment.
 
 The Gravitino connector does not support `CREATE TABLE AS SELECT`.

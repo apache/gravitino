@@ -6,7 +6,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Introduction
 
-Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages the
+Apache Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages the
 metadata directly in different sources, types, and regions. It also provides users with unified metadata access for data and AI assets.
 
 ![Gravitino Architecture](assets/gravitino-architecture.png)
@@ -70,7 +70,7 @@ assets like models, features, and others are under development.
 
 ## Terminology
 
-### The model of Gravitino
+### The model of Apache Gravitino
 
 ![Gravitino Model](assets/metadata-model.png)
 

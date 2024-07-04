@@ -7,7 +7,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Playground introduction
 
-The playground is a complete Gravitino Docker runtime environment with `Hive`, `HDFS`, `Trino`, `MySQL`, `PostgreSQL`, `Jupyter`, and a `Gravitino` server.
+The playground is a complete Apache Gravitino Docker runtime environment with `Hive`, `HDFS`, `Trino`, `MySQL`, `PostgreSQL`, `Jupyter`, and a `Gravitino` server.
 
 Depending on your network and computer, startup time may take 3-5 minutes. Once the playground environment has started, you can open [http://localhost:8090](http://localhost:8090) in a browser to access the Gravitino Web UI.
 
@@ -66,7 +66,7 @@ cd gravitino-playground
 ./launch-playground.sh hive|gravitino|trino|postgresql|mysql|spark|jupyter
 ```
 
-### Experiencing Gravitino Fileset with Jupyter
+### Experiencing Apache Gravitino Fileset with Jupyter
 
 We provide a Fileset playground environment to help you quickly understand how to use Gravitino
 Python client to manage non-tabular data on HDFS via fileset in Gravitino service.
@@ -97,7 +97,7 @@ contains the following code snippets:
 11. Drop this `Fileset.Type.EXTERNAL` type fileset and check if the fileset location was
     not deleted in HDFS.
 
-## Experiencing Gravitino with Trino SQL
+## Experiencing Apache Gravitino with Trino SQL
 
 1. Log in to the Gravitino playground Trino Docker container using the following command:
 

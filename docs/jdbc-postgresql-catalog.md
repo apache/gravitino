@@ -13,7 +13,7 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Gravitino provides the ability to manage PostgreSQL metadata.
+Apache Gravitino provides the ability to manage PostgreSQL metadata.
 
 :::caution
 Gravitino saves some system information in schema and table comment, like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, please don't change or remove this message.

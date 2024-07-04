@@ -7,7 +7,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Authentication
 
-Gravitino supports two kinds of authentication mechanisms: simple and OAuth.
+Apache Gravitino supports two kinds of authentication mechanisms: simple and OAuth.
 
 ### Simple mode
 
@@ -183,7 +183,7 @@ If users choose to enable HTTPS, Gravitino won't provide the ability of HTTP ser
 
 Both the Gravitino server and Iceberg REST service can configure HTTPS.
 
-### Gravitino server's configuration
+### Apache Gravitino server's configuration
 
 | Configuration item                                  | Description                                                        | Default value | Required                                          | Since version |
 |-----------------------------------------------------|--------------------------------------------------------------------|---------------|---------------------------------------------------|---------------|
