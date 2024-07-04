@@ -19,7 +19,6 @@
 package com.datastrato.gravitino.catalog.lakehouse.paimon.authentication;
 
 import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosConfig;
 import com.datastrato.gravitino.config.ConfigBuilder;
 import com.datastrato.gravitino.config.ConfigConstants;
 import com.datastrato.gravitino.config.ConfigEntry;
@@ -31,8 +30,6 @@ public class AuthenticationConfig extends Config {
 
   // The key for the authentication type, currently we support Kerberos and simple
   public static final String AUTH_TYPE_KEY = "authentication.type";
-
-  public static final String IMPERSONATION_ENABLE_KEY = "authentication.impersonation-enable";
 
   enum AuthenticationType {
     SIMPLE,
@@ -52,13 +49,6 @@ public class AuthenticationConfig extends Config {
           .stringConf()
           .createWithDefault("simple");
 
-  public static final ConfigEntry<Boolean> ENABLE_IMPERSONATION_ENTRY =
-      new ConfigBuilder(IMPERSONATION_ENABLE_KEY)
-          .doc("Whether to enable impersonation for the Paimon catalog")
-          .version(ConfigConstants.VERSION_0_6_0)
-          .booleanConf()
-          .createWithDefault(KerberosConfig.DEFAULT_IMPERSONATION_ENABLE);
-
   public String getAuthType() {
     return get(AUTH_TYPE_ENTRY);
   }
@@ -71,22 +61,8 @@ public class AuthenticationConfig extends Config {
     return AuthenticationType.KERBEROS.name().equalsIgnoreCase(getAuthType());
   }
 
-  public boolean isImpersonationEnabled() {
-    return get(ENABLE_IMPERSONATION_ENTRY);
-  }
-
   public static final Map<String, PropertyEntry<?>> AUTHENTICATION_PROPERTY_ENTRIES =
       new ImmutableMap.Builder<String, PropertyEntry<?>>()
-          .put(
-              IMPERSONATION_ENABLE_KEY,
-              PropertyEntry.booleanPropertyEntry(
-                  IMPERSONATION_ENABLE_KEY,
-                  "Whether to enable impersonation for the Paimon catalog",
-                  false,
-                  true,
-                  KerberosConfig.DEFAULT_IMPERSONATION_ENABLE,
-                  false,
-                  false))
           .put(
               AUTH_TYPE_KEY,
               PropertyEntry.stringImmutablePropertyEntry(

@@ -25,7 +25,6 @@ import static com.datastrato.gravitino.catalog.lakehouse.paimon.authentication.k
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
-import com.datastrato.gravitino.catalog.lakehouse.paimon.authentication.AuthenticationConfig;
 import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.client.KerberosTokenProvider;
@@ -203,90 +202,6 @@ public class CatalogPaimonKerberosFilesystemIT extends AbstractIT {
         "gravitino.authenticator.kerberos.keytab", TMP_DIR + GRAVITINO_SERVER_KEYTAB);
     AbstractIT.customConfigs.put(SDK_KERBEROS_KEYTAB_KEY, TMP_DIR + GRAVITINO_CLIENT_KEYTAB);
     AbstractIT.customConfigs.put(SDK_KERBEROS_PRINCIPAL_KEY, GRAVITINO_CLIENT_PRINCIPAL);
-  }
-
-  @Test
-  void testPaimonWithKerberosAndUserImpersonation() {
-    KerberosTokenProvider provider =
-        KerberosTokenProvider.builder()
-            .withClientPrincipal(GRAVITINO_CLIENT_PRINCIPAL)
-            .withKeyTabFile(new File(TMP_DIR + GRAVITINO_CLIENT_KEYTAB))
-            .build();
-    adminClient = GravitinoAdminClient.builder(serverUri).withKerberosAuth(provider).build();
-
-    GravitinoMetalake gravitinoMetalake =
-        adminClient.createMetalake(METALAKE_NAME, null, ImmutableMap.of());
-
-    // Create a catalog
-    Map<String, String> properties = Maps.newHashMap();
-    properties.put(AuthenticationConfig.IMPERSONATION_ENABLE_KEY, "true");
-    properties.put(AUTH_TYPE_KEY, "kerberos");
-    properties.put(KEY_TAB_URI_KEY, TMP_DIR + HDFS_CLIENT_KEYTAB);
-    properties.put(PRINCIPAL_KEY, HDFS_CLIENT_PRINCIPAL);
-
-    properties.put(PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND, TYPE);
-    properties.put(PaimonCatalogPropertiesMetadata.WAREHOUSE, WAREHOUSE);
-
-    Catalog catalog =
-        gravitinoMetalake.createCatalog(
-            CATALOG_NAME, Catalog.Type.RELATIONAL, "lakehouse-paimon", "comment", properties);
-
-    // The FilesystemCatalog would create the warehouse directory if it doesn't exist
-    // So we need to create the warehouse directory first to avoid the permission denied error for
-    // user 'cli' when initializing the FilesystemCatalog
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-mkdir", "/user/hive/paimon_catalog_warehouse");
-
-    // Test create schema
-    Exception exception =
-        Assertions.assertThrows(
-            Exception.class,
-            () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
-    String exceptionMessage = Throwables.getStackTraceAsString(exception);
-
-    // Make sure the real user is 'gravitino_client'
-    Assertions.assertTrue(
-        exceptionMessage.contains("Permission denied: user=gravitino_client, access=WRITE"));
-
-    // Now try to permit the user to create the schema again
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chmod", "-R", "777", "/user/hive/paimon_catalog_warehouse");
-    Assertions.assertDoesNotThrow(
-        () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
-
-    // Create table
-    NameIdentifier tableNameIdentifier = NameIdentifier.of(SCHEMA_NAME, TABLE_NAME);
-    catalog
-        .asTableCatalog()
-        .createTable(
-            tableNameIdentifier,
-            createColumns(),
-            "",
-            ImmutableMap.of(),
-            Transforms.EMPTY_TRANSFORM,
-            Distributions.NONE,
-            SortOrders.NONE);
-
-    // Load table
-    Table loadTable = catalog.asTableCatalog().loadTable(tableNameIdentifier);
-    Assertions.assertEquals(loadTable.name(), tableNameIdentifier.name());
-
-    // Drop table
-    catalog.asTableCatalog().dropTable(tableNameIdentifier);
-    Assertions.assertThrowsExactly(
-        RuntimeException.class, () -> catalog.asTableCatalog().tableExists(tableNameIdentifier));
-
-    // Drop schema
-    catalog.asSchemas().dropSchema(SCHEMA_NAME, false);
-    Assertions.assertThrowsExactly(
-        RuntimeException.class, () -> catalog.asSchemas().schemaExists(SCHEMA_NAME));
-
-    // Drop catalog
-    Assertions.assertTrue(gravitinoMetalake.dropCatalog(CATALOG_NAME));
-
-    // Drop warehouse path
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-rm", "-r", "/user/hive/paimon_catalog_warehouse");
   }
 
   @Test

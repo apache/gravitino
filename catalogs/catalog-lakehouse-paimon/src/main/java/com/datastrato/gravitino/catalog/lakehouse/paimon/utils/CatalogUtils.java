@@ -27,7 +27,6 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY
 import com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonCatalogBackend;
 import com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonConfig;
 import com.datastrato.gravitino.catalog.lakehouse.paimon.authentication.AuthenticationConfig;
-import com.datastrato.gravitino.catalog.lakehouse.paimon.authentication.kerberos.FilesystemBackendProxy;
 import com.datastrato.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosClient;
 import com.google.common.base.Preconditions;
 import java.io.File;
@@ -40,7 +39,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.CatalogContext;
 import org.apache.paimon.catalog.CatalogFactory;
-import org.apache.paimon.catalog.FileSystemCatalog;
 import org.apache.paimon.options.Options;
 
 /** Utilities of {@link Catalog} to support catalog management. */
@@ -85,16 +83,8 @@ public class CatalogUtils {
 
       switch (PaimonCatalogBackend.valueOf(metastore.toUpperCase(Locale.ROOT))) {
         case FILESYSTEM:
-          String realm = initKerberosAndReturnRealm(allConfig, configuration);
-          Catalog catalog = CatalogFactory.createCatalog(catalogContext);
-          if (authenticationConfig.isImpersonationEnabled()) {
-            FilesystemBackendProxy proxyFilesystemCatalog =
-                new FilesystemBackendProxy((FileSystemCatalog) catalog, catalogContext, realm);
-            return proxyFilesystemCatalog.getProxy();
-          }
-          return catalog;
-
-          // TODO: support hive backend
+          initKerberosAndReturnRealm(allConfig, configuration);
+          return CatalogFactory.createCatalog(catalogContext);
 
         default:
           throw new IllegalArgumentException(

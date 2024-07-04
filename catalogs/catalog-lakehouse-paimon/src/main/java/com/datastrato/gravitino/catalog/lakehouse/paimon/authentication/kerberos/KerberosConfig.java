@@ -37,8 +37,6 @@ public class KerberosConfig extends AuthenticationConfig {
   public static final String FETCH_TIMEOUT_SEC_KEY =
       "authentication.kerberos.keytab-fetch-timeout-sec";
 
-  public static final boolean DEFAULT_IMPERSONATION_ENABLE = false;
-
   public static final ConfigEntry<String> PRINCIPAL_ENTRY =
       new ConfigBuilder(PRINCIPAL_KEY)
           .doc("The principal of the Kerberos connection")
