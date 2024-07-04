@@ -85,6 +85,7 @@ tasks.withType<ShadowJar>(ShadowJar::class.java) {
   exclude("NOTICE")
 
   minimize()
+  relocate("com.datastrato.gravitino.catalog.lakehouse.iceberg", "com.datastrato.gravitino.shaded.bundled.catalog.lakehouse.iceberg")
 }
 
 tasks.jar {

@@ -20,8 +20,8 @@
 package com.datastrato.gravitino.trino.connector.catalog.iceberg;
 
 import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata;
 import com.datastrato.gravitino.catalog.property.PropertyConverter;
+import com.datastrato.gravitino.shaded.bundled.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
 import com.datastrato.gravitino.trino.connector.metadata.TestGravitinoCatalog;
 import com.google.common.collect.ImmutableMap;

@@ -19,13 +19,13 @@
 
 package com.datastrato.gravitino.trino.connector.catalog.iceberg;
 
-import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata.LOCATION;
+import static com.datastrato.gravitino.shaded.bundled.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata.LOCATION;
 import static com.datastrato.gravitino.trino.connector.catalog.iceberg.IcebergPropertyMeta.ICEBERG_LOCATION_PROPERTY;
 
-import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata;
 import com.datastrato.gravitino.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.connector.BasePropertiesMetadata;
 import com.datastrato.gravitino.connector.PropertyEntry;
+import com.datastrato.gravitino.shaded.bundled.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
