@@ -58,7 +58,7 @@ public class EntityStoreFactory {
 
     if (KV_STORE_KEY.equals(name)) {
       throw new UnsupportedOperationException(
-          "KvEntityStore is not supported since this version. Please use RelationalEntityStore instead.");
+          "KvEntityStore is not supported since version 0.6.0. Please use RelationalEntityStore instead.");
     }
 
     try {

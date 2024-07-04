@@ -108,8 +108,6 @@ public class TestGravitinoPaimonTable {
       Files.delete(Paths.get(warehousePath));
     } catch (Exception e) {
       // Ignore
-
-      System.out.println(e);
     }
   }
 

@@ -188,7 +188,6 @@ public class TestHadoopCatalogOperations {
         .delete(new Path(TEST_ROOT_PATH), true);
 
     File f = FileUtils.getFile(H2_file);
-    System.gc();
     f.delete();
   }
 

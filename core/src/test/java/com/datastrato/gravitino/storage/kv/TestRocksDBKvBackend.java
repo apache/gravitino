@@ -30,11 +30,13 @@ import java.nio.file.Files;
 import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 
+@Disabled("Gravitino will not support KV entity store since 0.6.0, so we disable this test.")
 public class TestRocksDBKvBackend {
 
   private KvBackend getKvBackEnd() throws IOException {

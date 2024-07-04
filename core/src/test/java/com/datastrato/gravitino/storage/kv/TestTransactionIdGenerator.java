@@ -42,6 +42,7 @@ import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@Disabled("Gravitino will not support KV entity store since 0.6.0, so we disable this test.")
 public class TestTransactionIdGenerator {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TestTransactionalKvBackend.class);

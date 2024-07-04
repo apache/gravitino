@@ -56,7 +56,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
 @TestInstance(Lifecycle.PER_CLASS)
-@Disabled
+@Disabled("Gravitino will not support KV entity store since 0.6.0, so we disable this test.")
 public class TestEntityKeyEncoding {
   private Config getConfig() throws IOException {
     File baseDir = new File(System.getProperty("java.io.tmpdir"));
