@@ -36,7 +36,7 @@ HADOOP_DIR_NAME = f"hadoop-{HADOOP_VERSION}"
 HADOOP_DOWNLOAD_URL = f"https://archive.apache.org/dist/hadoop/core/hadoop-{HADOOP_VERSION}/{HADOOP_PACK_NAME}"
 LOCAL_BASE_DIR = "/tmp/gravitino"
 LOCAL_HADOOP_DIR = f"{LOCAL_BASE_DIR}/python_its/hadoop"
-LOCAL_DOWNLOAD_TEMP_DIR = f"{LOCAL_HADOOP_DIR}/" + str(randint(1, 10000))
+LOCAL_DOWNLOAD_TEMP_DIR = f"{LOCAL_BASE_DIR}/python_its/" + str(randint(1, 10000))
 
 
 class BaseHadoopEnvironment:
@@ -71,7 +71,7 @@ class BaseHadoopEnvironment:
         # unzip the pack
         try:
             with tarfile.open(local_tar_path) as tar:
-                tar.extractall(path=LOCAL_DOWNLOAD_TEMP_DIR)
+                tar.extractall(path=f"{LOCAL_DOWNLOAD_TEMP_DIR}/{HADOOP_DIR_NAME}")
         except Exception as e:
             raise GravitinoRuntimeException(
                 f"Failed to extract file '{local_tar_path}': {e}"

@@ -194,27 +194,27 @@ class IntegrationTestEnv(unittest.TestCase):
             )
         filtered_lines = []
         with open(hadoop_conf_path, mode="r", encoding="utf-8") as file:
-            lines = file.readlines()
+            origin_lines = file.readlines()
 
         existed_config = {}
-        for line in lines:
+        for line in origin_lines:
             line = line.strip()
             if line.startswith("#"):
                 # append annotations directly
-                filtered_lines.append(line)
+                filtered_lines.append(line + "\n")
             else:
                 try:
                     key, value = line.split("=")
                     existed_config[key.strip()] = value.strip()
                 except ValueError:
                     # cannot split to key, value, so just append
-                    filtered_lines.append(lines)
+                    filtered_lines.append(line + "\n")
 
         for key, value in existed_config.items():
             if config[key] is None:
-                append_line = f"{key} = {value}"
+                append_line = f"{key} = {value}\n"
                 filtered_lines.append(append_line)
 
         with open(hadoop_conf_path, mode="w", encoding="utf-8") as file:
             for line in filtered_lines:
-                file.write(line + "\n")
+                file.write(line)

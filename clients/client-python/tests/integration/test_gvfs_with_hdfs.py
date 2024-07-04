@@ -91,16 +91,16 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
     @classmethod
     def setUpClass(cls):
         cls.hdfs_container = HDFSContainer()
-        # append the hadoop conf to server
         hdfs_container_ip = cls.hdfs_container.get_ip()
+        # init hadoop env
+        BaseHadoopEnvironment.init_hadoop_env()
         cls.config = {
             "gravitino.bypass.fs.defaultFS": f"hdfs://{hdfs_container_ip}:9000"
         }
+        # append the hadoop conf to server
         cls._append_catalog_hadoop_conf(cls.config)
         # restart the server
         cls.restart_server()
-        # init hadoop env
-        BaseHadoopEnvironment.init_hadoop_env()
         # create entity
         cls._init_test_entities()
 
