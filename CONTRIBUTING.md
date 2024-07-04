@@ -281,7 +281,7 @@ All text files should use macOS/unix style line endings (LF) not windows style l
 
 ## Community and communication
 
-Join the [community discourse group](https://gravitino.discourse.group) to discuss ideas and seek help. You are also encouraged to use GitHub discussions and follow Datastrato on social media to stay updated on project news.
+Join the [community mailing list](https://lists.apache.org/list.html?dev@gravitino.apache.org) to discuss ideas and seek help and are also encouraged to use GitHub discussions.
 
 ## License
 
