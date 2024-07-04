@@ -126,7 +126,7 @@ public abstract class FlinkEnvIT extends AbstractIT {
     }
   }
 
-  protected static void initFlinkEnv() {
+  private static void initFlinkEnv() {
     final Configuration configuration = new Configuration();
     configuration.setString(
         "table.catalog-store.kind", GravitinoCatalogStoreFactoryOptions.GRAVITINO);
