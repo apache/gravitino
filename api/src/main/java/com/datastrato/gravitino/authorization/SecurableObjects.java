@@ -20,11 +20,9 @@ package com.datastrato.gravitino.authorization;
 
 import com.datastrato.gravitino.MetadataObject;
 import com.datastrato.gravitino.MetadataObjects;
-import com.datastrato.gravitino.Namespace;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -33,19 +31,6 @@ import java.util.stream.Collectors;
 public class SecurableObjects {
 
   private static final Splitter DOT_SPLITTER = Splitter.on('.');
-
-  /**
-   * Create the securable object {@link SecurableObject} with the given object namespace.
-   *
-   * @param type The type of the object
-   * @param namespace The object
-   * @param privileges The privileges of the securable object
-   * @return The created securable object {@link SecurableObject}
-   */
-  public static SecurableObject ofNamespace(
-      MetadataObject.Type type, Namespace namespace, List<Privilege> privileges) {
-    return of(type, Arrays.asList(namespace.levels()), privileges);
-  }
 
   /**
    * Create the metalake {@link SecurableObject} with the given metalake name.
