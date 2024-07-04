@@ -215,6 +215,8 @@ Changelog
 You can use this image to test Apache Doris.
 
 Changelog
+- gravitino-ci-doris:0.1.5
+  - Remove the chmod command in the Dockerfile to decrease the size of the Docker image.
 
 - gravitino-ci-doris:0.1.4
   - remove chmod in start.sh to accelerate the startup speed
