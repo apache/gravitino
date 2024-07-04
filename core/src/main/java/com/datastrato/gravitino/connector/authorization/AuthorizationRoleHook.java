@@ -26,7 +26,7 @@ import java.util.List;
 /** Interface for authorization Role hooks operation of the underlying access control system */
 public interface AuthorizationRoleHook {
   /**
-   * Creates a new Role into underlying access control system.
+   * Creates a new Role into the underlying access control system.
    *
    * @param role The entity of the Role.
    * @param securableObjects The securable objects of the Role.
@@ -36,7 +36,7 @@ public interface AuthorizationRoleHook {
   Boolean onCreateRole(Role role, List<SecurableObject> securableObjects) throws RuntimeException;
 
   /**
-   * Check a Role if exist in the underlying access control system.
+   * Check a Role if exists in the underlying access control system.
    *
    * @param role The name of the Role.
    * @return IF exist return true, else return false.
@@ -46,7 +46,7 @@ public interface AuthorizationRoleHook {
   Boolean onCheckRole(String role) throws RuntimeException;
 
   /**
-   * Deletes a Role from underlying access control system.
+   * Deletes a Role from the underlying access control system.
    *
    * @param role The entity of the Role.
    * @return True if the Role was successfully deleted, false only when there's no such role
@@ -59,7 +59,7 @@ public interface AuthorizationRoleHook {
    *
    * @param role The entity of the Role.
    * @param changes role changes apply to the role.
-   * @return True if the update operation success; False if the update operation failed.
+   * @return True if the update operation is successful; False if the update operation fails.
    * @throws RuntimeException If update role encounters storage issues.
    */
   Boolean onUpdateRole(Role role, RoleChange... changes) throws RuntimeException;
