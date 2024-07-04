@@ -245,7 +245,7 @@ http://localhost:8090/api/metalakes/metalake/catalogs?details=true
 ```java
 // ...
 // Assuming you have just created a metalake named `metalake`
-Catalog[] catalogsInfos = gravitinoMetaLake.listCatalogsInfo(Namespace.ofCatalog("metalake"));
+Catalog[] catalogsInfos = gravitinoMetalake.listCatalogsInfo(Namespace.ofCatalog("metalake"));
 // ...
 ```
 
