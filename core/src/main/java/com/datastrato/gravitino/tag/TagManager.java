@@ -28,6 +28,8 @@ import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.exceptions.NoSuchTagException;
 import com.datastrato.gravitino.exceptions.TagAlreadyExistsException;
+import com.datastrato.gravitino.lock.LockType;
+import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.TagEntity;
 import com.datastrato.gravitino.storage.IdGenerator;
@@ -64,17 +66,22 @@ public class TagManager {
   }
 
   public String[] listTags(String metalake) {
-    checkMetalakeExists(metalake, entityStore);
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(ofTagNamespace(metalake).levels()),
+        LockType.READ,
+        () -> {
+          checkMetalakeExists(metalake, entityStore);
 
-    try {
-      return entityStore.list(ofTagNamespace(metalake), TagEntity.class, Entity.EntityType.TAG)
-          .stream()
-          .map(TagEntity::name)
-          .toArray(String[]::new);
-    } catch (IOException ioe) {
-      LOG.error("Failed to list tags", ioe);
-      throw new RuntimeException(ioe);
-    }
+          try {
+            return entityStore
+                .list(ofTagNamespace(metalake), TagEntity.class, Entity.EntityType.TAG).stream()
+                .map(TagEntity::name)
+                .toArray(String[]::new);
+          } catch (IOException ioe) {
+            LOG.error("Failed to list tags", ioe);
+            throw new RuntimeException(ioe);
+          }
+        });
   }
 
   public MetadataObject[] listAssociatedMetadataObjectsForTag(String metalake, String name) {
@@ -84,79 +91,101 @@ public class TagManager {
   public Tag createTag(String metalake, String name, String comment, Map<String, String> properties)
       throws TagAlreadyExistsException {
     Map<String, String> tagProperties = properties == null ? Collections.emptyMap() : properties;
-    checkMetalakeExists(metalake, entityStore);
 
-    TagEntity tagEntity =
-        TagEntity.builder()
-            .withId(idGenerator.nextId())
-            .withName(name)
-            .withNamespace(ofTagNamespace(metalake))
-            .withComment(comment)
-            .withProperties(tagProperties)
-            .withAuditInfo(
-                AuditInfo.builder()
-                    .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
-                    .withCreateTime(Instant.now())
-                    .build())
-            .build();
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(ofTagNamespace(metalake).levels()),
+        LockType.WRITE,
+        () -> {
+          checkMetalakeExists(metalake, entityStore);
 
-    try {
-      entityStore.put(tagEntity, false /* overwritten */);
-      return tagEntity;
-    } catch (EntityAlreadyExistsException e) {
-      throw new TagAlreadyExistsException(
-          "Tag with name %s under metalake %s already exists", name, metalake);
-    } catch (IOException ioe) {
-      LOG.error("Failed to create tag", ioe);
-      throw new RuntimeException(ioe);
-    }
+          TagEntity tagEntity =
+              TagEntity.builder()
+                  .withId(idGenerator.nextId())
+                  .withName(name)
+                  .withNamespace(ofTagNamespace(metalake))
+                  .withComment(comment)
+                  .withProperties(tagProperties)
+                  .withAuditInfo(
+                      AuditInfo.builder()
+                          .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+                          .withCreateTime(Instant.now())
+                          .build())
+                  .build();
+
+          try {
+            entityStore.put(tagEntity, false /* overwritten */);
+            return tagEntity;
+          } catch (EntityAlreadyExistsException e) {
+            throw new TagAlreadyExistsException(
+                "Tag with name %s under metalake %s already exists", name, metalake);
+          } catch (IOException ioe) {
+            LOG.error("Failed to create tag", ioe);
+            throw new RuntimeException(ioe);
+          }
+        });
   }
 
   public Tag getTag(String metalake, String name) throws NoSuchTagException {
-    checkMetalakeExists(metalake, entityStore);
+    return TreeLockUtils.doWithTreeLock(
+        ofTagIdent(metalake, name),
+        LockType.READ,
+        () -> {
+          checkMetalakeExists(metalake, entityStore);
 
-    try {
-      return entityStore.get(ofTagIdent(metalake, name), Entity.EntityType.TAG, TagEntity.class);
-    } catch (NoSuchEntityException e) {
-      throw new NoSuchTagException(
-          "Tag with name %s under metalake %s does not exist", name, metalake);
-    } catch (IOException ioe) {
-      LOG.error("Failed to get tag", ioe);
-      throw new RuntimeException(ioe);
-    }
+          try {
+            return entityStore.get(
+                ofTagIdent(metalake, name), Entity.EntityType.TAG, TagEntity.class);
+          } catch (NoSuchEntityException e) {
+            throw new NoSuchTagException(
+                "Tag with name %s under metalake %s does not exist", name, metalake);
+          } catch (IOException ioe) {
+            LOG.error("Failed to get tag", ioe);
+            throw new RuntimeException(ioe);
+          }
+        });
   }
 
   public Tag alterTag(String metalake, String name, TagChange... changes)
       throws NoSuchTagException, IllegalArgumentException {
-    checkMetalakeExists(metalake, entityStore);
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(ofTagNamespace(metalake).levels()),
+        LockType.WRITE,
+        () -> {
+          checkMetalakeExists(metalake, entityStore);
 
-    try {
-      return entityStore.update(
-          ofTagIdent(metalake, name),
-          TagEntity.class,
-          Entity.EntityType.TAG,
-          tagEntity -> updateTagEntity(tagEntity, changes));
-    } catch (NoSuchEntityException e) {
-      throw new NoSuchTagException(
-          "Tag with name %s under metalake %s does not exist", name, metalake);
-    } catch (EntityAlreadyExistsException e) {
-      throw new RuntimeException(
-          "Tag with name " + name + " under metalake " + metalake + " already exists");
-    } catch (IOException ioe) {
-      LOG.error("Failed to alter tag", ioe);
-      throw new RuntimeException(ioe);
-    }
+          try {
+            return entityStore.update(
+                ofTagIdent(metalake, name),
+                TagEntity.class,
+                Entity.EntityType.TAG,
+                tagEntity -> updateTagEntity(tagEntity, changes));
+          } catch (NoSuchEntityException e) {
+            throw new NoSuchTagException(
+                "Tag with name %s under metalake %s does not exist", name, metalake);
+          } catch (EntityAlreadyExistsException e) {
+            throw new RuntimeException(
+                "Tag with name " + name + " under metalake " + metalake + " already exists");
+          } catch (IOException ioe) {
+            LOG.error("Failed to alter tag", ioe);
+            throw new RuntimeException(ioe);
+          }
+        });
   }
 
   public boolean deleteTag(String metalake, String name) {
-    checkMetalakeExists(metalake, entityStore);
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(ofTagNamespace(metalake).levels()),
+        LockType.WRITE,
+        () -> {
+          checkMetalakeExists(metalake, entityStore);
 
-    try {
-      return entityStore.delete(ofTagIdent(metalake, name), Entity.EntityType.TAG);
-    } catch (IOException ioe) {
-      LOG.error("Failed to delete tag", ioe);
-      throw new RuntimeException(ioe);
-    }
+          try {
+            return entityStore.delete(ofTagIdent(metalake, name), Entity.EntityType.TAG);
+          } catch (IOException ioe) {
+            LOG.error("Failed to delete tag", ioe);
+            throw new RuntimeException(ioe);
+          }
+        });
   }
 
   public String[] listTagsForMetadataObject(String metalake, MetadataObject metadataObject) {

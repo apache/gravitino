@@ -26,14 +26,19 @@ import static com.datastrato.gravitino.Configs.ENTITY_STORE;
 import static com.datastrato.gravitino.Configs.RELATIONAL_ENTITY_STORE;
 import static com.datastrato.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static com.datastrato.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
+import static com.datastrato.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
+import static com.datastrato.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
+import static com.datastrato.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static com.datastrato.gravitino.Configs.VERSION_RETENTION_COUNT;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.EntityStoreFactory;
+import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.exceptions.NoSuchTagException;
 import com.datastrato.gravitino.exceptions.TagAlreadyExistsException;
+import com.datastrato.gravitino.lock.LockManager;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.SchemaVersion;
@@ -50,6 +55,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -74,7 +80,7 @@ public class TestTagManager {
   private static TagManager tagManager;
 
   @BeforeAll
-  public static void setUp() throws IOException {
+  public static void setUp() throws IOException, IllegalAccessException {
     idGenerator = new RandomIdGenerator();
 
     File dbDir = new File(DB_DIR);
@@ -88,6 +94,11 @@ public class TestTagManager {
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
     Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
+
+    Mockito.doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
+    Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
+    Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
 
     entityStore = EntityStoreFactory.createEntityStore(config);
     entityStore.initialize(config);

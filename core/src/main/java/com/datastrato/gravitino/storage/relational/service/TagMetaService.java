@@ -34,7 +34,6 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -67,24 +66,21 @@ public class TagMetaService {
   public void insertTag(TagEntity tagEntity, boolean overwritten) throws IOException {
     Namespace ns = tagEntity.namespace();
     String metalakeName = ns.level(0);
-    AtomicReference<Long> metalakeId = new AtomicReference<>(null);
 
     try {
-      SessionUtils.doMultipleWithCommit(
-          () -> metalakeId.set(MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName)),
-          () -> {
-            TagPO.Builder builder = TagPO.builder().withMetalakeId(metalakeId.get());
-            TagPO tagPO = POConverters.initializeTagPOWithVersion(tagEntity, builder);
+      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
 
-            SessionUtils.doWithoutCommit(
-                TagMetaMapper.class,
-                mapper -> {
-                  if (overwritten) {
-                    mapper.insertTagMetaOnDuplicateKeyUpdate(tagPO);
-                  } else {
-                    mapper.insertTagMeta(tagPO);
-                  }
-                });
+      TagPO.Builder builder = TagPO.builder().withMetalakeId(metalakeId);
+      TagPO tagPO = POConverters.initializeTagPOWithVersion(tagEntity, builder);
+
+      SessionUtils.doWithCommit(
+          TagMetaMapper.class,
+          mapper -> {
+            if (overwritten) {
+              mapper.insertTagMetaOnDuplicateKeyUpdate(tagPO);
+            } else {
+              mapper.insertTagMeta(tagPO);
+            }
           });
     } catch (RuntimeException e) {
       ExceptionUtils.checkSQLException(e, Entity.EntityType.TAG, tagEntity.toString());
@@ -96,40 +92,33 @@ public class TagMetaService {
       NameIdentifier ident, Function<E, E> updater) throws IOException {
     String metalakeName = ident.namespace().level(0);
 
-    AtomicReference<TagPO> tagPO = new AtomicReference<>(null);
-    AtomicReference<Integer> result = new AtomicReference<>(null);
-    AtomicReference<TagEntity> updatedTagEntity = new AtomicReference<>(null);
     try {
-      SessionUtils.doMultipleWithCommit(
-          () -> tagPO.set(getTagPOByMetalakeAndName(metalakeName, ident.name())),
-          () -> {
-            TagEntity oldTagEntity = POConverters.fromTagPO(tagPO.get(), ident.namespace());
-            updatedTagEntity.set((TagEntity) updater.apply((E) oldTagEntity));
-            Preconditions.checkArgument(
-                Objects.equals(oldTagEntity.id(), updatedTagEntity.get().id()),
-                "The updated tag entity id: %s must have the same id as the old entity id %s",
-                updatedTagEntity.get().id(),
-                oldTagEntity.id());
+      TagPO tagPO = getTagPOByMetalakeAndName(metalakeName, ident.name());
+      TagEntity oldTagEntity = POConverters.fromTagPO(tagPO, ident.namespace());
+      TagEntity updatedTagEntity = (TagEntity) updater.apply((E) oldTagEntity);
+      Preconditions.checkArgument(
+          Objects.equals(oldTagEntity.id(), updatedTagEntity.id()),
+          "The updated tag entity id: %s must have the same id as the old entity id %s",
+          updatedTagEntity.id(),
+          oldTagEntity.id());
 
-            result.set(
-                SessionUtils.doWithoutCommitAndFetchResult(
-                    TagMetaMapper.class,
-                    mapper ->
-                        mapper.updateTagMeta(
-                            POConverters.updateTagPOWithVersion(
-                                tagPO.get(), updatedTagEntity.get()),
-                            tagPO.get())));
-          });
+      Integer result =
+          SessionUtils.doWithCommitAndFetchResult(
+              TagMetaMapper.class,
+              mapper ->
+                  mapper.updateTagMeta(
+                      POConverters.updateTagPOWithVersion(tagPO, updatedTagEntity), tagPO));
+
+      if (result == null || result == 0) {
+        throw new IOException("Failed to update the entity: " + ident);
+      }
+
+      return updatedTagEntity;
+
     } catch (RuntimeException e) {
       ExceptionUtils.checkSQLException(e, Entity.EntityType.TAG, ident.toString());
       throw e;
     }
-
-    if (result.get() == null || result.get() == 0) {
-      throw new IOException("Failed to update the entity: " + ident);
-    }
-
-    return updatedTagEntity.get();
   }
 
   public boolean deleteTag(NameIdentifier ident) {
