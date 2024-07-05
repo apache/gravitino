@@ -21,6 +21,7 @@ package com.datastrato.gravitino.catalog.lakehouse.paimon.ops;
 import static com.datastrato.gravitino.catalog.lakehouse.paimon.utils.CatalogUtils.loadCatalogBackend;
 
 import com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonConfig;
+import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
 import org.apache.paimon.catalog.Catalog;
@@ -35,16 +36,21 @@ import org.apache.paimon.table.Table;
 /** Table operation proxy that handles table operations of an underlying Paimon catalog. */
 public class PaimonCatalogOps implements AutoCloseable {
 
+  private final PaimonBackendCatalogWrapper paimonBackendCatalogWrapper;
   protected Catalog catalog;
 
   public PaimonCatalogOps(PaimonConfig paimonConfig) {
-    catalog = loadCatalogBackend(paimonConfig);
+    paimonBackendCatalogWrapper = loadCatalogBackend(paimonConfig);
+    Preconditions.checkArgument(
+        paimonBackendCatalogWrapper.getCatalog() != null,
+        "Can not load Paimon backend catalog instance.");
+    catalog = paimonBackendCatalogWrapper.getCatalog();
   }
 
   @Override
   public void close() throws Exception {
-    if (catalog != null) {
-      catalog.close();
+    if (paimonBackendCatalogWrapper != null) {
+      paimonBackendCatalogWrapper.close();
     }
   }
 

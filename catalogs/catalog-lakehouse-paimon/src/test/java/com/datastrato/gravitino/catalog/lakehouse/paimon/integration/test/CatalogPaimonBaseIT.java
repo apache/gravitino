@@ -26,6 +26,7 @@ import com.datastrato.gravitino.SchemaChange;
 import com.datastrato.gravitino.SupportsSchemas;
 import com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
 import com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonConfig;
+import com.datastrato.gravitino.catalog.lakehouse.paimon.ops.PaimonBackendCatalogWrapper;
 import com.datastrato.gravitino.catalog.lakehouse.paimon.utils.CatalogUtils;
 import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.dto.util.DTOConverters;
@@ -525,7 +526,9 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(type), "Paimon Catalog backend type can not be null or empty.");
     catalogProperties.put(PaimonCatalogPropertiesMetadata.PAIMON_METASTORE, type);
-    paimonCatalog = CatalogUtils.loadCatalogBackend(new PaimonConfig(catalogProperties));
+    PaimonBackendCatalogWrapper paimonBackendCatalogWrapper =
+        CatalogUtils.loadCatalogBackend(new PaimonConfig(catalogProperties));
+    paimonCatalog = paimonBackendCatalogWrapper.getCatalog();
   }
 
   private void createSchema() {

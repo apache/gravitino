@@ -53,17 +53,18 @@ public class TestCatalogUtils {
   private void assertCatalog(String metastore, Consumer<Catalog> consumer) throws Exception {
     try (Catalog catalog =
         loadCatalogBackend(
-            new PaimonConfig(
-                ImmutableMap.of(
-                    PaimonConfig.CATALOG_BACKEND.getKey(),
-                    metastore,
-                    PaimonConfig.CATALOG_WAREHOUSE.getKey(),
-                    String.join(
-                        File.separator,
-                        System.getProperty("java.io.tmpdir"),
-                        "paimon_catalog_warehouse"),
-                    PaimonConfig.CATALOG_URI.getKey(),
-                    "uri")))) {
+                new PaimonConfig(
+                    ImmutableMap.of(
+                        PaimonConfig.CATALOG_BACKEND.getKey(),
+                        metastore,
+                        PaimonConfig.CATALOG_WAREHOUSE.getKey(),
+                        String.join(
+                            File.separator,
+                            System.getProperty("java.io.tmpdir"),
+                            "paimon_catalog_warehouse"),
+                        PaimonConfig.CATALOG_URI.getKey(),
+                        "uri")))
+            .getCatalog()) {
       consumer.accept(catalog);
     }
   }

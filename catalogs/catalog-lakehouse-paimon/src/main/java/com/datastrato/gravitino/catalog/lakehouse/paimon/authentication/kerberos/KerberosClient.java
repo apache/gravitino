@@ -19,23 +19,21 @@
 package com.datastrato.gravitino.catalog.lakehouse.paimon.authentication.kerberos;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Splitter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class KerberosClient {
+public class KerberosClient implements Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(KerberosClient.class);
 
   public static final String GRAVITINO_KEYTAB_FORMAT =
@@ -51,17 +49,17 @@ public class KerberosClient {
     this.checkTgtExecutor = new ScheduledThreadPoolExecutor(1, getThreadFactory("check-tgt"));
   }
 
-  public String login(String keytabFilePath) throws IOException {
+  /**
+   * performing kerberos authentication based on the keytab file.
+   *
+   * @param keytabFilePath local keytab file path
+   * @throws IOException
+   */
+  public void login(String keytabFilePath) throws IOException {
     KerberosConfig kerberosConfig = new KerberosConfig(conf);
 
     // Check the principal and keytab file
     String catalogPrincipal = kerberosConfig.getPrincipalName();
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(catalogPrincipal), "The principal can't be blank");
-    @SuppressWarnings("null")
-    List<String> principalComponents = Splitter.on('@').splitToList(catalogPrincipal);
-    Preconditions.checkArgument(
-        principalComponents.size() == 2, "The principal has the wrong format");
 
     // Login
     UserGroupInformation.setConfiguration(hadoopConf);
@@ -82,8 +80,6 @@ public class KerberosClient {
         checkInterval,
         checkInterval,
         TimeUnit.SECONDS);
-
-    return principalComponents.get(1);
   }
 
   public File saveKeyTabFileFromUri(String catalogId) throws IOException {
@@ -91,7 +87,6 @@ public class KerberosClient {
     KerberosConfig kerberosConfig = new KerberosConfig(conf);
 
     String keyTabUri = kerberosConfig.getKeytab();
-    Preconditions.checkArgument(StringUtils.isNotBlank(keyTabUri), "Keytab uri can't be blank");
     // TODO: Support to download the file from Kerberos HDFS
     Preconditions.checkArgument(
         !keyTabUri.trim().startsWith("hdfs"), "Keytab uri doesn't support to use HDFS");
@@ -118,5 +113,12 @@ public class KerberosClient {
 
   private static ThreadFactory getThreadFactory(String factoryName) {
     return new ThreadFactoryBuilder().setDaemon(true).setNameFormat(factoryName + "-%d").build();
+  }
+
+  @Override
+  public void close() {
+    if (checkTgtExecutor != null) {
+      checkTgtExecutor.shutdown();
+    }
   }
 }
