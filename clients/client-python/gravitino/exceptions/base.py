@@ -17,14 +17,59 @@ specific language governing permissions and limitations
 under the License.
 """
 
+
 class GravitinoRuntimeException(RuntimeError):
     """Base class for all Gravitino runtime exceptions."""
 
     def __init__(self, message, *args):
         super().__init__(message % args)
 
+
+class RESTException(RuntimeError):
+    """An exception thrown when a REST request fails."""
+
+    def __init__(self, message, *args):
+        super().__init__(message % args)
+
+
+class IllegalArugmentException(ValueError):
+    """Base class for all exceptions thrown when arguments are invalid."""
+
+    def __init__(self, message, *args):
+        super().__init__(message % args)
+
+
+class IllegalNameIdentifierException(IllegalArugmentException):
+    """An exception thrown when a name identifier is invalid."""
+
+
+class IllegalNamespaceException(IllegalArugmentException):
+    """An exception thrown when a namespace is invalid."""
+
+
+class InternalError(GravitinoRuntimeException):
+    """Base class for all exceptions thrown internally"""
+
+
 class NotFoundException(GravitinoRuntimeException):
     """Base class for all exceptions thrown when a resource is not found."""
 
+
 class NoSuchMetalakeException(NotFoundException):
     """An exception thrown when a metalake is not found."""
+
+
+class AlreadyExistException(GravitinoRuntimeException):
+    """Base exception thrown when an entity or resource already exists."""
+
+
+class NotEmptyException(GravitinoRuntimeException):
+    """Base class for all exceptions thrown when a resource is not empty."""
+
+
+class UnsupportedOperationException(GravitinoRuntimeException):
+    """Base class for all exceptions thrown when an operation is unsupported"""
+
+
+class UnknownError(RuntimeError):
+    """An exception thrown when other unknown exception is thrown"""

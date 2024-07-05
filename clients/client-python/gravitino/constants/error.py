@@ -19,6 +19,17 @@ under the License.
 
 from enum import IntEnum
 
+from gravitino.exceptions.base import (
+    RESTException,
+    IllegalArugmentException,
+    NotFoundException,
+    InternalError,
+    AlreadyExistException,
+    NotEmptyException,
+    UnsupportedOperationException,
+)
+
+
 class ErrorConstants(IntEnum):
     """Constants representing error codes for responses."""
 
@@ -45,3 +56,14 @@ class ErrorConstants(IntEnum):
 
     # Error codes for invalid state.
     UNKNOWN_ERROR_CODE = 1100
+
+
+EXCEPTION_MAPPING = {
+    RESTException: ErrorConstants.REST_ERROR_CODE,
+    IllegalArugmentException: ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+    InternalError: ErrorConstants.INTERNAL_ERROR_CODE,
+    NotFoundException: ErrorConstants.NOT_FOUND_CODE,
+    AlreadyExistException: ErrorConstants.ALREADY_EXISTS_CODE,
+    NotEmptyException: ErrorConstants.NON_EMPTY_CODE,
+    UnsupportedOperationException: ErrorConstants.UNSUPPORTED_OPERATION_CODE,
+}

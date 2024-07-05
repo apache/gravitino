@@ -40,7 +40,7 @@ class SchemaResponse(BaseResponse, DataClassJsonMixin):
         """Validates the response data.
 
         Raises:
-            IllegalArgumentException if catalog identifiers are not set.
+            AssertionError if catalog identifiers are not set.
         """
         super().validate()
 

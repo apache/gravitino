@@ -36,18 +36,6 @@ from gravitino.utils import HTTPClient
 logger = logging.getLogger(__name__)
 
 
-class NoSuchMetalakeException(Exception):
-    pass
-
-
-class NoSuchCatalogException(Exception):
-    pass
-
-
-class CatalogAlreadyExistsException(Exception):
-    pass
-
-
 class GravitinoMetalake(MetalakeDTO):
     """
     Gravitino Metalake is the top-level metadata repository for users. It contains a list of catalogs

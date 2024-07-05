@@ -26,18 +26,6 @@ from gravitino.client.gravitino_client_base import GravitinoClientBase
 from gravitino.client.gravitino_metalake import GravitinoMetalake
 
 
-class NoSuchMetalakeException(Exception):
-    pass
-
-
-class NoSuchCatalogException(Exception):
-    pass
-
-
-class CatalogAlreadyExistsException(Exception):
-    pass
-
-
 class GravitinoClient(GravitinoClientBase):
     """Gravitino Client for a user to interact with the Gravitino API, allowing the client to list,
     load, create, and alter Catalog.

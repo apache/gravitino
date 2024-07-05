@@ -22,8 +22,9 @@ from dataclasses import dataclass, field
 from dataclasses_json import config
 
 from gravitino.dto.responses.base_response import BaseResponse
-from gravitino.constants.error import ErrorConstants
-from gravitino.exceptions.rest_exception import RESTException
+from gravitino.constants.error import ErrorConstants, EXCEPTION_MAPPING
+from gravitino.exceptions.base import UnknownError
+
 
 @dataclass
 class ErrorResponse(BaseResponse):
@@ -36,32 +37,25 @@ class ErrorResponse(BaseResponse):
     def validate(self):
         super().validate()
 
-        assert self._type is not None and len(self._type) != 0, "type cannot be None or empty"
-        assert self._message is not None and len(self._message) != 0, "message cannot be None or empty"
+        assert (
+            self._type is not None and len(self._type) != 0
+        ), "type cannot be None or empty"
+        assert (
+            self._message is not None and len(self._message) != 0
+        ), "message cannot be None or empty"
 
     def __repr__(self) -> str:
-        return f"ErrorResponse(code={self._code}, type={self._type}, message={self._message})" + ("\n\t" + "\n\t".join(self._stack) if self._stack is not None else "")
+        return (
+            f"ErrorResponse(code={self._code}, type={self._type}, message={self._message})"
+            + ("\n\t" + "\n\t".join(self._stack) if self._stack is not None else "")
+        )
 
     @classmethod
-    def rest_error(cls, message: str) -> "ErrorResponse":
-        """Creates a new rest error instance of ErrorResponse.
+    def generate_error_response(cls, exception: Exception, message: str) -> "ErrorResponse":
+        for exception_type, error_code in EXCEPTION_MAPPING.items():
+            if issubclass(exception, exception_type):
+                return cls(error_code, exception.__name__, message, None)
 
-        Args:
-            message: The message of the error.
-
-        Returns:
-            The new instance.
-        """
-        return cls(ErrorConstants.REST_ERROR_CODE, RESTException.__name__, message, None)
-    
-    @classmethod
-    def illegal_arguments(cls, message: str) -> "ErrorResponse":
-        """Create a new illegal arguments error instance of ErrorResponse.
-
-        Args:
-            message: The message of the error.
-
-        Returns:
-            The new instance.
-        """
-        return cls(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, .__name__, message, None)
+        return cls(
+            ErrorConstants.UNKNOWN_ERROR_CODE, UnknownError.__name__, message, None
+        )
