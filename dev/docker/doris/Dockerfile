@@ -56,8 +56,7 @@ RUN ARCH=$(uname -m) && \
 #################################################################################
 ## add files
 ADD packages/doris-${TARGETARCH}.tar.xz /opt/
-RUN ln -s /opt/apache-doris-${DORIS_VERSION}-bin-* ${DORIS_HOME} && \
-    chmod 755 "${DORIS_BE_HOME}/lib/doris_be"
+RUN ln -s /opt/apache-doris-${DORIS_VERSION}-bin-* ${DORIS_HOME}
 
 COPY start.sh ${DORIS_HOME}
 
