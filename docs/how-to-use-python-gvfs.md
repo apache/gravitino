@@ -74,9 +74,27 @@ pip install gravitino
 ```
 
 2. Configuring the Hadoop environment.
-   You should configure Hadoop environments in the system environment:
+   You should ensure that the Python client has Kerberos authentication information and
+   configure Hadoop environments in the system environment:
 ```shell
-# Configure them in Linux
+# kinit kerberos
+kinit -kt /tmp/xxx.keytab xxx@HADOOP.COM
+# Or you can configure kerberos information in the Hadoop `core-site.xml` file
+<property>
+  <name>hadoop.security.authentication</name>
+  <value>kerberos</value>
+</property>
+
+<property>
+  <name>hadoop.client.kerberos.principal</name>
+  <value>xxx@HADOOP.COM</value>
+</property>
+
+<property>
+  <name>hadoop.client.keytab.file</name>
+  <value>/tmp/xxx.keytab</value>
+</property>
+# Configure Hadoop env in Linux
 export HADOOP_HOME=${YOUR_HADOOP_PATH}
 export HADOOP_CONF_DIR=${YOUR_HADOOP_PATH}/etc/hadoop
 export CLASSPATH=`$HADOOP_HOME/bin/hdfs classpath --glob`
