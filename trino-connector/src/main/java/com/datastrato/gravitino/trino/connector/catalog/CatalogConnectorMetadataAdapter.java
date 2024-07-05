@@ -1,6 +1,20 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.trino.connector.catalog;
 
@@ -56,7 +70,7 @@ public class CatalogConnectorMetadataAdapter {
     return dataTypeTransformer;
   }
 
-  /** Transform gravitino table metadata to trino ConnectorTableMetadata */
+  /** Transform Gravitino table metadata to Trino ConnectorTableMetadata */
   public ConnectorTableMetadata getTableMetadata(GravitinoTable gravitinoTable) {
     SchemaTableName schemaTableName =
         new SchemaTableName(gravitinoTable.getSchemaName(), gravitinoTable.getName());
@@ -73,7 +87,7 @@ public class CatalogConnectorMetadataAdapter {
         Optional.ofNullable(gravitinoTable.getComment()));
   }
 
-  /** Transform trino ConnectorTableMetadata to gravitino table metadata */
+  /** Transform Trino ConnectorTableMetadata to Gravitino table metadata */
   public GravitinoTable createTable(ConnectorTableMetadata tableMetadata) {
     String tableName = tableMetadata.getTableSchema().getTable().getTableName();
     String schemaName = tableMetadata.getTableSchema().getTable().getSchemaName();
@@ -104,12 +118,12 @@ public class CatalogConnectorMetadataAdapter {
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
-  /** Transform trino schema metadata to gravitino schema metadata */
+  /** Transform Trino schema metadata to Gravitino schema metadata */
   public GravitinoSchema createSchema(String schemaName, Map<String, Object> properties) {
     return new GravitinoSchema(schemaName, toGravitinoSchemaProperties(properties), "");
   }
 
-  /** Transform gravitino column metadata to trino ColumnMetadata */
+  /** Transform Gravitino column metadata to Trino ColumnMetadata */
   public ColumnMetadata getColumnMetadata(GravitinoColumn column) {
     return ColumnMetadata.builder()
         .setName(column.getName())
@@ -121,15 +135,15 @@ public class CatalogConnectorMetadataAdapter {
         .build();
   }
 
-  /** Transform gravitino table properties to trino ConnectorTableProperties */
+  /** Transform Gravitino table properties to Trino ConnectorTableProperties */
   public ConnectorTableProperties getTableProperties(GravitinoTable table) {
     throw new NotImplementedException();
   }
 
-  /** Normalize gravitino attributes for trino */
+  /** Normalize Gravitino attributes for Trino */
   private Map<String, Object> normalizeProperties(
       Map<String, String> properties, List<PropertyMetadata<?>> propertyTemplate) {
-    // TODO yuhui redo this function once gravitino table properties are supported..
+    // TODO yuhui redo this function once Gravitino table properties are supported..
     // Trino only supports properties defined in the propertyTemplate.
     Map<String, Object> validProperties = new HashMap<>();
     for (PropertyMetadata<?> propertyMetadata : propertyTemplate) {
@@ -137,33 +151,33 @@ public class CatalogConnectorMetadataAdapter {
       if (properties.containsKey(name)) {
         validProperties.put(name, properties.get(name));
       } else {
-        LOG.warn("Property {} is not defined in trino, we will ignore it", name);
+        LOG.warn("Property {} is not defined in Trino, we will ignore it", name);
       }
     }
     return validProperties;
   }
 
-  /** Normalize gravitino table attributes for trino */
+  /** Normalize Gravitino table attributes for Trino */
   public Map<String, Object> toTrinoTableProperties(Map<String, String> properties) {
     return normalizeProperties(properties, tableProperties);
   }
 
-  /** Normalize gravitino schema attributes for trino */
+  /** Normalize Gravitino schema attributes for Trino */
   public Map<String, Object> toTrinoSchemaProperties(Map<String, String> properties) {
     return normalizeProperties(properties, schemaProperties);
   }
 
-  /** Normalize trino table attributes for gravitino */
+  /** Normalize Trino table attributes for Gravitino */
   public Map<String, String> toGravitinoTableProperties(Map<String, Object> properties) {
     return removeUnsetProperties(properties);
   }
 
-  /** Normalize trino schema attributes for gravitino */
+  /** Normalize Trino schema attributes for Gravitino */
   public Map<String, String> toGravitinoSchemaProperties(Map<String, Object> properties) {
     return removeUnsetProperties(properties);
   }
 
-  /** Remove trino unset attributes fro gravitino */
+  /** Remove Trino unset attributes for Gravitino */
   private Map<String, String> removeUnsetProperties(Map<String, Object> properties) {
     return properties.entrySet().stream()
         .filter(e -> e.getValue() != null)

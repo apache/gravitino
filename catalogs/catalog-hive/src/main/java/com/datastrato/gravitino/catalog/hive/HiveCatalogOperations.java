@@ -1,6 +1,20 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.catalog.hive;
 
@@ -85,7 +99,7 @@ import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Operations for interacting with the Hive catalog in Gravitino. */
+/** Operations for interacting with an Apache Hive catalog in Apache Gravitino. */
 public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
 
   public static final Logger LOG = LoggerFactory.getLogger(HiveCatalogOperations.class);
@@ -145,7 +159,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     mergeConfig.putAll(gravitinoConfig);
 
     Configuration hadoopConf = new Configuration();
-    // Set byPass first to make gravitino config overwrite it, only keys in byPassConfig
+    // Set byPass first to make Gravitino config overwrite it, only keys in byPassConfig
     // and gravitinoConfig will be passed to Hive config, and gravitinoConfig has higher priority
     mergeConfig.forEach(hadoopConf::set);
     hiveConf = new HiveConf(hadoopConf, HiveCatalogOperations.class);
@@ -452,7 +466,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         }
       }
 
-      // alter the hive database parameters
+      // alter the Hive database parameters
       Database alteredDatabase = database.deepCopy();
       alteredDatabase.setParameters(properties);
 

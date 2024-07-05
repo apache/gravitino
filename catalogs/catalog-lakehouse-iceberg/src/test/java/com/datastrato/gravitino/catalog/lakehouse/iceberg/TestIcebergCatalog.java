@@ -1,6 +1,20 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
@@ -100,7 +114,7 @@ public class TestIcebergCatalog {
     try (IcebergCatalogOperations ops = new IcebergCatalogOperations()) {
       ops.initialize(conf, entity.toCatalogInfo(), ICEBERG_PROPERTIES_METADATA);
       Map<String, String> map1 = Maps.newHashMap();
-      map1.put(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND_NAME, "test");
+      map1.put(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND, "test");
       PropertiesMetadata metadata = ICEBERG_PROPERTIES_METADATA.catalogPropertiesMetadata();
       Assertions.assertThrows(
           IllegalArgumentException.class,
@@ -109,7 +123,7 @@ public class TestIcebergCatalog {
           });
 
       Map<String, String> map2 = Maps.newHashMap();
-      map2.put(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND_NAME, "hive");
+      map2.put(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND, "hive");
       map2.put(IcebergCatalogPropertiesMetadata.URI, "127.0.0.1");
       map2.put(IcebergCatalogPropertiesMetadata.WAREHOUSE, "test");
       Assertions.assertDoesNotThrow(
@@ -124,7 +138,7 @@ public class TestIcebergCatalog {
               () -> PropertiesMetadataHelpers.validatePropertyForCreate(metadata, map3));
 
       Assertions.assertTrue(
-          throwable.getMessage().contains(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND_NAME));
+          throwable.getMessage().contains(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND));
     }
   }
 }

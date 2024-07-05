@@ -1,12 +1,11 @@
 ---
-title: "Gravitino connector development"
+title: "Apache Gravitino connector development"
 slug: /trino-connector/development
 keyword: gravitino connector development 
-license: "Copyright 2024 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
-This document is to guide users through the development of the Gravitino connector for Trino locally.
+This document is to guide users through the development of the Apache Gravitino connector for Trino locally.
 
 ## Prerequisites
 
@@ -65,7 +64,7 @@ then you can see the `gravitino-trino-connecor` source files and directories in 
 
     <artifactId>trino-gravitino</artifactId>
     <packaging>trino-plugin</packaging>
-    <description>Trino - Graviton Connector</description>
+    <description>Trino - Gravitino Connector</description>
 
     <properties>
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
@@ -170,11 +169,6 @@ The corresponding configuration files are here:
 
 - Gravitino properties file: `gravitino.properties`
 ```properties
-#
-# Copyright 2024 Datastrato Pvt Ltd.
-# This software is licensed under the Apache License version 2.
-#
-
 # the connector name is always 'gravitino'
 connector.name=gravitino
 
@@ -187,11 +181,6 @@ gravitino.metalake=test
 ```
 - Trino configuration file: `config.properties`
 ```properties
-#
-# Copyright 2024 Datastrato Pvt Ltd.
-# This software is licensed under the Apache License version 2.
-#
-
 #
 # WARNING
 # ^^^^^^^

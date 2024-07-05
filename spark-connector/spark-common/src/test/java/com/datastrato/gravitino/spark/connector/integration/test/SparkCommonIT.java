@@ -1,6 +1,20 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.spark.connector.integration.test;
 
@@ -108,7 +122,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   // database after spark connector support Alter database xx set location command.
   @BeforeAll
   void initDefaultDatabase() throws IOException {
-    // In embedded mode, derby acts as the backend database for the hive metastore
+    // In embedded mode, derby acts as the backend database for the Hive metastore
     // and creates a directory named metastore_db to store metadata,
     // supporting only one connection at a time.
     // Previously, only SparkHiveCatalogIT accessed derby without any exceptions.

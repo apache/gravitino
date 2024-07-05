@@ -1,6 +1,20 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.storage.relational;
 
@@ -21,12 +35,12 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.Entity;
+import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.authorization.AuthorizationUtils;
 import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.SecurableObjects;
-import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
@@ -90,9 +104,9 @@ public class TestJDBCBackend {
     Mockito.when(config.get(ENTITY_STORE)).thenReturn(RELATIONAL_ENTITY_STORE);
     Mockito.when(config.get(ENTITY_RELATIONAL_STORE)).thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL))
-        .thenReturn(String.format("jdbc:h2:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
+        .thenReturn(String.format("jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("root");
-    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("123");
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("123456");
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
 
     String backendName = config.get(ENTITY_RELATIONAL_STORE);
@@ -106,8 +120,6 @@ public class TestJDBCBackend {
       throw new RuntimeException(
           "Failed to create and initialize RelationalBackend by name: " + backendName, e);
     }
-
-    prepareJdbcTable();
   }
 
   @AfterAll
@@ -189,7 +201,7 @@ public class TestJDBCBackend {
   }
 
   @Test
-  public void testInsertAlreadyExistsException() {
+  public void testInsertAlreadyExistsException() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
@@ -198,7 +210,7 @@ public class TestJDBCBackend {
     BaseMetalake metalakeCopy =
         createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
     backend.insert(metalake, false);
-    assertThrows(AlreadyExistsException.class, () -> backend.insert(metalakeCopy, false));
+    assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(metalakeCopy, false));
 
     CatalogEntity catalog =
         createCatalog(
@@ -213,7 +225,7 @@ public class TestJDBCBackend {
             "catalog",
             auditInfo);
     backend.insert(catalog, false);
-    assertThrows(AlreadyExistsException.class, () -> backend.insert(catalogCopy, false));
+    assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(catalogCopy, false));
 
     SchemaEntity schema =
         createSchemaEntity(
@@ -228,7 +240,7 @@ public class TestJDBCBackend {
             "schema",
             auditInfo);
     backend.insert(schema, false);
-    assertThrows(AlreadyExistsException.class, () -> backend.insert(schemaCopy, false));
+    assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(schemaCopy, false));
 
     TableEntity table =
         createTableEntity(
@@ -243,7 +255,7 @@ public class TestJDBCBackend {
             "table",
             auditInfo);
     backend.insert(table, false);
-    assertThrows(AlreadyExistsException.class, () -> backend.insert(tableCopy, false));
+    assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(tableCopy, false));
 
     FilesetEntity fileset =
         createFilesetEntity(
@@ -258,7 +270,7 @@ public class TestJDBCBackend {
             "fileset",
             auditInfo);
     backend.insert(fileset, false);
-    assertThrows(AlreadyExistsException.class, () -> backend.insert(filesetCopy, false));
+    assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(filesetCopy, false));
 
     TopicEntity topic =
         createTopicEntity(
@@ -273,11 +285,11 @@ public class TestJDBCBackend {
             "topic",
             auditInfo);
     backend.insert(topic, false);
-    assertThrows(AlreadyExistsException.class, () -> backend.insert(topicCopy, false));
+    assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(topicCopy, false));
   }
 
   @Test
-  public void testUpdateAlreadyExistsException() {
+  public void testUpdateAlreadyExistsException() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
@@ -288,7 +300,7 @@ public class TestJDBCBackend {
     backend.insert(metalake, false);
     backend.insert(metalakeCopy, false);
     assertThrows(
-        AlreadyExistsException.class,
+        EntityAlreadyExistsException.class,
         () ->
             backend.update(
                 metalakeCopy.nameIdentifier(),
@@ -310,7 +322,7 @@ public class TestJDBCBackend {
     backend.insert(catalog, false);
     backend.insert(catalogCopy, false);
     assertThrows(
-        AlreadyExistsException.class,
+        EntityAlreadyExistsException.class,
         () ->
             backend.update(
                 catalogCopy.nameIdentifier(),
@@ -334,7 +346,7 @@ public class TestJDBCBackend {
     backend.insert(schema, false);
     backend.insert(schemaCopy, false);
     assertThrows(
-        AlreadyExistsException.class,
+        EntityAlreadyExistsException.class,
         () ->
             backend.update(
                 schemaCopy.nameIdentifier(),
@@ -358,7 +370,7 @@ public class TestJDBCBackend {
     backend.insert(table, false);
     backend.insert(tableCopy, false);
     assertThrows(
-        AlreadyExistsException.class,
+        EntityAlreadyExistsException.class,
         () ->
             backend.update(
                 tableCopy.nameIdentifier(),
@@ -380,7 +392,7 @@ public class TestJDBCBackend {
     backend.insert(fileset, false);
     backend.insert(filesetCopy, false);
     assertThrows(
-        AlreadyExistsException.class,
+        EntityAlreadyExistsException.class,
         () ->
             backend.update(
                 filesetCopy.nameIdentifier(),
@@ -404,7 +416,7 @@ public class TestJDBCBackend {
     backend.insert(topic, false);
     backend.insert(topicCopy, false);
     assertThrows(
-        AlreadyExistsException.class,
+        EntityAlreadyExistsException.class,
         () ->
             backend.update(
                 topicCopy.nameIdentifier(),

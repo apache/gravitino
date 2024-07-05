@@ -1,6 +1,20 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.trino.connector;
 
@@ -48,13 +62,13 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   }
 
   /**
-   * This function call by trino creates a connector. It creates GravitinoSystemConnector at first.
+   * This function call by Trino creates a connector. It creates GravitinoSystemConnector at first.
    * Another time's it get GravitinoConnector by CatalogConnectorManager
    *
    * @param catalogName the connector name of catalog
    * @param requiredConfig the config of connector
-   * @param context trino connector context
-   * @return trino connector
+   * @param context Trino connector context
+   * @return Trino connector
    */
   @Override
   public Connector create(

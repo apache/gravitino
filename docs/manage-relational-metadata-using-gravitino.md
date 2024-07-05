@@ -1,15 +1,15 @@
 ---
-title: "Manage relational metadata using Gravitino"
+title: "Manage relational metadata using Apache Gravitino"
 slug: /manage-relational-metadata-using-gravitino
 date: 2023-12-10
 keyword: Gravitino relational metadata manage
-license: Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2.
+license: This software is licensed under the Apache License version 2.
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-This page introduces how to manage relational metadata by Gravitino, relational metadata refers
+This page introduces how to manage relational metadata by Apache Gravitino, relational metadata refers
 to relational catalog, schema, table and partitions. Through Gravitino, you can create, edit, and
 delete relational metadata via unified REST APIs or Java client.
 
@@ -245,7 +245,7 @@ http://localhost:8090/api/metalakes/metalake/catalogs?details=true
 ```java
 // ...
 // Assuming you have just created a metalake named `metalake`
-Catalog[] catalogsInfos = gravitinoMetaLake.listCatalogsInfo(Namespace.ofCatalog("metalake"));
+Catalog[] catalogsInfos = gravitinoMetalake.listCatalogsInfo(Namespace.ofCatalog("metalake"));
 // ...
 ```
 
@@ -692,7 +692,7 @@ In order to create a table, you need to provide the following information:
 - Table column auto-increment (optional)
 - Table property (optional)
 
-#### Gravitino table column type
+#### Apache Gravitino table column type
 
 The following types that Gravitino supports:
 

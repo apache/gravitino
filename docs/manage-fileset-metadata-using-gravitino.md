@@ -3,13 +3,13 @@ title: Manage fileset metadata using Gravitino
 slug: /manage-fileset-metadata-using-gravitino
 date: 2024-4-2
 keyword: Gravitino fileset metadata manage
-license: Copyright 2024 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2.
+license: This software is licensed under the Apache License version 2.
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-This page introduces how to manage fileset metadata in Gravitino. Filesets 
+This page introduces how to manage fileset metadata in Apache Gravitino. Filesets 
 are a collection of files and directories. Users can leverage
 filesets to manage non-tabular data like training datasets and other raw data.
 

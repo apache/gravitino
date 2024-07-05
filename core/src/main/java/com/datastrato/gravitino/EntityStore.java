@@ -1,11 +1,24 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino;
 
 import com.datastrato.gravitino.Entity.EntityType;
-import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.utils.Executable;
 import java.io.Closeable;
@@ -110,11 +123,11 @@ public interface EntityStore extends Closeable {
    * @return E the updated entity
    * @throws IOException if the store operation fails
    * @throws NoSuchEntityException if the entity does not exist
-   * @throws AlreadyExistsException if the updated entity already existed.
+   * @throws EntityAlreadyExistsException if the updated entity already existed.
    */
   <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Class<E> type, EntityType entityType, Function<E, E> updater)
-      throws IOException, NoSuchEntityException, AlreadyExistsException;
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException;
 
   /**
    * Get the entity from the underlying storage.

@@ -1,6 +1,20 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.catalog.doris.integration.test;
 
@@ -52,7 +66,7 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
 public class CatalogDorisIT extends AbstractIT {
 
@@ -231,9 +245,9 @@ public class CatalogDorisIT extends AbstractIT {
     catalog
         .asTableCatalog()
         .createTable(
-            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+            NameIdentifier.of(schemaName, tableName),
             createColumns(),
-            "Created by gravitino client",
+            "Created by Gravitino client",
             createTableProperties(),
             Transforms.EMPTY_TRANSFORM,
             createDistribution(),
@@ -322,8 +336,7 @@ public class CatalogDorisIT extends AbstractIT {
   @Test
   void testDorisTableBasicOperation() {
     // create a table
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
     Column[] columns = createColumns();
 
     Distribution distribution = createDistribution();
@@ -357,8 +370,7 @@ public class CatalogDorisIT extends AbstractIT {
     // rename table
     String newTableName = GravitinoITUtils.genRandomName("new_table_name");
     tableCatalog.alterTable(tableIdentifier, TableChange.rename(newTableName));
-    NameIdentifier newTableIdentifier =
-        NameIdentifier.of(metalakeName, catalogName, schemaName, newTableName);
+    NameIdentifier newTableIdentifier = NameIdentifier.of(schemaName, newTableName);
     Table renamedTable = tableCatalog.loadTable(newTableIdentifier);
     ITUtils.assertionsTableInfo(
         newTableName, table_comment, Arrays.asList(columns), properties, indexes, renamedTable);
@@ -479,8 +491,7 @@ public class CatalogDorisIT extends AbstractIT {
   @Test
   void testAlterDorisTable() {
     // create a table
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
     Column[] columns = createColumns();
 
     Distribution distribution = createDistribution();
@@ -572,8 +583,7 @@ public class CatalogDorisIT extends AbstractIT {
   void testDorisIndex() {
     String tableName = GravitinoITUtils.genRandomName("test_add_index");
 
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
     Column[] columns = createColumns();
 
     Distribution distribution = createDistribution();
@@ -593,7 +603,7 @@ public class CatalogDorisIT extends AbstractIT {
 
     // add index test.
     tableCatalog.alterTable(
-        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+        NameIdentifier.of(schemaName, tableName),
         TableChange.addIndex(
             Index.IndexType.PRIMARY_KEY, "k1_index", new String[][] {{DORIS_COL_NAME1}}));
 
@@ -605,14 +615,13 @@ public class CatalogDorisIT extends AbstractIT {
                 assertEquals(
                     1,
                     tableCatalog
-                        .loadTable(
-                            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName))
+                        .loadTable(NameIdentifier.of(schemaName, tableName))
                         .index()
                         .length));
 
     // delete index and add new column and index.
     tableCatalog.alterTable(
-        NameIdentifier.of(metalakeName, catalogName, schemaName, tableName),
+        NameIdentifier.of(schemaName, tableName),
         TableChange.deleteIndex("k1_index", true),
         TableChange.addIndex(
             Index.IndexType.PRIMARY_KEY, "k2_index", new String[][] {{DORIS_COL_NAME2}}));
@@ -625,8 +634,7 @@ public class CatalogDorisIT extends AbstractIT {
                 assertEquals(
                     1,
                     tableCatalog
-                        .loadTable(
-                            NameIdentifier.of(metalakeName, catalogName, schemaName, tableName))
+                        .loadTable(NameIdentifier.of(schemaName, tableName))
                         .index()
                         .length));
   }

@@ -1,14 +1,13 @@
 ---
-title: "Gravitino Spark connector"
+title: "Apache Gravitino Spark connector"
 slug: /spark-connector/spark-connector
 keyword: spark connector federation query 
-license: "Copyright 2024 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
 ## Overview
 
-The Gravitino Spark connector leverages the Spark DataSourceV2 interface to facilitate the management of diverse catalogs under Gravitino. This capability allows users to perform federation queries, accessing data from various catalogs through a unified interface and consistent access control.
+The Apache Gravitino Spark connector leverages the Spark DataSourceV2 interface to facilitate the management of diverse catalogs under Gravitino. This capability allows users to perform federation queries, accessing data from various catalogs through a unified interface and consistent access control.
 
 ## Capabilities
 

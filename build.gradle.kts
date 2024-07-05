@@ -1,6 +1,20 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 import com.github.gradle.node.NodeExtension
 import com.github.gradle.node.NodePlugin
@@ -10,12 +24,10 @@ import com.github.jk1.license.render.InventoryHtmlReportRenderer
 import com.github.jk1.license.render.ReportRenderer
 import com.github.vlsi.gradle.dsl.configureEach
 import net.ltgt.gradle.errorprone.errorprone
-import org.gradle.api.tasks.testing.Test
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.internal.hash.ChecksumService
 import org.gradle.internal.os.OperatingSystem
 import org.gradle.kotlin.dsl.support.serviceOf
-import java.io.File
 import java.io.IOException
 import java.util.Locale
 
@@ -186,9 +198,9 @@ allprojects {
       }
 
       param.useJUnitPlatform {
-        val DOCKER_IT_TEST = project.rootProject.extra["docker_it_test"] as? Boolean ?: false
-        if (!DOCKER_IT_TEST) {
-          excludeTags("gravitino-docker-it")
+        val dockerTest = project.rootProject.extra["dockerTest"] as? Boolean ?: false
+        if (!dockerTest) {
+          excludeTags("gravitino-docker-test")
         }
       }
     }
@@ -372,12 +384,12 @@ subprojects {
             developer {
               id.set("The maintainers of Gravitino")
               name.set("support")
-              email.set("support@datastrato.com")
+              email.set("dev@datastrato.com")
             }
           }
           scm {
-            url.set("https://github.com/datastrato/gravitino")
-            connection.set("scm:git:git://github.com/datastrato/gravitino.git")
+            url.set("https://github.com/apache/gravitino")
+            connection.set("scm:git:git://github.com/apache/gravitino.git")
           }
         }
       }
@@ -442,9 +454,6 @@ subprojects {
 }
 
 tasks.rat {
-  substringMatcher("DS", "Datastrato", "Copyright 2023 Datastrato Pvt Ltd.")
-  substringMatcher("DS", "Datastrato", "Copyright 2024 Datastrato Pvt Ltd.")
-  approvedLicense("Datastrato")
   approvedLicense("Apache License Version 2.0")
 
   // Set input directory to that of the root project instead of the CWD. This
@@ -452,7 +461,7 @@ tasks.rat {
   inputDir.set(project.rootDir)
 
   val exclusions = mutableListOf(
-    // Ignore files we track but do not need headers
+    // Ignore files we track but do not need full headers
     "**/.github/**/*",
     "dev/docker/**/*.xml",
     "dev/docker/**/*.conf",
@@ -461,6 +470,7 @@ tasks.rat {
     "**/licenses/*.txt",
     "**/licenses/*.md",
     "integration-test/**",
+    "docs/**/*.md",
     "web/.**",
     "web/next-env.d.ts",
     "web/dist/**/*",
@@ -474,6 +484,8 @@ tasks.rat {
     "web/src/lib/icons/svg/**/*.svg",
     "**/LICENSE.*",
     "**/NOTICE.*",
+    "DISCLAIMER_WIP.txt",
+    "DISCLAIMER.txt",
     "ROADMAP.md",
     "clients/client-python/.pytest_cache/*",
     "clients/client-python/gravitino.egg-info/*",
@@ -657,7 +669,7 @@ tasks {
 
 apply(plugin = "com.dorongold.task-tree")
 
-project.extra["docker_it_test"] = false
+project.extra["dockerTest"] = false
 project.extra["dockerRunning"] = false
 project.extra["macDockerConnector"] = false
 project.extra["isOrbStack"] = false
@@ -676,13 +688,15 @@ fun printDockerCheckInfo() {
   val macDockerConnector = project.extra["macDockerConnector"] as? Boolean ?: false
   val isOrbStack = project.extra["isOrbStack"] as? Boolean ?: false
 
-  if (OperatingSystem.current().isMacOsX() &&
+  if (extra["skipDockerTests"].toString().toBoolean()) {
+    project.extra["dockerTest"] = false
+  } else if (OperatingSystem.current().isMacOsX() &&
     dockerRunning &&
     (macDockerConnector || isOrbStack)
   ) {
-    project.extra["docker_it_test"] = true
+    project.extra["dockerTest"] = true
   } else if (OperatingSystem.current().isLinux() && dockerRunning) {
-    project.extra["docker_it_test"] = true
+    project.extra["dockerTest"] = true
   }
 
   println("------------------ Check Docker environment ---------------------")
@@ -692,11 +706,11 @@ fun printDockerCheckInfo() {
     println("OrbStack status ................................................. [${if (dockerRunning && isOrbStack) "yes" else "no"}]")
   }
 
-  val docker_it_test = project.extra["docker_it_test"] as? Boolean ?: false
-  if (!docker_it_test) {
-    println("Run test cases without `gravitino-docker-it` tag ................ [$testMode test]")
+  val dockerTest = project.extra["dockerTest"] as? Boolean ?: false
+  if (dockerTest) {
+    println("Using Docker container to run all tests. [$testMode test]")
   } else {
-    println("Using Gravitino IT Docker container to run all integration tests. [$testMode test]")
+    println("Run test cases without `gravitino-docker-test` tag ................ [$testMode test]")
   }
   println("-----------------------------------------------------------------")
 

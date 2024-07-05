@@ -1,15 +1,15 @@
 ---
-title: "Manage metalake using Gravitino"
+title: "Manage metalake using Apache Gravitino"
 slug: /manage-metalake-using-gravitino
 date: 2023-12-10
 keyword: Gravitino metalake manage
-license: Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2.
+license: This software is licensed under the Apache License version 2.
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-This page introduces how to manage metalake by Gravitino. Metalake is a tenant-like concept in
+This page introduces how to manage metalake by Apache Gravitino. Metalake is a tenant-like concept in
 Gravitino, all the catalogs, users and roles are under a metalake. Typically, a metalake is
 mapping to a organization or a company.
 
@@ -42,7 +42,7 @@ GravitinoAdminClient gravitinoAdminClient = GravitinoAdminClient
     .builder("http://localhost:8090")
     .build();
 
-GravitinoMetaLake newMetalake = gravitinoAdminClient.createMetalake(
+GravitinoMetalake newMetalake = gravitinoAdminClient.createMetalake(
     NameIdentifier.of("metalake"),
     "This is a new metalake",
     new HashMap<>());
@@ -79,7 +79,7 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 // ...
-GravitinoMetaLake loaded = gravitinoAdminClient.loadMetalake(
+GravitinoMetalake loaded = gravitinoAdminClient.loadMetalake(
     NameIdentifier.of("metalake"));
 // ...
 ```
@@ -123,7 +123,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 // ...
-GravitinoMetaLake renamed = gravitinoAdminClient.alterMetalake(
+GravitinoMetalake renamed = gravitinoAdminClient.alterMetalake(
     NameIdentifier.of("new_metalake"),
     MetalakeChange.rename("new_metalake_renamed")
 );
@@ -213,7 +213,7 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 // ...
-GravitinoMetaLake[] allMetalakes = gravitinoAdminClient.listMetalakes();
+GravitinoMetalake[] allMetalakes = gravitinoAdminClient.listMetalakes();
 // ...
 ```
 

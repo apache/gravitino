@@ -1,6 +1,19 @@
 /*
- *  Copyright 2024 Datastrato Pvt Ltd.
- *  This software is licensed under the Apache License version 2.
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
 package com.datastrato.gravitino.spark.connector.hive;
@@ -19,7 +32,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 
-/** Transform hive catalog properties between Spark and Gravitino. */
+/** Transform Apache Hive catalog properties between Apache Spark and Apache Gravitino. */
 public class HivePropertiesConverter implements PropertiesConverter {
   public static class HivePropertiesConverterHolder {
     private static final HivePropertiesConverter INSTANCE = new HivePropertiesConverter();
@@ -31,7 +44,7 @@ public class HivePropertiesConverter implements PropertiesConverter {
     return HivePropertiesConverterHolder.INSTANCE;
   }
 
-  // Transform Spark hive file format to Gravitino hive file format
+  // Transform Spark Hive file format to Gravitino hive file format
   static final Map<String, String> fileFormatMap =
       ImmutableMap.of(
           "sequencefile", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_SEQUENCEFILE,
@@ -68,7 +81,7 @@ public class HivePropertiesConverter implements PropertiesConverter {
         StringUtils.isNotBlank(metastoreUri),
         "Couldn't get "
             + GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI
-            + " from hive catalog properties");
+            + " from Hive catalog properties");
     HashMap<String, String> all = new HashMap<>();
     all.put(GravitinoSparkConfig.SPARK_HIVE_METASTORE_URI, metastoreUri);
     return all;

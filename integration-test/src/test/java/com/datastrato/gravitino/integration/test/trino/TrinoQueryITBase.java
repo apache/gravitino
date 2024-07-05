@@ -1,12 +1,27 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.integration.test.trino;
 
 import static java.lang.Thread.sleep;
 
 import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.SupportsSchemas;
 import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.client.GravitinoMetalake;
@@ -16,7 +31,6 @@ import com.datastrato.gravitino.integration.test.container.TrinoITContainers;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.utils.NameIdentifierUtil;
-import com.datastrato.gravitino.utils.NamespaceUtil;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -31,10 +45,10 @@ import org.testcontainers.shaded.org.apache.commons.io.FileUtils;
 public class TrinoQueryITBase {
   private static final Logger LOG = LoggerFactory.getLogger(TrinoQueryITBase.class);
 
-  // Auto start docker containers and gravitino server
+  // Auto start docker containers and Gravitino server
   protected static boolean autoStart = true;
 
-  // Auto start gravitino server
+  // Auto start Gravitino server
   protected static boolean autoStartGravitino = true;
 
   protected static boolean started = false;
@@ -189,9 +203,7 @@ public class TrinoQueryITBase {
             schema -> {
               try {
                 TableCatalog tableCatalog = catalog.asTableCatalog();
-                Arrays.stream(
-                        tableCatalog.listTables(
-                            NamespaceUtil.ofTable(metalakeName, catalogName, schema)))
+                Arrays.stream(tableCatalog.listTables(Namespace.of(schema)))
                     .forEach(
                         table -> {
                           boolean dropped =

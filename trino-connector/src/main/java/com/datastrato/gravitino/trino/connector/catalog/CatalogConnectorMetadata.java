@@ -1,6 +1,20 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.trino.connector.catalog;
 
@@ -40,13 +54,12 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.NotImplementedException;
 
-/** This class implements gravitino metadata operators. */
+/** This class implements Apache Gravitino metadata operators. */
 public class CatalogConnectorMetadata {
 
   private static final String CATALOG_DOES_NOT_EXIST_MSG = "Catalog does not exist";
   private static final String SCHEMA_DOES_NOT_EXIST_MSG = "Schema does not exist";
 
-  private final GravitinoMetalake metalake;
   private final String catalogName;
   private final SupportsSchemas schemaCatalog;
   private final TableCatalog tableCatalog;
@@ -54,7 +67,6 @@ public class CatalogConnectorMetadata {
   public CatalogConnectorMetadata(GravitinoMetalake metalake, NameIdentifier catalogIdentifier) {
     try {
       this.catalogName = catalogIdentifier.name();
-      this.metalake = metalake;
       Catalog catalog = metalake.loadCatalog(catalogName);
       // Make sure the catalog support schema operations.
       this.schemaCatalog = catalog.asSchemas();
@@ -88,9 +100,7 @@ public class CatalogConnectorMetadata {
 
   public GravitinoTable getTable(String schemaName, String tableName) {
     try {
-      Table table =
-          tableCatalog.loadTable(
-              NameIdentifier.of(metalake.name(), catalogName, schemaName, tableName));
+      Table table = tableCatalog.loadTable(NameIdentifier.of(schemaName, tableName));
       return new GravitinoTable(schemaName, tableName, table);
     } catch (NoSuchTableException e) {
       throw new TrinoException(GRAVITINO_TABLE_NOT_EXISTS, "Table does not exist", e);
@@ -99,8 +109,7 @@ public class CatalogConnectorMetadata {
 
   public List<String> listTables(String schemaName) {
     try {
-      NameIdentifier[] tables =
-          tableCatalog.listTables(Namespace.of(metalake.name(), catalogName, schemaName));
+      NameIdentifier[] tables = tableCatalog.listTables(Namespace.of(schemaName));
       return Arrays.stream(tables).map(NameIdentifier::name).toList();
     } catch (NoSuchSchemaException e) {
       throw new TrinoException(GRAVITINO_SCHEMA_NOT_EXISTS, SCHEMA_DOES_NOT_EXIST_MSG, e);
@@ -108,13 +117,11 @@ public class CatalogConnectorMetadata {
   }
 
   public boolean tableExists(String schemaName, String tableName) {
-    return tableCatalog.tableExists(
-        NameIdentifier.of(metalake.name(), catalogName, schemaName, tableName));
+    return tableCatalog.tableExists(NameIdentifier.of(schemaName, tableName));
   }
 
   public void createTable(GravitinoTable table, boolean ignoreExisting) {
-    NameIdentifier identifier =
-        NameIdentifier.of(metalake.name(), catalogName, table.getSchemaName(), table.getName());
+    NameIdentifier identifier = NameIdentifier.of(table.getSchemaName(), table.getName());
     try {
       tableCatalog.createTable(
           identifier,
@@ -159,8 +166,7 @@ public class CatalogConnectorMetadata {
   public void dropTable(SchemaTableName tableName) {
     boolean dropped =
         tableCatalog.dropTable(
-            NameIdentifier.of(
-                metalake.name(), catalogName, tableName.getSchemaName(), tableName.getTableName()));
+            NameIdentifier.of(tableName.getSchemaName(), tableName.getTableName()));
     if (!dropped) {
       throw new TrinoException(GRAVITINO_OPERATION_FAILED, "Failed to drop table " + tableName);
     }
@@ -173,9 +179,7 @@ public class CatalogConnectorMetadata {
   private void applyAlter(SchemaTableName tableName, TableChange... change) {
     try {
       tableCatalog.alterTable(
-          NameIdentifier.of(
-              metalake.name(), catalogName, tableName.getSchemaName(), tableName.getTableName()),
-          change);
+          NameIdentifier.of(tableName.getSchemaName(), tableName.getTableName()), change);
     } catch (NoSuchTableException e) {
       throw new TrinoException(GRAVITINO_TABLE_NOT_EXISTS, "Table does not exist");
     } catch (IllegalArgumentException e) {
