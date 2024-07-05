@@ -1,12 +1,12 @@
 ---
-title: Gravitino overview
+title: Apache Gravitino overview
 slug: /
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## What's Gravitino?
+## What's Apache Gravitino?
 
-Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages the
+Apache Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages the
 metadata directly in different sources, types, and regions. It also provides users with unified
 metadata access for data and AI assets.
 
@@ -43,7 +43,7 @@ To get started with Gravitino, see [Getting started](./getting-started.md) for t
 * [Running on Google Cloud Platform](./getting-started.md#getting-started-on-google-cloud-platform):
   a quick guide to starting and using Gravitino on GCP.
 
-## How to use Gravitino
+## How to use Apache Gravitino
 
 Gravitino provides two SDKs to manage metadata from different catalogs in a unified way: the
 REST API and the Java SDK. You can use either to manage metadata. See
@@ -84,7 +84,7 @@ Gravitino currently supports the following catalogs:
 Gravitino also provides an Iceberg REST catalog service for the Iceberg table format. See the
 [Iceberg REST catalog service](./iceberg-rest-service.md) for details.
 
-## Gravitino playground
+## Apache Gravitino playground
 
 To experience Gravitino with other components easily, Gravitino provides a playground to run. It
 integrates Apache Hadoop, Apache Hive, Trino, MySQL, PostgreSQL, and Gravitino together as a

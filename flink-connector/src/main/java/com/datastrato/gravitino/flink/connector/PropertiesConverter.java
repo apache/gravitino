@@ -23,7 +23,7 @@ import java.util.Map;
 import org.apache.flink.configuration.Configuration;
 
 /**
- * PropertiesConverter is used to convert properties between Flink properties and Gravitino
+ * PropertiesConverter is used to convert properties between Flink properties and Apache Gravitino
  * properties
  */
 public interface PropertiesConverter {

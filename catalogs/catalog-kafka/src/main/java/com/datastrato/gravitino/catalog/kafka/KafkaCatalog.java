@@ -25,7 +25,9 @@ import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.connector.capability.Capability;
 import java.util.Map;
 
-/** Kafka catalog is a messaging catalog that can manage topics on the Kafka messaging system. */
+/**
+ * Kafka catalog is a messaging catalog that can manage topics on the Apache Kafka messaging system.
+ */
 public class KafkaCatalog extends BaseCatalog<KafkaCatalog> {
 
   static final KafkaCatalogPropertiesMetadata CATALOG_PROPERTIES_METADATA =

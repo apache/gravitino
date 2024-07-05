@@ -57,7 +57,7 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 
-/** Table operations for Doris. */
+/** Table operations for Apache Doris. */
 public class DorisTableOperations extends JdbcTableOperations {
   private static final String BACK_QUOTE = "`";
   private static final String DORIS_AUTO_INCREMENT = "AUTO_INCREMENT";
@@ -468,7 +468,7 @@ public class DorisTableOperations extends JdbcTableOperations {
     if (null != updateComment) {
       String newComment = updateComment.getNewComment();
       if (null == StringIdentifier.fromComment(newComment)) {
-        // Detect and add gravitino id.
+        // Detect and add Gravitino id.
         JdbcTable jdbcTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         StringIdentifier identifier = StringIdentifier.fromComment(jdbcTable.comment());
         if (null != identifier) {

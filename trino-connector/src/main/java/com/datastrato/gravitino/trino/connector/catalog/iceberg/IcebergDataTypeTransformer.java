@@ -28,7 +28,7 @@ import io.trino.spi.TrinoException;
 import io.trino.spi.type.VarbinaryType;
 import io.trino.spi.type.VarcharType;
 
-/** Type transformer between Iceberg and Trino */
+/** Type transformer between Apache Iceberg and Trino */
 public class IcebergDataTypeTransformer extends GeneralDataTypeTransformer {
 
   @Override

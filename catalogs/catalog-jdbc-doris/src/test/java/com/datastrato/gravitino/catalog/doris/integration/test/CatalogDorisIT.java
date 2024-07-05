@@ -247,7 +247,7 @@ public class CatalogDorisIT extends AbstractIT {
         .createTable(
             NameIdentifier.of(schemaName, tableName),
             createColumns(),
-            "Created by gravitino client",
+            "Created by Gravitino client",
             createTableProperties(),
             Transforms.EMPTY_TRANSFORM,
             createDistribution(),

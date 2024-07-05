@@ -47,7 +47,7 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 
-/** Represents an Iceberg Table entity in the Iceberg table. */
+/** Represents an Apache Iceberg Table entity in the Iceberg table. */
 @ToString
 @Getter
 public class IcebergTable extends BaseTable {
@@ -107,7 +107,7 @@ public class IcebergTable extends BaseTable {
   }
 
   /**
-   * Transforms the gravitino distribution to the distribution mode name of the Iceberg table.
+   * Transforms the Gravitino distribution to the distribution mode name of the Iceberg table.
    *
    * @param distribution The distribution of the table.
    * @return The distribution mode name of the iceberg table.

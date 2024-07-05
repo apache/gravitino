@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.paimon;
 
-/** The type of Paimon catalog backend. */
+/** The type of Apache Paimon catalog backend. */
 public enum PaimonCatalogBackend {
   FILESYSTEM
 }

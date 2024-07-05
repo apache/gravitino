@@ -21,7 +21,7 @@ package com.datastrato.gravitino.rel.expressions.sorts;
 import com.datastrato.gravitino.rel.expressions.Expression;
 import java.util.Objects;
 
-/** Helper methods to create SortOrders to pass into Gravitino. */
+/** Helper methods to create SortOrders to pass into Apache Gravitino. */
 public class SortOrders {
 
   /** NONE is used to indicate that there is no sort order. */

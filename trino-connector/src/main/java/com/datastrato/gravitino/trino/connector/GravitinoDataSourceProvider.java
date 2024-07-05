@@ -28,7 +28,7 @@ import io.trino.spi.connector.ConnectorTransactionHandle;
 import io.trino.spi.connector.DynamicFilter;
 import java.util.List;
 
-/** This class provides a ConnectorPageSource for trino read data from internal connector. */
+/** This class provides a ConnectorPageSource for Trino read data from internal connector. */
 public class GravitinoDataSourceProvider implements ConnectorPageSourceProvider {
 
   ConnectorPageSourceProvider internalPageSourceProvider;

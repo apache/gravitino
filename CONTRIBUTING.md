@@ -17,9 +17,9 @@
   under the License.
 -->
 
-# Contributing to Gravitino
+# Contributing to Apache Gravitino
 
-Thank you for your interest in contributing to Gravitino! You are welcome to contribute in any way you can to enhance the project. Gravitino appreciates your assistance in making it better, whether through code contributions, documentation, tests, best practices, graphic design, or any other means that have a positive impact.
+Thank you for your interest in contributing to Apache Gravitino! You are welcome to contribute in any way you can to enhance the project. Gravitino appreciates your assistance in making it better, whether through code contributions, documentation, tests, best practices, graphic design, or any other means that have a positive impact.
 
 Before you get started, please read and follow these guidelines to ensure a smooth and productive collaboration.
 

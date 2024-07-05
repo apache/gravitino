@@ -1,5 +1,5 @@
 ---
-title: "Manage table partition using Gravitino"
+title: "Manage table partition using Apache Gravitino"
 slug: /manage-table-partition-using-gravitino
 date: 2024-02-03
 keyword: table partition management
@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Although many catalogs inherently manage partitions automatically, there are scenarios where manual partition management is necessary. Usage scenarios like managing the TTL (Time-To-Live) of partition data, gathering statistics on partition metadata, and optimizing queries through partition pruning. For these reasons, Gravitino provides capabilities of partition management.
+Although many catalogs inherently manage partitions automatically, there are scenarios where manual partition management is necessary. Usage scenarios like managing the TTL (Time-To-Live) of partition data, gathering statistics on partition metadata, and optimizing queries through partition pruning. For these reasons, Apache Gravitino provides capabilities of partition management.
 
 ### Requirements and limitations
 

@@ -7,9 +7,9 @@ license: "This software is licensed under the Apache License version 2."
 
 # User Docker images
 
-There are two kinds of Docker images you can use: the Gravitino Docker image and playground Docker images.
+There are two kinds of Docker images you can use: the Apache Gravitino Docker image and playground Docker images.
 
-## Gravitino Docker image
+## Apache Gravitino Docker image
 
 You can deploy the service with the Gravitino Docker image.
 
@@ -52,7 +52,7 @@ The playground consists of multiple Docker images.
 
 The Docker images of the playground have suitable configurations for users to experience.
 
-### Hive image
+### Apache Hive image
 
 Changelog
 
@@ -91,7 +91,7 @@ Changelog
 
 You can use these kinds of Docker images to facilitate integration testing of all catalog and connector modules within Gravitino.
 
-## Gravitino CI Apache Hive image with kerberos enabled
+## Apache Gravitino CI Apache Hive image with kerberos enabled
 
 You can use this kind of image to test the catalog of Apache Hive with kerberos enable
 
@@ -112,7 +112,7 @@ Changelog
     - Set up a Hive cluster with kerberos enabled.
     - Install a KDC server and create a principal for Hive. For more please see [kerberos-hive](../dev/docker/kerberos-hive)
 
-## Gravitino CI Apache Hive image
+## Apache Gravitino CI Apache Hive image
 
 You can use this kind of image to test the catalog of Apache Hive.
 
@@ -183,7 +183,7 @@ Changelog
     - `10000` HiveServer2
     - `10002` HiveServer2 HTTP
 
-## Gravitino CI Trino image
+## Apache Gravitino CI Trino image
 
 You can use this image to test Trino.
 
@@ -210,7 +210,7 @@ Changelog
   - Expose ports:
     - `8080` Trino JDBC port
 
-## Gravitino CI Doris image
+## Apache Gravitino CI Doris image
 
 You can use this image to test Apache Doris.
 
@@ -238,7 +238,7 @@ Changelog
     - `8030` Doris FE HTTP port
     - `9030` Doris FE MySQL server port
 
-## Gravitino CI Apache Ranger image
+## Apache Gravitino CI Apache Ranger image
 
 You can use this image to control Trino's permissions.
 

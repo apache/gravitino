@@ -58,8 +58,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Gravitino Client for the administrator to interact with the Gravitino API, allowing the client to
- * list, load, create, and alter Metalakes.
+ * Apache Gravitino Client for the administrator to interact with the Gravitino API, allowing the
+ * client to list, load, create, and alter Metalakes.
  *
  * <p>Normal users should use {@link GravitinoClient} to connect with the Gravitino server.
  */
