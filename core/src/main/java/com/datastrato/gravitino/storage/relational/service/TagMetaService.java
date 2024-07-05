@@ -76,7 +76,7 @@ public class TagMetaService {
             TagPO.Builder builder = TagPO.builder().withMetalakeId(metalakeId.get());
             TagPO tagPO = POConverters.initializeTagPOWithVersion(tagEntity, builder);
 
-            SessionUtils.doWithCommit(
+            SessionUtils.doWithoutCommit(
                 TagMetaMapper.class,
                 mapper -> {
                   if (overwritten) {
