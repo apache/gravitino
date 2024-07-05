@@ -150,16 +150,16 @@ RUN ln -s /opt/mysql-connector-java-${MYSQL_JDBC_DRIVER_VERSION}/* ${HIVE_HOME}/
 # add users and groups
 RUN groupadd hdfs && groupadd hadoop && groupadd hive && groupadd mapred
 
-RUN useradd -g hadoop gravitino && echo "gravitino:grav123" | chpasswd && adduser gravitino sudo
-RUN usermod -s /bin/bash gravitino
+RUN useradd -g hadoop datastrato && echo "datastrato:ds123" | chpasswd && adduser datastrato sudo
+RUN usermod -s /bin/bash datastrato
 
-RUN usermod -a -G hdfs gravitino
-RUN usermod -a -G hadoop gravitino
-RUN usermod -a -G hive gravitino
-RUN usermod -a -G mapred gravitino
+RUN usermod -a -G hdfs datastrato
+RUN usermod -a -G hadoop datastrato
+RUN usermod -a -G hive datastrato
+RUN usermod -a -G mapred datastrato
 
-RUN mkdir /home/gravitino
-RUN chown -R gravitino:hadoop /home/gravitino
+RUN mkdir /home/datastrato
+RUN chown -R datastrato:hadoop /home/datastrato
 
 ################################################################################
 # removed install packages and cache
