@@ -197,7 +197,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
 
   private BaseAuthorization<?> createAuthorizationInstance() {
     String provider = entity.getProperties().get(AUTHORIZATION_IMPL);
-    if (provider == null && provider.isEmpty()) {
+    if (provider == null || provider.isEmpty()) {
       throw new IllegalArgumentException("Authorization hook provider is not set");
     }
 
