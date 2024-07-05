@@ -37,6 +37,7 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.RegisterTableRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
@@ -109,6 +110,10 @@ public class IcebergTableOps implements AutoCloseable {
     validateNamespace(Optional.of(namespace));
     return CatalogHandlers.updateNamespaceProperties(
         asNamespaceCatalog, namespace, updateNamespacePropertiesRequest);
+  }
+
+  public LoadTableResponse registerTable(Namespace namespace, RegisterTableRequest request) {
+    return CatalogHandlers.registerTable(catalog, namespace, request);
   }
 
   public LoadTableResponse createTable(Namespace namespace, CreateTableRequest request) {

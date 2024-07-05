@@ -24,9 +24,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.gravitino.iceberg.common.IcebergCatalogBackend;
 import org.apache.iceberg.exceptions.BadRequestException;
-import org.apache.iceberg.exceptions.ServiceFailureException;
 import org.apache.iceberg.exceptions.ValidationException;
 import org.apache.spark.sql.AnalysisException;
 import org.apache.spark.sql.catalyst.analysis.NamespaceAlreadyExistsException;
@@ -262,13 +260,8 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
         "CREATE TABLE iceberg_rest_table_test.rename_foo1"
             + "(id bigint COMMENT 'unique id',data string) using iceberg");
 
-    Class exception =
-        catalogType == IcebergCatalogBackend.HIVE
-            ? ServiceFailureException.class
-            : TableAlreadyExistsException.class;
-
     Assertions.assertThrowsExactly(
-        exception,
+        TableAlreadyExistsException.class,
         () ->
             sql(
                 "ALTER TABLE iceberg_rest_table_test.rename_foo2 "
@@ -524,6 +517,44 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
             oldSnapshotId));
     Map<String, String> result =
         convertToStringMap(sql("select * from iceberg_rest_table_test.snapshot_foo1"));
+    Assertions.assertEquals(ImmutableMap.of("1", "a", "2", "b"), result);
+  }
+
+  @Test
+  @EnabledIf("catalogTypeNotMemory")
+  void testRegisterTable() {
+    String registerDB = "iceberg_register_db";
+    String registerTableName = "register_foo1";
+    sql("CREATE DATABASE " + registerDB);
+    sql(
+        String.format(
+            "CREATE TABLE %s.%s (id bigint COMMENT 'unique id',data string) using iceberg",
+            registerDB, registerTableName));
+    sql(String.format("INSERT INTO %s.%s VALUES (1, 'a')", registerDB, registerTableName));
+
+    // get metadata location
+    List<String> metadataLocations =
+        convertToStringList(
+            sql(
+                String.format(
+                    "select file from %s.%s.metadata_log_entries", registerDB, registerTableName)),
+            0);
+    String metadataLocation = metadataLocations.get(metadataLocations.size() - 1);
+
+    // register table
+    String register =
+        String.format(
+            "CALL rest.system.register_table(table => 'iceberg_rest_table_test.register_foo2', metadata_file=> '%s')",
+            metadataLocation);
+    sql(register);
+
+    Map<String, String> result =
+        convertToStringMap(sql("select * from iceberg_rest_table_test.register_foo2"));
+    Assertions.assertEquals(ImmutableMap.of("1", "a"), result);
+
+    // insert other data
+    sql(" INSERT INTO iceberg_rest_table_test.register_foo2 VALUES (2, 'b')");
+    result = convertToStringMap(sql("select * from iceberg_rest_table_test.register_foo2"));
     Assertions.assertEquals(ImmutableMap.of("1", "a", "2", "b"), result);
   }
 }

@@ -60,7 +60,7 @@ public class TestIcebergCatalogUtil {
         });
 
     Map<String, String> properties = new HashMap<>();
-    properties.put(CatalogProperties.URI, "jdbc://0.0.0.0:3306");
+    properties.put(CatalogProperties.URI, "jdbc:sqlite::memory:");
     properties.put(CatalogProperties.WAREHOUSE_LOCATION, "test");
     properties.put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.sqlite.JDBC");
     properties.put(IcebergConstants.ICEBERG_JDBC_USER, "test");
