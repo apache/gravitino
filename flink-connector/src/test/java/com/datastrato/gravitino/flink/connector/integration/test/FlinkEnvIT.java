@@ -46,7 +46,6 @@ import org.slf4j.LoggerFactory;
 public abstract class FlinkEnvIT extends AbstractIT {
   private static final Logger LOG = LoggerFactory.getLogger(FlinkEnvIT.class);
   private static final ContainerSuite CONTAINER_SUITE = ContainerSuite.getInstance();
-
   protected static final String GRAVITINO_METALAKE = "flink";
   protected static final String DEFAULT_CATALOG = "default_catalog";
 
@@ -105,10 +104,6 @@ public abstract class FlinkEnvIT extends AbstractIT {
             "hdfs://%s:%d/user/hive/warehouse",
             CONTAINER_SUITE.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HDFS_DEFAULTFS_PORT);
-    LOG.info(
-        "Startup Hive env successfully, metastore uri: {}, warehouse: {}",
-        hiveMetastoreUri,
-        warehouse);
   }
 
   private static void initHdfsEnv() {
@@ -133,7 +128,6 @@ public abstract class FlinkEnvIT extends AbstractIT {
         "table.catalog-store.kind", GravitinoCatalogStoreFactoryOptions.GRAVITINO);
     configuration.setString("table.catalog-store.gravitino.gravitino.metalake", GRAVITINO_METALAKE);
     configuration.setString("table.catalog-store.gravitino.gravitino.uri", gravitinoUri);
-
     EnvironmentSettings.Builder builder =
         EnvironmentSettings.newInstance().withConfiguration(configuration);
     tableEnv = TableEnvironment.create(builder.inBatchMode().build());
