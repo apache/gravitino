@@ -163,7 +163,7 @@ allprojects {
       // Default use MiniGravitino to run integration tests
       param.environment("GRAVITINO_ROOT_DIR", project.rootDir.path)
       param.environment("IT_PROJECT_DIR", project.buildDir.path)
-      param.environment("HADOOP_USER_NAME", "datastrato")
+      param.environment("HADOOP_USER_NAME", "gravitino")
       param.environment("HADOOP_HOME", "/tmp")
       param.environment("PROJECT_VERSION", project.version)
 
@@ -373,7 +373,7 @@ subprojects {
         pom {
           name.set("Gravitino")
           description.set("Gravitino is a high-performance, geo-distributed and federated metadata lake.")
-          url.set("https://datastrato.ai")
+          url.set("https://gravitino.apache.org")
           licenses {
             license {
               name.set("The Apache Software License, Version 2.0")
@@ -382,9 +382,9 @@ subprojects {
           }
           developers {
             developer {
-              id.set("The maintainers of Gravitino")
+              id.set("The Gravitino community")
               name.set("support")
-              email.set("support@datastrato.com")
+              email.set("dev@gravitino.apache.org")
             }
           }
           scm {

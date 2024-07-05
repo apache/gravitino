@@ -31,8 +31,8 @@ const Footer = props => {
             <Link
               className={'twc-no-underline twc-text-primary-main'}
               target='_blank'
-              href='https://datastrato.ai/'
-              data-refer='footer-link-datastrato'
+              href='https://gravitino.apache.org/'
+              data-refer='footer-link-gravitino'
             >
               Datastrato
             </Link>

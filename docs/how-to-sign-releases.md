@@ -85,10 +85,10 @@ Before signing or verifying a Gravitino release, ensure you have the following p
     GnuPG needs to construct a user ID to identify your key.
 
     Real name: John Smith
-    Email address: john@datastrato.com
+    Email address: john@apache.org
     Comment:
     You selected this USER-ID:
-        "John Smith <john@datastrato.com>"
+        "John Smith <john@apache.org>"
 
     Change (N)ame, (C)omment, (E)mail or (O)kay/(Q)uit? o
     We need to generate a lot of random bytes. It is a good idea to perform
@@ -104,7 +104,7 @@ Before signing or verifying a Gravitino release, ensure you have the following p
 
     pub   ed25519 2023-11-15 [SC] [expires: 2028-11-13]
         CC6BD9B0A3A31A7ACFF9E1383DF672F671B7F722
-    uid                      John Smith <john@datastrato.com>
+    uid                      John Smith <john@apache.org>
     sub   cv25519 2023-11-15 [E] [expires: 2028-11-13]
     ```
 
