@@ -33,7 +33,7 @@ setup(
     version="0.6.0.dev1",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/datastrato/gravitino",
+    url="https://github.com/apache/gravitino",
     author="datastrato",
     author_email="support@datastrato.com",
     python_requires=">=3.8",

@@ -34,7 +34,7 @@ the path mapping and convert automatically.
 
 + A Hadoop environment with HDFS running. GVFS has been tested against
   Hadoop 3.1.0. It is recommended to use Hadoop 3.1.0 or later, but it should work with Hadoop 2.
-  x. Please create an [issue](https://www.github.com/datastrato/gravitino/issues) if you find any
+  x. Please create an [issue](https://www.github.com/apache/gravitino/issues) if you find any
   compatibility issues.
 
 ## Configuration
@@ -104,7 +104,7 @@ two ways:
 
 2. Compile from the source code:
 
-   Download or clone the [Gravitino source code](https://github.com/datastrato/gravitino), and compile it
+   Download or clone the [Gravitino source code](https://github.com/apache/gravitino), and compile it
    locally using the following command in the Gravitino source code directory:
 
     ```shell
