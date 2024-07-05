@@ -1,4 +1,5 @@
 /*
+ * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
  * regarding copyright ownership.  The ASF licenses this file
@@ -23,6 +24,7 @@ import com.datastrato.gravitino.flink.connector.PropertiesConverter;
 import com.datastrato.gravitino.flink.connector.hive.GravitinoHiveCatalog;
 import com.datastrato.gravitino.flink.connector.hive.GravitinoHiveCatalogFactoryOptions;
 import com.datastrato.gravitino.flink.connector.integration.test.FlinkCommonIT;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.util.Arrays;
@@ -42,26 +44,35 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 @Tag("gravitino-docker-test")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class FlinkHiveCatalogIT extends FlinkCommonIT {
+  private static final String DEFAULT_HIVE_CATALOG = "test_flink_hive_schema_catalog";
 
   private static com.datastrato.gravitino.Catalog hiveCatalog;
 
   @BeforeAll
   static void hiveStartUp() {
-    hiveCatalog =
-        metalake.createCatalog(
-            "test_flink_hive_schema_catalog",
-            com.datastrato.gravitino.Catalog.Type.RELATIONAL,
-            "hive",
-            null,
-            ImmutableMap.of("metastore.uris", hiveMetastoreUri));
+    initDefaultHiveCatalog();
   }
 
   @AfterAll
   static void hiveStop() {
-    metalake.dropCatalog("test_flink_hive_schema_catalog");
+    Preconditions.checkNotNull(metalake);
+    metalake.dropCatalog(DEFAULT_HIVE_CATALOG);
+  }
+
+  protected static void initDefaultHiveCatalog() {
+    Preconditions.checkNotNull(metalake);
+    hiveCatalog =
+        metalake.createCatalog(
+            DEFAULT_HIVE_CATALOG,
+            com.datastrato.gravitino.Catalog.Type.RELATIONAL,
+            "hive",
+            null,
+            ImmutableMap.of("metastore.uris", hiveMetastoreUri));
   }
 
   @Test
@@ -75,8 +86,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
     configuration.set(
         CommonCatalogOptions.CATALOG_TYPE, GravitinoHiveCatalogFactoryOptions.IDENTIFIER);
     configuration.set(HiveCatalogFactoryOptions.HIVE_CONF_DIR, "src/test/resources/flink-tests");
-    configuration.set(
-        GravitinoHiveCatalogFactoryOptions.HIVE_METASTORE_URIS, "thrift://127.0.0.1:9084");
+    configuration.set(GravitinoHiveCatalogFactoryOptions.HIVE_METASTORE_URIS, hiveMetastoreUri);
     CatalogDescriptor catalogDescriptor = CatalogDescriptor.of(catalogName, configuration);
     tableEnv.createCatalog(catalogName, catalogDescriptor);
     Assertions.assertTrue(metalake.catalogExists(catalogName));
@@ -84,7 +94,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
     // Check the catalog properties.
     com.datastrato.gravitino.Catalog gravitinoCatalog = metalake.loadCatalog(catalogName);
     Map<String, String> properties = gravitinoCatalog.properties();
-    Assertions.assertEquals("thrift://127.0.0.1:9084", properties.get(METASTORE_URIS));
+    Assertions.assertEquals(hiveMetastoreUri, properties.get(METASTORE_URIS));
     Map<String, String> flinkProperties =
         gravitinoCatalog.properties().entrySet().stream()
             .filter(e -> e.getKey().startsWith(PropertiesConverter.FLINK_PROPERTY_PREFIX))
@@ -141,16 +151,16 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
             "create catalog %s with ("
                 + "'type'='gravitino-hive', "
                 + "'hive-conf-dir'='src/test/resources/flink-tests',"
-                + "'hive.metastore.uris'='thrift://127.0.0.1:9084',"
+                + "'hive.metastore.uris'='%s',"
                 + "'unknown.key'='unknown.value'"
                 + ")",
-            catalogName));
+            catalogName, hiveMetastoreUri));
     Assertions.assertTrue(metalake.catalogExists(catalogName));
 
     // Check the properties of the created catalog.
     com.datastrato.gravitino.Catalog gravitinoCatalog = metalake.loadCatalog(catalogName);
     Map<String, String> properties = gravitinoCatalog.properties();
-    Assertions.assertEquals("thrift://127.0.0.1:9084", properties.get(METASTORE_URIS));
+    Assertions.assertEquals(hiveMetastoreUri, properties.get(METASTORE_URIS));
     Map<String, String> flinkProperties =
         properties.entrySet().stream()
             .filter(e -> e.getKey().startsWith(PropertiesConverter.FLINK_PROPERTY_PREFIX))
@@ -245,7 +255,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
                 "flink.bypass.hive.test",
                 "hive.config",
                 "metastore.uris",
-                "thrift://127.0.0.1:9084"));
+                hiveMetastoreUri));
     Assertions.assertNotNull(gravitinoCatalog);
     Assertions.assertEquals(catalogName, gravitinoCatalog.name());
     Assertions.assertTrue(metalake.catalogExists(catalogName));
@@ -261,7 +271,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
     Assertions.assertTrue(hiveConf.size() > 0, "Should have hive conf");
     Assertions.assertEquals("hive.config", hiveConf.get("hive.test"));
     Assertions.assertEquals(
-        "thrift://127.0.0.1:9084", hiveConf.get(HiveConf.ConfVars.METASTOREURIS.varname));
+        hiveMetastoreUri, hiveConf.get(HiveConf.ConfVars.METASTOREURIS.varname));
 
     // drop the catalog.
     tableEnv.useCatalog(DEFAULT_CATALOG);
