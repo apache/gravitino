@@ -8,7 +8,7 @@ license: "This software is licensed under the Apache License version 2."
 To install the Apache Gravitino connector, you should first deploy the Trino environment, and then install the Gravitino connector plugin into Trino.
 Please refer to the [Deploying Trino documentation](https://trino.io/docs/current/installation/deployment.html) and do the following steps:
 
-1. [Download](https://github.com/datastrato/gravitino/releases) the Gravitino connector tarball and unpack it.
+1. [Download](https://github.com/apache/gravitino/releases) the Gravitino connector tarball and unpack it.
    The tarball contains a single top-level directory `gravitino-trino-connector-<version>`,
    which called the connector directory.
 2. Copy the connector directory to the Trino's plugin directory.
@@ -52,7 +52,7 @@ Download the Gravitino connector tarball and unpack it.
 
 ```shell
 cd /tmp
-wget https://github.com/datastrato/gravitino/releases/gravitino-trino-connector-<version>.tar.gz
+wget https://github.com/apache/gravitino/releases/gravitino-trino-connector-<version>.tar.gz
 tar -zxvf gravitino-trino-connector-<version>.tar.gz
 ```
 

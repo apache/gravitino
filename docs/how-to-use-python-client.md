@@ -42,7 +42,7 @@ to launch a Gravitino server, HDFS and Jupyter notebook environment in you local
 Waiting for the playground Docker environment to start, you can directly open
 `http://localhost:8888/lab/tree/gravitino-fileset-example.ipynb` in the browser and run the example.
 
-The [gravitino-fileset-example](https://github.com/datastrato/gravitino-playground/blob/main/init/jupyter/gravitino-fileset-example.ipynb)
+The [gravitino-fileset-example](https://github.com/apache/gravitino-playground/blob/main/init/jupyter/gravitino-fileset-example.ipynb)
 contains the following code snippets:
 
 1. Install HDFS Python client.
@@ -78,7 +78,7 @@ You can ues any IDE to develop Gravitino Python Client. Directly open the client
 1. Clone the Gravitino project.
 
     ```shell
-    git clone git@github.com:datastrato/gravitino.git
+    git clone git@github.com:apache/gravitino.git
     ```
 
 2. Build the Gravitino Python client module
@@ -119,12 +119,9 @@ You can ues any IDE to develop Gravitino Python Client. Directly open the client
 
 ## Resources
 
-+ Official website https://datastrato.ai/
-+ Project home on GitHub: https://github.com/datastrato/gravitino/
-+ Playground with Docker: https://github.com/datastrato/gravitino-playground
++ Official website https://gravitino.apache.org/ (coming soon)
++ Project home on GitHub: https://github.com/apache/gravitino/
++ Playground with Docker: https://github.com/apache/gravitino-playground
 + User documentation: https://datastrato.ai/docs/
 + Videos on Youtube: https://www.youtube.com/@Datastrato
-+ Twitter: https://twitter.com/datastrato
-+ Linkedin: https://www.linkedin.com/company/datastrato
-+ Slack Community: [https://join.slack.com/t/datastrato-community](https://join.slack.com/t/datastrato-community/shared_invite/zt-2a8vsjoch-cU_uUwHA_QU6Ab50thoq8w)
-+ Discourse Community: https://gravitino.discourse.group/
++ Slack Community: [https://the-asf.slack.com

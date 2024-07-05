@@ -15,7 +15,7 @@ Apache Gravitino supports running on Java 8, 11, and 17. Make sure you have Java
 ### Get the Apache Gravitino binary distribution package
 
 Before installing Gravitino, make sure you have the Gravitino binary distribution package. You can
-download the latest Gravitino binary distribution package from [GitHub](https://github.com/datastrato/gravitino/releases),
+download the latest Gravitino binary distribution package from [GitHub](https://github.com/apache/gravitino/releases),
 or you can build it yourself by following the instructions in [How to Build Gravitino](./how-to-build.md).
 
   - If you build Gravitino yourself using the `./gradlew compileDistribution` command, you can find the
@@ -152,5 +152,5 @@ you want to experience the whole Gravitino system with other components, use the
 `compose` file.
 
 For the details, review the
-[Gravitino playground repository](https://github.com/datastrato/gravitino-playground) and
+[Gravitino playground repository](https://github.com/apache/gravitino-playground) and
 [playground example](./how-to-use-the-playground.md).
