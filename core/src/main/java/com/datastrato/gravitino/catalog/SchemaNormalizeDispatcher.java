@@ -20,6 +20,7 @@ package com.datastrato.gravitino.catalog;
 
 import static com.datastrato.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static com.datastrato.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
+import static com.datastrato.gravitino.catalog.CapabilityHelpers.getCapability;
 
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
@@ -33,39 +34,51 @@ import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import java.util.Map;
 
 public class SchemaNormalizeDispatcher implements SchemaDispatcher {
+  private final CatalogManager catalogManager;
 
-  private final SchemaOperationDispatcher dispatcher;
+  private SchemaDispatcher dispatcher;
 
-  public SchemaNormalizeDispatcher(SchemaOperationDispatcher dispatcher) {
-    this.dispatcher = dispatcher;
+  public SchemaNormalizeDispatcher(CatalogManager catalogManager) {
+    this.catalogManager = catalogManager;
+  }
+
+  @Override
+  public SchemaDispatcher wrap(SchemaDispatcher schemaDispatcher) {
+    this.dispatcher = schemaDispatcher;
+    return dispatcher;
+  }
+
+  @Override
+  public SchemaDispatcher delegate() {
+    return dispatcher;
   }
 
   @Override
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
-    NameIdentifier[] identifiers = dispatcher.listSchemas(namespace);
+    NameIdentifier[] identifiers = delegate().listSchemas(namespace);
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
-    return applyCaseSensitive(identifiers, Capability.Scope.SCHEMA, dispatcher);
+    return normalizeCaseSensitive(identifiers);
   }
 
   @Override
   public boolean schemaExists(NameIdentifier ident) {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
-    return dispatcher.schemaExists(applyCaseSensitive(ident, Capability.Scope.SCHEMA, dispatcher));
+    return delegate().schemaExists(normalizeCaseSensitive(ident));
   }
 
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    return dispatcher.createSchema(normalizeNameIdentifier(ident), comment, properties);
+    return delegate().createSchema(normalizeNameIdentifier(ident), comment, properties);
   }
 
   @Override
   public Schema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
-    return dispatcher.loadSchema(applyCaseSensitive(ident, Capability.Scope.SCHEMA, dispatcher));
+    return delegate().loadSchema(normalizeCaseSensitive(ident));
   }
 
   @Override
@@ -73,17 +86,29 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
       throws NoSuchSchemaException {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
-    return dispatcher.alterSchema(
-        applyCaseSensitive(ident, Capability.Scope.SCHEMA, dispatcher), changes);
+    return delegate().alterSchema(normalizeCaseSensitive(ident), changes);
   }
 
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
-    return dispatcher.dropSchema(normalizeNameIdentifier(ident), cascade);
+    return delegate().dropSchema(normalizeNameIdentifier(ident), cascade);
   }
 
-  private NameIdentifier normalizeNameIdentifier(NameIdentifier ident) {
-    Capability capability = dispatcher.getCatalogCapability(ident);
-    return applyCapabilities(ident, Capability.Scope.SCHEMA, capability);
+  private NameIdentifier normalizeNameIdentifier(NameIdentifier schemaIdent) {
+    Capability capabilities =
+        getCapability(NameIdentifier.of(schemaIdent.namespace().levels()), catalogManager);
+    return applyCapabilities(schemaIdent, Capability.Scope.SCHEMA, capabilities);
+  }
+
+  private NameIdentifier normalizeCaseSensitive(NameIdentifier schemaIdent) {
+    Capability capabilities =
+        getCapability(NameIdentifier.of(schemaIdent.namespace().levels()), catalogManager);
+    return applyCaseSensitive(schemaIdent, Capability.Scope.SCHEMA, capabilities);
+  }
+
+  private NameIdentifier[] normalizeCaseSensitive(NameIdentifier[] schemaIdents) {
+    Capability capabilities =
+        getCapability(NameIdentifier.of(schemaIdents[0].namespace().levels()), catalogManager);
+    return applyCaseSensitive(schemaIdents, Capability.Scope.SCHEMA, capabilities);
   }
 }

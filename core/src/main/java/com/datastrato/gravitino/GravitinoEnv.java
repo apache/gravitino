@@ -18,6 +18,8 @@
  */
 package com.datastrato.gravitino;
 
+import static com.datastrato.gravitino.Configs.CUSTOM_SCHEMA_DISPATCHER;
+
 import com.datastrato.gravitino.authorization.AccessControlManager;
 import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
 import com.datastrato.gravitino.catalog.CatalogDispatcher;
@@ -56,6 +58,7 @@ import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.datastrato.gravitino.tag.TagManager;
 import com.google.common.base.Preconditions;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -151,11 +154,7 @@ public class GravitinoEnv {
         new CatalogNormalizeDispatcher(catalogManager);
     this.catalogDispatcher = new CatalogEventDispatcher(eventBus, catalogNormalizeDispatcher);
 
-    SchemaOperationDispatcher schemaOperationDispatcher =
-        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
-    SchemaNormalizeDispatcher schemaNormalizeDispatcher =
-        new SchemaNormalizeDispatcher(schemaOperationDispatcher);
-    this.schemaDispatcher = new SchemaEventDispatcher(eventBus, schemaNormalizeDispatcher);
+    this.schemaDispatcher = buildSchemaDispatcherDecorator(config);
 
     TableOperationDispatcher tableOperationDispatcher =
         new TableOperationDispatcher(catalogManager, entityStore, idGenerator);
@@ -199,6 +198,36 @@ public class GravitinoEnv {
     this.tagManager = new TagManager(idGenerator, entityStore);
 
     LOG.info("Gravitino Environment is initialized.");
+  }
+
+  private SchemaDispatcher buildSchemaDispatcherDecorator(Config config) {
+    SchemaDispatcher schemaEventDispatcher =
+        new SchemaEventDispatcher(eventListenerManager.createEventBus());
+    SchemaDispatcher schemaNormalizeDispatcher = new SchemaNormalizeDispatcher(catalogManager);
+    SchemaDispatcher schemaOperationDispatcher =
+        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
+
+    Optional<String> customClass = config.get(CUSTOM_SCHEMA_DISPATCHER);
+    if (customClass.isPresent()) {
+      schemaEventDispatcher
+          .wrap(schemaNormalizeDispatcher)
+          .wrap(customSchemaDispatcher(customClass.get()))
+          .wrap(schemaOperationDispatcher);
+    } else {
+      schemaEventDispatcher.wrap(schemaNormalizeDispatcher).wrap(schemaOperationDispatcher);
+    }
+    return schemaEventDispatcher;
+  }
+
+  private SchemaDispatcher customSchemaDispatcher(String customClassName) {
+    try {
+      Class<?> clazz =
+          Class.forName(customClassName, true, Thread.currentThread().getContextClassLoader());
+      return (SchemaDispatcher) clazz.getDeclaredConstructor().newInstance();
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Failed to create custom schema operation dispatcher: " + customClassName, e);
+    }
   }
 
   /**

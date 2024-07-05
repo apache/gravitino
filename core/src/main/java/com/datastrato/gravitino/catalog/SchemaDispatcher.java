@@ -26,4 +26,26 @@ import com.datastrato.gravitino.connector.SupportsSchemas;
  * to dispatching or handling schema-related events or actions that are not covered by the standard
  * {@code SupportsSchemas} operations.
  */
-public interface SchemaDispatcher extends SupportsSchemas {}
+public interface SchemaDispatcher extends SupportsSchemas {
+
+  /**
+   * Wraps the given {@link SchemaOperationDispatcher} with additional behaviors or operations. This
+   * method returns the same {@link SchemaOperationDispatcher} passed as a parameter to allow for
+   * chainable method calls. For example: dispatcherA.wrap(dispatcherB).wrap(dispatcherC)
+   *
+   * @param operationDispatcher The {@link SchemaOperationDispatcher} to wrap. This is the object
+   *     that additional behaviors are applied to. It should not be {@code null}.
+   * @return The same {@link SchemaOperationDispatcher} instance passed in as the parameter.
+   */
+  default SchemaDispatcher wrap(SchemaDispatcher operationDispatcher) {
+    return operationDispatcher;
+  }
+
+  /**
+   * Returns a {@link SchemaDispatcher} that delegates the schema operations to the previously
+   * wrapped {@link SchemaOperationDispatcher}.
+   *
+   * @return The {@link SchemaDispatcher} to delegate the schema operations to.
+   */
+  SchemaDispatcher delegate();
+}

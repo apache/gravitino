@@ -48,6 +48,16 @@ import java.util.Arrays;
 
 public class CapabilityHelpers {
 
+  public static Capability getCapability(
+      NameIdentifier catalogIdent, CatalogManager catalogManager) {
+    CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(catalogIdent);
+    try {
+      return c.capabilities();
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to get capabilities for catalog: " + catalogIdent, e);
+    }
+  }
+
   public static Column[] applyCapabilities(Column[] columns, Capability capabilities) {
     return Arrays.stream(columns)
         .map(c -> applyCapabilities(c, capabilities))
@@ -99,30 +109,28 @@ public class CapabilityHelpers {
   }
 
   public static NameIdentifier[] applyCaseSensitive(
-      NameIdentifier[] idents, Capability.Scope scope, OperationDispatcher operationDispatcher) {
+      NameIdentifier[] idents, Capability.Scope scope, Capability capabilities) {
     return Arrays.stream(idents)
-        .map(ident -> applyCaseSensitive(ident, scope, operationDispatcher))
+        .map(ident -> applyCaseSensitive(ident, scope, capabilities))
         .toArray(NameIdentifier[]::new);
   }
 
   public static NameIdentifier applyCaseSensitive(
-      NameIdentifier ident, Capability.Scope scope, OperationDispatcher operationDispatcher) {
-    Capability capabilities = operationDispatcher.getCatalogCapability(ident);
-    Namespace namespace = applyCaseSensitive(ident.namespace(), scope, operationDispatcher);
+      NameIdentifier ident, Capability.Scope scope, Capability capabilities) {
+    Namespace namespace = applyCaseSensitive(ident.namespace(), scope, capabilities);
 
     String name = applyCaseSensitiveOnName(scope, ident.name(), capabilities);
     return NameIdentifier.of(namespace, name);
   }
 
   public static Namespace applyCaseSensitive(
-      Namespace namespace, Capability.Scope identScope, OperationDispatcher operationDispatcher) {
+      Namespace namespace, Capability.Scope identScope, Capability capabilities) {
     String metalake = namespace.level(0);
     String catalog = namespace.level(1);
     if (identScope == Capability.Scope.TABLE
         || identScope == Capability.Scope.FILESET
         || identScope == Capability.Scope.TOPIC) {
       String schema = namespace.level(namespace.length() - 1);
-      Capability capabilities = operationDispatcher.getCatalogCapability(namespace);
       schema = applyCaseSensitiveOnName(Capability.Scope.SCHEMA, schema, capabilities);
       return Namespace.of(metalake, catalog, schema);
     }

@@ -61,6 +61,12 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     super(catalogManager, store, idGenerator);
   }
 
+  @Override
+  public SchemaDispatcher delegate() {
+    // Return the current instance as the delegate because this class is the last in the chain.
+    return this;
+  }
+
   /**
    * Lists the schemas within the specified namespace.
    *

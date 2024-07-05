@@ -50,24 +50,36 @@ import java.util.Map;
  */
 public class SchemaEventDispatcher implements SchemaDispatcher {
   private final EventBus eventBus;
-  private final SchemaDispatcher dispatcher;
+  /**
+   * The underlying {@link SchemaOperationDispatcher} that will perform the actual schema
+   * operations.
+   */
+  private SchemaDispatcher dispatcher;
 
   /**
    * Constructs a SchemaEventDispatcher with a specified EventBus and SchemaDispatcher.
    *
    * @param eventBus The EventBus to which events will be dispatched.
-   * @param dispatcher The underlying {@link SchemaOperationDispatcher} that will perform the actual
-   *     schema operations.
    */
-  public SchemaEventDispatcher(EventBus eventBus, SchemaDispatcher dispatcher) {
+  public SchemaEventDispatcher(EventBus eventBus) {
     this.eventBus = eventBus;
-    this.dispatcher = dispatcher;
+  }
+
+  @Override
+  public SchemaDispatcher wrap(SchemaDispatcher operationDispatcher) {
+    this.dispatcher = operationDispatcher;
+    return dispatcher;
+  }
+
+  @Override
+  public SchemaDispatcher delegate() {
+    return dispatcher;
   }
 
   @Override
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
     try {
-      NameIdentifier[] nameIdentifiers = dispatcher.listSchemas(namespace);
+      NameIdentifier[] nameIdentifiers = delegate().listSchemas(namespace);
       eventBus.dispatchEvent(new ListSchemaEvent(PrincipalUtils.getCurrentUserName(), namespace));
       return nameIdentifiers;
     } catch (Exception e) {
@@ -79,14 +91,14 @@ public class SchemaEventDispatcher implements SchemaDispatcher {
 
   @Override
   public boolean schemaExists(NameIdentifier ident) {
-    return dispatcher.schemaExists(ident);
+    return delegate().schemaExists(ident);
   }
 
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     try {
-      Schema schema = dispatcher.createSchema(ident, comment, properties);
+      Schema schema = delegate().createSchema(ident, comment, properties);
       eventBus.dispatchEvent(
           new CreateSchemaEvent(
               PrincipalUtils.getCurrentUserName(), ident, new SchemaInfo(schema)));
@@ -103,7 +115,7 @@ public class SchemaEventDispatcher implements SchemaDispatcher {
   @Override
   public Schema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
     try {
-      Schema schema = dispatcher.loadSchema(ident);
+      Schema schema = delegate().loadSchema(ident);
       eventBus.dispatchEvent(
           new LoadSchemaEvent(PrincipalUtils.getCurrentUserName(), ident, new SchemaInfo(schema)));
       return schema;
@@ -118,7 +130,7 @@ public class SchemaEventDispatcher implements SchemaDispatcher {
   public Schema alterSchema(NameIdentifier ident, SchemaChange... changes)
       throws NoSuchSchemaException {
     try {
-      Schema schema = dispatcher.alterSchema(ident, changes);
+      Schema schema = delegate().alterSchema(ident, changes);
       eventBus.dispatchEvent(
           new AlterSchemaEvent(
               PrincipalUtils.getCurrentUserName(), ident, changes, new SchemaInfo(schema)));
@@ -133,7 +145,7 @@ public class SchemaEventDispatcher implements SchemaDispatcher {
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
     try {
-      boolean isExists = dispatcher.dropSchema(ident, cascade);
+      boolean isExists = delegate().dropSchema(ident, cascade);
       eventBus.dispatchEvent(
           new DropSchemaEvent(PrincipalUtils.getCurrentUserName(), ident, isExists, cascade));
       return isExists;

@@ -18,12 +18,15 @@
  */
 package com.datastrato.gravitino;
 
+import static com.datastrato.gravitino.config.ConfigConstants.VERSION_0_1_0;
+
 import com.datastrato.gravitino.config.ConfigBuilder;
 import com.datastrato.gravitino.config.ConfigConstants;
 import com.datastrato.gravitino.config.ConfigEntry;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.util.List;
+import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 
 public class Configs {
@@ -322,4 +325,11 @@ public class Configs {
           .version(ConfigConstants.VERSION_0_5_1)
           .intConf()
           .createWithDefault(DEFAULT_METRICS_TIME_SLIDING_WINDOW_SECONDS);
+
+  public static final ConfigEntry<Optional<String>> CUSTOM_SCHEMA_DISPATCHER =
+      new ConfigBuilder("gravitino.custom.schema.operation.dispatcher")
+          .doc("The custom schema dispatcher class for schema operations")
+          .version(VERSION_0_1_0)
+          .stringConf()
+          .createWithOptional();
 }
