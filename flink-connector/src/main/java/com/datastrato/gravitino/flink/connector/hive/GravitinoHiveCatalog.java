@@ -54,6 +54,7 @@ public class GravitinoHiveCatalog extends BaseCatalog {
     hiveCatalog.open();
   }
 
+  @Override
   public void close() throws CatalogException {
     super.close();
     hiveCatalog.close();
