@@ -133,6 +133,7 @@ class HTTPClient:
                 raise RESTException(err.reason) from None
 
             err_resp = ErrorResponse.from_json(err_body, infer_missing=True)
+            err_resp.validate()
 
             if not isinstance(error_handler, ErrorHandler):
                 raise UnknownError(
