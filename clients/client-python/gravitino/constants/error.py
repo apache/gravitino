@@ -67,3 +67,5 @@ EXCEPTION_MAPPING = {
     NotEmptyException: ErrorConstants.NON_EMPTY_CODE,
     UnsupportedOperationException: ErrorConstants.UNSUPPORTED_OPERATION_CODE,
 }
+
+ERROR_CODE_MAPPING = {v: k for k, v in EXCEPTION_MAPPING.items()}

@@ -16,25 +16,3 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 """
-
-from gravitino.constants.error import ERROR_CODE_MAPPING
-from gravitino.dto.responses.error_response import ErrorResponse
-from gravitino.exceptions.handlers.error_handler import ErrorHandler
-from gravitino.exceptions.base import RESTException
-
-
-class RestErrorHandler(ErrorHandler):
-
-    def handle(self, error_response: ErrorResponse) -> Exception:
-        error_message = error_response.format_error_message()
-        code = error_response.code()
-
-        if code in ERROR_CODE_MAPPING:
-            return ERROR_CODE_MAPPING[code](error_message)
-
-        return RESTException(
-            f"Unable to process: {error_message}",
-        )
-
-
-REST_ERROR_HANDLER = RestErrorHandler()

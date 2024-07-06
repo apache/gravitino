@@ -17,24 +17,27 @@ specific language governing permissions and limitations
 under the License.
 """
 
-from gravitino.constants.error import ERROR_CODE_MAPPING
+from gravitino.constants.error import ErrorConstants
 from gravitino.dto.responses.error_response import ErrorResponse
-from gravitino.exceptions.handlers.error_handler import ErrorHandler
-from gravitino.exceptions.base import RESTException
+from gravitino.exceptions.handlers.rest_error_handler import RestErrorHandler
+from gravitino.exceptions.base import NoSuchFilesetException, NoSuchSchemaException
 
 
-class RestErrorHandler(ErrorHandler):
+class FilesetErrorHandler(RestErrorHandler):
 
     def handle(self, error_response: ErrorResponse) -> Exception:
+
         error_message = error_response.format_error_message()
         code = error_response.code()
+        exception_type = error_response.type()
 
-        if code in ERROR_CODE_MAPPING:
-            return ERROR_CODE_MAPPING[code](error_message)
+        if code == ErrorConstants.NOT_FOUND_CODE:
+            if exception_type == NoSuchSchemaException.__name__:
+                return NoSuchSchemaException(error_message)
+            if exception_type == NoSuchFilesetException.__name__:
+                return NoSuchFilesetException(error_message)
 
-        return RESTException(
-            f"Unable to process: {error_message}",
-        )
+        return super().handle(error_response)
 
 
-REST_ERROR_HANDLER = RestErrorHandler()
+FILESET_ERROR_HANDLER = FilesetErrorHandler()

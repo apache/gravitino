@@ -34,6 +34,15 @@ class ErrorResponse(BaseResponse):
     _message: str = field(metadata=config(field_name="message"))
     _stack: Optional[List[str]] = field(metadata=config(field_name="stack"))
 
+    def type(self):
+        return self._type
+
+    def message(self):
+        return self._message
+
+    def stack(self):
+        return self._stack
+
     def validate(self):
         super().validate()
 

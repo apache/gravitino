@@ -33,7 +33,6 @@ from gravitino.auth.auth_constants import AuthConstants
 from gravitino.auth.auth_data_provider import AuthDataProvider
 from gravitino.typing import JSONType
 
-from gravitino.utils.exceptions import handle_error
 from gravitino.constants.timeout import TIMEOUT
 
 from gravitino.dto.responses.error_response import ErrorResponse
@@ -128,19 +127,19 @@ class HTTPClient:
         try:
             return opener.open(request, timeout=timeout)
         except HTTPError as err:
-            exc = handle_error(err)
+            err_body = err.read()
 
-            if exc.body is None:
-                raise exc from RESTException(exc.reason)
+            if err_body is None:
+                raise RESTException(err.reason) from None
 
-            err_resp = ErrorResponse.from_json(exc.body, infer_missing=True)
+            err_resp = ErrorResponse.from_json(err_body, infer_missing=True)
 
             if not isinstance(error_handler, ErrorHandler):
-                raise exc from UnknownError(
+                raise UnknownError(
                     f"Unknown error handler {type(error_handler).__name__}, error response body: {err_resp}"
-                )
+                ) from None
 
-            raise exc from error_handler.handle(err_resp)
+            raise error_handler.handle(err_resp) from None
 
     def _request(
         self,

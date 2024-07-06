@@ -31,7 +31,6 @@ from gravitino.utils import HTTPClient
 from gravitino.exceptions.base import GravitinoRuntimeException
 from gravitino.constants.version import VERSION_INI, Version
 from gravitino.name_identifier import NameIdentifier
-from gravitino.exceptions.handlers.rest_error_handler import rest_error_handler
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +76,6 @@ class GravitinoClientBase:
         self.check_metalake_name(name)
         response = self._rest_client.get(
             GravitinoClientBase.API_METALAKES_IDENTIFIER_PATH + name,
-            error_handler=rest_error_handler,
         )
         metalake_response = MetalakeResponse.from_json(
             response.body, infer_missing=True

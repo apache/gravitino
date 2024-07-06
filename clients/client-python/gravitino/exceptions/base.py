@@ -55,6 +55,14 @@ class NotFoundException(GravitinoRuntimeException):
     """Base class for all exceptions thrown when a resource is not found."""
 
 
+class NoSuchSchemaException(NotFoundException):
+    """An exception thrown when a schema is not found."""
+
+
+class NoSuchFilesetException(NotFoundException):
+    """Exception thrown when a file with specified name is not existed."""
+
+
 class NoSuchMetalakeException(NotFoundException):
     """An exception thrown when a metalake is not found."""
 
