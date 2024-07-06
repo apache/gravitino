@@ -133,7 +133,9 @@ class TestMetalake(IntegrationTestEnv):
 
     def test_load_metalakes(self):
         self.create_metalake(self.metalake_name)
-        metalake = self.gravitino_admin_client.load_metalake(self.metalake_name)
+        # metalake = self.gravitino_admin_client.load_metalake(self.metalake_name)
+        # TODO for error test
+        metalake = self.gravitino_admin_client.load_metalake("XD")
         self.assertIsNotNone(metalake)
         self.assertEqual(metalake.name(), self.metalake_name)
         self.assertEqual(metalake.comment(), self.metalake_comment)

@@ -50,8 +50,17 @@ class ErrorResponse(BaseResponse):
             + ("\n\t" + "\n\t".join(self._stack) if self._stack is not None else "")
         )
 
+    def format_error_message(self) -> str:
+        return (
+            f"{self._message}\n" + "\n".join(self._stack)
+            if self._stack is not None
+            else ""
+        )
+
     @classmethod
-    def generate_error_response(cls, exception: Exception, message: str) -> "ErrorResponse":
+    def generate_error_response(
+        cls, exception: Exception, message: str
+    ) -> "ErrorResponse":
         for exception_type, error_code in EXCEPTION_MAPPING.items():
             if issubclass(exception, exception_type):
                 return cls(error_code, exception.__name__, message, None)
