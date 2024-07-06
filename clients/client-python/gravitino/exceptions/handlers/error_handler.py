@@ -28,5 +28,13 @@ class ErrorHandler(ABC):
     """
 
     @abstractmethod
-    def accept(self, error_response: ErrorResponse):
-        """"""
+    def handle(self, error_response: ErrorResponse) -> Exception:
+        """Handles the error response and returns the appropriate Exception. The implementation will use the
+        provided error response to determine which exception to raise.
+
+        Args:
+          error_response: the error response from the server
+
+        Returns:
+          Exceptions
+        """

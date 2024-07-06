@@ -24,7 +24,10 @@ from gravitino.exceptions.base import RESTException
 
 class RestErrorHandler(ErrorHandler):
 
-    def accept(self, error_response: ErrorResponse):
-        raise RESTException(
-            "Unable to process: %s", error_response.format_error_message()
+    def handle(self, error_response: ErrorResponse) -> Exception:
+        return RESTException(
+            f"Unable to process: {error_response.format_error_message()}",
         )
+
+
+rest_error_handler = RestErrorHandler()
