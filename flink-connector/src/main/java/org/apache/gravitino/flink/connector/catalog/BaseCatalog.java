@@ -494,8 +494,4 @@ public abstract class BaseCatalog extends AbstractCatalog implements TransformCo
   private String catalogName() {
     return getName();
   }
-
-  private String metalakeName() {
-    return GravitinoCatalogManager.get().getMetalakeName();
-  }
 }

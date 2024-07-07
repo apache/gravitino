@@ -1,5 +1,4 @@
 /*
-<<<<<<< HEAD
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,10 +15,6 @@
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
  * under the License.
-=======
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
->>>>>>> 8e10c18c ([#3371] feat(flink-connector): support basic table operation)
  */
 
 package org.apache.gravitino.flink.connector.utils;
