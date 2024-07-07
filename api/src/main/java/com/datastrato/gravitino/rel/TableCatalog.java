@@ -282,7 +282,7 @@ public interface TableCatalog {
    * implementation throws an {@link UnsupportedOperationException}.
    *
    * @param ident A table identifier.
-   * @return True if the table was purged, false if the table did not exist.
+   * @return True if the table was purged, false if the table does not exist.
    * @throws UnsupportedOperationException If the catalog does not support to purge a table.
    */
   default boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {

@@ -549,6 +549,10 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     Assertions.assertTrue(hiveCatalogOperations.tableExists(tableIdentifier));
     hiveCatalogOperations.purgeTable(tableIdentifier);
     Assertions.assertFalse(hiveCatalogOperations.tableExists(tableIdentifier));
+    // purging non-exist table should return false
+    Assertions.assertFalse(
+        hiveCatalogOperations.purgeTable(tableIdentifier),
+        "The table should not be found in the catalog");
   }
 
   @Test
