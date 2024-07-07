@@ -140,11 +140,6 @@ class TestFilesetCatalog(IntegrationTestEnv):
             properties=self.fileset_properties,
         )
 
-    def test_failed(self):
-        catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
-        with self.assertRaises(NoSuchFilesetException):
-            _ = catalog.as_fileset_catalog().load_fileset(ident=self.fileset_ident)
-
     def test_create_fileset(self):
         fileset = self.create_fileset()
         self.assertIsNotNone(fileset)
@@ -179,6 +174,11 @@ class TestFilesetCatalog(IntegrationTestEnv):
         self.assertEqual(fileset.comment(), self.fileset_comment)
         self.assertEqual(fileset.properties(), self.fileset_properties)
         self.assertEqual(fileset.audit_info().creator(), "anonymous")
+
+    def test_failed_load_fileset(self):
+        catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
+        with self.assertRaises(NoSuchFilesetException):
+            _ = catalog.as_fileset_catalog().load_fileset(ident=self.fileset_ident)
 
     def test_alter_fileset(self):
         self.create_fileset()
