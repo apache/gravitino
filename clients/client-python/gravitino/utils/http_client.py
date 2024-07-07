@@ -23,6 +23,7 @@ SOFTWARE.
 """
 
 import logging
+from typing import Tuple
 from urllib.request import Request, build_opener
 from urllib.parse import urlencode
 
@@ -120,27 +121,23 @@ class HTTPClient:
                 _headers[key] = value
         return _headers
 
-    def _make_request(
-        self, opener, request, timeout=None, error_handler: ErrorHandler = None
-    ):
+    def _make_request(self, opener, request, timeout=None) -> Tuple[bool, Response]:
         timeout = timeout or self.timeout
         try:
-            return opener.open(request, timeout=timeout)
+            return (True, Response(opener.open(request, timeout=timeout)))
         except HTTPError as err:
             err_body = err.read()
 
             if err_body is None:
-                raise RESTException(err.reason) from None
+                return (
+                    False,
+                    ErrorResponse.generate_error_response(RESTException, err.reason),
+                )
 
             err_resp = ErrorResponse.from_json(err_body, infer_missing=True)
             err_resp.validate()
 
-            if not isinstance(error_handler, ErrorHandler):
-                raise UnknownError(
-                    f"Unknown error handler {type(error_handler).__name__}, error response body: {err_resp}"
-                ) from None
-
-            raise error_handler.handle(err_resp) from None
+            return (False, err_resp)
 
     def _request(
         self,
@@ -180,11 +177,20 @@ class HTTPClient:
                 self.auth_data_provider.get_token_data().decode("utf-8"),
             )
         request.get_method = lambda: method
-        return Response(
-            self._make_request(
-                opener, request, timeout=timeout, error_handler=error_handler
-            )
-        )
+        is_success, resp = self._make_request(opener, request, timeout=timeout)
+
+        if is_success:
+            return resp
+
+        if not isinstance(error_handler, ErrorHandler):
+            raise UnknownError(
+                f"Unknown error handler {type(error_handler).__name__}, error response body: {resp}"
+            ) from None
+
+        error_handler.handle(resp)
+        raise UnknownError(
+            f"Error handler {type(error_handler).__name__} can't handle this response, error response body: {resp}"
+        ) from None
 
     def get(self, endpoint, params=None, error_handler=None, **kwargs):
         return self._request(

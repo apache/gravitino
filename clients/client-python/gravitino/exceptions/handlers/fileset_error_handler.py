@@ -25,7 +25,7 @@ from gravitino.exceptions.base import NoSuchFilesetException, NoSuchSchemaExcept
 
 class FilesetErrorHandler(RestErrorHandler):
 
-    def handle(self, error_response: ErrorResponse) -> Exception:
+    def handle(self, error_response: ErrorResponse):
 
         error_message = error_response.format_error_message()
         code = error_response.code()
@@ -33,11 +33,11 @@ class FilesetErrorHandler(RestErrorHandler):
 
         if code == ErrorConstants.NOT_FOUND_CODE:
             if exception_type == NoSuchSchemaException.__name__:
-                return NoSuchSchemaException(error_message)
+                raise NoSuchSchemaException(error_message)
             if exception_type == NoSuchFilesetException.__name__:
-                return NoSuchFilesetException(error_message)
+                raise NoSuchFilesetException(error_message)
 
-        return super().handle(error_response)
+        super().handle(error_response)
 
 
 FILESET_ERROR_HANDLER = FilesetErrorHandler()

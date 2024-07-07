@@ -25,14 +25,14 @@ from gravitino.exceptions.base import RESTException
 
 class RestErrorHandler(ErrorHandler):
 
-    def handle(self, error_response: ErrorResponse) -> Exception:
+    def handle(self, error_response: ErrorResponse):
         error_message = error_response.format_error_message()
         code = error_response.code()
 
         if code in ERROR_CODE_MAPPING:
-            return ERROR_CODE_MAPPING[code](error_message)
+            raise ERROR_CODE_MAPPING[code](error_message)
 
-        return RESTException(
+        raise RESTException(
             f"Unable to process: {error_message}",
         )
 
