@@ -18,11 +18,21 @@
  */
 package org.apache.gravitino.flink.connector.catalog;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
+import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.api.Schema;
+import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogDatabase;
 import org.apache.flink.table.catalog.CatalogDatabaseImpl;
+import org.apache.flink.table.catalog.CatalogTable;
+import org.apache.flink.table.catalog.Column;
+import org.apache.flink.table.catalog.TableChange;
 import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.flink.connector.PropertiesConverter;
+import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -48,5 +58,84 @@ public class TestBaseCatalog {
     Assertions.assertInstanceOf(SchemaChange.SetProperty.class, schemaChange[2]);
     Assertions.assertEquals("key2", ((SchemaChange.SetProperty) schemaChange[2]).getProperty());
     Assertions.assertEquals("new-value2", ((SchemaChange.SetProperty) schemaChange[2]).getValue());
+  }
+
+  @Test
+  public void testTableChanges() {
+    BaseCatalog mockCatalog = new TestCatalog();
+    List<TableChange> tableChanges =
+        ImmutableList.of(
+            TableChange.add(Column.physical("test", DataTypes.INT())),
+            TableChange.modifyPhysicalColumnType(
+                Column.physical("test", DataTypes.INT()), DataTypes.DOUBLE()),
+            TableChange.modifyColumnName(Column.physical("test", DataTypes.INT()), "test2"),
+            TableChange.dropColumn("aaa"),
+            TableChange.modifyColumnComment(
+                Column.physical("test", DataTypes.INT()), "new comment"),
+            TableChange.modifyColumnPosition(
+                Column.physical("test", DataTypes.INT()),
+                TableChange.ColumnPosition.after("test2")),
+            TableChange.modifyColumnPosition(
+                Column.physical("test", DataTypes.INT()), TableChange.ColumnPosition.first()),
+            TableChange.set("key", "value"),
+            TableChange.reset("key"));
+
+    List<org.apache.gravitino.rel.TableChange> expected =
+        ImmutableList.of(
+            org.apache.gravitino.rel.TableChange.addColumn(
+                new String[] {"test"}, Types.IntegerType.get()),
+            org.apache.gravitino.rel.TableChange.updateColumnType(
+                new String[] {"test"}, Types.DoubleType.get()),
+            org.apache.gravitino.rel.TableChange.renameColumn(new String[] {"test"}, "test2"),
+            org.apache.gravitino.rel.TableChange.deleteColumn(new String[] {"aaa"}, true),
+            org.apache.gravitino.rel.TableChange.updateColumnComment(
+                new String[] {"test"}, "new comment"),
+            org.apache.gravitino.rel.TableChange.updateColumnPosition(
+                new String[] {"test"},
+                org.apache.gravitino.rel.TableChange.ColumnPosition.after("test2")),
+            org.apache.gravitino.rel.TableChange.updateColumnPosition(
+                new String[] {"test"}, org.apache.gravitino.rel.TableChange.ColumnPosition.first()),
+            org.apache.gravitino.rel.TableChange.setProperty("key", "value"),
+            org.apache.gravitino.rel.TableChange.removeProperty("key"));
+
+    org.apache.gravitino.rel.TableChange[] gravitinoTableChanges =
+        mockCatalog.getTableChanges(tableChanges);
+    Assertions.assertArrayEquals(expected.toArray(), gravitinoTableChanges);
+  }
+
+  @Test
+  public void testTableChangesWithoutColumnChange() {
+    BaseCatalog mockCatalog = new TestCatalog();
+    Schema schema = Schema.newBuilder().column("test", "INT").build();
+    CatalogBaseTable table =
+        CatalogTable.of(
+            schema, "test", ImmutableList.of(), ImmutableMap.of("key", "value", "key2", "value2"));
+    CatalogBaseTable newTable =
+        CatalogTable.of(
+            schema, "new comment", ImmutableList.of(), ImmutableMap.of("key", "new value"));
+    org.apache.gravitino.rel.TableChange[] tableChanges =
+        mockCatalog.getTableChanges(table, newTable);
+    List<org.apache.gravitino.rel.TableChange> expected =
+        ImmutableList.of(
+            org.apache.gravitino.rel.TableChange.removeProperty("key2"),
+            org.apache.gravitino.rel.TableChange.setProperty("key", "new value"),
+            org.apache.gravitino.rel.TableChange.updateComment("new comment"));
+    Assertions.assertArrayEquals(expected.toArray(), tableChanges);
+  }
+}
+
+class TestCatalog extends BaseCatalog {
+
+  public TestCatalog(String catalogName, String defaultDatabase) {
+    super(catalogName, defaultDatabase);
+  }
+
+  public TestCatalog() {
+    this("test", "default");
+  }
+
+  @Override
+  protected PropertiesConverter getPropertiesConverter() {
+    return null;
   }
 }

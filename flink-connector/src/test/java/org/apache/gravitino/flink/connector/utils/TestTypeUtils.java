@@ -21,6 +21,7 @@ package org.apache.gravitino.flink.connector.utils;
 
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.catalog.UnresolvedIdentifier;
+import org.apache.flink.table.types.logical.BigIntType;
 import org.apache.flink.table.types.logical.DoubleType;
 import org.apache.flink.table.types.logical.IntType;
 import org.apache.flink.table.types.logical.UnresolvedUserDefinedType;
@@ -37,6 +38,7 @@ public class TestTypeUtils {
         Types.StringType.get(), TypeUtils.toGravitinoType(new VarCharType(Integer.MAX_VALUE)));
     Assertions.assertEquals(Types.DoubleType.get(), TypeUtils.toGravitinoType(new DoubleType()));
     Assertions.assertEquals(Types.IntegerType.get(), TypeUtils.toGravitinoType(new IntType()));
+    Assertions.assertEquals(Types.LongType.get(), TypeUtils.toGravitinoType(new BigIntType()));
     Assertions.assertThrows(
         UnsupportedOperationException.class,
         () ->
@@ -49,6 +51,7 @@ public class TestTypeUtils {
     Assertions.assertEquals(DataTypes.DOUBLE(), TypeUtils.toFlinkType(Types.DoubleType.get()));
     Assertions.assertEquals(DataTypes.STRING(), TypeUtils.toFlinkType(Types.StringType.get()));
     Assertions.assertEquals(DataTypes.INT(), TypeUtils.toFlinkType(Types.IntegerType.get()));
+    Assertions.assertEquals(DataTypes.BIGINT(), TypeUtils.toFlinkType(Types.LongType.get()));
     Assertions.assertThrows(
         UnsupportedOperationException.class,
         () -> TypeUtils.toFlinkType(Types.UnparsedType.of("unknown")));

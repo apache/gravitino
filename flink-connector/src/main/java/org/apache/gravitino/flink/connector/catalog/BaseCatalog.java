@@ -25,6 +25,7 @@ import com.google.common.collect.Maps;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.compress.utils.Lists;
@@ -68,6 +69,7 @@ import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.PropertiesConverter;
+import org.apache.gravitino.flink.connector.utils.TableUtils;
 import org.apache.gravitino.flink.connector.utils.TypeUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -280,10 +282,70 @@ public abstract class BaseCatalog extends AbstractCatalog {
     }
   }
 
+  /**
+   * The method only is used to change the properties and comments. To alter columns, use the other
+   * alterTable API and provide a list of TableChange's.
+   *
+   * @param tablePath path of the table or view to be modified
+   * @param newTable the new table definition
+   * @param ignoreIfNotExists flag to specify behavior when the table or view does not exist: if set
+   *     to false, throw an exception, if set to true, do nothing.
+   * @throws TableNotExistException if the table not exists.
+   * @throws CatalogException in case of any runtime exception.
+   */
   @Override
-  public void alterTable(ObjectPath objectPath, CatalogBaseTable catalogBaseTable, boolean b)
+  public void alterTable(ObjectPath tablePath, CatalogBaseTable newTable, boolean ignoreIfNotExists)
       throws TableNotExistException, CatalogException {
-    throw new UnsupportedOperationException();
+    CatalogBaseTable existingTable;
+
+    try {
+      existingTable = this.getTable(tablePath);
+    } catch (TableNotExistException e) {
+      if (!ignoreIfNotExists) {
+        throw e;
+      }
+      return;
+    }
+
+    if (existingTable.getTableKind() != newTable.getTableKind()) {
+      throw new CatalogException(
+          String.format(
+              "Table types don't match. Existing table is '%s' and new table is '%s'.",
+              existingTable.getTableKind(), newTable.getTableKind()));
+    }
+
+    NameIdentifier identifier =
+        NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName());
+    catalog().asTableCatalog().alterTable(identifier, getTableChanges(existingTable, newTable));
+  }
+
+  @Override
+  public void alterTable(
+      ObjectPath tablePath,
+      CatalogBaseTable newTable,
+      List<org.apache.flink.table.catalog.TableChange> tableChanges,
+      boolean ignoreIfNotExists)
+      throws TableNotExistException, CatalogException {
+    CatalogBaseTable existingTable;
+    try {
+      existingTable = this.getTable(tablePath);
+    } catch (TableNotExistException e) {
+      if (!ignoreIfNotExists) {
+        throw e;
+      }
+      return;
+    }
+
+    if (existingTable.getTableKind() != newTable.getTableKind()) {
+      throw new CatalogException(
+          String.format(
+              "Table types don't match. Existing table is '%s' and new table is '%s'.",
+              existingTable.getTableKind(), newTable.getTableKind()));
+    }
+
+    NameIdentifier identifier =
+        NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName());
+    catalog().asTableCatalog().alterTable(identifier, getTableChanges(tableChanges));
   }
 
   @Override
@@ -468,6 +530,119 @@ public abstract class BaseCatalog extends AbstractCatalog {
         column.getDataType().getLogicalType().isNullable(),
         false,
         null);
+  }
+
+  private List<TableChange> optionsChanges(
+      Map<String, String> currentOptions, Map<String, String> updatedOptions) {
+    List<TableChange> optionsChanges = com.google.common.collect.Lists.newArrayList();
+    MapDifference<String, String> difference = Maps.difference(currentOptions, updatedOptions);
+    difference
+        .entriesOnlyOnLeft()
+        .forEach((key, value) -> optionsChanges.add(TableChange.removeProperty(key)));
+    difference
+        .entriesOnlyOnRight()
+        .forEach((key, value) -> optionsChanges.add(TableChange.setProperty(key, value)));
+    difference
+        .entriesDiffering()
+        .forEach(
+            (key, value) -> {
+              optionsChanges.add(TableChange.setProperty(key, value.rightValue()));
+            });
+    return optionsChanges;
+  }
+
+  private void removeProperty(
+      org.apache.flink.table.catalog.TableChange.ResetOption change, List<TableChange> changes) {
+    changes.add(TableChange.removeProperty(change.getKey()));
+  }
+
+  private void setProperty(
+      org.apache.flink.table.catalog.TableChange.SetOption change, List<TableChange> changes) {
+    changes.add(TableChange.setProperty(change.getKey(), change.getValue()));
+  }
+
+  private void dropColumn(
+      org.apache.flink.table.catalog.TableChange.DropColumn change, List<TableChange> changes) {
+    changes.add(TableChange.deleteColumn(new String[] {change.getColumnName()}, true));
+  }
+
+  private void addColumn(
+      org.apache.flink.table.catalog.TableChange.AddColumn change, List<TableChange> changes) {
+    changes.add(
+        TableChange.addColumn(
+            new String[] {change.getColumn().getName()},
+            TypeUtils.toGravitinoType(change.getColumn().getDataType().getLogicalType()),
+            change.getColumn().getComment().orElse(null),
+            TableUtils.toGravitinoColumnPosition(change.getPosition())));
+  }
+
+  private void modifyColumn(
+      org.apache.flink.table.catalog.TableChange change, List<TableChange> changes) {
+    if (change instanceof org.apache.flink.table.catalog.TableChange.ModifyColumnName) {
+      org.apache.flink.table.catalog.TableChange.ModifyColumnName modifyColumnName =
+          (org.apache.flink.table.catalog.TableChange.ModifyColumnName) change;
+      changes.add(
+          TableChange.renameColumn(
+              new String[] {modifyColumnName.getOldColumnName()},
+              modifyColumnName.getNewColumnName()));
+    } else if (change
+        instanceof org.apache.flink.table.catalog.TableChange.ModifyPhysicalColumnType) {
+      org.apache.flink.table.catalog.TableChange.ModifyPhysicalColumnType modifyColumnType =
+          (org.apache.flink.table.catalog.TableChange.ModifyPhysicalColumnType) change;
+      changes.add(
+          TableChange.updateColumnType(
+              new String[] {modifyColumnType.getOldColumn().getName()},
+              TypeUtils.toGravitinoType(modifyColumnType.getNewType().getLogicalType())));
+    } else if (change instanceof org.apache.flink.table.catalog.TableChange.ModifyColumnPosition) {
+      org.apache.flink.table.catalog.TableChange.ModifyColumnPosition modifyColumnPosition =
+          (org.apache.flink.table.catalog.TableChange.ModifyColumnPosition) change;
+      changes.add(
+          TableChange.updateColumnPosition(
+              new String[] {modifyColumnPosition.getOldColumn().getName()},
+              TableUtils.toGravitinoColumnPosition(modifyColumnPosition.getNewPosition())));
+    } else if (change instanceof org.apache.flink.table.catalog.TableChange.ModifyColumnComment) {
+      org.apache.flink.table.catalog.TableChange.ModifyColumnComment modifyColumnComment =
+          (org.apache.flink.table.catalog.TableChange.ModifyColumnComment) change;
+      changes.add(
+          TableChange.updateColumnComment(
+              new String[] {modifyColumnComment.getOldColumn().getName()},
+              modifyColumnComment.getNewComment()));
+    } else {
+      throw new IllegalArgumentException(
+          String.format("Not support ModifyColumn : %s", change.getClass()));
+    }
+  }
+
+  @VisibleForTesting
+  TableChange[] getTableChanges(CatalogBaseTable existingTable, CatalogBaseTable newTable) {
+    List<TableChange> changes = Lists.newArrayList();
+    changes.addAll(optionsChanges(existingTable.getOptions(), newTable.getOptions()));
+    if (!Objects.equals(newTable.getComment(), existingTable.getComment())) {
+      changes.add(TableChange.updateComment(newTable.getComment()));
+    }
+    return changes.toArray(new TableChange[0]);
+  }
+
+  @VisibleForTesting
+  TableChange[] getTableChanges(List<org.apache.flink.table.catalog.TableChange> tableChanges) {
+    List<TableChange> changes = Lists.newArrayList();
+    for (org.apache.flink.table.catalog.TableChange change : tableChanges) {
+      if (change instanceof org.apache.flink.table.catalog.TableChange.AddColumn) {
+        addColumn((org.apache.flink.table.catalog.TableChange.AddColumn) change, changes);
+      } else if (change instanceof org.apache.flink.table.catalog.TableChange.DropColumn) {
+        dropColumn((org.apache.flink.table.catalog.TableChange.DropColumn) change, changes);
+      } else if (change instanceof org.apache.flink.table.catalog.TableChange.ModifyColumn) {
+        modifyColumn(change, changes);
+      } else if (change instanceof org.apache.flink.table.catalog.TableChange.SetOption) {
+        setProperty((org.apache.flink.table.catalog.TableChange.SetOption) change, changes);
+      } else if (change instanceof org.apache.flink.table.catalog.TableChange.ResetOption) {
+        removeProperty((org.apache.flink.table.catalog.TableChange.ResetOption) change, changes);
+      } else {
+        throw new UnsupportedOperationException(
+            String.format("Not supported change : %s", change.getClass()));
+      }
+    }
+    return changes.toArray(new TableChange[0]);
   }
 
   @VisibleForTesting
