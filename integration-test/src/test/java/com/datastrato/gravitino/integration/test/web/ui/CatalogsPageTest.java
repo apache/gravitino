@@ -29,6 +29,8 @@ import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.TrinoITContainers;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
+import com.datastrato.gravitino.integration.test.util.CommandExecutor;
+import com.datastrato.gravitino.integration.test.util.ProcessData;
 import com.datastrato.gravitino.integration.test.web.ui.pages.CatalogsPage;
 import com.datastrato.gravitino.integration.test.web.ui.pages.MetalakePage;
 import com.datastrato.gravitino.integration.test.web.ui.utils.AbstractWebIT;
@@ -612,6 +614,12 @@ public class CatalogsPageTest extends AbstractWebIT {
   @Test
   @Order(21)
   public void testFilesetCatalogTreeNode() throws InterruptedException {
+    Object o =
+        CommandExecutor.executeCommandLocalHost(
+            "docker exec trino-ci-hive hadoop fs -chown -R anonymous /",
+            false,
+            ProcessData.TypesOfData.STREAMS_MERGED);
+    LOG.info("Command result: {}", o);
     // 1. create schema and fileset of fileset catalog
     createSchema(METALAKE_NAME, FILESET_CATALOG_NAME, SCHEMA_NAME_FILESET);
     createFileset(METALAKE_NAME, FILESET_CATALOG_NAME, SCHEMA_NAME_FILESET, FILESET_NAME);
