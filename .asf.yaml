@@ -17,7 +17,7 @@
 
 github:
   description: World's most powerful open data catalog for building a high-performance, geo-distributed and federated metadata lake.
-  homepage: https://datastrato.ai/docs/
+  homepage: https://gravitino.apache.org
   labels:
     - metadata
     - data-catalog

@@ -33,7 +33,7 @@ The playground runs a number of services. The TCP ports used may clash with exis
 ### Launch all components of playground
 
 ```shell
-git clone git@github.com:datastrato/gravitino-playground.git
+git clone git@github.com:apache/gravitino-playground.git
 cd gravitino-playground
 ./launch-playground.sh
 ```
@@ -41,7 +41,7 @@ cd gravitino-playground
 ### Launch big data components of playground
 
 ```shell
-git clone git@github.com:datastrato/gravitino-playground.git
+git clone git@github.com:apache/gravitino-playground.git
 cd gravitino-playground
 ./launch-playground.sh bigdata
 # equivalent to
@@ -51,7 +51,7 @@ cd gravitino-playground
 ### Launch AI components of playground
 
 ```shell
-git clone git@github.com:datastrato/gravitino-playground.git
+git clone git@github.com:apache/gravitino-playground.git
 cd gravitino-playground
 ./launch-playground.sh ai
 # equivalent to
@@ -61,7 +61,7 @@ cd gravitino-playground
 ### Launch special component or components of playground
 
 ```shell
-git clone git@github.com:datastrato/gravitino-playground.git
+git clone git@github.com:apache/gravitino-playground.git
 cd gravitino-playground
 ./launch-playground.sh hive|gravitino|trino|postgresql|mysql|spark|jupyter
 ```

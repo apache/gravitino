@@ -17,7 +17,7 @@
 # under the License.
 #
 FROM ubuntu:22.04
-LABEL maintainer="support@datastrato.com"
+LABEL maintainer="dev@gravitino.apache.org"
 
 ARG DORIS_VERSION
 ARG TARGETARCH

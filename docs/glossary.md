@@ -146,7 +146,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Apache Gravitino
 
-- An open-source software platform created by Datastrato for high-performance, geo-distributed, and federated metadata lakes. Designed to manage metadata directly in different sources, types, and regions, providing unified metadata access for data and AI assets.
+- An open-source software platform originally created by Datastrato for high-performance, geo-distributed, and federated metadata lakes. Designed to manage metadata directly in different sources, types, and regions, providing unified metadata access for data and AI assets.
 
 ## Apache Gravitino configuration file (gravitino.conf)
 
