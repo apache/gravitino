@@ -22,8 +22,8 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.TestCatalog;
 import com.datastrato.gravitino.connector.BaseCatalog;
-import com.datastrato.gravitino.connector.authorization.authorization1.TestAuthorizationHook1;
-import com.datastrato.gravitino.connector.authorization.authorization2.TestAuthorizationHook2;
+import com.datastrato.gravitino.connector.authorization.authorization1.TestAuthorizationPlugin1;
+import com.datastrato.gravitino.connector.authorization.authorization2.TestAuthorizationPlugin2;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.google.common.collect.ImmutableMap;
@@ -72,21 +72,21 @@ public class TestAuthorization {
 
   @Test
   public void testAuthorizationCatalog1() {
-    AuthorizationHook authHook1 = testCatalog1.getAuthorizationHook();
-    Assertions.assertInstanceOf(TestAuthorizationHook1.class, authHook1);
-    TestAuthorizationHook1 testAuthOps1 = (TestAuthorizationHook1) authHook1;
+    AuthorizationPlugin authPlugin1 = testCatalog1.getAuthorizationPlugin();
+    Assertions.assertInstanceOf(TestAuthorizationPlugin1.class, authPlugin1);
+    TestAuthorizationPlugin1 testAuthOps1 = (TestAuthorizationPlugin1) authPlugin1;
     Assertions.assertFalse(testAuthOps1.callOnCreateRole1);
-    authHook1.onCreateRole(null, null);
+    authPlugin1.onCreateRole(null, null);
     Assertions.assertTrue(testAuthOps1.callOnCreateRole1);
   }
 
   @Test
   public void testAuthorizationCatalog2() {
-    AuthorizationHook authHook2 = testCatalog2.getAuthorizationHook();
-    Assertions.assertInstanceOf(TestAuthorizationHook2.class, authHook2);
-    TestAuthorizationHook2 testAuthOps2 = (TestAuthorizationHook2) authHook2;
+    AuthorizationPlugin authPlugin2 = testCatalog2.getAuthorizationPlugin();
+    Assertions.assertInstanceOf(TestAuthorizationPlugin2.class, authPlugin2);
+    TestAuthorizationPlugin2 testAuthOps2 = (TestAuthorizationPlugin2) authPlugin2;
     Assertions.assertFalse(testAuthOps2.callOnCreateRole2);
-    authHook2.onCreateRole(null, null);
+    authPlugin2.onCreateRole(null, null);
     Assertions.assertTrue(testAuthOps2.callOnCreateRole2);
   }
 }

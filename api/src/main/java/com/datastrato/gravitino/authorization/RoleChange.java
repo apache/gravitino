@@ -24,7 +24,7 @@ import com.datastrato.gravitino.annotation.Evolving;
 @Evolving
 public interface RoleChange {
   /**
-   * Create a RoleChange for Add a securable object into a role.
+   * Create a RoleChange to Add a securable object into a role.
    *
    * @param securableObject The securable object.
    * @return return a RoleChange for the add securable object.
@@ -34,7 +34,7 @@ public interface RoleChange {
   }
 
   /**
-   * Create a RoleChange for remove a securable object from a role.
+   * Create a RoleChange to remove a securable object from a role.
    *
    * @param securableObject The securable object.
    * @return return a RoleChange for the add securable object.

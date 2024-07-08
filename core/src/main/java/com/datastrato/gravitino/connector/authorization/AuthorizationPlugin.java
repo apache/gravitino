@@ -16,18 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datastrato.gravitino.authorization;
+package com.datastrato.gravitino.connector.authorization;
+
+import java.io.Closeable;
 
 /**
- * An Authorization provider is a class that provides a short name for an authorization. This short
- * name is used when creating an authorization.
+ * Authorization operations plugin interfaces. <br>
+ * Notice: Because each interface function needs to perform multiple steps in the underlying
+ * permission system, the implementation method of these function interface must be idempotent.
  */
-public interface AuthorizationProvider {
-  /**
-   * The string that represents the authorization that this provider uses. This is overridden by
-   * children to provide a nice alias for the authorization.
-   *
-   * @return The string that represents the authorization that this provider uses.
-   */
-  String shortName();
-}
+public interface AuthorizationPlugin
+    extends UserGroupAuthorizationPlugin, RoleAuthorizationPlugin, Closeable {}

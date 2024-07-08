@@ -18,49 +18,47 @@
  */
 package com.datastrato.gravitino.connector.authorization;
 
-import com.datastrato.gravitino.authorization.AuthorizationProvider;
 import java.io.Closeable;
 import java.io.IOException;
 
 /**
- * The abstract base class for Authorization implementations.
- *
- * <p>A typical authorization always contain {@link AuthorizationHook} which is used to trigger the
- * specific operations by the authorization.
- *
- * <p>For example, a Ranger authorization has a RangerAuthorizationHook which manipulates Ranger to
- * management Hive and HDFS permission.
+ * The abstract base class for Authorization implementations.<br>
+ * A typical authorization always contain {@link AuthorizationPlugin} which is used to trigger the
+ * specific operations by the authorization. <br>
+ * For example, a Ranger authorization has a RangerAuthorizationPlugin which manipulates Ranger to
+ * management Hive and HDFS permission. <br>
  *
  * @param <T> The type of the concrete subclass of BaseAuthorization.
  */
 public abstract class BaseAuthorization<T extends BaseAuthorization>
     implements AuthorizationProvider, Closeable {
-  private volatile AuthorizationHook hook = null;
+  private volatile AuthorizationPlugin plugin = null;
 
   /**
-   * Creates a new instance of AuthorizationHook. The child class should implement this method to
-   * provide a specific AuthorizationHook instance regarding that authorization.
+   * Creates a new instance of AuthorizationPlugin. <br>
+   * The child class should implement this method to provide a specific AuthorizationPlugin instance
+   * regarding that authorization. <br>
    *
    * @return A new instance of AuthorizationHook.
    */
-  protected abstract AuthorizationHook newHook();
+  protected abstract AuthorizationPlugin newPlugin();
 
-  public AuthorizationHook hook() {
-    if (hook == null) {
+  public AuthorizationPlugin plugin() {
+    if (plugin == null) {
       synchronized (this) {
-        if (hook == null) {
-          hook = newHook();
+        if (plugin == null) {
+          plugin = newPlugin();
         }
       }
     }
 
-    return hook;
+    return plugin;
   }
 
   @Override
   public void close() throws IOException {
-    if (hook != null) {
-      hook.close();
+    if (plugin != null) {
+      plugin.close();
     }
   }
 }

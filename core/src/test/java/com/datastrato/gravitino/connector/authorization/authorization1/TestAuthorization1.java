@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.connector.authorization.authorization1;
 
-import com.datastrato.gravitino.connector.authorization.AuthorizationHook;
+import com.datastrato.gravitino.connector.authorization.AuthorizationPlugin;
 import com.datastrato.gravitino.connector.authorization.BaseAuthorization;
 
 public class TestAuthorization1 extends BaseAuthorization<TestAuthorization1> {
@@ -31,7 +31,7 @@ public class TestAuthorization1 extends BaseAuthorization<TestAuthorization1> {
   }
 
   @Override
-  protected AuthorizationHook newHook() {
-    return new TestAuthorizationHook1();
+  protected AuthorizationPlugin newPlugin() {
+    return new TestAuthorizationPlugin1();
   }
 }

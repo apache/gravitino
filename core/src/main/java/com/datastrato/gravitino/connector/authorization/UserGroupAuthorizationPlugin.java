@@ -24,10 +24,10 @@ import com.datastrato.gravitino.authorization.User;
 import java.util.List;
 
 /**
- * Interface for authorization User and Group hooks operation of the underlying access control
+ * Interface for authorization User and Group plugin operation of the underlying access control
  * system.
  */
-public interface AuthorizationUserHook {
+interface UserGroupAuthorizationPlugin {
   /**
    * Add a new User to the underlying access control system.
    *
@@ -47,10 +47,10 @@ public interface AuthorizationUserHook {
   Boolean onRemoveUser(String user) throws RuntimeException;
 
   /**
-   * Check if a user exists from the underlying access control system. Because User information is
-   * already stored in the Gravition, so we don't need to get the User from the underlying access
-   * control system. We only need to check if the User exists in the underlying access control
-   * system.
+   * Check if a user exists from the underlying access control system. <br>
+   * Because User information is already stored in the Gravition, so we don't need to get the User
+   * from the underlying access control system. <br>
+   * We only need to check if the User exists in the underlying access control system.
    *
    * @param user The name of the User.
    * @return IF exist return true, else return false.
@@ -79,10 +79,10 @@ public interface AuthorizationUserHook {
   Boolean onRemoveGroup(String group) throws RuntimeException;
 
   /**
-   * Check a Group if it exists from the underlying access control system. Because Group information
-   * is already stored in the Gravition, so we don't need to get the Group from the underlying
-   * access control system. We only need to check if the Group exists in the underlying access
-   * control system.
+   * Check a Group if it exists from the underlying access control system. <br>
+   * Because Group information is already stored in the Gravition, so we don't need to get the Group
+   * from the underlying access control system. <br>
+   * We only need to check if the Group exists in the underlying access control system. <br>
    *
    * @param group The name of the Group.
    * @return If exist return true, else return false.

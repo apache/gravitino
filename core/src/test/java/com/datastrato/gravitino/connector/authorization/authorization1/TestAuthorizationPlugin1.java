@@ -16,24 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datastrato.gravitino.connector.authorization.authorization2;
+package com.datastrato.gravitino.connector.authorization.authorization1;
 
 import com.datastrato.gravitino.authorization.Group;
 import com.datastrato.gravitino.authorization.Role;
 import com.datastrato.gravitino.authorization.RoleChange;
 import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.User;
-import com.datastrato.gravitino.connector.authorization.AuthorizationHook;
+import com.datastrato.gravitino.connector.authorization.AuthorizationPlugin;
 import java.io.IOException;
 import java.util.List;
 
-public class TestAuthorizationHook2 implements AuthorizationHook {
-  public boolean callOnCreateRole2 = false;
+public class TestAuthorizationPlugin1 implements AuthorizationPlugin {
+  public boolean callOnCreateRole1 = false;
 
   @Override
   public Boolean onCreateRole(Role role, List<SecurableObject> securableObjects)
       throws RuntimeException {
-    callOnCreateRole2 = true;
+    callOnCreateRole1 = true;
     return null;
   }
 

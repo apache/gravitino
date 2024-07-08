@@ -22,8 +22,8 @@ import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogProvider;
 import com.datastrato.gravitino.annotation.Evolving;
-import com.datastrato.gravitino.authorization.AuthorizationProvider;
-import com.datastrato.gravitino.connector.authorization.AuthorizationHook;
+import com.datastrato.gravitino.connector.authorization.AuthorizationPlugin;
+import com.datastrato.gravitino.connector.authorization.AuthorizationProvider;
 import com.datastrato.gravitino.connector.authorization.BaseAuthorization;
 import com.datastrato.gravitino.connector.capability.Capability;
 import com.datastrato.gravitino.meta.CatalogEntity;
@@ -69,7 +69,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   // key in properties of catalogs to inject custom authorization to Gravitino.
   public static final String AUTHORIZATION_IMPL = "authorization-impl";
 
-  // Underlying access control system hook for this catalog.
+  // Underlying access control system plugin for this catalog.
   private volatile BaseAuthorization<?> authorization;
 
   private CatalogEntity entity;
@@ -184,21 +184,21 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     return ops;
   }
 
-  public AuthorizationHook getAuthorizationHook() {
+  public AuthorizationPlugin getAuthorizationPlugin() {
     if (authorization == null) {
       synchronized (this) {
         if (authorization == null) {
-          authorization = createAuthorizationInstance();
+          authorization = createAuthorizationPluginInstance();
         }
       }
     }
-    return authorization.hook();
+    return authorization.plugin();
   }
 
-  private BaseAuthorization<?> createAuthorizationInstance() {
+  private BaseAuthorization<?> createAuthorizationPluginInstance() {
     String provider = entity.getProperties().get(AUTHORIZATION_IMPL);
     if (provider == null || provider.isEmpty()) {
-      throw new IllegalArgumentException("Authorization hook provider is not set");
+      throw new IllegalArgumentException("Authorization plugin provider is not set");
     }
 
     ServiceLoader<AuthorizationProvider> loader =
@@ -211,10 +211,10 @@ public abstract class BaseCatalog<T extends BaseCatalog>
             .map(AuthorizationProvider::getClass)
             .collect(Collectors.toList());
     if (providers.isEmpty()) {
-      throw new IllegalArgumentException("No authorization hook provider found for: " + provider);
+      throw new IllegalArgumentException("No authorization plugin provider found for: " + provider);
     } else if (providers.size() > 1) {
       throw new IllegalArgumentException(
-          "Multiple authorization hook providers found for: " + provider);
+          "Multiple authorization plugin providers found for: " + provider);
     }
     try {
       return (BaseAuthorization<?>)

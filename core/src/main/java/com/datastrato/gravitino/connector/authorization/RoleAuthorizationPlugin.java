@@ -23,8 +23,8 @@ import com.datastrato.gravitino.authorization.RoleChange;
 import com.datastrato.gravitino.authorization.SecurableObject;
 import java.util.List;
 
-/** Interface for authorization Role hooks operation of the underlying access control system */
-public interface AuthorizationRoleHook {
+/** Interface for authorization Role plugin operation of the underlying access control system */
+interface RoleAuthorizationPlugin {
   /**
    * Creates a new Role into the underlying access control system.
    *

@@ -18,12 +18,16 @@
  */
 package com.datastrato.gravitino.connector.authorization;
 
-import java.io.Closeable;
-
 /**
- * authorization operations hooks interfaces. Note: Because each interface function needs to perform
- * multiple steps in the underlying permission system, the implementation method of these function
- * interface must be idempotent.
+ * An Authorization provider is a class that provides a short name for an authorization. <br>
+ * This short name is used when creating an authorization.
  */
-public interface AuthorizationHook
-    extends AuthorizationUserHook, AuthorizationRoleHook, Closeable {}
+public interface AuthorizationProvider {
+  /**
+   * The string that represents the authorization that this provider uses. <br>
+   * This is overridden by children to provide a nice alias for the authorization.
+   *
+   * @return The string that represents the authorization that this provider uses.
+   */
+  String shortName();
+}
