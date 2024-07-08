@@ -59,10 +59,12 @@ import java.time.Instant;
 import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 @SuppressWarnings("DefaultCharset")
+@Disabled("Gravitino will not support KV entity store since 0.6.0, so we disable this test.")
 class TestKvGarbageCollector {
   public Config getConfig() throws IOException {
     Config config = Mockito.mock(Config.class);

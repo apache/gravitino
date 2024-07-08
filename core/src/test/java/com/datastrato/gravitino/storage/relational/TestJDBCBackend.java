@@ -65,6 +65,8 @@ import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -88,6 +90,7 @@ public class TestJDBCBackend {
   private static final String JDBC_STORE_PATH =
       "/tmp/gravitino_jdbc_entityStore_" + UUID.randomUUID().toString().replace("-", "");
   private static final String DB_DIR = JDBC_STORE_PATH + "/testdb";
+  private static final String H2_FILE = DB_DIR + ".mv.db";
   private static final Config config = Mockito.mock(Config.class);
   public static final ImmutableMap<String, String> RELATIONAL_BACKENDS =
       ImmutableMap.of(
@@ -97,6 +100,7 @@ public class TestJDBCBackend {
   @BeforeAll
   public static void setup() {
     File dir = new File(DB_DIR);
+    dir.deleteOnExit();
     if (dir.exists() || !dir.isDirectory()) {
       dir.delete();
     }
@@ -127,8 +131,11 @@ public class TestJDBCBackend {
     dropAllTables();
     File dir = new File(DB_DIR);
     if (dir.exists()) {
-      dir.delete();
+      Files.delete(Paths.get(DB_DIR));
     }
+
+    Files.delete(Paths.get(H2_FILE));
+    Files.delete(Paths.get(JDBC_STORE_PATH));
     backend.close();
   }
 

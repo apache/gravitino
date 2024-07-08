@@ -18,6 +18,8 @@
  */
 package com.datastrato.gravitino;
 
+import static com.datastrato.gravitino.Configs.KV_STORE_KEY;
+
 import com.datastrato.gravitino.storage.kv.KvEntityStore;
 import com.datastrato.gravitino.storage.relational.RelationalEntityStore;
 import com.google.common.collect.ImmutableMap;
@@ -36,7 +38,7 @@ public class EntityStoreFactory {
   // doesn't need to specify the full qualified class name when creating an EntityStore.
   public static final ImmutableMap<String, String> ENTITY_STORES =
       ImmutableMap.of(
-          Configs.DEFAULT_ENTITY_STORE,
+          KV_STORE_KEY,
           KvEntityStore.class.getCanonicalName(),
           Configs.RELATIONAL_ENTITY_STORE,
           RelationalEntityStore.class.getCanonicalName());
@@ -53,6 +55,11 @@ public class EntityStoreFactory {
   public static EntityStore createEntityStore(Config config) {
     String name = config.get(Configs.ENTITY_STORE);
     String className = ENTITY_STORES.getOrDefault(name, name);
+
+    if (KV_STORE_KEY.equals(name)) {
+      throw new UnsupportedOperationException(
+          "KvEntityStore is not supported since version 0.6.0. Please use RelationalEntityStore instead.");
+    }
 
     try {
       return (EntityStore) Class.forName(className).getDeclaredConstructor().newInstance();
