@@ -75,7 +75,7 @@ class GravitinoClientBase:
 
         self.check_metalake_name(name)
         response = self._rest_client.get(
-            GravitinoClientBase.API_METALAKES_IDENTIFIER_PATH + name,
+            GravitinoClientBase.API_METALAKES_IDENTIFIER_PATH + name
         )
         metalake_response = MetalakeResponse.from_json(
             response.body, infer_missing=True
