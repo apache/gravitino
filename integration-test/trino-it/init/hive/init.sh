@@ -23,4 +23,4 @@ sed -i "s|<value>hdfs://localhost:9000|<value>hdfs://${IP}:9000|g" /usr/local/hi
 
 /bin/bash /usr/local/sbin/start.sh
 
-hdfs dfs -chown -R anonymous /user
+hdfs dfs -chown -R anonymous /
