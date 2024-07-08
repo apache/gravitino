@@ -76,4 +76,5 @@ echo "All docker compose service is now available."
 # change the hive container's logs directory permission
 docker exec trino-ci-hive chown -R `id -u`:`id -g` /tmp/root
 docker exec trino-ci-hive chown -R `id -u`:`id -g` /usr/local/hadoop/logs
+docker exec trino-ci-hive hadoop fs -chown -R anonymous /
 
