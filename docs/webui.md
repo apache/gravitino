@@ -1,5 +1,5 @@
 ---
-title: 'Gravitino web UI'
+title: 'Apache Gravitino web UI'
 slug: /webui
 keyword: webui
 last_update:
@@ -8,7 +8,7 @@ last_update:
 license: 'This software is licensed under the Apache License version 2.'
 ---
 
-This document primarily outlines how users can manage metadata within Gravitino using the web UI, the graphical interface is accessible through a web browser as an alternative to writing code or using the REST interface.
+This document primarily outlines how users can manage metadata within Apache Gravitino using the web UI, the graphical interface is accessible through a web browser as an alternative to writing code or using the REST interface.
 
 Currently, you can integrate [OAuth settings](./security.md) to view, add, modify, and delete metalakes, create catalogs, and view catalogs, schemas, and tables, among other functions.
 

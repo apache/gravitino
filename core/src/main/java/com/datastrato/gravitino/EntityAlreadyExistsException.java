@@ -24,7 +24,7 @@ import com.google.errorprone.annotations.FormatString;
 
 /**
  * Exception class indicating that an entity already exists. This exception is thrown when an
- * attempt is made to create an entity that already exists within the Gravitino framework.
+ * attempt is made to create an entity that already exists within the Apache Gravitino framework.
  */
 public class EntityAlreadyExistsException extends GravitinoRuntimeException {
 

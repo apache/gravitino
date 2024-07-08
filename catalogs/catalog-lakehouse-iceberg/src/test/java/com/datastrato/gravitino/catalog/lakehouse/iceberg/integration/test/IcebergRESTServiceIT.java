@@ -123,7 +123,7 @@ public class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
     String properties = databaseInfo.getOrDefault("Properties", "");
     switch (catalogType) {
       case HIVE:
-        //  hive add more properties, like:
+        //  Hive add more properties, like:
         //  ((hive.metastore.database.owner,hive), (hive.metastore.database.owner-type,USER))
         Assertions.assertTrue(properties.contains("(ID,001), (Name,John)"));
         break;

@@ -21,7 +21,7 @@ package com.datastrato.gravitino.exceptions;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 
-/** Base class for all Gravitino runtime exceptions. */
+/** Base class for all Apache Gravitino runtime exceptions. */
 public class GravitinoRuntimeException extends RuntimeException {
 
   /**

@@ -1,5 +1,5 @@
 ---
-title: Gravitino configuration
+title: Apache Gravitino configuration
 slug: /gravitino-server-config
 keywords:
   - configuration
@@ -8,20 +8,20 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Introduction
 
-Gravitino supports several configurations:
+Apache Gravitino supports several configurations:
 
 1. **Gravitino server configuration**: Used to start up the Gravitino server.
 2. **Gravitino catalog properties configuration**: Used to make default values for different catalogs.
 3. **Some other configurations**: Includes HDFS and other configurations.
 
-## Gravitino server configurations
+## Apache Gravitino server configurations
 
 You can customize the Gravitino server by editing the configuration file `gravitino.conf` in the `conf` directory. The default values are sufficient for most use cases.
 We strongly recommend that you read the following sections to understand the configuration file so you can change the default values to suit your specific situation and usage scenario.
 
 The `gravitino.conf` file lists the configuration items in the following table. It groups those items into the following categories:
 
-### Gravitino HTTP Server configuration
+### Apache Gravitino HTTP Server configuration
 
 | Configuration item                                    | Description                                                                                                                                                                           | Default value                                                                | Required | Since version |
 |-------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|----------|---------------|
@@ -138,7 +138,7 @@ Refer to [security](security.md) for HTTPS and authentication configurations.
 |-------------------------------------------|------------------------------------------------------|---------------|----------|---------------|
 | `gravitino.metrics.timeSlidingWindowSecs` | The seconds of Gravitino metrics time sliding window | 60            | No       | 0.5.1         |
 
-## Gravitino catalog properties configuration
+## Apache Gravitino catalog properties configuration
 
 There are three types of catalog properties:
 

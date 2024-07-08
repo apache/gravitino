@@ -30,8 +30,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Support trino Memory connector for testing. Transforming Memory connector configuration and
- * components into Gravitino connector.
+ * Support Trino Memory connector for testing. Transforming Memory connector configuration and
+ * components into Apache Gravitino connector.
  */
 public class MemoryConnectorAdapter implements CatalogConnectorAdapter {
 

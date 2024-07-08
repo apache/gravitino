@@ -372,7 +372,7 @@ subprojects {
         pom {
           name.set("Gravitino")
           description.set("Gravitino is a high-performance, geo-distributed and federated metadata lake.")
-          url.set("https://datastrato.ai")
+          url.set("https://gravitino.apache.org")
           licenses {
             license {
               name.set("The Apache Software License, Version 2.0")
@@ -381,14 +381,14 @@ subprojects {
           }
           developers {
             developer {
-              id.set("The maintainers of Gravitino")
+              id.set("The Gravitino community")
               name.set("support")
-              email.set("support@datastrato.com")
+              email.set("dev@gravitino.apache.org")
             }
           }
           scm {
-            url.set("https://github.com/datastrato/gravitino")
-            connection.set("scm:git:git://github.com/datastrato/gravitino.git")
+            url.set("https://github.com/apache/gravitino")
+            connection.set("scm:git:git://github.com/apache/gravitino.git")
           }
         }
       }
@@ -483,6 +483,8 @@ tasks.rat {
     "web/src/lib/icons/svg/**/*.svg",
     "**/LICENSE.*",
     "**/NOTICE.*",
+    "DISCLAIMER_WIP.txt",
+    "DISCLAIMER.txt",
     "ROADMAP.md",
     "clients/client-python/.pytest_cache/*",
     "clients/client-python/gravitino.egg-info/*",

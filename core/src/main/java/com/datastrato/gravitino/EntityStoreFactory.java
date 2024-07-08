@@ -28,7 +28,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * This class is responsible for creating instances of EntityStore implementations. EntityStore
- * implementations are used to store and manage entities within the Gravitino framework.
+ * implementations are used to store and manage entities within the Apache Gravitino framework.
  */
 public class EntityStoreFactory {
 

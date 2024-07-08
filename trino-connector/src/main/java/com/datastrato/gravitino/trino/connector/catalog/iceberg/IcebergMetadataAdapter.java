@@ -46,7 +46,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 
-/** Transforming gravitino Iceberg metadata to trino. */
+/** Transforming Apache Gravitino Iceberg metadata to Trino. */
 public class IcebergMetadataAdapter extends CatalogConnectorMetadataAdapter {
 
   // Move all this logic to CatalogConnectorMetadataAdapter

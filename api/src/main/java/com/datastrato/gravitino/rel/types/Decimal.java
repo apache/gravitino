@@ -26,7 +26,7 @@ import java.math.RoundingMode;
 import java.util.Objects;
 
 /**
- * Used to represent a {@link Types.DecimalType} value in Gravitino.
+ * Used to represent a {@link Types.DecimalType} value in Apache Gravitino.
  *
  * <p>For Decimal, we expect the precision is equal to or larger than the scale, however, in {@link
  * BigDecimal}, the digit count starts from the leftmost nonzero digit of the exact result. For

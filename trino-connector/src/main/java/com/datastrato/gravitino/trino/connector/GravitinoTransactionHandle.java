@@ -25,8 +25,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import io.trino.spi.connector.ConnectorTransactionHandle;
 
 /**
- * The GravitinoFTransactionHandle is used to make Gravitino metadata operations transactional and
- * wrap the inner connector transaction for data access.
+ * The GravitinoFTransactionHandle is used to make Apache Gravitino metadata operations
+ * transactional and wrap the inner connector transaction for data access.
  */
 public class GravitinoTransactionHandle
     implements ConnectorTransactionHandle, GravitinoHandle<ConnectorTransactionHandle> {

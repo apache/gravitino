@@ -21,7 +21,7 @@ package com.datastrato.gravitino.catalog.hive;
 import com.datastrato.gravitino.connector.BaseColumn;
 import lombok.EqualsAndHashCode;
 
-/** Represents a column in the Hive Metastore catalog. */
+/** Represents a column in an Apache Hive Metastore catalog. */
 @EqualsAndHashCode(callSuper = true)
 public class HiveColumn extends BaseColumn {
 

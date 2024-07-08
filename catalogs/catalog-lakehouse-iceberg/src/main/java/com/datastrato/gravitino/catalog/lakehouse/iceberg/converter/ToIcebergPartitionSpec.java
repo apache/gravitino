@@ -25,15 +25,15 @@ import com.google.common.base.Preconditions;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 
-/** Convert Gravitino Transforms to Iceberg PartitionSpec. */
+/** Convert Apache Gravitino Transforms to an Apache Iceberg PartitionSpec. */
 public class ToIcebergPartitionSpec {
 
   private static final String DOT = ".";
 
   /**
-   * Convert iceberg table to iceberg partition spec through gravitino.
+   * Convert Iceberg table to Iceberg partition spec through Gravitino.
    *
-   * @param icebergTable the iceberg table.
+   * @param icebergTable the Iceberg table.
    * @return a PartitionSpec
    */
   public static PartitionSpec toPartitionSpec(IcebergTable icebergTable) {
@@ -42,7 +42,7 @@ public class ToIcebergPartitionSpec {
   }
 
   /**
-   * Converts gravitino transforms into a {@link PartitionSpec}.
+   * Converts Gravitino transforms into a {@link PartitionSpec}.
    *
    * @param schema the table schema
    * @param partitioning Gravitino Transforms

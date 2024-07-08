@@ -30,7 +30,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.sql.SQLException;
 import java.util.regex.Pattern;
 
-/** Exception converter to Gravitino exception for Doris. */
+/** Exception converter to Apache Gravitino exception for Apache Doris. */
 public class DorisExceptionConverter extends JdbcExceptionConverter {
 
   // see: https://doris.apache.org/docs/admin-manual/maint-monitor/doris-error-code/

@@ -40,7 +40,7 @@ import org.apache.spark.sql.types.StructType;
 
 /**
  * GravitinoTableInfoHelper is a common helper class that is used to retrieve table info from the
- * Gravitino Server
+ * Apache Gravitino Server
  */
 public class GravitinoTableInfoHelper {
 

@@ -22,7 +22,7 @@ import com.datastrato.gravitino.annotation.Evolving;
 import java.util.Map;
 
 /**
- * The interface of a metalake. The metalake is the top level entity in the gravitino system,
+ * The interface of a metalake. The metalake is the top level entity in the Apache Gravitino system,
  * containing a set of catalogs.
  */
 @Evolving

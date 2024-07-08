@@ -56,7 +56,7 @@ import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
 /**
- * BaseCatalog acts as the foundational class for Spark CatalogManager registration, enabling
+ * BaseCatalog acts as the foundational class for Apache Spark CatalogManager registration, enabling
  * seamless integration of various data source catalogs within Spark's ecosystem. This class is
  * pivotal in bridging Spark with diverse data sources, ensuring a unified approach to data
  * management and manipulation across the platform.

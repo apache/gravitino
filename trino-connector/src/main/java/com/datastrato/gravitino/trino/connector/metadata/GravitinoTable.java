@@ -33,7 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/** Help Gravitino connector access TableMetadata from gravitino client. */
+/** Help Apache Gravitino connector access TableMetadata from Gravitino client. */
 public class GravitinoTable {
   private final String schemaName;
   private final String tableName;

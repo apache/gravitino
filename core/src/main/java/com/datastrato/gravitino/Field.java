@@ -20,7 +20,7 @@ package com.datastrato.gravitino;
 
 import lombok.EqualsAndHashCode;
 
-/** This class represents a field in the Gravitino framework. */
+/** This class represents a field in the Apache Gravitino framework. */
 @EqualsAndHashCode
 public class Field {
 

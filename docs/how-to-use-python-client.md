@@ -1,5 +1,5 @@
 ---
-title: "How to use Gravitino Python client"
+title: "How to use Apache Gravitino Python client"
 slug: /how-to-use-gravitino-python-client
 date: 2024-05-09
 keyword: Gravitino Python client
@@ -7,7 +7,7 @@ license: This software is licensed under the Apache License version 2.
 ---
 ## Introduction
 
-Gravitino is a high-performance, geo-distributed, and federated metadata lake.
+Apache Gravitino is a high-performance, geo-distributed, and federated metadata lake.
 It manages the metadata directly in different sources, types, and regions, also provides users
 the unified metadata access for data and AI assets.
 
@@ -23,7 +23,7 @@ First of all, You must have a Gravitino server set up and run, You can refer doc
 [How to install Gravitino](./how-to-install.md) to build Gravitino server from source code and
 install it in your local.
 
-### Gravitino Python client API
+### Apache Gravitino Python client API
 
 ```shell
 pip install gravitino
@@ -32,7 +32,7 @@ pip install gravitino
 1. [Manage metalake using Gravitino Python API](./manage-metalake-using-gravitino.md?language=python)
 2. [Manage fileset metadata using Gravitino Python API](./manage-fileset-metadata-using-gravitino.md?language=python)
 
-### Gravitino Fileset Example
+### Apache Gravitino Fileset Example
 
 We offer a playground environment to help you quickly understand how to use Gravitino Python
 client to manage non-tabular data on HDFS via Fileset in Gravitino. You can refer to the
@@ -42,7 +42,7 @@ to launch a Gravitino server, HDFS and Jupyter notebook environment in you local
 Waiting for the playground Docker environment to start, you can directly open
 `http://localhost:8888/lab/tree/gravitino-fileset-example.ipynb` in the browser and run the example.
 
-The [gravitino-fileset-example](https://github.com/datastrato/gravitino-playground/blob/main/init/jupyter/gravitino-fileset-example.ipynb)
+The [gravitino-fileset-example](https://github.com/apache/gravitino-playground/blob/main/init/jupyter/gravitino-fileset-example.ipynb)
 contains the following code snippets:
 
 1. Install HDFS Python client.
@@ -63,7 +63,7 @@ contains the following code snippets:
 11. Drop this `Fileset.Type.EXTERNAL` type fileset and check if the fileset location was
     not deleted in HDFS.
 
-## How to development Gravitino Python Client
+## How to development Apache Gravitino Python Client
 
 You can ues any IDE to develop Gravitino Python Client. Directly open the client-python module project in the IDE.
 
@@ -78,7 +78,7 @@ You can ues any IDE to develop Gravitino Python Client. Directly open the client
 1. Clone the Gravitino project.
 
     ```shell
-    git clone git@github.com:datastrato/gravitino.git
+    git clone git@github.com:apache/gravitino.git
     ```
 
 2. Build the Gravitino Python client module
@@ -119,12 +119,9 @@ You can ues any IDE to develop Gravitino Python Client. Directly open the client
 
 ## Resources
 
-+ Official website https://datastrato.ai/
-+ Project home on GitHub: https://github.com/datastrato/gravitino/
-+ Playground with Docker: https://github.com/datastrato/gravitino-playground
++ Official website https://gravitino.apache.org/ (coming soon)
++ Project home on GitHub: https://github.com/apache/gravitino/
++ Playground with Docker: https://github.com/apache/gravitino-playground
 + User documentation: https://datastrato.ai/docs/
 + Videos on Youtube: https://www.youtube.com/@Datastrato
-+ Twitter: https://twitter.com/datastrato
-+ Linkedin: https://www.linkedin.com/company/datastrato
-+ Slack Community: [https://join.slack.com/t/datastrato-community](https://join.slack.com/t/datastrato-community/shared_invite/zt-2a8vsjoch-cU_uUwHA_QU6Ab50thoq8w)
-+ Discourse Community: https://gravitino.discourse.group/
++ Slack Community: [https://the-asf.slack.com

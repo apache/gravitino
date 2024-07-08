@@ -22,7 +22,7 @@ import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadata
 import io.trino.spi.session.PropertyMetadata;
 import java.util.List;
 
-/** Transforming gravitino PostgreSQL metadata to trino. */
+/** Transforming gravitino PostgreSQL metadata to Trino. */
 public class PostgreSQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
 
   public PostgreSQLMetadataAdapter(
