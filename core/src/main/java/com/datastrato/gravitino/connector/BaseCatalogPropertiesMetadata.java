@@ -48,6 +48,13 @@ public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetada
                   null,
                   false,
                   false),
+              PropertyEntry.stringImmutablePropertyEntry(
+                  BaseCatalog.AUTHORIZATION_PROVIDER,
+                  "The classname of custom authorization provider",
+                  false,
+                  null,
+                  false,
+                  false),
               PropertyEntry.enumPropertyEntry(
                   CLOUD_NAME,
                   "The cloud that the catalog is running on",

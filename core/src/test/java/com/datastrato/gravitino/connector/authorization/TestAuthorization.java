@@ -47,7 +47,7 @@ public class TestAuthorization {
             .withName("catalog-test1")
             .withNamespace(Namespace.of("default"))
             .withType(Catalog.Type.RELATIONAL)
-            .withProperties(ImmutableMap.of(BaseCatalog.AUTHORIZATION_IMPL, "test1"))
+            .withProperties(ImmutableMap.of(BaseCatalog.AUTHORIZATION_PROVIDER, "test1"))
             .withProvider("test")
             .withAuditInfo(auditInfo)
             .build();
@@ -61,7 +61,7 @@ public class TestAuthorization {
             .withName("catalog-test2")
             .withNamespace(Namespace.of("default"))
             .withType(Catalog.Type.RELATIONAL)
-            .withProperties(ImmutableMap.of(BaseCatalog.AUTHORIZATION_IMPL, "test2"))
+            .withProperties(ImmutableMap.of(BaseCatalog.AUTHORIZATION_PROVIDER, "test2"))
             .withProvider("test")
             .withAuditInfo(auditInfo)
             .build();
@@ -76,7 +76,7 @@ public class TestAuthorization {
     Assertions.assertInstanceOf(TestAuthorizationPlugin1.class, authPlugin1);
     TestAuthorizationPlugin1 testAuthOps1 = (TestAuthorizationPlugin1) authPlugin1;
     Assertions.assertFalse(testAuthOps1.callOnCreateRole1);
-    authPlugin1.onCreateRole(null, null);
+    authPlugin1.onRoleCreated(null);
     Assertions.assertTrue(testAuthOps1.callOnCreateRole1);
   }
 
@@ -86,7 +86,7 @@ public class TestAuthorization {
     Assertions.assertInstanceOf(TestAuthorizationPlugin2.class, authPlugin2);
     TestAuthorizationPlugin2 testAuthOps2 = (TestAuthorizationPlugin2) authPlugin2;
     Assertions.assertFalse(testAuthOps2.callOnCreateRole2);
-    authPlugin2.onCreateRole(null, null);
+    authPlugin2.onRoleCreated(null);
     Assertions.assertTrue(testAuthOps2.callOnCreateRole2);
   }
 }

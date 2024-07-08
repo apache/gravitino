@@ -21,7 +21,6 @@ package com.datastrato.gravitino.connector.authorization.authorization2;
 import com.datastrato.gravitino.authorization.Group;
 import com.datastrato.gravitino.authorization.Role;
 import com.datastrato.gravitino.authorization.RoleChange;
-import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.User;
 import com.datastrato.gravitino.connector.authorization.AuthorizationPlugin;
 import java.io.IOException;
@@ -31,74 +30,73 @@ public class TestAuthorizationPlugin2 implements AuthorizationPlugin {
   public boolean callOnCreateRole2 = false;
 
   @Override
-  public Boolean onCreateRole(Role role, List<SecurableObject> securableObjects)
-      throws RuntimeException {
+  public Boolean onRoleCreated(Role role) throws RuntimeException {
     callOnCreateRole2 = true;
     return null;
   }
 
   @Override
-  public Boolean onCheckRole(String role) throws RuntimeException {
+  public Boolean onRoleGotten(Role role) throws RuntimeException {
     return null;
   }
 
   @Override
-  public Boolean onDeleteRole(Role role) throws RuntimeException {
+  public Boolean onRoleDeleted(Role role) throws RuntimeException {
     return null;
   }
 
   @Override
-  public Boolean onUpdateRole(Role role, RoleChange... changes) throws RuntimeException {
+  public Boolean onRoleUpdated(Role role, RoleChange... changes) throws RuntimeException {
     return null;
   }
 
   @Override
-  public Boolean onAddUser(User user) throws RuntimeException {
+  public Boolean onUserAdded(User user) throws RuntimeException {
     return null;
   }
 
   @Override
-  public Boolean onRemoveUser(String user) throws RuntimeException {
+  public Boolean onUserRemoved(User user) throws RuntimeException {
     return null;
   }
 
   @Override
-  public Boolean onCheckUser(String user) throws RuntimeException {
+  public Boolean onUserGotten(User user) throws RuntimeException {
     return null;
   }
 
   @Override
-  public Boolean onAddGroup(String group) throws RuntimeException {
+  public Boolean onGroupAdded(Group group) throws RuntimeException {
     return null;
   }
 
   @Override
-  public Boolean onRemoveGroup(String group) throws RuntimeException {
+  public Boolean onGroupRemoved(Group group) throws RuntimeException {
     return null;
   }
 
   @Override
-  public Boolean onCheckGroup(String group) {
+  public Boolean onGroupGotten(Group group) {
     return null;
   }
 
   @Override
-  public Boolean onGrantRolesToUser(List<Role> roles, User user) throws RuntimeException {
+  public Boolean onGrantedRolesToUser(List<Role> roles, User user) throws RuntimeException {
     return null;
   }
 
   @Override
-  public Boolean onRevokeRolesFromUser(List<Role> roles, User user) throws RuntimeException {
+  public Boolean onRevokedRolesFromUser(List<Role> roles, User user) throws RuntimeException {
     return null;
   }
 
   @Override
-  public Boolean onGrantRolesToGroup(List<Role> roles, Group group) throws RuntimeException {
+  public Boolean onGrantedRolesToGroup(List<Role> roles, Group group) throws RuntimeException {
     return null;
   }
 
   @Override
-  public Boolean onRevokeRolesFromGroup(List<Role> roles, Group group) throws RuntimeException {
+  public Boolean onRevokedRolesFromGroup(List<Role> roles, Group group) throws RuntimeException {
     return null;
   }
 

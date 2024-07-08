@@ -65,9 +65,9 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   // The object you used is not stable, don't use it unless you know what you are doing.
   @VisibleForTesting public static final String CATALOG_OPERATION_IMPL = "ops-impl";
 
-  // Different catalogs may have different authorization implementations, this variable is used as a
+  // Different catalogs may have different authorization provider, this variable is used as a
   // key in properties of catalogs to inject custom authorization to Gravitino.
-  public static final String AUTHORIZATION_IMPL = "authorization-impl";
+  public static final String AUTHORIZATION_PROVIDER = "authorization-provider";
 
   // Underlying access control system plugin for this catalog.
   private volatile BaseAuthorization<?> authorization;
@@ -196,7 +196,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   }
 
   private BaseAuthorization<?> createAuthorizationPluginInstance() {
-    String provider = entity.getProperties().get(AUTHORIZATION_IMPL);
+    String provider = entity.getProperties().get(AUTHORIZATION_PROVIDER);
     if (provider == null || provider.isEmpty()) {
       throw new IllegalArgumentException("Authorization plugin provider is not set");
     }

@@ -29,105 +29,115 @@ import java.util.List;
  */
 interface UserGroupAuthorizationPlugin {
   /**
-   * Add a new User to the underlying access control system.
+   * After adding a User to Gravitino, this method is called to add the User to the underlying
+   * system. <br>
    *
    * @param user The user entity.
    * @return True if the add User was successfully added, false if the add User failed.
    * @throws RuntimeException If adding the User encounters storage issues.
    */
-  Boolean onAddUser(User user) throws RuntimeException;
+  Boolean onUserAdded(User user) throws RuntimeException;
 
   /**
-   * Removes a User from the underlying access control system.
+   * After removing a User from Gravitino, this method is called to remove the User from the
+   * underlying system. <br>
    *
-   * @param user The name of the User.
+   * @param user The user entity.
    * @return True if the User was successfully removed, false if the remove User failed.
    * @throws RuntimeException If removing the User encounters storage issues.
    */
-  Boolean onRemoveUser(String user) throws RuntimeException;
+  Boolean onUserRemoved(User user) throws RuntimeException;
 
   /**
-   * Check if a user exists from the underlying access control system. <br>
+   * After getting a User from Gravitino, this method is called to check if the User exists in the
+   * underlying system. <br>
    * Because User information is already stored in the Gravition, so we don't need to get the User
    * from the underlying access control system. <br>
    * We only need to check if the User exists in the underlying access control system.
    *
-   * @param user The name of the User.
+   * @param user The user entity.
    * @return IF exist return true, else return false.
    * @throws RuntimeException If getting the User encounters underlying access control system
    *     issues.
    */
-  Boolean onCheckUser(String user) throws RuntimeException;
+  Boolean onUserGotten(User user) throws RuntimeException;
 
   /**
-   * Adds a new Group to the underlying access control system.
+   * After adding a Group to Gravitino, this method is called to add the Group to the underlying
+   * system. <br>
    *
-   * @param group The name of the Group.
+   * @param group The group entity.
    * @return True if the add Group was successfully added, false if the add Group failed.
    * @throws RuntimeException If adding the Group encounters storage issues.
    */
-  Boolean onAddGroup(String group) throws RuntimeException;
+  Boolean onGroupAdded(Group group) throws RuntimeException;
 
   /**
-   * Removes a Group from the underlying access control system.
+   * After removing a Group from Gravitino, this method is called to remove the Group from the
+   * underlying system. <br>
    *
-   * @param group The name of the Group.
+   * @param group The group entity.
    * @return True if the remove Group was successfully removed, false if the remove Group was
    *     failed.
    * @throws RuntimeException If removing the Group encounters storage issues.
    */
-  Boolean onRemoveGroup(String group) throws RuntimeException;
+  Boolean onGroupRemoved(Group group) throws RuntimeException;
 
   /**
-   * Check a Group if it exists from the underlying access control system. <br>
+   * After getting a Group from Gravitino, this method is called to check if the Group exists in the
+   * underlying system. <br>
    * Because Group information is already stored in the Gravition, so we don't need to get the Group
    * from the underlying access control system. <br>
    * We only need to check if the Group exists in the underlying access control system. <br>
    *
-   * @param group The name of the Group.
+   * @param group The group entity.
    * @return If exist return true, else return false.
    * @throws RuntimeException If getting the Group encounters underlying access control system
    *     issues.
    */
-  Boolean onCheckGroup(String group);
+  Boolean onGroupGotten(Group group);
 
   /**
-   * Grant roles to a user into the underlying access control system.
+   * After granting roles to a user from Gravitino, this method is called to grant roles to the user
+   * in the underlying system. <br>
    *
    * @param user The entity of the User.
    * @param roles The entities of the Roles.
    * @return True if the Grant was successful, false if the Grant was failed.
    * @throws RuntimeException If granting roles to a user encounters storage issues.
    */
-  Boolean onGrantRolesToUser(List<Role> roles, User user) throws RuntimeException;
+  Boolean onGrantedRolesToUser(List<Role> roles, User user) throws RuntimeException;
 
   /**
-   * Revoke roles from a user into the underlying access control system.
+   * After revoking roles from a user from Gravitino, this method is called to revoke roles from the
+   * user in the underlying system. <br>
    *
    * @param user The entity of the User.
    * @param roles The entities of the Roles.
    * @return True if the revoke was successfully removed, false if the revoke failed.
    * @throws RuntimeException If revoking roles from a user encounters storage issues.
    */
-  Boolean onRevokeRolesFromUser(List<Role> roles, User user) throws RuntimeException;
+  Boolean onRevokedRolesFromUser(List<Role> roles, User user) throws RuntimeException;
 
   /**
-   * Grant roles to a group into the underlying access control system.
+   * After granting roles to a group from Gravitino, this method is called to grant roles to the
+   * group in the underlying system. <br>
    *
    * @param group The entity of the Group.
    * @param roles The entities of the Roles.
    * @return True if the revoke was successfully removed, False if the revoke failed.
    * @throws RuntimeException If granting roles to a group encounters storage issues.
    */
-  Boolean onGrantRolesToGroup(List<Role> roles, Group group) throws RuntimeException;
+  Boolean onGrantedRolesToGroup(List<Role> roles, Group group) throws RuntimeException;
 
   /**
-   * Revoke roles from a group from the underlying access control system.
+   * After revoking roles from a group from Gravitino, this method is called to revoke roles from
+   * the group in the underlying system. <br>
    *
    * @param group The entity of the Group.
    * @param roles The entities of the Roles.
    * @return True if the revoke was successfully removed, False if the revoke failed.
    * @throws RuntimeException If revoking roles from a group encounters storage issues.
    */
-  Boolean onRevokeRolesFromGroup(List<Role> roles, Group group) throws RuntimeException;
+  Boolean onRevokedRolesFromGroup(List<Role> roles, Group group) throws RuntimeException;
 }

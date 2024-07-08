@@ -20,47 +20,51 @@ package com.datastrato.gravitino.connector.authorization;
 
 import com.datastrato.gravitino.authorization.Role;
 import com.datastrato.gravitino.authorization.RoleChange;
-import com.datastrato.gravitino.authorization.SecurableObject;
-import java.util.List;
 
 /** Interface for authorization Role plugin operation of the underlying access control system */
 interface RoleAuthorizationPlugin {
   /**
-   * Creates a new Role into the underlying access control system.
+   * After creating a role in Gravitino, this method is called to create the role in the underlying
+   * system.<br>
    *
    * @param role The entity of the Role.
-   * @param securableObjects The securable objects of the Role.
    * @return True if the create operation success; False if the create operation failed.
    * @throws RuntimeException If creating the Role encounters storage issues.
    */
-  Boolean onCreateRole(Role role, List<SecurableObject> securableObjects) throws RuntimeException;
+  Boolean onRoleCreated(Role role) throws RuntimeException;
 
   /**
-   * Check a Role if exists in the underlying access control system.
+   * After gotten a role from Gravitino, this method is called to check if the role exists in the
+   * underlying system. <br>
+   * Because role information is already stored in the Gravition, so we don't need to get the Role
+   * from the underlying access control system. <br>
+   * We only need to check if the Role exists in the underlying access control system.
    *
-   * @param role The name of the Role.
+   * @param role The entity of the Role.
    * @return IF exist return true, else return false.
    * @throws RuntimeException If getting the Role encounters underlying access control system
    *     issues.
    */
-  Boolean onCheckRole(String role) throws RuntimeException;
+  Boolean onRoleGotten(Role role) throws RuntimeException;
 
   /**
-   * Deletes a Role from the underlying access control system.
+   * After deleting a role from Gravitino, this method is called to delete the role in the
+   * underlying system. <br>
    *
    * @param role The entity of the Role.
    * @return True if the Role was successfully deleted, false only when there's no such role
    * @throws RuntimeException If deleting the Role encounters storage issues.
    */
-  Boolean onDeleteRole(Role role) throws RuntimeException;
+  Boolean onRoleDeleted(Role role) throws RuntimeException;
 
   /**
-   * Update a role into underlying access control system.
+   * After updating a role in Gravitino, this method is called to update the role in the underlying
+   * system. <br>
    *
    * @param role The entity of the Role.
    * @param changes role changes apply to the role.
    * @return True if the update operation is successful; False if the update operation fails.
    * @throws RuntimeException If update role encounters storage issues.
    */
-  Boolean onUpdateRole(Role role, RoleChange... changes) throws RuntimeException;
+  Boolean onRoleUpdated(Role role, RoleChange... changes) throws RuntimeException;
 }
