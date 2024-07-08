@@ -81,12 +81,10 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
-@Disabled
 public class TestEntityStorage {
   public static final String KV_STORE_PATH =
       "/tmp/gravitino_kv_entityStore_" + UUID.randomUUID().toString().replace("-", "");
