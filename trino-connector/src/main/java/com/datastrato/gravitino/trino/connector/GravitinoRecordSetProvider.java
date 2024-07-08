@@ -27,7 +27,7 @@ import io.trino.spi.connector.ConnectorTransactionHandle;
 import io.trino.spi.connector.RecordSet;
 import java.util.List;
 
-/** This class provides a RecordSet for trino read data from internal connector. */
+/** This class provides a RecordSet for Trino read data from internal connector. */
 public class GravitinoRecordSetProvider implements ConnectorRecordSetProvider {
 
   ConnectorRecordSetProvider internalRecordSetProvider;

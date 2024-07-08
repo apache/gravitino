@@ -1,5 +1,5 @@
 ---
-title: "Gravitino connector - Hive catalog"
+title: "Apache Gravitino connector - Hive catalog"
 slug: /trino-connector/catalog-hive
 keyword: gravitino connector trino
 license: "This software is licensed under the Apache License version 2."
@@ -40,7 +40,7 @@ per catalog:
 
 ### Create a schema 
 
-Users can create a schema with properties through Gravitino Trino connector as follows:
+Users can create a schema with properties through Apache Gravitino Trino connector as follows:
 
 ```SQL
 CREATE SCHEMA catalog.schema_name 

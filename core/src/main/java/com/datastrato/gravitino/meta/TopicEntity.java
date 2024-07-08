@@ -29,7 +29,7 @@ import java.util.Map;
 import java.util.Objects;
 import lombok.ToString;
 
-/** A class representing a topic metadata entity in Gravitino. */
+/** A class representing a topic metadata entity in Apache Gravitino. */
 @ToString
 public class TopicEntity implements Entity, Auditable, HasIdentifier {
   public static final Field ID =

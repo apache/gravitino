@@ -36,7 +36,7 @@ import org.apache.flink.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** GravitinoCatalogStore is used to store catalog information to Gravitino server. */
+/** GravitinoCatalogStore is used to store catalog information to Apache Gravitino server. */
 public class GravitinoCatalogStore extends AbstractCatalogStore {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoCatalogStore.class);
   private final GravitinoCatalogManager gravitinoCatalogManager;

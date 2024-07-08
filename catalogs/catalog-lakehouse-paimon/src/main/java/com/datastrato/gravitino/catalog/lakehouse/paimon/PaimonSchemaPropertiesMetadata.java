@@ -29,7 +29,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Implementation of {@link PropertiesMetadata} that represents Paimon schema properties metadata.
+ * Implementation of {@link PropertiesMetadata} that represents Apache Paimon schema properties
+ * metadata.
  */
 public class PaimonSchemaPropertiesMetadata extends BasePropertiesMetadata {
 

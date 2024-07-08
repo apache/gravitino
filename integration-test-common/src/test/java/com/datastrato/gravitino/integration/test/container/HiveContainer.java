@@ -89,7 +89,7 @@ public class HiveContainer extends BaseContainer {
   private void copyHiveLog() {
     try {
       String destPath = System.getenv("IT_PROJECT_DIR");
-      LOG.info("Copy hive log file to {}", destPath);
+      LOG.info("Copy Hive log file to {}", destPath);
 
       String hiveLogJarPath = "/hive.tar";
       String HdfsLogJarPath = "/hdfs.tar";
@@ -101,7 +101,7 @@ public class HiveContainer extends BaseContainer {
       container.copyFileFromContainer(hiveLogJarPath, destPath + File.separator + "hive.tar");
       container.copyFileFromContainer(HdfsLogJarPath, destPath + File.separator + "hdfs.tar");
     } catch (Exception e) {
-      LOG.warn("Can't copy hive log for:", e);
+      LOG.warn("Can't copy Hive log for:", e);
     }
   }
 

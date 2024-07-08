@@ -1,12 +1,12 @@
 ---
-title: How to use Gravitino Virtual File System with Filesets
+title: How to use Apache Gravitino Virtual File System with Filesets
 slug: /how-to-use-gvfs
 license: "This software is licensed under the Apache License version 2."
 ---
 
 ## Introduction
 
-`Fileset` is a concept brought in by Gravitino, which is a logical collection of files and
+`Fileset` is a concept brought in by Apache Gravitino, which is a logical collection of files and
 directories, with `fileset` you can manage non-tabular data through Gravitino. For
 details, you can read [How to manage fileset metadata using Gravitino](./manage-fileset-metadata-using-gravitino.md).
 
@@ -34,7 +34,7 @@ the path mapping and convert automatically.
 
 + A Hadoop environment with HDFS running. GVFS has been tested against
   Hadoop 3.1.0. It is recommended to use Hadoop 3.1.0 or later, but it should work with Hadoop 2.
-  x. Please create an [issue](https://www.github.com/datastrato/gravitino/issues) if you find any
+  x. Please create an [issue](https://www.github.com/apache/gravitino/issues) if you find any
   compatibility issues.
 
 ## Configuration
@@ -94,7 +94,7 @@ You can configure these properties in two ways:
       </property>
     ```
 
-## How to use the Gravitino Virtual File System
+## How to use the Apache Gravitino Virtual File System
 
 First make sure to obtain the Gravitino Virtual File System runtime jar, which you can get in
 two ways:
@@ -104,7 +104,7 @@ two ways:
 
 2. Compile from the source code:
 
-   Download or clone the [Gravitino source code](https://github.com/datastrato/gravitino), and compile it
+   Download or clone the [Gravitino source code](https://github.com/apache/gravitino), and compile it
    locally using the following command in the Gravitino source code directory:
 
     ```shell

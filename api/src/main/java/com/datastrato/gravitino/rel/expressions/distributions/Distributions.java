@@ -23,7 +23,7 @@ import com.datastrato.gravitino.rel.expressions.NamedReference;
 import java.util.Arrays;
 import java.util.Objects;
 
-/** Helper methods to create distributions to pass into Gravitino. */
+/** Helper methods to create distributions to pass into Apache Gravitino. */
 public class Distributions {
 
   /** NONE is used to indicate that there is no distribution. */

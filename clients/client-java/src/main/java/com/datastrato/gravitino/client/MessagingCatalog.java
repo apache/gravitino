@@ -104,7 +104,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
   /**
    * Load the topic with the given identifier.
    *
-   * @param ident The identifier of the topic to load, which should be a "schema.topic" style.
+   * @param ident The identifier of the topic to load, which should be "schema.topic" format.
    * @return The {@link Topic} with the specified identifier.
    * @throws NoSuchTopicException if the topic with the specified identifier does not exist.
    */
@@ -127,7 +127,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
   /**
    * Create a new topic with the given identifier, comment, data layout and properties.
    *
-   * @param ident A topic identifier, which should be a "schema.topic" style.
+   * @param ident A topic identifier, which should be "schema.topic" format.
    * @param comment The comment of the topic object. Null is set if no comment is specified.
    * @param dataLayout The message schema of the topic object. Always null because it's not
    *     supported yet.
@@ -166,7 +166,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
   /**
    * Alter the topic with the given identifier.
    *
-   * @param ident A topic identifier, which should be a "schema.topic" style.
+   * @param ident A topic identifier, which should be "schema.topic" format.
    * @param changes The changes to apply to the topic.
    * @return The altered topic object.
    * @throws NoSuchTopicException if the topic with the specified identifier does not exist.
@@ -200,7 +200,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
   /**
    * Drop the topic with the given identifier.
    *
-   * @param ident A topic identifier, which should be a "schema.topic" style.
+   * @param ident A topic identifier, which should be "schema.topic" format.
    * @return True if the topic is dropped successfully, false the topic does not exist.
    */
   @Override
@@ -226,9 +226,9 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
   }
 
   /**
-   * Check whether the namespace of a topic is valid
+   * Check whether the namespace of a topic is valid.
    *
-   * @param namespace The namespace to check
+   * @param namespace The namespace to check.
    */
   static void checkTopicNamespace(Namespace namespace) {
     Namespace.check(
@@ -238,9 +238,9 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
   }
 
   /**
-   * Check whether the NameIdentifier of a topic is valid
+   * Check whether the NameIdentifier of a topic is valid.
    *
-   * @param ident The NameIdentifier to check
+   * @param ident The NameIdentifier to check, which should be "schema.topic" format.
    */
   static void checkTopicNameIdentifier(NameIdentifier ident) {
     NameIdentifier.check(ident != null, "NameIdentifier must not be null");
@@ -249,8 +249,14 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
     checkTopicNamespace(ident.namespace());
   }
 
-  private Namespace getTopicFullNamespace(Namespace tableNamespace) {
-    return Namespace.of(this.catalogNamespace().level(0), this.name(), tableNamespace.level(0));
+  /**
+   * Get the full namespace of the topic with the given topic's short namespace (schema name).
+   *
+   * @param topicNamespace The topic's short namespace, which is the schema name.
+   * @return full namespace of the topic, which is "metalake.catalog.schema" format.
+   */
+  private Namespace getTopicFullNamespace(Namespace topicNamespace) {
+    return Namespace.of(this.catalogNamespace().level(0), this.name(), topicNamespace.level(0));
   }
 
   static class Builder extends CatalogDTO.Builder<Builder> {

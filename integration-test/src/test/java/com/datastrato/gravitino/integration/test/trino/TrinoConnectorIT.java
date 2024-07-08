@@ -94,7 +94,7 @@ public class TrinoConnectorIT extends AbstractIT {
 
     containerSuite.startHiveContainer();
 
-    // Initial hive client
+    // Initial Hive client
     HiveConf hiveConf = new HiveConf();
     String hiveMetastoreUris =
         String.format(
@@ -103,7 +103,7 @@ public class TrinoConnectorIT extends AbstractIT {
             HiveContainer.HIVE_METASTORE_PORT);
     hiveConf.set(HiveConf.ConfVars.METASTOREURIS.varname, hiveMetastoreUris);
 
-    // Currently must first create metalake and catalog then start trino container
+    // Currently must first create metalake and catalog then start Trino container
     createMetalake();
     createCatalog();
 
@@ -835,7 +835,7 @@ public class TrinoConnectorIT extends AbstractIT {
       Assertions.fail("Trino fail to load catalogs created by gravitino: " + sql);
     }
 
-    // Because we assign 'hive.target-max-file-size' a wrong value, trino can't load the catalog
+    // Because we assign 'hive.target-max-file-size' a wrong value, Trino can't load the catalog
     String data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
     Assertions.assertEquals(catalogName, data);
   }
@@ -875,7 +875,7 @@ public class TrinoConnectorIT extends AbstractIT {
     String sql = String.format("show catalogs like '%s'", catalogName);
     await().atLeast(6, TimeUnit.SECONDS);
 
-    // Because we assign 'hive.target-max-file-size' a wrong value, trino can't load the catalog
+    // Because we assign 'hive.target-max-file-size' a wrong value, Trino can't load the catalog
     Assertions.assertTrue(containerSuite.getTrinoContainer().executeQuerySQL(sql).isEmpty());
   }
 
@@ -941,11 +941,11 @@ public class TrinoConnectorIT extends AbstractIT {
 
     boolean success = checkTrinoHasLoaded(sql, 30);
     if (!success) {
-      Assertions.fail("Trino fail to load table created by gravitino: " + sql);
+      Assertions.fail("Trino fail to load table created by Gravitino: " + sql);
     }
 
     String data = containerSuite.getTrinoContainer().executeQuerySQL(sql).get(0).get(0);
-    LOG.info("create iceberg hive table sql is: {}", data);
+    LOG.info("create Iceberg Hive table SQL is: {}", data);
     // Iceberg does not contain any properties;
     Assertions.assertFalse(data.contains("key1"));
     Assertions.assertTrue(data.contains("partitioning = ARRAY['BinaryType']"));
@@ -1041,7 +1041,7 @@ public class TrinoConnectorIT extends AbstractIT {
     Assertions.assertTrue(checkTrinoHasLoaded(sql, 30));
 
     final String sql1 = String.format("drop schema %s.%s cascade", catalogName, schemaName);
-    // Will fail because the iceberg catalog does not support cascade drop
+    // Will fail because the Iceberg catalog does not support cascade drop
     TrinoContainer trinoContainer = containerSuite.getTrinoContainer();
     Assertions.assertThrows(
         RuntimeException.class,

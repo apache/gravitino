@@ -31,7 +31,7 @@ import java.util.Map;
 import java.util.Objects;
 import lombok.ToString;
 
-/** A class representing a user metadata entity in Gravitino. */
+/** A class representing a user metadata entity in Apache Gravitino. */
 @ToString
 public class UserEntity implements User, Entity, Auditable, HasIdentifier {
 

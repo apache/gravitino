@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.rel.indexes;
 
-/** Helper methods to create index to pass into Gravitino. */
+/** Helper methods to create index to pass into Apache Gravitino. */
 public class Indexes {
 
   /** An empty array of indexes. */

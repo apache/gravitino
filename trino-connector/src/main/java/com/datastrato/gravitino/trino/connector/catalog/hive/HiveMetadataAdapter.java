@@ -55,7 +55,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 
-/** Transforming gravitino hive metadata to trino. */
+/** Transforming Apache Gravitino Hive metadata to Trino. */
 public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
 
   private final PropertyConverter tableConverter;

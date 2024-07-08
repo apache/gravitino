@@ -18,7 +18,7 @@
 #
 # Apache Ranger Admin runtime Docker image
 FROM debian:buster
-LABEL maintainer="support@datastrato.com"
+LABEL maintainer="dev@gravitino.apache.org"
 
 WORKDIR /root
 

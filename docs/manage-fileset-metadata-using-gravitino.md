@@ -9,7 +9,7 @@ license: This software is licensed under the Apache License version 2.
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-This page introduces how to manage fileset metadata in Gravitino. Filesets 
+This page introduces how to manage fileset metadata in Apache Gravitino. Filesets 
 are a collection of files and directories. Users can leverage
 filesets to manage non-tabular data like training datasets and other raw data.
 
@@ -69,8 +69,7 @@ Map<String, String> properties = ImmutableMap.<String, String>builder()
     // a storage location will be stored under this location.
     .build();
 
-Catalog catalog = gravitinoClient.createCatalog(
-    NameIdentifier.of("metalake", "catalog"),
+Catalog catalog = gravitinoClient.createCatalog("catalog",
     Type.FILESET,
     "hadoop", // provider, Gravitino only supports "hadoop" for now.
     "This is a Hadoop fileset catalog",
@@ -83,7 +82,7 @@ Catalog catalog = gravitinoClient.createCatalog(
 
 ```python
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
-catalog = gravitino_client.create_catalog(ident=NameIdentifier.of("metalake", "catalog"),
+catalog = gravitino_client.create_catalog(name="catalog",
                                           type=Catalog.Type.FILESET,
                                           provider="hadoop", 
                                           comment="This is a Hadoop fileset catalog",
@@ -167,7 +166,7 @@ GravitinoClient gravitinoClient = GravitinoClient
     .build();
 
 // Assuming you have just created a Hadoop catalog named `catalog`
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+Catalog catalog = gravitinoClient.loadCatalog("catalog");
 
 SupportsSchemas supportsSchemas = catalog.asSchemas();
 
@@ -176,8 +175,7 @@ Map<String, String> schemaProperties = ImmutableMap.<String, String>builder()
     // specifying storage location will be stored under this location.
     .put("location", "file:/tmp/root/schema")
     .build();
-Schema schema = supportsSchemas.createSchema(
-    NameIdentifier.of("metalake", "catalog", "schema"),
+Schema schema = supportsSchemas.createSchema("schema",
     "This is a schema",
     schemaProperties
 );
@@ -190,8 +188,8 @@ Schema schema = supportsSchemas.createSchema(
 ```python
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
 
-catalog: Catalog = gravitino_client.load_catalog(ident=NameIdentifier.of("metalake", "catalog"))
-catalog.as_schemas().create_schema(ident=NameIdentifier.of("metalake", "catalog", "schema"), 
+catalog: Catalog = gravitino_client.load_catalog(name="catalog")
+catalog.as_schemas().create_schema(name="schema", 
                                    comment="This is a schema",
                                    properties={"location": "/tmp/root/schema"})
 ```
@@ -270,7 +268,7 @@ GravitinoClient gravitinoClient = GravitinoClient
     .withMetalake("metalake")
     .build();
 
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+Catalog catalog = gravitinoClient.loadCatalog("catalog");
 FilesetCatalog filesetCatalog = catalog.asFilesetCatalog();
 
 Map<String, String> propertiesMap = ImmutableMap.<String, String>builder()
@@ -278,7 +276,7 @@ Map<String, String> propertiesMap = ImmutableMap.<String, String>builder()
         .build();
 
 filesetCatalog.createFileset(
-  NameIdentifier.of("metalake", "catalog", "schema", "example_fileset"),
+  NameIdentifier.of("schema", "example_fileset"),
   "This is an example fileset",
   Fileset.Type.MANAGED,
   "file:/tmp/root/schema/example_fileset",
@@ -292,8 +290,8 @@ filesetCatalog.createFileset(
 ```python
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
 
-catalog: Catalog = gravitino_client.load_catalog(ident=NameIdentifier.of("metalake", "catalog"))
-catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("metalake", "catalog", "schema", "example_fileset"),
+catalog: Catalog = gravitino_client.load_catalog(name="catalog")
+catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("schema", "example_fileset"),
                                             type=Fileset.Type.MANAGED,
                                             comment="This is an example fileset",
                                             storage_location="/tmp/root/schema/example_fileset",
@@ -362,11 +360,11 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 // ...
 // Assuming you have just created a Fileset catalog named `catalog`
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+Catalog catalog = gravitinoClient.loadCatalog("catalog");
 
 FilesetCatalog filesetCatalog = catalog.asFilesetCatalog();
 
-Fileset f = filesetCatalog.alterFileset(NameIdentifier.of("metalake", "catalog", "schema", "fileset"),
+Fileset f = filesetCatalog.alterFileset(NameIdentifier.of("schema", "fileset"),
     FilesetChange.rename("fileset_renamed"), FilesetChange.updateComment("xxx"));
 // ...
 ```
@@ -377,12 +375,12 @@ Fileset f = filesetCatalog.alterFileset(NameIdentifier.of("metalake", "catalog",
 ```python
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
 
-catalog: Catalog = gravitino_client.load_catalog(ident=NameIdentifier.of("metalake", "catalog"))
+catalog: Catalog = gravitino_client.load_catalog(name="catalog")
 changes = (
    FilesetChange.remove_property("fileset_properties_key1"),
    FilesetChange.set_property("fileset_properties_key2", "fileset_propertie_new_value"),
 )
-fileset_new = catalog.as_fileset_catalog().alter_fileset(NameIdentifier.of("metalake", "catalog", "schema", "fileset"), 
+fileset_new = catalog.as_fileset_catalog().alter_fileset(NameIdentifier.of("schema", "fileset"), 
                                                          *changes)
 ```
 
@@ -419,12 +417,12 @@ http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/fil
 ```java
 // ...
 // Assuming you have just created a Fileset catalog named `catalog`
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+Catalog catalog = gravitinoClient.loadCatalog("catalog");
 
 FilesetCatalog filesetCatalog = catalog.asFilesetCatalog();
 
 // Drop a fileset
-filesetCatalog.dropFileset(NameIdentifier.of("metalake", "catalog", "schema", "fileset"));
+filesetCatalog.dropFileset(NameIdentifier.of("schema", "fileset"));
 // ...
 ```
 
@@ -434,8 +432,8 @@ filesetCatalog.dropFileset(NameIdentifier.of("metalake", "catalog", "schema", "f
 ```python
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
 
-catalog: Catalog = gravitino_client.load_catalog(ident=NameIdentifier.of("metalake", "catalog"))
-catalog.as_fileset_catalog().drop_fileset(ident=NameIdentifier.of("metalake", "catalog", "schema", "fileset"))
+catalog: Catalog = gravitino_client.load_catalog(name="catalog")
+catalog.as_fileset_catalog().drop_fileset(ident=NameIdentifier.of("schema", "fileset"))
 ```
 
 </TabItem>
@@ -464,11 +462,11 @@ http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/fil
 
 ```java
 // ...
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+Catalog catalog = gravitinoClient.loadCatalog("catalog");
 
 FilesetCatalog filesetCatalog = catalog.asFilesetCatalog();
 NameIdentifier[] identifiers =
-    filesetCatalog.listFilesets(Namespace.ofFileset("metalake", "catalog", "schema"));
+    filesetCatalog.listFilesets(Namespace.of("schema"));
 // ...
 ```
 
@@ -478,8 +476,8 @@ NameIdentifier[] identifiers =
 ```python
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
 
-catalog: Catalog = gravitino_client.load_catalog(ident=NameIdentifier.of("metalake", "catalog"))
-fileset_list: List[NameIdentifier] = catalog.as_fileset_catalog().list_filesets(namespace=Namespace.of_fileset("metalake", "catalog", "schema")))
+catalog: Catalog = gravitino_client.load_catalog(name="catalog")
+fileset_list: List[NameIdentifier] = catalog.as_fileset_catalog().list_filesets(namespace=Namespace.of("schema")))
 ```
 
 </TabItem>

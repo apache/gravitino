@@ -37,9 +37,11 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+@Disabled("Gravitino will not support KV entity store since 0.6.0, so we disable this test.")
 class TestStorageVersion {
 
   @Test

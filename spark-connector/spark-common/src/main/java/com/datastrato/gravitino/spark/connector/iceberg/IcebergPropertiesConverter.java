@@ -25,7 +25,7 @@ import java.util.Locale;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 
-/** Transform Iceberg catalog properties between Spark and Gravitino. */
+/** Transform Apache Iceberg catalog properties between Apache Spark and Apache Gravitino. */
 public class IcebergPropertiesConverter implements PropertiesConverter {
 
   public static class IcebergPropertiesConverterHolder {

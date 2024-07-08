@@ -26,8 +26,8 @@ import javax.annotation.Nullable;
 
 /**
  * An interface representing a topic under a schema {@link com.datastrato.gravitino.Namespace}. A
- * topic is a message queue that is managed by Gravitino. Users can create/drop/alter a topic on the
- * Message Queue system like Kafka, Pulsar, etc.
+ * topic is a message queue that is managed by Apache Gravitino. Users can create/drop/alter a topic
+ * on the Message Queue system like Apache Kafka, Apache Pulsar, etc.
  *
  * <p>{@link Topic} defines the basic properties of a topic object. A catalog implementation with
  * {@link TopicCatalog} should implement this interface.

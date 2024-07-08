@@ -13,7 +13,7 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Gravitino provides the ability to manage Apache Iceberg metadata.
+Apache Gravitino provides the ability to manage Apache Iceberg metadata.
 
 ### Requirements and limitations
 

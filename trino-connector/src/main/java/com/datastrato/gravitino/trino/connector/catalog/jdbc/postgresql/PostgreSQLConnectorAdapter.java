@@ -28,7 +28,9 @@ import com.datastrato.gravitino.trino.connector.catalog.jdbc.JDBCCatalogProperty
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
 import java.util.Map;
 
-/** Transforming PostgreSQL connector configuration and components into Gravitino connector. */
+/**
+ * Transforming PostgreSQL connector configuration and components into Apche Gravitino connector.
+ */
 public class PostgreSQLConnectorAdapter implements CatalogConnectorAdapter {
   private final PropertyConverter catalogConverter;
 

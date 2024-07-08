@@ -35,7 +35,7 @@ import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.connector.capability.Capability;
 import java.util.Map;
 
-/** Implementation of a Mysql catalog in Gravitino. */
+/** Implementation of a Mysql catalog in Apache Gravitino. */
 public class MysqlCatalog extends JdbcCatalog {
 
   private static final MysqlTablePropertiesMetadata TABLE_PROPERTIES_META =

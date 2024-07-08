@@ -48,9 +48,9 @@ import java.util.Set;
 
 /**
  * GravitinoSystemConnector is primarily used to drive the GravitinoCatalogManager to load catalog
- * connectors managed in the Gravitino server. After users configure the Gravitino connector through
- * Trino catalog configuration, a GravitinoSystemConnector is initially created. And it provides
- * some system tables and stored procedures of Gravitino connector.
+ * connectors managed in the Apache Gravitino server. After users configure the Gravitino connector
+ * through Trino catalog configuration, a GravitinoSystemConnector is initially created. And it
+ * provides some system tables and stored procedures of Gravitino connector.
  */
 public class GravitinoSystemConnector implements Connector {
 

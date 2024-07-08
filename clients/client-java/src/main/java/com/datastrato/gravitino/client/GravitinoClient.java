@@ -29,8 +29,8 @@ import com.google.common.base.Preconditions;
 import java.util.Map;
 
 /**
- * Gravitino Client for an user to interact with the Gravitino API, allowing the client to list,
- * load, create, and alter Catalog.
+ * Apache Gravitino Client for an user to interact with the Gravitino API, allowing the client to
+ * list, load, create, and alter Catalog.
  *
  * <p>It uses an underlying {@link RESTClient} to send HTTP requests and receive responses from the
  * API.

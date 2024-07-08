@@ -29,7 +29,7 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** GravitinoCatalogManager is used to retrieve catalogs from Gravitino server. */
+/** GravitinoCatalogManager is used to retrieve catalogs from Apache Gravitino server. */
 public class GravitinoCatalogManager {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoCatalogManager.class);
   private static GravitinoCatalogManager gravitinoCatalogManager;

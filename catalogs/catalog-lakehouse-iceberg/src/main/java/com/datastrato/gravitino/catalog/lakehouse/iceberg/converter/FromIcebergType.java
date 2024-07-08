@@ -26,7 +26,7 @@ import org.apache.iceberg.types.TypeUtil;
 import org.apache.iceberg.types.Types;
 
 /**
- * Implement a type converter to convert types in Iceberg.
+ * Implement a type converter to convert types in Apache Iceberg.
  *
  * <p>Referred from core/src/main/java/org/apache/iceberg/spark/TypeToSparkType.java
  */

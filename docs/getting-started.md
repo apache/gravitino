@@ -1,10 +1,10 @@
 ---
-title: "Getting started with Gravitino"
+title: "Getting started with Apache Gravitino"
 slug: /getting-started
 license: "This software is licensed under the Apache License version 2."
 ---
 
-There are several options for getting started with Gravitino. Installing and configuring Hive and Trino can be a little complex, so if you are unfamiliar with the technologies it would be best to use Docker.
+There are several options for getting started with Apache Gravitino. Installing and configuring Hive and Trino can be a little complex, so if you are unfamiliar with the technologies it would be best to use Docker.
 
 If you want to download and install Gravitino:
 
@@ -12,7 +12,7 @@ If you want to download and install Gravitino:
   - Google Cloud Platform, see [Getting started on Google Cloud Platform](#getting-started-on-google-cloud-platform)
   - locally, see [Getting started locally](#getting-started-locally)
 
-If you have your own Gravitino setup and want to use Apache Hive: 
+If you have your own Apache Gravitino setup and want to use Apache Hive: 
 
   - on AWS or Google Cloud Platform, see [Installing Apache Hive on AWS or Google Cloud Platform](#installing-apache-hive-on-aws-or-google-cloud-platform)
   - locally, see [Installing Apache Hive locally](#installing-apache-hive-locally)
@@ -208,7 +208,7 @@ sudo docker start gravitino-container
 
 The same steps for installing Hive on AWS or Google Cloud Platform apply when installing it locally. Follow [Installing Apache Hive on AWS or Google Cloud Platform](#installing-apache-hive-on-aws-or-google-cloud-platform).
 
-## Installing Gravitino playground on AWS or Google Cloud Platform
+## Installing Apache Gravitino playground on AWS or Google Cloud Platform
 
 Gravitino provides a bundle of Docker images to launch a Gravitino playground, which
 includes Apache Hive, Apache Hadoop, Trino, MySQL, PostgreSQL, and Gravitino. You can use
@@ -223,14 +223,14 @@ newgrp docker
 ```
 
 You can install and run all the programs as Docker containers by using the
-[gravitino-playground](https://github.com/datastrato/gravitino-playground). For details about
+[gravitino-playground](https://github.com/apache/gravitino-playground). For details about
 how to run the playground, see [how-to-use-the-playground](./how-to-use-the-playground.md)
 
-## Installing Gravitino playground locally
+## Installing Apache Gravitino playground locally
 
 The same steps for installing the playground on AWS or Google Cloud Platform apply when installing it locally. Follow [Installing Gravitino playground on AWS or Google Cloud Platform](#installing-gravitino-playground-on-aws-or-google-cloud-platform).
 
-## Using REST to interact with Gravitino
+## Using REST to interact with Apache Gravitino
 
 After starting the Gravitino distribution, issue REST commands to create and modify metadata. While you are using `localhost` in these examples, run these commands remotely via a hostname or IP address once you establish correct access.
 
@@ -291,7 +291,7 @@ After starting the Gravitino distribution, issue REST commands to create and mod
 
    Note that the metastore.uris property is used for the Hive catalog and needs updating if you change your configuration.
 
-## Accessing Gravitino on AWS externally
+## Accessing Apache Gravitino on AWS externally
 
 When you deploy Gravitino on AWS, accessing it externally requires some additional configuration due to how AWS networking works.
 
@@ -321,17 +321,16 @@ After completing these steps, you should be able to access the Gravitino REST in
 
 2. **Community engagement:**
    - Join the Gravitino community forums to connect with other users, share experiences, and seek assistance if needed.
-   - Check out our GitHub repository: https://github.com/datastrato
-   - Check out our Discourse group: https://gravitino.discourse.group/
+   - Check out our GitHub repository: https://github.com/apache/gravitino
+   - Check out our Slack channel in ASF Slack: https://the-asf.slack.com
    
 3. **Read our blogs:**
-   - Check out: https://datastrato.ai/blog
+   - Check out: https://gravitino.apache.org/blog (coming soon)
 
 4. **Continuous updates:**
    - Stay informed about Gravitino updates and new releases to benefit from the latest features, optimizations, and security       
      enhancements.
-   - Check out our Website: https://datastrato.ai/
-   - Check out our page on X (formerly Twitter): https://twitter.com/datastrato
+   - Check out our Website: https://gravitino.apache.org (coming soon)
   
 
-This document is just the beginning. You're welcome to customize your Gravitino setup based on your requirements and to explore the vast possibilities this powerful tool offers. If you encounter any issues or have questions, you can always connect with the Gravitino community for assistance. 
+This document is just the beginning. You're welcome to customize your Gravitino setup based on your requirements and to explore the vast possibilities this powerful tool offers. If you encounter any issues or have questions, you can always connect with the Gravitino community for assistance.
