@@ -309,11 +309,12 @@ public class SecureHadoopCatalogOperations
 
       // TODO(yuqi) comment the following code if the user in the docker hive image is the same as
       //  the user `anonymous` see: https://github.com/datastrato/gravitino/issues/4013
-      try {
-        return UserGroupInformation.getLoginUser();
-      } catch (IOException e) {
-        throw new RuntimeException("Failed to get login user", e);
-      }
+      //      try {
+      //        return UserGroupInformation.getLoginUser();
+      //      } catch (IOException e) {
+      //        throw new RuntimeException("Failed to get login user", e);
+      //      }
+      throw new RuntimeException("Failed to get user information for " + nameIdentifier);
     }
 
     UserGroupInformation ugi = userInfo.loginUser;

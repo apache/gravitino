@@ -114,7 +114,7 @@ public class ContainerSuite implements Closeable {
           container.start();
           // Uncomment the following code if https://github.com/datastrato/gravitino/issues/4013 is
           // done.
-          // container.executeInContainer("hadoop", "fs", "-chown", "-R", "anonymous", "/user/");
+          container.executeInContainer("hadoop", "fs", "-chown", "-R", "anonymous", "/user/");
           hiveContainer = container;
         }
       }

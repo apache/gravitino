@@ -66,6 +66,10 @@ public class GravitinoVirtualFileSystemIT extends AbstractIT {
   @BeforeAll
   public static void startUp() {
     containerSuite.startHiveContainer();
+    containerSuite
+        .getHiveContainer()
+        .executeInContainer("hadoop", "fs", "-chown", "-R", "anonymous", "/");
+
     Assertions.assertFalse(client.metalakeExists(metalakeName));
     metalake = client.createMetalake(metalakeName, "metalake comment", Collections.emptyMap());
     Assertions.assertTrue(client.metalakeExists(metalakeName));
