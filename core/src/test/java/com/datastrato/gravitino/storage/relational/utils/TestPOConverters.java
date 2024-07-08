@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Entity;
+import com.datastrato.gravitino.MetadataObject;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.meta.AuditInfo;
@@ -41,6 +42,7 @@ import com.datastrato.gravitino.storage.relational.po.FilesetVersionPO;
 import com.datastrato.gravitino.storage.relational.po.MetalakePO;
 import com.datastrato.gravitino.storage.relational.po.SchemaPO;
 import com.datastrato.gravitino.storage.relational.po.TablePO;
+import com.datastrato.gravitino.storage.relational.po.TagMetadataObjectRelPO;
 import com.datastrato.gravitino.storage.relational.po.TagPO;
 import com.datastrato.gravitino.storage.relational.po.TopicPO;
 import com.datastrato.gravitino.utils.NamespaceUtil;
@@ -651,6 +653,21 @@ public class TestPOConverters {
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
     assertEquals("this is test2", updatePO.getComment());
+  }
+
+  @Test
+  public void testTagMetadataObjectRelPO() {
+    TagMetadataObjectRelPO tagMetadataObjectRelPO =
+        POConverters.initializeTagMetadataObjectRelPOWithVersion(
+            1L, 1L, MetadataObject.Type.CATALOG.toString());
+    assertEquals(1L, tagMetadataObjectRelPO.getTagId());
+    assertEquals(1L, tagMetadataObjectRelPO.getMetadataObjectId());
+    assertEquals(
+        MetadataObject.Type.CATALOG.toString(), tagMetadataObjectRelPO.getMetadataObjectType());
+
+    assertEquals(1, tagMetadataObjectRelPO.getCurrentVersion());
+    assertEquals(1, tagMetadataObjectRelPO.getLastVersion());
+    assertEquals(0, tagMetadataObjectRelPO.getDeletedAt());
   }
 
   private static BaseMetalake createMetalake(Long id, String name, String comment) {

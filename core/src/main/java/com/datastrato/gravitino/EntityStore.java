@@ -181,4 +181,14 @@ public interface EntityStore extends Closeable {
    */
   <R, E extends Exception> R executeInTransaction(Executable<R, E> executable)
       throws E, IOException;
+
+  /**
+   * Get the extra operations that are supported by the entity store.
+   *
+   * @return the extra operations object that are supported by the entity store
+   * @throws UnsupportedOperationException if the extra operations are not supported
+   */
+  default SupportsExtraOperations extraOperations() {
+    throw new UnsupportedOperationException("extra operations are not supported");
+  }
 }

@@ -27,9 +27,12 @@ import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.EntitySerDe;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.HasIdentifier;
+import com.datastrato.gravitino.MetadataObject;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.SupportsExtraOperations;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
+import com.datastrato.gravitino.meta.TagEntity;
 import com.datastrato.gravitino.utils.Executable;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -43,7 +46,7 @@ import org.slf4j.LoggerFactory;
  * MySQL, PostgreSQL, etc. If you want to use a different backend, you can implement the {@link
  * RelationalBackend} interface
  */
-public class RelationalEntityStore implements EntityStore {
+public class RelationalEntityStore implements EntityStore, SupportsExtraOperations {
   private static final Logger LOGGER = LoggerFactory.getLogger(RelationalEntityStore.class);
   public static final ImmutableMap<String, String> RELATIONAL_BACKENDS =
       ImmutableMap.of(
@@ -131,5 +134,40 @@ public class RelationalEntityStore implements EntityStore {
   public void close() throws IOException {
     garbageCollector.close();
     backend.close();
+  }
+
+  public SupportsExtraOperations extraOperations() {
+    return this;
+  }
+
+  @Override
+  public MetadataObject[] listAssociatedMetadataObjectsForTag(NameIdentifier tagIdent)
+      throws IOException {
+    return backend.listAssociatedMetadataObjectsForTag(tagIdent);
+  }
+
+  @Override
+  public TagEntity[] listAssociatedTagsForMetadataObject(
+      NameIdentifier objectIdent, Entity.EntityType objectType)
+      throws NoSuchEntityException, IOException {
+    return backend.listAssociatedTagsForMetadataObject(objectIdent, objectType);
+  }
+
+  @Override
+  public TagEntity getTagForMetadataObject(
+      NameIdentifier objectIdent, Entity.EntityType objectType, NameIdentifier tagIdent)
+      throws NoSuchEntityException, IOException {
+    return backend.getTagForMetadataObject(objectIdent, objectType, tagIdent);
+  }
+
+  @Override
+  public TagEntity[] associateTagsWithMetadataObject(
+      NameIdentifier objectIdent,
+      Entity.EntityType objectType,
+      NameIdentifier[] tagsToAdd,
+      NameIdentifier[] tagsToRemove)
+      throws NoSuchEntityException, EntityAlreadyExistsException, IOException {
+    return backend.associateTagsWithMetadataObject(
+        objectIdent, objectType, tagsToAdd, tagsToRemove);
   }
 }

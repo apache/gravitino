@@ -24,9 +24,12 @@ import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.MetadataObject;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.SupportsExtraOperations;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.exceptions.NoSuchTagException;
+import com.datastrato.gravitino.exceptions.NotFoundException;
+import com.datastrato.gravitino.exceptions.TagAlreadyAssociatedException;
 import com.datastrato.gravitino.exceptions.TagAlreadyExistsException;
 import com.datastrato.gravitino.lock.LockType;
 import com.datastrato.gravitino.lock.TreeLockUtils;
@@ -34,13 +37,18 @@ import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.TagEntity;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.storage.kv.KvEntityStore;
+import com.datastrato.gravitino.utils.MetadataObjectUtil;
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,6 +60,8 @@ public class TagManager {
 
   private final EntityStore entityStore;
 
+  private final SupportsExtraOperations supportsExtraOperations;
+
   public TagManager(IdGenerator idGenerator, EntityStore entityStore) {
     if (entityStore instanceof KvEntityStore) {
       String errorMsg =
@@ -60,6 +70,16 @@ public class TagManager {
       LOG.error(errorMsg);
       throw new RuntimeException(errorMsg);
     }
+
+    if (!(entityStore instanceof SupportsExtraOperations)) {
+      String errorMsg =
+          "TagManager cannot run with entity store that does not support extra operations, "
+              + "please configure the entity store to use relational entity store and restart the Gravitino server";
+      LOG.error(errorMsg);
+      throw new RuntimeException(errorMsg);
+    }
+
+    this.supportsExtraOperations = entityStore.extraOperations();
 
     this.idGenerator = idGenerator;
     this.entityStore = entityStore;
@@ -82,10 +102,6 @@ public class TagManager {
             throw new RuntimeException(ioe);
           }
         });
-  }
-
-  public MetadataObject[] listAssociatedMetadataObjectsForTag(String metalake, String name) {
-    throw new UnsupportedOperationException("Not implemented yet");
   }
 
   public Tag createTag(String metalake, String name, String comment, Map<String, String> properties)
@@ -188,22 +204,141 @@ public class TagManager {
         });
   }
 
-  public String[] listTagsForMetadataObject(String metalake, MetadataObject metadataObject) {
-    throw new UnsupportedOperationException("Not implemented yet");
+  public MetadataObject[] listMetadataObjectsForTag(String metalake, String name)
+      throws NoSuchTagException {
+    NameIdentifier tagId = ofTagIdent(metalake, name);
+    return TreeLockUtils.doWithTreeLock(
+        tagId,
+        LockType.READ,
+        () -> {
+          try {
+            if (!entityStore.exists(tagId, Entity.EntityType.TAG)) {
+              throw new NoSuchTagException(
+                  "Tag with name %s under metalake %s does not exist", name, metalake);
+            }
+
+            return supportsExtraOperations.listAssociatedMetadataObjectsForTag(tagId);
+          } catch (IOException e) {
+            LOG.error("Failed to list metadata objects for tag {}", name, e);
+            throw new RuntimeException(e);
+          }
+        });
   }
 
-  public Tag[] listTagsInfoForMetadataObject(String metalake, MetadataObject metadataObject) {
-    throw new UnsupportedOperationException("Not implemented yet");
+  public String[] listTagsForMetadataObject(String metalake, MetadataObject metadataObject)
+      throws NotFoundException {
+    return Arrays.stream(listTagsInfoForMetadataObject(metalake, metadataObject))
+        .map(Tag::name)
+        .toArray(String[]::new);
+  }
+
+  public Tag[] listTagsInfoForMetadataObject(String metalake, MetadataObject metadataObject)
+      throws NotFoundException {
+    NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
+
+    return TreeLockUtils.doWithTreeLock(
+        entityIdent,
+        LockType.READ,
+        () -> {
+          try {
+            return supportsExtraOperations.listAssociatedTagsForMetadataObject(
+                entityIdent, entityType);
+          } catch (NoSuchEntityException e) {
+            throw new NotFoundException(
+                e, "Failed to list tags for metadata object %s due to not found", metadataObject);
+          } catch (IOException e) {
+            LOG.error("Failed to list tags for metadata object {}", metadataObject, e);
+            throw new RuntimeException(e);
+          }
+        });
   }
 
   public Tag getTagForMetadataObject(String metalake, MetadataObject metadataObject, String name)
-      throws NoSuchTagException {
-    throw new UnsupportedOperationException("Not implemented yet");
+      throws NotFoundException {
+    NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
+    NameIdentifier tagIdent = ofTagIdent(metalake, name);
+
+    return TreeLockUtils.doWithTreeLock(
+        entityIdent,
+        LockType.READ,
+        () -> {
+          try {
+            return supportsExtraOperations.getTagForMetadataObject(
+                entityIdent, entityType, tagIdent);
+          } catch (NoSuchEntityException e) {
+            if (e.getMessage().contains("No such tag entity")) {
+              throw new NoSuchTagException(
+                  e, "Tag %s does not exist for metadata object %s", name, metadataObject);
+            } else {
+              throw new NotFoundException(
+                  e, "Failed to get tag for metadata object %s due to not found", metadataObject);
+            }
+          } catch (IOException e) {
+            LOG.error("Failed to get tag for metadata object {}", metadataObject, e);
+            throw new RuntimeException(e);
+          }
+        });
   }
 
   public String[] associateTagsForMetadataObject(
-      String metalake, MetadataObject metadataObject, String[] tagsToAdd, String[] tagsToRemove) {
-    throw new UnsupportedOperationException("Not implemented yet");
+      String metalake, MetadataObject metadataObject, String[] tagsToAdd, String[] tagsToRemove)
+      throws NotFoundException, TagAlreadyAssociatedException {
+    Preconditions.checkArgument(
+        !metadataObject.type().equals(MetadataObject.Type.METALAKE)
+            && !metadataObject.type().equals(MetadataObject.Type.COLUMN),
+        "Cannot associate tags for unsupported metadata object type %s",
+        metadataObject.type());
+
+    NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
+
+    Set<String> tagsToAddSet = tagsToAdd == null ? Sets.newHashSet() : Sets.newHashSet(tagsToAdd);
+    if (tagsToRemove != null) {
+      for (String tag : tagsToRemove) {
+        tagsToAddSet.remove(tag);
+      }
+    }
+
+    NameIdentifier[] tagsToAddIdent =
+        tagsToAddSet.stream().map(tag -> ofTagIdent(metalake, tag)).toArray(NameIdentifier[]::new);
+    NameIdentifier[] tagsToRemoveIdent =
+        tagsToRemove == null
+            ? new NameIdentifier[0]
+            : Sets.newHashSet(tagsToRemove).stream()
+                .map(tag -> ofTagIdent(metalake, tag))
+                .toArray(NameIdentifier[]::new);
+
+    // TODO. We need to add a write lock to Tag's namespace to avoid tag alteration and deletion
+    //  during the association operation.
+    return TreeLockUtils.doWithTreeLock(
+        entityIdent,
+        LockType.READ,
+        () -> {
+          try {
+            return Arrays.stream(
+                    supportsExtraOperations.associateTagsWithMetadataObject(
+                        entityIdent, entityType, tagsToAddIdent, tagsToRemoveIdent))
+                .map(Tag::name)
+                .toArray(String[]::new);
+          } catch (NoSuchEntityException e) {
+            throw new NotFoundException(
+                e,
+                "Failed to associate tags for metadata object %s due to not found",
+                metadataObject);
+          } catch (EntityAlreadyExistsException e) {
+            throw new TagAlreadyAssociatedException(
+                e,
+                "Failed to associate tags for metadata object due to some tags %s already "
+                    + "associated to the metadata object %s",
+                Arrays.toString(tagsToAdd),
+                metadataObject);
+          } catch (IOException e) {
+            LOG.error("Failed to associate tags for metadata object {}", metadataObject, e);
+            throw new RuntimeException(e);
+          }
+        });
   }
 
   private static void checkMetalakeExists(String metalake, EntityStore entityStore) {

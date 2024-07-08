@@ -24,6 +24,7 @@ import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
+import com.datastrato.gravitino.SupportsExtraOperations;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import java.io.Closeable;
 import java.io.IOException;
@@ -31,7 +32,7 @@ import java.util.List;
 import java.util.function.Function;
 
 /** Interface defining the operations for a Relation Backend. */
-public interface RelationalBackend extends Closeable {
+public interface RelationalBackend extends Closeable, SupportsExtraOperations {
 
   /**
    * Initializes the Relational Backend environment with the provided configuration.
