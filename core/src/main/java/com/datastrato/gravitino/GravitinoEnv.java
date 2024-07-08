@@ -120,7 +120,7 @@ public class GravitinoEnv {
    *
    * @param config The configuration object to initialize the environment.
    */
-  public void initialize(Config config, boolean initGravitinoServerComponet) {
+  public void initialize(Config config, boolean initGravitinoServerComponent) {
     LOG.info("Initializing Gravitino Environment...");
 
     this.config = config;
@@ -132,7 +132,7 @@ public class GravitinoEnv {
         config.getConfigsWithPrefix(EventListenerManager.GRAVITINO_EVENT_LISTENER_PREFIX));
     EventBus eventBus = eventListenerManager.createEventBus();
 
-    if (!initGravitinoServerComponet) {
+    if (!initGravitinoServerComponent) {
       return;
     }
 

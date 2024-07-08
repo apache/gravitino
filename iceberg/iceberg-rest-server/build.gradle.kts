@@ -33,7 +33,7 @@ val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat
 dependencies {
   implementation(project(":core"))
   implementation(project(":common"))
-  implementation(project(":iceberg-common"))
+  implementation(project(":iceberg:iceberg-common"))
   implementation(project(":server-common"))
   implementation(libs.bundles.iceberg)
   implementation(libs.bundles.jetty)
@@ -160,6 +160,12 @@ tasks {
   register("copyLibs", Copy::class) {
     dependsOn(copyDepends, "build")
     from("build/libs")
-    into("$rootDir/distribution/package/extensions/iceberg-rest-server/libs")
+    into("$rootDir/distribution/package/iceberg-rest-server/libs")
+  }
+
+  register("copyLibsToStandalonePackage", Copy::class) {
+    dependsOn(copyDepends, "build")
+    from("build/libs")
+    into("$rootDir/distribution/iceberg-rest-server/libs")
   }
 }

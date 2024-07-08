@@ -51,7 +51,7 @@ public class IcebergRESTServerManagerForEmbedded extends IcebergRESTServerManage
   }
 
   @Override
-  public Optional<Future> doStartIcebergRESTServer() {
+  public Optional<Future<?>> doStartIcebergRESTServer() {
     Future<?> future =
         executor.submit(
             () -> {

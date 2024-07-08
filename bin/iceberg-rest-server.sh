@@ -178,7 +178,11 @@ fi
 
 #JAVA_OPTS+=" -Djava.securit.krb5.conf=/etc/krb5.conf"
 
-addJarInDir "${GRAVITINO_HOME}/libs"
+if [ -d "${GRAVITINO_HOME}/iceberg-rest-server/libs" ]; then
+  addJarInDir "${GRAVITINO_HOME}/iceberg-rest-server/libs"
+else
+  addJarInDir "${GRAVITINO_HOME}/libs"
+fi
 
 case "${1}" in
   start)

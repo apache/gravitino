@@ -37,8 +37,7 @@ jobs:
               - gradle/**
               - integration-test/**
               - integration-test-common/**
-              - iceberg-common/**
-              - iceberg-rest-server/**
+              - iceberg/**
               - meta/**
               - server/**
               - server-common/**
@@ -106,14 +105,13 @@ jobs:
           name: integrate-test-reports-${{ matrix.java-version }}-${{ matrix.test-mode }}-${{ matrix.backend }}
           path: |
             build/reports
-            iceberg-rest-server/build/*.log
+            iceberg/iceberg-rest-server/build/*.log
             integration-test/build/*.log
             integration-test/build/*.tar
             integration-test/build/trino-ci-container-log/hive/*.*
             integration-test/build/trino-ci-container-log/hdfs/*.*
             distribution/package/logs/gravitino-server.out
             distribution/package/logs/gravitino-server.log
-            distribution/package/extensions/iceberg-rest-server/logs/*.*
             catalogs/**/*.log
             catalogs/**/*.tar
             distribution/**/*.log

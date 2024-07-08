@@ -149,7 +149,7 @@ tasks.test {
     exclude("**/integration/**")
   } else {
     dependsOn(tasks.jar)
-    dependsOn(":iceberg-rest-server:jar")
+    dependsOn(":iceberg:iceberg-rest-server:jar")
 
     doFirst {
       environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.12")

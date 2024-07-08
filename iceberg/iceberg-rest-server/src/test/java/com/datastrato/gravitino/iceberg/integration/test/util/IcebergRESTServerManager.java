@@ -27,10 +27,6 @@ import com.datastrato.gravitino.rest.RESTUtils;
 import com.datastrato.gravitino.server.IcebergRESTServer;
 import com.datastrato.gravitino.server.ServerConfig;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
-import com.github.dockerjava.zerodep.shaded.org.apache.hc.client5.http.classic.methods.HttpGet;
-import com.github.dockerjava.zerodep.shaded.org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import com.github.dockerjava.zerodep.shaded.org.apache.hc.client5.http.impl.classic.HttpClients;
-import com.github.dockerjava.zerodep.shaded.org.apache.hc.core5.http.ClassicHttpResponse;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -40,6 +36,10 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,15 +53,13 @@ public abstract class IcebergRESTServerManager {
 
   public abstract Path getConfigDir();
 
-  public abstract Optional<Future> doStartIcebergRESTServer() throws Exception;
+  public abstract Optional<Future<?>> doStartIcebergRESTServer() throws Exception;
 
   public abstract void doStopIcebergRESTServer();
 
   public static IcebergRESTServerManager create() {
-    String testMode =
-        System.getProperty(com.datastrato.gravitino.integration.test.util.ITUtils.TEST_MODE);
-    if (com.datastrato.gravitino.integration.test.util.ITUtils.EMBEDDED_TEST_MODE.equals(
-        testMode)) {
+    String testMode = System.getProperty(ITUtils.TEST_MODE);
+    if (ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
       return new IcebergRESTServerManagerForEmbedded();
     } else {
       return new IcebergRESTServerManagerForDeploy();
@@ -78,7 +76,7 @@ public abstract class IcebergRESTServerManager {
 
   public void startIcebergRESTServer() throws Exception {
     initServerConfig();
-    Optional<Future> future = doStartIcebergRESTServer();
+    Optional<Future<?>> future = doStartIcebergRESTServer();
 
     long beginTime = System.currentTimeMillis();
     boolean started = false;
@@ -120,17 +118,6 @@ public abstract class IcebergRESTServerManager {
     }
   }
 
-  private static boolean isHttpServerUp(String testUrl) {
-    try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
-      HttpGet request = new HttpGet(testUrl);
-      ClassicHttpResponse response = httpClient.execute(request, a -> a);
-      return response.getCode() == 200;
-    } catch (Exception e) {
-      LOG.warn("Check IcebergRESTServer failed, url:{}, error:{} ", testUrl, e.getMessage());
-      return false;
-    }
-  }
-
   private void customizeConfigFile(String configTempFileName, String configFileName)
       throws IOException {
     Map<String, String> configMap = new HashMap<>();
@@ -163,5 +150,16 @@ public abstract class IcebergRESTServerManager {
     int port = jettyServerConfig.getHttpPort();
     this.checkUri = String.format("http://%s:%d/metrics", host, port);
     LOG.info("Check uri:{}.", checkUri);
+  }
+
+  private static boolean isHttpServerUp(String testUrl) {
+    try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+      HttpGet request = new HttpGet(testUrl);
+      ClassicHttpResponse response = httpClient.execute(request, a -> a);
+      return response.getCode() == 200;
+    } catch (Exception e) {
+      LOG.warn("Check server failed: url:{}, error message:{}", testUrl, e.getMessage());
+      return false;
+    }
   }
 }

@@ -36,14 +36,17 @@ dependencies {
   implementation(libs.iceberg.hive.metastore)
   implementation(libs.hadoop2.common) {
     exclude("com.github.spotbugs")
+    exclude("com.sun.jersey")
     exclude("javax.servlet")
     exclude("org.mortbay.jetty")
   }
   implementation(libs.hadoop2.hdfs) {
+    exclude("com.sun.jersey")
     exclude("javax.servlet")
     exclude("org.mortbay.jetty")
   }
   implementation(libs.hadoop2.mapreduce.client.core) {
+    exclude("com.sun.jersey")
     exclude("javax.servlet")
     exclude("org.mortbay.jetty")
   }
@@ -51,7 +54,7 @@ dependencies {
     exclude("co.cask.tephra")
     exclude("com.github.spotbugs")
     exclude("com.google.code.findbugs", "jsr305")
-    exclude("com.sun.jersey", "jersey-server")
+    exclude("com.sun.jersey")
     exclude("com.tdunning", "json")
     exclude("com.zaxxer", "HikariCP")
     exclude("javax.servlet")

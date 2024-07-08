@@ -63,7 +63,7 @@ gravitino.catalog.cache.evictionIntervalMs = 3600000
 # Auxiliary service names, separate by ','
 gravitino.auxService.names = iceberg-rest
 # Iceberg REST service classpath
-gravitino.iceberg-rest.classpath = extensions/iceberg-rest-server/libs
+gravitino.iceberg-rest.classpath = iceberg-rest-server/libs
 # Iceberg REST service host
 gravitino.iceberg-rest.host = 0.0.0.0
 # Iceberg REST service http port

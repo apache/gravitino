@@ -525,20 +525,14 @@ tasks {
   val outputDir = projectDir.dir("distribution")
 
   val compileDistribution by registering {
-    dependsOn("copySubprojectDependencies", "copyCatalogLibAndConfigs", "copySubprojectLib", "copyIcebergRESTServer")
+    dependsOn("copySubprojectDependencies", "copyCatalogLibAndConfigs", "copySubprojectLib", "iceberg:iceberg-rest-server:copyLibs")
 
     group = "gravitino distribution"
     outputs.dir(projectDir.dir("distribution/package"))
     doLast {
       copy {
-        from(projectDir.dir("conf")) {
-          include("gravitino-env.sh.template", "gravitino.conf.template", "log4j2.properties.template")
-          into("package/conf")
-        }
-        from(projectDir.dir("bin")) {
-          include("gravitino.sh", "common.sh")
-          into("package/bin")
-        }
+        from(projectDir.dir("conf")) { into("package/conf") }
+        from(projectDir.dir("bin")) { into("package/bin") }
         from(projectDir.dir("web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web") }
         from(projectDir.dir("scripts")) { into("package/scripts") }
         into(outputDir)
@@ -564,19 +558,19 @@ tasks {
     }
   }
 
-  val copyIcebergRESTServer by registering {
-    dependsOn("iceberg-rest-server:copyLibs")
+  val compileIcebergRESTServer by registering {
+    dependsOn("iceberg:iceberg-rest-server:copyLibsToStandalonePackage")
     group = "gravitino distribution"
-    outputs.dir(projectDir.dir("distribution/package/extensions/iceberg-rest-server"))
+    outputs.dir(projectDir.dir("distribution/iceberg-rest-server"))
     doLast {
       copy {
         from(projectDir.dir("conf")) {
           include("iceberg-rest-server.conf.template", "log4j2.properties.template")
-          into("package/extensions/iceberg-rest-server/conf")
+          into("iceberg-rest-server/conf")
         }
         from(projectDir.dir("bin")) {
           include("common.sh", "iceberg-rest-server.sh")
-          into("package/extensions/iceberg-rest-server/bin")
+          into("iceberg-rest-server/bin")
         }
         into(outputDir)
         rename { fileName ->
@@ -584,11 +578,22 @@ tasks {
         }
         fileMode = 0b111101101
       }
+
+      copy {
+        from(projectDir.dir("licenses")) { into("iceberg-rest-server/licenses") }
+        from(projectDir.file("LICENSE.bin")) { into("iceberg-rest-server") }
+        from(projectDir.file("NOTICE.bin")) { into("iceberg-rest-server") }
+        from(projectDir.file("README.md")) { into("iceberg-rest-server") }
+        into(outputDir)
+        rename { fileName ->
+          fileName.replace(".bin", "")
+        }
+      }
     }
   }
 
   val assembleDistribution by registering(Tar::class) {
-    dependsOn("assembleTrinoConnector")
+    dependsOn("assembleTrinoConnector", "assembleIcebergRESTServer")
     group = "gravitino distribution"
     finalizedBy("checksumDistribution")
     into("${rootProject.name}-$version-bin")
@@ -610,11 +615,13 @@ tasks {
   }
 
   val assembleIcebergRESTServer by registering(Tar::class) {
-    dependsOn("iceberg-rest-server:copyLibs")
+    dependsOn("compileIcebergRESTServer")
+    // fix gradlew assembleDistribution error
+    mustRunAfter("compileDistribution")
     group = "gravitino distribution"
     finalizedBy("checksumIcebergRESTServerDistribution")
     into("${rootProject.name}-iceberg-rest-server-$version-bin")
-    from(copyIcebergRESTServer.map { it.outputs.files.single() })
+    from(compileIcebergRESTServer.map { it.outputs.files.single() })
     compression = Compression.GZIP
     archiveFileName.set("${rootProject.name}-iceberg-rest-server-$version-bin.tar.gz")
     destinationDirectory.set(projectDir.dir("distribution"))
@@ -638,7 +645,7 @@ tasks {
 
   register("checksumDistribution") {
     group = "gravitino distribution"
-    dependsOn(assembleDistribution, "checksumTrinoConnector")
+    dependsOn(assembleDistribution, "checksumTrinoConnector", "checksumIcebergRESTServerDistribution")
     val archiveFile = assembleDistribution.flatMap { it.archiveFile }
     val checksumFile = archiveFile.map { archive ->
       archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
