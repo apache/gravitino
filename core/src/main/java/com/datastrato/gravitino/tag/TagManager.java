@@ -78,7 +78,7 @@ public class TagManager {
                 .map(TagEntity::name)
                 .toArray(String[]::new);
           } catch (IOException ioe) {
-            LOG.error("Failed to list tags", ioe);
+            LOG.error("Failed to list tags under metalake {}", metalake, ioe);
             throw new RuntimeException(ioe);
           }
         });
@@ -119,7 +119,7 @@ public class TagManager {
             throw new TagAlreadyExistsException(
                 "Tag with name %s under metalake %s already exists", name, metalake);
           } catch (IOException ioe) {
-            LOG.error("Failed to create tag", ioe);
+            LOG.error("Failed to create tag {} under metalake {}", name, metalake, ioe);
             throw new RuntimeException(ioe);
           }
         });
@@ -139,7 +139,7 @@ public class TagManager {
             throw new NoSuchTagException(
                 "Tag with name %s under metalake %s does not exist", name, metalake);
           } catch (IOException ioe) {
-            LOG.error("Failed to get tag", ioe);
+            LOG.error("Failed to get tag {} under metalake {}", name, metalake, ioe);
             throw new RuntimeException(ioe);
           }
         });
@@ -166,7 +166,7 @@ public class TagManager {
             throw new RuntimeException(
                 "Tag with name " + name + " under metalake " + metalake + " already exists");
           } catch (IOException ioe) {
-            LOG.error("Failed to alter tag", ioe);
+            LOG.error("Failed to alter tag {} under metalake {}", name, metalake, ioe);
             throw new RuntimeException(ioe);
           }
         });
@@ -182,7 +182,7 @@ public class TagManager {
           try {
             return entityStore.delete(ofTagIdent(metalake, name), Entity.EntityType.TAG);
           } catch (IOException ioe) {
-            LOG.error("Failed to delete tag", ioe);
+            LOG.error("Failed to delete tag {} under metalake {}", name, metalake, ioe);
             throw new RuntimeException(ioe);
           }
         });
