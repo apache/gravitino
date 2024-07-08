@@ -22,3 +22,5 @@ IP=$(hostname -I | awk '{print $1}')
 sed -i "s|<value>hdfs://localhost:9000|<value>hdfs://${IP}:9000|g" /usr/local/hive/conf/hive-site.xml
 
 /bin/bash /usr/local/sbin/start.sh
+
+hdfs dfs -chown -R anonymous /user
