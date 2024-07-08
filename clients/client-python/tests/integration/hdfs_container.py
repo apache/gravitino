@@ -70,6 +70,17 @@ async def check_hdfs_container_status(hdfs_container):
         ) from e
 
 
+def check_owner_to_anonymous(hdfs_container):
+    command_and_args = ["hadoop", "fs", "-chown", "-R", "anonymous", "/"]
+    exec_result = hdfs_container.exec_run(command_and_args)
+    if exec_result.exit_code != 0:
+        message = f"Command {command_and_args} exited with {exec_result.exit_code}"
+        logger.warning(message)
+        logger.warning("output: %s", exec_result.output)
+        return False
+    return True
+
+
 class HDFSContainer:
     _docker_client = None
     _container = None
@@ -105,6 +116,11 @@ class HDFSContainer:
         asyncio.run(check_hdfs_container_status(self._container))
 
         self._fetch_ip()
+
+        if not check_owner_to_anonymous(self._container):
+            raise GravitinoRuntimeException(
+                "Failed to change the owner of the root directory to anonymous."
+            )
 
     def _create_networks(self):
         pool_config = tp.IPAMPool(subnet="10.20.31.16/28")
