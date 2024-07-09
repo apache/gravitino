@@ -6,7 +6,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Introduction
 
-Before the version `0.5.0`, Gravitino only supports KV backend storage to store metadata. Since
+Before the version `0.5.0`, Apache Gravitino only supports KV backend storage to store metadata. Since
 RDBMS is widely used in the industry, starting from the version `0.5.0`, Gravitino supports using
 RDBMS as relational backend storage to store metadata. This doc will guide you on how to use the
 relational backend storage in Gravitino.
@@ -61,7 +61,7 @@ Then please place it in the distribution package directory:
 ${GRAVITINO_HOME}/libs/
 ```
 
-### Step 4: Set up the Gravitino server configs
+### Step 4: Set up the Apache Gravitino server configs
 
 Find the server configuration file which name is `gravitino.conf` in the distribution package directory:
 

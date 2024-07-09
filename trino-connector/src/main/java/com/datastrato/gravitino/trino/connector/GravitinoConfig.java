@@ -45,7 +45,7 @@ public class GravitinoConfig {
   public static final String TRINO_CATALOG_STORE_DEFAULT_VALUE = "file";
   public static final String TRINO_CATALOG_MANAGEMENT_DEFAULT_VALUE = "static";
 
-  // The trino configuration of etc/config.properties
+  // The Trino configuration of etc/config.properties
   public static final TrinoConfig trinoConfig = new TrinoConfig();
 
   // Gravitino config keys

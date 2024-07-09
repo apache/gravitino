@@ -62,13 +62,13 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   }
 
   /**
-   * This function call by trino creates a connector. It creates GravitinoSystemConnector at first.
+   * This function call by Trino creates a connector. It creates GravitinoSystemConnector at first.
    * Another time's it get GravitinoConnector by CatalogConnectorManager
    *
    * @param catalogName the connector name of catalog
    * @param requiredConfig the config of connector
-   * @param context trino connector context
-   * @return trino connector
+   * @param context Trino connector context
+   * @return Trino connector
    */
   @Override
   public Connector create(

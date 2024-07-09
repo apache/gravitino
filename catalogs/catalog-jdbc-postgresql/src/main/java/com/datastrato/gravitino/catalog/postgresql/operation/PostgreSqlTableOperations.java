@@ -453,7 +453,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       TableChange.UpdateComment updateComment, JdbcTable jdbcTable) {
     String newComment = updateComment.getNewComment();
     if (null == StringIdentifier.fromComment(newComment)) {
-      // Detect and add gravitino id.
+      // Detect and add Gravitino id.
       if (StringUtils.isNotEmpty(jdbcTable.comment())) {
         StringIdentifier identifier = StringIdentifier.fromComment(jdbcTable.comment());
         if (null != identifier) {
@@ -632,7 +632,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     // Append position if available
     if (!(addColumn.getPosition() instanceof TableChange.Default)) {
       throw new IllegalArgumentException(
-          "PostgreSQL does not support column position in gravitino.");
+          "PostgreSQL does not support column position in Gravitino.");
     }
     result.add(columnDefinition.append(";").toString());
 

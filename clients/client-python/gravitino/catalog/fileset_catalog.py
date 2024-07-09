@@ -101,7 +101,7 @@ class FilesetCatalog(BaseSchemaCatalog):
         """Load fileset metadata by {@link NameIdentifier} from the catalog.
 
         Args:
-            ident: A fileset identifier.
+            ident: A fileset identifier, which should be "schema.fileset" format.
 
         Raises:
             NoSuchFilesetException If the fileset does not exist.
@@ -137,7 +137,7 @@ class FilesetCatalog(BaseSchemaCatalog):
         If the type of the fileset object is "EXTERNAL", the underlying storageLocation must be set.
 
         Args:
-            ident: A fileset identifier.
+            ident: A fileset identifier, which should be "schema.fileset" format.
             comment: The comment of the fileset.
             fileset_type: The type of the fileset.
             storage_location: The storage location of the fileset.
@@ -174,7 +174,7 @@ class FilesetCatalog(BaseSchemaCatalog):
         """Update a fileset metadata in the catalog.
 
         Args:
-            ident: A fileset identifier.
+            ident: A fileset identifier, which should be "schema.fileset" format.
             changes: The changes to apply to the fileset.
 
         Args:
@@ -209,7 +209,7 @@ class FilesetCatalog(BaseSchemaCatalog):
         metadata will be dropped.
 
         Args:
-             ident: A fileset identifier.
+             ident: A fileset identifier, which should be "schema.fileset" format.
 
         Returns:
              true If the fileset is dropped, false the fileset did not exist.

@@ -30,16 +30,16 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The CatalogConnector serves as a communication bridge between the Gravitino connector and its
- * internal connectors. It manages the lifecycle, configuration, and runtime environment of internal
- * connectors.
+ * The CatalogConnector serves as a communication bridge between the Apache Gravitino connector and
+ * its internal connectors. It manages the lifecycle, configuration, and runtime environment of
+ * internal connectors.
  */
 public class CatalogConnectorContext {
 
   private final GravitinoCatalog catalog;
   private final GravitinoMetalake metalake;
 
-  // Connector communicates with trino
+  // Connector communicates with Trino
   private final GravitinoConnector connector;
 
   // Internal connector communicates with data storage

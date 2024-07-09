@@ -27,7 +27,7 @@ import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 
-// This filter is used to serve static HTML files from the Gravitino WEB UI.
+// This filter is used to serve static HTML files from the Apache Gravitino WEB UI.
 // https://nextjs.org/docs/pages/building-your-application/deploying/static-exports#deploying
 public class WebUIFilter implements Filter {
   @Override

@@ -97,10 +97,9 @@ public class FilesetCatalog extends BaseSchemaCatalog
   }
 
   /**
-   * Load fileset metadata by {@link NameIdentifier} from the catalog, which should be a
-   * "schema.fileset" style.
+   * Load fileset metadata by {@link NameIdentifier} from the catalog.
    *
-   * @param ident A fileset identifier.
+   * @param ident A fileset identifier, which should be "schema.fileset" format.
    * @return The fileset metadata.
    * @throws NoSuchFilesetException If the fileset does not exist.
    */
@@ -128,7 +127,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
    *
    * <p>If the type of the fileset object is "EXTERNAL", the underlying storageLocation must be set.
    *
-   * @param ident A fileset identifier, which should be a "schema.fileset" style.
+   * @param ident A fileset identifier, which should be "schema.fileset" format.
    * @param comment The comment of the fileset.
    * @param type The type of the fileset.
    * @param storageLocation The storage location of the fileset.
@@ -172,7 +171,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
   /**
    * Update a fileset metadata in the catalog.
    *
-   * @param ident A fileset identifier, which should be a "schema.fileset" style.
+   * @param ident A fileset identifier, which should be "schema.fileset" format.
    * @param changes The changes to apply to the fileset.
    * @return The updated fileset metadata.
    * @throws NoSuchFilesetException If the fileset does not exist.
@@ -209,7 +208,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
    * <p>The underlying files will be deleted if this fileset type is managed, otherwise, only the
    * metadata will be dropped.
    *
-   * @param ident A fileset identifier, which should be a "schema.fileset" style.
+   * @param ident A fileset identifier, which should be "schema.fileset" format.
    * @return true If the fileset is dropped, false the fileset did not exist.
    */
   @Override
@@ -240,9 +239,9 @@ public class FilesetCatalog extends BaseSchemaCatalog
   }
 
   /**
-   * Check whether the namespace of a fileset is valid
+   * Check whether the namespace of a fileset is valid.
    *
-   * @param namespace The namespace to check
+   * @param namespace The namespace to check.
    */
   static void checkFilesetNamespace(Namespace namespace) {
     Namespace.check(
@@ -252,9 +251,9 @@ public class FilesetCatalog extends BaseSchemaCatalog
   }
 
   /**
-   * Check whether the NameIdentifier of a fileset is valid
+   * Check whether the NameIdentifier of a fileset is valid.
    *
-   * @param ident The NameIdentifier to check
+   * @param ident The NameIdentifier to check, which should be "schema.fileset" format.
    */
   static void checkFilesetNameIdentifier(NameIdentifier ident) {
     NameIdentifier.check(ident != null, "NameIdentifier must not be null");
@@ -263,8 +262,14 @@ public class FilesetCatalog extends BaseSchemaCatalog
     checkFilesetNamespace(ident.namespace());
   }
 
-  private Namespace getFilesetFullNamespace(Namespace tableNamespace) {
-    return Namespace.of(this.catalogNamespace().level(0), this.name(), tableNamespace.level(0));
+  /**
+   * Get the full namespace of the fileset with the given fileset's short namespace (schema name).
+   *
+   * @param filesetNamespace The fileset's short namespace, which is the schema name.
+   * @return full namespace of the fileset, which is "metalake.catalog.schema" format.
+   */
+  private Namespace getFilesetFullNamespace(Namespace filesetNamespace) {
+    return Namespace.of(this.catalogNamespace().level(0), this.name(), filesetNamespace.level(0));
   }
 
   /**

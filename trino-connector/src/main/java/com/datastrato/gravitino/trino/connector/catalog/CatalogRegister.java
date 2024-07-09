@@ -44,8 +44,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This class dynamically register the Catalog managed by Gravitino into Trino using Trino CREATE
- * CATALOG statement. It allows the catalog to be used in Trino like a regular Trino catalog.
+ * This class dynamically register the Catalog managed by Apache Gravitino into Trino using Trino
+ * CREATE CATALOG statement. It allows the catalog to be used in Trino like a regular Trino catalog.
  */
 public class CatalogRegister {
 
@@ -147,7 +147,7 @@ public class CatalogRegister {
         if (!catalogContents.contains(GRAVITINO_DYNAMIC_CONNECTOR + "=true")) {
           throw new TrinoException(
               GRAVITINO_DUPLICATED_CATALOGS,
-              "Catalog already exists, the catalog is not created by gravitino");
+              "Catalog already exists, the catalog is not created by Gravitino");
         } else {
           throw new TrinoException(
               GRAVITINO_CATALOG_ALREADY_EXISTS,

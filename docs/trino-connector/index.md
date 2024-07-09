@@ -1,11 +1,11 @@
 ---
-title: "Gravitino connector index"
+title: "Apache Gravitino connector index"
 slug: /trino-connector/index
 keyword: gravitino connector trino
 license: "This software is licensed under the Apache License version 2."
 ---
 
-Gravitino connector index:
+Apache Gravitino connector index:
 
 - [Trino Support](trino-connector.md)
   - [Requirements](requirements.md)

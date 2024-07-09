@@ -36,7 +36,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 
-/** Database operations for Doris. */
+/** Database operations for Apache Doris. */
 public class DorisDatabaseOperations extends JdbcDatabaseOperations {
   public static final String COMMENT_KEY = "comment";
 

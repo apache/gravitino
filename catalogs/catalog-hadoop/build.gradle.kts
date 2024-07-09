@@ -53,6 +53,7 @@ dependencies {
 
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.mockito.core)
+  testImplementation(libs.mockito.inline)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
@@ -101,6 +102,15 @@ tasks {
 }
 
 tasks.test {
+  doFirst {
+    val testMode = project.properties["testMode"] as? String ?: "embedded"
+    if (testMode == "deploy") {
+      environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package")
+    } else if (testMode == "embedded") {
+      environment("GRAVITINO_HOME", project.rootDir.path)
+    }
+  }
+
   val skipUTs = project.hasProperty("skipTests")
   if (skipUTs) {
     // Only run integration tests

@@ -31,7 +31,7 @@ import io.trino.spi.session.PropertyMetadata;
 import java.util.List;
 import java.util.Map;
 
-/** Transforming MySQL connector configuration and components into Gravitino connector. */
+/** Transforming MySQL connector configuration and components into Apache Gravitino connector. */
 public class MySQLConnectorAdapter implements CatalogConnectorAdapter {
 
   private final PropertyConverter catalogConverter;

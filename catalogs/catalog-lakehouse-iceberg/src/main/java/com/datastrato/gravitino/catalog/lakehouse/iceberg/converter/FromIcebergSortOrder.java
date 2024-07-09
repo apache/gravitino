@@ -33,7 +33,7 @@ import org.apache.iceberg.SortDirection;
 import org.apache.iceberg.transforms.SortOrderVisitor;
 
 /**
- * Implement iceberg sort order converter to gravitino sort order.
+ * Implement Apache Iceberg sort order converter to Apache Gravitino sort order.
  *
  * <p>Referred from core/src/main/java/org/apache/iceberg/spark/SortOrderToSpark.java
  */

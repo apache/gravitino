@@ -26,7 +26,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Transforming between gravitino schema/table/column property and engine property. */
+/** Transforming between Apache Gravitino schema/table/column property and engine property. */
 public abstract class PropertyConverter {
 
   protected static final String TRINO_PROPERTIES_PREFIX = "trino.bypass.";
@@ -34,7 +34,7 @@ public abstract class PropertyConverter {
   private static final Logger LOG = LoggerFactory.getLogger(PropertyConverter.class);
   /**
    * Mapping that maps engine properties to Gravitino properties. It will return a map that holds
-   * the mapping between engine and gravitino properties.
+   * the mapping between engine and Gravitino properties.
    *
    * @return a map that holds the mapping from engine to Gravitino properties.
    */

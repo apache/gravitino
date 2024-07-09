@@ -30,7 +30,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 
-/** Represents a Hive Schema (Database) entity in the Hive Metastore catalog. */
+/** Represents an Apache Hive Schema (Database) entity in the Hive Metastore catalog. */
 @ToString
 public class HiveSchema extends BaseSchema {
   private Configuration conf;

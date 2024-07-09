@@ -60,7 +60,7 @@ public class GravitinoStoredProcedureFactory {
               } catch (Exception e) {
                 throw new TrinoException(
                     GRAVITINO_UNSUPPORTED_OPERATION,
-                    "Failed to initialize gravitino system procedures",
+                    "Failed to initialize Gravitino system procedures",
                     e);
               }
             })

@@ -31,7 +31,7 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.Provider;
 
 /**
- * AccessControlNotAllowedFilter is used for filter the requests related to access control if
+ * AccessControlNotAllowedFilter is used for filter the requests related to access control if Apache
  * Gravitino doesn't enable authorization. The filter return 405 error code. You can refer to
  * https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405. No methods will be returned in the
  * allow methods.

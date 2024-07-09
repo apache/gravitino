@@ -50,9 +50,14 @@ if [ "${GITHUB_ACTIONS}" = "true" ]; then
   # 376MB
   sudo rm -rf /opt/hostedtoolcache/node || :
   # Remove Web browser packages
-  sudo apt purge -y \
-    firefox \
-    google-chrome-stable \
-    microsoft-edge-stable
+  if dpkg-query -l firefox;then
+    sudo apt purge -y firefox
+  fi
+  if dpkg-query -l google-chrome-stable;then
+    sudo apt purge -y google-chrome-stable
+  fi
+  if dpkg-query -l microsoft-edge-stable;then
+    sudo apt purge -y microsoft-edge-stable
+  fi
   df -h
 fi

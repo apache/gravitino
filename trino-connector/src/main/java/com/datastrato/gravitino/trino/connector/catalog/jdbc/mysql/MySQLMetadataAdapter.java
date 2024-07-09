@@ -31,7 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/** Transforming gravitino MySQL metadata to trino. */
+/** Transforming Apache Gravitino MySQL metadata to Trino. */
 public class MySQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
 
   private final PropertyConverter tableConverter;
@@ -57,7 +57,7 @@ public class MySQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
     return super.toTrinoTableProperties(objectMap);
   }
 
-  /** Transform trino ConnectorTableMetadata to gravitino table metadata */
+  /** Transform Trino ConnectorTableMetadata to Gravitino table metadata */
   @Override
   public GravitinoTable createTable(ConnectorTableMetadata tableMetadata) {
     String tableName = tableMetadata.getTableSchema().getTable().getTableName();

@@ -176,7 +176,7 @@ public class CatalogHiveIT extends AbstractIT {
     HiveConf hiveConf = new HiveConf();
     hiveConf.set(HiveConf.ConfVars.METASTOREURIS.varname, HIVE_METASTORE_URIS);
 
-    // Check if hive client can connect to hive metastore
+    // Check if Hive client can connect to Hive metastore
     hiveClientPool = new HiveClientPool(1, hiveConf);
     List<String> dbs = hiveClientPool.run(client -> client.getAllDatabases());
     Assertions.assertFalse(dbs.isEmpty());
@@ -298,7 +298,7 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertEquals("val2", loadSchema.properties().get("key2"));
     Assertions.assertNotNull(loadSchema.properties().get(HiveSchemaPropertiesMetadata.LOCATION));
 
-    // Directly get database from hive metastore to verify the schema creation
+    // Directly get database from Hive metastore to verify the schema creation
     Database database = hiveClientPool.run(client -> client.getDatabase(schemaName));
     Assertions.assertEquals(schemaName.toLowerCase(), database.getName());
     Assertions.assertEquals(comment, database.getDescription());
@@ -387,7 +387,7 @@ public class CatalogHiveIT extends AbstractIT {
                 distribution,
                 sortOrders);
 
-    // Directly get table from hive metastore to check if the table is created successfully.
+    // Directly get table from Hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
         hiveClientPool.run(client -> client.getTable(schemaName, tableName));
     properties
@@ -404,7 +404,7 @@ public class CatalogHiveIT extends AbstractIT {
             .asTableCatalog()
             .createTable(nameIdentifier, columns, TABLE_COMMENT, properties, (Transform[]) null);
 
-    // Directly get table from hive metastore to check if the table is created successfully.
+    // Directly get table from Hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTable1 =
         hiveClientPool.run(client -> client.getTable(schemaName, tableName));
     properties
@@ -468,7 +468,7 @@ public class CatalogHiveIT extends AbstractIT {
             .createTable(
                 nameIdentifier, columns, TABLE_COMMENT, properties, Transforms.EMPTY_TRANSFORM);
 
-    // Directly get table from hive metastore to check if the table is created successfully.
+    // Directly get table from Hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
         hiveClientPool.run(client -> client.getTable(schemaName, tableName));
     properties
@@ -496,7 +496,7 @@ public class CatalogHiveIT extends AbstractIT {
             .asTableCatalog()
             .createTable(nameIdentifier, columns, TABLE_COMMENT, properties, (Transform[]) null);
 
-    // Directly get table from hive metastore to check if the table is created successfully.
+    // Directly get table from Hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTable1 =
         hiveClientPool.run(client -> client.getTable(schemaName, tableName));
     properties
@@ -684,7 +684,7 @@ public class CatalogHiveIT extends AbstractIT {
                   Transforms.identity(columns[1].name()), Transforms.identity(columns[2].name())
                 });
 
-    // Directly get table from hive metastore to check if the table is created successfully.
+    // Directly get table from Hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
         hiveClientPool.run(client -> client.getTable(schemaName, tableName));
     properties
@@ -805,7 +805,7 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertEquals(
         "hive_col_name2=2023-01-01/hive_col_name3=gravitino_it_test", partition.name());
 
-    // Directly get partition from hive metastore
+    // Directly get partition from Hive metastore
     org.apache.hadoop.hive.metastore.api.Partition hivePartition =
         hiveClientPool.run(
             client -> client.getPartition(schemaName, createdTable.name(), partition.name()));
@@ -915,7 +915,7 @@ public class CatalogHiveIT extends AbstractIT {
     IdentityPartition partitionAdded1 =
         (IdentityPartition) createdTable.supportPartitions().addPartition(identity1);
 
-    // Directly get partition from hive metastore to check if the partition is created successfully.
+    // Directly get partition from Hive metastore to check if the partition is created successfully.
     org.apache.hadoop.hive.metastore.api.Partition partitionGot1 =
         hiveClientPool.run(
             client -> client.getPartition(schemaName, createdTable.name(), partitionAdded1.name()));
@@ -934,7 +934,7 @@ public class CatalogHiveIT extends AbstractIT {
         Partitions.identity(new String[][] {field5, field6}, new Literal<?>[] {literal5, literal6});
     IdentityPartition partitionAdded2 =
         (IdentityPartition) createdTable.supportPartitions().addPartition(identity2);
-    // Directly get partition from hive metastore to check if the partition is created successfully.
+    // Directly get partition from Hive metastore to check if the partition is created successfully.
     org.apache.hadoop.hive.metastore.api.Partition partitionGot2 =
         hiveClientPool.run(
             client -> client.getPartition(schemaName, createdTable.name(), partitionAdded2.name()));
@@ -1103,7 +1103,8 @@ public class CatalogHiveIT extends AbstractIT {
                     new String[] {HIVE_COL_NAME1}, Types.IntegerType.get()));
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, alteredTable.auditInfo().creator());
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, alteredTable.auditInfo().lastModifier());
-    // Direct get table from hive metastore to check if the table is altered successfully.
+
+    // Direct get table from Hive metastore to check if the table is altered successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
         hiveClientPool.run(client -> client.getTable(schemaName, ALTER_TABLE_NAME));
     Assertions.assertEquals(schemaName.toLowerCase(), hiveTab.getDbName());
@@ -1252,7 +1253,7 @@ public class CatalogHiveIT extends AbstractIT {
             Transforms.EMPTY_TRANSFORM);
     catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, ALTER_TABLE_NAME));
 
-    // Directly get table from hive metastore to check if the table is dropped successfully.
+    // Directly get table from Hive metastore to check if the table is dropped successfully.
     assertThrows(
         NoSuchObjectException.class,
         () -> hiveClientPool.run(client -> client.getTable(schemaName, ALTER_TABLE_NAME)));
@@ -1463,7 +1464,8 @@ public class CatalogHiveIT extends AbstractIT {
             TABLE_COMMENT,
             createProperties(),
             new Transform[] {Transforms.identity(columns[2].name())});
-    // Directly get table from hive metastore to check if the table is created successfully.
+
+    // Directly get table from Hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
         hiveClientPool.run(client -> client.getTable(schemaName, tableName));
     checkTableReadWrite(hiveTab);
@@ -1471,7 +1473,7 @@ public class CatalogHiveIT extends AbstractIT {
     Path tableDirectory = new Path(hiveTab.getSd().getLocation());
     catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, tableName));
     Boolean existed = hiveClientPool.run(client -> client.tableExists(schemaName, tableName));
-    Assertions.assertFalse(existed, "The hive table should not exist");
+    Assertions.assertFalse(existed, "The Hive table should not exist");
     Assertions.assertFalse(hdfs.exists(tableDirectory), "The table directory should not exist");
   }
 
@@ -1486,7 +1488,7 @@ public class CatalogHiveIT extends AbstractIT {
             TABLE_COMMENT,
             ImmutableMap.of(TABLE_TYPE, EXTERNAL_TABLE.name().toLowerCase(Locale.ROOT)),
             new Transform[] {Transforms.identity(columns[2].name())});
-    // Directly get table from hive metastore to check if the table is created successfully.
+    // Directly get table from Hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
         hiveClientPool.run(client -> client.getTable(schemaName, tableName));
     checkTableReadWrite(hiveTab);
@@ -1511,14 +1513,15 @@ public class CatalogHiveIT extends AbstractIT {
             TABLE_COMMENT,
             createProperties(),
             new Transform[] {Transforms.identity(columns[2].name())});
-    // Directly get table from hive metastore to check if the table is created successfully.
+
+    // Directly get table from Hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
         hiveClientPool.run(client -> client.getTable(schemaName, tableName));
     checkTableReadWrite(hiveTab);
     Assertions.assertEquals(MANAGED_TABLE.name(), hiveTab.getTableType());
     catalog.asTableCatalog().purgeTable(NameIdentifier.of(schemaName, tableName));
     Boolean existed = hiveClientPool.run(client -> client.tableExists(schemaName, tableName));
-    Assertions.assertFalse(existed, "The hive table should not exist");
+    Assertions.assertFalse(existed, "The Hive table should not exist");
     Path tableDirectory = new Path(hiveTab.getSd().getLocation());
     Assertions.assertFalse(hdfs.exists(tableDirectory), "The table directory should not exist");
     Path trashDirectory = hdfs.getTrashRoot(tableDirectory);
@@ -1536,7 +1539,8 @@ public class CatalogHiveIT extends AbstractIT {
             TABLE_COMMENT,
             ImmutableMap.of(TABLE_TYPE, EXTERNAL_TABLE.name().toLowerCase(Locale.ROOT)),
             new Transform[] {Transforms.identity(columns[2].name())});
-    // Directly get table from hive metastore to check if the table is created successfully.
+
+    // Directly get table from Hive metastore to check if the table is created successfully.
     org.apache.hadoop.hive.metastore.api.Table hiveTab =
         hiveClientPool.run(client -> client.getTable(schemaName, tableName));
     checkTableReadWrite(hiveTab);
@@ -1548,7 +1552,7 @@ public class CatalogHiveIT extends AbstractIT {
         () -> {
           tableCatalog.purgeTable(id);
         },
-        "Can't purge a external hive table");
+        "Can't purge a external Hive table");
 
     Boolean existed = hiveClientPool.run(client -> client.tableExists(schemaName, tableName));
     Assertions.assertTrue(existed, "The table should be still exist");
@@ -1569,7 +1573,7 @@ public class CatalogHiveIT extends AbstractIT {
             ImmutableMap.of(TABLE_TYPE, EXTERNAL_TABLE.name().toLowerCase(Locale.ROOT)),
             new Transform[] {Transforms.identity(columns[2].name())});
 
-    // Directly drop table from hive metastore.
+    // Directly drop table from Hive metastore.
     hiveClientPool.run(
         client -> {
           client.dropTable(schemaName, tableName, true, false, false);
@@ -1598,7 +1602,7 @@ public class CatalogHiveIT extends AbstractIT {
             ImmutableMap.of(TABLE_TYPE, EXTERNAL_TABLE.name().toLowerCase(Locale.ROOT)),
             new Transform[] {Transforms.identity(columns[2].name())});
 
-    // Directly drop table from hive metastore.
+    // Directly drop table from Hive metastore.
     hiveClientPool.run(
         client -> {
           client.dropTable(schemaName, tableName, true, false, true);

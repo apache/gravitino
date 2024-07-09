@@ -22,7 +22,7 @@ import org.apache.spark.api.plugin.DriverPlugin;
 import org.apache.spark.api.plugin.ExecutorPlugin;
 import org.apache.spark.api.plugin.SparkPlugin;
 
-/** The entrypoint for Gravitino Spark connector. */
+/** The entrypoint for Apache Gravitino Spark connector. */
 public class GravitinoSparkPlugin implements SparkPlugin {
 
   @Override

@@ -30,7 +30,7 @@ import org.apache.paimon.types.DataField;
 import org.apache.paimon.types.DataType;
 import org.apache.paimon.types.RowType;
 
-/** Implementation of {@link Column} that represents a column in the Paimon column. */
+/** Implementation of {@link Column} that represents a column in the Apache Paimon column. */
 @EqualsAndHashCode(callSuper = true)
 public class GravitinoPaimonColumn extends BaseColumn {
 

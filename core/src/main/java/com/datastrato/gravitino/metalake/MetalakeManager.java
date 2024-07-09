@@ -41,7 +41,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Manages Metalakes within the Gravitino system. */
+/** Manages Metalakes within the Apache Gravitino system. */
 public class MetalakeManager implements MetalakeDispatcher {
 
   private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";

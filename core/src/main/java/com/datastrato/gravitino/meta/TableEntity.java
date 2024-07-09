@@ -28,7 +28,7 @@ import com.google.common.collect.Maps;
 import java.util.Map;
 import lombok.ToString;
 
-/** A class representing a table entity in Gravitino. */
+/** A class representing a table entity in Apache Gravitino. */
 @ToString
 public class TableEntity implements Entity, Auditable, HasIdentifier {
 

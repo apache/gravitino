@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
 
 // hive-metastore/src/main/java/org/apache/iceberg/hive/HiveClientPool.java
 
-/** Represents a client pool for managing connections to the Hive Metastore service. */
+/** Represents a client pool for managing connections to an Apache Hive Metastore service. */
 public class HiveClientPool extends ClientPoolImpl<IMetaStoreClient, TException> {
 
   private static final Logger LOG = LoggerFactory.getLogger(HiveClientPool.class);
