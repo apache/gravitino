@@ -344,7 +344,7 @@ public class CatalogHiveIT extends AbstractIT {
     }
     Assertions.assertTrue(fileStatuses.length > 0);
     for (FileStatus fileStatus : fileStatuses) {
-      Assertions.assertEquals("datastrato", fileStatus.getOwner());
+      Assertions.assertEquals("anonymous", fileStatus.getOwner());
     }
   }
 
