@@ -25,16 +25,13 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.util.Optional;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 
 public class FetchFileUtils {
 
   private FetchFileUtils() {}
 
-  public static void fetchFileFromUri(
-      String fileUri, File destFile, int timeout, Configuration conf) throws IOException {
+  public static void fetchFileFromUri(String fileUri, File destFile, int timeout)
+      throws IOException {
     try {
       URI uri = new URI(fileUri);
       String scheme = Optional.ofNullable(uri.getScheme()).orElse("file");
@@ -48,10 +45,6 @@ public class FetchFileUtils {
 
         case "file":
           Files.createSymbolicLink(destFile.toPath(), new File(uri.getPath()).toPath());
-          break;
-
-        case "hdfs":
-          FileSystem.get(conf).copyToLocalFile(new Path(uri), new Path(destFile.toURI()));
           break;
 
         default:

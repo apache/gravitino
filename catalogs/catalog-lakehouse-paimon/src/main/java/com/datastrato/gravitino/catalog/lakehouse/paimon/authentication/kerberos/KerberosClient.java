@@ -18,7 +18,6 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.paimon.authentication.kerberos;
 
-import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
 import java.io.File;
@@ -87,9 +86,6 @@ public class KerberosClient implements Closeable {
     KerberosConfig kerberosConfig = new KerberosConfig(conf);
 
     String keyTabUri = kerberosConfig.getKeytab();
-    // TODO: Support to download the file from Kerberos HDFS
-    Preconditions.checkArgument(
-        !keyTabUri.trim().startsWith("hdfs"), "Keytab uri doesn't support to use HDFS");
 
     File keytabsDir = new File("keytabs");
     if (!keytabsDir.exists()) {
@@ -106,7 +102,7 @@ public class KerberosClient implements Closeable {
     }
 
     int fetchKeytabFileTimeout = kerberosConfig.getFetchTimeoutSec();
-    FetchFileUtils.fetchFileFromUri(keyTabUri, keytabFile, fetchKeytabFileTimeout, hadoopConf);
+    FetchFileUtils.fetchFileFromUri(keyTabUri, keytabFile, fetchKeytabFileTimeout);
 
     return keytabFile;
   }
