@@ -188,7 +188,6 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
           initKerberos(
               conf, hadoopConf, NameIdentifier.of(catalogInfo.namespace(), catalogInfo.name()));
     } else if (config.isSimpleAuth()) {
-      UserGroupInformation.reset();
       UserGroupInformation u =
           UserGroupInformation.createRemoteUser(PrincipalUtils.getCurrentUserName());
       userInfoMap.put(

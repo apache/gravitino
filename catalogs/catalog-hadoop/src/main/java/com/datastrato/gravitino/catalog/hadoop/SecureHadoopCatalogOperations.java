@@ -298,9 +298,6 @@ public class SecureHadoopCatalogOperations
     if (kerberosConfig.isKerberosAuth()) {
       // We assume that the realm of catalog is the same as the realm of the schema and table.
       hadoopCatalogOperations.initKerberos(properties, new Configuration(), ident);
-    } else if (kerberosConfig.isSimpleAuth()) {
-      // Reset the user information.
-      UserGroupInformation.reset();
     }
     // If the kerberos is not enabled (Simple mode), we will use the current user
     return getUserBaseOnNameIdentifier(ident);
