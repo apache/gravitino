@@ -20,8 +20,6 @@ package com.datastrato.gravitino.meta;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Field;
-import com.datastrato.gravitino.MetadataObject;
-import com.datastrato.gravitino.MetadataObjects;
 import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.file.Fileset;
@@ -335,23 +333,5 @@ public class TestEntity {
         TagEntity.builder().withId(1L).withName("tag2").withAuditInfo(auditInfo).build();
     Assertions.assertNull(tag2.comment());
     Assertions.assertNull(tag2.properties());
-
-    MetadataObject[] metadataObjects =
-        new MetadataObject[] {
-          MetadataObjects.parse("test1", MetadataObject.Type.METALAKE),
-          MetadataObjects.parse("test2", MetadataObject.Type.CATALOG),
-          MetadataObjects.parse("a.b", MetadataObject.Type.SCHEMA),
-          MetadataObjects.parse("a.b.c", MetadataObject.Type.TABLE),
-          MetadataObjects.parse("a.b.c.d", MetadataObject.Type.COLUMN)
-        };
-
-    TagEntity tag3 =
-        TagEntity.builder()
-            .withId(1L)
-            .withName("tag3")
-            .withAuditInfo(auditInfo)
-            .withMetadataObjects(metadataObjects)
-            .build();
-    Assertions.assertEquals(metadataObjects, tag3.objects());
   }
 }
