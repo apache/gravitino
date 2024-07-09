@@ -191,11 +191,11 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       // TODO: change the user 'datastrato' to 'anonymous' and uncomment the following code;
       //  uncomment the following code after the user 'datastrato' is removed from the codebase.
       //  for more, please see https://github.com/datastrato/gravitino/issues/4013
-      // UserGroupInformation u =
-      //    UserGroupInformation.createRemoteUser(PrincipalUtils.getCurrentUserName());
-      // userInfoMap.put(
-      //    NameIdentifier.of(catalogInfo.namespace(), catalogInfo.name()),
-      //    UserInfo.of(u, false, null, null));
+       UserGroupInformation u =
+          UserGroupInformation.createRemoteUser(PrincipalUtils.getCurrentUserName());
+       userInfoMap.put(
+          NameIdentifier.of(catalogInfo.namespace(), catalogInfo.name()),
+          UserInfo.of(u, false, null, null));
     }
   }
 
