@@ -39,6 +39,7 @@ import org.apache.gravitino.dto.responses.CatalogListResponse;
 import org.apache.gravitino.dto.responses.CatalogResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
+import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -214,6 +215,44 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
             ErrorHandlers.catalogErrorHandler());
     resp.validate();
     return resp.dropped();
+  }
+
+  /**
+   * Test whether a catalog can be created successfully with the specified parameters, without
+   * actually creating it.
+   *
+   * @param catalogName the name of the catalog.
+   * @param type the type of the catalog.
+   * @param provider the provider of the catalog.
+   * @param comment the comment of the catalog.
+   * @param properties the properties of the catalog.
+   * @throws Exception if the test failed.
+   */
+  @Override
+  public void testConnection(
+      String catalogName,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties)
+      throws Exception {
+    CatalogCreateRequest req =
+        new CatalogCreateRequest(catalogName, type, provider, comment, properties);
+    req.validate();
+
+    ErrorResponse resp =
+        restClient.post(
+            String.format("api/metalakes/%s/catalogs/testConnection", this.name()),
+            req,
+            ErrorResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.catalogErrorHandler());
+
+    if (resp.getCode() == 0) {
+      return;
+    }
+
+    ErrorHandlers.catalogErrorHandler().accept(resp);
   }
 
   static class Builder extends MetalakeDTO.Builder<Builder> {

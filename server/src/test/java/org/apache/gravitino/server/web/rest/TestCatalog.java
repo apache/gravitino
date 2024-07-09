@@ -21,6 +21,7 @@ package org.apache.gravitino.server.web.rest;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Map;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
@@ -43,6 +44,15 @@ public class TestCatalog extends BaseCatalog<TestCatalog> {
       public void initialize(
           Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
           throws RuntimeException {}
+
+      @Override
+      public void testConnection(
+          NameIdentifier catalogIdent,
+          Type type,
+          String provider,
+          String comment,
+          Map<String, String> properties)
+          throws Exception {}
 
       @Override
       public void close() throws IOException {}

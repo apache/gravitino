@@ -32,13 +32,20 @@ import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METAST
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.PRINCIPAL;
 import static org.apache.gravitino.catalog.hive.TestHiveCatalog.HIVE_PROPERTIES_METADATA;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
+import org.apache.thrift.TException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -125,5 +132,26 @@ class TestHiveCatalogOperations {
 
     Assertions.assertEquals("v2", op.hiveConf.get("a.b"));
     Assertions.assertEquals("v4", op.hiveConf.get("c.d"));
+  }
+
+  @Test
+  void testTestConnection() throws TException, InterruptedException {
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.clientPool = mock(CachedClientPool.class);
+    when(op.clientPool.run(any())).thenThrow(new TException("mock connection exception"));
+
+    ConnectionFailedException exception =
+        Assertions.assertThrows(
+            ConnectionFailedException.class,
+            () ->
+                op.testConnection(
+                    NameIdentifier.of("metalake", "catalog"),
+                    Catalog.Type.RELATIONAL,
+                    "hive",
+                    "comment",
+                    ImmutableMap.of()));
+    Assertions.assertEquals(
+        "Failed to run getAllDatabases in Hive Metastore: mock connection exception",
+        exception.getMessage());
   }
 }

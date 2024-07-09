@@ -27,6 +27,7 @@ import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.OAuth2ErrorResponse;
 import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
@@ -339,6 +340,9 @@ public class ErrorHandlers {
       switch (errorResponse.getCode()) {
         case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
           throw new IllegalArgumentException(errorMessage);
+
+        case ErrorConstants.CONNECTION_FAILED_CODE:
+          throw new ConnectionFailedException(errorMessage);
 
         case ErrorConstants.NOT_FOUND_CODE:
           if (errorResponse.getType().equals(NoSuchMetalakeException.class.getSimpleName())) {

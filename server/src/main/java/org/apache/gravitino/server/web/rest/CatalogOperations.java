@@ -43,6 +43,7 @@ import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.dto.requests.CatalogCreateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdatesRequest;
+import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.CatalogListResponse;
 import org.apache.gravitino.dto.responses.CatalogResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
@@ -145,6 +146,44 @@ public class CatalogOperations {
     } catch (Exception e) {
       return ExceptionHandlers.handleCatalogException(
           OperationType.CREATE, request.getName(), metalake, e);
+    }
+  }
+
+  @POST
+  @Path("testConnection")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "test-connection." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "test-connection", absolute = true)
+  public Response testConnection(
+      @PathParam("metalake") String metalake, CatalogCreateRequest request) {
+    LOG.info("Received test connection request for catalog: {}.{}", metalake, request.getName());
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            request.validate();
+            NameIdentifier ident = NameIdentifierUtil.ofCatalog(metalake, request.getName());
+            TreeLockUtils.doWithTreeLock(
+                NameIdentifierUtil.ofMetalake(metalake),
+                LockType.READ,
+                () -> {
+                  catalogDispatcher.testConnection(
+                      ident,
+                      request.getType(),
+                      request.getProvider(),
+                      request.getComment(),
+                      request.getProperties());
+                  return null;
+                });
+            Response response = Utils.ok(new BaseResponse());
+            LOG.info(
+                "Successfully test connection for catalog: {}.{}", metalake, request.getName());
+            return response;
+          });
+
+    } catch (Exception e) {
+      LOG.info("Failed to test connection for catalog: {}.{}", metalake, request.getName());
+      return ExceptionHandlers.handleTestConnectionException(e);
     }
   }
 

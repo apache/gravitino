@@ -79,6 +79,62 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
+  /metalakes/{metalake}/catalogs/testConnection:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+    post:
+      tags:
+        - catalog
+      summary: Test catalog connection
+      operationId: testConnection
+      requestBody:
+        content:
+            application/json:
+                schema:
+                  $ref: "#/components/schemas/CatalogCreateRequest"
+                examples:
+                  CatalogCreate:
+                    $ref: "#/components/examples/CatalogCreate"
+      responses:
+        "200":
+          description: Test connection completed
+          content:
+              application/vnd.gravitino.v1+json:
+              schema:
+                  type: object
+                  required:
+                    - code
+                  properties:
+                    code:
+                        type: integer
+                        format: int32
+                        description: Status code of the response
+                        enum:
+                        - 0
+                    type:
+                      type: string
+                      description: Internal type definition of the exception
+                    message:
+                      type: string
+                      description: The message of the exception
+                    stack:
+                      type: array
+                      items:
+                        type: string
+                        description: The stack trace of the exception
+              examples:
+              TestConnectionSuccess:
+                value: {
+                  "code": 0
+                }
+              TestConnectionFailed:
+                $ref: "#/components/examples/CatalogAlreadyExistsException"
+
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+
+
   /metalakes/{metalake}/catalogs/{catalog}:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"

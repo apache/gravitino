@@ -156,4 +156,16 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
       throw e;
     }
   }
+
+  @Override
+  public void testConnection(
+      NameIdentifier ident,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties)
+      throws Exception {
+    // TODO: Support event dispatching for testConnection
+    dispatcher.testConnection(ident, type, provider, comment, properties);
+  }
 }
