@@ -40,7 +40,7 @@ from gravitino import (
     Catalog,
     Fileset,
 )
-from gravitino.exceptions.gravitino_runtime_exception import GravitinoRuntimeException
+from gravitino.exceptions.base import GravitinoRuntimeException
 from tests.integration.integration_test_env import IntegrationTestEnv
 from tests.integration.hdfs_container import HDFSContainer
 from tests.integration.base_hadoop_env import BaseHadoopEnvironment

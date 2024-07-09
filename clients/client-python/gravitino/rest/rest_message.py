@@ -44,12 +44,6 @@ class RESTMessage(DataClassJsonMixin, ABC):
         pass
 
 
-class IllegalArgumentException(Exception):
-    """Exception raised if a REST message is not valid according to the REST spec."""
-
-    pass
-
-
 class RESTRequest(RESTMessage, ABC):
     """Interface to mark a REST request."""
 
