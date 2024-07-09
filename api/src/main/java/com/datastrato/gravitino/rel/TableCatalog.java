@@ -268,7 +268,7 @@ public interface TableCatalog {
    * is removed.
    *
    * @param ident A table identifier.
-   * @return True if the table was dropped, false if the table did not exist.
+   * @return True if the table is dropped, false if the table does not exist.
    */
   boolean dropTable(NameIdentifier ident);
 
@@ -282,7 +282,7 @@ public interface TableCatalog {
    * implementation throws an {@link UnsupportedOperationException}.
    *
    * @param ident A table identifier.
-   * @return True if the table was purged, false if the table does not exist.
+   * @return True if the table is purged, false if the table does not exist.
    * @throws UnsupportedOperationException If the catalog does not support to purge a table.
    */
   default boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {

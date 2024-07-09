@@ -347,7 +347,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    * implementation throws an {@link UnsupportedOperationException}.
    *
    * @param ident A table identifier.
-   * @return True if the table was purged, false if the table does not exist.
+   * @return True if the table is purged, false if the table does not exist.
    * @throws UnsupportedOperationException If the catalog does not support to purge a table.
    * @throws RuntimeException If an error occurs while purging the table.
    */
