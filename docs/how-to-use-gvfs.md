@@ -23,7 +23,9 @@ the files or folders as shown below:
 ```text
 gvfs://fileset/${catalog_name}/${schema_name}/${fileset_name}/sub_dir/
 ```
+
 In python GVFS, you can also access the files or folders as shown below:
+
 ```text
 fileset/${catalog_name}/${schema_name}/${fileset_name}/sub_dir/
 ```
@@ -354,36 +356,37 @@ fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalak
 1. Make sure to obtain the Gravitino library.
    You can get it by [pip](https://pip.pypa.io/en/stable/installation/):
 
-```shell
-pip install gravitino
-```
+    ```shell
+    pip install gravitino
+    ```
 
 2. Configuring the Hadoop environment.
    You should ensure that the Python client has Kerberos authentication information and
    configure Hadoop environments in the system environment:
-```shell
-# kinit kerberos
-kinit -kt /tmp/xxx.keytab xxx@HADOOP.COM
-# Or you can configure kerberos information in the Hadoop `core-site.xml` file
-<property>
-  <name>hadoop.security.authentication</name>
-  <value>kerberos</value>
-</property>
 
-<property>
-  <name>hadoop.client.kerberos.principal</name>
-  <value>xxx@HADOOP.COM</value>
-</property>
-
-<property>
-  <name>hadoop.client.keytab.file</name>
-  <value>/tmp/xxx.keytab</value>
-</property>
-# Configure Hadoop env in Linux
-export HADOOP_HOME=${YOUR_HADOOP_PATH}
-export HADOOP_CONF_DIR=${YOUR_HADOOP_PATH}/etc/hadoop
-export CLASSPATH=`$HADOOP_HOME/bin/hdfs classpath --glob`
-```
+    ```shell
+    # kinit kerberos
+    kinit -kt /tmp/xxx.keytab xxx@HADOOP.COM
+    # Or you can configure kerberos information in the Hadoop `core-site.xml` file
+    <property>
+      <name>hadoop.security.authentication</name>
+      <value>kerberos</value>
+    </property>
+    
+    <property>
+      <name>hadoop.client.kerberos.principal</name>
+      <value>xxx@HADOOP.COM</value>
+    </property>
+    
+    <property>
+      <name>hadoop.client.keytab.file</name>
+      <value>/tmp/xxx.keytab</value>
+    </property>
+    # Configure Hadoop env in Linux
+    export HADOOP_HOME=${YOUR_HADOOP_PATH}
+    export HADOOP_CONF_DIR=${YOUR_HADOOP_PATH}/etc/hadoop
+    export CLASSPATH=`$HADOOP_HOME/bin/hdfs classpath --glob`
+    ```
 
 #### Via fsspec-style interface
 
@@ -455,6 +458,7 @@ integrating with some Third-party Python libraries which support fsspec compatib
 
 For example:
 1. Integrating with [Pandas](https://pandas.pydata.org/docs/reference/io.html)(2.0.3).
+
 ```python
 from gravitino import gvfs
 import pandas as pd
@@ -478,9 +482,11 @@ print(df)
 ```
 
 2. Integrating with [PyArrow](https://arrow.apache.org/docs/python/filesystems.html)(15.0.2).
+
 ```python
 from gravitino import gvfs
-import pandas as pd
+import pyarrow.dataset as dt
+import pyarrow.parquet as pq
 
 fs = gvfs.GravitinoVirtualFileSystem(
     server_uri="http://localhost:8090", metalake_name="test_metalake"
@@ -494,6 +500,7 @@ arrow_table = pq.read_table("gvfs://fileset/fileset_catalog/tmp/tmp_fileset/test
 ```
 
 3. Integrating with [Ray](https://docs.ray.io/en/latest/data/loading-data.html#loading-data)(2.10.0).
+
 ```python
 from gravitino import gvfs
 import ray
@@ -506,7 +513,8 @@ fs = gvfs.GravitinoVirtualFileSystem(
 ds = ray.data.read_parquet("gvfs://fileset/fileset_catalog/tmp/tmp_fileset/test.parquet",fs)
 ```
 
-4. Integrating with [Llama Index](https://docs.llamaindex.ai/en/stable/module_guides/loading/simpledirectoryreader/#support-for-external-filesystems)(0.10.40).
+4. Integrating with [LlamaIndex](https://docs.llamaindex.ai/en/stable/module_guides/loading/simpledirectoryreader/#support-for-external-filesystems)(0.10.40).
+
 ```python
 from gravitino import gvfs
 from llama_index.core import SimpleDirectoryReader
