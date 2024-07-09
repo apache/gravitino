@@ -1124,7 +1124,7 @@ public class TestRelationalCatalog extends TestBase {
 
     Throwable exception =
         Assertions.assertThrows(
-            RuntimeException.class, () -> catalog.asTableCatalog().dropTable(tableId));
+            RuntimeException.class, () -> catalog.asTableCatalog().purgeTable(tableId));
     Assertions.assertTrue(exception.getMessage().contains("internal error"));
   }
 
