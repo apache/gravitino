@@ -22,12 +22,12 @@ package com.datastrato.gravitino.catalog.lakehouse.iceberg.authentication.kerber
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -36,20 +36,31 @@ import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class KerberosClient {
+public class KerberosClient implements Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(KerberosClient.class);
 
   private final ScheduledThreadPoolExecutor checkTgtExecutor;
   private final Map<String, String> conf;
   private final Configuration hadoopConf;
+  private String realm;
 
   public KerberosClient(Map<String, String> conf, Configuration hadoopConf) {
     this.conf = conf;
     this.hadoopConf = hadoopConf;
-    this.checkTgtExecutor = new ScheduledThreadPoolExecutor(1, getThreadFactory("check-tgt"));
+    this.checkTgtExecutor =
+        new ScheduledThreadPoolExecutor(
+            1,
+            new ThreadFactoryBuilder()
+                .setDaemon(true)
+                .setNameFormat("check-Iceberg-Hive-tgt-%d")
+                .build());
   }
 
-  public String login(String keytabFilePath) throws IOException {
+  public String getRealm() {
+    return realm;
+  }
+
+  public void login(String keytabFilePath) throws IOException {
     KerberosConfig kerberosConfig = new KerberosConfig(conf);
 
     // Check the principal and keytab file
@@ -81,7 +92,7 @@ public class KerberosClient {
         checkInterval,
         TimeUnit.SECONDS);
 
-    return principalComponents.get(1);
+    this.realm = principalComponents.get(1);
   }
 
   public File saveKeyTabFileFromUri(Long catalogId) throws IOException {
@@ -115,7 +126,10 @@ public class KerberosClient {
     return keytabFile;
   }
 
-  private static ThreadFactory getThreadFactory(String factoryName) {
-    return new ThreadFactoryBuilder().setDaemon(true).setNameFormat(factoryName + "-%d").build();
+  @Override
+  public void close() throws IOException {
+    if (checkTgtExecutor != null) {
+      checkTgtExecutor.shutdownNow();
+    }
   }
 }
