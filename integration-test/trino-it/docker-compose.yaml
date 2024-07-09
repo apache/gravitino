@@ -26,7 +26,7 @@ services:
       - trino-net
     container_name: trino-ci-hive
     environment:
-      - HADOOP_USER_NAME=root
+      - HADOOP_USER_NAME=anonymous
     entrypoint:  /bin/bash /tmp/hive/init.sh
     volumes:
       - ./init/hive:/tmp/hive

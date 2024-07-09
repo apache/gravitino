@@ -191,7 +191,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     Map<String, String> databaseMeta = getDatabaseMetadata(testDatabaseName);
     Assertions.assertFalse(databaseMeta.containsKey("Comment"));
     Assertions.assertTrue(databaseMeta.containsKey("Location"));
-    Assertions.assertEquals("datastrato", databaseMeta.get("Owner"));
+    Assertions.assertEquals("anonymous", databaseMeta.get("Owner"));
     String properties = databaseMeta.get("Properties");
     Assertions.assertTrue(properties.contains("(ID,001)"));
 
