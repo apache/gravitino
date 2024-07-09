@@ -49,7 +49,7 @@ interface UserGroupAuthorizationPlugin {
   Boolean onUserRemoved(User user) throws RuntimeException;
 
   /**
-   * After getting a User from Gravitino, this method is called to check if the User exists in the
+   * After acquiring a User from Gravitino, this method is called to acquire the User in the
    * underlying system. <br>
    * Because User information is already stored in the Gravition, so we don't need to get the User
    * from the underlying access control system. <br>
@@ -60,7 +60,7 @@ interface UserGroupAuthorizationPlugin {
    * @throws RuntimeException If getting the User encounters underlying access control system
    *     issues.
    */
-  Boolean onUserGotten(User user) throws RuntimeException;
+  Boolean onUserAcquired(User user) throws RuntimeException;
 
   /**
    * After adding a Group to Gravitino, this method is called to add the Group to the underlying
@@ -84,7 +84,7 @@ interface UserGroupAuthorizationPlugin {
   Boolean onGroupRemoved(Group group) throws RuntimeException;
 
   /**
-   * After getting a Group from Gravitino, this method is called to check if the Group exists in the
+   * After acquiring a Group from Gravitino, this method is called to acquire the Group in the
    * underlying system. <br>
    * Because Group information is already stored in the Gravition, so we don't need to get the Group
    * from the underlying access control system. <br>
@@ -95,7 +95,7 @@ interface UserGroupAuthorizationPlugin {
    * @throws RuntimeException If getting the Group encounters underlying access control system
    *     issues.
    */
-  Boolean onGroupGotten(Group group);
+  Boolean onGroupAcquired(Group group) throws RuntimeException;
 
   /**
    * After granting roles to a user from Gravitino, this method is called to grant roles to the user

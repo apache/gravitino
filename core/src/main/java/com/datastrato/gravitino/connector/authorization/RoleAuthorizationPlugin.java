@@ -34,8 +34,8 @@ interface RoleAuthorizationPlugin {
   Boolean onRoleCreated(Role role) throws RuntimeException;
 
   /**
-   * After gotten a role from Gravitino, this method is called to check if the role exists in the
-   * underlying system. <br>
+   * After acquiring a role from Gravitino, this method is called to acquire the role in the
+   * underlying system.<br>
    * Because role information is already stored in the Gravition, so we don't need to get the Role
    * from the underlying access control system. <br>
    * We only need to check if the Role exists in the underlying access control system.
@@ -45,7 +45,7 @@ interface RoleAuthorizationPlugin {
    * @throws RuntimeException If getting the Role encounters underlying access control system
    *     issues.
    */
-  Boolean onRoleGotten(Role role) throws RuntimeException;
+  Boolean onRoleAcquired(Role role) throws RuntimeException;
 
   /**
    * After deleting a role from Gravitino, this method is called to delete the role in the

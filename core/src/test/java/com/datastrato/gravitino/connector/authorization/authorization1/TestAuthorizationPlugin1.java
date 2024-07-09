@@ -36,7 +36,7 @@ public class TestAuthorizationPlugin1 implements AuthorizationPlugin {
   }
 
   @Override
-  public Boolean onRoleGotten(Role role) throws RuntimeException {
+  public Boolean onRoleAcquired(Role role) throws RuntimeException {
     return null;
   }
 
@@ -61,7 +61,7 @@ public class TestAuthorizationPlugin1 implements AuthorizationPlugin {
   }
 
   @Override
-  public Boolean onUserGotten(User user) throws RuntimeException {
+  public Boolean onUserAcquired(User user) throws RuntimeException {
     return null;
   }
 
@@ -76,7 +76,7 @@ public class TestAuthorizationPlugin1 implements AuthorizationPlugin {
   }
 
   @Override
-  public Boolean onGroupGotten(Group group) {
+  public Boolean onGroupAcquired(Group group) {
     return null;
   }
 
