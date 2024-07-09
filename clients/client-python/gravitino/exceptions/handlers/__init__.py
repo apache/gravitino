@@ -16,9 +16,3 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 """
-
-from gravitino.exceptions.gravitino_runtime_exception import GravitinoRuntimeException
-
-
-class NotFoundException(GravitinoRuntimeException):
-    """Base class for all exceptions thrown when a resource is not found."""

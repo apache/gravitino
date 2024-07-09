@@ -33,7 +33,7 @@ from readerwriterlock import rwlock
 from gravitino.api.catalog import Catalog
 from gravitino.api.fileset import Fileset
 from gravitino.client.gravitino_client import GravitinoClient
-from gravitino.exceptions.gravitino_runtime_exception import GravitinoRuntimeException
+from gravitino.exceptions.base import GravitinoRuntimeException
 from gravitino.name_identifier import NameIdentifier
 
 PROTOCOL_NAME = "gvfs"

@@ -17,12 +17,24 @@ specific language governing permissions and limitations
 under the License.
 """
 
+from abc import ABC, abstractmethod
+from gravitino.dto.responses.error_response import ErrorResponse
 
-class IllegalNameIdentifierException(Exception):
-    """An exception thrown when a name identifier is invalid."""
 
-    def __init__(self, message=None):
-        if message:
-            super().__init__(message)
-        else:
-            super().__init__()
+class ErrorHandler(ABC):
+    """The ErrorHandler class is an abstract class specialized for handling ErrorResponse objects.
+    Subclasses of ErrorHandler must implement the parseResponse method to provide custom parsing
+    logic for different types of errors.
+    """
+
+    @abstractmethod
+    def handle(self, error_response: ErrorResponse):
+        """Handles the error response and raise the appropriate Exception. The implementation will use the
+        provided error response to determine which exception to raise.
+
+        Args:
+          error_response: the error response from the server
+
+        Raises:
+          appropriate Exception.
+        """

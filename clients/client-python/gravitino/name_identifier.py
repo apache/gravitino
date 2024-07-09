@@ -23,12 +23,10 @@ from dataclasses import dataclass, field
 
 from dataclasses_json import DataClassJsonMixin, config
 
-from gravitino.exceptions.illegal_name_identifier_exception import (
+from gravitino.exceptions.base import (
     IllegalNameIdentifierException,
 )
 from gravitino.namespace import Namespace
-
-# TODO: delete redundant methods
 
 
 @dataclass

@@ -17,8 +17,24 @@ specific language governing permissions and limitations
 under the License.
 """
 
-from gravitino.exceptions.not_found_exception import NotFoundException
+from gravitino.constants.error import ERROR_CODE_MAPPING
+from gravitino.dto.responses.error_response import ErrorResponse
+from gravitino.exceptions.handlers.error_handler import ErrorHandler
+from gravitino.exceptions.base import RESTException
 
 
-class NoSuchMetalakeException(NotFoundException):
-    """An exception thrown when a metalake is not found."""
+class RestErrorHandler(ErrorHandler):
+
+    def handle(self, error_response: ErrorResponse):
+        error_message = error_response.format_error_message()
+        code = error_response.code()
+
+        if code in ERROR_CODE_MAPPING:
+            raise ERROR_CODE_MAPPING[code](error_message)
+
+        raise RESTException(
+            f"Unable to process: {error_message}",
+        )
+
+
+REST_ERROR_HANDLER = RestErrorHandler()
