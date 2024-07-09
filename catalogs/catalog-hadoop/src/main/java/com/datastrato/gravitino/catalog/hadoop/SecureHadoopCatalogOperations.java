@@ -298,6 +298,9 @@ public class SecureHadoopCatalogOperations
     if (kerberosConfig.isKerberosAuth()) {
       // We assume that the realm of catalog is the same as the realm of the schema and table.
       hadoopCatalogOperations.initKerberos(properties, new Configuration(), ident);
+    } else if (kerberosConfig.isSimpleAuth()) {
+      // Reset the user information.
+      UserGroupInformation.reset();
     }
     // If the kerberos is not enabled (Simple mode), we will use the current user
     return getUserBaseOnNameIdentifier(ident);
@@ -306,15 +309,6 @@ public class SecureHadoopCatalogOperations
   private UserGroupInformation getUserBaseOnNameIdentifier(NameIdentifier nameIdentifier) {
     UserInfo userInfo = getNearestUserGroupInformation(nameIdentifier);
     if (userInfo == null) {
-
-      // TODO(yuqi) comment the following code if the user in the docker hive image is the same as
-      //  the user `anonymous` see: https://github.com/datastrato/gravitino/issues/4013
-      //      try {
-      //        return UserGroupInformation.getLoginUser();
-      //      } catch (IOException e) {
-      //        throw new RuntimeException("Failed to get login user", e);
-      //      }
-
       throw new RuntimeException("Failed to get user information for " + nameIdentifier);
     }
 

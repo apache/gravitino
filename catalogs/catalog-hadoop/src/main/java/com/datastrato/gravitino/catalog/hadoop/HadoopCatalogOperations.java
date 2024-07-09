@@ -188,9 +188,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
           initKerberos(
               conf, hadoopConf, NameIdentifier.of(catalogInfo.namespace(), catalogInfo.name()));
     } else if (config.isSimpleAuth()) {
-      // TODO: change the user 'datastrato' to 'anonymous' and uncomment the following code;
-      //  uncomment the following code after the user 'datastrato' is removed from the codebase.
-      //  for more, please see https://github.com/datastrato/gravitino/issues/4013
+      UserGroupInformation.reset();
       UserGroupInformation u =
           UserGroupInformation.createRemoteUser(PrincipalUtils.getCurrentUserName());
       userInfoMap.put(
@@ -323,8 +321,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
             .withComment(comment)
             .withFilesetType(type)
             // Store the storageLocation to the store. If the "storageLocation" is null
-            // for
-            // managed fileset, Gravitino will get and store the location based on the
+            // for managed fileset, Gravitino will get and store the location based on the
             // catalog/schema's location and store it to the store.
             .withStorageLocation(filesetPath.toString())
             .withProperties(properties)
@@ -447,9 +444,8 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       configuration.set(
           HADOOP_SECURITY_AUTHENTICATION,
           AuthenticationMethod.KERBEROS.name().toLowerCase(Locale.ROOT));
-      UserGroupInformation.setConfiguration(configuration);
-
       try {
+        UserGroupInformation.setConfiguration(configuration);
         KerberosClient kerberosClient = new KerberosClient(properties, configuration);
         // Add the kerberos client to the closable to close resources.
         closeables.add(kerberosClient);
