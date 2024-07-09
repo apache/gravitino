@@ -115,6 +115,8 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   protected abstract boolean supportsDelete();
 
+  protected abstract boolean supportsSchemaEvolution();
+
   // Use a custom database not the original default database because SparkCommonIT couldn't
   // read&write data to tables in default database. The main reason is default database location is
   // determined by `hive.metastore.warehouse.dir` in hive-site.xml which is local HDFS address
@@ -573,11 +575,17 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
     tableInfo = getTableInfo(tableName);
     checkTableColumns(tableName, updateColumns, tableInfo);
-    sql(String.format("INSERT INTO %S VALUES(1, 'name2', 10)", tableName));
-    List<String> data = getTableData(tableName);
+    sql(String.format("INSERT INTO %S VALUES(3, 'name2', 10)", tableName));
+    List<String> data = getQueryData(String.format("SELECT * from %s ORDER BY id", tableName));
     Assertions.assertEquals(2, data.size());
-    Assertions.assertEquals(firstLine, data.get(0));
-    Assertions.assertEquals("1,name2,10", data.get(1));
+    if (supportsSchemaEvolution()) {
+      // It's different columns for Iceberg if delete and add a column with same name.
+      Assertions.assertEquals(
+          String.join(",", Arrays.asList(NULL_STRING, NULL_STRING, NULL_STRING)), data.get(0));
+    } else {
+      Assertions.assertEquals(firstLine, data.get(0));
+    }
+    Assertions.assertEquals("3,name2,10", data.get(1));
   }
 
   @Test
