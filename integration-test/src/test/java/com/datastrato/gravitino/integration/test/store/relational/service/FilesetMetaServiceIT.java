@@ -54,6 +54,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -98,7 +99,11 @@ public class FilesetMetaServiceIT {
                       + String.format(
                           "/scripts/mysql/schema-%s-mysql.sql", ConfigConstants.VERSION_0_5_0)),
               "UTF-8");
-      String[] initMySQLBackendSqls = mysqlContent.split(";");
+      String[] initMySQLBackendSqls =
+          Arrays.stream(mysqlContent.split(";"))
+              .map(String::trim)
+              .filter(s -> !s.isEmpty())
+              .toArray(String[]::new);
       initMySQLBackendSqls = ArrayUtils.addFirst(initMySQLBackendSqls, "use " + META_DATA + ";");
       for (String sql : initMySQLBackendSqls) {
         statement.execute(sql);

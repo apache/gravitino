@@ -24,7 +24,6 @@ import com.datastrato.gravitino.Auditable;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Field;
 import com.datastrato.gravitino.HasIdentifier;
-import com.datastrato.gravitino.MetadataObject;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.tag.Tag;
 import com.google.common.collect.Maps;
@@ -47,10 +46,6 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
   public static final Field PROPERTIES =
       Field.optional("properties", Map.class, "The properties of the tag entity.");
 
-  public static final Field ASSOCIATED_OBJECTS =
-      Field.optional(
-          "objects", MetadataObject[].class, "The associated objects of the tag entity.");
-
   public static final Field AUDIT_INFO =
       Field.required("audit_info", Audit.class, "The audit details of the tag entity.");
 
@@ -59,7 +54,6 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
   private Namespace namespace;
   private String comment;
   private Map<String, String> properties;
-  private MetadataObject[] objects = null;
   private Audit auditInfo;
 
   private TagEntity() {}
@@ -72,7 +66,6 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
     fields.put(COMMENT, comment);
     fields.put(PROPERTIES, properties);
     fields.put(AUDIT_INFO, auditInfo);
-    fields.put(ASSOCIATED_OBJECTS, objects);
 
     return Collections.unmodifiableMap(fields);
   }
@@ -110,10 +103,6 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
   @Override
   public Optional<Boolean> inherited() {
     return Optional.empty();
-  }
-
-  public MetadataObject[] objects() {
-    return objects;
   }
 
   @Override
@@ -178,11 +167,6 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
 
     public Builder withProperties(Map<String, String> properties) {
       tagEntity.properties = properties;
-      return this;
-    }
-
-    public Builder withMetadataObjects(MetadataObject[] objects) {
-      tagEntity.objects = objects;
       return this;
     }
 
