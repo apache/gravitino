@@ -16,22 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datastrato.gravitino.connector.authorization.authorization2;
+package com.datastrato.gravitino.connector.authorization.mysql;
 
 import com.datastrato.gravitino.connector.authorization.AuthorizationPlugin;
 import com.datastrato.gravitino.connector.authorization.BaseAuthorization;
 
-public class TestAuthorization2 extends BaseAuthorization<TestAuthorization2> {
+public class TestMySQLAuthorization extends BaseAuthorization<TestMySQLAuthorization> {
 
-  public TestAuthorization2() {}
+  public TestMySQLAuthorization() {}
 
   @Override
   public String shortName() {
-    return "test2";
+    return "mysql";
   }
 
   @Override
   protected AuthorizationPlugin newPlugin() {
-    return new TestAuthorizationPlugin2();
+    return new TestMySQLAuthorizationPlugin();
   }
 }

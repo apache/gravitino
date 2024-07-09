@@ -19,6 +19,9 @@
 
 package com.datastrato.gravitino.catalog.hive;
 
+import static com.datastrato.gravitino.Catalog.AUTHORIZATION_PLUGIN;
+
+import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.connector.BaseCatalogPropertiesMetadata;
 import com.datastrato.gravitino.connector.PropertyEntry;
 import com.google.common.collect.ImmutableMap;
@@ -116,6 +119,17 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
                   DEFAULT_LIST_ALL_TABLES,
                   false,
                   false))
+          .put(
+              AUTHORIZATION_PLUGIN,
+              PropertyEntry.enumPropertyEntry(
+                  AUTHORIZATION_PLUGIN,
+                  "The name of the authorization plugin provider for Gravitino",
+                  false /* required */,
+                  true /* immutable */,
+                  Catalog.AuthorizationPluginType.class,
+                  Catalog.AuthorizationPluginType.RANGER,
+                  false /* hidden */,
+                  false /* reserved */))
           .putAll(BASIC_CATALOG_PROPERTY_ENTRIES)
           .build();
 

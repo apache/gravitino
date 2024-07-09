@@ -65,10 +65,6 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   // The object you used is not stable, don't use it unless you know what you are doing.
   @VisibleForTesting public static final String CATALOG_OPERATION_IMPL = "ops-impl";
 
-  // Different catalogs may have different authorization provider, this variable is used as a
-  // key in properties of catalogs to inject custom authorization to Gravitino.
-  public static final String AUTHORIZATION_PROVIDER = "authorization-provider";
-
   // Underlying access control system plugin for this catalog.
   private volatile BaseAuthorization<?> authorization;
 
@@ -196,8 +192,10 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   }
 
   private BaseAuthorization<?> createAuthorizationPluginInstance() {
-    String provider = entity.getProperties().get(AUTHORIZATION_PROVIDER);
-    if (provider == null || provider.isEmpty()) {
+    AuthorizationPluginType pluginType =
+        (AuthorizationPluginType)
+            catalogPropertiesMetadata().getOrDefault(conf, AUTHORIZATION_PLUGIN);
+    if (pluginType == null) {
       throw new IllegalArgumentException("Authorization plugin provider is not set");
     }
 
@@ -207,14 +205,15 @@ public abstract class BaseCatalog<T extends BaseCatalog>
 
     List<Class<? extends AuthorizationProvider>> providers =
         Streams.stream(loader.iterator())
-            .filter(p -> p.shortName().equalsIgnoreCase(provider))
+            .filter(p -> p.shortName().equalsIgnoreCase(pluginType.getPluginName()))
             .map(AuthorizationProvider::getClass)
             .collect(Collectors.toList());
     if (providers.isEmpty()) {
-      throw new IllegalArgumentException("No authorization plugin provider found for: " + provider);
+      throw new IllegalArgumentException(
+          "No authorization plugin provider found for: " + pluginType);
     } else if (providers.size() > 1) {
       throw new IllegalArgumentException(
-          "Multiple authorization plugin providers found for: " + provider);
+          "Multiple authorization plugin providers found for: " + pluginType);
     }
     try {
       return (BaseAuthorization<?>)

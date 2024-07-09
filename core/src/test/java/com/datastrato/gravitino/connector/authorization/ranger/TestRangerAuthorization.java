@@ -16,22 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datastrato.gravitino.connector.authorization.authorization1;
+package com.datastrato.gravitino.connector.authorization.ranger;
 
 import com.datastrato.gravitino.connector.authorization.AuthorizationPlugin;
 import com.datastrato.gravitino.connector.authorization.BaseAuthorization;
 
-public class TestAuthorization1 extends BaseAuthorization<TestAuthorization1> {
+public class TestRangerAuthorization extends BaseAuthorization<TestRangerAuthorization> {
 
-  public TestAuthorization1() {}
+  public TestRangerAuthorization() {}
 
   @Override
   public String shortName() {
-    return "test1";
+    return "ranger";
   }
 
   @Override
   protected AuthorizationPlugin newPlugin() {
-    return new TestAuthorizationPlugin1();
+    return new TestRangerAuthorizationPlugin();
   }
 }

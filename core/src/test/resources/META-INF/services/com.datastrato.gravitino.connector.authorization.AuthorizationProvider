@@ -16,5 +16,5 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-com.datastrato.gravitino.connector.authorization.authorization1.TestAuthorization1
-com.datastrato.gravitino.connector.authorization.authorization2.TestAuthorization2
+com.datastrato.gravitino.connector.authorization.ranger.TestRangerAuthorization
+com.datastrato.gravitino.connector.authorization.mysql.TestMySQLAuthorization

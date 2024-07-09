@@ -115,6 +115,17 @@ public class TestCatalog extends BaseCatalog<TestCatalog> {
                     false,
                     false,
                     false))
+            .put(
+                AUTHORIZATION_PLUGIN,
+                PropertyEntry.enumPropertyEntry(
+                    AUTHORIZATION_PLUGIN,
+                    "The name of the authorization plugin provider for Gravitino",
+                    false /* required */,
+                    true /* immutable */,
+                    AuthorizationPluginType.class,
+                    null,
+                    false /* hidden */,
+                    false /* reserved */))
             .build();
       }
     };

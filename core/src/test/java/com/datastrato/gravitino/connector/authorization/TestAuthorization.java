@@ -21,9 +21,8 @@ package com.datastrato.gravitino.connector.authorization;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.TestCatalog;
-import com.datastrato.gravitino.connector.BaseCatalog;
-import com.datastrato.gravitino.connector.authorization.authorization1.TestAuthorizationPlugin1;
-import com.datastrato.gravitino.connector.authorization.authorization2.TestAuthorizationPlugin2;
+import com.datastrato.gravitino.connector.authorization.mysql.TestMySQLAuthorizationPlugin;
+import com.datastrato.gravitino.connector.authorization.ranger.TestRangerAuthorizationPlugin;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.google.common.collect.ImmutableMap;
@@ -33,60 +32,69 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 public class TestAuthorization {
-  private static TestCatalog testCatalog1;
-  private static TestCatalog testCatalog2;
+  private static TestCatalog hiveCatalog;
+  private static TestCatalog mySQLCatalog;
 
   @BeforeAll
   public static void setUp() throws Exception {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
 
-    CatalogEntity catalogTest1 =
+    CatalogEntity hiveCatalogEntity =
         CatalogEntity.builder()
             .withId(1L)
             .withName("catalog-test1")
             .withNamespace(Namespace.of("default"))
             .withType(Catalog.Type.RELATIONAL)
-            .withProperties(ImmutableMap.of(BaseCatalog.AUTHORIZATION_PROVIDER, "test1"))
             .withProvider("test")
             .withAuditInfo(auditInfo)
             .build();
 
-    testCatalog1 =
-        new TestCatalog().withCatalogConf(ImmutableMap.of()).withCatalogEntity(catalogTest1);
+    hiveCatalog =
+        new TestCatalog()
+            .withCatalogConf(
+                ImmutableMap.of(
+                    Catalog.AUTHORIZATION_PLUGIN,
+                    Catalog.AuthorizationPluginType.RANGER.getPluginName()))
+            .withCatalogEntity(hiveCatalogEntity);
 
-    CatalogEntity catalogTest2 =
+    CatalogEntity mySQLEntity =
         CatalogEntity.builder()
             .withId(2L)
             .withName("catalog-test2")
             .withNamespace(Namespace.of("default"))
             .withType(Catalog.Type.RELATIONAL)
-            .withProperties(ImmutableMap.of(BaseCatalog.AUTHORIZATION_PROVIDER, "test2"))
             .withProvider("test")
             .withAuditInfo(auditInfo)
             .build();
 
-    testCatalog2 =
-        new TestCatalog().withCatalogConf(ImmutableMap.of()).withCatalogEntity(catalogTest2);
+    mySQLCatalog =
+        new TestCatalog()
+            .withCatalogConf(
+                ImmutableMap.of(
+                    Catalog.AUTHORIZATION_PLUGIN,
+                    Catalog.AuthorizationPluginType.MYSQL.getPluginName()))
+            .withCatalogEntity(mySQLEntity);
   }
 
   @Test
-  public void testAuthorizationCatalog1() {
-    AuthorizationPlugin authPlugin1 = testCatalog1.getAuthorizationPlugin();
-    Assertions.assertInstanceOf(TestAuthorizationPlugin1.class, authPlugin1);
-    TestAuthorizationPlugin1 testAuthOps1 = (TestAuthorizationPlugin1) authPlugin1;
-    Assertions.assertFalse(testAuthOps1.callOnCreateRole1);
+  public void testRangerAuthorization() {
+    AuthorizationPlugin authPlugin1 = hiveCatalog.getAuthorizationPlugin();
+    Assertions.assertInstanceOf(TestRangerAuthorizationPlugin.class, authPlugin1);
+    TestRangerAuthorizationPlugin testMySQLAuthPlugin = (TestRangerAuthorizationPlugin) authPlugin1;
+    Assertions.assertFalse(testMySQLAuthPlugin.callOnCreateRole1);
     authPlugin1.onRoleCreated(null);
-    Assertions.assertTrue(testAuthOps1.callOnCreateRole1);
+    Assertions.assertTrue(testMySQLAuthPlugin.callOnCreateRole1);
   }
 
   @Test
-  public void testAuthorizationCatalog2() {
-    AuthorizationPlugin authPlugin2 = testCatalog2.getAuthorizationPlugin();
-    Assertions.assertInstanceOf(TestAuthorizationPlugin2.class, authPlugin2);
-    TestAuthorizationPlugin2 testAuthOps2 = (TestAuthorizationPlugin2) authPlugin2;
-    Assertions.assertFalse(testAuthOps2.callOnCreateRole2);
-    authPlugin2.onRoleCreated(null);
-    Assertions.assertTrue(testAuthOps2.callOnCreateRole2);
+  public void testMySQLAuthorization() {
+    AuthorizationPlugin mySQLAuthPlugin = mySQLCatalog.getAuthorizationPlugin();
+    Assertions.assertInstanceOf(TestMySQLAuthorizationPlugin.class, mySQLAuthPlugin);
+    TestMySQLAuthorizationPlugin testRangerAuthPlugin =
+        (TestMySQLAuthorizationPlugin) mySQLAuthPlugin;
+    Assertions.assertFalse(testRangerAuthPlugin.callOnCreateRole2);
+    mySQLAuthPlugin.onRoleCreated(null);
+    Assertions.assertTrue(testRangerAuthPlugin.callOnCreateRole2);
   }
 }

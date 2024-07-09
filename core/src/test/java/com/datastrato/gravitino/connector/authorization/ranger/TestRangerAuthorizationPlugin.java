@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datastrato.gravitino.connector.authorization.authorization1;
+package com.datastrato.gravitino.connector.authorization.ranger;
 
 import com.datastrato.gravitino.authorization.Group;
 import com.datastrato.gravitino.authorization.Role;
@@ -26,7 +26,7 @@ import com.datastrato.gravitino.connector.authorization.AuthorizationPlugin;
 import java.io.IOException;
 import java.util.List;
 
-public class TestAuthorizationPlugin1 implements AuthorizationPlugin {
+public class TestRangerAuthorizationPlugin implements AuthorizationPlugin {
   public boolean callOnCreateRole1 = false;
 
   @Override
