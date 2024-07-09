@@ -189,7 +189,7 @@ class HTTPClient:
 
         error_handler.handle(resp)
 
-        # This code generally will not be ran because the error handler should define the default behavior,
+        # This code generally will not be run because the error handler should define the default behavior,
         # and raise appropriate
         raise UnknownError(
             f"Error handler {type(error_handler).__name__} can't handle this response, error response body: {resp}"
