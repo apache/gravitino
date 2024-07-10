@@ -55,4 +55,19 @@ public interface Authenticator {
    * @throws RuntimeException if the initialization fails
    */
   void initialize(Config config) throws RuntimeException;
+
+  /**
+   * Determines if the provided token data is supported by this authenticator
+   *
+   * <p>This method checks if the given token data can be processed by this authenticator.
+   * Implementations should override this method to provide specific logic for determining if the
+   * token data format or content is recognized and can be authenticated.
+   *
+   * @param tokenData The byte array containing the token data to be checked.
+   * @return true if the token data is supported and can be authenticated by this authenticator;
+   *     false otherwise.
+   */
+  default boolean supports(byte[] tokenData) {
+    return false;
+  }
 }

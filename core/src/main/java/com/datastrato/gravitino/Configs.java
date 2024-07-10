@@ -199,7 +199,9 @@ public class Configs {
 
   public static final ConfigEntry<String> AUTHENTICATOR =
       new ConfigBuilder("gravitino.authenticator")
-          .doc("The authenticator which Gravitino uses")
+          .doc(
+              "The authenticator which Gravitino uses. Multiple authenticators "
+                  + "separated by commas")
           .version(ConfigConstants.VERSION_0_3_0)
           .stringConf()
           .createWithDefault("simple");

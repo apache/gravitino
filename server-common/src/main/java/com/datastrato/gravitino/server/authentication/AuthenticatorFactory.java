@@ -22,7 +22,10 @@ package com.datastrato.gravitino.server.authentication;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.auth.AuthenticatorType;
+import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,6 +33,8 @@ import org.slf4j.LoggerFactory;
 public class AuthenticatorFactory {
 
   private static final Logger LOG = LoggerFactory.getLogger(AuthenticatorFactory.class);
+
+  private static final Splitter COMMA = Splitter.on(",").omitEmptyStrings().trimResults();
 
   public static final ImmutableMap<String, String> AUTHENTICATORS =
       ImmutableMap.of(
@@ -42,15 +47,22 @@ public class AuthenticatorFactory {
 
   private AuthenticatorFactory() {}
 
-  public static Authenticator createAuthenticator(Config config) {
-    String name = config.get(Configs.AUTHENTICATOR);
-    String className = AUTHENTICATORS.getOrDefault(name, name);
+  public static List<Authenticator> createAuthenticators(Config config) {
+    String configAuthenticator = config.get(Configs.AUTHENTICATOR);
+    List<String> names = COMMA.splitToList(configAuthenticator);
 
-    try {
-      return (Authenticator) Class.forName(className).getDeclaredConstructor().newInstance();
-    } catch (Exception e) {
-      LOG.error("Failed to create and initialize Authenticator by name {}.", name, e);
-      throw new RuntimeException("Failed to create and initialize Authenticator: " + name, e);
+    List<Authenticator> authenticators = Lists.newArrayList();
+    for (String name : names) {
+      String className = AUTHENTICATORS.getOrDefault(name, name);
+      try {
+        Authenticator authenticator =
+            (Authenticator) Class.forName(className).getDeclaredConstructor().newInstance();
+        authenticators.add(authenticator);
+      } catch (Exception e) {
+        LOG.error("Failed to create and initialize Authenticator by name {}.", name, e);
+        throw new RuntimeException("Failed to create and initialize Authenticator: " + name, e);
+      }
     }
+    return authenticators;
   }
 }
