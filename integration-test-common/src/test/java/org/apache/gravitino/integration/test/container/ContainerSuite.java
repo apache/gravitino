@@ -61,6 +61,7 @@ public class ContainerSuite implements Closeable {
 
   private static volatile MySQLContainer mySQLContainer;
   private static volatile MySQLContainer mySQLVersion5Container;
+  private static volatile S3MockContainer s3MockContainer;
   private static volatile Map<PGImageName, PostgreSQLContainer> pgContainerMap =
       new EnumMap<>(PGImageName.class);
 
@@ -346,6 +347,23 @@ public class ContainerSuite implements Closeable {
     }
   }
 
+  public void startS3MockContainer() {
+    if (s3MockContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (s3MockContainer == null) {
+          S3MockContainer.Builder s3MockContainerBuilder =
+              S3MockContainer.builder()
+                  .withHostName("gravitino-ci-s3mock")
+                  .withEnvVars(ImmutableMap.of("initialBuckets", "gravitino-fileset-IT"))
+                  .withNetwork(network);
+          S3MockContainer container = closer.register(s3MockContainerBuilder.build());
+          container.start();
+          s3MockContainer = container;
+        }
+      }
+    }
+  }
+
   public RangerContainer getRangerContainer() {
     return rangerContainer;
   }
@@ -379,6 +397,10 @@ public class ContainerSuite implements Closeable {
               pgImageName));
     }
     return pgContainerMap.get(pgImageName);
+  }
+
+  public S3MockContainer getS3MockContainer() {
+    return s3MockContainer;
   }
 
   // Let containers assign addresses in a fixed subnet to avoid

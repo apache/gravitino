@@ -40,6 +40,7 @@ dependencies {
     exclude("javax.servlet", "servlet-api")
   }
   implementation(libs.hadoop3.client)
+  implementation(libs.hadoop3.aws)
 
   implementation(libs.slf4j.api)
 
@@ -50,7 +51,7 @@ dependencies {
 
   testImplementation(libs.minikdc)
   testImplementation(libs.hadoop3.minicluster)
-
+  testImplementation(libs.commons.lang)
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mockito.inline)
@@ -127,6 +128,7 @@ tasks.test {
     doFirst {
       environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.13")
       environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-kerberos-hive:0.1.2")
+      environment("GRAVITINO_CI_S3MOCK_DOCKER_IMAGE", "adobe/s3mock:3.9.1")
     }
 
     val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
