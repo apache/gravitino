@@ -18,13 +18,24 @@
  */
 package com.datastrato.gravitino.catalog.doris.utils;
 
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class DorisUtils {
+  private static final Logger LOGGER = LoggerFactory.getLogger(DorisUtils.class);
+  private static final String PARTITION_BY = "PARTITION BY";
+  private static final String LIST_PARTITION = "LIST";
+  private static final String RANGE_PARTITION = "RANGE";
+
   private DorisUtils() {}
 
   // convert Map<String, String> properties to SQL String
@@ -64,5 +75,41 @@ public final class DorisUtils {
       }
     }
     return properties;
+  }
+
+  public static Optional<Transform> extractPartitionInfoFromSql(String createTableSql) {
+    try {
+      String[] lines = createTableSql.split("\n");
+      for (String line : lines) {
+        if (line.contains(PARTITION_BY)) {
+          String partitionInfoString = line.trim().substring(PARTITION_BY.length() + 1);
+          int partitionColumnStartIndex = partitionInfoString.indexOf("(");
+          int partitionColumnEndIndex = partitionInfoString.indexOf(")");
+          String partitionType =
+              partitionInfoString.substring(0, partitionColumnStartIndex).toUpperCase();
+          String[] columns =
+              Arrays.stream(
+                      partitionInfoString
+                          .substring(partitionColumnStartIndex + 1, partitionColumnEndIndex)
+                          .split(", "))
+                  .map(s -> s.substring(1, s.length() - 1))
+                  .toArray(String[]::new);
+          if (LIST_PARTITION.equals(partitionType)) {
+            String[][] filedNames =
+                Arrays.stream(columns).map(s -> new String[] {s}).toArray(String[][]::new);
+            return Optional.of(Transforms.list(filedNames));
+          } else if (RANGE_PARTITION.equals(partitionType)) {
+            return Optional.of(Transforms.range(new String[] {columns[0]}));
+          } else {
+            throw new RuntimeException(
+                "Cannot extract partition type from SQL:\n" + createTableSql);
+          }
+        }
+      }
+      return Optional.empty();
+    } catch (Exception e) {
+      LOGGER.warn("Failed to extract partition info", e);
+      return Optional.empty();
+    }
   }
 }
