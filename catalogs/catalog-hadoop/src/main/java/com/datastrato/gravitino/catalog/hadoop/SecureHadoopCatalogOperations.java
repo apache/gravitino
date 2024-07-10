@@ -108,22 +108,12 @@ public class SecureHadoopCatalogOperations
 
     UserGroupInformation currentUser = getUGIByIdent(properties, ident);
     try {
-      return currentUser.doAs(
-          (PrivilegedExceptionAction<Fileset>)
-              () ->
-                  hadoopCatalogOperations.createFileset(
-                      ident, comment, type, storageLocation, properties));
-    } catch (IOException | InterruptedException ioe) {
-      throw new RuntimeException("Failed to create fileset " + ident, ioe);
-    } catch (UndeclaredThrowableException e) {
-      Throwable innerException = e.getCause();
-      if (innerException instanceof PrivilegedActionException) {
-        throw new RuntimeException(innerException.getCause());
-      } else if (innerException instanceof InvocationTargetException) {
-        throw new RuntimeException(innerException.getCause());
-      } else {
-        throw new RuntimeException(innerException);
-      }
+      return doAs(
+          currentUser,
+          () ->
+              hadoopCatalogOperations.createFileset(
+                  ident, comment, type, storageLocation, properties),
+          ident);
     } finally {
       hadoopCatalogOperations.setCurrentUser(null);
     }
@@ -148,51 +138,25 @@ public class SecureHadoopCatalogOperations
     // Reset the current user based on the name identifier.
     UserGroupInformation currentUser = getUGIByIdent(filesetEntity.properties(), ident);
 
-    try {
-      boolean r =
-          currentUser.doAs(
-              (PrivilegedExceptionAction<Boolean>)
-                  () -> hadoopCatalogOperations.dropFileset(ident));
-      cleanUserInfo(ident);
-      return r;
-    } catch (IOException | InterruptedException ioe) {
-      throw new RuntimeException("Failed to create fileset " + ident, ioe);
-    } catch (UndeclaredThrowableException e) {
-      Throwable innerException = e.getCause();
-      if (innerException instanceof PrivilegedActionException) {
-        throw new RuntimeException(innerException.getCause());
-      } else if (innerException instanceof InvocationTargetException) {
-        throw new RuntimeException(innerException.getCause());
-      } else {
-        throw new RuntimeException(innerException);
-      }
-    }
+    boolean r = doAs(currentUser, () -> hadoopCatalogOperations.dropFileset(ident), ident);
+    cleanUserInfo(ident);
+    return r;
   }
 
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
 
-    try {
-      String apiUser = PrincipalUtils.getCurrentUserName();
-      hadoopCatalogOperations.setCurrentUser(apiUser);
-      // Reset the current user based on the name identifier and properties.
-      UserGroupInformation currentUser = getUGIByIdent(properties, ident);
+    String apiUser = PrincipalUtils.getCurrentUserName();
+    hadoopCatalogOperations.setCurrentUser(apiUser);
+    // Reset the current user based on the name identifier and properties.
+    UserGroupInformation currentUser = getUGIByIdent(properties, ident);
 
-      return currentUser.doAs(
-          (PrivilegedExceptionAction<Schema>)
-              () -> hadoopCatalogOperations.createSchema(ident, comment, properties));
-    } catch (IOException | InterruptedException ioe) {
-      throw new RuntimeException("Failed to create fileset " + ident, ioe);
-    } catch (UndeclaredThrowableException e) {
-      Throwable innerException = e.getCause();
-      if (innerException instanceof PrivilegedActionException) {
-        throw new RuntimeException(innerException.getCause());
-      } else if (innerException instanceof InvocationTargetException) {
-        throw new RuntimeException(innerException.getCause());
-      } else {
-        throw new RuntimeException(innerException);
-      }
+    try {
+      return doAs(
+          currentUser,
+          () -> hadoopCatalogOperations.createSchema(ident, comment, properties),
+          ident);
     } finally {
       hadoopCatalogOperations.setCurrentUser(null);
     }
@@ -211,24 +175,11 @@ public class SecureHadoopCatalogOperations
       // Reset the current user based on the name identifier.
       UserGroupInformation user = getUGIByIdent(properties, ident);
 
-      boolean r =
-          user.doAs(
-              (PrivilegedExceptionAction<Boolean>)
-                  () -> hadoopCatalogOperations.dropSchema(ident, cascade));
+      boolean r = doAs(user, () -> hadoopCatalogOperations.dropSchema(ident, cascade), ident);
       cleanUserInfo(ident);
       return r;
-
-    } catch (IOException | InterruptedException ioe) {
-      throw new RuntimeException("Failed to create fileset " + ident, ioe);
-    } catch (UndeclaredThrowableException e) {
-      Throwable innerException = e.getCause();
-      if (innerException instanceof PrivilegedActionException) {
-        throw new RuntimeException(innerException.getCause());
-      } else if (innerException instanceof InvocationTargetException) {
-        throw new RuntimeException(innerException.getCause());
-      } else {
-        throw new RuntimeException(innerException);
-      }
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to delete schema " + ident, ioe);
     }
   }
 
@@ -356,6 +307,26 @@ public class SecureHadoopCatalogOperations
     File file = new File(filePath);
     if (file.exists()) {
       file.delete();
+    }
+  }
+
+  private <T> T doAs(
+      UserGroupInformation userGroupInformation,
+      PrivilegedExceptionAction<T> action,
+      NameIdentifier ident) {
+    try {
+      return userGroupInformation.doAs(action);
+    } catch (IOException | InterruptedException ioe) {
+      throw new RuntimeException("Failed to operation on fileset " + ident, ioe);
+    } catch (UndeclaredThrowableException e) {
+      Throwable innerException = e.getCause();
+      if (innerException instanceof PrivilegedActionException) {
+        throw new RuntimeException(innerException.getCause());
+      } else if (innerException instanceof InvocationTargetException) {
+        throw new RuntimeException(innerException.getCause());
+      } else {
+        throw new RuntimeException(innerException);
+      }
     }
   }
 }
