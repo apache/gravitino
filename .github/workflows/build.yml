@@ -104,7 +104,7 @@ jobs:
         with:
           name: unit test report
           path: |
-            build/reports
+            ${{ github.workspace }}/**/build/reports
             catalogs/**/*.log
             catalogs/**/*.tar
 
