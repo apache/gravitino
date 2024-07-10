@@ -22,6 +22,7 @@ package com.datastrato.gravitino.catalog.lakehouse.iceberg.catalog;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+import org.apache.commons.compress.utils.Lists;
 import org.apache.iceberg.hive.HiveCatalog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +35,7 @@ public class WrappedHiveCatalog extends HiveCatalog implements Closeable {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(WrappedHiveCatalog.class);
 
-  private List<Closeable> resources;
+  private final List<Closeable> resources = Lists.newArrayList();
 
   public WrappedHiveCatalog() {
     super();
@@ -51,7 +52,9 @@ public class WrappedHiveCatalog extends HiveCatalog implements Closeable {
     resources.forEach(
         resource -> {
           try {
-            resource.close();
+            if (resource != null) {
+              resource.close();
+            }
           } catch (IOException e) {
             LOGGER.warn("Failed to close resource: {}", resource, e);
           }
