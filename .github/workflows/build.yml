@@ -113,9 +113,9 @@ jobs:
         uses: madrapps/jacoco-report@fd4800e8a81e21bdf373438e5918b975df041d15
         with:
           paths: |
-            ${{ github.workspace }}/api/build/reports/jacoco/test/jacocoTestReport.xml
-            ${{ github.workspace }}/common/build/reports/jacoco/test/jacocoTestReport.xml
-            ${{ github.workspace }}/server/build/reports/jacoco/test/jacocoTestReport.xml
+            ${{ github.workspace }}/api/build/reports/jacoco/test/jacocoTestReport.xml,
+            ${{ github.workspace }}/common/build/reports/jacoco/test/jacocoTestReport.xml,
+            ${{ github.workspace }}/server/build/reports/jacoco/test/jacocoTestReport.xml,
             ${{ github.workspace }}/core/build/reports/jacoco/test/jacocoTestReport.xml
           token: ${{ secrets.GITHUB_TOKEN }}
           min-coverage-overall: 40
