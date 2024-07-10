@@ -192,11 +192,10 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   }
 
   private BaseAuthorization<?> createAuthorizationPluginInstance() {
-    AuthorizationPluginType pluginType =
-        (AuthorizationPluginType)
-            catalogPropertiesMetadata().getOrDefault(conf, AUTHORIZATION_PLUGIN);
-    if (pluginType == null) {
-      throw new IllegalArgumentException("Authorization plugin provider is not set");
+    String authorizationProvider =
+        (String) catalogPropertiesMetadata().getOrDefault(conf, AUTHORIZATION_PROVIDER);
+    if (authorizationProvider == null) {
+      throw new IllegalArgumentException("Authorization provider is not set");
     }
 
     ServiceLoader<AuthorizationProvider> loader =
@@ -205,15 +204,15 @@ public abstract class BaseCatalog<T extends BaseCatalog>
 
     List<Class<? extends AuthorizationProvider>> providers =
         Streams.stream(loader.iterator())
-            .filter(p -> p.shortName().equalsIgnoreCase(pluginType.getPluginName()))
+            .filter(p -> p.shortName().equalsIgnoreCase(authorizationProvider))
             .map(AuthorizationProvider::getClass)
             .collect(Collectors.toList());
     if (providers.isEmpty()) {
       throw new IllegalArgumentException(
-          "No authorization plugin provider found for: " + pluginType);
+          "No authorization provider found for: " + authorizationProvider);
     } else if (providers.size() > 1) {
       throw new IllegalArgumentException(
-          "Multiple authorization plugin providers found for: " + pluginType);
+          "Multiple authorization providers found for: " + authorizationProvider);
     }
     try {
       return (BaseAuthorization<?>)

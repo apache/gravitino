@@ -22,7 +22,6 @@ import com.datastrato.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.file.FilesetCatalog;
 import com.datastrato.gravitino.messaging.TopicCatalog;
 import com.datastrato.gravitino.rel.TableCatalog;
-import com.google.common.base.Preconditions;
 import java.util.Map;
 
 /**
@@ -90,32 +89,10 @@ public interface Catalog extends Auditable {
   String CLOUD_REGION_CODE = "cloud.region-code";
 
   /**
-   * This variable is used as a key in properties of catalogs to use authorization plugin provider
-   * in Gravitino. <br>
-   * You can use your own authorized provider with this configuration The object you use may be
-   * unstable, so don't use it unless you know what you're doing.
+   * This variable is used as a key in properties of catalogs to use authorization provider in
+   * Gravitino.
    */
-  String AUTHORIZATION_PLUGIN = "authorization-plugin";
-
-  /** Authorization plugin types */
-  enum AuthorizationPluginType {
-    /** Ranger authorization plugin */
-    RANGER("ranger"),
-    /** MySQL authorization plugin */
-    MYSQL("mysql");
-    /** Authorization plugin name */
-    private final String pluginName;
-
-    AuthorizationPluginType(String pluginName) {
-      Preconditions.checkArgument(pluginName != null, "plugin must not be null");
-      this.pluginName = pluginName;
-    }
-
-    /** @return The plugin name. */
-    public String getPluginName() {
-      return pluginName;
-    }
-  }
+  String AUTHORIZATION_PROVIDER = "authorization-provider";
 
   /** @return The name of the catalog. */
   String name();

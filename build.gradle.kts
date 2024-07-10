@@ -710,7 +710,7 @@ fun printDockerCheckInfo() {
   if (dockerTest) {
     println("Using Docker container to run all tests. [$testMode test]")
   } else {
-    println("Run test cases without `gravitino-docker-test` tag ................ [$testMode test]")
+    println("Run test cases without `gravitino-docker-test` tag .............. [$testMode test]")
   }
   println("-----------------------------------------------------------------")
 

@@ -18,12 +18,10 @@
  */
 package com.datastrato.gravitino.catalog.mysql;
 
-import static com.datastrato.gravitino.Catalog.AUTHORIZATION_PLUGIN;
 import static com.datastrato.gravitino.connector.PropertyEntry.enumImmutablePropertyEntry;
 import static com.datastrato.gravitino.connector.PropertyEntry.integerOptionalPropertyEntry;
 import static com.datastrato.gravitino.connector.PropertyEntry.stringReservedPropertyEntry;
 
-import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTablePropertiesMetadata;
 import com.datastrato.gravitino.connector.PropertyEntry;
 import java.util.Collections;
@@ -73,17 +71,6 @@ public class MysqlTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
             true,
             null,
             false));
-    map.put(
-        AUTHORIZATION_PLUGIN,
-        PropertyEntry.enumPropertyEntry(
-            AUTHORIZATION_PLUGIN,
-            "The name of the authorization plugin to use for this catalog",
-            false /* required */,
-            true /* immutable */,
-            Catalog.AuthorizationPluginType.class,
-            Catalog.AuthorizationPluginType.MYSQL,
-            false /* hidden */,
-            false /* reserved */));
     return Collections.unmodifiableMap(map);
   }
 

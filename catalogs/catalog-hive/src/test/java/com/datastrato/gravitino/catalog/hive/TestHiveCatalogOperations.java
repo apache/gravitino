@@ -88,7 +88,7 @@ class TestHiveCatalogOperations {
     Assertions.assertTrue(propertyEntryMap.containsKey(METASTORE_URIS));
     Assertions.assertTrue(propertyEntryMap.containsKey(Catalog.PROPERTY_PACKAGE));
     Assertions.assertTrue(propertyEntryMap.containsKey(BaseCatalog.CATALOG_OPERATION_IMPL));
-    Assertions.assertTrue(propertyEntryMap.containsKey(BaseCatalog.AUTHORIZATION_PLUGIN));
+    Assertions.assertTrue(propertyEntryMap.containsKey(BaseCatalog.AUTHORIZATION_PROVIDER));
     Assertions.assertTrue(propertyEntryMap.containsKey(CLIENT_POOL_SIZE));
     Assertions.assertTrue(propertyEntryMap.containsKey(IMPERSONATION_ENABLE));
     Assertions.assertTrue(propertyEntryMap.containsKey(LIST_ALL_TABLES));

@@ -52,10 +52,7 @@ public class TestAuthorization {
 
     hiveCatalog =
         new TestCatalog()
-            .withCatalogConf(
-                ImmutableMap.of(
-                    Catalog.AUTHORIZATION_PLUGIN,
-                    Catalog.AuthorizationPluginType.RANGER.getPluginName()))
+            .withCatalogConf(ImmutableMap.of(Catalog.AUTHORIZATION_PROVIDER, "ranger"))
             .withCatalogEntity(hiveCatalogEntity);
 
     CatalogEntity mySQLEntity =
@@ -70,10 +67,7 @@ public class TestAuthorization {
 
     mySQLCatalog =
         new TestCatalog()
-            .withCatalogConf(
-                ImmutableMap.of(
-                    Catalog.AUTHORIZATION_PLUGIN,
-                    Catalog.AuthorizationPluginType.MYSQL.getPluginName()))
+            .withCatalogConf(ImmutableMap.of(Catalog.AUTHORIZATION_PROVIDER, "mysql"))
             .withCatalogEntity(mySQLEntity);
   }
 

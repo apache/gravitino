@@ -116,16 +116,14 @@ public class TestCatalog extends BaseCatalog<TestCatalog> {
                     false,
                     false))
             .put(
-                AUTHORIZATION_PLUGIN,
-                PropertyEntry.enumPropertyEntry(
-                    AUTHORIZATION_PLUGIN,
-                    "The name of the authorization plugin provider for Gravitino",
-                    false /* required */,
-                    true /* immutable */,
-                    AuthorizationPluginType.class,
+                AUTHORIZATION_PROVIDER,
+                PropertyEntry.stringImmutablePropertyEntry(
+                    Catalog.AUTHORIZATION_PROVIDER,
+                    "The name of the authorization provider for Gravitino",
+                    false,
                     null,
-                    false /* hidden */,
-                    false /* reserved */))
+                    false,
+                    false))
             .build();
       }
     };
