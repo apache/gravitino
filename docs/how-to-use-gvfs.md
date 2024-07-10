@@ -530,3 +530,25 @@ reader = SimpleDirectoryReader(
 documents = reader.load_data()
 print(documents)
 ```
+
+### Authentication
+
+Currently, Gravitino Virtual File System in Python only supports one kind of authentication types to access Gravitino server: `simple`.
+
+The type of `simple` is the default authentication type in Gravitino Virtual File System in Python.
+
+#### How to use authentication
+
+##### Using `simple` authentication
+
+First, make sure that your Gravitino server is also configured to use the `simple` authentication mode.
+
+Then, you can configure the authentication like this:
+
+```python
+from gravitino import gvfs
+
+options = {"auth_type": "simple"}
+fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalake_name="test_metalake", options=options)
+print(fs.ls("gvfs://fileset/fileset_catlaog/tmp/test_fileset"))
+```
