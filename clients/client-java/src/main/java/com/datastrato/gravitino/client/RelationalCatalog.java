@@ -237,7 +237,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
    * Purge the table with specified identifier.
    *
    * @param ident The identifier of the table, which should be "schema.table" format.
-   * @return true if the table is purged successfully, false otherwise.
+   * @return true if the table is purged successfully, false if the table does not exist.
    */
   @Override
   public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
@@ -246,21 +246,15 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
     Namespace fullNamespace = getTableFullNamespace(ident.namespace());
     Map<String, String> params = new HashMap<>();
     params.put("purge", "true");
-    try {
-      DropResponse resp =
-          restClient.delete(
-              formatTableRequestPath(fullNamespace) + "/" + RESTUtils.encodeString(ident.name()),
-              params,
-              DropResponse.class,
-              Collections.emptyMap(),
-              ErrorHandlers.tableErrorHandler());
-      resp.validate();
-      return resp.dropped();
-    } catch (UnsupportedOperationException e) {
-      throw e;
-    } catch (Exception e) {
-      return false;
-    }
+    DropResponse resp =
+        restClient.delete(
+            formatTableRequestPath(fullNamespace) + "/" + RESTUtils.encodeString(ident.name()),
+            params,
+            DropResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.tableErrorHandler());
+    resp.validate();
+    return resp.dropped();
   }
 
   @VisibleForTesting

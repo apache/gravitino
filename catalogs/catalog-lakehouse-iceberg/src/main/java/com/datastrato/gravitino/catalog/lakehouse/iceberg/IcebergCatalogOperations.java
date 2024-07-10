@@ -547,6 +547,8 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
     } catch (org.apache.iceberg.exceptions.NoSuchTableException e) {
       LOG.warn("Iceberg table {} does not exist", tableIdent.name());
       return false;
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     }
   }
 

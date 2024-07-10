@@ -35,7 +35,6 @@ class BaseResponse(RESTResponse):
 
     def validate(self):
         """Validates the response code.
-        TODO: @throws IllegalArgumentException if code value is negative.
+        @throws IllegalArgumentException if code value is negative.
         """
-        if self._code < 0:
-            raise ValueError("code must be >= 0")
+        assert self._code >= 0, "code must be >= 0"

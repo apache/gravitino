@@ -1522,6 +1522,10 @@ public class CatalogHiveIT extends AbstractIT {
     catalog.asTableCatalog().purgeTable(NameIdentifier.of(schemaName, tableName));
     Boolean existed = hiveClientPool.run(client -> client.tableExists(schemaName, tableName));
     Assertions.assertFalse(existed, "The Hive table should not exist");
+    // purging non-exist table should return false
+    Assertions.assertFalse(
+        catalog.asTableCatalog().purgeTable(NameIdentifier.of(schemaName, tableName)),
+        "The table should not be found in the catalog");
     Path tableDirectory = new Path(hiveTab.getSd().getLocation());
     Assertions.assertFalse(hdfs.exists(tableDirectory), "The table directory should not exist");
     Path trashDirectory = hdfs.getTrashRoot(tableDirectory);

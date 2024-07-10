@@ -182,8 +182,8 @@ allprojects {
       param.environment("jdbcBackend", jdbcDatabase)
 
       val testMode = project.properties["testMode"] as? String ?: "embedded"
-      param.systemProperty("gravitino.log.path", project.buildDir.path + "/${project.name}-integration-test.log")
-      project.delete(project.buildDir.path + "/${project.name}-integration-test.log")
+      param.systemProperty("gravitino.log.path", "build/${project.name}-integration-test.log")
+      project.delete("build/${project.name}-integration-test.log")
       if (testMode == "deploy") {
         param.environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package")
         param.systemProperty("testMode", "deploy")

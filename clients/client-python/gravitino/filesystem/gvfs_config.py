@@ -17,8 +17,13 @@ specific language governing permissions and limitations
 under the License.
 """
 
-from gravitino.exceptions.not_found_exception import NotFoundException
 
+class GVFSConfig:
+    CACHE_SIZE = "cache_size"
+    DEFAULT_CACHE_SIZE = 20
 
-class NoSuchMetalakeException(NotFoundException):
-    """An exception thrown when a metalake is not found."""
+    CACHE_EXPIRED_TIME = "cache_expired_time"
+    DEFAULT_CACHE_EXPIRED_TIME = 3600
+
+    AUTH_TYPE = "auth_type"
+    DEFAULT_AUTH_TYPE = "simple"

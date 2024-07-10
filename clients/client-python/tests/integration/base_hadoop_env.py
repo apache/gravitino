@@ -23,7 +23,7 @@ import shutil
 import subprocess
 import tarfile
 
-from gravitino.exceptions.gravitino_runtime_exception import GravitinoRuntimeException
+from gravitino.exceptions.base import GravitinoRuntimeException
 
 logger = logging.getLogger(__name__)
 

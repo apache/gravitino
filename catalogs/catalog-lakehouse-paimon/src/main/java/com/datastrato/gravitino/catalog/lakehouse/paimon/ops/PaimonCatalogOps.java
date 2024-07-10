@@ -74,9 +74,9 @@ public class PaimonCatalogOps implements AutoCloseable {
     return catalog.getTable(tableIdentifier(tableName));
   }
 
-  public void createTable(String tablename, Schema schema)
+  public void createTable(String tableName, Schema schema)
       throws Catalog.TableAlreadyExistException, DatabaseNotExistException {
-    catalog.createTable(tableIdentifier(tablename), schema, false);
+    catalog.createTable(tableIdentifier(tableName), schema, false);
   }
 
   public void dropTable(String tableName) throws TableNotExistException {

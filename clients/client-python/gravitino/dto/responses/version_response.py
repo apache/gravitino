@@ -20,8 +20,8 @@ under the License.
 from dataclasses import dataclass, field
 from dataclasses_json import config
 
-from .base_response import BaseResponse
-from ..version_dto import VersionDTO
+from gravitino.dto.responses.base_response import BaseResponse
+from gravitino.dto.version_dto import VersionDTO
 
 
 @dataclass
