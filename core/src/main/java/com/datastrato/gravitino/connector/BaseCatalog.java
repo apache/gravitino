@@ -22,15 +22,23 @@ import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogProvider;
 import com.datastrato.gravitino.annotation.Evolving;
+import com.datastrato.gravitino.connector.authorization.AuthorizationPlugin;
+import com.datastrato.gravitino.connector.authorization.AuthorizationProvider;
+import com.datastrato.gravitino.connector.authorization.BaseAuthorization;
 import com.datastrato.gravitino.connector.capability.Capability;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Streams;
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.ServiceLoader;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,6 +64,9 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   // You can use your own object to replace the default catalog operation.
   // The object you used is not stable, don't use it unless you know what you are doing.
   @VisibleForTesting public static final String CATALOG_OPERATION_IMPL = "ops-impl";
+
+  // Underlying access control system plugin for this catalog.
+  private volatile BaseAuthorization<?> authorization;
 
   private CatalogEntity entity;
 
@@ -169,11 +180,63 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     return ops;
   }
 
+  public AuthorizationPlugin getAuthorizationPlugin() {
+    if (authorization == null) {
+      synchronized (this) {
+        if (authorization == null) {
+          BaseAuthorization<?> baseAuthorization = createAuthorizationPluginInstance();
+          if (baseAuthorization == null) {
+            return null;
+          }
+          authorization = baseAuthorization;
+        }
+      }
+    }
+    return authorization.plugin();
+  }
+
+  private BaseAuthorization<?> createAuthorizationPluginInstance() {
+    String authorizationProvider =
+        (String) catalogPropertiesMetadata().getOrDefault(conf, AUTHORIZATION_PROVIDER);
+    if (authorizationProvider == null) {
+      LOG.info("Authorization provider is not set!");
+      return null;
+    }
+
+    ServiceLoader<AuthorizationProvider> loader =
+        ServiceLoader.load(
+            AuthorizationProvider.class, Thread.currentThread().getContextClassLoader());
+
+    List<Class<? extends AuthorizationProvider>> providers =
+        Streams.stream(loader.iterator())
+            .filter(p -> p.shortName().equalsIgnoreCase(authorizationProvider))
+            .map(AuthorizationProvider::getClass)
+            .collect(Collectors.toList());
+    if (providers.isEmpty()) {
+      throw new IllegalArgumentException(
+          "No authorization provider found for: " + authorizationProvider);
+    } else if (providers.size() > 1) {
+      throw new IllegalArgumentException(
+          "Multiple authorization providers found for: " + authorizationProvider);
+    }
+    try {
+      return (BaseAuthorization<?>)
+          Iterables.getOnlyElement(providers).getDeclaredConstructor().newInstance();
+    } catch (Exception e) {
+      LOG.error("Failed to create authorization instance", e);
+      throw new RuntimeException(e);
+    }
+  }
+
   @Override
   public void close() throws IOException {
     if (ops != null) {
       ops.close();
       ops = null;
+    }
+    if (authorization != null) {
+      authorization.close();
+      authorization = null;
     }
   }
 

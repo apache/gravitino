@@ -48,6 +48,13 @@ public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetada
                   null,
                   false,
                   false),
+              PropertyEntry.stringImmutablePropertyEntry(
+                  Catalog.AUTHORIZATION_PROVIDER,
+                  "The name of the authorization provider for Gravitino",
+                  false,
+                  null,
+                  false,
+                  false),
               PropertyEntry.enumPropertyEntry(
                   CLOUD_NAME,
                   "The cloud that the catalog is running on",

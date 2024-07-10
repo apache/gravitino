@@ -88,6 +88,12 @@ public interface Catalog extends Auditable {
    */
   String CLOUD_REGION_CODE = "cloud.region-code";
 
+  /**
+   * This variable is used as a key in properties of catalogs to use authorization provider in
+   * Gravitino.
+   */
+  String AUTHORIZATION_PROVIDER = "authorization-provider";
+
   /** @return The name of the catalog. */
   String name();
 
