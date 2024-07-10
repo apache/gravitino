@@ -1,6 +1,20 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.catalog.doris.operation;
 
@@ -12,7 +26,6 @@ import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTablePartitionOperations;
 import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
 import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
-import com.datastrato.gravitino.exceptions.NotPartitionedTableException;
 import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
 import com.datastrato.gravitino.rel.expressions.literals.Literal;
 import com.datastrato.gravitino.rel.expressions.literals.Literals;
@@ -203,7 +216,9 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
       Optional<Transform> transform =
           DorisUtils.extractPartitionInfoFromSql(createTableSql.toString());
       return transform.orElseThrow(
-          () -> new NotPartitionedTableException("%s is not a partitioned table", tableName));
+          () ->
+              new UnsupportedOperationException(
+                  String.format("%s is not a partitioned table", tableName)));
     }
   }
 
@@ -257,7 +272,8 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
       return Partitions.list(
           partitionName, lists.build().stream().toArray(Literal<?>[][]::new), properties);
     } else {
-      throw new NotPartitionedTableException("%s is not a partitioned table", tableName);
+      throw new UnsupportedOperationException(
+          String.format("%s is not a partitioned table", tableName));
     }
   }
 
