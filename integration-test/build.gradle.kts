@@ -161,7 +161,7 @@ tasks.test {
       environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "datastrato/gravitino-ci-trino:0.1.5")
       environment("GRAVITINO_CI_KAFKA_DOCKER_IMAGE", "apache/kafka:3.7.0")
       environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "datastrato/gravitino-ci-doris:0.1.5")
-      environment("GRAVITINO_CI_RANGER_DOCKER_IMAGE", "datastrato/gravitino-ci-ranger:0.1.0")
+      environment("GRAVITINO_CI_RANGER_DOCKER_IMAGE", "datastrato/gravitino-ci-ranger:0.1.1")
 
       copy {
         from("${project.rootDir}/dev/docker/trino/conf")

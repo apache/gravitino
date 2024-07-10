@@ -84,10 +84,11 @@ class TestHiveCatalogOperations {
     Map<String, PropertyEntry<?>> propertyEntryMap =
         HIVE_PROPERTIES_METADATA.catalogPropertiesMetadata().propertyEntries();
 
-    Assertions.assertEquals(14, propertyEntryMap.size());
+    Assertions.assertEquals(15, propertyEntryMap.size());
     Assertions.assertTrue(propertyEntryMap.containsKey(METASTORE_URIS));
     Assertions.assertTrue(propertyEntryMap.containsKey(Catalog.PROPERTY_PACKAGE));
     Assertions.assertTrue(propertyEntryMap.containsKey(BaseCatalog.CATALOG_OPERATION_IMPL));
+    Assertions.assertTrue(propertyEntryMap.containsKey(BaseCatalog.AUTHORIZATION_PROVIDER));
     Assertions.assertTrue(propertyEntryMap.containsKey(CLIENT_POOL_SIZE));
     Assertions.assertTrue(propertyEntryMap.containsKey(IMPERSONATION_ENABLE));
     Assertions.assertTrue(propertyEntryMap.containsKey(LIST_ALL_TABLES));
