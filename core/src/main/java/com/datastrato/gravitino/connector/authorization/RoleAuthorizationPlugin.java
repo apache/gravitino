@@ -36,7 +36,7 @@ interface RoleAuthorizationPlugin {
   /**
    * After acquiring a role from Gravitino, this method is called to acquire the role in the
    * underlying system.<br>
-   * Because role information is already stored in the Gravition, so we don't need to get the Role
+   * Because role information is already stored in the Gravitino, so we don't need to get the Role
    * from the underlying access control system. <br>
    * We only need to check if the Role exists in the underlying access control system.
    *

@@ -51,7 +51,7 @@ interface UserGroupAuthorizationPlugin {
   /**
    * After acquiring a User from Gravitino, this method is called to acquire the User in the
    * underlying system. <br>
-   * Because User information is already stored in the Gravition, so we don't need to get the User
+   * Because User information is already stored in the Gravitino, so we don't need to get the User
    * from the underlying access control system. <br>
    * We only need to check if the User exists in the underlying access control system.
    *
@@ -86,7 +86,7 @@ interface UserGroupAuthorizationPlugin {
   /**
    * After acquiring a Group from Gravitino, this method is called to acquire the Group in the
    * underlying system. <br>
-   * Because Group information is already stored in the Gravition, so we don't need to get the Group
+   * Because Group information is already stored in the Gravitino, so we don't need to get the Group
    * from the underlying access control system. <br>
    * We only need to check if the Group exists in the underlying access control system. <br>
    *

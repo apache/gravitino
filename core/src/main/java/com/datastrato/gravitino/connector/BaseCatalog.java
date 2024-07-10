@@ -184,7 +184,11 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     if (authorization == null) {
       synchronized (this) {
         if (authorization == null) {
-          authorization = createAuthorizationPluginInstance();
+          BaseAuthorization<?> baseAuthorization = createAuthorizationPluginInstance();
+          if (baseAuthorization == null) {
+            return null;
+          }
+          authorization = baseAuthorization;
         }
       }
     }
@@ -195,7 +199,8 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     String authorizationProvider =
         (String) catalogPropertiesMetadata().getOrDefault(conf, AUTHORIZATION_PROVIDER);
     if (authorizationProvider == null) {
-      throw new IllegalArgumentException("Authorization provider is not set");
+      LOG.info("Authorization provider is not set!");
+      return null;
     }
 
     ServiceLoader<AuthorizationProvider> loader =

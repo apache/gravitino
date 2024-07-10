@@ -73,22 +73,23 @@ public class TestAuthorization {
 
   @Test
   public void testRangerAuthorization() {
-    AuthorizationPlugin authPlugin1 = hiveCatalog.getAuthorizationPlugin();
-    Assertions.assertInstanceOf(TestRangerAuthorizationPlugin.class, authPlugin1);
-    TestRangerAuthorizationPlugin testMySQLAuthPlugin = (TestRangerAuthorizationPlugin) authPlugin1;
-    Assertions.assertFalse(testMySQLAuthPlugin.callOnCreateRole1);
-    authPlugin1.onRoleCreated(null);
-    Assertions.assertTrue(testMySQLAuthPlugin.callOnCreateRole1);
+    AuthorizationPlugin rangerAuthPlugin = hiveCatalog.getAuthorizationPlugin();
+    Assertions.assertInstanceOf(TestRangerAuthorizationPlugin.class, rangerAuthPlugin);
+    TestRangerAuthorizationPlugin testRangerAuthPlugin =
+        (TestRangerAuthorizationPlugin) rangerAuthPlugin;
+    Assertions.assertFalse(testRangerAuthPlugin.callOnCreateRole1);
+    rangerAuthPlugin.onRoleCreated(null);
+    Assertions.assertTrue(testRangerAuthPlugin.callOnCreateRole1);
   }
 
   @Test
   public void testMySQLAuthorization() {
     AuthorizationPlugin mySQLAuthPlugin = mySQLCatalog.getAuthorizationPlugin();
     Assertions.assertInstanceOf(TestMySQLAuthorizationPlugin.class, mySQLAuthPlugin);
-    TestMySQLAuthorizationPlugin testRangerAuthPlugin =
+    TestMySQLAuthorizationPlugin testMySQLAuthPlugin =
         (TestMySQLAuthorizationPlugin) mySQLAuthPlugin;
-    Assertions.assertFalse(testRangerAuthPlugin.callOnCreateRole2);
+    Assertions.assertFalse(testMySQLAuthPlugin.callOnCreateRole2);
     mySQLAuthPlugin.onRoleCreated(null);
-    Assertions.assertTrue(testRangerAuthPlugin.callOnCreateRole2);
+    Assertions.assertTrue(testMySQLAuthPlugin.callOnCreateRole2);
   }
 }
