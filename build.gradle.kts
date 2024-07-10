@@ -1,6 +1,20 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 import com.github.gradle.node.NodeExtension
 import com.github.gradle.node.NodePlugin
@@ -164,9 +178,8 @@ allprojects {
 
       // Change poll image pause time from 30s to 60s
       param.environment("TESTCONTAINERS_PULL_PAUSE_TIMEOUT", "60")
-      if (project.hasProperty("jdbcBackend")) {
-        param.environment("jdbcBackend", "true")
-      }
+      val jdbcDatabase = project.properties["jdbcBackend"] as? String ?: "h2"
+      param.environment("jdbcBackend", jdbcDatabase)
 
       val testMode = project.properties["testMode"] as? String ?: "embedded"
       param.systemProperty("gravitino.log.path", project.buildDir.path + "/${project.name}-integration-test.log")
@@ -359,7 +372,7 @@ subprojects {
         pom {
           name.set("Gravitino")
           description.set("Gravitino is a high-performance, geo-distributed and federated metadata lake.")
-          url.set("https://datastrato.ai")
+          url.set("https://gravitino.apache.org")
           licenses {
             license {
               name.set("The Apache Software License, Version 2.0")
@@ -368,14 +381,14 @@ subprojects {
           }
           developers {
             developer {
-              id.set("The maintainers of Gravitino")
+              id.set("The Gravitino community")
               name.set("support")
-              email.set("support@datastrato.com")
+              email.set("dev@gravitino.apache.org")
             }
           }
           scm {
-            url.set("https://github.com/datastrato/gravitino")
-            connection.set("scm:git:git://github.com/datastrato/gravitino.git")
+            url.set("https://github.com/apache/gravitino")
+            connection.set("scm:git:git://github.com/apache/gravitino.git")
           }
         }
       }
@@ -440,9 +453,6 @@ subprojects {
 }
 
 tasks.rat {
-  substringMatcher("DS", "Datastrato", "Copyright 2023 Datastrato Pvt Ltd.")
-  substringMatcher("DS", "Datastrato", "Copyright 2024 Datastrato Pvt Ltd.")
-  approvedLicense("Datastrato")
   approvedLicense("Apache License Version 2.0")
 
   // Set input directory to that of the root project instead of the CWD. This
@@ -450,7 +460,7 @@ tasks.rat {
   inputDir.set(project.rootDir)
 
   val exclusions = mutableListOf(
-    // Ignore files we track but do not need headers
+    // Ignore files we track but do not need full headers
     "**/.github/**/*",
     "dev/docker/**/*.xml",
     "dev/docker/**/*.conf",
@@ -459,6 +469,7 @@ tasks.rat {
     "**/licenses/*.txt",
     "**/licenses/*.md",
     "integration-test/**",
+    "docs/**/*.md",
     "web/.**",
     "web/next-env.d.ts",
     "web/dist/**/*",
@@ -472,6 +483,8 @@ tasks.rat {
     "web/src/lib/icons/svg/**/*.svg",
     "**/LICENSE.*",
     "**/NOTICE.*",
+    "DISCLAIMER_WIP.txt",
+    "DISCLAIMER.txt",
     "ROADMAP.md",
     "clients/client-python/.pytest_cache/*",
     "clients/client-python/gravitino.egg-info/*",

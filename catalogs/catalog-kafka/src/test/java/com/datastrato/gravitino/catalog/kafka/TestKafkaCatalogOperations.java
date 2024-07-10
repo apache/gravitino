@@ -1,16 +1,40 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.catalog.kafka;
 
 import static com.datastrato.gravitino.Catalog.Type.MESSAGING;
 import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_KV_STORE;
+import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_KV_ROCKSDB_BACKEND_PATH;
 import static com.datastrato.gravitino.Configs.ENTITY_KV_STORE;
+import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
+import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD;
+import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
+import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL;
+import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER;
+import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_STORE;
+import static com.datastrato.gravitino.Configs.ENTITY_SERDE;
 import static com.datastrato.gravitino.Configs.ENTITY_STORE;
+import static com.datastrato.gravitino.Configs.RELATIONAL_ENTITY_STORE;
 import static com.datastrato.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static com.datastrato.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
+import static com.datastrato.gravitino.Configs.VERSION_RETENTION_COUNT;
 import static com.datastrato.gravitino.StringIdentifier.ID_KEY;
 import static com.datastrato.gravitino.catalog.kafka.KafkaCatalog.CATALOG_PROPERTIES_METADATA;
 import static com.datastrato.gravitino.catalog.kafka.KafkaCatalog.SCHEMA_PROPERTIES_METADATA;
@@ -19,10 +43,11 @@ import static com.datastrato.gravitino.catalog.kafka.KafkaCatalogOperations.CLIE
 import static com.datastrato.gravitino.catalog.kafka.KafkaCatalogPropertiesMetadata.BOOTSTRAP_SERVERS;
 import static com.datastrato.gravitino.catalog.kafka.KafkaTopicPropertiesMetadata.PARTITION_COUNT;
 import static com.datastrato.gravitino.catalog.kafka.KafkaTopicPropertiesMetadata.REPLICATION_FACTOR;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.when;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
-import com.datastrato.gravitino.EntitySerDeFactory;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.EntityStoreFactory;
 import com.datastrato.gravitino.NameIdentifier;
@@ -41,7 +66,10 @@ import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
+import com.datastrato.gravitino.storage.relational.service.CatalogMetaService;
+import com.datastrato.gravitino.storage.relational.service.MetalakeMetaService;
 import com.google.common.collect.ImmutableMap;
+import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
@@ -51,12 +79,13 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
 
-  private static final String ROCKS_DB_STORE_PATH =
-      "/tmp/gravitino_test_entityStore_" + genRandomString();
+  private static final String STORE_PATH = "/tmp/gravitino_test_entityStore_" + genRandomString();
+  private static final String H2_FILE = STORE_PATH + ".mv.db";
   private static final String METALAKE_NAME = "metalake";
   private static final String CATALOG_NAME = "test_kafka_catalog";
   private static final String DEFAULT_SCHEMA_NAME = "default";
@@ -100,15 +129,55 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
     Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
     Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
     Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
-    Mockito.when(config.get(ENTITY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(ROCKS_DB_STORE_PATH);
+    Mockito.when(config.get(ENTITY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(STORE_PATH);
 
-    Assertions.assertEquals(ROCKS_DB_STORE_PATH, config.get(ENTITY_KV_ROCKSDB_BACKEND_PATH));
+    Assertions.assertEquals(STORE_PATH, config.get(ENTITY_KV_ROCKSDB_BACKEND_PATH));
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
 
+    when(config.get(ENTITY_STORE)).thenReturn(RELATIONAL_ENTITY_STORE);
+    when(config.get(ENTITY_RELATIONAL_STORE)).thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
+    when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PATH)).thenReturn(STORE_PATH);
+
+    when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL))
+        .thenReturn(String.format("jdbc:h2:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", STORE_PATH));
+    when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("gravitino");
+    when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("gravitino");
+    when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
+
+    File f = FileUtils.getFile(STORE_PATH);
+    f.deleteOnExit();
+
+    when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
+    when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
+    when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
+    when(config.get(ENTITY_SERDE)).thenReturn("proto");
+
+    // Mock
+    MetalakeMetaService metalakeMetaService = MetalakeMetaService.getInstance();
+    MetalakeMetaService spyMetaservice = Mockito.spy(metalakeMetaService);
+    doReturn(1L).when(spyMetaservice).getMetalakeIdByName(Mockito.anyString());
+
+    CatalogMetaService catalogMetaService = CatalogMetaService.getInstance();
+    CatalogMetaService spyCatalogMetaService = Mockito.spy(catalogMetaService);
+    doReturn(1L)
+        .when(spyCatalogMetaService)
+        .getCatalogIdByMetalakeIdAndName(Mockito.anyLong(), Mockito.anyString());
+
+    MockedStatic<MetalakeMetaService> metalakeMetaServiceMockedStatic =
+        Mockito.mockStatic(MetalakeMetaService.class);
+    MockedStatic<CatalogMetaService> catalogMetaServiceMockedStatic =
+        Mockito.mockStatic(CatalogMetaService.class);
+
+    metalakeMetaServiceMockedStatic
+        .when(MetalakeMetaService::getInstance)
+        .thenReturn(spyMetaservice);
+    catalogMetaServiceMockedStatic
+        .when(CatalogMetaService::getInstance)
+        .thenReturn(spyCatalogMetaService);
+
     store = EntityStoreFactory.createEntityStore(config);
     store.initialize(config);
-    store.setSerDe(EntitySerDeFactory.createEntitySerDe(config));
     idGenerator = new RandomIdGenerator();
     kafkaCatalogEntity =
         CatalogEntity.builder()
@@ -133,7 +202,7 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
   public static void tearDown() throws IOException {
     if (store != null) {
       store.close();
-      FileUtils.deleteDirectory(FileUtils.getFile(ROCKS_DB_STORE_PATH));
+      FileUtils.deleteQuietly(FileUtils.getFile(H2_FILE));
     }
   }
 

@@ -3,7 +3,7 @@ title: "Table partitioning, bucketing and sort ordering and indexes"
 slug: /table-partitioning-bucketing-sort-order-indexes
 date: 2023-12-25
 keyword: Table Partition Bucket Distribute Sort By
-license: Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2.
+license: This software is licensed under the Apache License version 2.
 last_update:
   date: 2024-02-02
   author: Clearvive
@@ -211,7 +211,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 tableCatalog.createTable(
-    NameIdentifier.of("metalake", "hive_catalog", "schema", "table"),
+    NameIdentifier.of("schema", "table"),
     new Column[] {
       Column.of("id", Types.IntegerType.get(), "Id of the user", true, false, null),
       Column.of("name", Types.VarCharType.of(2000), "Name of the user", true, false, null),
@@ -328,7 +328,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 tableCatalog.createTable(
-    NameIdentifier.of("metalake", "hive_catalog", "schema", "table"),
+    NameIdentifier.of("schema", "table"),
     new Column[] {
       Column.of("id", Types.IntegerType.get(), "Id of the user", false, true, null),
       Column.of("name", Types.VarCharType.of(1000), "Name of the user", true, false, null),

@@ -1,13 +1,30 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
+import de.undercouch.gradle.tasks.download.Download
+import de.undercouch.gradle.tasks.download.Verify
 import io.github.piyushroshan.python.VenvTask
 import java.net.HttpURLConnection
 import java.net.URL
 
 plugins {
   id("io.github.piyushroshan.python-gradle-miniforge-plugin") version "1.0.0"
+  id("de.undercouch.download") version "5.6.0"
 }
 
 pythonPlugin {
@@ -134,6 +151,10 @@ fun generatePypiProjectHomePage() {
   }
 }
 
+val hadoopVersion = "2.7.3"
+val hadoopPackName = "hadoop-${hadoopVersion}.tar.gz"
+val hadoopDirName = "hadoop-${hadoopVersion}"
+val hadoopDownloadUrl = "https://archive.apache.org/dist/hadoop/core/hadoop-${hadoopVersion}/${hadoopPackName}"
 tasks {
   val pipInstall by registering(VenvTask::class) {
     venvExec = "pip"
@@ -159,6 +180,26 @@ tasks {
     workingDir = projectDir.resolve("./tests/integration")
   }
 
+  val build by registering(VenvTask::class) {
+    dependsOn(pylint)
+    venvExec = "python"
+    args = listOf("scripts/generate_version.py")
+  }
+
+  val downloadHadoopPack by registering(Download::class) {
+    dependsOn(build)
+    onlyIfModified(true)
+    src(hadoopDownloadUrl)
+    dest(layout.buildDirectory.dir("tmp"))
+  }
+
+  val verifyHadoopPack by registering(Verify::class) {
+    dependsOn(downloadHadoopPack)
+    src(layout.buildDirectory.file("tmp/${hadoopPackName}"))
+    algorithm("MD5")
+    checksum("3455bb57e4b4906bbea67b58cca78fa8")
+  }
+
   val integrationTest by registering(VenvTask::class) {
     doFirst {
       gravitinoServer("start")
@@ -167,11 +208,23 @@ tasks {
     venvExec = "coverage"
     args = listOf("run", "--branch", "-m", "unittest")
     workingDir = projectDir.resolve("./tests/integration")
-    environment = mapOf(
-      "PROJECT_VERSION" to project.version,
-      "GRAVITINO_HOME" to project.rootDir.path + "/distribution/package",
-      "START_EXTERNAL_GRAVITINO" to "true"
-    )
+    val dockerTest = project.rootProject.extra["dockerTest"] as? Boolean ?: false
+    val envMap = mapOf<String, Any>().toMutableMap()
+    if (dockerTest) {
+      dependsOn("verifyHadoopPack")
+      envMap.putAll(mapOf(
+          "HADOOP_VERSION" to hadoopVersion,
+          "PYTHON_BUILD_PATH" to project.rootDir.path + "/clients/client-python/build"
+      ))
+    }
+    envMap.putAll(mapOf(
+        "PROJECT_VERSION" to project.version,
+        "GRAVITINO_HOME" to project.rootDir.path + "/distribution/package",
+        "START_EXTERNAL_GRAVITINO" to "true",
+        "DOCKER_TEST" to dockerTest.toString(),
+        "GRAVITINO_CI_HIVE_DOCKER_IMAGE" to "datastrato/gravitino-ci-hive:0.1.12",
+    ))
+    environment = envMap
 
     doLast {
       gravitinoServer("stop")
@@ -208,12 +261,6 @@ tasks {
         dependsOn(integrationTest)
       }
     }
-  }
-
-  val build by registering(VenvTask::class) {
-    dependsOn(pylint)
-    venvExec = "python"
-    args = listOf("scripts/generate_version.py")
   }
 
   val pydoc by registering(VenvTask::class) {

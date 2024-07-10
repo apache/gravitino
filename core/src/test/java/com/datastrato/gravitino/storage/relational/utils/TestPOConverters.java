@@ -1,13 +1,29 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
 package com.datastrato.gravitino.storage.relational.utils;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.meta.AuditInfo;
@@ -17,6 +33,7 @@ import com.datastrato.gravitino.meta.FilesetEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
+import com.datastrato.gravitino.meta.TagEntity;
 import com.datastrato.gravitino.meta.TopicEntity;
 import com.datastrato.gravitino.storage.relational.po.CatalogPO;
 import com.datastrato.gravitino.storage.relational.po.FilesetPO;
@@ -24,6 +41,7 @@ import com.datastrato.gravitino.storage.relational.po.FilesetVersionPO;
 import com.datastrato.gravitino.storage.relational.po.MetalakePO;
 import com.datastrato.gravitino.storage.relational.po.SchemaPO;
 import com.datastrato.gravitino.storage.relational.po.TablePO;
+import com.datastrato.gravitino.storage.relational.po.TagPO;
 import com.datastrato.gravitino.storage.relational.po.TopicPO;
 import com.datastrato.gravitino.utils.NamespaceUtil;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -580,6 +598,61 @@ public class TestPOConverters {
     assertEquals("test1", updatePO2.getFilesetName());
   }
 
+  @Test
+  public void testFromTagPO() throws JsonProcessingException {
+    TagPO tagPO = createTagPO(1L, "test", 1L, "this is test");
+    Namespace tagNS =
+        Namespace.of("test_metalake", Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.TAG_SCHEMA_NAME);
+
+    TagEntity expectedTag = createTag(1L, "test", tagNS, "this is test");
+    TagEntity convertedTag = POConverters.fromTagPO(tagPO, tagNS);
+
+    // Assert
+    assertEquals(expectedTag.id(), convertedTag.id());
+    assertEquals(expectedTag.name(), convertedTag.name());
+    assertEquals(expectedTag.namespace(), convertedTag.namespace());
+    assertEquals(expectedTag.auditInfo().creator(), convertedTag.auditInfo().creator());
+    assertEquals(expectedTag.comment(), convertedTag.comment());
+
+    TagPO tagPOWithNullComment = createTagPO(1L, "test", 1L, null);
+    TagEntity expectedTagWithNullComment = createTag(1L, "test", tagNS, null);
+    TagEntity convertedTagWithNullComment = POConverters.fromTagPO(tagPOWithNullComment, tagNS);
+    assertEquals(expectedTagWithNullComment.id(), convertedTagWithNullComment.id());
+    assertEquals(expectedTagWithNullComment.name(), convertedTagWithNullComment.name());
+    assertEquals(expectedTagWithNullComment.namespace(), convertedTagWithNullComment.namespace());
+    assertEquals(
+        expectedTagWithNullComment.auditInfo().creator(),
+        convertedTagWithNullComment.auditInfo().creator());
+    assertNull(convertedTagWithNullComment.comment());
+  }
+
+  @Test
+  public void testInitTagPOVersion() {
+    Namespace tagNS =
+        Namespace.of("test_metalake", Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.TAG_SCHEMA_NAME);
+    TagEntity tag = createTag(1L, "test", tagNS, "this is test");
+    TagPO.Builder builder = TagPO.builder().withMetalakeId(1L);
+    TagPO initPO = POConverters.initializeTagPOWithVersion(tag, builder);
+    assertEquals(1, initPO.getCurrentVersion());
+    assertEquals(1, initPO.getLastVersion());
+    assertEquals(0, initPO.getDeletedAt());
+  }
+
+  @Test
+  public void testUpdateTagPOVersion() {
+    Namespace tagNS =
+        Namespace.of("test_metalake", Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.TAG_SCHEMA_NAME);
+    TagEntity tag = createTag(1L, "test", tagNS, "this is test");
+    TagEntity updatedTag = createTag(1L, "test", tagNS, "this is test2");
+    TagPO.Builder builder = TagPO.builder().withMetalakeId(1L);
+    TagPO initPO = POConverters.initializeTagPOWithVersion(tag, builder);
+    TagPO updatePO = POConverters.updateTagPOWithVersion(initPO, updatedTag);
+    assertEquals(1, initPO.getCurrentVersion());
+    assertEquals(1, initPO.getLastVersion());
+    assertEquals(0, initPO.getDeletedAt());
+    assertEquals("this is test2", updatePO.getComment());
+  }
+
   private static BaseMetalake createMetalake(Long id, String name, String comment) {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
@@ -828,6 +901,38 @@ public class TestPOConverters {
         .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(properties))
         .withVersion(1L)
         .withDeletedAt(0L)
+        .build();
+  }
+
+  private static TagPO createTagPO(Long id, String name, Long metalakeId, String comment)
+      throws JsonProcessingException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    Map<String, String> properties = ImmutableMap.of("key", "value");
+    return TagPO.builder()
+        .withTagId(id)
+        .withTagName(name)
+        .withMetalakeId(metalakeId)
+        .withComment(comment)
+        .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(properties))
+        .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
+        .withCurrentVersion(1L)
+        .withLastVersion(1L)
+        .withDeletedAt(0L)
+        .build();
+  }
+
+  private static TagEntity createTag(Long id, String name, Namespace namespace, String comment) {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    Map<String, String> properties = ImmutableMap.of("key", "value");
+    return TagEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(namespace)
+        .withComment(comment)
+        .withProperties(properties)
+        .withAuditInfo(auditInfo)
         .build();
   }
 }

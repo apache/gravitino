@@ -1,8 +1,24 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino;
+
+import static com.datastrato.gravitino.Configs.KV_STORE_KEY;
 
 import com.datastrato.gravitino.storage.kv.KvEntityStore;
 import com.datastrato.gravitino.storage.relational.RelationalEntityStore;
@@ -12,7 +28,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * This class is responsible for creating instances of EntityStore implementations. EntityStore
- * implementations are used to store and manage entities within the Gravitino framework.
+ * implementations are used to store and manage entities within the Apache Gravitino framework.
  */
 public class EntityStoreFactory {
 
@@ -22,7 +38,7 @@ public class EntityStoreFactory {
   // doesn't need to specify the full qualified class name when creating an EntityStore.
   public static final ImmutableMap<String, String> ENTITY_STORES =
       ImmutableMap.of(
-          Configs.DEFAULT_ENTITY_STORE,
+          KV_STORE_KEY,
           KvEntityStore.class.getCanonicalName(),
           Configs.RELATIONAL_ENTITY_STORE,
           RelationalEntityStore.class.getCanonicalName());
@@ -39,6 +55,11 @@ public class EntityStoreFactory {
   public static EntityStore createEntityStore(Config config) {
     String name = config.get(Configs.ENTITY_STORE);
     String className = ENTITY_STORES.getOrDefault(name, name);
+
+    if (KV_STORE_KEY.equals(name)) {
+      throw new UnsupportedOperationException(
+          "KvEntityStore is not supported since version 0.6.0. Please use RelationalEntityStore instead.");
+    }
 
     try {
       return (EntityStore) Class.forName(className).getDeclaredConstructor().newInstance();

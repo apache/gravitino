@@ -1,28 +1,27 @@
 ---
-title: Gravitino configuration
+title: Apache Gravitino configuration
 slug: /gravitino-server-config
 keywords:
   - configuration
-license: "Copyright 2023 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
 ## Introduction
 
-Gravitino supports several configurations:
+Apache Gravitino supports several configurations:
 
 1. **Gravitino server configuration**: Used to start up the Gravitino server.
 2. **Gravitino catalog properties configuration**: Used to make default values for different catalogs.
 3. **Some other configurations**: Includes HDFS and other configurations.
 
-## Gravitino server configurations
+## Apache Gravitino server configurations
 
 You can customize the Gravitino server by editing the configuration file `gravitino.conf` in the `conf` directory. The default values are sufficient for most use cases.
 We strongly recommend that you read the following sections to understand the configuration file so you can change the default values to suit your specific situation and usage scenario.
 
 The `gravitino.conf` file lists the configuration items in the following table. It groups those items into the following categories:
 
-### Gravitino HTTP Server configuration
+### Apache Gravitino HTTP Server configuration
 
 | Configuration item                                    | Description                                                                                                                                                                           | Default value                                                                | Required | Since version |
 |-------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|----------|---------------|
@@ -45,7 +44,7 @@ You can also specify filter parameters by setting configuration entries of the f
 
 | Configuration item                                | Description                                                                                                                                                                                                                                         | Default value                    | Required                                         | Since version |
 |---------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------|--------------------------------------------------|---------------|
-| `gravitino.entity.store`                          | Which storage implementation to use. Key-value pair storage and relational storage are currently supported, the default value is `kv`, and the optional value is `relational`.                                                                      | `kv`                             | No                                               | 0.1.0         |
+| `gravitino.entity.store`                          | Which entity storage implementation to use. Only`relational` storage is currently supported.                                                                                                                                                        | `relational`                     | No                                               | 0.1.0         |
 | `gravitino.entity.store.kv`                       | Detailed implementation of KV storage. `RocksDB` storage is currently supported, and the implementation is `RocksDBKvBackend`.                                                                                                                      | `RocksDBKvBackend`               | No                                               | 0.1.0         |
 | `gravitino.entity.store.kv.rocksdbPath`           | The storage path for RocksDB storage implementation. It supports both absolute and relative path, if the value is a relative path, the final path is `${GRAVITINO_HOME}/${PATH_YOU_HAVA_SET}`, default value is `${GRAVITINO_HOME}/data/rocksdb`    | `${GRAVITINO_HOME}/data/rocksdb` | No                                               | 0.1.0         |
 | `gravitino.entity.serde`                          | The serialization/deserialization class used to support entity storage. `proto' is currently supported.                                                                                                                                             | `proto`                          | No                                               | 0.1.0         |
@@ -139,7 +138,7 @@ Refer to [security](security.md) for HTTPS and authentication configurations.
 |-------------------------------------------|------------------------------------------------------|---------------|----------|---------------|
 | `gravitino.metrics.timeSlidingWindowSecs` | The seconds of Gravitino metrics time sliding window | 60            | No       | 0.5.1         |
 
-## Gravitino catalog properties configuration
+## Apache Gravitino catalog properties configuration
 
 There are three types of catalog properties:
 

@@ -1,6 +1,20 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
 package com.datastrato.gravitino.storage.relational.utils;
@@ -23,6 +37,7 @@ import com.datastrato.gravitino.meta.RoleEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
+import com.datastrato.gravitino.meta.TagEntity;
 import com.datastrato.gravitino.meta.TopicEntity;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.relational.po.CatalogPO;
@@ -35,6 +50,7 @@ import com.datastrato.gravitino.storage.relational.po.RolePO;
 import com.datastrato.gravitino.storage.relational.po.SchemaPO;
 import com.datastrato.gravitino.storage.relational.po.SecurableObjectPO;
 import com.datastrato.gravitino.storage.relational.po.TablePO;
+import com.datastrato.gravitino.storage.relational.po.TagPO;
 import com.datastrato.gravitino.storage.relational.po.TopicPO;
 import com.datastrato.gravitino.storage.relational.po.UserPO;
 import com.datastrato.gravitino.storage.relational.po.UserRoleRelPO;
@@ -940,6 +956,61 @@ public class POConverters {
           .withDeletedAt(DEFAULT_DELETED_AT);
 
       return builder;
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  public static TagEntity fromTagPO(TagPO tagPO, Namespace namespace) {
+    try {
+      return TagEntity.builder()
+          .withId(tagPO.getTagId())
+          .withName(tagPO.getTagName())
+          .withNamespace(namespace)
+          .withComment(tagPO.getComment())
+          .withProperties(JsonUtils.anyFieldMapper().readValue(tagPO.getProperties(), Map.class))
+          .withAuditInfo(
+              JsonUtils.anyFieldMapper().readValue(tagPO.getAuditInfo(), AuditInfo.class))
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
+
+  public static TagPO initializeTagPOWithVersion(TagEntity tagEntity, TagPO.Builder builder) {
+    try {
+      return builder
+          .withTagId(tagEntity.id())
+          .withTagName(tagEntity.name())
+          .withComment(tagEntity.comment())
+          .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(tagEntity.properties()))
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(tagEntity.auditInfo()))
+          .withCurrentVersion(INIT_VERSION)
+          .withLastVersion(INIT_VERSION)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  public static TagPO updateTagPOWithVersion(TagPO oldTagPO, TagEntity newEntity) {
+    Long lastVersion = oldTagPO.getLastVersion();
+    // TODO: set the version to the last version + 1 when having some fields need be multiple
+    // version
+    Long nextVersion = lastVersion;
+    try {
+      return TagPO.builder()
+          .withTagId(oldTagPO.getTagId())
+          .withTagName(newEntity.name())
+          .withMetalakeId(oldTagPO.getMetalakeId())
+          .withComment(newEntity.comment())
+          .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(newEntity.properties()))
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newEntity.auditInfo()))
+          .withCurrentVersion(nextVersion)
+          .withLastVersion(nextVersion)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
     }

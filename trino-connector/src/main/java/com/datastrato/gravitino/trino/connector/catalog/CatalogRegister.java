@@ -1,6 +1,20 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.trino.connector.catalog;
 
@@ -30,8 +44,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This class dynamically register the Catalog managed by Gravitino into Trino using Trino CREATE
- * CATALOG statement. It allows the catalog to be used in Trino like a regular Trino catalog.
+ * This class dynamically register the Catalog managed by Apache Gravitino into Trino using Trino
+ * CREATE CATALOG statement. It allows the catalog to be used in Trino like a regular Trino catalog.
  */
 public class CatalogRegister {
 
@@ -133,7 +147,7 @@ public class CatalogRegister {
         if (!catalogContents.contains(GRAVITINO_DYNAMIC_CONNECTOR + "=true")) {
           throw new TrinoException(
               GRAVITINO_DUPLICATED_CATALOGS,
-              "Catalog already exists, the catalog is not created by gravitino");
+              "Catalog already exists, the catalog is not created by Gravitino");
         } else {
           throw new TrinoException(
               GRAVITINO_CATALOG_ALREADY_EXISTS,

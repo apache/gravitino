@@ -1,6 +1,20 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
 package com.datastrato.gravitino.meta;
@@ -10,7 +24,6 @@ import com.datastrato.gravitino.Auditable;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Field;
 import com.datastrato.gravitino.HasIdentifier;
-import com.datastrato.gravitino.MetadataObject;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.tag.Tag;
 import com.google.common.collect.Maps;
@@ -33,10 +46,6 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
   public static final Field PROPERTIES =
       Field.optional("properties", Map.class, "The properties of the tag entity.");
 
-  public static final Field ASSOCIATED_OBJECTS =
-      Field.optional(
-          "objects", MetadataObject[].class, "The associated objects of the tag entity.");
-
   public static final Field AUDIT_INFO =
       Field.required("audit_info", Audit.class, "The audit details of the tag entity.");
 
@@ -45,7 +54,6 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
   private Namespace namespace;
   private String comment;
   private Map<String, String> properties;
-  private MetadataObject[] objects = null;
   private Audit auditInfo;
 
   private TagEntity() {}
@@ -58,7 +66,6 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
     fields.put(COMMENT, comment);
     fields.put(PROPERTIES, properties);
     fields.put(AUDIT_INFO, auditInfo);
-    fields.put(ASSOCIATED_OBJECTS, objects);
 
     return Collections.unmodifiableMap(fields);
   }
@@ -96,10 +103,6 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
   @Override
   public Optional<Boolean> inherited() {
     return Optional.empty();
-  }
-
-  public MetadataObject[] objects() {
-    return objects;
   }
 
   @Override
@@ -164,11 +167,6 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
 
     public Builder withProperties(Map<String, String> properties) {
       tagEntity.properties = properties;
-      return this;
-    }
-
-    public Builder withMetadataObjects(MetadataObject[] objects) {
-      tagEntity.objects = objects;
       return this;
     }
 

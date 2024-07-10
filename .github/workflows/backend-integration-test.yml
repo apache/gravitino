@@ -61,7 +61,7 @@ jobs:
         architecture: [linux/amd64]
         java-version: [ 8, 11, 17 ]
         test-mode: [ embedded, deploy ]
-        backend: [ jdbcBackend, kvBackend]
+        backend: [ mysql, h2]
     env:
       PLATFORM: ${{ matrix.architecture }}
     steps:
@@ -84,10 +84,6 @@ jobs:
         if : ${{ matrix.test-mode == 'deploy' }}
         run: |
           ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
-
-      - name: Setup debug Github Action
-        if: ${{ contains(github.event.pull_request.labels.*.name, 'debug action') }}
-        uses: csexton/debugger-action@master
 
       - name: Free up disk space
         run: |
