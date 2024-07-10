@@ -19,10 +19,12 @@
 
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.catalog;
 
-import com.datastrato.gravitino.catalog.lakehouse.iceberg.authentication.kerberos.KerberosClient;
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.List;
 import org.apache.iceberg.hive.HiveCatalog;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A wrapper class for HiveCatalog to support kerberos authentication. We can also make HiveCatalog
@@ -30,23 +32,29 @@ import org.apache.iceberg.hive.HiveCatalog;
  */
 public class WrappedHiveCatalog extends HiveCatalog implements Closeable {
 
-  private KerberosClient kerberosClient;
+  private static final Logger LOGGER = LoggerFactory.getLogger(WrappedHiveCatalog.class);
+
+  private List<Closeable> resources;
 
   public WrappedHiveCatalog() {
     super();
   }
 
-  public void setKerberosClient(KerberosClient kerberosClient) {
-    this.kerberosClient = kerberosClient;
+  public void addResource(Closeable resource) {
+    resources.add(resource);
   }
 
   @Override
   public void close() throws IOException {
     // Do clean up work here. We need a mechanism to close the HiveCatalog; however, HiveCatalog
     // doesn't implement the Closeable interface.
-
-    if (kerberosClient != null) {
-      kerberosClient.close();
-    }
+    resources.forEach(
+        resource -> {
+          try {
+            resource.close();
+          } catch (IOException e) {
+            LOGGER.warn("Failed to close resource: {}", resource, e);
+          }
+        });
   }
 }

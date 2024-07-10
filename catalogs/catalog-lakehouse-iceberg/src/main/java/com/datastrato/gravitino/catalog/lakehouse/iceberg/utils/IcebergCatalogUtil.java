@@ -79,7 +79,7 @@ public class IcebergCatalogUtil {
       hiveCatalog.initialize(icebergCatalogName, properties);
 
       KerberosClient kerberosClient = initKerberosAndReturnClient(properties, hdfsConfiguration);
-      hiveCatalog.setKerberosClient(kerberosClient);
+      hiveCatalog.addResource(kerberosClient);
       if (authenticationConfig.isImpersonationEnabled()) {
         HiveBackendProxy proxyHiveCatalog =
             new HiveBackendProxy(resultProperties, hiveCatalog, kerberosClient.getRealm());
