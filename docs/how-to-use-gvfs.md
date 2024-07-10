@@ -335,20 +335,25 @@ to recompile the native libraries like `libhdfs` and others, and completely repl
 
 ### Configuration
 
-| Configuration item   | Description                                                                                                               | Default value | Required | Since version |
-|----------------------|---------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `server_uri`         | The Gravitino server uri, e.g. `http://localhost:8090`.                                                                   | (none)        | Yes      | 0.6.0         |.                                                                                                                | (none)        | Yes                                 | 0.6.0         |
-| `metalake_name`      | The metalake name which the fileset belongs to.                                                                           | (none)        | Yes      | 0.6.0         |.                                                                                                                |  (none)        | Yes                                 | 0.6.0         | .                               | (none)        | Yes      | 0.6.0         |
-| `cache_size`         | The cache capacity of the Gravitino Virtual File System.                                                                  | `20`          | No       | 0.6.0         |.                                                                                                                |  (none)        | Yes                                 | 0.6.0         | .                               | (none)        | Yes      | 0.6.0         |
-| `cache_expired_time` | The value of time that the cache expires after accessing in the Gravitino Virtual File System. The value is in `seconds`. | `3600`        | No       | 0.6.0         |.                                                                                                                |  (none)        | Yes                                 | 0.6.0         | .                               | (none)        | Yes      | 0.6.0         |
+| Configuration item   | Description                                                                                                                                  | Default value | Required | Since version |
+|----------------------|----------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `server_uri`         | The Gravitino server uri, e.g. `http://localhost:8090`.                                                                                      | (none)        | Yes      | 0.6.0         |.                                                                                                                | (none)        | Yes                                 | 0.6.0         |
+| `metalake_name`      | The metalake name which the fileset belongs to.                                                                                              | (none)        | Yes      | 0.6.0         |.                                                                                                                |  (none)        | Yes                                 | 0.6.0         | .                               | (none)        | Yes      | 0.6.0         |
+| `cache_size`         | The cache capacity of the Gravitino Virtual File System.                                                                                     | `20`          | No       | 0.6.0         |.                                                                                                                |  (none)        | Yes                                 | 0.6.0         | .                               | (none)        | Yes      | 0.6.0         |
+| `cache_expired_time` | The value of time that the cache expires after accessing in the Gravitino Virtual File System. The value is in `seconds`.                    | `3600`        | No       | 0.6.0         |.
+| `auth_type`          | The auth type to initialize the Gravitino client to use with the Gravitino Virtual File System. Currently only supports `simple` auth types. | `simple`      | No       | 0.6.0         |.
 
 
 You can configure these properties when obtaining the `Gravitino Virtual FileSystem` in Python like this:
 
 ```python
 from gravitino import gvfs
-
-fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalake_name="test_metalake")
+options = {
+    "cache_size": 20,
+    "cache_expired_time": 3600,
+    "auth_type": "simple"
+}
+fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalake_name="test_metalake", options=options)
 ```
 
 ### Usage examples

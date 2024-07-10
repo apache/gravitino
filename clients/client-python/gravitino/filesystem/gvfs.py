@@ -35,9 +35,8 @@ from gravitino.api.fileset import Fileset
 from gravitino.auth.simple_auth_provider import SimpleAuthProvider
 from gravitino.client.gravitino_client import GravitinoClient
 from gravitino.exceptions.base import GravitinoRuntimeException
+from gravitino.filesystem.gvfs_config import GVFSConfig
 from gravitino.name_identifier import NameIdentifier
-
-from .gvfs_config import GVFSConfig
 
 PROTOCOL_NAME = "gvfs"
 
