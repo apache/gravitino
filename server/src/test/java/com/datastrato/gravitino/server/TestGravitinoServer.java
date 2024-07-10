@@ -19,6 +19,7 @@
 package com.datastrato.gravitino.server;
 
 import static com.datastrato.gravitino.Configs.ENTITY_KV_ROCKSDB_BACKEND_PATH;
+import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
@@ -26,8 +27,11 @@ import com.datastrato.gravitino.rest.RESTUtils;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -73,6 +77,19 @@ public class TestGravitinoServer {
       // Ignore
     }
     gravitinoServer = new GravitinoServer(spyServerConfig);
+  }
+
+  @AfterAll
+  public void clear() {
+    String path = spyServerConfig.get(ENTITY_RELATIONAL_JDBC_BACKEND_PATH);
+    if (path != null) {
+      Path p = Paths.get(path).getParent();
+      try {
+        FileUtils.deleteDirectory(p.toFile());
+      } catch (IOException e) {
+        // Ignore
+      }
+    }
   }
 
   @AfterEach

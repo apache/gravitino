@@ -442,8 +442,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public boolean purgeTable(NameIdentifier tableIdent) throws UnsupportedOperationException {
     String databaseName = NameIdentifier.of(tableIdent.namespace().levels()).name();
-    tableOperation.purge(databaseName, tableIdent.name());
-    return true;
+    return tableOperation.purge(databaseName, tableIdent.name());
   }
 
   /**

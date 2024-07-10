@@ -35,6 +35,7 @@ from gravitino.name_identifier import NameIdentifier
 from gravitino.namespace import Namespace
 from gravitino.utils import HTTPClient
 from gravitino.rest.rest_utils import encode_string
+from gravitino.exceptions.handlers.fileset_error_handler import FILESET_ERROR_HANDLER
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +89,10 @@ class FilesetCatalog(BaseSchemaCatalog):
 
         full_namespace = self._get_fileset_full_namespace(namespace)
 
-        resp = self.rest_client.get(self.format_fileset_request_path(full_namespace))
+        resp = self.rest_client.get(
+            self.format_fileset_request_path(full_namespace),
+            error_handler=FILESET_ERROR_HANDLER,
+        )
         entity_list_resp = EntityListResponse.from_json(resp.body, infer_missing=True)
         entity_list_resp.validate()
 
@@ -114,7 +118,8 @@ class FilesetCatalog(BaseSchemaCatalog):
         full_namespace = self._get_fileset_full_namespace(ident.namespace())
 
         resp = self.rest_client.get(
-            f"{self.format_fileset_request_path(full_namespace)}/{encode_string(ident.name())}"
+            f"{self.format_fileset_request_path(full_namespace)}/{encode_string(ident.name())}",
+            error_handler=FILESET_ERROR_HANDLER,
         )
         fileset_resp = FilesetResponse.from_json(resp.body, infer_missing=True)
         fileset_resp.validate()
@@ -163,7 +168,9 @@ class FilesetCatalog(BaseSchemaCatalog):
         )
 
         resp = self.rest_client.post(
-            self.format_fileset_request_path(full_namespace), req
+            self.format_fileset_request_path(full_namespace),
+            req,
+            error_handler=FILESET_ERROR_HANDLER,
         )
         fileset_resp = FilesetResponse.from_json(resp.body, infer_missing=True)
         fileset_resp.validate()
@@ -195,7 +202,9 @@ class FilesetCatalog(BaseSchemaCatalog):
         req.validate()
 
         resp = self.rest_client.put(
-            f"{self.format_fileset_request_path(full_namespace)}/{ident.name()}", req
+            f"{self.format_fileset_request_path(full_namespace)}/{ident.name()}",
+            req,
+            error_handler=FILESET_ERROR_HANDLER,
         )
         fileset_resp = FilesetResponse.from_json(resp.body, infer_missing=True)
         fileset_resp.validate()
@@ -221,6 +230,7 @@ class FilesetCatalog(BaseSchemaCatalog):
 
             resp = self.rest_client.delete(
                 f"{self.format_fileset_request_path(full_namespace)}/{ident.name()}",
+                error_handler=FILESET_ERROR_HANDLER,
             )
             drop_resp = DropResponse.from_json(resp.body, infer_missing=True)
             drop_resp.validate()
