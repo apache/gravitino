@@ -36,6 +36,7 @@ public interface SupportsExtraOperations {
    *
    * @param tagIdent The identifier of the tag.
    * @return The list of metadata objects associated with the given tag.
+   * @throws IOException If an error occurs while accessing the entity store.
    */
   MetadataObject[] listAssociatedMetadataObjectsForTag(NameIdentifier tagIdent) throws IOException;
 
@@ -46,6 +47,7 @@ public interface SupportsExtraOperations {
    * @param objectType The type of the metadata object.
    * @return The list of tags associated with the given metadata object.
    * @throws NoSuchEntityException if the metadata object does not exist.
+   * @throws IOException If an error occurs while accessing the entity store.
    */
   TagEntity[] listAssociatedTagsForMetadataObject(
       NameIdentifier objectIdent, Entity.EntityType objectType)
@@ -58,7 +60,9 @@ public interface SupportsExtraOperations {
    * @param objectType The type of the metadata object.
    * @param tagIdent The identifier of the tag.
    * @return The tag associated with the metadata object.
-   * @throws NoSuchEntityException if the metadata object does not exist.
+   * @throws NoSuchEntityException if the metadata object does not exist or the tag is not
+   *     associated to the metadata object.
+   * @throws IOException If an error occurs while accessing the entity store.
    */
   TagEntity getTagForMetadataObject(
       NameIdentifier objectIdent, Entity.EntityType objectType, NameIdentifier tagIdent)
@@ -73,6 +77,8 @@ public interface SupportsExtraOperations {
    * @param tagsToRemove the name of tags to remove from the metadata object.
    * @return The list of tags associated with the metadata object after the operation.
    * @throws NoSuchEntityException if the metadata object does not exist.
+   * @throws EntityAlreadyExistsException if tags already associated with the metadata object.
+   * @throws IOException If an error occurs while accessing the entity store.
    */
   TagEntity[] associateTagsWithMetadataObject(
       NameIdentifier objectIdent,
