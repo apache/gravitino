@@ -20,7 +20,6 @@
 package com.datastrato.gravitino.trino.connector.catalog.iceberg;
 
 import com.datastrato.gravitino.catalog.property.PropertyConverter;
-import com.datastrato.gravitino.connector.PropertyEntry;
 import com.datastrato.gravitino.trino.connector.GravitinoErrorCode;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
@@ -355,10 +354,5 @@ public class IcebergCatalogPropertyConverter extends PropertyConverter {
     jdbcProperties.put("iceberg.jdbc-catalog.catalog-name", "jdbc");
 
     return jdbcProperties;
-  }
-
-  @Override
-  public Map<String, PropertyEntry<?>> gravitinoPropertyMeta() {
-    return ImmutableMap.of();
   }
 }

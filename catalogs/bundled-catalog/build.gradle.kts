@@ -29,7 +29,6 @@ dependencies {
   implementation(project(":catalogs:catalog-jdbc-common"))
   implementation(project(":catalogs:catalog-jdbc-mysql"))
   implementation(project(":catalogs:catalog-jdbc-postgresql"))
-  implementation(project(":catalogs:catalog-lakehouse-iceberg"))
   implementation(project(":catalogs:catalog-lakehouse-paimon"))
   implementation(project(":core"))
   implementation(libs.slf4j.api)
@@ -94,7 +93,6 @@ tasks.jar {
 
 tasks.compileJava {
   dependsOn(":catalogs:catalog-jdbc-postgresql:runtimeJars")
-  dependsOn(":catalogs:catalog-lakehouse-iceberg:runtimeJars")
   dependsOn(":catalogs:catalog-lakehouse-paimon:runtimeJars")
   dependsOn(":catalogs:catalog-jdbc-mysql:runtimeJars")
   dependsOn(":catalogs:catalog-hive:runtimeJars")

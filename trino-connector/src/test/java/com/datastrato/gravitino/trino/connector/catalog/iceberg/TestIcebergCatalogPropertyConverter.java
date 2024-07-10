@@ -20,16 +20,13 @@
 package com.datastrato.gravitino.trino.connector.catalog.iceberg;
 
 import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata;
 import com.datastrato.gravitino.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
 import com.datastrato.gravitino.trino.connector.metadata.TestGravitinoCatalog;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 import io.trino.spi.TrinoException;
 import java.util.Map;
-import java.util.Set;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -93,17 +90,6 @@ public class TestIcebergCatalogPropertyConverter {
         TrinoException.class,
         () -> propertyConverter.gravitinoToEngineProperties(wrongMap),
         "Missing required property for JDBC backend: [jdbc-driver]");
-  }
-
-  // To test whether we load jar `bundled-catalog` successfully.
-  @Test
-  public void testPropertyMetadata() {
-    Set<String> gravitinoHiveKeys =
-        Sets.newHashSet(IcebergTablePropertyConverter.TRINO_KEY_TO_GRAVITINO_KEY.values());
-    Set<String> actualGravitinoKeys =
-        Sets.newHashSet(new IcebergTablePropertiesMetadata().propertyEntries().keySet());
-
-    Assertions.assertTrue(actualGravitinoKeys.containsAll(gravitinoHiveKeys));
   }
 
   @Test

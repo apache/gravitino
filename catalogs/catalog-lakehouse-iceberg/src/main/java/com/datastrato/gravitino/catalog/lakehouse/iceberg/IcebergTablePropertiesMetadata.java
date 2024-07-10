@@ -30,16 +30,16 @@ import java.util.Map;
 import org.apache.iceberg.TableProperties;
 
 public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
-  public static final String COMMENT = "comment";
-  public static final String CREATOR = "creator";
-  public static final String LOCATION = "location";
-  public static final String CURRENT_SNAPSHOT_ID = "current-snapshot-id";
-  public static final String CHERRY_PICK_SNAPSHOT_ID = "cherry-pick-snapshot-id";
-  public static final String SORT_ORDER = "sort-order";
-  public static final String IDENTIFIER_FIELDS = "identifier-fields";
-  public static final String PROVIDER = "provider";
-  public static final String FORMAT = "format";
-  public static final String FORMAT_VERSION = "format-version";
+  public static final String COMMENT = IcebergConstants.COMMENT;
+  public static final String CREATOR = IcebergConstants.CREATOR;
+  public static final String LOCATION = IcebergConstants.LOCATION;
+  public static final String CURRENT_SNAPSHOT_ID = IcebergConstants.CURRENT_SNAPSHOT_ID;
+  public static final String CHERRY_PICK_SNAPSHOT_ID = IcebergConstants.CHERRY_PICK_SNAPSHOT_ID;
+  public static final String SORT_ORDER = IcebergConstants.SORT_ORDER;
+  public static final String IDENTIFIER_FIELDS = IcebergConstants.IDENTIFIER_FIELDS;
+  public static final String PROVIDER = IcebergConstants.PROVIDER;
+  public static final String FORMAT = IcebergConstants.FORMAT;
+  public static final String FORMAT_VERSION = IcebergConstants.FORMAT_VERSION;
   public static final String DISTRIBUTION_MODE = TableProperties.WRITE_DISTRIBUTION_MODE;
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;

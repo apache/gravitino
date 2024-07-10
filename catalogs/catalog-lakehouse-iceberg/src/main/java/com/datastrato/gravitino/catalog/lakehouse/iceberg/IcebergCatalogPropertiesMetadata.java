@@ -33,19 +33,19 @@ import java.util.List;
 import java.util.Map;
 
 public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
-  public static final String CATALOG_BACKEND = "catalog-backend";
+  public static final String CATALOG_BACKEND = IcebergConstants.CATALOG_BACKEND;
 
-  public static final String GRAVITINO_JDBC_USER = "jdbc-user";
-  public static final String ICEBERG_JDBC_USER = "jdbc.user";
+  public static final String GRAVITINO_JDBC_USER = IcebergConstants.GRAVITINO_JDBC_USER;
+  public static final String ICEBERG_JDBC_USER = IcebergConstants.ICEBERG_JDBC_USER;
 
-  public static final String GRAVITINO_JDBC_PASSWORD = "jdbc-password";
-  public static final String ICEBERG_JDBC_PASSWORD = "jdbc.password";
-  public static final String ICEBERG_JDBC_INITIALIZE = "jdbc-initialize";
+  public static final String GRAVITINO_JDBC_PASSWORD = IcebergConstants.GRAVITINO_JDBC_PASSWORD;
+  public static final String ICEBERG_JDBC_PASSWORD = IcebergConstants.ICEBERG_JDBC_PASSWORD;
+  public static final String ICEBERG_JDBC_INITIALIZE = IcebergConstants.ICEBERG_JDBC_INITIALIZE;
 
-  public static final String GRAVITINO_JDBC_DRIVER = "jdbc-driver";
-  public static final String WAREHOUSE = "warehouse";
-  public static final String URI = "uri";
-  public static final String CATALOG_BACKEND_NAME = "catalog-backend-name";
+  public static final String GRAVITINO_JDBC_DRIVER = IcebergConstants.GRAVITINO_JDBC_DRIVER;
+  public static final String WAREHOUSE = IcebergConstants.WAREHOUSE;
+  public static final String URI = IcebergConstants.URI;
+  public static final String CATALOG_BACKEND_NAME = IcebergConstants.CATALOG_BACKEND_NAME;
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
