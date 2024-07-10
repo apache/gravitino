@@ -18,9 +18,12 @@
  */
 package com.datastrato.gravitino.integration.test.authorization.ranger;
 
+import static org.apache.ranger.plugin.util.SearchFilter.SERVICE_NAME;
+import static org.apache.ranger.plugin.util.SearchFilter.SERVICE_TYPE;
+
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.google.common.collect.ImmutableMap;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.ranger.RangerClient;
@@ -34,8 +37,10 @@ import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-test")
 public class RangerIT {
-  private static final String serviceName = "trino-test";
+  private static final String trinoServiceName = "trinodev";
   private static final String trinoType = "trino";
+  private static final String hiveServiceName = "hivedev";
+  private static final String hiveType = "hive";
   private static RangerClient rangerClient;
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
@@ -50,7 +55,8 @@ public class RangerIT {
   @AfterAll
   public static void cleanup() throws RangerServiceException {
     if (rangerClient != null) {
-      rangerClient.deleteService(serviceName);
+      rangerClient.deleteService(trinoServiceName);
+      rangerClient.deleteService(hiveServiceName);
     }
   }
 
@@ -65,7 +71,7 @@ public class RangerIT {
 
     RangerService service = new RangerService();
     service.setType(trinoType);
-    service.setName(serviceName);
+    service.setName(trinoServiceName);
     service.setConfigs(
         ImmutableMap.<String, String>builder()
             .put(usernameKey, usernameVal)
@@ -76,10 +82,48 @@ public class RangerIT {
     RangerService createdService = rangerClient.createService(service);
     Assertions.assertNotNull(createdService);
 
-    Map<String, String> filter = Collections.emptyMap();
+    Map<String, String> filter = new HashMap<>();
+    filter.put(SERVICE_TYPE, trinoType);
+    filter.put(SERVICE_NAME, trinoServiceName);
     List<RangerService> services = rangerClient.findServices(filter);
-    Assertions.assertEquals(services.get(0).getName(), serviceName);
+    Assertions.assertEquals(services.get(0).getName(), trinoServiceName);
     Assertions.assertEquals(services.get(0).getType(), trinoType);
+    Assertions.assertEquals(services.get(0).getConfigs().get(usernameKey), usernameVal);
+    Assertions.assertEquals(services.get(0).getConfigs().get(jdbcKey), jdbcVal);
+    Assertions.assertEquals(services.get(0).getConfigs().get(jdbcUrlKey), jdbcUrlVal);
+  }
+
+  @Test
+  public void createHiveService() throws RangerServiceException {
+    String usernameKey = "username";
+    String usernameVal = "admin";
+    String passwordKey = "password";
+    String passwordVal = "admin";
+    String jdbcKey = "jdbc.driverClassName";
+    String jdbcVal = "org.apache.hive.jdbc.HiveDriver";
+    String jdbcUrlKey = "jdbc.url";
+    String jdbcUrlVal = "jdbc:hive2://172.17.0.2:10000";
+
+    RangerService service = new RangerService();
+    service.setType(hiveType);
+    service.setName(hiveServiceName);
+    service.setConfigs(
+        ImmutableMap.<String, String>builder()
+            .put(usernameKey, usernameVal)
+            .put(passwordKey, passwordVal)
+            .put(jdbcKey, jdbcVal)
+            .put(jdbcUrlKey, jdbcUrlVal)
+            .build());
+
+    RangerService createdService = rangerClient.createService(service);
+    Assertions.assertNotNull(createdService);
+
+    Map<String, String> filter = new HashMap<>();
+    filter.put(SERVICE_TYPE, hiveType);
+    filter.put(SERVICE_NAME, hiveServiceName);
+    List<RangerService> services = rangerClient.findServices(filter);
+    Assertions.assertEquals(services.get(0).getName(), hiveServiceName);
+    Assertions.assertEquals(services.get(0).getType(), hiveType);
     Assertions.assertEquals(services.get(0).getConfigs().get(usernameKey), usernameVal);
     Assertions.assertEquals(services.get(0).getConfigs().get(jdbcKey), jdbcVal);
     Assertions.assertEquals(services.get(0).getConfigs().get(jdbcUrlKey), jdbcUrlVal);
