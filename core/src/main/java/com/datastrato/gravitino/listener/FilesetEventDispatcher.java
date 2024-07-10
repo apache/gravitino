@@ -36,8 +36,10 @@ import com.datastrato.gravitino.listener.api.event.ListFilesetEvent;
 import com.datastrato.gravitino.listener.api.event.ListFilesetFailureEvent;
 import com.datastrato.gravitino.listener.api.event.LoadFilesetEvent;
 import com.datastrato.gravitino.listener.api.event.LoadFilesetFailureEvent;
+import com.datastrato.gravitino.listener.api.event.LoadFilesetListEvent;
 import com.datastrato.gravitino.listener.api.info.FilesetInfo;
 import com.datastrato.gravitino.utils.PrincipalUtils;
+import java.util.Arrays;
 import java.util.Map;
 
 /**
@@ -80,6 +82,24 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
     } catch (Exception e) {
       eventBus.dispatchEvent(
           new LoadFilesetFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e));
+      throw e;
+    }
+  }
+
+  @Override
+  public Fileset[] loadFilesetList(NameIdentifier[] idents) {
+    NameIdentifier parentIdent = null;
+    try {
+      parentIdent = NameIdentifier.of(idents[0].namespace().toString());
+      Fileset[] filesets = dispatcher.loadFilesetList(idents);
+      FilesetInfo[] filesetInfos =
+          Arrays.stream(filesets).map(FilesetInfo::new).toArray(FilesetInfo[]::new);
+      eventBus.dispatchEvent(
+          new LoadFilesetListEvent(PrincipalUtils.getCurrentUserName(), parentIdent, filesetInfos));
+      return filesets;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new LoadFilesetFailureEvent(PrincipalUtils.getCurrentUserName(), parentIdent, e));
       throw e;
     }
   }

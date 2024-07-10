@@ -616,6 +616,19 @@ public class DTOConverters {
   }
 
   /**
+   * Converts an array of FilesetDTO to an array of FilesetDTO.
+   *
+   * @param filesets The filesets to be converted.
+   * @return The array of CatalogDTOs.
+   */
+  public static FilesetDTO[] toDTOs(Fileset[] filesets) {
+    if (ArrayUtils.isEmpty(filesets)) {
+      return new FilesetDTO[0];
+    }
+    return Arrays.stream(filesets).map(DTOConverters::toDTO).toArray(FilesetDTO[]::new);
+  }
+
+  /**
    * Converts an array of Catalogs to an array of CatalogDTOs.
    *
    * @param catalogs The catalogs to be converted.

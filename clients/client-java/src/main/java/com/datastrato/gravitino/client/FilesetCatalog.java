@@ -24,10 +24,12 @@ import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.requests.FilesetCreateRequest;
+import com.datastrato.gravitino.dto.requests.FilesetListLoadRequest;
 import com.datastrato.gravitino.dto.requests.FilesetUpdateRequest;
 import com.datastrato.gravitino.dto.requests.FilesetUpdatesRequest;
 import com.datastrato.gravitino.dto.responses.DropResponse;
 import com.datastrato.gravitino.dto.responses.EntityListResponse;
+import com.datastrato.gravitino.dto.responses.FileSetListResponse;
 import com.datastrato.gravitino.dto.responses.FilesetResponse;
 import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
@@ -117,6 +119,31 @@ public class FilesetCatalog extends BaseSchemaCatalog
     resp.validate();
 
     return resp.getFileset();
+  }
+
+  /**
+   * Load filesets metadata by {@link NameIdentifier} from the catalog.
+   *
+   * @param idents List of fileset identifier.
+   * @return The fileset list metadata.
+   */
+  @Override
+  public Fileset[] loadFilesetList(NameIdentifier[] idents) {
+    Arrays.stream(idents).forEach(FilesetCatalog::checkFilesetNameIdentifer);
+    String[] filesetNames = Arrays.stream(idents).map(NameIdentifier::name).toArray(String[]::new);
+
+    FilesetListLoadRequest req =
+        FilesetListLoadRequest.builder().filesetNames(filesetNames).build();
+    FileSetListResponse resp =
+        restClient.post(
+            formatFilesetRequestPath(idents[0].namespace()),
+            req,
+            FileSetListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.filesetErrorHandler());
+    resp.validate();
+
+    return resp.getFilesets();
   }
 
   /**

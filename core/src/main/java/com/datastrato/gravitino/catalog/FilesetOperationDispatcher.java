@@ -32,6 +32,7 @@ import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
 import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.file.FilesetChange;
 import com.datastrato.gravitino.storage.IdGenerator;
+import java.util.Arrays;
 import java.util.Map;
 
 public class FilesetOperationDispatcher extends OperationDispatcher implements FilesetDispatcher {
@@ -85,6 +86,36 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
                 catalogIdent,
                 HasPropertyMetadata::filesetPropertiesMetadata,
                 fileset.properties()));
+  }
+
+  /**
+   * Load filesets metadata by {@link NameIdentifier} from the catalog.
+   *
+   * @param idents List of fileset identifier.
+   * @return The fileset metadata.
+   * @throws NoSuchFilesetException If the fileset does not exist.
+   */
+  @Override
+  public Fileset[] loadFilesetList(NameIdentifier[] idents) {
+    NameIdentifier catalogIdent = getCatalogIdentifier(idents[0]);
+    Fileset[] filesets =
+        doWithCatalog(
+            catalogIdent,
+            c -> c.doWithFilesetOps(f -> f.loadFilesetList(idents)),
+            NoSuchFilesetException.class);
+
+    // Currently we only support maintaining the Fileset in the Gravitino's store.
+    return Arrays.stream(filesets)
+        .map(
+            fileset -> {
+              return EntityCombinedFileset.of(fileset)
+                  .withHiddenPropertiesSet(
+                      getHiddenPropertyNames(
+                          catalogIdent,
+                          HasPropertyMetadata::filesetPropertiesMetadata,
+                          fileset.properties()));
+            })
+        .toArray(Fileset[]::new);
   }
 
   /**

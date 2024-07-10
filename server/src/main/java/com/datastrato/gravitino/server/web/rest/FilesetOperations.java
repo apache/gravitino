@@ -24,10 +24,12 @@ import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.FilesetDispatcher;
 import com.datastrato.gravitino.dto.requests.FilesetCreateRequest;
+import com.datastrato.gravitino.dto.requests.FilesetListLoadRequest;
 import com.datastrato.gravitino.dto.requests.FilesetUpdateRequest;
 import com.datastrato.gravitino.dto.requests.FilesetUpdatesRequest;
 import com.datastrato.gravitino.dto.responses.DropResponse;
 import com.datastrato.gravitino.dto.responses.EntityListResponse;
+import com.datastrato.gravitino.dto.responses.FileSetListResponse;
 import com.datastrato.gravitino.dto.responses.FilesetResponse;
 import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.file.Fileset;
@@ -38,7 +40,10 @@ import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.server.web.Utils;
 import com.datastrato.gravitino.utils.NameIdentifierUtil;
 import com.datastrato.gravitino.utils.NamespaceUtil;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
@@ -171,6 +176,47 @@ public class FilesetOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleFilesetException(OperationType.LOAD, fileset, schema, e);
+    }
+  }
+
+  @POST
+  @Path("list")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "load-fileset." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "load-fileset", absolute = true)
+  public Response loadFilesetList(
+      @PathParam("metalake") String metalake,
+      @PathParam("catalog") String catalog,
+      @PathParam("schema") String schema,
+      FilesetListLoadRequest request) {
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            String[] queryFilesetNames = request.getFilesetNames();
+            NameIdentifier[] idents =
+                Arrays.stream(queryFilesetNames)
+                    .map(
+                        fileset -> NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset))
+                    .toArray(NameIdentifier[]::new);
+            // When batch loading FileSets, a read lock should be applied to each individual
+            // FileSet. Currently, only the first element of the fileset is being locked, which is
+            // an issue that needs to be addressed.
+            Fileset[] filesets =
+                TreeLockUtils.doWithTreeLock(
+                    idents[0], LockType.READ, () -> dispatcher.loadFilesetList(idents));
+            List<String> existFilesetNames =
+                Arrays.stream(filesets).map(Fileset::name).collect(Collectors.toList());
+            String[] notExistsFilesetNames =
+                Arrays.stream(queryFilesetNames)
+                    .filter(fileset -> !existFilesetNames.contains(fileset))
+                    .toArray(String[]::new);
+            return Utils.ok(
+                new FileSetListResponse(DTOConverters.toDTOs(filesets), notExistsFilesetNames));
+          });
+    } catch (Exception e) {
+      return ExceptionHandlers.handleFilesetException(
+          OperationType.LOAD, Arrays.toString(request.getFilesetNames()), schema, e);
     }
   }
 

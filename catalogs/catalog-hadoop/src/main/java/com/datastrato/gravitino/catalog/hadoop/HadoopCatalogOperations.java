@@ -57,6 +57,7 @@ import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -194,6 +195,20 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to load fileset %s" + ident, ioe);
     }
+  }
+
+  @Override
+  public Fileset[] loadFilesetList(NameIdentifier[] idents) {
+    List<Fileset> filesets = new ArrayList<>();
+    for (NameIdentifier ident : idents) {
+      try {
+        Fileset fileset = loadFileset(ident);
+        filesets.add(fileset);
+      } catch (NoSuchFilesetException exception) {
+        LOG.warn("Fileset: " + ident + " not exist");
+      }
+    }
+    return filesets.toArray(new Fileset[0]);
   }
 
   @Override

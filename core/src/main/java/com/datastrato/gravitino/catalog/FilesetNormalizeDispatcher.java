@@ -56,6 +56,14 @@ public class FilesetNormalizeDispatcher implements FilesetDispatcher {
   }
 
   @Override
+  public Fileset[] loadFilesetList(NameIdentifier[] idents) {
+    // The constraints of the name spec may be more strict than underlying catalog,
+    // and for compatibility reasons, we only apply case-sensitive capabilities here.
+    return dispatcher.loadFilesetList(
+        applyCaseSensitive(idents, Capability.Scope.FILESET, dispatcher));
+  }
+
+  @Override
   public boolean filesetExists(NameIdentifier ident) {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
