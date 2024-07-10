@@ -113,5 +113,5 @@ public interface TableOperation {
    * @param databaseName The name of the database.
    * @param tableName The name of the table.
    */
-  void purge(String databaseName, String tableName) throws NoSuchTableException;
+  boolean purge(String databaseName, String tableName);
 }
