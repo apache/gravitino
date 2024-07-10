@@ -1,12 +1,11 @@
 ---
-title: "Gravitino supported Catalogs"
+title: "Apache Gravitino supported Catalogs"
 slug: /trino-connector/supported-catalog
 keyword: gravitino connector trino
-license: "Copyright 2023 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
-The catalogs currently supported by the Gravitino connector are as follows:
+The catalogs currently supported by the Apache Gravitino connector are as follows:
 
 - [Hive](catalog-hive.md)
 - [Iceberg](catalog-iceberg.md)
@@ -146,7 +145,7 @@ More trino connector configurations can refer to:
 - [MySQL catalog](https://trino.io/docs/current/connector/mysql.html#general-configuration-properties)
 - [PostgreSQL catalog](https://trino.io/docs/current/connector/postgresql.html#general-configuration-properties)
 
-## Data type mapping between Trino and Gravitino
+## Data type mapping between Trino and Apache Gravitino
 
 Gravitino connector supports the following data type conversions between Trino and Gravitino currently. Depending on the detailed catalog, Gravitino may not support some data types conversion for this specific catalog, for example,
 Hive does not support `TIME` data type.

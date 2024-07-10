@@ -1,6 +1,20 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.server.web.rest;
 
@@ -32,12 +46,21 @@ import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.metalake.MetalakeDispatcher;
 import com.datastrato.gravitino.metalake.MetalakeManager;
 import com.datastrato.gravitino.rest.RESTUtils;
+import com.datastrato.gravitino.server.web.mapper.JsonMappingExceptionMapper;
+import com.datastrato.gravitino.server.web.mapper.JsonParseExceptionMapper;
+import com.datastrato.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
@@ -93,8 +116,33 @@ public class TestMetalakeOperations extends JerseyTest {
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });
-
+    resourceConfig.register(JsonProcessingExceptionMapper.class);
+    resourceConfig.register(JsonParseExceptionMapper.class);
+    resourceConfig.register(JsonMappingExceptionMapper.class);
+    resourceConfig.register(TestException.class);
     return resourceConfig;
+  }
+
+  @Path("/test")
+  public static class TestException {
+    @GET
+    @Path("/jsonProcessingException")
+    public Response getJsonProcessingException() throws JsonProcessingException {
+      throw new JsonProcessingException("Error processing JSON") {};
+    }
+
+    @GET
+    @Path("/jsonMappingException")
+    public Response getJsonMappingException() throws JsonMappingException {
+      JsonParser mockParser = Mockito.mock(JsonParser.class);
+      throw JsonMappingException.from(mockParser, "Error mapping JSON");
+    }
+
+    @GET
+    @Path("/jsonParseException")
+    public Response getJsonParseException() throws JsonParseException {
+      throw new JsonParseException("Error parsing JSON");
+    }
   }
 
   @Test
@@ -376,5 +424,31 @@ public class TestMetalakeOperations extends JerseyTest {
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
     Assertions.assertTrue(
         errorResponse.getMessage().contains("Failed to operate object [test] operation [DROP]"));
+  }
+
+  @Test
+  public void testExceptionMapper() {
+    Response resp = target("/test/jsonProcessingException").request().get();
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
+    ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp.getType());
+    Assertions.assertTrue(
+        errorResp.getMessage().contains("Unexpected error occurs when json processing."));
+
+    Response resp1 = target("/test/jsonMappingException").request().get();
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp1.getStatus());
+    ErrorResponse errorResp1 = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResp1.getCode());
+    Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), errorResp1.getType());
+    Assertions.assertTrue(errorResp1.getMessage().contains("Malformed json request"));
+
+    Response resp2 = target("/test/jsonParseException").request().get();
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp2.getStatus());
+    ErrorResponse errorResp2 = resp2.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResp2.getCode());
+    Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), errorResp2.getType());
+    Assertions.assertTrue(errorResp2.getMessage().contains("Malformed json request"));
   }
 }

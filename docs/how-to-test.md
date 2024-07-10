@@ -1,11 +1,10 @@
 ---
-title: How to test Gravitino
+title: How to test Apache Gravitino
 slug: /how-to-test
-license: "Copyright 2023 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
-Gravitino has two types of tests:
+Apache Gravitino has two types of tests:
 
   - Unit tests, focus on the functionalities of the specific class, module, or component.
   - Integration tests, end-to-end tests that cover the whole system.
@@ -55,7 +54,7 @@ Gravitino has two modes to run the integration tests, the default `embedded` mod
 Running the `./gradlew build` command triggers the build and runs the integration tests in embedded mode.
 :::
 
-### Deploy the Gravitino server and run the integration tests in deploy mode
+### Deploy the Apache Gravitino server and run the integration tests in deploy mode
 
 To deploy the Gravitino server locally to run the integration tests, follow these steps:
 
@@ -86,16 +85,16 @@ For example:
 Some integration test cases depend on the Gravitino CI Docker image.
 
 If an integration test relies on the specific Gravitino CI Docker image,
-set the `@tag(gravitino-docker-it)` annotation in the test class.
+set the `@tag(gravitino-docker-test)` annotation in the test class.
 For example, the `integration-test/src/test/.../CatalogHiveIT.java` test needs to connect to
 the `datastrato/gravitino-ci-hive` Docker container for testing the Hive data source.
-Therefore, it should have the following `@tag` annotation:`@tag(gravitino-docker-it)`. This annotation
+Therefore, it should have the following `@tag` annotation:`@tag(gravitino-docker-test)`. This annotation
 helps identify the specific Docker container required for the integration test.
 
 For example:
 
 ```java
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 public class CatalogHiveIT extends AbstractIT {
 ...
 }
@@ -105,7 +104,7 @@ public class CatalogHiveIT extends AbstractIT {
 
 :::note
 * Make sure that the `Docker server` is running before running all the
-  integration tests. Otherwise, it only runs the integration tests without the `gravitino-docker-it` tag.
+  integration tests. Otherwise, it only runs the integration tests without the `gravitino-docker-test` tag.
 * On macOS, be sure to run the `${GRAVITINO_HOME}/dev/docker/tools/mac-docker-connector.sh`
   script before running the integration tests; or make sure that
   [OrbStack](https://orbstack.dev/) is running.
@@ -124,15 +123,15 @@ Using Gravitino IT Docker container to run all integration tests. [deploy test]
 ```
 
 Complete integration tests only run when all the required environments are met. Otherwise,
-only parts of them without the `gravitino-docker-it` tag run.
+only parts of them without the `gravitino-docker-test` tag run.
 
-## How to debug Gravitino server and integration tests in embedded mode
+## How to debug Apache Gravitino server and integration tests in embedded mode
 
 By default, the integration tests run in the embedded mode, in which `MiniGravitino` starts in the
 same process. Debugging `MiniGravitino` is simple and easy, you can modify any code in the
 Gravitino project and set breakpoints anywhere.
 
-## How to debug Gravitino server and integration tests in deploy mode
+## How to debug Apache Gravitino server and integration tests in deploy mode
 
 This mode is closer to the actual environment, but more complex to debug. To debug the Gravitino server code, follow these steps:
 
@@ -154,7 +153,6 @@ This mode is closer to the actual environment, but more complex to debug. To deb
 * View the test results in the `Actions` tab of the pull request page.
 * Run the integration tests in several steps:
   * The Gravitino integration tests pull the CI Docker image from the Docker Hub repository. This step typically takes around 15 seconds.
-  * If you set the `debug action` label in the pull request, GitHub actions runs an SSH server with `csexton/debugger-action@master`, allowing you to log into the GitHub actions environment for remote debugging.
   * The Gravitino project compiles and packages in the `distribution` directory using the `./gradlew compileDistribution` command.
   * Run the `./gradlew test -PtestMode=[embedded|deploy]` command.
 

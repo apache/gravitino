@@ -71,11 +71,11 @@ import org.apache.thrift.TException;
  * }
  * }</pre>
  *
- * Why do we need to do this? Because the original client pool in iceberg uses a fixed username to
- * create the client pool (please see the key in the method clientPool()). Assuming the original
- * name is A and when a new user B tries to call the clientPool() method, it will use the connection
- * that belongs to A. This will not work with kerberos authentication as it will change the user
- * name.
+ * Why do we need to do this? Because the original client pool in Apache Iceberg uses a fixed
+ * username to create the client pool (please see the key in the method clientPool()). Assuming the
+ * original name is A and when a new user B tries to call the clientPool() method, it will use the
+ * connection that belongs to A. This will not work with kerberos authentication as it will change
+ * the user name.
  */
 public class IcebergHiveCachedClientPool
     implements ClientPool<IMetaStoreClient, TException>, Closeable {

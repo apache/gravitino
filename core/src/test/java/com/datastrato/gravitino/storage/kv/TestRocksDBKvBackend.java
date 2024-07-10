@@ -1,14 +1,28 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
 package com.datastrato.gravitino.storage.kv;
 
-import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
+import static com.datastrato.gravitino.Configs.ENTITY_KV_ROCKSDB_BACKEND_PATH;
 
 import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.exceptions.AlreadyExistsException;
+import com.datastrato.gravitino.EntityAlreadyExistsException;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -16,11 +30,13 @@ import java.nio.file.Files;
 import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 
+@Disabled("Gravitino will not support KV entity store since 0.6.0, so we disable this test.")
 public class TestRocksDBKvBackend {
 
   private KvBackend getKvBackEnd() throws IOException {
@@ -29,7 +45,7 @@ public class TestRocksDBKvBackend {
     File baseDir = new File(System.getProperty("java.io.tmpdir"));
     File file = Files.createTempDirectory(baseDir.toPath(), "test").toFile();
     file.deleteOnExit();
-    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(file.getAbsolutePath());
+    Mockito.when(config.get(ENTITY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(file.getAbsolutePath());
 
     KvBackend kvBackend = new RocksDBKvBackend();
     kvBackend.initialize(config);
@@ -39,16 +55,18 @@ public class TestRocksDBKvBackend {
   @Test
   void testStoragePath() {
     Config config = Mockito.mock(Config.class);
-    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn("/a/b");
+    Mockito.when(config.get(ENTITY_KV_ROCKSDB_BACKEND_PATH)).thenReturn("/a/b");
     RocksDBKvBackend kvBackend = new RocksDBKvBackend();
     String path = kvBackend.getStoragePath(config);
     Assertions.assertEquals("/a/b", path);
 
-    Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn("");
+    Mockito.when(config.get(ENTITY_KV_ROCKSDB_BACKEND_PATH)).thenReturn("");
     kvBackend = new RocksDBKvBackend();
     path = kvBackend.getStoragePath(config);
     // We haven't set the GRAVITINO_HOME
-    Assertions.assertEquals("null/data/rocksdb", path);
+
+    String gravitinoHome = System.getenv("GRAVITINO_HOME");
+    Assertions.assertEquals(gravitinoHome + "/data/rocksdb", path);
   }
 
   @Test
@@ -64,7 +82,7 @@ public class TestRocksDBKvBackend {
     Assertions.assertEquals("testValue", new String(bytes, StandardCharsets.UTF_8));
 
     Assertions.assertThrowsExactly(
-        AlreadyExistsException.class,
+        EntityAlreadyExistsException.class,
         () ->
             kvBackend.put(
                 "testKey".getBytes(StandardCharsets.UTF_8),

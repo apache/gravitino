@@ -1,13 +1,25 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.meta;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Field;
-import com.datastrato.gravitino.MetadataObject;
-import com.datastrato.gravitino.MetadataObjects;
 import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.file.Fileset;
@@ -321,23 +333,5 @@ public class TestEntity {
         TagEntity.builder().withId(1L).withName("tag2").withAuditInfo(auditInfo).build();
     Assertions.assertNull(tag2.comment());
     Assertions.assertNull(tag2.properties());
-
-    MetadataObject[] metadataObjects =
-        new MetadataObject[] {
-          MetadataObjects.parse("test1", MetadataObject.Type.METALAKE),
-          MetadataObjects.parse("test2", MetadataObject.Type.CATALOG),
-          MetadataObjects.parse("a.b", MetadataObject.Type.SCHEMA),
-          MetadataObjects.parse("a.b.c", MetadataObject.Type.TABLE),
-          MetadataObjects.parse("a.b.c.d", MetadataObject.Type.COLUMN)
-        };
-
-    TagEntity tag3 =
-        TagEntity.builder()
-            .withId(1L)
-            .withName("tag3")
-            .withAuditInfo(auditInfo)
-            .withMetadataObjects(metadataObjects)
-            .build();
-    Assertions.assertEquals(metadataObjects, tag3.objects());
   }
 }

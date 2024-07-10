@@ -1,10 +1,24 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.integration.test.util;
 
-import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
+import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
 import static com.datastrato.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
 import com.datastrato.gravitino.Config;
@@ -28,6 +42,7 @@ import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -165,7 +180,13 @@ public class AbstractIT {
                       + String.format(
                           "/scripts/mysql/schema-%s-mysql.sql", ConfigConstants.VERSION_0_6_0)),
               "UTF-8");
-      String[] initMySQLBackendSqls = mysqlContent.split(";");
+
+      String[] initMySQLBackendSqls =
+          Arrays.stream(mysqlContent.split(";"))
+              .map(String::trim)
+              .filter(s -> !s.isEmpty())
+              .toArray(String[]::new);
+
       initMySQLBackendSqls = ArrayUtils.addFirst(initMySQLBackendSqls, "use " + META_DATA + ";");
       for (String sql : initMySQLBackendSqls) {
         statement.execute(sql);
@@ -192,7 +213,7 @@ public class AbstractIT {
 
     LOG.info("Running Gravitino Server in {} mode", testMode);
 
-    if ("true".equals(System.getenv("jdbcBackend"))) {
+    if ("MySQL".equalsIgnoreCase(System.getenv("jdbcBackend"))) {
       // Start MySQL docker instance.
       META_DATA = TestDatabaseName.MYSQL_JDBC_BACKEND;
       containerSuite.startMySQLContainer(META_DATA);
@@ -201,7 +222,13 @@ public class AbstractIT {
       setMySQLBackend();
     }
 
+    File baseDir = new File(System.getProperty("java.io.tmpdir"));
+    File file = Files.createTempDirectory(baseDir.toPath(), "test").toFile();
+    file.mkdir();
+    file.deleteOnExit();
+
     serverConfig = new ServerConfig();
+    customConfigs.put(ENTITY_RELATIONAL_JDBC_BACKEND_PATH.getKey(), file.getAbsolutePath());
     if (testMode != null && testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {
       MiniGravitinoContext context =
           new MiniGravitinoContext(customConfigs, ignoreIcebergRestService);
@@ -212,12 +239,6 @@ public class AbstractIT {
       rewriteGravitinoServerConfig();
       serverConfig.loadFromFile(GravitinoServer.CONF_FILE);
       downLoadJDBCDriver();
-      try {
-        FileUtils.deleteDirectory(
-            FileUtils.getFile(serverConfig.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)));
-      } catch (Exception e) {
-        // Ignore
-      }
 
       GravitinoITUtils.startGravitinoServer();
 

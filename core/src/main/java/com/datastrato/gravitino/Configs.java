@@ -1,6 +1,20 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino;
 
@@ -16,7 +30,7 @@ public class Configs {
 
   private Configs() {}
 
-  public static final String DEFAULT_ENTITY_STORE = "kv";
+  public static final String KV_STORE_KEY = "kv";
   public static final String RELATIONAL_ENTITY_STORE = "relational";
   public static final String ENTITY_STORE_KEY = "gravitino.entity.store";
 
@@ -34,6 +48,9 @@ public class Configs {
       "gravitino.entity.store.relational.jdbcUser";
   public static final String ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD_KEY =
       "gravitino.entity.store.relational.jdbcPassword";
+
+  public static final String ENTITY_RELATIONAL_JDBC_BACKEND_STORAGE_PATH_KEY =
+      "gravitino.entity.store.relational.storagePath";
 
   public static final String ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY =
       "gravitino.entity.store.kv.rocksdbPath";
@@ -66,6 +83,17 @@ public class Configs {
   public static final String DEFAULT_KV_ROCKSDB_BACKEND_PATH =
       String.join(File.separator, System.getenv("GRAVITINO_HOME"), "data", "rocksdb");
 
+  public static final String DEFAULT_RELATIONAL_JDBC_BACKEND_PATH =
+      String.join(File.separator, System.getenv("GRAVITINO_HOME"), "data", "jdbc");
+
+  public static final String DEFAULT_RELATIONAL_JDBC_BACKEND_URL = "jdbc:h2";
+
+  public static final String DEFAULT_RELATIONAL_JDBC_BACKEND_DRIVER = "org.h2.Driver";
+
+  public static final String DEFAULT_RELATIONAL_JDBC_BACKEND_USERNAME = "gravitino";
+
+  public static final String DEFAULT_RELATIONAL_JDBC_BACKEND_PASSWORD = "gravitino";
+
   public static final int GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT = 100;
   public static final long MAX_NODE_IN_MEMORY = 100000L;
 
@@ -78,7 +106,7 @@ public class Configs {
           .doc("Which storage implementation to use")
           .version(ConfigConstants.VERSION_0_1_0)
           .stringConf()
-          .createWithDefault(DEFAULT_ENTITY_STORE);
+          .createWithDefault(RELATIONAL_ENTITY_STORE);
 
   public static final ConfigEntry<String> ENTITY_KV_STORE =
       new ConfigBuilder(ENTITY_KV_STORE_KEY)
@@ -101,7 +129,7 @@ public class Configs {
           .version(ConfigConstants.VERSION_0_5_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
-          .create();
+          .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_URL);
 
   public static final ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER =
       new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER_KEY)
@@ -109,7 +137,7 @@ public class Configs {
           .version(ConfigConstants.VERSION_0_5_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
-          .create();
+          .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_DRIVER);
 
   public static final ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_USER =
       new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_USER_KEY)
@@ -117,17 +145,27 @@ public class Configs {
           .version(ConfigConstants.VERSION_0_5_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
-          .create();
+          .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_USERNAME);
 
   public static final ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD =
       new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD_KEY)
           .doc("Password of `JDBCBackend`")
           .version(ConfigConstants.VERSION_0_5_0)
           .stringConf()
-          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
-          .create();
+          .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_PASSWORD);
 
-  public static final ConfigEntry<String> ENTRY_KV_ROCKSDB_BACKEND_PATH =
+  public static final ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_PATH =
+      new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_STORAGE_PATH_KEY)
+          .doc(
+              "The storage path for JDBC storage implementation. It supports both absolute and"
+                  + " relative path, if the value is a relative path, the final path is "
+                  + "`${GRAVITINO_HOME}/${PATH_YOU_HAVA_SET}`, default value is "
+                  + "`${GRAVITINO_HOME}/data/jdbc`")
+          .version(ConfigConstants.VERSION_0_6_0)
+          .stringConf()
+          .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_PATH);
+
+  public static final ConfigEntry<String> ENTITY_KV_ROCKSDB_BACKEND_PATH =
       new ConfigBuilder(ENTITY_KV_ROCKSDB_BACKEND_PATH_KEY)
           .doc(
               "The storage path for RocksDB storage implementation. It supports both absolute and"

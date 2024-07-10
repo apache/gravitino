@@ -1,6 +1,20 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
 package com.datastrato.gravitino.integration.test.client;
@@ -11,6 +25,7 @@ import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.util.Collections;
@@ -25,7 +40,7 @@ import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 public class CatalogIT extends AbstractIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogIT.class);
@@ -121,7 +136,27 @@ public class CatalogIT extends AbstractIT {
     Assertions.assertEquals("hadoop", catalog.provider());
     Assertions.assertEquals("catalog comment", catalog.comment());
     Assertions.assertTrue(catalog.properties().isEmpty());
+    metalake.dropCatalog(catalogName);
 
+    // test cloud related properties
+    ImmutableMap<String, String> illegalProps = ImmutableMap.of("cloud.name", "myCloud");
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                metalake.createCatalog(
+                    catalogName, Catalog.Type.FILESET, "hadoop", "catalog comment", illegalProps));
+    Assertions.assertTrue(exception.getMessage().contains("Invalid value [myCloud]"));
+
+    ImmutableMap<String, String> props =
+        ImmutableMap.of("cloud.name", "aws", "cloud.region-code", "us-west-2");
+    catalog =
+        metalake.createCatalog(
+            catalogName, Catalog.Type.FILESET, "hadoop", "catalog comment", props);
+    Assertions.assertTrue(metalake.catalogExists(catalogName));
+    Assertions.assertFalse(catalog.properties().isEmpty());
+    Assertions.assertEquals("aws", catalog.properties().get("cloud.name"));
+    Assertions.assertEquals("us-west-2", catalog.properties().get("cloud.region-code"));
     metalake.dropCatalog(catalogName);
   }
 

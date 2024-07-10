@@ -1,13 +1,27 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
 package com.datastrato.gravitino.storage.relational.service;
 
+import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.authorization.AuthorizationUtils;
-import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
@@ -22,6 +36,7 @@ import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelp
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -38,7 +53,7 @@ class TestUserMetaService extends TestJDBCBackend {
   String metalakeName = "metalake";
 
   @Test
-  void getUserByIdentifier() {
+  void getUserByIdentifier() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
@@ -102,7 +117,7 @@ class TestUserMetaService extends TestJDBCBackend {
   }
 
   @Test
-  void insertUser() {
+  void insertUser() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     BaseMetalake metalake =
@@ -137,7 +152,7 @@ class TestUserMetaService extends TestJDBCBackend {
             "user1",
             auditInfo);
     Assertions.assertThrows(
-        AlreadyExistsException.class, () -> userMetaService.insertUser(user1Exist, false));
+        EntityAlreadyExistsException.class, () -> userMetaService.insertUser(user1Exist, false));
 
     // insert overwrite
     UserEntity user1Overwrite =
@@ -192,7 +207,7 @@ class TestUserMetaService extends TestJDBCBackend {
             "user2",
             auditInfo);
     Assertions.assertThrows(
-        AlreadyExistsException.class, () -> userMetaService.insertUser(user2Exist, false));
+        EntityAlreadyExistsException.class, () -> userMetaService.insertUser(user2Exist, false));
 
     // insert overwrite user with 2 roles
     UserEntity user2Overwrite =
@@ -254,7 +269,7 @@ class TestUserMetaService extends TestJDBCBackend {
   }
 
   @Test
-  void deleteUser() {
+  void deleteUser() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     BaseMetalake metalake =
@@ -331,7 +346,7 @@ class TestUserMetaService extends TestJDBCBackend {
   }
 
   @Test
-  void updateUser() {
+  void updateUser() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     BaseMetalake metalake =
@@ -545,7 +560,7 @@ class TestUserMetaService extends TestJDBCBackend {
   }
 
   @Test
-  void deleteMetalake() {
+  void deleteMetalake() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     BaseMetalake metalake =
@@ -626,7 +641,7 @@ class TestUserMetaService extends TestJDBCBackend {
   }
 
   @Test
-  void deleteMetalakeCascade() {
+  void deleteMetalakeCascade() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     BaseMetalake metalake =
@@ -705,7 +720,7 @@ class TestUserMetaService extends TestJDBCBackend {
   }
 
   @Test
-  void deleteUserMetasByLegacyTimeline() {
+  void deleteUserMetasByLegacyTimeline() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     BaseMetalake metalake =

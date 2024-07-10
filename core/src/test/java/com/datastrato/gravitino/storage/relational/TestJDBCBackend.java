@@ -1,6 +1,20 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.storage.relational;
 
@@ -21,12 +35,12 @@ import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.Entity;
+import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.authorization.AuthorizationUtils;
 import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.SecurableObjects;
-import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
@@ -37,6 +51,7 @@ import com.datastrato.gravitino.meta.RoleEntity;
 import com.datastrato.gravitino.meta.SchemaEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
+import com.datastrato.gravitino.meta.TagEntity;
 import com.datastrato.gravitino.meta.TopicEntity;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
@@ -45,12 +60,15 @@ import com.datastrato.gravitino.storage.relational.mapper.UserMetaMapper;
 import com.datastrato.gravitino.storage.relational.service.RoleMetaService;
 import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
+import com.datastrato.gravitino.tag.TagManager;
 import com.datastrato.gravitino.utils.NamespaceUtil;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -74,6 +92,7 @@ public class TestJDBCBackend {
   private static final String JDBC_STORE_PATH =
       "/tmp/gravitino_jdbc_entityStore_" + UUID.randomUUID().toString().replace("-", "");
   private static final String DB_DIR = JDBC_STORE_PATH + "/testdb";
+  private static final String H2_FILE = DB_DIR + ".mv.db";
   private static final Config config = Mockito.mock(Config.class);
   public static final ImmutableMap<String, String> RELATIONAL_BACKENDS =
       ImmutableMap.of(
@@ -83,6 +102,7 @@ public class TestJDBCBackend {
   @BeforeAll
   public static void setup() {
     File dir = new File(DB_DIR);
+    dir.deleteOnExit();
     if (dir.exists() || !dir.isDirectory()) {
       dir.delete();
     }
@@ -90,9 +110,9 @@ public class TestJDBCBackend {
     Mockito.when(config.get(ENTITY_STORE)).thenReturn(RELATIONAL_ENTITY_STORE);
     Mockito.when(config.get(ENTITY_RELATIONAL_STORE)).thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL))
-        .thenReturn(String.format("jdbc:h2:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
+        .thenReturn(String.format("jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("root");
-    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("123");
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("123456");
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
 
     String backendName = config.get(ENTITY_RELATIONAL_STORE);
@@ -106,8 +126,6 @@ public class TestJDBCBackend {
       throw new RuntimeException(
           "Failed to create and initialize RelationalBackend by name: " + backendName, e);
     }
-
-    prepareJdbcTable();
   }
 
   @AfterAll
@@ -115,8 +133,11 @@ public class TestJDBCBackend {
     dropAllTables();
     File dir = new File(DB_DIR);
     if (dir.exists()) {
-      dir.delete();
+      Files.delete(Paths.get(DB_DIR));
     }
+
+    Files.delete(Paths.get(H2_FILE));
+    Files.delete(Paths.get(JDBC_STORE_PATH));
     backend.close();
   }
 
@@ -189,7 +210,7 @@ public class TestJDBCBackend {
   }
 
   @Test
-  public void testInsertAlreadyExistsException() {
+  public void testInsertAlreadyExistsException() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
@@ -198,7 +219,7 @@ public class TestJDBCBackend {
     BaseMetalake metalakeCopy =
         createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
     backend.insert(metalake, false);
-    assertThrows(AlreadyExistsException.class, () -> backend.insert(metalakeCopy, false));
+    assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(metalakeCopy, false));
 
     CatalogEntity catalog =
         createCatalog(
@@ -213,7 +234,7 @@ public class TestJDBCBackend {
             "catalog",
             auditInfo);
     backend.insert(catalog, false);
-    assertThrows(AlreadyExistsException.class, () -> backend.insert(catalogCopy, false));
+    assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(catalogCopy, false));
 
     SchemaEntity schema =
         createSchemaEntity(
@@ -228,7 +249,7 @@ public class TestJDBCBackend {
             "schema",
             auditInfo);
     backend.insert(schema, false);
-    assertThrows(AlreadyExistsException.class, () -> backend.insert(schemaCopy, false));
+    assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(schemaCopy, false));
 
     TableEntity table =
         createTableEntity(
@@ -243,7 +264,7 @@ public class TestJDBCBackend {
             "table",
             auditInfo);
     backend.insert(table, false);
-    assertThrows(AlreadyExistsException.class, () -> backend.insert(tableCopy, false));
+    assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(tableCopy, false));
 
     FilesetEntity fileset =
         createFilesetEntity(
@@ -258,7 +279,7 @@ public class TestJDBCBackend {
             "fileset",
             auditInfo);
     backend.insert(fileset, false);
-    assertThrows(AlreadyExistsException.class, () -> backend.insert(filesetCopy, false));
+    assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(filesetCopy, false));
 
     TopicEntity topic =
         createTopicEntity(
@@ -273,11 +294,11 @@ public class TestJDBCBackend {
             "topic",
             auditInfo);
     backend.insert(topic, false);
-    assertThrows(AlreadyExistsException.class, () -> backend.insert(topicCopy, false));
+    assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(topicCopy, false));
   }
 
   @Test
-  public void testUpdateAlreadyExistsException() {
+  public void testUpdateAlreadyExistsException() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
@@ -288,7 +309,7 @@ public class TestJDBCBackend {
     backend.insert(metalake, false);
     backend.insert(metalakeCopy, false);
     assertThrows(
-        AlreadyExistsException.class,
+        EntityAlreadyExistsException.class,
         () ->
             backend.update(
                 metalakeCopy.nameIdentifier(),
@@ -310,7 +331,7 @@ public class TestJDBCBackend {
     backend.insert(catalog, false);
     backend.insert(catalogCopy, false);
     assertThrows(
-        AlreadyExistsException.class,
+        EntityAlreadyExistsException.class,
         () ->
             backend.update(
                 catalogCopy.nameIdentifier(),
@@ -334,7 +355,7 @@ public class TestJDBCBackend {
     backend.insert(schema, false);
     backend.insert(schemaCopy, false);
     assertThrows(
-        AlreadyExistsException.class,
+        EntityAlreadyExistsException.class,
         () ->
             backend.update(
                 schemaCopy.nameIdentifier(),
@@ -358,7 +379,7 @@ public class TestJDBCBackend {
     backend.insert(table, false);
     backend.insert(tableCopy, false);
     assertThrows(
-        AlreadyExistsException.class,
+        EntityAlreadyExistsException.class,
         () ->
             backend.update(
                 tableCopy.nameIdentifier(),
@@ -380,7 +401,7 @@ public class TestJDBCBackend {
     backend.insert(fileset, false);
     backend.insert(filesetCopy, false);
     assertThrows(
-        AlreadyExistsException.class,
+        EntityAlreadyExistsException.class,
         () ->
             backend.update(
                 filesetCopy.nameIdentifier(),
@@ -404,7 +425,7 @@ public class TestJDBCBackend {
     backend.insert(topic, false);
     backend.insert(topicCopy, false);
     assertThrows(
-        AlreadyExistsException.class,
+        EntityAlreadyExistsException.class,
         () ->
             backend.update(
                 topicCopy.nameIdentifier(),
@@ -501,6 +522,16 @@ public class TestJDBCBackend {
             Lists.newArrayList(role.id()));
     backend.insert(group, false);
 
+    TagEntity tag =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("tag")
+            .withNamespace(TagManager.ofTagNamespace("metalake"))
+            .withComment("tag comment")
+            .withAuditInfo(auditInfo)
+            .build();
+    backend.insert(tag, false);
+
     // another meta data creation
     BaseMetalake anotherMetaLake =
         createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "another-metalake", auditInfo);
@@ -579,6 +610,16 @@ public class TestJDBCBackend {
             Lists.newArrayList(anotherRole.id()));
     backend.insert(anotherGroup, false);
 
+    TagEntity anotherTagEntity =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("another-tag")
+            .withNamespace(TagManager.ofTagNamespace("another-metalake"))
+            .withComment("another-tag comment")
+            .withAuditInfo(auditInfo)
+            .build();
+    backend.insert(anotherTagEntity, false);
+
     // meta data list
     List<BaseMetalake> metaLakes = backend.list(metalake.namespace(), Entity.EntityType.METALAKE);
     assertTrue(metaLakes.contains(metalake));
@@ -621,6 +662,12 @@ public class TestJDBCBackend {
                 GroupMetaMapper.class, mapper -> mapper.listGroupsByRoleId(role.id()))
             .size());
 
+    TagEntity tagEntity = backend.get(tag.nameIdentifier(), Entity.EntityType.TAG);
+    assertEquals(tag, tagEntity);
+    List<TagEntity> tags = backend.list(tag.namespace(), Entity.EntityType.TAG);
+    assertTrue(tags.contains(tag));
+    assertEquals(1, tags.size());
+
     // meta data soft delete
     backend.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE, true);
 
@@ -661,6 +708,9 @@ public class TestJDBCBackend {
             .size());
     assertTrue(backend.exists(anotherGroup.nameIdentifier(), Entity.EntityType.GROUP));
 
+    assertFalse(backend.exists(tag.nameIdentifier(), Entity.EntityType.TAG));
+    assertTrue(backend.exists(anotherTagEntity.nameIdentifier(), Entity.EntityType.TAG));
+
     // check legacy record after soft delete
     assertTrue(legacyRecordExistsInDB(metalake.id(), Entity.EntityType.METALAKE));
     assertTrue(legacyRecordExistsInDB(catalog.id(), Entity.EntityType.CATALOG));
@@ -675,6 +725,7 @@ public class TestJDBCBackend {
     assertEquals(2, countRoleRels(anotherRole.id()));
     assertEquals(2, listFilesetVersions(fileset.id()).size());
     assertEquals(3, listFilesetVersions(anotherFileset.id()).size());
+    assertTrue(legacyRecordExistsInDB(tag.id(), Entity.EntityType.TAG));
 
     // meta data hard delete
     for (Entity.EntityType entityType : Entity.EntityType.values()) {
@@ -692,6 +743,7 @@ public class TestJDBCBackend {
     assertEquals(0, countRoleRels(role.id()));
     assertEquals(2, countRoleRels(anotherRole.id()));
     assertEquals(0, listFilesetVersions(fileset.id()).size());
+    assertFalse(legacyRecordExistsInDB(tag.id(), Entity.EntityType.TAG));
 
     // soft delete for old version fileset
     assertEquals(3, listFilesetVersions(anotherFileset.id()).size());
@@ -748,6 +800,10 @@ public class TestJDBCBackend {
       case GROUP:
         tableName = "group_meta";
         idColumnName = "group_id";
+        break;
+      case TAG:
+        tableName = "tag_meta";
+        idColumnName = "tag_id";
         break;
       default:
         throw new IllegalArgumentException("Unsupported entity type: " + entityType);

@@ -1,10 +1,25 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.server;
 
-import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
+import static com.datastrato.gravitino.Configs.ENTITY_KV_ROCKSDB_BACKEND_PATH;
+import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
@@ -12,8 +27,11 @@ import com.datastrato.gravitino.rest.RESTUtils;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -36,7 +54,7 @@ public class TestGravitinoServer {
     ServerConfig serverConfig = new ServerConfig();
     serverConfig.loadFromMap(
         ImmutableMap.of(
-            ENTRY_KV_ROCKSDB_BACKEND_PATH.getKey(),
+            ENTITY_KV_ROCKSDB_BACKEND_PATH.getKey(),
             ROCKS_DB_STORE_PATH,
             GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
             String.valueOf(RESTUtils.findAvailablePort(5000, 6000))),
@@ -61,6 +79,19 @@ public class TestGravitinoServer {
     gravitinoServer = new GravitinoServer(spyServerConfig);
   }
 
+  @AfterAll
+  public void clear() {
+    String path = spyServerConfig.get(ENTITY_RELATIONAL_JDBC_BACKEND_PATH);
+    if (path != null) {
+      Path p = Paths.get(path).getParent();
+      try {
+        FileUtils.deleteDirectory(p.toFile());
+      } catch (IOException e) {
+        // Ignore
+      }
+    }
+  }
+
   @AfterEach
   public void tearDown() {
     if (gravitinoServer != null) {
@@ -76,7 +107,7 @@ public class TestGravitinoServer {
   @Test
   void testConfig() {
     Assertions.assertEquals(
-        ROCKS_DB_STORE_PATH, spyServerConfig.get(ENTRY_KV_ROCKSDB_BACKEND_PATH));
+        ROCKS_DB_STORE_PATH, spyServerConfig.get(ENTITY_KV_ROCKSDB_BACKEND_PATH));
   }
 
   @Test

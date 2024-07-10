@@ -2,13 +2,12 @@
 title: "Security"
 slug: /security
 keyword: security
-license: "Copyright 2023 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
 ## Authentication
 
-Gravitino supports two kinds of authentication mechanisms: simple and OAuth.
+Apache Gravitino supports two kinds of authentication mechanisms: simple and OAuth.
 
 ### Simple mode
 
@@ -184,7 +183,7 @@ If users choose to enable HTTPS, Gravitino won't provide the ability of HTTP ser
 
 Both the Gravitino server and Iceberg REST service can configure HTTPS.
 
-### Gravitino server's configuration
+### Apache Gravitino server's configuration
 
 | Configuration item                                  | Description                                                        | Default value | Required                                          | Since version |
 |-----------------------------------------------------|--------------------------------------------------------------------|---------------|---------------------------------------------------|---------------|
@@ -201,7 +200,7 @@ Both the Gravitino server and Iceberg REST service can configure HTTPS.
 | `gravitino.server.webserver.trustStorePassword`     | Password to the trust store.                                       | (none)        | Yes if use HTTPS and the authentication of client | 0.3.0         |
 | `gravitino.server.webserver.trustStoreType`         | The type to the trust store.                                       | `JKS`         | No                                                | 0.3.0         |
 
-### Iceberg REST service's configuration
+### Apache Iceberg REST service's configuration
 
 | Configuration item                                         | Description                                                        | Default value | Required                                          | Since version |
 |------------------------------------------------------------|--------------------------------------------------------------------|---------------|---------------------------------------------------|---------------|
@@ -310,7 +309,7 @@ curl -v -X GET --cacert ./certificate.pem -H "Accept: application/vnd.gravitino.
 | `gravitino.server.webserver.exposedHeaders`        | A comma separated list of allowed HTTP headers exposed on the client. The default value is the empty list.                                                                                                                             | ``                                            | No       | 0.4.0         |
 | `gravitino.server.webserver.chainPreflight`        | If true chained preflight requests for normal handling (as an OPTION request). Otherwise, the filter responds to the preflight. The default is true.                                                                                   | `true`                                        | No       | 0.4.0         |
 
-### Iceberg REST service's configuration
+### Apache Iceberg REST service's configuration
 
 | Configuration item                                        | Description                                                                                                                                                                                                  | Default value                                 | Required | Since version |
 |-----------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------|----------|---------------|

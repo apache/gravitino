@@ -1,20 +1,35 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
 package com.datastrato.gravitino.storage;
 
 import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
+import static com.datastrato.gravitino.Configs.ENTITY_KV_ROCKSDB_BACKEND_PATH;
 import static com.datastrato.gravitino.Configs.ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
 import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD;
+import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
 import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL;
 import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER;
 import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_STORE;
-import static com.datastrato.gravitino.Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH;
 import static com.datastrato.gravitino.Configs.RELATIONAL_ENTITY_STORE;
 import static com.datastrato.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static com.datastrato.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
@@ -25,6 +40,7 @@ import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Entity.EntityType;
+import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.EntityStoreFactory;
 import com.datastrato.gravitino.NameIdentifier;
@@ -33,7 +49,6 @@ import com.datastrato.gravitino.authorization.AuthorizationUtils;
 import com.datastrato.gravitino.authorization.Privileges;
 import com.datastrato.gravitino.authorization.SecurableObject;
 import com.datastrato.gravitino.authorization.SecurableObjects;
-import com.datastrato.gravitino.exceptions.AlreadyExistsException;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
 import com.datastrato.gravitino.file.Fileset;
@@ -48,14 +63,12 @@ import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.meta.TopicEntity;
 import com.datastrato.gravitino.meta.UserEntity;
-import com.datastrato.gravitino.storage.relational.RelationalEntityStore;
 import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -63,10 +76,8 @@ import java.sql.Statement;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
@@ -81,14 +92,15 @@ public class TestEntityStorage {
   private static final String JDBC_STORE_PATH =
       "/tmp/gravitino_jdbc_entityStore_" + UUID.randomUUID().toString().replace("-", "");
   private static final String DB_DIR = JDBC_STORE_PATH + "/testdb";
+  private static final String H2_FILE = DB_DIR + ".mv.db";
 
   static Object[] storageProvider() {
-    return new Object[] {Configs.DEFAULT_ENTITY_STORE, Configs.RELATIONAL_ENTITY_STORE};
+    return new Object[] {Configs.RELATIONAL_ENTITY_STORE};
   }
 
   private void init(String type, Config config) {
     Preconditions.checkArgument(StringUtils.isNotBlank(type));
-    if (type.equals(Configs.DEFAULT_ENTITY_STORE)) {
+    if (type.equals(Configs.KV_STORE_KEY)) {
       try {
         FileUtils.deleteDirectory(FileUtils.getFile(KV_STORE_PATH));
       } catch (Exception e) {
@@ -97,9 +109,9 @@ public class TestEntityStorage {
       Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
       Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
       Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
-      Mockito.when(config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(KV_STORE_PATH);
+      Mockito.when(config.get(ENTITY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(KV_STORE_PATH);
 
-      Assertions.assertEquals(KV_STORE_PATH, config.get(ENTRY_KV_ROCKSDB_BACKEND_PATH));
+      Assertions.assertEquals(KV_STORE_PATH, config.get(ENTITY_KV_ROCKSDB_BACKEND_PATH));
       Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
       Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
       Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
@@ -111,11 +123,18 @@ public class TestEntityStorage {
       dir.mkdirs();
       Mockito.when(config.get(ENTITY_STORE)).thenReturn(RELATIONAL_ENTITY_STORE);
       Mockito.when(config.get(ENTITY_RELATIONAL_STORE)).thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
+      Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PATH)).thenReturn(DB_DIR);
+
+      // The following properties are used to create the JDBC connection; they are just for test, in
+      // the real world,
+      // they will be set automatically by the configuration file if you set ENTITY_RELATIONAL_STORE
+      // as EMBEDDED_ENTITY_RELATIONAL_STORE.
       Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL))
           .thenReturn(String.format("jdbc:h2:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
-      Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("root");
-      Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("123");
+      Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("gravitino");
+      Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("gravitino");
       Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
+
       Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
       Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
     } else {
@@ -123,28 +142,9 @@ public class TestEntityStorage {
     }
   }
 
-  private void prepareJdbcTable() {
-    // Read the ddl sql to create table
-    String scriptPath = "h2/schema-h2.sql";
-    try (SqlSession sqlSession =
-            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
-        Connection connection = sqlSession.getConnection();
-        Statement statement = connection.createStatement()) {
-      StringBuilder ddlBuilder = new StringBuilder();
-      IOUtils.readLines(
-              Objects.requireNonNull(
-                  this.getClass().getClassLoader().getResourceAsStream(scriptPath)),
-              StandardCharsets.UTF_8)
-          .forEach(line -> ddlBuilder.append(line).append("\n"));
-      statement.execute(ddlBuilder.toString());
-    } catch (Exception e) {
-      throw new IllegalStateException("Create tables failed", e);
-    }
-  }
-
   private void destroy(String type) {
     Preconditions.checkArgument(StringUtils.isNotBlank(type));
-    if (type.equals(Configs.DEFAULT_ENTITY_STORE)) {
+    if (type.equals(Configs.KV_STORE_KEY)) {
       try {
         FileUtils.deleteDirectory(FileUtils.getFile(KV_STORE_PATH));
       } catch (Exception e) {
@@ -156,6 +156,8 @@ public class TestEntityStorage {
       if (dir.exists()) {
         dir.delete();
       }
+
+      FileUtils.deleteQuietly(new File(H2_FILE));
     } else {
       throw new UnsupportedOperationException("Unsupported entity store type: " + type);
     }
@@ -193,9 +195,6 @@ public class TestEntityStorage {
 
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
-      if (store instanceof RelationalEntityStore) {
-        prepareJdbcTable();
-      }
 
       BaseMetalake metalake =
           createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
@@ -380,9 +379,6 @@ public class TestEntityStorage {
 
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
-      if (store instanceof RelationalEntityStore) {
-        prepareJdbcTable();
-      }
 
       BaseMetalake metalake =
           createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
@@ -486,9 +482,6 @@ public class TestEntityStorage {
 
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
-      if (store instanceof RelationalEntityStore) {
-        prepareJdbcTable();
-      }
 
       BaseMetalake metalake = createBaseMakeLake(1L, "metalake", auditInfo);
       store.put(metalake);
@@ -535,9 +528,6 @@ public class TestEntityStorage {
 
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
-      if (store instanceof RelationalEntityStore) {
-        prepareJdbcTable();
-      }
 
       BaseMetalake metalake = createBaseMakeLake(1L, "metalake", auditInfo);
       CatalogEntity catalog = createCatalog(1L, Namespace.of("metalake"), "catalog", auditInfo);
@@ -758,9 +748,6 @@ public class TestEntityStorage {
     init(type, config);
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
-      if (store instanceof RelationalEntityStore) {
-        prepareJdbcTable();
-      }
 
       AuditInfo auditInfo =
           AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
@@ -898,9 +885,6 @@ public class TestEntityStorage {
     init(type, config);
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
-      if (store instanceof RelationalEntityStore) {
-        prepareJdbcTable();
-      }
 
       AuditInfo auditInfo =
           AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
@@ -1864,7 +1848,7 @@ public class TestEntityStorage {
   private void validateAlreadyExistEntity(EntityStore store, SchemaEntity schema) {
     // The updated entities already existed, should throw exception
     Assertions.assertThrowsExactly(
-        AlreadyExistsException.class,
+        EntityAlreadyExistsException.class,
         () ->
             store.update(
                 NameIdentifier.of("metalakeChanged", "catalogChanged", "schema2"),
@@ -2131,9 +2115,6 @@ public class TestEntityStorage {
 
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
-      if (store instanceof RelationalEntityStore) {
-        prepareJdbcTable();
-      }
 
       BaseMetalake metalake = createBaseMakeLake(1L, "metalake", auditInfo);
       CatalogEntity catalog = createCatalog(1L, Namespace.of("metalake"), "catalog", auditInfo);

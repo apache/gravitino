@@ -1,6 +1,20 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.catalog.kafka.integration.test;
 
@@ -13,6 +27,7 @@ import static com.datastrato.gravitino.integration.test.container.KafkaContainer
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.SchemaChange;
 import com.datastrato.gravitino.client.GravitinoMetalake;
@@ -22,7 +37,6 @@ import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.messaging.Topic;
 import com.datastrato.gravitino.messaging.TopicChange;
-import com.datastrato.gravitino.utils.NamespaceUtil;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -57,7 +71,7 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 public class CatalogKafkaIT extends AbstractIT {
   private static final Logger LOG = LoggerFactory.getLogger(CatalogKafkaIT.class);
   private static final ContainerSuite CONTAINER_SUITE = ContainerSuite.getInstance();
@@ -209,11 +223,7 @@ public class CatalogKafkaIT extends AbstractIT {
     exception =
         Assertions.assertThrows(
             RuntimeException.class,
-            () ->
-                kafka
-                    .asTopicCatalog()
-                    .listTopics(
-                        NamespaceUtil.ofTopic(METALAKE_NAME, catalogName2, DEFAULT_SCHEMA_NAME)));
+            () -> kafka.asTopicCatalog().listTopics(Namespace.of(DEFAULT_SCHEMA_NAME)));
     Assertions.assertTrue(
         exception
             .getMessage()
@@ -275,15 +285,12 @@ public class CatalogKafkaIT extends AbstractIT {
         catalog
             .asTopicCatalog()
             .createTopic(
-                NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, topicName),
+                NameIdentifier.of(DEFAULT_SCHEMA_NAME, topicName),
                 "comment",
                 null,
                 Collections.emptyMap());
     Topic loadedTopic =
-        catalog
-            .asTopicCatalog()
-            .loadTopic(
-                NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, topicName));
+        catalog.asTopicCatalog().loadTopic(NameIdentifier.of(DEFAULT_SCHEMA_NAME, topicName));
 
     Assertions.assertEquals(createdTopic, loadedTopic);
     assertTopicWithKafka(createdTopic);
@@ -291,9 +298,7 @@ public class CatalogKafkaIT extends AbstractIT {
 
     // test list topics
     NameIdentifier[] topics =
-        catalog
-            .asTopicCatalog()
-            .listTopics(NamespaceUtil.ofTopic(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME));
+        catalog.asTopicCatalog().listTopics(Namespace.of(DEFAULT_SCHEMA_NAME));
     Assertions.assertTrue(topics.length > 0);
     Assertions.assertTrue(
         ImmutableList.copyOf(topics).stream().anyMatch(topic -> topic.name().equals(topicName)));
@@ -306,7 +311,7 @@ public class CatalogKafkaIT extends AbstractIT {
         catalog
             .asTopicCatalog()
             .createTopic(
-                NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, topicName),
+                NameIdentifier.of(DEFAULT_SCHEMA_NAME, topicName),
                 "comment",
                 null,
                 ImmutableMap.of(TopicConfig.RETENTION_MS_CONFIG, "43200000"));
@@ -322,15 +327,12 @@ public class CatalogKafkaIT extends AbstractIT {
         catalog
             .asTopicCatalog()
             .alterTopic(
-                NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, topicName),
+                NameIdentifier.of(DEFAULT_SCHEMA_NAME, topicName),
                 TopicChange.updateComment("new comment"),
                 TopicChange.setProperty(PARTITION_COUNT, "3"),
                 TopicChange.removeProperty(TopicConfig.RETENTION_MS_CONFIG));
     Topic loadedTopic =
-        catalog
-            .asTopicCatalog()
-            .loadTopic(
-                NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, topicName));
+        catalog.asTopicCatalog().loadTopic(NameIdentifier.of(DEFAULT_SCHEMA_NAME, topicName));
 
     Assertions.assertEquals(alteredTopic, loadedTopic);
     Assertions.assertEquals("new comment", alteredTopic.comment());
@@ -348,16 +350,13 @@ public class CatalogKafkaIT extends AbstractIT {
         catalog
             .asTopicCatalog()
             .createTopic(
-                NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, topicName),
+                NameIdentifier.of(DEFAULT_SCHEMA_NAME, topicName),
                 "comment",
                 null,
                 Collections.emptyMap());
 
     boolean dropped =
-        catalog
-            .asTopicCatalog()
-            .dropTopic(
-                NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, topicName));
+        catalog.asTopicCatalog().dropTopic(NameIdentifier.of(DEFAULT_SCHEMA_NAME, topicName));
     Assertions.assertTrue(dropped);
 
     // verify topic not exist in Kafka
@@ -371,23 +370,17 @@ public class CatalogKafkaIT extends AbstractIT {
     catalog
         .asTopicCatalog()
         .createTopic(
-            NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, topicName1),
+            NameIdentifier.of(DEFAULT_SCHEMA_NAME, topicName1),
             "comment",
             null,
             Collections.emptyMap());
 
     adminClient.deleteTopics(Collections.singleton(topicName1)).all().get();
     boolean dropped1 =
-        catalog
-            .asTopicCatalog()
-            .dropTopic(
-                NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, topicName1));
+        catalog.asTopicCatalog().dropTopic(NameIdentifier.of(DEFAULT_SCHEMA_NAME, topicName1));
     Assertions.assertFalse(dropped1, "Should return false when dropping non-exist topic");
     Assertions.assertFalse(
-        catalog
-            .asTopicCatalog()
-            .topicExists(
-                NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, topicName1)),
+        catalog.asTopicCatalog().topicExists(NameIdentifier.of(DEFAULT_SCHEMA_NAME, topicName1)),
         "Topic should not exist after dropping");
   }
 
@@ -397,8 +390,7 @@ public class CatalogKafkaIT extends AbstractIT {
     String illegalName = "test.topic";
     adminClient.createTopics(ImmutableList.of(new NewTopic(illegalName, 1, (short) 1))).all().get();
 
-    NameIdentifier ident =
-        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, illegalName);
+    NameIdentifier ident = NameIdentifier.of(DEFAULT_SCHEMA_NAME, illegalName);
     IllegalArgumentException exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
@@ -412,9 +404,7 @@ public class CatalogKafkaIT extends AbstractIT {
     Assertions.assertEquals(illegalName, loadedTopic.name());
 
     NameIdentifier[] topics =
-        catalog
-            .asTopicCatalog()
-            .listTopics(NamespaceUtil.ofTopic(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME));
+        catalog.asTopicCatalog().listTopics(Namespace.of(DEFAULT_SCHEMA_NAME));
     Assertions.assertTrue(
         Arrays.stream(topics).anyMatch(topic -> topic.name().equals(illegalName)));
 

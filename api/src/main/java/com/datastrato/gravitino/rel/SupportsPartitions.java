@@ -1,6 +1,20 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.rel;
 
@@ -80,7 +94,7 @@ public interface SupportsPartitions {
    * Drop a partition with specified name.
    *
    * @param partitionName the name of the partition
-   * @return true if a partition was deleted successfully, false if the partition does not exist.
+   * @return true if the partition is deleted successfully, false if the partition does not exist.
    */
   boolean dropPartition(String partitionName);
 
@@ -90,12 +104,10 @@ public interface SupportsPartitions {
    * purging partitions, {@link UnsupportedOperationException} is thrown.
    *
    * @param partitionName The name of the partition.
-   * @return true if a partition was deleted, false if the partition did not exist.
-   * @throws NoSuchPartitionException If the partition does not exist.
+   * @return true if the partition is purged, false if the partition does not exist.
    * @throws UnsupportedOperationException If partition purging is not supported.
    */
-  default boolean purgePartition(String partitionName)
-      throws NoSuchPartitionException, UnsupportedOperationException {
+  default boolean purgePartition(String partitionName) throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Partition purging is not supported");
   }
 }

@@ -1,9 +1,25 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.server.web.rest;
 
+import com.codahale.metrics.annotation.ResponseMetered;
+import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.CatalogChange;
 import com.datastrato.gravitino.NameIdentifier;
@@ -19,6 +35,7 @@ import com.datastrato.gravitino.dto.responses.EntityListResponse;
 import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.lock.LockType;
 import com.datastrato.gravitino.lock.TreeLockUtils;
+import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.server.web.Utils;
 import com.datastrato.gravitino.utils.NameIdentifierUtil;
 import com.datastrato.gravitino.utils.NamespaceUtil;
@@ -58,6 +75,8 @@ public class CatalogOperations {
 
   @GET
   @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "list-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-catalog", absolute = true)
   public Response listCatalogs(
       @PathParam("metalake") String metalake,
       @QueryParam("details") @DefaultValue("false") boolean verbose) {
@@ -96,6 +115,8 @@ public class CatalogOperations {
 
   @POST
   @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "create-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "create-catalog", absolute = true)
   public Response createCatalog(
       @PathParam("metalake") String metalake, CatalogCreateRequest request) {
     LOG.info("Received create catalog request for metalake: {}", metalake);
@@ -130,6 +151,8 @@ public class CatalogOperations {
   @GET
   @Path("{catalog}")
   @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "load-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "load-catalog", absolute = true)
   public Response loadCatalog(
       @PathParam("metalake") String metalakeName, @PathParam("catalog") String catalogName) {
     LOG.info("Received load catalog request for catalog: {}.{}", metalakeName, catalogName);
@@ -151,6 +174,8 @@ public class CatalogOperations {
   @PUT
   @Path("{catalog}")
   @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "alter-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "alter-catalog", absolute = true)
   public Response alterCatalog(
       @PathParam("metalake") String metalakeName,
       @PathParam("catalog") String catalogName,
@@ -185,6 +210,8 @@ public class CatalogOperations {
   @DELETE
   @Path("{catalog}")
   @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "drop-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "drop-catalog", absolute = true)
   public Response dropCatalog(
       @PathParam("metalake") String metalakeName, @PathParam("catalog") String catalogName) {
     LOG.info("Received drop catalog request for catalog: {}.{}", metalakeName, catalogName);

@@ -5,8 +5,7 @@ keywords:
 - jdbc
 - MySQL
 - metadata
-license: "Copyright 2023 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
 import Tabs from '@theme/Tabs';
@@ -14,7 +13,7 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Gravitino provides the ability to manage MySQL metadata.
+Apache Gravitino provides the ability to manage MySQL metadata.
 
 :::caution
 Gravitino saves some system information in schema and table comment, like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, please don't change or remove this message.
@@ -40,6 +39,7 @@ Check the relevant data source configuration in [data source properties](https:/
 When you use the Gravitino with Trino. You can pass the Trino MySQL connector configuration using prefix `trino.bypass.`. For example, using `trino.bypass.join-pushdown.strategy` to pass the `join-pushdown.strategy` to the Gravitino MySQL catalog in Trino runtime.
 
 If you use a JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user` and `jdbc-password` to catalog properties.
+Besides the [common catalog properties](./gravitino-server-config.md#gravitino-catalog-properties-configuration), the MySQL catalog has the following properties:
 
 | Configuration item   | Description                                                                                            | Default value | Required | Since Version |
 |----------------------|--------------------------------------------------------------------------------------------------------|---------------|----------|---------------|

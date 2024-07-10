@@ -1,13 +1,27 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
 package com.datastrato.gravitino.storage.kv;
 
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
-import com.datastrato.gravitino.exceptions.AlreadyExistsException;
+import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.utils.ByteUtils;
 import com.datastrato.gravitino.utils.Bytes;
 import com.google.common.annotations.VisibleForTesting;
@@ -67,7 +81,7 @@ public class RocksDBKvBackend implements KvBackend {
 
   @VisibleForTesting
   String getStoragePath(Config config) {
-    String dbPath = config.get(Configs.ENTRY_KV_ROCKSDB_BACKEND_PATH);
+    String dbPath = config.get(Configs.ENTITY_KV_ROCKSDB_BACKEND_PATH);
     if (StringUtils.isBlank(dbPath)) {
       return Configs.DEFAULT_KV_ROCKSDB_BACKEND_PATH;
     }
@@ -95,7 +109,7 @@ public class RocksDBKvBackend implements KvBackend {
   public void put(byte[] key, byte[] value, boolean overwrite) throws IOException {
     try {
       handlePut(key, value, overwrite);
-    } catch (AlreadyExistsException e) {
+    } catch (EntityAlreadyExistsException e) {
       throw e;
     } catch (Exception e) {
       throw new IOException(e);
@@ -110,7 +124,7 @@ public class RocksDBKvBackend implements KvBackend {
     }
     byte[] existKey = db.get(key);
     if (existKey != null) {
-      throw new AlreadyExistsException(
+      throw new EntityAlreadyExistsException(
           "Key %s already exists in the database, please use overwrite option to overwrite it",
           ByteUtils.formatByteArray(key));
     }
