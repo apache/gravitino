@@ -26,7 +26,7 @@ import sys
 
 import requests
 
-from gravitino.exceptions.gravitino_runtime_exception import GravitinoRuntimeException
+from gravitino.exceptions.base import GravitinoRuntimeException
 
 logger = logging.getLogger(__name__)
 

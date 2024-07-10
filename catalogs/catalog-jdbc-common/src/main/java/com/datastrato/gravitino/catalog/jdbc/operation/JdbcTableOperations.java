@@ -266,7 +266,16 @@ public abstract class JdbcTableOperations implements TableOperation {
   }
 
   @Override
-  public void purge(String databaseName, String tableName) throws NoSuchTableException {
+  public boolean purge(String databaseName, String tableName) {
+    try {
+      purgeTable(databaseName, tableName);
+    } catch (NoSuchTableException | NoSuchSchemaException e) {
+      return false;
+    }
+    return true;
+  }
+
+  protected void purgeTable(String databaseName, String tableName) {
     LOG.info("Attempting to purge table {} from database {}", tableName, databaseName);
     try (Connection connection = getConnection(databaseName)) {
       JdbcConnectorUtils.executeUpdate(connection, generatePurgeTableSql(tableName));

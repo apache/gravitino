@@ -99,7 +99,7 @@ public interface PartitionDispatcher {
    *
    * @param tableIdent The identifier of the table.
    * @param partitionName The name of the partition.
-   * @return True if the partition was purged, false if the partition does not exist.
+   * @return True if the partition is purged, false if the partition does not exist.
    * @throws UnsupportedOperationException If partition purging is not supported.
    */
   default boolean purgePartition(NameIdentifier tableIdent, String partitionName)

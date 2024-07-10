@@ -40,7 +40,7 @@ from gravitino.auth.auth_constants import AuthConstants
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.fileset_dto import FilesetDTO
 from gravitino.filesystem.gvfs import FilesetContext, StorageType
-from gravitino.exceptions.gravitino_runtime_exception import GravitinoRuntimeException
+from gravitino.exceptions.base import GravitinoRuntimeException
 
 from tests.unittests import mock_base
 
