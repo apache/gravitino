@@ -19,22 +19,15 @@
 
 package org.apache.gravitino.trino.connector.catalog.iceberg;
 
-import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata.LOCATION;
+import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants.LOCATION;
 import static org.apache.gravitino.trino.connector.catalog.iceberg.IcebergPropertyMeta.ICEBERG_LOCATION_PROPERTY;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
-import java.util.Map;
 import org.apache.commons.collections4.bidimap.TreeBidiMap;
-import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata;
 import org.apache.gravitino.catalog.property.PropertyConverter;
-import org.apache.gravitino.connector.BasePropertiesMetadata;
-import org.apache.gravitino.connector.PropertyEntry;
 
 public class IcebergTablePropertyConverter extends PropertyConverter {
-
-  private final BasePropertiesMetadata icebergTablePropertiesMetadata =
-      new IcebergTablePropertiesMetadata();
 
   // TODO (yuqi) add more properties
   @VisibleForTesting
@@ -49,10 +42,5 @@ public class IcebergTablePropertyConverter extends PropertyConverter {
     // Note: As the properties for Iceberg table loaded from Gravitino are always empty currently,
     // no matter what the mapping is, the properties will be empty.
     return TRINO_KEY_TO_GRAVITINO_KEY;
-  }
-
-  @Override
-  public Map<String, PropertyEntry<?>> gravitinoPropertyMeta() {
-    return icebergTablePropertiesMetadata.propertyEntries();
   }
 }

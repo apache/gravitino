@@ -24,15 +24,9 @@ import java.util.Map;
 import org.apache.commons.collections4.bidimap.TreeBidiMap;
 import org.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata;
 import org.apache.gravitino.catalog.property.PropertyConverter;
-import org.apache.gravitino.connector.BasePropertiesMetadata;
-import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.shaded.com.google.common.collect.ImmutableMap;
 
 public class MySQLTablePropertyConverter extends PropertyConverter {
-
-  private final BasePropertiesMetadata mysqlTablePropertiesMetadata =
-      new MysqlTablePropertiesMetadata();
-
   // TODO (yuqi) add more properties
   @VisibleForTesting
   static final TreeBidiMap<String, String> TRINO_KEY_TO_GRAVITINO_KEY =
@@ -48,10 +42,5 @@ public class MySQLTablePropertyConverter extends PropertyConverter {
   @Override
   public Map<String, String> engineToGravitinoMapping() {
     return TRINO_KEY_TO_GRAVITINO_KEY;
-  }
-
-  @Override
-  public Map<String, PropertyEntry<?>> gravitinoPropertyMeta() {
-    return mysqlTablePropertiesMetadata.propertyEntries();
   }
 }
