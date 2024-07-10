@@ -37,6 +37,9 @@ import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.datastrato.gravitino.server.web.ObjectMapperProvider;
 import com.datastrato.gravitino.server.web.VersioningFilter;
 import com.datastrato.gravitino.server.web.filter.AccessControlNotAllowedFilter;
+import com.datastrato.gravitino.server.web.mapper.JsonMappingExceptionMapper;
+import com.datastrato.gravitino.server.web.mapper.JsonParseExceptionMapper;
+import com.datastrato.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
 import com.datastrato.gravitino.server.web.ui.WebUIFilter;
 import java.io.File;
 import java.util.Properties;
@@ -102,6 +105,9 @@ public class GravitinoServer extends ResourceConfig {
             bind(gravitinoEnv.topicDispatcher()).to(TopicDispatcher.class).ranked(1);
           }
         });
+    register(JsonProcessingExceptionMapper.class);
+    register(JsonParseExceptionMapper.class);
+    register(JsonMappingExceptionMapper.class);
     register(ObjectMapperProvider.class).register(JacksonFeature.class);
 
     if (!enableAuthorization) {

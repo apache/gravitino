@@ -15,7 +15,6 @@ software distributed under the License is distributed on an
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
-
 """
 
 from typing import List, Dict
@@ -25,18 +24,6 @@ from gravitino.api.catalog_change import CatalogChange
 from gravitino.auth.auth_data_provider import AuthDataProvider
 from gravitino.client.gravitino_client_base import GravitinoClientBase
 from gravitino.client.gravitino_metalake import GravitinoMetalake
-
-
-class NoSuchMetalakeException(Exception):
-    pass
-
-
-class NoSuchCatalogException(Exception):
-    pass
-
-
-class CatalogAlreadyExistsException(Exception):
-    pass
 
 
 class GravitinoClient(GravitinoClientBase):

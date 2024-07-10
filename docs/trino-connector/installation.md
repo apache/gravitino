@@ -1,14 +1,14 @@
 ---
-title: "Gravitino connector installation"
+title: "Apache Gravitino connector installation"
 slug: /trino-connector/installation
 keyword: gravitino connector trino
 license: "This software is licensed under the Apache License version 2."
 ---
 
-To install the Gravitino connector, you should first deploy the Trino environment, and then install the Gravitino connector plugin into Trino.
+To install the Apache Gravitino connector, you should first deploy the Trino environment, and then install the Gravitino connector plugin into Trino.
 Please refer to the [Deploying Trino documentation](https://trino.io/docs/current/installation/deployment.html) and do the following steps:
 
-1. [Download](https://github.com/datastrato/gravitino/releases) the Gravitino connector tarball and unpack it.
+1. [Download](https://github.com/apache/gravitino/releases) the Gravitino connector tarball and unpack it.
    The tarball contains a single top-level directory `gravitino-trino-connector-<version>`,
    which called the connector directory.
 2. Copy the connector directory to the Trino's plugin directory.
@@ -46,13 +46,13 @@ docker run --name trino-gravitino -d -p 8080:8080 trinodb/trino:435
 Run `docker ps` to check whether the container is running.
 
 
-### Installing the Gravitino connector
+### Installing the Apache Gravitino connector
 
 Download the Gravitino connector tarball and unpack it.
 
 ```shell
 cd /tmp
-wget https://github.com/datastrato/gravitino/releases/gravitino-trino-connector-<version>.tar.gz
+wget https://github.com/apache/gravitino/releases/gravitino-trino-connector-<version>.tar.gz
 tar -zxvf gravitino-trino-connector-<version>.tar.gz
 ```
 
@@ -86,7 +86,7 @@ discovery.uri=http://localhost:8080
 catalog.management=dynamic
 ```
 
-### Configuring the Gravitino connector
+### Configuring the Apache Gravitino connector
 
 Assuming you have now started the Gravitino server on the host `gravitino-server-host` and already created a metalake named `test`, if those have not been prepared, please refer to the [Gravitino getting started](../getting-started.md).
 
@@ -104,7 +104,7 @@ gravitino.simplify-catalog-names=true
 - The `gravitino.uri` defines the connection information about Gravitino server. Make sure your container can access the Gravitino server.
 - The `gravitino.simplify-catalog-names` setting omits the metalake prefix from catalog names when set to true. 
 
-Full configurations for Gravitino connector can be seen [here](configuration.md)
+Full configurations for Apache Gravitino connector can be seen [here](configuration.md)
 
 If you haven't created the metalake named `test`, you can use the following command to create it.
 
@@ -118,7 +118,7 @@ And then restart the Trino container to load the Gravitino connector.
 docker restart trino-gravitino
 ```
 
-### Verifying the Gravitino connector
+### Verifying the Apache Gravitino connector
 
 Use the Trino CLI to connect to the Trino container and run a query.
 

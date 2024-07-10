@@ -142,7 +142,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
     adminClientConfig.putAll(bypassConfigs);
     adminClientConfig.put(
         AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, config.get(BOOTSTRAP_SERVERS));
-    // use gravitino catalog id as the admin client id
+    // use Gravitino catalog id as the admin client id
     adminClientConfig.put(
         AdminClientConfig.CLIENT_ID_CONFIG,
         String.format(CLIENT_ID_TEMPLATE, config.get(ID_KEY), info.namespace(), info.name()));

@@ -7,7 +7,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Playground introduction
 
-The playground is a complete Gravitino Docker runtime environment with `Hive`, `HDFS`, `Trino`, `MySQL`, `PostgreSQL`, `Jupyter`, and a `Gravitino` server.
+The playground is a complete Apache Gravitino Docker runtime environment with `Hive`, `HDFS`, `Trino`, `MySQL`, `PostgreSQL`, `Jupyter`, and a `Gravitino` server.
 
 Depending on your network and computer, startup time may take 3-5 minutes. Once the playground environment has started, you can open [http://localhost:8090](http://localhost:8090) in a browser to access the Gravitino Web UI.
 
@@ -33,7 +33,7 @@ The playground runs a number of services. The TCP ports used may clash with exis
 ### Launch all components of playground
 
 ```shell
-git clone git@github.com:datastrato/gravitino-playground.git
+git clone git@github.com:apache/gravitino-playground.git
 cd gravitino-playground
 ./launch-playground.sh
 ```
@@ -41,7 +41,7 @@ cd gravitino-playground
 ### Launch big data components of playground
 
 ```shell
-git clone git@github.com:datastrato/gravitino-playground.git
+git clone git@github.com:apache/gravitino-playground.git
 cd gravitino-playground
 ./launch-playground.sh bigdata
 # equivalent to
@@ -51,7 +51,7 @@ cd gravitino-playground
 ### Launch AI components of playground
 
 ```shell
-git clone git@github.com:datastrato/gravitino-playground.git
+git clone git@github.com:apache/gravitino-playground.git
 cd gravitino-playground
 ./launch-playground.sh ai
 # equivalent to
@@ -61,12 +61,12 @@ cd gravitino-playground
 ### Launch special component or components of playground
 
 ```shell
-git clone git@github.com:datastrato/gravitino-playground.git
+git clone git@github.com:apache/gravitino-playground.git
 cd gravitino-playground
 ./launch-playground.sh hive|gravitino|trino|postgresql|mysql|spark|jupyter
 ```
 
-### Experiencing Gravitino Fileset with Jupyter
+### Experiencing Apache Gravitino Fileset with Jupyter
 
 We provide a Fileset playground environment to help you quickly understand how to use Gravitino
 Python client to manage non-tabular data on HDFS via fileset in Gravitino service.
@@ -76,7 +76,7 @@ to launch a Gravitino server, HDFS and Jupyter notebook environment in you local
 Waiting for the playground Docker environment to start, you can directly open
 `http://localhost:8888/lab/tree/gravitino-fileset-example.ipynb` in the browser and run the example.
 
-The [gravitino-fileset-example](https://github.com/datastrato/gravitino-playground/blob/main/init/jupyter/gravitino-fileset-example.ipynb)
+The [gravitino-fileset-example](https://github.com/apache/gravitino-playground/blob/main/init/jupyter/gravitino-fileset-example.ipynb)
 contains the following code snippets:
 
 1. Install HDFS Python client.
@@ -97,7 +97,7 @@ contains the following code snippets:
 11. Drop this `Fileset.Type.EXTERNAL` type fileset and check if the fileset location was
     not deleted in HDFS.
 
-## Experiencing Gravitino with Trino SQL
+## Experiencing Apache Gravitino with Trino SQL
 
 1. Log in to the Gravitino playground Trino Docker container using the following command:
 
@@ -184,7 +184,7 @@ WHERE e.employee_id = p.employee_id AND p.employee_id = s.employee_id
 GROUP BY e.employee_id,  given_name, family_name;
 ```
 
-### Using Iceberg REST service
+### Using Apache Iceberg REST service
 
 If you want to migrate your business from Hive to Iceberg. Some tables will use Hive, and the other tables will use Iceberg.
 Gravitino provides an Iceberg REST catalog service, too. You can use Spark to access REST catalog to write the table data.

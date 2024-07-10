@@ -1,11 +1,11 @@
 ---
-title: "Gravitino connector development"
+title: "Apache Gravitino connector development"
 slug: /trino-connector/development
 keyword: gravitino connector development 
 license: "This software is licensed under the Apache License version 2."
 ---
 
-This document is to guide users through the development of the Gravitino connector for Trino locally.
+This document is to guide users through the development of the Apache Gravitino connector for Trino locally.
 
 ## Prerequisites
 

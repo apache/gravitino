@@ -30,7 +30,7 @@ import org.apache.iceberg.types.Types;
 public class ConvertUtil {
 
   /**
-   * Convert the Iceberg Table to the corresponding schema information in the Iceberg.
+   * Convert an Apache Iceberg Table to the corresponding schema information in the Iceberg.
    *
    * @param gravitinoTable Gravitino table of Iceberg.
    * @return Iceberg schema.
@@ -47,7 +47,7 @@ public class ConvertUtil {
    * Convert the nested field of Iceberg to the Iceberg column.
    *
    * @param nestedField Iceberg nested field.
-   * @return Gravitino iceberg column
+   * @return Gravitino Iceberg column
    */
   public static IcebergColumn fromNestedField(Types.NestedField nestedField) {
     return IcebergColumn.builder()
@@ -59,9 +59,9 @@ public class ConvertUtil {
   }
 
   /**
-   * Convert the Gravitino iceberg table to the Gravitino StructType
+   * Convert the Gravitino Iceberg table to the Gravitino StructType
    *
-   * @param icebergTable Gravitino iceberg table
+   * @param icebergTable Gravitino Iceberg table
    * @return Gravitino StructType
    */
   private static com.datastrato.gravitino.rel.types.Types.StructType toGravitinoStructType(

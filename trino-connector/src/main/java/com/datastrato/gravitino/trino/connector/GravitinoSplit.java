@@ -28,8 +28,8 @@ import io.trino.spi.connector.ConnectorSplit;
 import java.util.List;
 
 /**
- * The GravitinoFTransactionHandle is used to make Gravitino metadata operations transactional and
- * wrap the inner connector transaction for data access.
+ * The GravitinoFTransactionHandle is used to make Apache Gravitino metadata operations
+ * transactional and wrap the inner connector transaction for data access.
  */
 public class GravitinoSplit implements ConnectorSplit, GravitinoHandle<ConnectorSplit> {
 

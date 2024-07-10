@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 
-/** Transform hive catalog properties between Spark and Gravitino. */
+/** Transform Apache Hive catalog properties between Apache Spark and Apache Gravitino. */
 public class HivePropertiesConverter implements PropertiesConverter {
   public static class HivePropertiesConverterHolder {
     private static final HivePropertiesConverter INSTANCE = new HivePropertiesConverter();
@@ -44,7 +44,7 @@ public class HivePropertiesConverter implements PropertiesConverter {
     return HivePropertiesConverterHolder.INSTANCE;
   }
 
-  // Transform Spark hive file format to Gravitino hive file format
+  // Transform Spark Hive file format to Gravitino hive file format
   static final Map<String, String> fileFormatMap =
       ImmutableMap.of(
           "sequencefile", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_SEQUENCEFILE,
@@ -81,7 +81,7 @@ public class HivePropertiesConverter implements PropertiesConverter {
         StringUtils.isNotBlank(metastoreUri),
         "Couldn't get "
             + GravitinoSparkConfig.GRAVITINO_HIVE_METASTORE_URI
-            + " from hive catalog properties");
+            + " from Hive catalog properties");
     HashMap<String, String> all = new HashMap<>();
     all.put(GravitinoSparkConfig.SPARK_HIVE_METASTORE_URI, metastoreUri);
     return all;

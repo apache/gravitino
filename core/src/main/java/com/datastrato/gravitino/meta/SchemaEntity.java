@@ -29,7 +29,7 @@ import java.util.Collections;
 import java.util.Map;
 import lombok.ToString;
 
-/** A class representing a schema entity in Gravitino. */
+/** A class representing a schema entity in Apache Gravitino. */
 @ToString
 public class SchemaEntity implements Entity, Auditable, HasIdentifier {
 

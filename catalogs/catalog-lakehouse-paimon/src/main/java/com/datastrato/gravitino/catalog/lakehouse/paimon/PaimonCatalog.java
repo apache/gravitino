@@ -25,7 +25,9 @@ import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.connector.capability.Capability;
 import java.util.Map;
 
-/** Implementation of {@link Catalog} that represents a Paimon catalog in Gravitino. */
+/**
+ * Implementation of {@link Catalog} that represents an Apache Paimon catalog in Apache Gravitino.
+ */
 public class PaimonCatalog extends BaseCatalog<PaimonCatalog> {
 
   static final PaimonCatalogPropertiesMetadata CATALOG_PROPERTIES_META =

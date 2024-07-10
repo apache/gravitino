@@ -15,15 +15,13 @@ software distributed under the License is distributed on an
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
-
 """
 
+import urllib.parse
 
-class IllegalNameIdentifierException(Exception):
-    """An exception thrown when a name identifier is invalid."""
 
-    def __init__(self, message=None):
-        if message:
-            super().__init__(message)
-        else:
-            super().__init__()
+def encode_string(to_encode: str):
+
+    assert to_encode is not None, "Invalid string to encode: None"
+
+    return urllib.parse.quote(to_encode)

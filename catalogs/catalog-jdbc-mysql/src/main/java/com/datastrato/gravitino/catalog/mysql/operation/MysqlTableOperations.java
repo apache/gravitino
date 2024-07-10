@@ -373,7 +373,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     if (null != updateComment) {
       String newComment = updateComment.getNewComment();
       if (null == StringIdentifier.fromComment(newComment)) {
-        // Detect and add gravitino id.
+        // Detect and add Gravitino id.
         JdbcTable jdbcTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         StringIdentifier identifier = StringIdentifier.fromComment(jdbcTable.comment());
         if (null != identifier) {

@@ -89,7 +89,7 @@ public class FromIcebergPartitionSpec implements PartitionSpecVisitor<Transform>
   }
 
   /**
-   * Transform assembled into gravitino.
+   * Transform assembled into Gravitino.
    *
    * @param partitionSpec Iceberg partition spec.
    * @param schema Iceberg schema.

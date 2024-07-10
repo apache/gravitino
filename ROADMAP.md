@@ -1,8 +1,8 @@
-# Gravitino Roadmap
+# Apache Gravitino Roadmap
 
 ## 2024 Roadmap
 
-As of March 2024, this is the current roadmap for the Gravitino project. Please note that Gravitino is an open-source project and relies on the collective efforts of both community contributors and paid developers to shape its future features and direction. While we strive to keep this roadmap up-to-date, it is best seen as a general guide for future developments rather than an exhaustive list of planned features. The Gravitino community may decide to alter the project's direction or prioritize other features that are not listed here.
+As of March 2024, this is the current roadmap for the Apache Gravitino project. Please note that Gravitino is an open-source project and relies on the collective efforts of both community contributors and paid developers to shape its future features and direction. While we strive to keep this roadmap up-to-date, it is best seen as a general guide for future developments rather than an exhaustive list of planned features. The Gravitino community may decide to alter the project's direction or prioritize other features that are not listed here.
 
 ## First half of 2024 (January-June) - Make Gravitino ready for production environment
 
@@ -20,7 +20,7 @@ As of March 2024, this is the current roadmap for the Gravitino project. Please 
 - Implement support for a basic data compliance framework.
 - Continue to encourage and support community work.
 
-## Second half of 2024 (July-December) - Improve Gravitino features
+## Second half of 2024 (July-December) - Improve Apache Gravitino features
 
 ### Q3 (July-September)
 

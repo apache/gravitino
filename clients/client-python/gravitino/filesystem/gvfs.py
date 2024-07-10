@@ -15,7 +15,6 @@ software distributed under the License is distributed on an
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
-
 """
 
 from enum import Enum
@@ -34,7 +33,7 @@ from readerwriterlock import rwlock
 from gravitino.api.catalog import Catalog
 from gravitino.api.fileset import Fileset
 from gravitino.client.gravitino_client import GravitinoClient
-from gravitino.exceptions.gravitino_runtime_exception import GravitinoRuntimeException
+from gravitino.exceptions.base import GravitinoRuntimeException
 from gravitino.name_identifier import NameIdentifier
 
 PROTOCOL_NAME = "gvfs"
@@ -571,7 +570,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
 
         match = self._identifier_pattern.match(path)
         if match and len(match.groups()) == 3:
-            return NameIdentifier.of_fileset(
+            return NameIdentifier.of(
                 self._metalake, match.group(1), match.group(2), match.group(3)
             )
         raise GravitinoRuntimeException(
@@ -584,12 +583,11 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         :param identifier: The fileset identifier
         :return The fileset
         """
-        catalog: Catalog = self._client.load_catalog(
-            NameIdentifier.of_catalog(
-                identifier.namespace().level(0), identifier.namespace().level(1)
-            )
+        catalog: Catalog = self._client.load_catalog(identifier.namespace().level(1))
+
+        return catalog.as_fileset_catalog().load_fileset(
+            NameIdentifier.of(identifier.namespace().level(2), identifier.name())
         )
-        return catalog.as_fileset_catalog().load_fileset(identifier)
 
     def _get_actual_path_by_ident(
         self,

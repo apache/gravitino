@@ -8,7 +8,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Introduction
 
-Gravitino offers the capability to utilize [Apache Hive](https://hive.apache.org) as a catalog for metadata management.
+Apache Gravitino offers the capability to utilize [Apache Hive](https://hive.apache.org) as a catalog for metadata management.
 
 ### Requirements and limitations
 

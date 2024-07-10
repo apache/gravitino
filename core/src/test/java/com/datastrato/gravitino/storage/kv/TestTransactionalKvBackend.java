@@ -54,6 +54,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @SuppressWarnings("DefaultCharset")
+@Disabled("Gravitino will not support KV entity store since 0.6.0, so we disable this test.")
 class TestTransactionalKvBackend {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TestTransactionalKvBackend.class);

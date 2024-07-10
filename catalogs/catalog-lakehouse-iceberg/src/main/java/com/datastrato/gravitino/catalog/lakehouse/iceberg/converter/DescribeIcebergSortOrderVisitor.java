@@ -23,7 +23,7 @@ import org.apache.iceberg.NullOrder;
 import org.apache.iceberg.transforms.SortOrderVisitor;
 
 /**
- * Convert expressions of Iceberg SortOrders to function string.
+ * Convert expressions of Apache Iceberg SortOrders to function string.
  *
  * <p>Referred from org/apache/iceberg/spark/Spark3Util/DescribeSortOrderVisitor.java
  */

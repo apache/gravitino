@@ -17,9 +17,9 @@
   under the License.
 -->
 
-# Contributing to Gravitino
+# Contributing to Apache Gravitino
 
-Thank you for your interest in contributing to Gravitino! You are welcome to contribute in any way you can to enhance the project. Gravitino appreciates your assistance in making it better, whether through code contributions, documentation, tests, best practices, graphic design, or any other means that have a positive impact.
+Thank you for your interest in contributing to Apache Gravitino! You are welcome to contribute in any way you can to enhance the project. Gravitino appreciates your assistance in making it better, whether through code contributions, documentation, tests, best practices, graphic design, or any other means that have a positive impact.
 
 Before you get started, please read and follow these guidelines to ensure a smooth and productive collaboration.
 
@@ -55,13 +55,13 @@ Before you get started, please read and follow these guidelines to ensure a smoo
 Either click the "Fork" button at the top right of the repository's page on GitHub OR create a fork on your local machine using `git clone`.
 
 ```bash
-git clone https://github.com/datastrato/gravitino.git
+git clone https://github.com/apache/gravitino.git
 cd gravitino
 ```
 
 ### Development Setup
 
-Once you have cloned the [GitHub repository](https://github.com/datastrato/gravitino), see [how to build](/docs/how-to-build.md) for instructions on how to build, or you can use the provided docker images at [Datastrato's DockerHub repository](https://hub.docker.com/u/datastrato).
+Once you have cloned the [GitHub repository](https://github.com/apache/gravitino), see [how to build](/docs/how-to-build.md) for instructions on how to build, or you can use the provided docker images at [Datastrato's DockerHub repository](https://hub.docker.com/u/datastrato).
 
 To stop and start a local Gravitino server via `bin/gravitino.sh start` and `bin/gravitino.sh stop` in a Gravitino distribution, see [how to build](/docs/how-to-build.md) for more instructions.
 
@@ -225,7 +225,7 @@ If you have ideas for enhancements or new features, feel free to create an issue
 
 ### Good First Issues
 
-If you are new to open source or can't find something to work on, check out the [Good First Issues list](https://github.com/datastrato/gravitino/contribute).
+If you are new to open source or can't find something to work on, check out the [Good First Issues list](https://github.com/apache/gravitino/contribute).
 
 ### Working on Issues
 
@@ -281,7 +281,7 @@ All text files should use macOS/unix style line endings (LF) not windows style l
 
 ## Community and communication
 
-Join the [community discourse group](https://gravitino.discourse.group) to discuss ideas and seek help. You are also encouraged to use GitHub discussions and follow Datastrato on social media to stay updated on project news.
+Join the [community mailing list](https://lists.apache.org/list.html?dev@gravitino.apache.org) to discuss ideas and seek help and are also encouraged to use GitHub discussions.
 
 ## License
 

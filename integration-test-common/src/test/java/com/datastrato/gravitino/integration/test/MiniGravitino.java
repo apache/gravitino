@@ -53,8 +53,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * MiniGravitino is a mini Gravitino server for integration tests. It starts a Gravitino server in
- * the same JVM process.
+ * MiniGravitino is a mini Apache Gravitino server for integration tests. It starts a Gravitino
+ * server in the same JVM process.
  */
 public class MiniGravitino {
   private static final Logger LOG = LoggerFactory.getLogger(MiniGravitino.class);
@@ -76,7 +76,7 @@ public class MiniGravitino {
   }
 
   private void removeIcebergRestConfiguration(Properties properties) {
-    // Disable iceberg rest service
+    // Disable Iceberg REST service
     properties.remove(
         AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
             + AuxiliaryServiceManager.AUX_SERVICE_NAMES);

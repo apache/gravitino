@@ -54,7 +54,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.NotImplementedException;
 
-/** This class implements gravitino metadata operators. */
+/** This class implements Apache Gravitino metadata operators. */
 public class CatalogConnectorMetadata {
 
   private static final String CATALOG_DOES_NOT_EXIST_MSG = "Catalog does not exist";

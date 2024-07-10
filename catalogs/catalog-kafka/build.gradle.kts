@@ -43,6 +43,7 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.kafka)
   testImplementation(libs.mockito.core)
+  testImplementation(libs.mockito.inline)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.mysql)
@@ -83,6 +84,15 @@ tasks.getByName("generateMetadataFileForMavenJavaPublication") {
 }
 
 tasks.test {
+  doFirst {
+    val testMode = project.properties["testMode"] as? String ?: "embedded"
+    if (testMode == "deploy") {
+      environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package")
+    } else if (testMode == "embedded") {
+      environment("GRAVITINO_HOME", project.rootDir.path)
+    }
+  }
+
   val skipUTs = project.hasProperty("skipTests")
   if (skipUTs) {
     // Only run integration tests

@@ -28,7 +28,7 @@ import com.google.common.collect.ObjectArrays;
 import java.util.Arrays;
 import java.util.Objects;
 
-/** Helper methods to create logical transforms to pass into Gravitino. */
+/** Helper methods to create logical transforms to pass into Apache Gravitino. */
 public class Transforms {
   /** An empty array of transforms. */
   public static final Transform[] EMPTY_TRANSFORM = new Transform[0];

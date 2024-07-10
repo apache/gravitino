@@ -38,11 +38,15 @@ import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.Maps;
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.paimon.schema.Schema;
 import org.apache.paimon.types.DataField;
@@ -98,6 +102,13 @@ public class TestGravitinoPaimonTable {
   @AfterAll
   static void cleanUp() {
     paimonCatalogOperations.dropSchema(schemaIdent, true);
+    String warehousePath = "/tmp/paimon_catalog_warehouse";
+    try {
+      FileUtils.deleteDirectory(new File(warehousePath));
+      Files.delete(Paths.get(warehousePath));
+    } catch (Exception e) {
+      // Ignore
+    }
   }
 
   private static CatalogEntity createDefaultCatalogEntity() {

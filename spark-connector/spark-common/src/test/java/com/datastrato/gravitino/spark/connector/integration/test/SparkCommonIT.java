@@ -122,7 +122,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   // database after spark connector support Alter database xx set location command.
   @BeforeAll
   void initDefaultDatabase() throws IOException {
-    // In embedded mode, derby acts as the backend database for the hive metastore
+    // In embedded mode, derby acts as the backend database for the Hive metastore
     // and creates a directory named metastore_db to store metadata,
     // supporting only one connection at a time.
     // Previously, only SparkHiveCatalogIT accessed derby without any exceptions.

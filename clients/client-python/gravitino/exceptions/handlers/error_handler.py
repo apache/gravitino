@@ -15,11 +15,26 @@ software distributed under the License is distributed on an
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
-
 """
 
-from gravitino.exceptions.not_found_exception import NotFoundException
+from abc import ABC, abstractmethod
+from gravitino.dto.responses.error_response import ErrorResponse
 
 
-class NoSuchMetalakeException(NotFoundException):
-    """An exception thrown when a metalake is not found."""
+class ErrorHandler(ABC):
+    """The ErrorHandler class is an abstract class specialized for handling ErrorResponse objects.
+    Subclasses of ErrorHandler must implement the parseResponse method to provide custom parsing
+    logic for different types of errors.
+    """
+
+    @abstractmethod
+    def handle(self, error_response: ErrorResponse):
+        """Handles the error response and raise the appropriate Exception. The implementation will use the
+        provided error response to determine which exception to raise.
+
+        Args:
+          error_response: the error response from the server
+
+        Raises:
+          appropriate Exception.
+        """

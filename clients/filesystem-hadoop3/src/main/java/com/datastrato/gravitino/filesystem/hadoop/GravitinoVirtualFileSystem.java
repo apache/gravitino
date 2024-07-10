@@ -56,8 +56,8 @@ import org.slf4j.LoggerFactory;
 /**
  * {@link GravitinoVirtualFileSystem} is a virtual file system which users can access `fileset` and
  * other resources. It obtains the actual storage location corresponding to the resource from the
- * Gravitino server, and creates an independent file system for it to act as an agent for users to
- * access the underlying storage.
+ * Apache Gravitino server, and creates an independent file system for it to act as an agent for
+ * users to access the underlying storage.
  */
 public class GravitinoVirtualFileSystem extends FileSystem {
   private static final Logger Logger = LoggerFactory.getLogger(GravitinoVirtualFileSystem.class);

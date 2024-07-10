@@ -34,7 +34,7 @@ import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.capability.Capability;
 import java.util.Map;
 
-/** Implementation of a Doris catalog in Gravitino. */
+/** Implementation of an Apache Doris catalog in Apache Gravitino. */
 public class DorisCatalog extends JdbcCatalog {
 
   @Override

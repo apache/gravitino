@@ -35,6 +35,8 @@ import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
+import org.apache.commons.io.FileUtils;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -69,8 +71,17 @@ public class TestPaimonCatalog {
         }
       };
 
-  private String tempDir =
+  private static String tempDir =
       String.join(File.separator, System.getProperty("java.io.tmpdir"), "paimon_catalog_warehouse");
+
+  @AfterAll
+  public static void clean() {
+    try {
+      FileUtils.deleteDirectory(new File(tempDir));
+    } catch (Exception e) {
+      // Ignore
+    }
+  }
 
   @Test
   public void testCatalogOperation() {

@@ -826,7 +826,7 @@ public class CatalogMysqlIT extends AbstractIT {
         .createTable(
             NameIdentifier.of(schemaName, tableName),
             createColumns(),
-            "Created by gravitino client",
+            "Created by Gravitino client",
             ImmutableMap.<String, String>builder().build());
 
     // Try to drop a database, and cascade equals to false, it should not be

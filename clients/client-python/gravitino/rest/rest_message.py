@@ -15,7 +15,6 @@ software distributed under the License is distributed on an
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
-
 """
 
 from abc import ABC, abstractmethod
@@ -43,12 +42,6 @@ class RESTMessage(DataClassJsonMixin, ABC):
             IllegalArgumentException: If the message is not valid.
         """
         pass
-
-
-class IllegalArgumentException(Exception):
-    """Exception raised if a REST message is not valid according to the REST spec."""
-
-    pass
 
 
 class RESTRequest(RESTMessage, ABC):

@@ -27,7 +27,7 @@ import org.apache.commons.collections4.bidimap.TreeBidiMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Convert hive properties between trino and gravitino. */
+/** Convert Apache Hive properties between Trino and Apache Gravitino. */
 public class HiveCatalogPropertyConverter extends PropertyConverter {
 
   public static final Logger LOG = LoggerFactory.getLogger(HiveCatalogPropertyConverter.class);

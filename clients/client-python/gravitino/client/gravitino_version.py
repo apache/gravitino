@@ -15,7 +15,6 @@ software distributed under the License is distributed on an
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
-
 """
 
 import re
@@ -23,7 +22,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from gravitino.dto.version_dto import VersionDTO
-from gravitino.exceptions.gravitino_runtime_exception import GravitinoRuntimeException
+from gravitino.exceptions.base import GravitinoRuntimeException
 
 
 class Version(Enum):

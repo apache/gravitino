@@ -63,14 +63,12 @@ import com.datastrato.gravitino.meta.SchemaVersion;
 import com.datastrato.gravitino.meta.TableEntity;
 import com.datastrato.gravitino.meta.TopicEntity;
 import com.datastrato.gravitino.meta.UserEntity;
-import com.datastrato.gravitino.storage.relational.RelationalEntityStore;
 import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -78,10 +76,8 @@ import java.sql.Statement;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
@@ -96,14 +92,15 @@ public class TestEntityStorage {
   private static final String JDBC_STORE_PATH =
       "/tmp/gravitino_jdbc_entityStore_" + UUID.randomUUID().toString().replace("-", "");
   private static final String DB_DIR = JDBC_STORE_PATH + "/testdb";
+  private static final String H2_FILE = DB_DIR + ".mv.db";
 
   static Object[] storageProvider() {
-    return new Object[] {Configs.DEFAULT_ENTITY_STORE, Configs.RELATIONAL_ENTITY_STORE};
+    return new Object[] {Configs.RELATIONAL_ENTITY_STORE};
   }
 
   private void init(String type, Config config) {
     Preconditions.checkArgument(StringUtils.isNotBlank(type));
-    if (type.equals(Configs.DEFAULT_ENTITY_STORE)) {
+    if (type.equals(Configs.KV_STORE_KEY)) {
       try {
         FileUtils.deleteDirectory(FileUtils.getFile(KV_STORE_PATH));
       } catch (Exception e) {
@@ -145,28 +142,9 @@ public class TestEntityStorage {
     }
   }
 
-  private void prepareJdbcTable() {
-    // Read the ddl sql to create table
-    String scriptPath = "h2/schema-0.6.0-h2.sql";
-    try (SqlSession sqlSession =
-            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
-        Connection connection = sqlSession.getConnection();
-        Statement statement = connection.createStatement()) {
-      StringBuilder ddlBuilder = new StringBuilder();
-      IOUtils.readLines(
-              Objects.requireNonNull(
-                  this.getClass().getClassLoader().getResourceAsStream(scriptPath)),
-              StandardCharsets.UTF_8)
-          .forEach(line -> ddlBuilder.append(line).append("\n"));
-      statement.execute(ddlBuilder.toString());
-    } catch (Exception e) {
-      throw new IllegalStateException("Create tables failed", e);
-    }
-  }
-
   private void destroy(String type) {
     Preconditions.checkArgument(StringUtils.isNotBlank(type));
-    if (type.equals(Configs.DEFAULT_ENTITY_STORE)) {
+    if (type.equals(Configs.KV_STORE_KEY)) {
       try {
         FileUtils.deleteDirectory(FileUtils.getFile(KV_STORE_PATH));
       } catch (Exception e) {
@@ -178,6 +156,8 @@ public class TestEntityStorage {
       if (dir.exists()) {
         dir.delete();
       }
+
+      FileUtils.deleteQuietly(new File(H2_FILE));
     } else {
       throw new UnsupportedOperationException("Unsupported entity store type: " + type);
     }
@@ -2135,9 +2115,6 @@ public class TestEntityStorage {
 
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
-      if (store instanceof RelationalEntityStore) {
-        prepareJdbcTable();
-      }
 
       BaseMetalake metalake = createBaseMakeLake(1L, "metalake", auditInfo);
       CatalogEntity catalog = createCatalog(1L, Namespace.of("metalake"), "catalog", auditInfo);

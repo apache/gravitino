@@ -36,7 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/** An implementation of Gravitino System connector Metadata */
+/** An implementation of Apache Gravitino System connector Metadata */
 public class GravitinoSystemConnectorMetadata implements ConnectorMetadata {
 
   @Override

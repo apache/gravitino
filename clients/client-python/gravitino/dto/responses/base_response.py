@@ -15,7 +15,6 @@ software distributed under the License is distributed on an
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
-
 """
 
 from dataclasses import dataclass, field
@@ -36,7 +35,6 @@ class BaseResponse(RESTResponse):
 
     def validate(self):
         """Validates the response code.
-        TODO: @throws IllegalArgumentException if code value is negative.
+        @throws IllegalArgumentException if code value is negative.
         """
-        if self._code < 0:
-            raise ValueError("code must be >= 0")
+        assert self._code >= 0, "code must be >= 0"

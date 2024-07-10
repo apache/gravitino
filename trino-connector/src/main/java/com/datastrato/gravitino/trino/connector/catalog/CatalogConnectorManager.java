@@ -53,7 +53,7 @@ import org.slf4j.LoggerFactory;
  * This class has the following main functions:
  *
  * <pre>
- * 1. Load catalogs from the Gravitino server and create
+ * 1. Load catalogs from the Apache Gravitino server and create
  * catalog contexts.
  * 2. Manage all catalog context instances, which primarily handle communication
  * with Trino through Gravitino connectors and inner connectors related to the engine.

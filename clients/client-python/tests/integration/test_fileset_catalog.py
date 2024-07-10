@@ -15,7 +15,6 @@ software distributed under the License is distributed on an
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
-
 """
 
 import logging
@@ -30,6 +29,7 @@ from gravitino import (
     Fileset,
     FilesetChange,
 )
+from gravitino.exceptions.base import NoSuchFilesetException
 from tests.integration.integration_test_env import IntegrationTestEnv
 
 logger = logging.getLogger(__name__)
@@ -58,18 +58,12 @@ class TestFilesetCatalog(IntegrationTestEnv):
     }
     fileset_new_name = fileset_name + "_new"
 
-    catalog_ident: NameIdentifier = NameIdentifier.of_catalog(
-        metalake_name, catalog_name
-    )
-    schema_ident: NameIdentifier = NameIdentifier.of_schema(
+    catalog_ident: NameIdentifier = NameIdentifier.of(metalake_name, catalog_name)
+    schema_ident: NameIdentifier = NameIdentifier.of(
         metalake_name, catalog_name, schema_name
     )
-    fileset_ident: NameIdentifier = NameIdentifier.of_fileset(
-        metalake_name, catalog_name, schema_name, fileset_name
-    )
-    fileset_new_ident: NameIdentifier = NameIdentifier.of_fileset(
-        metalake_name, catalog_name, schema_name, fileset_new_name
-    )
+    fileset_ident: NameIdentifier = NameIdentifier.of(schema_name, fileset_name)
+    fileset_new_ident: NameIdentifier = NameIdentifier.of(schema_name, fileset_new_name)
 
     gravitino_admin_client: GravitinoAdminClient = GravitinoAdminClient(
         uri="http://localhost:8090"
@@ -101,7 +95,9 @@ class TestFilesetCatalog(IntegrationTestEnv):
             logger.info(
                 "Drop schema %s[%s]",
                 self.schema_ident,
-                catalog.as_schemas().drop_schema(ident=self.schema_ident, cascade=True),
+                catalog.as_schemas().drop_schema(
+                    schema_name=self.schema_name, cascade=True
+                ),
             )
             logger.info(
                 "Drop catalog %s[%s]",
@@ -131,7 +127,7 @@ class TestFilesetCatalog(IntegrationTestEnv):
             properties={self.catalog_location_prop: "/tmp/test1"},
         )
         catalog.as_schemas().create_schema(
-            ident=self.schema_ident, comment="", properties={}
+            schema_name=self.schema_name, comment="", properties={}
         )
 
     def create_fileset(self) -> Fileset:
@@ -178,6 +174,11 @@ class TestFilesetCatalog(IntegrationTestEnv):
         self.assertEqual(fileset.comment(), self.fileset_comment)
         self.assertEqual(fileset.properties(), self.fileset_properties)
         self.assertEqual(fileset.audit_info().creator(), "anonymous")
+
+    def test_failed_load_fileset(self):
+        catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
+        with self.assertRaises(NoSuchFilesetException):
+            _ = catalog.as_fileset_catalog().load_fileset(ident=self.fileset_ident)
 
     def test_alter_fileset(self):
         self.create_fileset()

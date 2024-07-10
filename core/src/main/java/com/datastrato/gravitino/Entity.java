@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 import lombok.Getter;
 
-/** This interface defines an entity within the Gravitino framework. */
+/** This interface defines an entity within the Apache Gravitino framework. */
 public interface Entity extends Serializable {
 
   // The below constants are used for virtual metalakes, catalogs and schemas

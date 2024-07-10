@@ -46,7 +46,7 @@ import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.types.TimestampType;
 import org.apache.spark.sql.types.VarcharType;
 
-/** Transform DataTypes between Gravitino and Spark. */
+/** Transform DataTypes between Apache Gravitino and Apache Spark. */
 public class SparkTypeConverter {
   public Type toGravitinoType(DataType sparkType) {
     if (sparkType instanceof ByteType) {

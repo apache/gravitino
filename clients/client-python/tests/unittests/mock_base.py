@@ -15,9 +15,9 @@ software distributed under the License is distributed on an
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
-
 """
 
+import json
 from unittest.mock import patch
 
 from gravitino import GravitinoMetalake, Catalog, Fileset
@@ -25,6 +25,8 @@ from gravitino.catalog.fileset_catalog import FilesetCatalog
 from gravitino.dto.fileset_dto import FilesetDTO
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.metalake_dto import MetalakeDTO
+from gravitino.namespace import Namespace
+from gravitino.utils.http_client import HTTPClient
 
 
 def mock_load_metalake():
@@ -50,14 +52,18 @@ def mock_load_fileset_catalog():
         _last_modifier="test",
         _last_modified_time="2024-04-05T10:10:35.218Z",
     )
+
+    namespace = Namespace.of("metalake_demo")
+
     catalog = FilesetCatalog(
+        namespace=namespace,
         name="fileset_catalog",
         catalog_type=Catalog.Type.FILESET,
         provider="hadoop",
         comment="this is test",
         properties={"k": "v"},
         audit=audit_dto,
-        rest_client=None,
+        rest_client=HTTPClient("http://localhost:9090", is_debug=True),
     )
     return catalog
 
@@ -97,3 +103,8 @@ def mock_data(cls):
         pass
 
     return Wrapper
+
+
+def mock_name_identifier_json(name, namespace):
+
+    return json.dumps({"name": name, "namespace": namespace}).encode("utf-8")

@@ -68,7 +68,7 @@ import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 
-/** Represents a Hive Table entity in the Hive Metastore catalog. */
+/** Represents an Apache Hive Table entity in the Hive Metastore catalog. */
 @ToString
 public class HiveTable extends BaseTable {
 

@@ -23,7 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
-/** Interface for transforming properties between Gravitino and Spark. */
+/** Interface for transforming properties between Apache Gravitino and Apache Spark. */
 public interface PropertiesConverter {
   @VisibleForTesting String SPARK_PROPERTY_PREFIX = "spark.bypass.";
 

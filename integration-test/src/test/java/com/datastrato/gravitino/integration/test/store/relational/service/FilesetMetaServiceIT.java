@@ -54,6 +54,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -76,7 +77,7 @@ public class FilesetMetaServiceIT {
 
   @BeforeAll
   public static void setup() {
-    Assumptions.assumeTrue("true".equals(System.getenv("jdbcBackend")));
+    Assumptions.assumeTrue("MySQL".equals(System.getenv("jdbcBackend")));
     TestDatabaseName META_DATA = TestDatabaseName.MYSQL_JDBC_BACKEND;
     containerSuite.startMySQLContainer(META_DATA);
     MySQLContainer MYSQL_CONTAINER = containerSuite.getMySQLContainer();
@@ -98,7 +99,11 @@ public class FilesetMetaServiceIT {
                       + String.format(
                           "/scripts/mysql/schema-%s-mysql.sql", ConfigConstants.VERSION_0_5_0)),
               "UTF-8");
-      String[] initMySQLBackendSqls = mysqlContent.split(";");
+      String[] initMySQLBackendSqls =
+          Arrays.stream(mysqlContent.split(";"))
+              .map(String::trim)
+              .filter(s -> !s.isEmpty())
+              .toArray(String[]::new);
       initMySQLBackendSqls = ArrayUtils.addFirst(initMySQLBackendSqls, "use " + META_DATA + ";");
       for (String sql : initMySQLBackendSqls) {
         statement.execute(sql);
@@ -123,7 +128,7 @@ public class FilesetMetaServiceIT {
 
   @Test
   public void testDeleteFilesetVersionsByRetentionCount() throws IOException {
-    Assumptions.assumeTrue("true".equals(System.getenv("jdbcBackend")));
+    Assumptions.assumeTrue("MySQL".equals(System.getenv("jdbcBackend")));
     IdGenerator idGenerator = new RandomIdGenerator();
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();

@@ -15,7 +15,6 @@ software distributed under the License is distributed on an
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
-
 """
 
 import logging
@@ -29,7 +28,7 @@ from gravitino.dto.version_dto import VersionDTO
 from gravitino.dto.responses.metalake_response import MetalakeResponse
 from gravitino.dto.responses.version_response import VersionResponse
 from gravitino.utils import HTTPClient
-from gravitino.exceptions.gravitino_runtime_exception import GravitinoRuntimeException
+from gravitino.exceptions.base import GravitinoRuntimeException
 from gravitino.constants.version import VERSION_INI, Version
 from gravitino.name_identifier import NameIdentifier
 
