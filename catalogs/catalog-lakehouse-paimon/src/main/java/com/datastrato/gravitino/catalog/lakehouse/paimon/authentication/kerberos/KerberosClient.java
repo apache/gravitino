@@ -16,8 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
-package com.datastrato.gravitino.catalog.hadoop.authentication.kerberos;
+package com.datastrato.gravitino.catalog.lakehouse.paimon.authentication.kerberos;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
@@ -39,7 +38,8 @@ import org.slf4j.LoggerFactory;
 public class KerberosClient {
   private static final Logger LOG = LoggerFactory.getLogger(KerberosClient.class);
 
-  public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-hadoop-%s-keytab";
+  public static final String GRAVITINO_KEYTAB_FORMAT =
+      "keytabs/gravitino-lakehouse-paimon-%s-keytab";
 
   private final ScheduledThreadPoolExecutor checkTgtExecutor;
   private final Map<String, String> conf;
@@ -86,7 +86,7 @@ public class KerberosClient {
     return principalComponents.get(1);
   }
 
-  public File saveKeyTabFileFromUri(Long catalogId) throws IOException {
+  public File saveKeyTabFileFromUri(String catalogId) throws IOException {
 
     KerberosConfig kerberosConfig = new KerberosConfig(conf);
 
@@ -96,9 +96,9 @@ public class KerberosClient {
     Preconditions.checkArgument(
         !keyTabUri.trim().startsWith("hdfs"), "Keytab uri doesn't support to use HDFS");
 
-    java.io.File keytabsDir = new File("keytabs");
+    File keytabsDir = new File("keytabs");
     if (!keytabsDir.exists()) {
-      // Ignore the return value, because there exists many Hadoop catalog operations making
+      // Ignore the return value, because there exists many Paimon catalog operations making
       // this directory.
       keytabsDir.mkdir();
     }
