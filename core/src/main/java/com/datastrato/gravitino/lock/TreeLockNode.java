@@ -19,6 +19,7 @@
 
 package com.datastrato.gravitino.lock;
 
+import com.datastrato.gravitino.NameIdentifier;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
 import com.google.common.collect.Lists;
@@ -44,12 +45,59 @@ public class TreeLockNode {
   private final String name;
   private final ReentrantReadWriteLock readWriteLock;
   @VisibleForTesting final Map<String, TreeLockNode> childMap;
-  private final Map<Thread, Long> holdingThreadTimestamp = new ConcurrentHashMap<>();
+
+  private final Map<ThreadIdentifier, Long> holdingThreadTimestamp = new ConcurrentHashMap<>();
 
   // The reference count of this node. The reference count is used to track the number of the
   // TreeLocks that are using this node. If the reference count is 0, it means that no TreeLock is
   // using this node, and this node can be removed from the tree.
   private final AtomicLong referenceCount = new AtomicLong();
+
+  /**
+   * The identifier of a thread. This class is used to identify this tree lock node is held by which
+   * thread and identifier because one thread can hold multiple tree lock nodes at the same time.
+   * For example, a thread can hold the lock of the root node and the lock of the child node at the
+   * same time.
+   */
+  static class ThreadIdentifier {
+    private final Thread thread;
+    private final NameIdentifier ident;
+
+    public ThreadIdentifier(Thread thread, NameIdentifier ident) {
+      this.thread = thread;
+      this.ident = ident;
+    }
+
+    static ThreadIdentifier of(Thread thread, NameIdentifier identifier) {
+      return new ThreadIdentifier(thread, identifier);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || !(o instanceof ThreadIdentifier)) {
+        return false;
+      }
+      ThreadIdentifier that = (ThreadIdentifier) o;
+      return Objects.equal(thread, that.thread) && Objects.equal(ident, that.ident);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hashCode(thread, ident);
+    }
+
+    @Override
+    public String toString() {
+      final StringBuilder sb = new StringBuilder("ThreadIdentifier{");
+      sb.append("thread=").append(thread);
+      sb.append(", ident=").append(ident);
+      sb.append('}');
+      return sb.toString();
+    }
+  }
 
   protected TreeLockNode(String name) {
     this.name = name;
@@ -61,8 +109,16 @@ public class TreeLockNode {
     return name;
   }
 
-  Map<Thread, Long> getHoldingThreadTimestamp() {
+  Map<ThreadIdentifier, Long> getHoldingThreadTimestamp() {
     return holdingThreadTimestamp;
+  }
+
+  void addHoldingThreadTimestamp(Thread currentThread, NameIdentifier identifier, long timestamp) {
+    holdingThreadTimestamp.put(ThreadIdentifier.of(currentThread, identifier), timestamp);
+  }
+
+  long removeHoldingThreadTimestamp(Thread currentThread, NameIdentifier identifier) {
+    return holdingThreadTimestamp.remove(ThreadIdentifier.of(currentThread, identifier));
   }
 
   /**
@@ -97,17 +153,6 @@ public class TreeLockNode {
     } else {
       readWriteLock.writeLock().lock();
     }
-
-    holdingThreadTimestamp.put(Thread.currentThread(), System.currentTimeMillis());
-    if (LOG.isTraceEnabled()) {
-      LOG.trace(
-          "Node {} has been lock with '{}' lock, hold by {} at {}, current holding threads: {}",
-          this,
-          lockType,
-          Thread.currentThread(),
-          System.currentTimeMillis(),
-          holdingThreadTimestamp);
-    }
   }
 
   /**
@@ -125,17 +170,6 @@ public class TreeLockNode {
     }
 
     this.referenceCount.decrementAndGet();
-
-    long holdStartTime = holdingThreadTimestamp.remove(Thread.currentThread());
-    if (LOG.isTraceEnabled()) {
-      LOG.trace(
-          "Node {} has been unlock with '{}' lock, hold by {} for {} ms, current holding threads: {}",
-          this,
-          lockType,
-          Thread.currentThread(),
-          System.currentTimeMillis() - holdStartTime,
-          holdingThreadTimestamp);
-    }
   }
 
   /**
