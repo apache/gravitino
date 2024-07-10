@@ -76,6 +76,10 @@ jobs:
         java-version: [ 8, 11, 17 ]
     timeout-minutes: 30
     needs: changes
+    permissions:
+      contents: write
+      actions: write
+
     if: needs.changes.outputs.source_changes == 'true'
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
