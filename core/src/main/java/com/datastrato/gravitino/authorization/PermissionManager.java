@@ -42,7 +42,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * PermissionManager is used for managing the logic the granting and revoking roles. Role is used
- * for manging permissions. PermissionManager will filter the invalid roles, too.
+ * for manging permissions.
  */
 class PermissionManager {
   private static final Logger LOG = LoggerFactory.getLogger(PermissionManager.class);
@@ -67,9 +67,12 @@ class PermissionManager {
           UserEntity.class,
           Entity.EntityType.USER,
           userEntity -> {
-            List<RoleEntity> roleEntities =
-                roleManager.getValidRoles(metalake, userEntity.roleNames(), userEntity.roleIds());
-
+            List<RoleEntity> roleEntities = Lists.newArrayList();
+            if (userEntity.roleNames() != null) {
+              for (String role : userEntity.roleNames()) {
+                roleEntities.add(roleManager.getRole(metalake, role));
+              }
+            }
             List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
             List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
 
@@ -129,8 +132,12 @@ class PermissionManager {
           GroupEntity.class,
           Entity.EntityType.GROUP,
           groupEntity -> {
-            List<RoleEntity> roleEntities =
-                roleManager.getValidRoles(metalake, groupEntity.roleNames(), groupEntity.roleIds());
+            List<RoleEntity> roleEntities = Lists.newArrayList();
+            if (groupEntity.roleNames() != null) {
+              for (String role : groupEntity.roleNames()) {
+                roleEntities.add(roleManager.getRole(metalake, role));
+              }
+            }
             List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
             List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
 
@@ -190,8 +197,12 @@ class PermissionManager {
           GroupEntity.class,
           Entity.EntityType.GROUP,
           groupEntity -> {
-            List<RoleEntity> roleEntities =
-                roleManager.getValidRoles(metalake, groupEntity.roleNames(), groupEntity.roleIds());
+            List<RoleEntity> roleEntities = Lists.newArrayList();
+            if (groupEntity.roleNames() != null) {
+              for (String role : groupEntity.roleNames()) {
+                roleEntities.add(roleManager.getRole(metalake, role));
+              }
+            }
             List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
             List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
 
@@ -252,8 +263,12 @@ class PermissionManager {
           UserEntity.class,
           Entity.EntityType.USER,
           userEntity -> {
-            List<RoleEntity> roleEntities =
-                roleManager.getValidRoles(metalake, userEntity.roleNames(), userEntity.roleIds());
+            List<RoleEntity> roleEntities = Lists.newArrayList();
+            if (userEntity.roleNames() != null) {
+              for (String role : userEntity.roleNames()) {
+                roleEntities.add(roleManager.getRole(metalake, role));
+              }
+            }
 
             List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
             List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
