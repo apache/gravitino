@@ -84,17 +84,19 @@ ${HADOOP_HOME}/sbin/start-secure-dns.sh
 sleep 5
 
 # Check if the DataNode is running
-ps -ef | grep DataNode | grep -v "color=auto"
+ps -ef | grep DataNode | grep -v "grep"
 if [[ $? -ne 0 ]]; then
   echo "DataNode failed to start, please check the logs"
-  ehco "HDFS DataNode log start----------------------------"
-  cat ${HADOOP_HOME}/bin/logs/hadoop-root-datanode-*.log
+  echo "HDFS DataNode log start---------------------------"
+  cat ${HADOOP_HOME}/logs/*.log
+  cat ${HADOOP_HOME}/logs/*.out
+  echo "HDFS DataNode log end-----------------------------"
   exit 1
 fi
 
 retry_times=0
 ready=0
-while [[ ${retry_times} -lt 10 ]]; do
+while [[ ${retry_times} -lt 15 ]]; do
   hdfs_ready=$(hdfs dfsadmin -report | grep "Live datanodes" | awk '{print $3}')
   if [[ ${hdfs_ready} == "(1):" ]]; then
     echo "HDFS is ready, retry_times = ${retry_times}"
@@ -106,9 +108,13 @@ while [[ ${retry_times} -lt 10 ]]; do
 done
 
 if [[ ${ready} -ne 1 ]]; then
-  echo "HDFS is not ready"
-  ehco "HDFS DataNode log start---------------------------"
-  cat ${HADOOP_HOME}/bin/logs/hadoop-root-datanode-*.log
+  echo "HDFS is not ready, execute log:"
+  ps -ef | grep DataNode | grep -v "grep"
+  hdfs dfsadmin -report
+  echo "HDFS DataNode log start---------------------------"
+  cat ${HADOOP_HOME}/logs/*.log
+  cat ${HADOOP_HOME}/logs/*.out
+  echo "HDFS DataNode log end-----------------------------"
   exit 1
 fi
 
