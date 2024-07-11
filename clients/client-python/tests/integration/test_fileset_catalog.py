@@ -190,9 +190,7 @@ class TestFilesetCatalog(IntegrationTestEnv):
             FilesetChange.set_property(
                 self.fileset_properties_key2, fileset_properties_new_value
             ),
-            FilesetChange.update_comment(
-                fileset_new_comment
-            ),
+            FilesetChange.update_comment(fileset_new_comment),
         )
         catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
         fileset_new = catalog.as_fileset_catalog().alter_fileset(
@@ -203,14 +201,10 @@ class TestFilesetCatalog(IntegrationTestEnv):
             fileset_properties_new_value,
         )
         self.assertTrue(self.fileset_properties_key1 not in fileset_new.properties())
-        self.assertEqual(
-            fileset_new.comment(),
-            fileset_new_comment
-        )
+        self.assertEqual(fileset_new.comment(), fileset_new_comment)
 
         fileset_comment_removed = catalog.as_fileset_catalog().alter_fileset(
             self.fileset_ident, FilesetChange.remove_comment()
         )
-        self.assertEqual(fileset_comment_removed.ident(), self.fileset_ident)
+        self.assertEqual(fileset_comment_removed.name(), self.fileset_name)
         self.assertIsNone(fileset_comment_removed.comment())
-

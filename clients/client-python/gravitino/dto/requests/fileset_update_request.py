@@ -159,7 +159,7 @@ class FilesetUpdateRequest:
         def validate(self):
             """Validates the fields of the request.
 
-               always pass
+            always pass
             """
             pass
 
