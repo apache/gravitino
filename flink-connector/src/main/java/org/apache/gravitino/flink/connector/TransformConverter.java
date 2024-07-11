@@ -18,12 +18,8 @@
  */
 package org.apache.gravitino.flink.connector;
 
-import com.google.common.base.Preconditions;
-import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
-import org.apache.gravitino.rel.expressions.transforms.Transforms;
 
 /**
  * The TransformConverter is used to convert the partition between Flink and Gravitino. The Flink
@@ -32,19 +28,19 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
  * partition transform.
  */
 public interface TransformConverter {
-  default List<String> toFlinkPartitionKeys(Transform[] transforms) {
-    List<String> partitionKeys =
-        Arrays.stream(transforms)
-            .filter(t -> t instanceof Transforms.IdentityTransform)
-            .map(Transform::name)
-            .collect(Collectors.toList());
-    Preconditions.checkArgument(
-        partitionKeys.size() == transforms.length,
-        "Flink only support identity transform for now.");
-    return partitionKeys;
-  }
+  /**
+   * Convert the partition keys to Flink partition keys.
+   *
+   * @param transforms The partition keys in Gravitino.
+   * @return The partition keys in Flink.
+   */
+  List<String> toFlinkPartitionKeys(Transform[] transforms);
 
-  default Transform[] toGravitinoTransforms(List<String> partitionsKey) {
-    return partitionsKey.stream().map(Transforms::identity).toArray(Transform[]::new);
-  }
+  /**
+   * Convert the partition keys to Gravitino partition keys.
+   *
+   * @param partitionsKey The partition keys in Flink.
+   * @return The partition keys in Gravitino.
+   */
+  Transform[] toGravitinoPartitions(List<String> partitionsKey);
 }

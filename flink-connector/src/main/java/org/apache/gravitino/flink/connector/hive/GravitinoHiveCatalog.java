@@ -27,7 +27,9 @@ import org.apache.flink.table.catalog.hive.HiveCatalog;
 import org.apache.flink.table.catalog.stats.CatalogColumnStatistics;
 import org.apache.flink.table.catalog.stats.CatalogTableStatistics;
 import org.apache.flink.table.factories.Factory;
+import org.apache.gravitino.flink.connector.DefaultTransformConverter;
 import org.apache.gravitino.flink.connector.PropertiesConverter;
+import org.apache.gravitino.flink.connector.TransformConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
 import org.apache.hadoop.hive.conf.HiveConf;
 
@@ -72,6 +74,11 @@ public class GravitinoHiveCatalog extends BaseCatalog {
   @Override
   protected PropertiesConverter getPropertiesConverter() {
     return HivePropertiesConverter.INSTANCE;
+  }
+
+  @Override
+  protected TransformConverter getTransformConverter() {
+    return DefaultTransformConverter.INSTANCE;
   }
 
   @Override

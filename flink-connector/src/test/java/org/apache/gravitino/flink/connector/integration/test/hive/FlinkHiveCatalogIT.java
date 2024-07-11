@@ -24,6 +24,7 @@ import static org.apache.gravitino.flink.connector.integration.test.utils.TestUt
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
@@ -33,8 +34,11 @@ import org.apache.flink.table.api.ResultKind;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.Catalog;
+import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogDescriptor;
 import org.apache.flink.table.catalog.CommonCatalogOptions;
+import org.apache.flink.table.catalog.ObjectPath;
+import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOptions;
 import org.apache.flink.types.Row;
 import org.apache.gravitino.NameIdentifier;
@@ -48,6 +52,7 @@ import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -331,6 +336,21 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
               };
           Assertions.assertArrayEquals(partitions, table.partitioning());
 
+          // load flink catalog
+          try {
+            Catalog flinkCatalog = tableEnv.getCatalog(currentCatalog().name()).get();
+            CatalogBaseTable flinkTable =
+                flinkCatalog.getTable(ObjectPath.fromString(databaseName + "." + tableName));
+            ResolvedCatalogTable resolvedCatalogTable = (ResolvedCatalogTable) flinkTable;
+            Assertions.assertTrue(resolvedCatalogTable.isPartitioned());
+            Assertions.assertArrayEquals(
+                new String[] {"string_type", "double_type"},
+                resolvedCatalogTable.getPartitionKeys().toArray());
+          } catch (Exception e) {
+            Assertions.fail("Table should be exist", e);
+          }
+
+          // write and read datas
           TestUtils.assertTableResult(
               sql("INSERT INTO %s VALUES ('A', 1.0), ('B', 2.0)", tableName),
               ResultKind.SUCCESS_WITH_CONTENT,
@@ -340,6 +360,18 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
               ResultKind.SUCCESS_WITH_CONTENT,
               Row.of("A", 1.0),
               Row.of("B", 2.0));
+          try {
+            Assertions.assertTrue(
+                hdfs.exists(
+                    new Path(
+                        table.properties().get("location"), "/string_type=A/double_type=1.0")));
+            Assertions.assertTrue(
+                hdfs.exists(
+                    new Path(
+                        table.properties().get("location"), "/string_type=B/double_type=2.0")));
+          } catch (IOException e) {
+            Assertions.fail("The partition directory should be exist.", e);
+          }
         },
         true);
   }

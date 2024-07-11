@@ -78,12 +78,14 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
  * The BaseCatalog that provides a default implementation for all methods in the {@link
  * org.apache.flink.table.catalog.Catalog} interface.
  */
-public abstract class BaseCatalog extends AbstractCatalog implements TransformConverter {
+public abstract class BaseCatalog extends AbstractCatalog {
   private final PropertiesConverter propertiesConverter;
+  private final TransformConverter transformConverter;
 
   protected BaseCatalog(String catalogName, String defaultDatabase) {
     super(catalogName, defaultDatabase);
     this.propertiesConverter = getPropertiesConverter();
+    this.transformConverter = getTransformConverter();
   }
 
   @Override
@@ -261,7 +263,8 @@ public abstract class BaseCatalog extends AbstractCatalog implements TransformCo
     String comment = table.getComment();
     Map<String, String> properties =
         propertiesConverter.toGravitinoTableProperties(table.getOptions());
-    Transform[] partitions = toGravitinoTransforms(((CatalogTable) table).getPartitionKeys());
+    Transform[] partitions =
+        transformConverter.toGravitinoPartitions(((CatalogTable) table).getPartitionKeys());
     try {
       catalog().asTableCatalog().createTable(identifier, columns, comment, properties, partitions);
     } catch (NoSuchSchemaException e) {
@@ -439,6 +442,8 @@ public abstract class BaseCatalog extends AbstractCatalog implements TransformCo
 
   protected abstract PropertiesConverter getPropertiesConverter();
 
+  protected abstract TransformConverter getTransformConverter();
+
   protected CatalogBaseTable toFlinkTable(Table table) {
     org.apache.flink.table.api.Schema.Builder builder =
         org.apache.flink.table.api.Schema.newBuilder();
@@ -450,7 +455,7 @@ public abstract class BaseCatalog extends AbstractCatalog implements TransformCo
     }
     Map<String, String> flinkTableProperties =
         propertiesConverter.toFlinkTableProperties(table.properties());
-    List<String> partitionKeys = toFlinkPartitionKeys(table.partitioning());
+    List<String> partitionKeys = transformConverter.toFlinkPartitionKeys(table.partitioning());
     return CatalogTable.of(builder.build(), table.comment(), partitionKeys, flinkTableProperties);
   }
 
