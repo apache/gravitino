@@ -77,7 +77,7 @@ class PermissionManager {
             List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
 
             for (RoleEntity roleEntityToGrant : roleEntitiesToGrant) {
-              if (roleNames.contains(roleEntityToGrant.name())) {
+              if (roleIds.contains(roleEntityToGrant.id())) {
                 LOG.warn(
                     "Failed to grant, role {} already exists in the user {} of metalake {}",
                     roleEntityToGrant.name(),
@@ -142,7 +142,7 @@ class PermissionManager {
             List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
 
             for (RoleEntity roleEntityToGrant : roleEntitiesToGrant) {
-              if (roleNames.contains(roleEntityToGrant.name())) {
+              if (roleIds.contains(roleEntityToGrant.id())) {
                 LOG.warn(
                     "Failed to grant, role {} already exists in the group {} of metalake {}",
                     roleEntityToGrant.name(),
