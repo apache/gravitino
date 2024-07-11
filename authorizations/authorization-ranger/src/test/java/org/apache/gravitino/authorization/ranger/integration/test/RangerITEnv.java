@@ -16,13 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.integration.test.authorization.ranger;
+package org.apache.gravitino.authorization.ranger.integration.test;
+
+import static org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin.MANAGED_BY_GRAVITINO;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.gravitino.authorization.ranger.RangerDefines;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.TrinoContainer;
@@ -30,21 +34,23 @@ import org.apache.ranger.RangerClient;
 import org.apache.ranger.RangerServiceException;
 import org.apache.ranger.plugin.model.RangerPolicy;
 import org.apache.ranger.plugin.model.RangerService;
+import org.apache.ranger.plugin.util.SearchFilter;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public abstract class AbstractRangerIT {
-  private static final Logger LOG = LoggerFactory.getLogger(AbstractRangerIT.class);
+// Ranger IT environment
+public class RangerITEnv {
+  private static final Logger LOG = LoggerFactory.getLogger(RangerITEnv.class);
   protected static final String RANGER_TRINO_REPO_NAME = "trinoDev";
   private static final String RANGER_TRINO_TYPE = "trino";
   protected static final String RANGER_HIVE_REPO_NAME = "hiveDev";
   private static final String RANGER_HIVE_TYPE = "hive";
   protected static final String RANGER_HDFS_REPO_NAME = "hdfsDev";
   private static final String RANGER_HDFS_TYPE = "hdfs";
-  private static RangerClient rangerClient;
+  protected static RangerClient rangerClient;
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
@@ -111,7 +117,7 @@ public abstract class AbstractRangerIT {
         return;
       }
     } catch (RangerServiceException e) {
-      LOG.error("Error while fetching service: {}", e.getMessage());
+      LOG.warn("Error while fetching service: {}", e.getMessage());
     }
 
     String usernameKey = "username";
@@ -162,7 +168,7 @@ public abstract class AbstractRangerIT {
         return;
       }
     } catch (RangerServiceException e) {
-      LOG.error("Error while fetching service: {}", e.getMessage());
+      LOG.warn("Error while fetching service: {}", e.getMessage());
     }
 
     String usernameKey = "username";
@@ -216,17 +222,17 @@ public abstract class AbstractRangerIT {
     }
   }
 
-  protected static String updateOrCreateRangerPolicy(
+  protected static void updateOrCreateRangerPolicy(
       String type,
       String serviceName,
       String policyName,
       Map<String, RangerPolicy.RangerPolicyResource> policyResourceMap,
       List<RangerPolicy.RangerPolicyItem> policyItems) {
-    String retPolicyName = policyName;
 
     Map<String, String> resourceFilter = new HashMap<>(); // use to match the precise policy
     Map<String, String> policyFilter = new HashMap<>();
     policyFilter.put(RangerDefines.SEARCH_FILTER_SERVICE_NAME, serviceName);
+    policyFilter.put(SearchFilter.POLICY_LABELS_PARTIAL, MANAGED_BY_GRAVITINO);
     final int[] index = {0};
     policyResourceMap.forEach(
         (k, v) -> {
@@ -274,12 +280,12 @@ public abstract class AbstractRangerIT {
         RangerPolicy policy = policies.get(0);
         policy.getPolicyItems().addAll(policyItems);
         rangerClient.updatePolicy(policy.getId(), policy);
-        retPolicyName = policy.getName();
       } else {
         RangerPolicy policy = new RangerPolicy();
         policy.setServiceType(type);
         policy.setService(serviceName);
         policy.setName(policyName);
+        policy.setPolicyLabels(Lists.newArrayList(MANAGED_BY_GRAVITINO));
         policy.setResources(policyResourceMap);
         policy.setPolicyItems(policyItems);
         rangerClient.createPolicy(policy);
@@ -294,8 +300,6 @@ public abstract class AbstractRangerIT {
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
-
-    return retPolicyName;
   }
 
   /** Clean all policy in the Ranger */
@@ -310,5 +314,12 @@ public abstract class AbstractRangerIT {
     } catch (RangerServiceException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  /**
+   * Didn't call this function in the Lambda function body, It will return a random function name
+   */
+  public static String currentFunName() {
+    return Thread.currentThread().getStackTrace()[2].getMethodName();
   }
 }

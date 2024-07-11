@@ -16,23 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.connector.authorization.mysql;
+package org.apache.gravitino.authorization.ranger.defines;
 
-import java.util.Map;
-import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
-import org.apache.gravitino.connector.authorization.BaseAuthorization;
-
-public class TestMySQLAuthorization extends BaseAuthorization<TestMySQLAuthorization> {
-
-  public TestMySQLAuthorization() {}
-
-  @Override
-  public String shortName() {
-    return "mysql";
-  }
-
-  @Override
-  protected AuthorizationPlugin newPlugin(String catalogProvider, Map<String, String> config) {
-    return new TestMySQLAuthorizationPlugin();
-  }
+// apache/ranger/security-admin/src/main/java/org/apache/ranger/defines/RangerCommonEnums.java
+public class RangerCommonEnums {
+  /** IS_VISIBLE is an element of enum VisibilityStatus. Its value is "IS_VISIBLE". */
+  public static final int IS_VISIBLE = 1;
+  /** STATUS_ENABLED is an element of enum ActiveStatus. Its value is "STATUS_ENABLED". */
+  public static final int STATUS_ENABLED = 1;
+  /** internal group */
+  public static final int GROUP_INTERNAL = 0;
 }
