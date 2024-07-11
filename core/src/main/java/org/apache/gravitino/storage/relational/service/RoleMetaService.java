@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.util.List;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.SecurableObject;
@@ -237,17 +236,10 @@ public class RoleMetaService {
   }
 
   private MetadataObject.Type getType(String type) {
-    if (Entity.ALL_METALAKES_ENTITY_TYPE.equals(type)) {
-      return MetadataObject.Type.METALAKE;
-    }
     return MetadataObject.Type.valueOf(type);
   }
 
   private String getEntityType(SecurableObject securableObject) {
-    if (securableObject.type() == MetadataObject.Type.METALAKE
-        && securableObject.name().equals(MetadataObjects.METADATA_OBJECT_RESERVED_NAME)) {
-      return Entity.ALL_METALAKES_ENTITY_TYPE;
-    }
     return securableObject.type().name();
   }
 }

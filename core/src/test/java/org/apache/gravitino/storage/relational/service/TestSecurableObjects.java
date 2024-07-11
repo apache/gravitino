@@ -104,8 +104,6 @@ public class TestSecurableObjects extends TestJDBCBackend {
     SecurableObject topicObject =
         SecurableObjects.ofTopic(
             schemaObject, "topic", Lists.newArrayList(Privileges.ReadTopic.deny()));
-    SecurableObject allMetalakesObject =
-        SecurableObjects.ofAllMetalakes(Lists.newArrayList(Privileges.UseMetalake.allow()));
 
     RoleEntity role1 =
         createRoleEntity(
@@ -114,12 +112,7 @@ public class TestSecurableObjects extends TestJDBCBackend {
             "role1",
             auditInfo,
             Lists.newArrayList(
-                catalogObject,
-                schemaObject,
-                tableObject,
-                filesetObject,
-                topicObject,
-                allMetalakesObject),
+                catalogObject, schemaObject, tableObject, filesetObject, topicObject),
             ImmutableMap.of("k1", "v1"));
 
     Assertions.assertDoesNotThrow(() -> roleMetaService.insertRole(role1, false));
