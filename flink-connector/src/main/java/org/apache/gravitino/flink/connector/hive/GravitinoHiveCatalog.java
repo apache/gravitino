@@ -20,12 +20,9 @@ package org.apache.gravitino.flink.connector.hive;
 
 import java.util.Optional;
 import javax.annotation.Nullable;
-import org.apache.flink.table.catalog.ObjectPath;
+import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
-import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.table.catalog.hive.HiveCatalog;
-import org.apache.flink.table.catalog.stats.CatalogColumnStatistics;
-import org.apache.flink.table.catalog.stats.CatalogTableStatistics;
 import org.apache.flink.table.factories.Factory;
 import org.apache.gravitino.flink.connector.DefaultTransformConverter;
 import org.apache.gravitino.flink.connector.PropertiesConverter;
@@ -82,14 +79,7 @@ public class GravitinoHiveCatalog extends BaseCatalog {
   }
 
   @Override
-  public CatalogTableStatistics getTableStatistics(ObjectPath objectPath)
-      throws TableNotExistException, CatalogException {
-    return hiveCatalog.getTableStatistics(objectPath);
-  }
-
-  @Override
-  public CatalogColumnStatistics getTableColumnStatistics(ObjectPath tablePath)
-      throws TableNotExistException, CatalogException {
-    return hiveCatalog.getTableColumnStatistics(tablePath);
+  protected AbstractCatalog realCatalog() {
+    return hiveCatalog;
   }
 }

@@ -351,13 +351,13 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
             Assertions.fail("Table should be exist", e);
           }
 
-          // write and read datas
+          // write and read.
           TestUtils.assertTableResult(
               sql("INSERT INTO %s VALUES ('A', 1.0), ('B', 2.0)", tableName),
               ResultKind.SUCCESS_WITH_CONTENT,
               Row.of(-1L));
           TestUtils.assertTableResult(
-              sql("SELECT * FROM %s", tableName),
+              sql("SELECT * FROM %s ORDER BY double_type", tableName),
               ResultKind.SUCCESS_WITH_CONTENT,
               Row.of("A", 1.0),
               Row.of("B", 2.0));
@@ -365,11 +365,11 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
             Assertions.assertTrue(
                 hdfs.exists(
                     new Path(
-                        table.properties().get("location"), "/string_type=A/double_type=1.0")));
+                        table.properties().get("location") + "/string_type=A/double_type=1.0")));
             Assertions.assertTrue(
                 hdfs.exists(
                     new Path(
-                        table.properties().get("location"), "/string_type=B/double_type=2.0")));
+                        table.properties().get("location") + "/string_type=B/double_type=2.0")));
           } catch (IOException e) {
             Assertions.fail("The partition directory should be exist.", e);
           }

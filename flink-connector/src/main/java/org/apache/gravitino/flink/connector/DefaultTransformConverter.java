@@ -12,7 +12,7 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 
-public class DefaultTransformConverter implements TransformConverter {
+public class DefaultTransformConverter extends TransformConverter {
 
   private DefaultTransformConverter() {}
 
@@ -23,7 +23,7 @@ public class DefaultTransformConverter implements TransformConverter {
     List<String> partitionKeys =
         Arrays.stream(transforms)
             .filter(t -> t instanceof Transforms.IdentityTransform)
-            .map(Transform::name)
+            .flatMap(t -> Arrays.stream(((Transforms.IdentityTransform) t).fieldName()))
             .collect(Collectors.toList());
     Preconditions.checkArgument(
         partitionKeys.size() == transforms.length,

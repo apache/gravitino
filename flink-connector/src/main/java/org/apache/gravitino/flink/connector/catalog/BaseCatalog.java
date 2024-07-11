@@ -88,6 +88,8 @@ public abstract class BaseCatalog extends AbstractCatalog {
     this.transformConverter = getTransformConverter();
   }
 
+  protected abstract AbstractCatalog realCatalog();
+
   @Override
   public void open() throws CatalogException {}
 
@@ -285,37 +287,36 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   @Override
-  public List<CatalogPartitionSpec> listPartitions(ObjectPath objectPath)
+  public List<CatalogPartitionSpec> listPartitions(ObjectPath tablePath)
       throws TableNotExistException, TableNotPartitionedException, CatalogException {
-    throw new UnsupportedOperationException();
+    return realCatalog().listPartitions(tablePath);
   }
 
   @Override
   public List<CatalogPartitionSpec> listPartitions(
-      ObjectPath objectPath, CatalogPartitionSpec catalogPartitionSpec)
+      ObjectPath tablePath, CatalogPartitionSpec partitionSpec)
       throws TableNotExistException, TableNotPartitionedException, PartitionSpecInvalidException,
           CatalogException {
-    throw new UnsupportedOperationException();
+    return realCatalog().listPartitions(tablePath, partitionSpec);
   }
 
   @Override
   public List<CatalogPartitionSpec> listPartitionsByFilter(
-      ObjectPath objectPath, List<Expression> list)
+      ObjectPath tablePath, List<Expression> filter)
       throws TableNotExistException, TableNotPartitionedException, CatalogException {
-    throw new UnsupportedOperationException();
+    return realCatalog().listPartitionsByFilter(tablePath, filter);
   }
 
   @Override
-  public CatalogPartition getPartition(
-      ObjectPath objectPath, CatalogPartitionSpec catalogPartitionSpec)
+  public CatalogPartition getPartition(ObjectPath tablePath, CatalogPartitionSpec partitionSpec)
       throws PartitionNotExistException, CatalogException {
-    throw new UnsupportedOperationException();
+    return realCatalog().getPartition(tablePath, partitionSpec);
   }
 
   @Override
-  public boolean partitionExists(ObjectPath objectPath, CatalogPartitionSpec catalogPartitionSpec)
+  public boolean partitionExists(ObjectPath tablePath, CatalogPartitionSpec partitionSpec)
       throws CatalogException {
-    throw new UnsupportedOperationException();
+    return realCatalog().partitionExists(tablePath, partitionSpec);
   }
 
   @Override
@@ -352,9 +353,9 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   @Override
-  public CatalogFunction getFunction(ObjectPath objectPath)
+  public CatalogFunction getFunction(ObjectPath tablePath)
       throws FunctionNotExistException, CatalogException {
-    throw new UnsupportedOperationException();
+    return realCatalog().getFunction(tablePath);
   }
 
   @Override
@@ -381,29 +382,29 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   @Override
-  public CatalogTableStatistics getTableStatistics(ObjectPath objectPath)
+  public CatalogTableStatistics getTableStatistics(ObjectPath tablePath)
       throws TableNotExistException, CatalogException {
-    throw new UnsupportedOperationException();
+    return realCatalog().getTableStatistics(tablePath);
   }
 
   @Override
-  public CatalogColumnStatistics getTableColumnStatistics(ObjectPath objectPath)
+  public CatalogColumnStatistics getTableColumnStatistics(ObjectPath tablePath)
       throws TableNotExistException, CatalogException {
-    throw new UnsupportedOperationException();
+    return realCatalog().getTableColumnStatistics(tablePath);
   }
 
   @Override
   public CatalogTableStatistics getPartitionStatistics(
-      ObjectPath objectPath, CatalogPartitionSpec catalogPartitionSpec)
+      ObjectPath tablePath, CatalogPartitionSpec partitionSpec)
       throws PartitionNotExistException, CatalogException {
-    throw new UnsupportedOperationException();
+    return realCatalog().getPartitionStatistics(tablePath, partitionSpec);
   }
 
   @Override
   public CatalogColumnStatistics getPartitionColumnStatistics(
-      ObjectPath objectPath, CatalogPartitionSpec catalogPartitionSpec)
+      ObjectPath tablePath, CatalogPartitionSpec partitionSpec)
       throws PartitionNotExistException, CatalogException {
-    throw new UnsupportedOperationException();
+    return realCatalog().getPartitionColumnStatistics(tablePath, partitionSpec);
   }
 
   @Override
