@@ -37,8 +37,8 @@ import org.apache.flink.table.catalog.Catalog;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogDescriptor;
 import org.apache.flink.table.catalog.CommonCatalogOptions;
+import org.apache.flink.table.catalog.DefaultCatalogTable;
 import org.apache.flink.table.catalog.ObjectPath;
-import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOptions;
 import org.apache.flink.types.Row;
 import org.apache.gravitino.NameIdentifier;
@@ -342,11 +342,11 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
             Catalog flinkCatalog = tableEnv.getCatalog(currentCatalog().name()).get();
             CatalogBaseTable flinkTable =
                 flinkCatalog.getTable(ObjectPath.fromString(databaseName + "." + tableName));
-            ResolvedCatalogTable resolvedCatalogTable = (ResolvedCatalogTable) flinkTable;
-            Assertions.assertTrue(resolvedCatalogTable.isPartitioned());
+            DefaultCatalogTable catalogTable = (DefaultCatalogTable) flinkTable;
+            Assertions.assertTrue(catalogTable.isPartitioned());
             Assertions.assertArrayEquals(
                 new String[] {"string_type", "double_type"},
-                resolvedCatalogTable.getPartitionKeys().toArray());
+                catalogTable.getPartitionKeys().toArray());
           } catch (Exception e) {
             Assertions.fail("Table should be exist", e);
           }
