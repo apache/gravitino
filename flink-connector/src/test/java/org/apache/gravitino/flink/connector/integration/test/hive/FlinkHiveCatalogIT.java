@@ -313,8 +313,9 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
                   "CREATE TABLE %s "
                       + "(string_type STRING COMMENT 'string_type', "
                       + " double_type DOUBLE COMMENT 'double_type')"
+                      + " COMMENT '%s' "
                       + " PARTITIONED BY (string_type, double_type)"
-                      + " COMMENT '%s' WITH ("
+                      + " WITH ("
                       + "'%s' = '%s')",
                   tableName, comment, key, value);
           TestUtils.assertTableResult(result, ResultKind.SUCCESS);
