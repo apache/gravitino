@@ -75,9 +75,33 @@ sed -i "s/mockhost/${HOSTNAME}/g" ${HIVE_HOME}/conf/hive-site.xml
 # format HDFS
 ${HADOOP_HOME}/bin/hdfs namenode -format -nonInteractive
 
+# Check Whether the ports are occupied and kill the process
+for port in 3306 9000 9083 10000 10002 50070 50075 50010
+do
+  echo "Check whether the port ${port} is occupied..."
+  netstat -tlnp | grep ${port}
+  if [[ $? -eq 0 ]]; then
+    echo "Port ${port} is occupied, killing the process..."
+    pid=$(netstat -tlnp | grep ${port} | awk '{print $7}' | awk -F '/' '{print $1}')
+    kill -9 ${pid}
+  fi
+done
+
 echo "Starting HDFS..."
 echo "Starting NameNode..."
 ${HADOOP_HOME}/sbin/hadoop-daemon.sh start namenode
+
+# Check if the nameNode is running
+ps -ef | grep NameNode | grep -v "grep"
+if [[ $? -ne 0 ]]; then
+  echo "NameNode failed to start, please check the logs"
+  echo "HDFS NameNode log start---------------------------"
+  cat ${HADOOP_HOME}/logs/*.log
+  cat ${HADOOP_HOME}/logs/*.out
+  echo "HDFS NameNode log end-----------------------------"
+  exit 1
+fi
+
 
 echo "Starting DataNode..."
 ${HADOOP_HOME}/sbin/start-secure-dns.sh
