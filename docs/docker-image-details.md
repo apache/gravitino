@@ -266,10 +266,11 @@ Changelog
   - Use `ranger-admin` release from `datastrato/apache-ranger:2.4.0` to build docker image.
   - Remove unnecessary hack in `start-ranger-service.sh`.
   - Reduce docker image build time from `~1h` to `~5min`.
-  - How to debug Ranger admin
+  - How to debug Ranger admin service:
     - Use `docker exec -it <container_id> bash` to enter the docker container.
     - Add these context `export JAVA_OPTS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5001` into `/opt/ranger-admin/ews/webapp/WEB-INF/classes/conf/ranger-admin-env-debug.sh` in the docker container.
     - Execute `./opt/ranger-admin/stop-ranger-admin.sh` and `./opt/ranger-admin/start-ranger-admin.sh` to restart Ranger admin.
+    - Clone the `Apache Ranger` project from GiHub and checkout the `2.4.0` release.
     - Create a remote debug configuration (`Use model classpath` = `EmbeddedServer`) in your IDE and connect to the Ranger admin container.
 
 - gravitino-ci-ranger:0.1.0

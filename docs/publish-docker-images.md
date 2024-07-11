@@ -25,7 +25,7 @@ You can use GitHub actions to publish Docker images to the Docker Hub repository
    + `datastrato/gravitino-ci-trino`.
    + Future plans include support for other data sources.
 5. Input the `tag name`, for example: `0.1.0`, Then build and push the Docker image name as `datastrato/{image-name}:0.1.0`.
-6. Input the `envoriments`, for example: `HADOOP_VERSION=3.1.0 HIVE_VERSION=3.1.3`, Then use special version to install HDFS and Hive.
+6. Input the `environment`, for example: `HADOOP_VERSION=3.1.0 HIVE_VERSION=3.1.3`, Then use special version to install HDFS and Hive.
 7. You must enter the correct `publish docker token` before you can execute run `Publish Docker Image` workflow.
 8. Wait for the workflow to complete. You can see a new Docker image shown in the [Datastrato Docker Hub](https://hub.docker.com/u/datastrato) repository.
 

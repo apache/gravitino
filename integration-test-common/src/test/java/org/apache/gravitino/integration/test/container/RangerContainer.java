@@ -43,10 +43,11 @@ public class RangerContainer extends BaseContainer {
   private static final String username = "admin";
   // Apache Ranger Password should be minimum 8 characters with min one alphabet and one numeric.
   private static final String password = "rangerR0cks!";
-  /* for kerberos authentication:
-  authType = "kerberos"
-  username = principal
-  password = path of the keytab file */
+
+  /**
+   * for kerberos authentication: authType = "kerberos" username = principal password = path of the
+   * keytab file
+   */
   private static final String authType = "simple";
   // Ranger hive/hdfs Docker startup environment variable name
   public static final String DOCKER_ENV_RANGER_SERVER_URL = "RANGER_SERVER_URL";

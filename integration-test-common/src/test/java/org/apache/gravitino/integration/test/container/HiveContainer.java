@@ -229,26 +229,10 @@ public class HiveContainer extends BaseContainer {
       return hiveDockerImageName;
     }
 
-    private String generateHostName() {
-      String hiveContainerHostName = hostName;
-      if (kerberosEnabled) {
-        hiveContainerHostName = "kerberos-" + hostName;
-      } else if (rangerEnablePlugin) {
-        hiveContainerHostName = "ranger-" + hostName;
-      }
-      return hiveContainerHostName;
-    }
-
     @Override
     public HiveContainer build() {
       return new HiveContainer(
-          generateImageName(),
-          generateHostName(),
-          exposePorts,
-          extraHosts,
-          filesToMount,
-          envVars,
-          network);
+          generateImageName(), hostName, exposePorts, extraHosts, filesToMount, envVars, network);
     }
   }
 }

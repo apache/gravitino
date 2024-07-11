@@ -132,7 +132,7 @@ public class ContainerSuite implements Closeable {
           // Start Hive container
           HiveContainer.Builder hiveBuilder =
               HiveContainer.builder()
-                  .withHostName("gravitino-ci-hive")
+                  .withHostName("gravitino-ci-hive-ranger")
                   .withEnableRangerPlugin(true)
                   .withEnvVars(envVars)
                   .withNetwork(network);
