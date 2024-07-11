@@ -66,8 +66,8 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.PropertiesConverter;
-import org.apache.gravitino.flink.connector.TransformConverter;
 import org.apache.gravitino.flink.connector.utils.TypeUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -80,12 +80,12 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
  */
 public abstract class BaseCatalog extends AbstractCatalog {
   private final PropertiesConverter propertiesConverter;
-  private final TransformConverter transformConverter;
+  private final PartitionConverter partitionConverter;
 
   protected BaseCatalog(String catalogName, String defaultDatabase) {
     super(catalogName, defaultDatabase);
     this.propertiesConverter = getPropertiesConverter();
-    this.transformConverter = getTransformConverter();
+    this.partitionConverter = getPartitionConverter();
   }
 
   protected abstract AbstractCatalog realCatalog();
@@ -266,7 +266,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
     Map<String, String> properties =
         propertiesConverter.toGravitinoTableProperties(table.getOptions());
     Transform[] partitions =
-        transformConverter.toGravitinoPartitions(((CatalogTable) table).getPartitionKeys());
+        partitionConverter.toGravitinoPartitions(((CatalogTable) table).getPartitionKeys());
     try {
       catalog().asTableCatalog().createTable(identifier, columns, comment, properties, partitions);
     } catch (NoSuchSchemaException e) {
@@ -443,7 +443,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
 
   protected abstract PropertiesConverter getPropertiesConverter();
 
-  protected abstract TransformConverter getTransformConverter();
+  protected abstract PartitionConverter getPartitionConverter();
 
   protected CatalogBaseTable toFlinkTable(Table table) {
     org.apache.flink.table.api.Schema.Builder builder =
@@ -456,7 +456,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
     }
     Map<String, String> flinkTableProperties =
         propertiesConverter.toFlinkTableProperties(table.properties());
-    List<String> partitionKeys = transformConverter.toFlinkPartitionKeys(table.partitioning());
+    List<String> partitionKeys = partitionConverter.toFlinkPartitionKeys(table.partitioning());
     return CatalogTable.of(builder.build(), table.comment(), partitionKeys, flinkTableProperties);
   }
 

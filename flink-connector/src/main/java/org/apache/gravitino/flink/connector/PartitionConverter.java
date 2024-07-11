@@ -22,19 +22,19 @@ import java.util.List;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 
 /**
- * The TransformConverter is used to convert the partition between Flink and Gravitino. The Flink
+ * The PartitionConverter is used to convert the partition between Flink and Gravitino. The Flink
  * only support identity transform. Some of the table like Apache Paimon will use the table
  * properties to store the partition transform, so we can implement this interface to achieve more
  * partition transform.
  */
-public abstract class TransformConverter {
+public abstract class PartitionConverter {
   /**
    * Convert the partition keys to Flink partition keys.
    *
-   * @param transforms The partition keys in Gravitino.
+   * @param partitions The partition keys in Gravitino.
    * @return The partition keys in Flink.
    */
-  public abstract List<String> toFlinkPartitionKeys(Transform[] transforms);
+  public abstract List<String> toFlinkPartitionKeys(Transform[] partitions);
 
   /**
    * Convert the partition keys to Gravitino partition keys.
