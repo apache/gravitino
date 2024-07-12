@@ -362,6 +362,14 @@ public class TestFilesetOperations extends JerseyTest {
   }
 
   @Test
+  public void testRemoveFilesetComment() {
+    FilesetUpdateRequest req = new FilesetUpdateRequest.RemoveFilesetCommentRequest();
+    Fileset fileset =
+        mockFileset("fileset1", Fileset.Type.MANAGED, null, "mock location", ImmutableMap.of());
+    assertUpdateFileset(new FilesetUpdatesRequest(ImmutableList.of(req)), fileset);
+  }
+
+  @Test
   public void testMultiUpdateRequest() {
     FilesetUpdateRequest req = new FilesetUpdateRequest.RenameFilesetRequest("new name");
     FilesetUpdateRequest req1 = new FilesetUpdateRequest.UpdateFilesetCommentRequest("new comment");
@@ -371,16 +379,15 @@ public class TestFilesetOperations extends JerseyTest {
     FilesetUpdateRequest req4 = new FilesetUpdateRequest.SetFilesetPropertiesRequest("k2", "v2");
     // remove k2
     FilesetUpdateRequest req5 = new FilesetUpdateRequest.RemoveFilesetPropertiesRequest("k2");
+    // remove comment
+    FilesetUpdateRequest req6 = new FilesetUpdateRequest.RemoveFilesetCommentRequest();
 
     Fileset fileset =
         mockFileset(
-            "new name",
-            Fileset.Type.MANAGED,
-            "new comment",
-            "mock location",
-            ImmutableMap.of("k1", "v2"));
+            "new name", Fileset.Type.MANAGED, null, "mock location", ImmutableMap.of("k1", "v2"));
     assertUpdateFileset(
-        new FilesetUpdatesRequest(ImmutableList.of(req, req1, req2, req3, req4, req5)), fileset);
+        new FilesetUpdatesRequest(ImmutableList.of(req, req1, req2, req3, req4, req5, req6)),
+        fileset);
   }
 
   @Test
