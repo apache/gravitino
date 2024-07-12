@@ -315,31 +315,35 @@ public class TagManager {
     return TreeLockUtils.doWithTreeLock(
         entityIdent,
         LockType.READ,
-        () -> {
-          try {
-            return supportsTagOperations
-                .associateTagsWithMetadataObject(
-                    entityIdent, entityType, tagsToAddIdent, tagsToRemoveIdent)
-                .stream()
-                .map(Tag::name)
-                .toArray(String[]::new);
-          } catch (NoSuchEntityException e) {
-            throw new NotFoundException(
-                e,
-                "Failed to associate tags for metadata object %s due to not found",
-                metadataObject);
-          } catch (EntityAlreadyExistsException e) {
-            throw new TagAlreadyAssociatedException(
-                e,
-                "Failed to associate tags for metadata object due to some tags %s already "
-                    + "associated to the metadata object %s",
-                Arrays.toString(tagsToAdd),
-                metadataObject);
-          } catch (IOException e) {
-            LOG.error("Failed to associate tags for metadata object {}", metadataObject, e);
-            throw new RuntimeException(e);
-          }
-        });
+        () ->
+            TreeLockUtils.doWithTreeLock(
+                NameIdentifier.of(ofTagNamespace(metalake).levels()),
+                LockType.WRITE,
+                () -> {
+                  try {
+                    return supportsTagOperations
+                        .associateTagsWithMetadataObject(
+                            entityIdent, entityType, tagsToAddIdent, tagsToRemoveIdent)
+                        .stream()
+                        .map(Tag::name)
+                        .toArray(String[]::new);
+                  } catch (NoSuchEntityException e) {
+                    throw new NotFoundException(
+                        e,
+                        "Failed to associate tags for metadata object %s due to not found",
+                        metadataObject);
+                  } catch (EntityAlreadyExistsException e) {
+                    throw new TagAlreadyAssociatedException(
+                        e,
+                        "Failed to associate tags for metadata object due to some tags %s already "
+                            + "associated to the metadata object %s",
+                        Arrays.toString(tagsToAdd),
+                        metadataObject);
+                  } catch (IOException e) {
+                    LOG.error("Failed to associate tags for metadata object {}", metadataObject, e);
+                    throw new RuntimeException(e);
+                  }
+                }));
   }
 
   private static void checkMetalakeExists(String metalake, EntityStore entityStore) {
