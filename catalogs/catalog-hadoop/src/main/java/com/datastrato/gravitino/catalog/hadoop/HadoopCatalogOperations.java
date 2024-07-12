@@ -597,6 +597,8 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
         newName = ((FilesetChange.RenameFileset) change).getNewName();
       } else if (change instanceof FilesetChange.UpdateFilesetComment) {
         newComment = ((FilesetChange.UpdateFilesetComment) change).getNewComment();
+      } else if (change instanceof FilesetChange.RemoveComment) {
+        newComment = null;
       } else {
         throw new IllegalArgumentException(
             "Unsupported fileset change: " + change.getClass().getSimpleName());

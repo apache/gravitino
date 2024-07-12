@@ -207,6 +207,8 @@ class DTOConverters {
     } else if (change instanceof FilesetChange.UpdateFilesetComment) {
       return new FilesetUpdateRequest.UpdateFilesetCommentRequest(
           ((FilesetChange.UpdateFilesetComment) change).getNewComment());
+    } else if (change instanceof FilesetChange.RemoveComment) {
+      return new FilesetUpdateRequest.RemoveFilesetCommentRequest();
     } else if (change instanceof FilesetChange.SetProperty) {
       return new FilesetUpdateRequest.SetFilesetPropertiesRequest(
           ((FilesetChange.SetProperty) change).getProperty(),

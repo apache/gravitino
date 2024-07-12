@@ -280,4 +280,6 @@ class FilesetCatalog(BaseSchemaCatalog):
             )
         if isinstance(change, FilesetChange.RemoveProperty):
             return FilesetUpdateRequest.RemoveFilesetPropertyRequest(change.property())
+        if isinstance(change, FilesetChange.RemoveComment):
+            return FilesetUpdateRequest.RemoveFilesetCommentRequest()
         raise ValueError(f"Unknown change type: {type(change).__name__}")

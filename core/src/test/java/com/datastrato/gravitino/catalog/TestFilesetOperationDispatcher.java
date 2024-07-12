@@ -130,6 +130,18 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
     Map<String, String> expectedProps = ImmutableMap.of("k2", "v2", "k3", "v3");
     testProperties(expectedProps, alteredFileset.properties());
 
+    FilesetChange[] changes2 = new FilesetChange[] {FilesetChange.updateComment("new comment")};
+
+    Fileset alteredFileset2 = filesetOperationDispatcher.alterFileset(filesetIdent1, changes2);
+    Assertions.assertEquals(fileset1.name(), alteredFileset2.name());
+    Assertions.assertEquals("new comment", alteredFileset2.comment());
+
+    FilesetChange[] changes3 = new FilesetChange[] {FilesetChange.removeComment()};
+
+    Fileset alteredFileset3 = filesetOperationDispatcher.alterFileset(filesetIdent1, changes3);
+    Assertions.assertEquals(fileset1.name(), alteredFileset3.name());
+    Assertions.assertNull(alteredFileset3.comment());
+
     // Test immutable fileset properties
     FilesetChange[] illegalChange = new FilesetChange[] {FilesetChange.setProperty(ID_KEY, "test")};
     testPropertyException(
