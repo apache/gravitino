@@ -75,14 +75,17 @@ sed -i "s/mockhost/${HOSTNAME}/g" ${HIVE_HOME}/conf/hive-site.xml
 # format HDFS
 ${HADOOP_HOME}/bin/hdfs namenode -format -nonInteractive
 
+# Wait the format operation exit total.
+sleep 2 
 # Check Whether the ports are occupied and kill the process
 for port in 3306 9000 9083 10000 10002 50070 50075 50010
 do
   echo "Check whether the port ${port} is occupied..."
-  netstat -tlnp | grep ${port}
-  if [[ $? -eq 0 ]]; then
-    echo "Port ${port} is occupied, killing the process..."
-    pid=$(netstat -tlnp | grep ${port} | awk '{print $7}' | awk -F '/' '{print $1}')
+  pid=$(netstat -tlnp | grep ${port} | awk '{print $7}' | awk -F '/' '{print $1}')
+  # if pid is not null, kill the process
+  if [[ -n ${pid} ]]; then
+    ps -ef | grep ${pid}
+    echo "The port ${port} is occupied, the process id is ${pid}, killing the process..."
     kill -9 ${pid}
   fi
 done
