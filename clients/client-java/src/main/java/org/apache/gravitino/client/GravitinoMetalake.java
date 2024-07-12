@@ -31,27 +31,48 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsCatalogs;
+import org.apache.gravitino.authorization.Group;
+import org.apache.gravitino.authorization.Role;
+import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
+import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.requests.CatalogCreateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdatesRequest;
+import org.apache.gravitino.dto.requests.GroupAddRequest;
+import org.apache.gravitino.dto.requests.RoleCreateRequest;
+import org.apache.gravitino.dto.requests.RoleGrantRequest;
+import org.apache.gravitino.dto.requests.RoleRevokeRequest;
 import org.apache.gravitino.dto.requests.TagCreateRequest;
 import org.apache.gravitino.dto.requests.TagUpdateRequest;
 import org.apache.gravitino.dto.requests.TagUpdatesRequest;
+import org.apache.gravitino.dto.requests.UserAddRequest;
 import org.apache.gravitino.dto.responses.CatalogListResponse;
 import org.apache.gravitino.dto.responses.CatalogResponse;
+import org.apache.gravitino.dto.responses.DeleteResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.dto.responses.GroupResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
+import org.apache.gravitino.dto.responses.RemoveResponse;
+import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.responses.TagListResponse;
 import org.apache.gravitino.dto.responses.TagResponse;
+import org.apache.gravitino.dto.responses.UserResponse;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.NoSuchUserException;
+import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
+import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagOperations;
@@ -63,6 +84,11 @@ import org.apache.gravitino.tag.TagOperations;
  */
 public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, TagOperations {
   private static final String API_METALAKES_CATALOGS_PATH = "api/metalakes/%s/catalogs/%s";
+  private static final String API_PERMISSION_PATH = "api/metalakes/%s/permissions/%s";
+  private static final String API_METALAKES_USERS_PATH = "api/metalakes/%s/users/%s";
+  private static final String API_METALAKES_GROUPS_PATH = "api/metalakes/%s/groups/%s";
+  private static final String API_METALAKES_ROLES_PATH = "api/metalakes/%s/roles/%s";
+  private static final String BLANK_PLACE_HOLDER = "";
 
   private static final String API_METALAKES_TAGS_PATH = "api/metalakes/%s/tags";
 
@@ -409,6 +435,323 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
             ErrorHandlers.tagErrorHandler());
     resp.validate();
     return resp.dropped();
+  }
+
+  /**
+   * Adds a new User.
+   *
+   * @param user The name of the User.
+   * @return The added User instance.
+   * @throws UserAlreadyExistsException If a User with the same name already exists.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If adding the User encounters storage issues.
+   */
+  public User addUser(String user) throws UserAlreadyExistsException, NoSuchMetalakeException {
+    UserAddRequest req = new UserAddRequest(user);
+    req.validate();
+
+    UserResponse resp =
+        restClient.post(
+            String.format(API_METALAKES_USERS_PATH, this.name(), BLANK_PLACE_HOLDER),
+            req,
+            UserResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.userErrorHandler());
+    resp.validate();
+
+    return resp.getUser();
+  }
+
+  /**
+   * Removes a User.
+   *
+   * @param user The name of the User.
+   * @return True if the User was successfully removed, false only when there's no such user,
+   *     otherwise it will throw an exception.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If removing the User encounters storage issues.
+   */
+  public boolean removeUser(String user) throws NoSuchMetalakeException {
+    RemoveResponse resp =
+        restClient.delete(
+            String.format(API_METALAKES_USERS_PATH, this.name(), user),
+            RemoveResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.userErrorHandler());
+    resp.validate();
+
+    return resp.removed();
+  }
+
+  /**
+   * Gets a User.
+   *
+   * @param user The name of the User.
+   * @return The getting User instance.
+   * @throws NoSuchUserException If the User with the given name does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If getting the User encounters storage issues.
+   */
+  public User getUser(String user) throws NoSuchUserException, NoSuchMetalakeException {
+    UserResponse resp =
+        restClient.get(
+            String.format(API_METALAKES_USERS_PATH, this.name(), user),
+            UserResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.userErrorHandler());
+    resp.validate();
+
+    return resp.getUser();
+  }
+
+  /**
+   * Adds a new Group.
+   *
+   * @param group The name of the Group.
+   * @return The Added Group instance.
+   * @throws GroupAlreadyExistsException If a Group with the same name already exists.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If adding the Group encounters storage issues.
+   */
+  public Group addGroup(String group) throws GroupAlreadyExistsException, NoSuchMetalakeException {
+    GroupAddRequest req = new GroupAddRequest(group);
+    req.validate();
+
+    GroupResponse resp =
+        restClient.post(
+            String.format(API_METALAKES_GROUPS_PATH, this.name(), BLANK_PLACE_HOLDER),
+            req,
+            GroupResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.groupErrorHandler());
+    resp.validate();
+
+    return resp.getGroup();
+  }
+
+  /**
+   * Removes a Group.
+   *
+   * @param group THe name of the Group.
+   * @return True if the Group was successfully removed, false only when there's no such group,
+   *     otherwise it will throw an exception.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If removing the Group encounters storage issues.
+   */
+  public boolean removeGroup(String group) throws NoSuchMetalakeException {
+    RemoveResponse resp =
+        restClient.delete(
+            String.format(API_METALAKES_GROUPS_PATH, this.name(), group),
+            RemoveResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.groupErrorHandler());
+    resp.validate();
+
+    return resp.removed();
+  }
+
+  /**
+   * Gets a Group.
+   *
+   * @param group The name of the Group.
+   * @return The getting Group instance.
+   * @throws NoSuchGroupException If the Group with the given name does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If getting the Group encounters storage issues.
+   */
+  public Group getGroup(String group) throws NoSuchGroupException, NoSuchMetalakeException {
+    GroupResponse resp =
+        restClient.get(
+            String.format(API_METALAKES_GROUPS_PATH, this.name(), group),
+            GroupResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.groupErrorHandler());
+    resp.validate();
+
+    return resp.getGroup();
+  }
+
+  /**
+   * Gets a Role.
+   *
+   * @param role The name of the Role.
+   * @return The getting Role instance.
+   * @throws NoSuchRoleException If the Role with the given name does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If getting the Role encounters storage issues.
+   */
+  public Role getRole(String role) throws NoSuchRoleException, NoSuchMetalakeException {
+    RoleResponse resp =
+        restClient.get(
+            String.format(API_METALAKES_ROLES_PATH, this.name(), role),
+            RoleResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.roleErrorHandler());
+    resp.validate();
+
+    return resp.getRole();
+  }
+
+  /**
+   * Deletes a Role.
+   *
+   * @param role The name of the Role.
+   * @return True if the Role was successfully deleted, false only when there's no such role,
+   *     otherwise it will throw an exception.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If deleting the Role encounters storage issues.
+   */
+  public boolean deleteRole(String role) throws NoSuchMetalakeException {
+    DeleteResponse resp =
+        restClient.delete(
+            String.format(API_METALAKES_ROLES_PATH, this.name(), role),
+            DeleteResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.roleErrorHandler());
+    resp.validate();
+
+    return resp.deleted();
+  }
+
+  /**
+   * Creates a new Role.
+   *
+   * @param role The name of the Role.
+   * @param properties The properties of the Role.
+   * @param securableObjects The securable objects of the Role.
+   * @return The created Role instance.
+   * @throws RoleAlreadyExistsException If a Role with the same name already exists.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If creating the Role encounters storage issues.
+   */
+  public Role createRole(
+      String role, Map<String, String> properties, List<SecurableObject> securableObjects)
+      throws RoleAlreadyExistsException, NoSuchMetalakeException {
+    RoleCreateRequest req =
+        new RoleCreateRequest(
+            role,
+            properties,
+            securableObjects.stream()
+                .map(DTOConverters::toSecurableObject)
+                .toArray(SecurableObjectDTO[]::new));
+    req.validate();
+
+    RoleResponse resp =
+        restClient.post(
+            String.format(API_METALAKES_ROLES_PATH, this.name(), BLANK_PLACE_HOLDER),
+            req,
+            RoleResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.roleErrorHandler());
+    resp.validate();
+
+    return resp.getRole();
+  }
+
+  /**
+   * Grant roles to a user.
+   *
+   * @param user The name of the User.
+   * @param roles The names of the Role.
+   * @return The Group after granted.
+   * @throws NoSuchUserException If the User with the given name does not exist.
+   * @throws NoSuchRoleException If the Role with the given name does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If granting roles to a user encounters storage issues.
+   */
+  public User grantRolesToUser(List<String> roles, String user)
+      throws NoSuchUserException, NoSuchRoleException, NoSuchMetalakeException {
+    RoleGrantRequest request = new RoleGrantRequest(roles);
+    UserResponse resp =
+        restClient.put(
+            String.format(API_PERMISSION_PATH, this.name(), String.format("users/%s/grant", user)),
+            request,
+            UserResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.permissionOperationErrorHandler());
+    resp.validate();
+
+    return resp.getUser();
+  }
+
+  /**
+   * Grant roles to a group.
+   *
+   * @param group The name of the Group.
+   * @param roles The names of the Role.
+   * @return The Group after granted.
+   * @throws NoSuchGroupException If the Group with the given name does not exist.
+   * @throws NoSuchRoleException If the Role with the given name does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If granting roles to a group encounters storage issues.
+   */
+  public Group grantRolesToGroup(List<String> roles, String group)
+      throws NoSuchGroupException, NoSuchRoleException, NoSuchMetalakeException {
+    RoleGrantRequest request = new RoleGrantRequest(roles);
+    GroupResponse resp =
+        restClient.put(
+            String.format(
+                API_PERMISSION_PATH, this.name(), String.format("groups/%s/grant", group)),
+            request,
+            GroupResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.permissionOperationErrorHandler());
+    resp.validate();
+
+    return resp.getGroup();
+  }
+
+  /**
+   * Revoke roles from a user.
+   *
+   * @param user The name of the User.
+   * @param roles The names of the Role.
+   * @return The User after revoked.
+   * @throws NoSuchUserException If the User with the given name does not exist.
+   * @throws NoSuchRoleException If the Role with the given name does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If revoking roles from a user encounters storage issues.
+   */
+  public User revokeRolesFromUser(List<String> roles, String user)
+      throws NoSuchUserException, NoSuchRoleException, NoSuchMetalakeException {
+    RoleRevokeRequest request = new RoleRevokeRequest(roles);
+    UserResponse resp =
+        restClient.put(
+            String.format(API_PERMISSION_PATH, this.name(), String.format("users/%s/revoke", user)),
+            request,
+            UserResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.permissionOperationErrorHandler());
+    resp.validate();
+
+    return resp.getUser();
+  }
+
+  /**
+   * Revoke roles from a group.
+   *
+   * @param group The name of the Group.
+   * @param roles The names of the Role.
+   * @return The Group after revoked.
+   * @throws NoSuchGroupException If the Group with the given name does not exist.
+   * @throws NoSuchRoleException If the Role with the given name does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If revoking roles from a group encounters storage issues.
+   */
+  public Group revokeRolesFromGroup(List<String> roles, String group)
+      throws NoSuchGroupException, NoSuchRoleException, NoSuchMetalakeException {
+    RoleRevokeRequest request = new RoleRevokeRequest(roles);
+    GroupResponse resp =
+        restClient.put(
+            String.format(
+                API_PERMISSION_PATH, this.name(), String.format("groups/%s/revoke", group)),
+            request,
+            GroupResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.permissionOperationErrorHandler());
+    resp.validate();
+
+    return resp.getGroup();
   }
 
   static class Builder extends MetalakeDTO.Builder<Builder> {
