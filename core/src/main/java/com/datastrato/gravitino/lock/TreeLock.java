@@ -104,8 +104,17 @@ public class TreeLock {
       try {
         treeLockNode.lock(type);
         heldLocks.push(Pair.of(treeLockNode, type));
+
+        treeLockNode.addHoldingThreadTimestamp(
+            Thread.currentThread(), identifier, System.currentTimeMillis());
         if (LOG.isTraceEnabled()) {
-          LOG.trace("Locked node: {}, lock type: {}", treeLockNode, type);
+          LOG.trace(
+              "Node {} has been lock with '{}' lock, hold by {} with ident '{}' at {}",
+              this,
+              lockType,
+              Thread.currentThread(),
+              identifier,
+              System.currentTimeMillis());
         }
       } catch (Exception e) {
         LOG.error(
@@ -140,8 +149,16 @@ public class TreeLock {
       TreeLockNode current = pair.getLeft();
       LockType type = pair.getRight();
       current.unlock(type);
+
+      long holdStartTime = current.removeHoldingThreadTimestamp(Thread.currentThread(), identifier);
       if (LOG.isTraceEnabled()) {
-        LOG.trace("Unlocked node: {}, lock type: {}", current, type);
+        LOG.trace(
+            "Node {} has been unlock with '{}' lock, hold by {} with ident '{}' for {} ms",
+            this,
+            lockType,
+            Thread.currentThread(),
+            identifier,
+            System.currentTimeMillis() - holdStartTime);
       }
     }
 
