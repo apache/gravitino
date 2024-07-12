@@ -1,11 +1,23 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
-
 package com.datastrato.gravitino.dto.tag;
 
-import com.datastrato.gravitino.MetadataObject;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.json.JsonUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -87,48 +99,5 @@ public class TestTagDTO {
     serJson = JsonUtils.objectMapper().writeValueAsString(tagDTO4);
     TagDTO deserTagDTO4 = JsonUtils.objectMapper().readValue(serJson, TagDTO.class);
     Assertions.assertEquals(Optional.of(true), deserTagDTO4.inherited());
-
-    // Test tag with metadata objects
-    MetadataObjectDTO metalakeDTO =
-        MetadataObjectDTO.builder()
-            .withName("metalake_test")
-            .withType(MetadataObject.Type.METALAKE)
-            .build();
-
-    MetadataObjectDTO catalogDTO =
-        MetadataObjectDTO.builder()
-            .withName("catalog_test")
-            .withType(MetadataObject.Type.CATALOG)
-            .build();
-
-    MetadataObjectDTO schemaDTO =
-        MetadataObjectDTO.builder()
-            .withName("schema_test")
-            .withParent("catalog_test")
-            .withType(MetadataObject.Type.SCHEMA)
-            .build();
-
-    MetadataObjectDTO tableDTO =
-        MetadataObjectDTO.builder()
-            .withName("table_test")
-            .withParent("catalog_test.schema_test")
-            .withType(MetadataObject.Type.TABLE)
-            .build();
-
-    MetadataObjectDTO[] objectDTOs =
-        new MetadataObjectDTO[] {metalakeDTO, catalogDTO, schemaDTO, tableDTO};
-
-    TagDTO tagDTO5 =
-        TagDTO.builder()
-            .withName("tag_test")
-            .withComment("tag comment")
-            .withAudit(audit)
-            .withObjects(objectDTOs)
-            .build();
-
-    serJson = JsonUtils.objectMapper().writeValueAsString(tagDTO5);
-    TagDTO deserTagDTO5 = JsonUtils.objectMapper().readValue(serJson, TagDTO.class);
-    Assertions.assertEquals(tagDTO5, deserTagDTO5);
-    Assertions.assertArrayEquals(objectDTOs, deserTagDTO5.objects());
   }
 }

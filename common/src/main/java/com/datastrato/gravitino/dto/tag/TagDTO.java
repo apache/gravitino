@@ -1,11 +1,23 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
-
 package com.datastrato.gravitino.dto.tag;
 
-import com.datastrato.gravitino.MetadataObject;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.tag.Tag;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -15,7 +27,7 @@ import lombok.EqualsAndHashCode;
 
 /** Represents a Tag Data Transfer Object (DTO). */
 @EqualsAndHashCode
-public class TagDTO implements Tag, Tag.AssociatedObjects {
+public class TagDTO implements Tag {
 
   @JsonProperty("name")
   private String name;
@@ -31,9 +43,6 @@ public class TagDTO implements Tag, Tag.AssociatedObjects {
 
   @JsonProperty("inherited")
   private Optional<Boolean> inherited = Optional.empty();
-
-  @JsonProperty("objects")
-  private MetadataObjectDTO[] objects;
 
   private TagDTO() {}
 
@@ -60,16 +69,6 @@ public class TagDTO implements Tag, Tag.AssociatedObjects {
   @Override
   public Optional<Boolean> inherited() {
     return inherited;
-  }
-
-  @Override
-  public MetadataObject[] objects() {
-    return objects;
-  }
-
-  @Override
-  public AssociatedObjects associatedObjects() {
-    return this;
   }
 
   /** @return a new builder for constructing a Tag DTO. */
@@ -137,17 +136,6 @@ public class TagDTO implements Tag, Tag.AssociatedObjects {
      */
     public Builder withInherited(Optional<Boolean> inherited) {
       tagDTO.inherited = inherited;
-      return this;
-    }
-
-    /**
-     * Sets the objects associated with the tag.
-     *
-     * @param objects The objects associated with the tag.
-     * @return The builder instance.
-     */
-    public Builder withObjects(MetadataObjectDTO[] objects) {
-      tagDTO.objects = objects;
       return this;
     }
 

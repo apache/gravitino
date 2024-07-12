@@ -500,13 +500,6 @@ public class DTOConverters {
             .withAudit(toDTO(tag.auditInfo()))
             .withInherited(inherited);
 
-    Optional.ofNullable(tag.associatedObjects().objects())
-        .map(Arrays::stream)
-        .ifPresent(
-            objects ->
-                builder.withObjects(
-                    objects.map(DTOConverters::toDTO).toArray(MetadataObjectDTO[]::new)));
-
     return builder.build();
   }
 

@@ -1,6 +1,20 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.server.web.rest;
 
@@ -185,11 +199,10 @@ public class TestTagOperations extends JerseyTest {
             .build();
 
     Tag[] tags = new Tag[] {tag1, tag2};
-    when(tagManager.listTagsInfo(metalake, false)).thenReturn(tags);
+    when(tagManager.listTagsInfo(metalake)).thenReturn(tags);
 
     Response resp =
         target(tagPath(metalake))
-            .queryParam("extended", false)
             .queryParam("details", true)
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
@@ -211,10 +224,9 @@ public class TestTagOperations extends JerseyTest {
     Assertions.assertEquals(Optional.empty(), tagListResp.getTags()[1].inherited());
 
     // Test return null
-    when(tagManager.listTagsInfo(metalake, false)).thenReturn(null);
+    when(tagManager.listTagsInfo(metalake)).thenReturn(null);
     Response resp1 =
         target(tagPath(metalake))
-            .queryParam("extended", false)
             .queryParam("details", true)
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
@@ -227,10 +239,9 @@ public class TestTagOperations extends JerseyTest {
     Assertions.assertEquals(0, tagListResp1.getTags().length);
 
     // Test return empty array
-    when(tagManager.listTagsInfo(metalake, false)).thenReturn(new Tag[0]);
+    when(tagManager.listTagsInfo(metalake)).thenReturn(new Tag[0]);
     Response resp2 =
         target(tagPath(metalake))
-            .queryParam("extended", false)
             .queryParam("details", true)
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
@@ -241,55 +252,6 @@ public class TestTagOperations extends JerseyTest {
     TagListResponse tagListResp2 = resp2.readEntity(TagListResponse.class);
     Assertions.assertEquals(0, tagListResp2.getCode());
     Assertions.assertEquals(0, tagListResp2.getTags().length);
-
-    // Test with extended = true
-    MetadataObject[] objects =
-        new MetadataObject[] {MetadataObjects.parse("catalog_1", MetadataObject.Type.CATALOG)};
-
-    TagEntity tag3 =
-        TagEntity.builder()
-            .withName("tag3")
-            .withId(1L)
-            .withComment("tag3 comment")
-            .withAuditInfo(testAuditInfo1)
-            .withMetadataObjects(objects)
-            .build();
-
-    TagEntity tag4 =
-        TagEntity.builder()
-            .withName("tag4")
-            .withId(1L)
-            .withComment("tag4 comment")
-            .withAuditInfo(testAuditInfo1)
-            .withMetadataObjects(objects)
-            .build();
-
-    Tag[] tags1 = new Tag[] {tag3, tag4};
-    when(tagManager.listTagsInfo(metalake, true)).thenReturn(tags1);
-
-    Response resp3 =
-        target(tagPath(metalake))
-            .queryParam("extended", true)
-            .queryParam("details", true)
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp3.getStatus());
-
-    TagListResponse tagListResp3 = resp3.readEntity(TagListResponse.class);
-    Assertions.assertEquals(0, tagListResp3.getCode());
-    Assertions.assertEquals(tags1.length, tagListResp3.getTags().length);
-
-    Assertions.assertEquals(tag3.name(), tagListResp3.getTags()[0].name());
-    Assertions.assertEquals(tag3.comment(), tagListResp3.getTags()[0].comment());
-    Assertions.assertEquals(tag3.objects().length, tagListResp3.getTags()[0].objects().length);
-    Assertions.assertEquals(Optional.empty(), tagListResp3.getTags()[0].inherited());
-
-    Assertions.assertEquals(tag4.name(), tagListResp3.getTags()[1].name());
-    Assertions.assertEquals(tag4.comment(), tagListResp3.getTags()[1].comment());
-    Assertions.assertEquals(tag4.objects().length, tagListResp3.getTags()[1].objects().length);
-    Assertions.assertEquals(Optional.empty(), tagListResp3.getTags()[1].inherited());
   }
 
   @Test
@@ -320,8 +282,6 @@ public class TestTagOperations extends JerseyTest {
     Assertions.assertEquals(tag1.name(), respTag.name());
     Assertions.assertEquals(tag1.comment(), respTag.comment());
     Assertions.assertEquals(Optional.empty(), respTag.inherited());
-    Assertions.assertNull(respTag.associatedObjects().objects());
-    Assertions.assertEquals(0, respTag.associatedObjects().count());
 
     // Test throw TagAlreadyExistsException
     doThrow(new TagAlreadyExistsException("mock error"))
@@ -367,7 +327,7 @@ public class TestTagOperations extends JerseyTest {
             .withComment("tag1 comment")
             .withAuditInfo(testAuditInfo1)
             .build();
-    when(tagManager.getTag(metalake, "tag1", false)).thenReturn(tag1);
+    when(tagManager.getTag(metalake, "tag1")).thenReturn(tag1);
 
     Response resp =
         target(tagPath(metalake))
@@ -387,41 +347,8 @@ public class TestTagOperations extends JerseyTest {
     Assertions.assertEquals(tag1.comment(), respTag.comment());
     Assertions.assertEquals(Optional.empty(), respTag.inherited());
 
-    // Test get tag with extended = true
-    MetadataObject[] objects =
-        new MetadataObject[] {MetadataObjects.parse("catalog_1", MetadataObject.Type.CATALOG)};
-
-    TagEntity tag2 =
-        TagEntity.builder()
-            .withName("tag2")
-            .withId(1L)
-            .withComment("tag2 comment")
-            .withAuditInfo(testAuditInfo1)
-            .withMetadataObjects(objects)
-            .build();
-    when(tagManager.getTag(metalake, "tag2", true)).thenReturn(tag2);
-
-    Response resp1 =
-        target(tagPath(metalake))
-            .path("tag2")
-            .queryParam("extended", true)
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp1.getStatus());
-
-    TagResponse tagResp1 = resp1.readEntity(TagResponse.class);
-    Assertions.assertEquals(0, tagResp1.getCode());
-
-    Tag respTag1 = tagResp1.getTag();
-    Assertions.assertEquals(tag2.name(), respTag1.name());
-    Assertions.assertEquals(tag2.comment(), respTag1.comment());
-    Assertions.assertEquals(tag2.objects().length, respTag1.associatedObjects().objects().length);
-    Assertions.assertEquals(Optional.empty(), respTag1.inherited());
-
     // Test throw NoSuchTagException
-    doThrow(new NoSuchTagException("mock error")).when(tagManager).getTag(metalake, "tag1", false);
+    doThrow(new NoSuchTagException("mock error")).when(tagManager).getTag(metalake, "tag1");
 
     Response resp2 =
         target(tagPath(metalake))
@@ -437,7 +364,7 @@ public class TestTagOperations extends JerseyTest {
     Assertions.assertEquals(NoSuchTagException.class.getSimpleName(), errorResp.getType());
 
     // Test throw RuntimeException
-    doThrow(new RuntimeException("mock error")).when(tagManager).getTag(metalake, "tag1", false);
+    doThrow(new RuntimeException("mock error")).when(tagManager).getTag(metalake, "tag1");
 
     Response resp3 =
         target(tagPath(metalake))

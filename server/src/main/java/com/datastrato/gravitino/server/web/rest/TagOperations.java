@@ -1,6 +1,20 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package com.datastrato.gravitino.server.web.rest;
 
@@ -66,20 +80,16 @@ public class TagOperations {
   @ResponseMetered(name = "list-tags", absolute = true)
   public Response listTags(
       @PathParam("metalake") String metalake,
-      @QueryParam("details") @DefaultValue("false") boolean verbose,
-      @QueryParam("extended") @DefaultValue("false") boolean extended) {
+      @QueryParam("details") @DefaultValue("false") boolean verbose) {
     LOG.info(
-        "Received list tag {} with extended {} request for metalake: {}",
-        verbose ? "infos" : "names",
-        extended,
-        metalake);
+        "Received list tag {} request for metalake: {}", verbose ? "infos" : "names", metalake);
 
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
             if (verbose) {
-              Tag[] tags = tagManager.listTagsInfo(metalake, extended);
+              Tag[] tags = tagManager.listTagsInfo(metalake);
               TagDTO[] tagDTOs;
               if (ArrayUtils.isEmpty(tags)) {
                 tagDTOs = new TagDTO[0];
@@ -90,11 +100,7 @@ public class TagOperations {
                         .toArray(TagDTO[]::new);
               }
 
-              LOG.info(
-                  "List {} tags info with extended {} under metalake: {}",
-                  tagDTOs.length,
-                  extended,
-                  metalake);
+              LOG.info("List {} tags info under metalake: {}", tagDTOs.length, metalake);
               return Utils.ok(new TagListResponse(tagDTOs));
 
             } else {
@@ -140,17 +146,14 @@ public class TagOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-tag." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-tag", absolute = true)
-  public Response getTag(
-      @PathParam("metalake") String metalake,
-      @PathParam("tag") String name,
-      @QueryParam("extended") @DefaultValue("false") boolean extended) {
+  public Response getTag(@PathParam("metalake") String metalake, @PathParam("tag") String name) {
     LOG.info("Received get tag request for tag: {} under metalake: {}", name, metalake);
 
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            Tag tag = tagManager.getTag(metalake, name, extended);
+            Tag tag = tagManager.getTag(metalake, name);
             LOG.info("Get tag: {} under metalake: {}", name, metalake);
             return Utils.ok(new TagResponse(DTOConverters.toDTO(tag, Optional.empty())));
           });
@@ -221,7 +224,7 @@ public class TagOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-object-tags." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-object-tags", absolute = true)
-  public Response listTagsForObject(
+  public Response listTagsForMetdataObject(
       @PathParam("metalake") String metalake,
       @PathParam("type") String type,
       @PathParam("fullName") String fullName,
