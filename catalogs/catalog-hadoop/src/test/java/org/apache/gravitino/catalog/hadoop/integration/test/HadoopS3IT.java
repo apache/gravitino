@@ -22,12 +22,15 @@ import static com.datastrato.gravitino.integration.test.container.S3MockContaine
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.datastrato.gravitino.Catalog;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.client.GravitinoMetalake;
+import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
 import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
@@ -62,7 +65,7 @@ public class HadoopS3IT extends AbstractIT {
 
   private static GravitinoMetalake metalake;
   private static Catalog catalog;
-  private static FileSystem s3FileSystem;
+  private static FileSystem s3fs;
   private static String s3Endpoint;
 
   @BeforeAll
@@ -83,7 +86,7 @@ public class HadoopS3IT extends AbstractIT {
     conf.set("fs.s3a.connection.ssl.enabled", "false");
     conf.set(
         "fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider");
-    s3FileSystem = FileSystem.get(conf);
+    s3fs = FileSystem.get(conf);
 
     createMetalake();
     createCatalog();
@@ -137,12 +140,12 @@ public class HadoopS3IT extends AbstractIT {
   }
 
   @Test
-  public void testCreateFilesetOnS3() throws IOException {
+  public void testCreateManagedFilesetOnS3() throws IOException {
     // create fileset
-    String filesetName = "test_create_fileset_s3";
+    String filesetName = "test_create_fileset_on_s3";
     String storageLocation = DEFAULT_BASE_LOCATION + filesetName;
     assertFalse(
-        s3FileSystem.exists(new Path(storageLocation)),
+        s3fs.exists(new Path(storageLocation)),
         "storage location should not exist before creating");
     Fileset fileset =
         createFileset(
@@ -160,6 +163,135 @@ public class HadoopS3IT extends AbstractIT {
     assertEquals(storageLocation, fileset.storageLocation());
     assertEquals(1, fileset.properties().size());
     assertEquals("v1", fileset.properties().get("k1"));
+
+    // test create a fileset that already exist
+    assertThrows(
+        FilesetAlreadyExistsException.class,
+        () ->
+            createFileset(
+                filesetName,
+                "comment",
+                Fileset.Type.MANAGED,
+                storageLocation,
+                ImmutableMap.of("k1", "v1")));
+
+    // create fileset with null fileset name
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            createFileset(
+                null,
+                "comment",
+                Fileset.Type.MANAGED,
+                storageLocation,
+                ImmutableMap.of("k1", "v1")),
+        "Should throw IllegalArgumentException when fileset name is null");
+
+    // create fileset with null storage location
+    String filesetName2 = "test_create_fileset_on_s3_no_storage_location";
+    String storageLocation2 = DEFAULT_BASE_LOCATION + filesetName2;
+    assertFalse(
+        s3fs.exists(new Path(storageLocation2)),
+        "storage location should not exist before creating");
+    Fileset fileset2 = createFileset(filesetName2, null, Fileset.Type.MANAGED, null, null);
+    assertFilesetExists(filesetName2, storageLocation);
+    assertNotNull(fileset2, "fileset should be created");
+    assertNull(fileset2.comment(), "comment should be null");
+    assertEquals(Fileset.Type.MANAGED, fileset2.type(), "type should be MANAGED");
+    assertEquals(
+        storageLocation2, fileset2.storageLocation(), "storage location should be created");
+    assertEquals(ImmutableMap.of(), fileset2.properties(), "properties should be empty");
+
+    // create fileset with null fileset type
+    String filesetName3 = "test_create_fileset_on_s3_no_type";
+    String storageLocation3 = DEFAULT_BASE_LOCATION + filesetName3;
+    Fileset fileset3 =
+        createFileset(filesetName3, "comment", null, storageLocation3, ImmutableMap.of("k1", "v1"));
+    assertFilesetExists(filesetName3, storageLocation3);
+    assertEquals(
+        Fileset.Type.MANAGED, fileset3.type(), "fileset type should be MANAGED by default");
+  }
+
+  @Test
+  public void testCreateExternalFilesetOnS3() throws IOException {
+    // create fileset
+    String filesetName = "test_external_fileset_on_s3";
+    String storageLocation = DEFAULT_BASE_LOCATION + filesetName;
+    Fileset fileset =
+        createFileset(
+            filesetName,
+            "comment",
+            Fileset.Type.EXTERNAL,
+            storageLocation,
+            ImmutableMap.of("k1", "v1"));
+
+    // verify fileset is created
+    assertFilesetExists(filesetName, storageLocation);
+    assertNotNull(fileset, "fileset should be created");
+    assertEquals("comment", fileset.comment());
+    assertEquals(Fileset.Type.EXTERNAL, fileset.type());
+    assertEquals(storageLocation, fileset.storageLocation());
+    assertEquals(1, fileset.properties().size());
+    assertEquals("v1", fileset.properties().get("k1"));
+    assertTrue(s3fs.exists(new Path(storageLocation)), "storage location should be created");
+
+    // create fileset with storage location that not exist
+    String filesetName2 = "test_external_fileset_on_s3_no_exist";
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            createFileset(
+                filesetName2, "comment", Fileset.Type.EXTERNAL, null, ImmutableMap.of("k1", "v1")),
+        "Should throw IllegalArgumentException when storage location is null");
+  }
+
+  @Test
+  public void testDropManagedFilesetOnS3() throws IOException {
+    // create fileset
+    String filesetName = "test_drop_managed_fileset_on_s3";
+    String storageLocation = DEFAULT_BASE_LOCATION + filesetName;
+    assertFalse(
+        s3fs.exists(new Path(storageLocation)),
+        "storage location should not exist before creating");
+    createFileset(
+        filesetName, "comment", Fileset.Type.MANAGED, storageLocation, ImmutableMap.of("k1", "v1"));
+    assertFilesetExists(filesetName, storageLocation);
+
+    // drop fileset
+    assertTrue(
+        catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(SCHEMA_NAME, filesetName)),
+        "fileset should be dropped");
+
+    // verify fileset is dropped
+    assertFalse(
+        catalog.asFilesetCatalog().filesetExists(NameIdentifier.of(SCHEMA_NAME, filesetName)),
+        "fileset should not exist");
+    assertFalse(s3fs.exists(new Path(storageLocation)), "storage location should not exist");
+  }
+
+  @Test
+  public void testDropExternalFilesetOnS3() throws IOException {
+    // create fileset
+    String filesetName = "test_drop_external_fileset_on_s3";
+    String storageLocation = DEFAULT_BASE_LOCATION + filesetName;
+    createFileset(
+        filesetName,
+        "comment",
+        Fileset.Type.EXTERNAL,
+        storageLocation,
+        ImmutableMap.of("k1", "v1"));
+    assertFilesetExists(filesetName, storageLocation);
+
+    // drop fileset
+    assertTrue(
+        catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(SCHEMA_NAME, filesetName)),
+        "fileset should be dropped");
+
+    // verify fileset is dropped
+    assertFalse(
+        catalog.asFilesetCatalog().filesetExists(NameIdentifier.of(SCHEMA_NAME, filesetName)),
+        "fileset should not exist");
+    assertTrue(s3fs.exists(new Path(storageLocation)), "storage location should exist");
   }
 
   private Fileset createFileset(
@@ -171,7 +303,7 @@ public class HadoopS3IT extends AbstractIT {
     if (storageLocation != null) {
       Path location = new Path(storageLocation);
       try {
-        s3FileSystem.deleteOnExit(location);
+        s3fs.deleteOnExit(location);
       } catch (IOException e) {
         LOGGER.warn("Failed to delete location: {}", location, e);
       }
@@ -189,8 +321,8 @@ public class HadoopS3IT extends AbstractIT {
   private void assertFilesetExists(String filesetName, String storageLocation) throws IOException {
     assertTrue(
         catalog.asFilesetCatalog().filesetExists(NameIdentifier.of(SCHEMA_NAME, filesetName)),
-        "fileset should be exists");
-    assertTrue(s3FileSystem.exists(new Path(storageLocation)), "storage location should be exists");
+        "fileset should exist");
+    assertTrue(s3fs.exists(new Path(storageLocation)), "storage location should exist");
   }
 
   @AfterAll
@@ -200,8 +332,8 @@ public class HadoopS3IT extends AbstractIT {
     metalake.dropCatalog(CATALOG_NAME);
     client.dropMetalake(METALAKE_NAME);
 
-    if (s3FileSystem != null) {
-      s3FileSystem.close();
+    if (s3fs != null) {
+      s3fs.close();
     }
 
     try {

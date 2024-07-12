@@ -52,6 +52,7 @@ dependencies {
   testImplementation(libs.minikdc)
   testImplementation(libs.hadoop3.minicluster)
   testImplementation(libs.commons.lang)
+
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mockito.inline)
