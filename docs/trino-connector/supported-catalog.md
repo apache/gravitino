@@ -14,7 +14,6 @@ The catalogs currently supported by the Apache Gravitino connector are as follow
 
 ## Create catalog
 
-Trino itself does not support creating catalogs. 
 Users can create catalogs through the Gravitino connector and then load them into Trino. 
 The Gravitino connector provides the following stored procedures to create, delete, and alter catalogs.
 User can also use the system table `catalog` to describe all the catalogs.
