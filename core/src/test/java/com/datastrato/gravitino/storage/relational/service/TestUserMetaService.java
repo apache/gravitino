@@ -557,6 +557,12 @@ class TestUserMetaService extends TestJDBCBackend {
         Sets.newHashSet(role1.id(), role4.id()), Sets.newHashSet(noUpdaterUser.roleIds()));
     Assertions.assertEquals("creator", noUpdaterUser.auditInfo().creator());
     Assertions.assertEquals("grantRevokeUser", noUpdaterUser.auditInfo().lastModifier());
+
+    // Delete a role, the user entity won't contain this role.
+    RoleMetaService.getInstance().deleteRole(role1.nameIdentifier());
+    UserEntity userEntity =
+        UserMetaService.getInstance().getUserByIdentifier(user1.nameIdentifier());
+    Assertions.assertEquals(Sets.newHashSet("role4"), Sets.newHashSet(userEntity.roleNames()));
   }
 
   @Test

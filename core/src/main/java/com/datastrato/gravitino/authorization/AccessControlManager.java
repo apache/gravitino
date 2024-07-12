@@ -53,7 +53,7 @@ public class AccessControlManager {
   public AccessControlManager(EntityStore store, IdGenerator idGenerator, Config config) {
     this.adminManager = new AdminManager(store, idGenerator, config);
     this.roleManager = new RoleManager(store, idGenerator, config);
-    this.userGroupManager = new UserGroupManager(store, idGenerator, roleManager);
+    this.userGroupManager = new UserGroupManager(store, idGenerator);
     this.permissionManager = new PermissionManager(store, roleManager);
   }
 
