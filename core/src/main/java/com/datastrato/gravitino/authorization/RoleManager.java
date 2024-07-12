@@ -36,7 +36,6 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.time.Instant;
@@ -160,29 +159,5 @@ class RoleManager {
   @VisibleForTesting
   Cache<NameIdentifier, RoleEntity> getCache() {
     return cache;
-  }
-
-  List<RoleEntity> getValidRoles(String metalake, List<String> roleNames, List<Long> roleIds) {
-    List<RoleEntity> roleEntities = Lists.newArrayList();
-    if (roleNames == null || roleNames.isEmpty()) {
-      return roleEntities;
-    }
-
-    int index = 0;
-    for (String role : roleNames) {
-      try {
-
-        RoleEntity roleEntity = getRoleEntity(AuthorizationUtils.ofRole(metalake, role));
-
-        if (roleEntity.id().equals(roleIds.get(index))) {
-          roleEntities.add(roleEntity);
-        }
-        index++;
-
-      } catch (NoSuchEntityException nse) {
-        // ignore this entity
-      }
-    }
-    return roleEntities;
   }
 }
