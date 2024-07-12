@@ -22,10 +22,24 @@ import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.MetadataObject;
 import com.datastrato.gravitino.NameIdentifier;
 import com.google.common.base.Joiner;
+import com.google.common.collect.BiMap;
+import com.google.common.collect.ImmutableBiMap;
+import java.util.Optional;
 
 public class MetadataObjectUtil {
 
   private static final Joiner DOT = Joiner.on(".");
+
+  private static final BiMap<MetadataObject.Type, Entity.EntityType> TYPE_TO_TYPE_MAP =
+      ImmutableBiMap.<MetadataObject.Type, Entity.EntityType>builder()
+          .put(MetadataObject.Type.METALAKE, Entity.EntityType.METALAKE)
+          .put(MetadataObject.Type.CATALOG, Entity.EntityType.CATALOG)
+          .put(MetadataObject.Type.SCHEMA, Entity.EntityType.SCHEMA)
+          .put(MetadataObject.Type.TABLE, Entity.EntityType.TABLE)
+          .put(MetadataObject.Type.TOPIC, Entity.EntityType.TOPIC)
+          .put(MetadataObject.Type.FILESET, Entity.EntityType.FILESET)
+          .put(MetadataObject.Type.COLUMN, Entity.EntityType.COLUMN)
+          .build();
 
   private MetadataObjectUtil() {}
 
@@ -37,25 +51,11 @@ public class MetadataObjectUtil {
    * @throws IllegalArgumentException if the metadata object type is unknown
    */
   public static Entity.EntityType toEntityType(MetadataObject metadataObject) {
-    switch (metadataObject.type()) {
-      case METALAKE:
-        return Entity.EntityType.METALAKE;
-      case CATALOG:
-        return Entity.EntityType.CATALOG;
-      case SCHEMA:
-        return Entity.EntityType.SCHEMA;
-      case TABLE:
-        return Entity.EntityType.TABLE;
-      case TOPIC:
-        return Entity.EntityType.TOPIC;
-      case FILESET:
-        return Entity.EntityType.FILESET;
-      case COLUMN:
-        return Entity.EntityType.COLUMN;
-      default:
-        throw new IllegalArgumentException(
-            "Unknown metadata object type: " + metadataObject.type());
-    }
+    return Optional.ofNullable(TYPE_TO_TYPE_MAP.get(metadataObject.type()))
+        .orElseThrow(
+            () ->
+                new IllegalArgumentException(
+                    "Unknown metadata object type: " + metadataObject.type()));
   }
 
   /**

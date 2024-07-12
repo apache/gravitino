@@ -18,6 +18,7 @@
  */
 package com.datastrato.gravitino.storage.relational.po;
 
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;
@@ -45,18 +46,18 @@ public class TagMetadataObjectRelPO {
       return false;
     }
     TagMetadataObjectRelPO tagRelPO = (TagMetadataObjectRelPO) o;
-    return java.util.Objects.equals(tagId, tagRelPO.tagId)
-        && java.util.Objects.equals(metadataObjectId, tagRelPO.metadataObjectId)
-        && java.util.Objects.equals(metadataObjectType, tagRelPO.metadataObjectType)
-        && java.util.Objects.equals(auditInfo, tagRelPO.auditInfo)
-        && java.util.Objects.equals(currentVersion, tagRelPO.currentVersion)
-        && java.util.Objects.equals(lastVersion, tagRelPO.lastVersion)
-        && java.util.Objects.equals(deletedAt, tagRelPO.deletedAt);
+    return Objects.equal(tagId, tagRelPO.tagId)
+        && Objects.equal(metadataObjectId, tagRelPO.metadataObjectId)
+        && Objects.equal(metadataObjectType, tagRelPO.metadataObjectType)
+        && Objects.equal(auditInfo, tagRelPO.auditInfo)
+        && Objects.equal(currentVersion, tagRelPO.currentVersion)
+        && Objects.equal(lastVersion, tagRelPO.lastVersion)
+        && Objects.equal(deletedAt, tagRelPO.deletedAt);
   }
 
   @Override
   public int hashCode() {
-    return java.util.Objects.hash(
+    return Objects.hashCode(
         tagId,
         metadataObjectId,
         metadataObjectType,

@@ -24,7 +24,6 @@ import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.MetadataObject;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.SupportsExtraOperations;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.exceptions.NoSuchTagException;
@@ -60,7 +59,7 @@ public class TagManager {
 
   private final EntityStore entityStore;
 
-  private final SupportsExtraOperations supportsExtraOperations;
+  private final SupportsTagOperations supportsTagOperations;
 
   public TagManager(IdGenerator idGenerator, EntityStore entityStore) {
     if (entityStore instanceof KvEntityStore) {
@@ -71,15 +70,15 @@ public class TagManager {
       throw new RuntimeException(errorMsg);
     }
 
-    if (!(entityStore instanceof SupportsExtraOperations)) {
+    if (!(entityStore instanceof SupportsTagOperations)) {
       String errorMsg =
-          "TagManager cannot run with entity store that does not support extra operations, "
+          "TagManager cannot run with entity store that does not support tag operations, "
               + "please configure the entity store to use relational entity store and restart the Gravitino server";
       LOG.error(errorMsg);
       throw new RuntimeException(errorMsg);
     }
 
-    this.supportsExtraOperations = entityStore.extraOperations();
+    this.supportsTagOperations = entityStore.tagOperations();
 
     this.idGenerator = idGenerator;
     this.entityStore = entityStore;
@@ -217,7 +216,9 @@ public class TagManager {
                   "Tag with name %s under metalake %s does not exist", name, metalake);
             }
 
-            return supportsExtraOperations.listAssociatedMetadataObjectsForTag(tagId);
+            return supportsTagOperations
+                .listAssociatedMetadataObjectsForTag(tagId)
+                .toArray(new MetadataObject[0]);
           } catch (IOException e) {
             LOG.error("Failed to list metadata objects for tag {}", name, e);
             throw new RuntimeException(e);
@@ -242,8 +243,9 @@ public class TagManager {
         LockType.READ,
         () -> {
           try {
-            return supportsExtraOperations.listAssociatedTagsForMetadataObject(
-                entityIdent, entityType);
+            return supportsTagOperations
+                .listAssociatedTagsForMetadataObject(entityIdent, entityType)
+                .toArray(new Tag[0]);
           } catch (NoSuchEntityException e) {
             throw new NotFoundException(
                 e, "Failed to list tags for metadata object %s due to not found", metadataObject);
@@ -265,8 +267,7 @@ public class TagManager {
         LockType.READ,
         () -> {
           try {
-            return supportsExtraOperations.getTagForMetadataObject(
-                entityIdent, entityType, tagIdent);
+            return supportsTagOperations.getTagForMetadataObject(entityIdent, entityType, tagIdent);
           } catch (NoSuchEntityException e) {
             if (e.getMessage().contains("No such tag entity")) {
               throw new NoSuchTagException(
@@ -294,21 +295,20 @@ public class TagManager {
     NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
 
+    // Remove all the tags that are both set to add and remove
     Set<String> tagsToAddSet = tagsToAdd == null ? Sets.newHashSet() : Sets.newHashSet(tagsToAdd);
-    if (tagsToRemove != null) {
-      for (String tag : tagsToRemove) {
-        tagsToAddSet.remove(tag);
-      }
-    }
+    Set<String> tagsToRemoveSet =
+        tagsToRemove == null ? Sets.newHashSet() : Sets.newHashSet(tagsToRemove);
+    Set<String> common = Sets.intersection(tagsToAddSet, tagsToRemoveSet);
+    tagsToAddSet.removeAll(common);
+    tagsToRemoveSet.removeAll(common);
 
     NameIdentifier[] tagsToAddIdent =
         tagsToAddSet.stream().map(tag -> ofTagIdent(metalake, tag)).toArray(NameIdentifier[]::new);
     NameIdentifier[] tagsToRemoveIdent =
-        tagsToRemove == null
-            ? new NameIdentifier[0]
-            : Sets.newHashSet(tagsToRemove).stream()
-                .map(tag -> ofTagIdent(metalake, tag))
-                .toArray(NameIdentifier[]::new);
+        tagsToRemoveSet.stream()
+            .map(tag -> ofTagIdent(metalake, tag))
+            .toArray(NameIdentifier[]::new);
 
     // TODO. We need to add a write lock to Tag's namespace to avoid tag alteration and deletion
     //  during the association operation.
@@ -317,9 +317,10 @@ public class TagManager {
         LockType.READ,
         () -> {
           try {
-            return Arrays.stream(
-                    supportsExtraOperations.associateTagsWithMetadataObject(
-                        entityIdent, entityType, tagsToAddIdent, tagsToRemoveIdent))
+            return supportsTagOperations
+                .associateTagsWithMetadataObject(
+                    entityIdent, entityType, tagsToAddIdent, tagsToRemoveIdent)
+                .stream()
                 .map(Tag::name)
                 .toArray(String[]::new);
           } catch (NoSuchEntityException e) {

@@ -70,19 +70,19 @@ public interface TagMetadataObjectRelMapper {
       @Param("tagName") String tagName);
 
   @Select(
-      "SELECT tmo.tag_id as tagId, tmo.metadata_object_id as metadataObjectId,"
-          + " tmo.metadata_object_type as metadataObjectType, tmo.audit_info as auditInfo,"
-          + " tmo.current_version as currentVersion, tmo.last_version as lastVersion,"
-          + " tmo.deleted_at as deletedAt"
+      "SELECT te.tag_id as tagId, te.metadata_object_id as metadataObjectId,"
+          + " te.metadata_object_type as metadataObjectType, te.audit_info as auditInfo,"
+          + " te.current_version as currentVersion, te.last_version as lastVersion,"
+          + " te.deleted_at as deletedAt"
           + " FROM "
           + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-          + " tmo JOIN "
+          + " te JOIN "
           + TagMetaMapper.TAG_TABLE_NAME
           + " tm JOIN "
           + MetalakeMetaMapper.TABLE_NAME
-          + " mm ON tmo.tag_id = tm.tag_id AND tm.metalake_id = mm.metalake_id"
+          + " mm ON te.tag_id = tm.tag_id AND tm.metalake_id = mm.metalake_id"
           + " WHERE mm.metalake_name = #{metalakeName} AND tm.tag_name = #{tagName}"
-          + " AND tmo.deleted_at = 0 AND tm.deleted_at = 0 AND mm.deleted_at = 0")
+          + " AND te.deleted_at = 0 AND tm.deleted_at = 0 AND mm.deleted_at = 0")
   List<TagMetadataObjectRelPO> listTagMetadataObjectRelsByMetalakeAndTagName(
       @Param("metalakeName") String metalakeName, @Param("tagName") String tagName);
 
@@ -128,26 +128,26 @@ public interface TagMetadataObjectRelMapper {
   @Update(
       "UPDATE "
           + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-          + " tmo SET tmo.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+          + " te SET te.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
           + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-          + " WHERE tmo.tag_id IN (SELECT tm.tag_id FROM "
+          + " WHERE te.tag_id IN (SELECT tm.tag_id FROM "
           + TagMetaMapper.TAG_TABLE_NAME
           + " tm WHERE tm.metalake_id IN (SELECT mm.metalake_id FROM "
           + MetalakeMetaMapper.TABLE_NAME
           + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0)"
-          + " AND tm.deleted_at = 0) AND tmo.deleted_at = 0")
+          + " AND tm.deleted_at = 0) AND te.deleted_at = 0")
   Integer softDeleteTagMetadataObjectRelsByMetalakeAndTagName(
       @Param("metalakeName") String metalakeName, @Param("tagName") String tagName);
 
   @Update(
       "UPDATE "
           + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-          + " tmo SET tmo.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+          + " te SET te.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
           + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
           + " WHERE EXISTS (SELECT * FROM "
           + TagMetaMapper.TAG_TABLE_NAME
-          + " tm WHERE tm.metalake_id = #{metalakeId} AND tm.tag_id = tmo.tag_id"
-          + " AND tm.deleted_at = 0) AND tmo.deleted_at = 0")
+          + " tm WHERE tm.metalake_id = #{metalakeId} AND tm.tag_id = te.tag_id"
+          + " AND tm.deleted_at = 0) AND te.deleted_at = 0")
   void softDeleteTagMetadataObjectRelsByMetalakeId(@Param("metalakeId") Long metalakeId);
 
   @Delete(

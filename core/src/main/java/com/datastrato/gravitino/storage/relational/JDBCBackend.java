@@ -330,20 +330,16 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
-  public MetadataObject[] listAssociatedMetadataObjectsForTag(NameIdentifier tagIdent)
+  public List<MetadataObject> listAssociatedMetadataObjectsForTag(NameIdentifier tagIdent)
       throws IOException {
-    return TagMetaService.getInstance()
-        .listAssociatedMetadataObjectIdentsForTag(tagIdent)
-        .toArray(new MetadataObject[0]);
+    return TagMetaService.getInstance().listAssociatedMetadataObjectIdentsForTag(tagIdent);
   }
 
   @Override
-  public TagEntity[] listAssociatedTagsForMetadataObject(
+  public List<TagEntity> listAssociatedTagsForMetadataObject(
       NameIdentifier objectIdent, Entity.EntityType objectType)
       throws NoSuchEntityException, IOException {
-    return TagMetaService.getInstance()
-        .listTagsForMetadataObject(objectIdent, objectType)
-        .toArray(new TagEntity[0]);
+    return TagMetaService.getInstance().listTagsForMetadataObject(objectIdent, objectType);
   }
 
   @Override
@@ -354,15 +350,14 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
-  public TagEntity[] associateTagsWithMetadataObject(
+  public List<TagEntity> associateTagsWithMetadataObject(
       NameIdentifier objectIdent,
       Entity.EntityType objectType,
       NameIdentifier[] tagsToAdd,
       NameIdentifier[] tagsToRemove)
       throws NoSuchEntityException, EntityAlreadyExistsException, IOException {
     return TagMetaService.getInstance()
-        .associateTagsWithMetadataObject(objectIdent, objectType, tagsToAdd, tagsToRemove)
-        .toArray(new TagEntity[0]);
+        .associateTagsWithMetadataObject(objectIdent, objectType, tagsToAdd, tagsToRemove);
   }
 
   enum JDBCBackendType {

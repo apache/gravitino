@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datastrato.gravitino.storage.relational.utils;
+package com.datastrato.gravitino.storage.relational.service;
 
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.MetadataObject;
@@ -27,28 +27,22 @@ import com.datastrato.gravitino.storage.relational.po.MetalakePO;
 import com.datastrato.gravitino.storage.relational.po.SchemaPO;
 import com.datastrato.gravitino.storage.relational.po.TablePO;
 import com.datastrato.gravitino.storage.relational.po.TopicPO;
-import com.datastrato.gravitino.storage.relational.service.CatalogMetaService;
-import com.datastrato.gravitino.storage.relational.service.FilesetMetaService;
-import com.datastrato.gravitino.storage.relational.service.MetalakeMetaService;
-import com.datastrato.gravitino.storage.relational.service.SchemaMetaService;
-import com.datastrato.gravitino.storage.relational.service.TableMetaService;
-import com.datastrato.gravitino.storage.relational.service.TopicMetaService;
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import java.util.List;
 import javax.annotation.Nullable;
 
 /**
- * MetadataObjectUtils is used for converting full name to entity id and converting entity id to
+ * MetadataObjectService is used for converting full name to entity id and converting entity id to
  * full name.
  */
-public class MetadataObjectUtils {
+public class MetadataObjectService {
 
   private static final String DOT = ".";
   private static final Joiner DOT_JOINER = Joiner.on(DOT);
   private static final Splitter DOT_SPLITTER = Splitter.on(DOT);
 
-  private MetadataObjectUtils() {}
+  private MetadataObjectService() {}
 
   public static long getMetadataObjectId(
       long metalakeId, String fullName, MetadataObject.Type type) {

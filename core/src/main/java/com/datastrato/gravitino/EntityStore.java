@@ -20,6 +20,7 @@ package com.datastrato.gravitino;
 
 import com.datastrato.gravitino.Entity.EntityType;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
+import com.datastrato.gravitino.tag.SupportsTagOperations;
 import com.datastrato.gravitino.utils.Executable;
 import java.io.Closeable;
 import java.io.IOException;
@@ -183,12 +184,12 @@ public interface EntityStore extends Closeable {
       throws E, IOException;
 
   /**
-   * Get the extra operations that are supported by the entity store.
+   * Get the extra tag operations that are supported by the entity store.
    *
-   * @return the extra operations object that are supported by the entity store
+   * @return the tag operations object that are supported by the entity store
    * @throws UnsupportedOperationException if the extra operations are not supported
    */
-  default SupportsExtraOperations extraOperations() {
+  default SupportsTagOperations tagOperations() {
     throw new UnsupportedOperationException("extra operations are not supported");
   }
 }

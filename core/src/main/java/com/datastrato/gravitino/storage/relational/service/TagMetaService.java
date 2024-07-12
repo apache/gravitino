@@ -33,7 +33,6 @@ import com.datastrato.gravitino.storage.relational.mapper.TagMetadataObjectRelMa
 import com.datastrato.gravitino.storage.relational.po.TagMetadataObjectRelPO;
 import com.datastrato.gravitino.storage.relational.po.TagPO;
 import com.datastrato.gravitino.storage.relational.utils.ExceptionUtils;
-import com.datastrato.gravitino.storage.relational.utils.MetadataObjectUtils;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
 import com.datastrato.gravitino.tag.TagManager;
@@ -165,7 +164,7 @@ public class TagMetaService {
     try {
       Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
       Long metadataObjectId =
-          MetadataObjectUtils.getMetadataObjectId(
+          MetadataObjectService.getMetadataObjectId(
               metalakeId, metadataObject.fullName(), metadataObject.type());
 
       tagPOs =
@@ -194,7 +193,7 @@ public class TagMetaService {
     try {
       Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
       Long metadataObjectId =
-          MetadataObjectUtils.getMetadataObjectId(
+          MetadataObjectService.getMetadataObjectId(
               metalakeId, metadataObject.fullName(), metadataObject.type());
 
       tagPO =
@@ -233,7 +232,7 @@ public class TagMetaService {
       List<MetadataObject> metadataObjects = Lists.newArrayList();
       for (TagMetadataObjectRelPO po : tagMetadataObjectRelPOs) {
         String fullName =
-            MetadataObjectUtils.getMetadataObjectFullName(
+            MetadataObjectService.getMetadataObjectFullName(
                 po.getMetadataObjectType(), po.getMetadataObjectId());
 
         // Metadata object may be deleted asynchronously when we query the name, so it will return
@@ -265,7 +264,7 @@ public class TagMetaService {
     try {
       Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
       Long metadataObjectId =
-          MetadataObjectUtils.getMetadataObjectId(
+          MetadataObjectService.getMetadataObjectId(
               metalakeId, metadataObject.fullName(), metadataObject.type());
 
       // Fetch all the tags need to associate with the metadata object.

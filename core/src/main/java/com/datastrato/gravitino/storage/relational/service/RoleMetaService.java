@@ -33,7 +33,6 @@ import com.datastrato.gravitino.storage.relational.mapper.UserRoleRelMapper;
 import com.datastrato.gravitino.storage.relational.po.RolePO;
 import com.datastrato.gravitino.storage.relational.po.SecurableObjectPO;
 import com.datastrato.gravitino.storage.relational.utils.ExceptionUtils;
-import com.datastrato.gravitino.storage.relational.utils.MetadataObjectUtils;
 import com.datastrato.gravitino.storage.relational.utils.POConverters;
 import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
 import com.google.common.collect.Lists;
@@ -108,7 +107,8 @@ public class RoleMetaService {
             POConverters.initializeSecurablePOBuilderWithVersion(
                 roleEntity.id(), object, getEntityType(object));
         objectBuilder.withEntityId(
-            MetadataObjectUtils.getMetadataObjectId(metalakeId, object.fullName(), object.type()));
+            MetadataObjectService.getMetadataObjectId(
+                metalakeId, object.fullName(), object.type()));
         securableObjectPOs.add(objectBuilder.build());
       }
 
@@ -154,7 +154,7 @@ public class RoleMetaService {
 
     for (SecurableObjectPO securableObjectPO : securableObjectPOs) {
       String fullName =
-          MetadataObjectUtils.getMetadataObjectFullName(
+          MetadataObjectService.getMetadataObjectFullName(
               securableObjectPO.getType(), securableObjectPO.getEntityId());
       if (fullName != null) {
         securableObjects.add(

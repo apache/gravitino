@@ -17,19 +17,25 @@
  * under the License.
  */
 
-package com.datastrato.gravitino;
+package com.datastrato.gravitino.tag;
 
+import com.datastrato.gravitino.Entity;
+import com.datastrato.gravitino.EntityAlreadyExistsException;
+import com.datastrato.gravitino.EntityStore;
+import com.datastrato.gravitino.MetadataObject;
+import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.TagEntity;
 import java.io.IOException;
+import java.util.List;
 
 /**
- * An interface to support extra entity store operations, this interface should be mixed with {@link
+ * An interface to support extra tag operations, this interface should be mixed with {@link
  * EntityStore} to provide extra operations.
  *
  * <p>Any operations that can be done by the entity store should be added here.
  */
-public interface SupportsExtraOperations {
+public interface SupportsTagOperations {
 
   /**
    * List all the metadata objects that are associated with the given tag.
@@ -38,7 +44,8 @@ public interface SupportsExtraOperations {
    * @return The list of metadata objects associated with the given tag.
    * @throws IOException If an error occurs while accessing the entity store.
    */
-  MetadataObject[] listAssociatedMetadataObjectsForTag(NameIdentifier tagIdent) throws IOException;
+  List<MetadataObject> listAssociatedMetadataObjectsForTag(NameIdentifier tagIdent)
+      throws IOException;
 
   /**
    * List all the tags that are associated with the given metadata object.
@@ -49,7 +56,7 @@ public interface SupportsExtraOperations {
    * @throws NoSuchEntityException if the metadata object does not exist.
    * @throws IOException If an error occurs while accessing the entity store.
    */
-  TagEntity[] listAssociatedTagsForMetadataObject(
+  List<TagEntity> listAssociatedTagsForMetadataObject(
       NameIdentifier objectIdent, Entity.EntityType objectType)
       throws NoSuchEntityException, IOException;
 
@@ -80,7 +87,7 @@ public interface SupportsExtraOperations {
    * @throws EntityAlreadyExistsException if tags already associated with the metadata object.
    * @throws IOException If an error occurs while accessing the entity store.
    */
-  TagEntity[] associateTagsWithMetadataObject(
+  List<TagEntity> associateTagsWithMetadataObject(
       NameIdentifier objectIdent,
       Entity.EntityType objectType,
       NameIdentifier[] tagsToAdd,

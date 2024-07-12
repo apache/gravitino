@@ -30,9 +30,9 @@ import com.datastrato.gravitino.HasIdentifier;
 import com.datastrato.gravitino.MetadataObject;
 import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.SupportsExtraOperations;
 import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.TagEntity;
+import com.datastrato.gravitino.tag.SupportsTagOperations;
 import com.datastrato.gravitino.utils.Executable;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -46,7 +46,7 @@ import org.slf4j.LoggerFactory;
  * MySQL, PostgreSQL, etc. If you want to use a different backend, you can implement the {@link
  * RelationalBackend} interface
  */
-public class RelationalEntityStore implements EntityStore, SupportsExtraOperations {
+public class RelationalEntityStore implements EntityStore, SupportsTagOperations {
   private static final Logger LOGGER = LoggerFactory.getLogger(RelationalEntityStore.class);
   public static final ImmutableMap<String, String> RELATIONAL_BACKENDS =
       ImmutableMap.of(
@@ -136,18 +136,19 @@ public class RelationalEntityStore implements EntityStore, SupportsExtraOperatio
     backend.close();
   }
 
-  public SupportsExtraOperations extraOperations() {
+  @Override
+  public SupportsTagOperations tagOperations() {
     return this;
   }
 
   @Override
-  public MetadataObject[] listAssociatedMetadataObjectsForTag(NameIdentifier tagIdent)
+  public List<MetadataObject> listAssociatedMetadataObjectsForTag(NameIdentifier tagIdent)
       throws IOException {
     return backend.listAssociatedMetadataObjectsForTag(tagIdent);
   }
 
   @Override
-  public TagEntity[] listAssociatedTagsForMetadataObject(
+  public List<TagEntity> listAssociatedTagsForMetadataObject(
       NameIdentifier objectIdent, Entity.EntityType objectType)
       throws NoSuchEntityException, IOException {
     return backend.listAssociatedTagsForMetadataObject(objectIdent, objectType);
@@ -161,7 +162,7 @@ public class RelationalEntityStore implements EntityStore, SupportsExtraOperatio
   }
 
   @Override
-  public TagEntity[] associateTagsWithMetadataObject(
+  public List<TagEntity> associateTagsWithMetadataObject(
       NameIdentifier objectIdent,
       Entity.EntityType objectType,
       NameIdentifier[] tagsToAdd,
