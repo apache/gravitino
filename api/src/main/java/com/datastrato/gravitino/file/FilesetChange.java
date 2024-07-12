@@ -75,7 +75,7 @@ public interface FilesetChange {
    * @return The fileset change.
    */
   static FilesetChange removeComment() {
-    return new RemoveComment();
+    return RemoveComment.getInstance();
   }
 
   /** A fileset change to rename the fileset. */
@@ -312,7 +312,11 @@ public interface FilesetChange {
 
   /** A fileset change to remove comment from the fileset. */
   final class RemoveComment implements FilesetChange {
-    private RemoveComment() {}
+    private static final RemoveComment INSTANCE = new RemoveComment();
+
+    private static RemoveComment getInstance() {
+      return INSTANCE;
+    }
 
     /**
      * Compares this RemoveComment instance with another object for equality. Two instances are
