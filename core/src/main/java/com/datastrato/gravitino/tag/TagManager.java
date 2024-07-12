@@ -299,7 +299,7 @@ public class TagManager {
     Set<String> tagsToAddSet = tagsToAdd == null ? Sets.newHashSet() : Sets.newHashSet(tagsToAdd);
     Set<String> tagsToRemoveSet =
         tagsToRemove == null ? Sets.newHashSet() : Sets.newHashSet(tagsToRemove);
-    Set<String> common = Sets.intersection(tagsToAddSet, tagsToRemoveSet);
+    Set<String> common = Sets.intersection(tagsToAddSet, tagsToRemoveSet).immutableCopy();
     tagsToAddSet.removeAll(common);
     tagsToRemoveSet.removeAll(common);
 

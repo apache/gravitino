@@ -397,14 +397,24 @@ public class TestTagManager {
     Assertions.assertEquals(ImmutableSet.of("tag1", "tag2", "tag3"), ImmutableSet.copyOf(tags4));
 
     // Test associate tags for table
+    String[] tagsToAdd1 = new String[] {tag1.name()};
     MetadataObject tableObject =
         NameIdentifierUtil.toMetadataObject(
             NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE), Entity.EntityType.TABLE);
     String[] tags5 =
-        tagManager.associateTagsForMetadataObject(METALAKE, tableObject, tagsToAdd, null);
+        tagManager.associateTagsForMetadataObject(METALAKE, tableObject, tagsToAdd1, null);
 
-    Assertions.assertEquals(3, tags5.length);
-    Assertions.assertEquals(ImmutableSet.of("tag1", "tag2", "tag3"), ImmutableSet.copyOf(tags5));
+    Assertions.assertEquals(1, tags5.length);
+    Assertions.assertEquals(ImmutableSet.of("tag1"), ImmutableSet.copyOf(tags5));
+
+    // Test associate and disassociate same tags for table
+    String[] tagsToAdd2 = new String[] {tag2.name(), tag3.name()};
+    String[] tagsToRemove1 = new String[] {tag2.name()};
+    String[] tags6 =
+        tagManager.associateTagsForMetadataObject(METALAKE, tableObject, tagsToAdd2, tagsToRemove1);
+
+    Assertions.assertEquals(2, tags6.length);
+    Assertions.assertEquals(ImmutableSet.of("tag1", "tag3"), ImmutableSet.copyOf(tags6));
   }
 
   @Test
