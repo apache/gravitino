@@ -318,7 +318,7 @@ public class DorisTableOperations extends JdbcTableOperations {
     try (Statement statement = connection.createStatement();
         ResultSet result = statement.executeQuery(showCreateTableSql)) {
       StringBuilder createTableSql = new StringBuilder();
-      while (result.next()) {
+      if (result.next()) {
         createTableSql.append(result.getString("Create Table"));
       }
       Optional<Transform> transform =
