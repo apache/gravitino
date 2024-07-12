@@ -20,6 +20,7 @@
 package com.datastrato.gravitino.client;
 
 import com.datastrato.gravitino.auth.AuthConstants;
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -38,6 +39,17 @@ final class SimpleTokenProvider implements AuthDataProvider {
       gravitinoUser = System.getProperty("user.name");
     }
     String userInformation = gravitinoUser + ":dummy";
+    this.token =
+        (AuthConstants.AUTHORIZATION_BASIC_HEADER
+                + new String(
+                    Base64.getEncoder().encode(userInformation.getBytes(StandardCharsets.UTF_8)),
+                    StandardCharsets.UTF_8))
+            .getBytes(StandardCharsets.UTF_8);
+  }
+
+  public SimpleTokenProvider(String userName) {
+    Preconditions.checkArgument(userName != null, "userName cannot be null");
+    String userInformation = userName + ":dummy";
     this.token =
         (AuthConstants.AUTHORIZATION_BASIC_HEADER
                 + new String(

@@ -50,4 +50,23 @@ public class TestSimpleTokenProvider {
       }
     }
   }
+
+  @Test
+  public void testAuthenticationWithUserName() throws IOException {
+    String userName = "testUser";
+    try (AuthDataProvider provider = new SimpleTokenProvider(userName)) {
+      Assertions.assertTrue(provider.hasTokenData());
+      String token = new String(provider.getTokenData(), StandardCharsets.UTF_8);
+      Assertions.assertTrue(token.startsWith(AuthConstants.AUTHORIZATION_BASIC_HEADER));
+      String tokenString =
+          new String(
+              Base64.getDecoder()
+                  .decode(
+                      token
+                          .substring(AuthConstants.AUTHORIZATION_BASIC_HEADER.length())
+                          .getBytes(StandardCharsets.UTF_8)),
+              StandardCharsets.UTF_8);
+      Assertions.assertEquals(userName + ":dummy", tokenString);
+    }
+  }
 }

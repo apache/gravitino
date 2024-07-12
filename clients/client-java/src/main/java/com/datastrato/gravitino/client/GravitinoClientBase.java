@@ -219,6 +219,17 @@ public abstract class GravitinoClientBase implements Closeable {
     }
 
     /**
+     * Sets the simple mode authentication for Gravitino with the given username.
+     *
+     * @param username The username for the simple mode authentication.
+     * @return This Builder instance for method chaining.
+     */
+    public Builder<T> withSimpleAuth(String username) {
+      this.authDataProvider = new SimpleTokenProvider(username);
+      return this;
+    }
+
+    /**
      * Optional, set a flag to verify the client is supported to connector the server
      *
      * @return This Builder instance for method chaining.
