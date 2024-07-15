@@ -35,6 +35,7 @@ import com.datastrato.gravitino.rest.RESTUtils;
 import com.datastrato.gravitino.server.GravitinoServer;
 import com.datastrato.gravitino.server.ServerConfig;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
+import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
@@ -58,6 +59,7 @@ import org.slf4j.LoggerFactory;
  */
 public class MiniGravitino {
   private static final Logger LOG = LoggerFactory.getLogger(MiniGravitino.class);
+  private static final Splitter COMMA = Splitter.on(",").omitEmptyStrings().trimResults();
   private MiniGravitinoContext context;
   private RESTClient restClient;
   private final File mockConfDir;
@@ -115,19 +117,17 @@ public class MiniGravitino {
     this.host = jettyServerConfig.getHost();
     this.port = jettyServerConfig.getHttpPort();
     String URI = String.format("http://%s:%d", host, port);
-    if (AuthenticatorType.OAUTH
-        .name()
-        .toLowerCase()
-        .equals(context.customConfig.get(Configs.AUTHENTICATOR.getKey()))) {
+    if (COMMA
+            .splitToList(context.customConfig.get(Configs.AUTHENTICATOR.getKey()))
+            .contains(AuthenticatorType.OAUTH.name().toLowerCase())) {
       restClient =
           HTTPClient.builder(ImmutableMap.of())
               .uri(URI)
               .withAuthDataProvider(OAuthMockDataProvider.getInstance())
               .build();
-    } else if (AuthenticatorType.KERBEROS
-        .name()
-        .toLowerCase()
-        .equals(context.customConfig.get(Configs.AUTHENTICATOR.getKey()))) {
+    } else if (COMMA
+            .splitToList(context.customConfig.get(Configs.AUTHENTICATOR.getKey()))
+            .contains(AuthenticatorType.KERBEROS.name().toLowerCase())) {
       restClient =
           HTTPClient.builder(ImmutableMap.of())
               .uri(URI)
