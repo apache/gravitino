@@ -249,10 +249,10 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
       if (matcher.find()) {
         String lowerValue = matcher.group(2);
         lower = Literals.of(lowerValue, partitionColumnType);
-      }
-      if (matcher.find()) {
-        String upperValue = matcher.group(2);
-        upper = Literals.of(upperValue, partitionColumnType);
+        if (matcher.find()) {
+          String upperValue = matcher.group(2);
+          upper = Literals.of(upperValue, partitionColumnType);
+        }
       }
       return Partitions.range(partitionName, upper, lower, properties);
     } else if (partitionInfo instanceof Transforms.ListTransform) {
