@@ -18,8 +18,8 @@
 
 package com.datastrato.gravitino.spark.connector.iceberg;
 
-import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata;
-import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata;
+import com.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata;
+import com.apache.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.CatalogUtil;

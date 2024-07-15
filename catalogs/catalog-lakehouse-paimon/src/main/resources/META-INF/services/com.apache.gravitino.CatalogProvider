@@ -16,4 +16,4 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonCatalog
+com.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalog

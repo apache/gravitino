@@ -19,8 +19,8 @@
 
 package com.datastrato.gravitino.flink.connector.hive;
 
-import com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta;
-import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
+import com.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta;
+import com.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata;
 import com.datastrato.gravitino.flink.connector.PropertiesConverter;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;

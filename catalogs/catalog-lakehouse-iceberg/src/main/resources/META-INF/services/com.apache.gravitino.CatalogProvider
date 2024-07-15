@@ -16,4 +16,4 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalog
+com.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalog

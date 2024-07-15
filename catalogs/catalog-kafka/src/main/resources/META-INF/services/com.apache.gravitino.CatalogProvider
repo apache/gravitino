@@ -16,4 +16,4 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-com.datastrato.gravitino.catalog.kafka.KafkaCatalog
+com.apache.gravitino.catalog.kafka.KafkaCatalog

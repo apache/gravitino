@@ -19,7 +19,7 @@
 
 package com.datastrato.gravitino.trino.connector.catalog.iceberg;
 
-import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergSchemaPropertiesMetadata;
+import com.apache.gravitino.catalog.lakehouse.iceberg.IcebergSchemaPropertiesMetadata;
 import com.datastrato.gravitino.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.connector.BasePropertiesMetadata;
 import com.datastrato.gravitino.connector.PropertyEntry;

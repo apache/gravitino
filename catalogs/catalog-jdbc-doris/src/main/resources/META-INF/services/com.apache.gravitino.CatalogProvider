@@ -16,4 +16,4 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-com.datastrato.gravitino.catalog.doris.DorisCatalog
+com.apache.gravitino.catalog.doris.DorisCatalog

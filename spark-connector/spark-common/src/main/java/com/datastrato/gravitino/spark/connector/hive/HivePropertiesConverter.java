@@ -18,7 +18,7 @@
 
 package com.datastrato.gravitino.spark.connector.hive;
 
-import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
+import com.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata;
 import com.datastrato.gravitino.spark.connector.GravitinoSparkConfig;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.google.common.annotations.VisibleForTesting;

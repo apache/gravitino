@@ -19,7 +19,8 @@
 
 package com.datastrato.gravitino.catalog.property;
 
-import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
+import com.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata;
+import com.apache.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata;
 import com.datastrato.gravitino.connector.PropertyEntry;
 import java.util.HashMap;
 import java.util.Map;
@@ -43,7 +44,7 @@ public abstract class PropertyConverter {
   /**
    * Get the property metadata for the catalog. for more please see {@link
    * HiveTablePropertiesMetadata#propertyEntries()} or {@link
-   * com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata#propertyEntries()}
+   * IcebergTablePropertiesMetadata#propertyEntries()}
    */
   public abstract Map<String, PropertyEntry<?>> gravitinoPropertyMeta();
 

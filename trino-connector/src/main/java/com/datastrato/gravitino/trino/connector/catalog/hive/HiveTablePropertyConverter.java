@@ -29,7 +29,7 @@ import static com.datastrato.gravitino.trino.connector.catalog.hive.HiveProperty
 import static com.datastrato.gravitino.trino.connector.catalog.hive.HivePropertyMeta.HIVE_TABLE_TOTAL_SIZE;
 import static com.datastrato.gravitino.trino.connector.catalog.hive.HivePropertyMeta.HIVE_TABLE_TYPE;
 
-import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
+import com.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata;
 import com.datastrato.gravitino.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.connector.BasePropertiesMetadata;
 import com.datastrato.gravitino.connector.PropertyEntry;

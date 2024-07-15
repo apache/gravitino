@@ -20,7 +20,7 @@ package com.datastrato.gravitino.trino.connector.catalog.hive;
 
 import static com.datastrato.gravitino.trino.connector.catalog.hive.HivePropertyMeta.HIVE_SCHEMA_LOCATION;
 
-import com.datastrato.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
+import com.apache.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
 import com.datastrato.gravitino.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.connector.BasePropertiesMetadata;
 import com.datastrato.gravitino.connector.PropertyEntry;

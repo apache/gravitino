@@ -16,4 +16,4 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-com.datastrato.gravitino.catalog.mysql.MysqlCatalog
+com.apache.gravitino.catalog.mysql.MysqlCatalog

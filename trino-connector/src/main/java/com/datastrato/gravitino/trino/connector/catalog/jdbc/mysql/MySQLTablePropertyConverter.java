@@ -22,8 +22,8 @@ package com.datastrato.gravitino.trino.connector.catalog.jdbc.mysql;
 import static com.datastrato.gravitino.trino.connector.catalog.jdbc.mysql.MySQLPropertyMeta.TABLE_AUTO_INCREMENT_OFFSET;
 import static com.datastrato.gravitino.trino.connector.catalog.jdbc.mysql.MySQLPropertyMeta.TABLE_ENGINE;
 
+import com.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata;
 import com.apache.gravitino.shaded.com.google.common.collect.ImmutableMap;
-import com.datastrato.gravitino.catalog.mysql.MysqlTablePropertiesMetadata;
 import com.datastrato.gravitino.catalog.property.PropertyConverter;
 import com.datastrato.gravitino.connector.BasePropertiesMetadata;
 import com.datastrato.gravitino.connector.PropertyEntry;

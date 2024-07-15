@@ -19,14 +19,14 @@
 
 package com.datastrato.gravitino.catalog.common;
 
-import com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta;
-import com.datastrato.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
-import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
-import com.datastrato.gravitino.catalog.jdbc.JdbcTablePropertiesMetadata;
-import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata;
-import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergSchemaPropertiesMetadata;
-import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata;
-import com.datastrato.gravitino.catalog.mysql.MysqlTablePropertiesMetadata;
+import com.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta;
+import com.apache.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
+import com.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata;
+import com.apache.gravitino.catalog.jdbc.JdbcTablePropertiesMetadata;
+import com.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata;
+import com.apache.gravitino.catalog.lakehouse.iceberg.IcebergSchemaPropertiesMetadata;
+import com.apache.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata;
+import com.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata;
 import com.datastrato.gravitino.connector.BasePropertiesMetadata;
 import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.connector.PropertyEntry;

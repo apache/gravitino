@@ -18,10 +18,10 @@
 
 package com.datastrato.gravitino.spark.connector.hive;
 
-import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType.EXTERNAL_TABLE;
+import static com.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType.EXTERNAL_TABLE;
 
-import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
-import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.StorageFormat;
+import com.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata;
+import com.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.StorageFormat;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 

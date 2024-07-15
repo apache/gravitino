@@ -16,4 +16,4 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-com.datastrato.gravitino.catalog.hadoop.HadoopCatalog
+com.apache.gravitino.catalog.hadoop.HadoopCatalog
