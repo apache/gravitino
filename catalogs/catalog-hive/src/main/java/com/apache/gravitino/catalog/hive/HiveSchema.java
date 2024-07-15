@@ -18,8 +18,8 @@
  */
 package com.apache.gravitino.catalog.hive;
 
-import com.datastrato.gravitino.connector.BaseSchema;
-import com.datastrato.gravitino.meta.AuditInfo;
+import com.apache.gravitino.connector.BaseSchema;
+import com.apache.gravitino.meta.AuditInfo;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.Optional;

@@ -29,8 +29,8 @@ import com.apache.gravitino.catalog.postgresql.converter.PostgreSqlExceptionConv
 import com.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter;
 import com.apache.gravitino.catalog.postgresql.operation.PostgreSqlSchemaOperations;
 import com.apache.gravitino.catalog.postgresql.operation.PostgreSqlTableOperations;
-import com.datastrato.gravitino.connector.CatalogOperations;
-import com.datastrato.gravitino.connector.capability.Capability;
+import com.apache.gravitino.connector.CatalogOperations;
+import com.apache.gravitino.connector.capability.Capability;
 import java.util.Map;
 
 public class PostgreSqlCatalog extends JdbcCatalog {

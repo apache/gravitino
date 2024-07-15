@@ -18,7 +18,7 @@
  */
 package com.apache.gravitino.catalog.kafka;
 
-import com.datastrato.gravitino.connector.BaseTopic;
+import com.apache.gravitino.connector.BaseTopic;
 import java.util.Optional;
 import org.apache.kafka.clients.admin.NewTopic;
 

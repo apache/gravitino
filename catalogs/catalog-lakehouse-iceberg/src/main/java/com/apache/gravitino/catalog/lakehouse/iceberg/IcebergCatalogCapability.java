@@ -18,8 +18,8 @@
  */
 package com.apache.gravitino.catalog.lakehouse.iceberg;
 
-import com.datastrato.gravitino.connector.capability.Capability;
-import com.datastrato.gravitino.connector.capability.CapabilityResult;
+import com.apache.gravitino.connector.capability.Capability;
+import com.apache.gravitino.connector.capability.CapabilityResult;
 
 public class IcebergCatalogCapability implements Capability {
   @Override

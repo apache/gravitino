@@ -18,7 +18,7 @@
  */
 package com.apache.gravitino.catalog.hadoop;
 
-import com.datastrato.gravitino.connector.BaseSchema;
+import com.apache.gravitino.connector.BaseSchema;
 
 public class HadoopSchema extends BaseSchema {
 

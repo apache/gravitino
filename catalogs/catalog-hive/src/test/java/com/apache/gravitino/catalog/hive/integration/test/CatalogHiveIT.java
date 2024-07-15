@@ -55,10 +55,15 @@ import com.apache.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
 import com.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata;
 import com.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType;
 import com.apache.gravitino.client.GravitinoMetalake;
+import com.apache.gravitino.connector.BaseCatalog;
 import com.apache.gravitino.exceptions.NoSuchCatalogException;
 import com.apache.gravitino.exceptions.NoSuchMetalakeException;
 import com.apache.gravitino.exceptions.NoSuchSchemaException;
 import com.apache.gravitino.exceptions.NoSuchTableException;
+import com.apache.gravitino.integration.test.container.ContainerSuite;
+import com.apache.gravitino.integration.test.container.HiveContainer;
+import com.apache.gravitino.integration.test.util.AbstractIT;
+import com.apache.gravitino.integration.test.util.GravitinoITUtils;
 import com.apache.gravitino.rel.Column;
 import com.apache.gravitino.rel.Table;
 import com.apache.gravitino.rel.TableCatalog;
@@ -79,11 +84,6 @@ import com.apache.gravitino.rel.partitions.IdentityPartition;
 import com.apache.gravitino.rel.partitions.Partition;
 import com.apache.gravitino.rel.partitions.Partitions;
 import com.apache.gravitino.rel.types.Types;
-import com.datastrato.gravitino.connector.BaseCatalog;
-import com.datastrato.gravitino.integration.test.container.ContainerSuite;
-import com.datastrato.gravitino.integration.test.container.HiveContainer;
-import com.datastrato.gravitino.integration.test.util.AbstractIT;
-import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -1632,7 +1632,7 @@ public class CatalogHiveIT extends AbstractIT {
         RuntimeException.class,
         () ->
             createCatalogWithCustomOperation(
-                catalogName + "_not_exists", "com.datastrato.gravitino.catalog.not.exists"));
+                catalogName + "_not_exists", "com.apache.gravitino.catalog.not.exists"));
   }
 
   private static void createCatalogWithCustomOperation(String catalogName, String customImpl) {

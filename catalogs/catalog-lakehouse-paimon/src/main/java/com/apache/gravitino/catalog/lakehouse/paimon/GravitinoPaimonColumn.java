@@ -19,8 +19,8 @@
 package com.apache.gravitino.catalog.lakehouse.paimon;
 
 import com.apache.gravitino.catalog.lakehouse.paimon.utils.TypeUtils;
+import com.apache.gravitino.connector.BaseColumn;
 import com.apache.gravitino.rel.Column;
-import com.datastrato.gravitino.connector.BaseColumn;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.EqualsAndHashCode;

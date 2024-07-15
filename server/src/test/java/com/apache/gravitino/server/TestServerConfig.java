@@ -18,10 +18,10 @@
  */
 package com.apache.gravitino.server;
 
+import com.apache.gravitino.Configs;
+import com.apache.gravitino.auxiliary.AuxiliaryServiceManager;
+import com.apache.gravitino.config.ConfigEntry;
 import com.apache.gravitino.server.web.JettyServerConfig;
-import com.datastrato.gravitino.Configs;
-import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
-import com.datastrato.gravitino.config.ConfigEntry;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;

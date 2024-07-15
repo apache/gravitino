@@ -26,6 +26,7 @@ import com.apache.gravitino.catalog.jdbc.converter.SqliteColumnDefaultValueConve
 import com.apache.gravitino.catalog.jdbc.converter.SqliteExceptionConverter;
 import com.apache.gravitino.catalog.jdbc.converter.SqliteTypeConverter;
 import com.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
+import com.apache.gravitino.connector.BaseColumn;
 import com.apache.gravitino.exceptions.NoSuchTableException;
 import com.apache.gravitino.rel.Column;
 import com.apache.gravitino.rel.TableChange;
@@ -33,7 +34,6 @@ import com.apache.gravitino.rel.expressions.distributions.Distributions;
 import com.apache.gravitino.rel.indexes.Indexes;
 import com.apache.gravitino.rel.types.Type;
 import com.apache.gravitino.rel.types.Types;
-import com.datastrato.gravitino.connector.BaseColumn;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;

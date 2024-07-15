@@ -18,8 +18,8 @@
  */
 package com.apache.gravitino.catalog.jdbc;
 
-import com.datastrato.gravitino.connector.BasePropertiesMetadata;
-import com.datastrato.gravitino.connector.PropertyEntry;
+import com.apache.gravitino.connector.BasePropertiesMetadata;
+import com.apache.gravitino.connector.PropertyEntry;
 import java.util.Collections;
 import java.util.Map;
 

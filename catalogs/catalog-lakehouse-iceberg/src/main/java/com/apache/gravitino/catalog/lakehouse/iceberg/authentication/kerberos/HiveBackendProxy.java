@@ -20,7 +20,7 @@
 package com.apache.gravitino.catalog.lakehouse.iceberg.authentication.kerberos;
 
 import com.apache.gravitino.catalog.lakehouse.iceberg.IcebergHiveCachedClientPool;
-import com.datastrato.gravitino.utils.PrincipalUtils;
+import com.apache.gravitino.utils.PrincipalUtils;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;

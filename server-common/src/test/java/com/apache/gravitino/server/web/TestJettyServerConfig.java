@@ -18,8 +18,8 @@
  */
 package com.apache.gravitino.server.web;
 
-import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.config.ConfigBuilder;
+import com.apache.gravitino.Config;
+import com.apache.gravitino.config.ConfigBuilder;
 import com.google.common.collect.Sets;
 import java.util.Collections;
 import java.util.Optional;

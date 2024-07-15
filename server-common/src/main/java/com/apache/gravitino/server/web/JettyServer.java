@@ -18,11 +18,11 @@
  */
 package com.apache.gravitino.server.web;
 
+import com.apache.gravitino.GravitinoEnv;
+import com.apache.gravitino.metrics.MetricsSystem;
 import com.apache.gravitino.server.authentication.AuthenticationFilter;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.servlets.MetricsServlet;
-import com.datastrato.gravitino.GravitinoEnv;
-import com.datastrato.gravitino.metrics.MetricsSystem;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;

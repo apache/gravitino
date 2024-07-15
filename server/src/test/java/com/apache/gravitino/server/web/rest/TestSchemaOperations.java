@@ -18,9 +18,9 @@
  */
 package com.apache.gravitino.server.web.rest;
 
-import static com.datastrato.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
-import static com.datastrato.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
-import static com.datastrato.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
+import static com.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
+import static com.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
+import static com.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -28,8 +28,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.apache.gravitino.Audit;
+import com.apache.gravitino.Config;
+import com.apache.gravitino.GravitinoEnv;
 import com.apache.gravitino.NameIdentifier;
 import com.apache.gravitino.Schema;
+import com.apache.gravitino.catalog.SchemaDispatcher;
+import com.apache.gravitino.catalog.SchemaOperationDispatcher;
 import com.apache.gravitino.dto.SchemaDTO;
 import com.apache.gravitino.dto.requests.SchemaCreateRequest;
 import com.apache.gravitino.dto.requests.SchemaUpdateRequest;
@@ -43,12 +47,8 @@ import com.apache.gravitino.exceptions.NoSuchCatalogException;
 import com.apache.gravitino.exceptions.NoSuchSchemaException;
 import com.apache.gravitino.exceptions.NonEmptySchemaException;
 import com.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import com.apache.gravitino.lock.LockManager;
 import com.apache.gravitino.rest.RESTUtils;
-import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.GravitinoEnv;
-import com.datastrato.gravitino.catalog.SchemaDispatcher;
-import com.datastrato.gravitino.catalog.SchemaOperationDispatcher;
-import com.datastrato.gravitino.lock.LockManager;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;

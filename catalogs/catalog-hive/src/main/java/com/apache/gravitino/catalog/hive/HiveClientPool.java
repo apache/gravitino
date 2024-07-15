@@ -20,7 +20,7 @@ package com.apache.gravitino.catalog.hive;
 
 import com.apache.gravitino.catalog.hive.dyn.DynMethods;
 import com.apache.gravitino.catalog.hive.dyn.DynMethods.StaticMethod;
-import com.datastrato.gravitino.utils.ClientPoolImpl;
+import com.apache.gravitino.utils.ClientPoolImpl;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;

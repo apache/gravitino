@@ -30,9 +30,9 @@ import com.apache.gravitino.catalog.mysql.converter.MysqlExceptionConverter;
 import com.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter;
 import com.apache.gravitino.catalog.mysql.operation.MysqlDatabaseOperations;
 import com.apache.gravitino.catalog.mysql.operation.MysqlTableOperations;
-import com.datastrato.gravitino.connector.CatalogOperations;
-import com.datastrato.gravitino.connector.PropertiesMetadata;
-import com.datastrato.gravitino.connector.capability.Capability;
+import com.apache.gravitino.connector.CatalogOperations;
+import com.apache.gravitino.connector.PropertiesMetadata;
+import com.apache.gravitino.connector.capability.Capability;
 import java.util.Map;
 
 /** Implementation of a Mysql catalog in Apache Gravitino. */

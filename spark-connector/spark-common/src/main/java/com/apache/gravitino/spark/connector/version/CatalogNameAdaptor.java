@@ -26,15 +26,15 @@ import org.apache.spark.util.VersionUtils$;
 public class CatalogNameAdaptor {
   private static final Map<String, String> catalogNames =
       ImmutableMap.of(
-          "hive-3.3", "com.datastrato.gravitino.spark.connector.hive.GravitinoHiveCatalogSpark33",
-          "hive-3.4", "com.datastrato.gravitino.spark.connector.hive.GravitinoHiveCatalogSpark34",
-          "hive-3.5", "com.datastrato.gravitino.spark.connector.hive.GravitinoHiveCatalogSpark35",
+          "hive-3.3", "com.apache.gravitino.spark.connector.hive.GravitinoHiveCatalogSpark33",
+          "hive-3.4", "com.apache.gravitino.spark.connector.hive.GravitinoHiveCatalogSpark34",
+          "hive-3.5", "com.apache.gravitino.spark.connector.hive.GravitinoHiveCatalogSpark35",
           "lakehouse-iceberg-3.3",
-              "com.datastrato.gravitino.spark.connector.iceberg.GravitinoIcebergCatalogSpark33",
+              "com.apache.gravitino.spark.connector.iceberg.GravitinoIcebergCatalogSpark33",
           "lakehouse-iceberg-3.4",
-              "com.datastrato.gravitino.spark.connector.iceberg.GravitinoIcebergCatalogSpark34",
+              "com.apache.gravitino.spark.connector.iceberg.GravitinoIcebergCatalogSpark34",
           "lakehouse-iceberg-3.5",
-              "com.datastrato.gravitino.spark.connector.iceberg.GravitinoIcebergCatalogSpark35");
+              "com.apache.gravitino.spark.connector.iceberg.GravitinoIcebergCatalogSpark35");
 
   private static String sparkVersion() {
     return package$.MODULE$.SPARK_VERSION();

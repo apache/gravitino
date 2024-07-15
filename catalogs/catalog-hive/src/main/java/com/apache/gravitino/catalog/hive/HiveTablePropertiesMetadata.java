@@ -20,13 +20,13 @@ package com.apache.gravitino.catalog.hive;
 
 import static com.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.StorageFormat.TEXTFILE;
 import static com.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType.MANAGED_TABLE;
-import static com.datastrato.gravitino.connector.PropertyEntry.booleanReservedPropertyEntry;
-import static com.datastrato.gravitino.connector.PropertyEntry.enumImmutablePropertyEntry;
-import static com.datastrato.gravitino.connector.PropertyEntry.stringImmutablePropertyEntry;
-import static com.datastrato.gravitino.connector.PropertyEntry.stringReservedPropertyEntry;
+import static com.apache.gravitino.connector.PropertyEntry.booleanReservedPropertyEntry;
+import static com.apache.gravitino.connector.PropertyEntry.enumImmutablePropertyEntry;
+import static com.apache.gravitino.connector.PropertyEntry.stringImmutablePropertyEntry;
+import static com.apache.gravitino.connector.PropertyEntry.stringReservedPropertyEntry;
 
-import com.datastrato.gravitino.connector.BasePropertiesMetadata;
-import com.datastrato.gravitino.connector.PropertyEntry;
+import com.apache.gravitino.connector.BasePropertiesMetadata;
+import com.apache.gravitino.connector.PropertyEntry;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;

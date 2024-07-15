@@ -18,16 +18,20 @@
  */
 package com.apache.gravitino.server.web.rest;
 
-import static com.datastrato.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
-import static com.datastrato.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
-import static com.datastrato.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
+import static com.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
+import static com.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
+import static com.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.apache.gravitino.Audit;
+import com.apache.gravitino.Config;
+import com.apache.gravitino.GravitinoEnv;
 import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.catalog.TopicDispatcher;
+import com.apache.gravitino.catalog.TopicOperationDispatcher;
 import com.apache.gravitino.dto.messaging.TopicDTO;
 import com.apache.gravitino.dto.requests.TopicCreateRequest;
 import com.apache.gravitino.dto.requests.TopicUpdateRequest;
@@ -39,14 +43,10 @@ import com.apache.gravitino.dto.responses.ErrorResponse;
 import com.apache.gravitino.dto.responses.TopicResponse;
 import com.apache.gravitino.exceptions.NoSuchSchemaException;
 import com.apache.gravitino.exceptions.TopicAlreadyExistsException;
+import com.apache.gravitino.lock.LockManager;
 import com.apache.gravitino.messaging.Topic;
 import com.apache.gravitino.messaging.TopicChange;
 import com.apache.gravitino.rest.RESTUtils;
-import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.GravitinoEnv;
-import com.datastrato.gravitino.catalog.TopicDispatcher;
-import com.datastrato.gravitino.catalog.TopicOperationDispatcher;
-import com.datastrato.gravitino.lock.LockManager;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;

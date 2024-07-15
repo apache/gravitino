@@ -19,10 +19,10 @@
 
 package com.apache.gravitino.catalog.jdbc.config;
 
-import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.config.ConfigBuilder;
-import com.datastrato.gravitino.config.ConfigConstants;
-import com.datastrato.gravitino.config.ConfigEntry;
+import com.apache.gravitino.Config;
+import com.apache.gravitino.config.ConfigBuilder;
+import com.apache.gravitino.config.ConfigConstants;
+import com.apache.gravitino.config.ConfigEntry;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 

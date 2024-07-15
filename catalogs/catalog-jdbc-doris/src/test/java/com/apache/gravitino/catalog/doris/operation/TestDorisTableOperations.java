@@ -20,6 +20,7 @@ package com.apache.gravitino.catalog.doris.operation;
 
 import com.apache.gravitino.catalog.jdbc.JdbcColumn;
 import com.apache.gravitino.catalog.jdbc.JdbcTable;
+import com.apache.gravitino.integration.test.util.GravitinoITUtils;
 import com.apache.gravitino.rel.TableChange;
 import com.apache.gravitino.rel.expressions.NamedReference;
 import com.apache.gravitino.rel.expressions.distributions.Distribution;
@@ -31,7 +32,6 @@ import com.apache.gravitino.rel.indexes.Indexes;
 import com.apache.gravitino.rel.types.Type;
 import com.apache.gravitino.rel.types.Types;
 import com.apache.gravitino.utils.RandomNameUtils;
-import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.Arrays;

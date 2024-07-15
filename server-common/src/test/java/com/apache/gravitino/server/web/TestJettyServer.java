@@ -22,8 +22,8 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 
+import com.apache.gravitino.Config;
 import com.apache.gravitino.rest.RESTUtils;
-import com.datastrato.gravitino.Config;
 import java.io.IOException;
 import javax.servlet.Filter;
 import javax.servlet.Servlet;

@@ -25,8 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.file.Fileset;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.file.Fileset;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;

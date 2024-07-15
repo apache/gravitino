@@ -18,7 +18,7 @@
  */
 package com.apache.gravitino.catalog.hadoop;
 
-import com.datastrato.gravitino.connector.BaseFileset;
+import com.apache.gravitino.connector.BaseFileset;
 
 public class HadoopFileset extends BaseFileset {
 

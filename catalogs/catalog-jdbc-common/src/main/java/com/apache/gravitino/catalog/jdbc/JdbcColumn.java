@@ -18,7 +18,7 @@
  */
 package com.apache.gravitino.catalog.jdbc;
 
-import com.datastrato.gravitino.connector.BaseColumn;
+import com.apache.gravitino.connector.BaseColumn;
 import lombok.EqualsAndHashCode;
 
 /** Represents a column in the Jdbc column. */

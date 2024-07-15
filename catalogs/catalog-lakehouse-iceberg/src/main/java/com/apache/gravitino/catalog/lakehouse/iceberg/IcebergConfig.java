@@ -19,13 +19,13 @@
 
 package com.apache.gravitino.catalog.lakehouse.iceberg;
 
+import com.apache.gravitino.Config;
 import com.apache.gravitino.catalog.lakehouse.iceberg.web.metrics.IcebergMetricsManager;
+import com.apache.gravitino.config.ConfigBuilder;
+import com.apache.gravitino.config.ConfigConstants;
+import com.apache.gravitino.config.ConfigEntry;
 import com.apache.gravitino.server.web.JettyServerConfig;
 import com.apache.gravitino.server.web.OverwriteDefaultConfig;
-import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.config.ConfigBuilder;
-import com.datastrato.gravitino.config.ConfigConstants;
-import com.datastrato.gravitino.config.ConfigEntry;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import java.util.Optional;

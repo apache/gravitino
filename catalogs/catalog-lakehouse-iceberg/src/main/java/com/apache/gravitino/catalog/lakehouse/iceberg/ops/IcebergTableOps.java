@@ -22,7 +22,7 @@ import com.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import com.apache.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import com.apache.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper.IcebergTableChange;
 import com.apache.gravitino.catalog.lakehouse.iceberg.utils.IcebergCatalogUtil;
-import com.datastrato.gravitino.utils.IsolatedClassLoader;
+import com.apache.gravitino.utils.IsolatedClassLoader;
 import com.google.common.base.Preconditions;
 import java.sql.Driver;
 import java.sql.DriverManager;

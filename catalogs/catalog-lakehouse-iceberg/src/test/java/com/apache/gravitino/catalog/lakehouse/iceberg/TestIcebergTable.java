@@ -25,8 +25,12 @@ import static com.apache.gravitino.rel.expressions.transforms.Transforms.truncat
 
 import com.apache.gravitino.NameIdentifier;
 import com.apache.gravitino.Namespace;
+import com.apache.gravitino.catalog.PropertiesMetadataHelpers;
+import com.apache.gravitino.connector.PropertiesMetadata;
 import com.apache.gravitino.exceptions.NoSuchSchemaException;
 import com.apache.gravitino.exceptions.TableAlreadyExistsException;
+import com.apache.gravitino.meta.AuditInfo;
+import com.apache.gravitino.meta.CatalogEntity;
 import com.apache.gravitino.rel.Column;
 import com.apache.gravitino.rel.Table;
 import com.apache.gravitino.rel.TableCatalog;
@@ -42,10 +46,6 @@ import com.apache.gravitino.rel.expressions.sorts.SortOrder;
 import com.apache.gravitino.rel.expressions.sorts.SortOrders;
 import com.apache.gravitino.rel.expressions.transforms.Transform;
 import com.apache.gravitino.rel.types.Types;
-import com.datastrato.gravitino.catalog.PropertiesMetadataHelpers;
-import com.datastrato.gravitino.connector.PropertiesMetadata;
-import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.meta.CatalogEntity;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.ArrayList;

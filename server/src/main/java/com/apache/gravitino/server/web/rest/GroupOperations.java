@@ -18,17 +18,17 @@
  */
 package com.apache.gravitino.server.web.rest;
 
+import com.apache.gravitino.GravitinoEnv;
+import com.apache.gravitino.authorization.AccessControlManager;
 import com.apache.gravitino.dto.requests.GroupAddRequest;
 import com.apache.gravitino.dto.responses.GroupResponse;
 import com.apache.gravitino.dto.responses.RemoveResponse;
 import com.apache.gravitino.dto.util.DTOConverters;
+import com.apache.gravitino.metrics.MetricNames;
 import com.apache.gravitino.server.authorization.NameBindings;
 import com.apache.gravitino.server.web.Utils;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import com.datastrato.gravitino.GravitinoEnv;
-import com.datastrato.gravitino.authorization.AccessControlManager;
-import com.datastrato.gravitino.metrics.MetricNames;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;

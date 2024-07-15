@@ -19,11 +19,11 @@
 package com.apache.gravitino.catalog.hadoop;
 
 import com.apache.gravitino.catalog.hadoop.authentication.kerberos.KerberosConfig;
-import com.datastrato.gravitino.connector.BaseCatalog;
-import com.datastrato.gravitino.connector.CatalogOperations;
-import com.datastrato.gravitino.connector.PropertiesMetadata;
-import com.datastrato.gravitino.connector.ProxyPlugin;
-import com.datastrato.gravitino.connector.capability.Capability;
+import com.apache.gravitino.connector.BaseCatalog;
+import com.apache.gravitino.connector.CatalogOperations;
+import com.apache.gravitino.connector.PropertiesMetadata;
+import com.apache.gravitino.connector.ProxyPlugin;
+import com.apache.gravitino.connector.capability.Capability;
 import java.util.Map;
 import java.util.Optional;
 

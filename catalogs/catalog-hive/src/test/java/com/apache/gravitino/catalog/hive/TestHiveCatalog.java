@@ -24,12 +24,12 @@ import static com.apache.gravitino.catalog.hive.HiveCatalog.TABLE_PROPERTIES_MET
 import static com.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 
 import com.apache.gravitino.Namespace;
+import com.apache.gravitino.catalog.PropertiesMetadataHelpers;
 import com.apache.gravitino.catalog.hive.miniHMS.MiniHiveMetastoreService;
-import com.datastrato.gravitino.catalog.PropertiesMetadataHelpers;
-import com.datastrato.gravitino.connector.HasPropertyMetadata;
-import com.datastrato.gravitino.connector.PropertiesMetadata;
-import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.meta.CatalogEntity;
+import com.apache.gravitino.connector.HasPropertyMetadata;
+import com.apache.gravitino.connector.PropertiesMetadata;
+import com.apache.gravitino.meta.AuditInfo;
+import com.apache.gravitino.meta.CatalogEntity;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.List;

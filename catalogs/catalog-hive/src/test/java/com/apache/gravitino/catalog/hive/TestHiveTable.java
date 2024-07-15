@@ -20,9 +20,9 @@ package com.apache.gravitino.catalog.hive;
 
 import static com.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 import static com.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
+import static com.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static com.apache.gravitino.rel.expressions.transforms.Transforms.day;
 import static com.apache.gravitino.rel.expressions.transforms.Transforms.identity;
-import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
 
 import com.apache.gravitino.NameIdentifier;
@@ -30,6 +30,8 @@ import com.apache.gravitino.Namespace;
 import com.apache.gravitino.catalog.hive.miniHMS.MiniHiveMetastoreService;
 import com.apache.gravitino.exceptions.NoSuchSchemaException;
 import com.apache.gravitino.exceptions.TableAlreadyExistsException;
+import com.apache.gravitino.meta.AuditInfo;
+import com.apache.gravitino.meta.CatalogEntity;
 import com.apache.gravitino.rel.Column;
 import com.apache.gravitino.rel.Table;
 import com.apache.gravitino.rel.TableCatalog;
@@ -43,8 +45,6 @@ import com.apache.gravitino.rel.expressions.sorts.SortOrder;
 import com.apache.gravitino.rel.expressions.sorts.SortOrders;
 import com.apache.gravitino.rel.expressions.transforms.Transform;
 import com.apache.gravitino.rel.types.Types;
-import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.meta.CatalogEntity;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Arrays;

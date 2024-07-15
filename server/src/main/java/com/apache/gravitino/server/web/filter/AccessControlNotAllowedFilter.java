@@ -21,8 +21,8 @@ package com.apache.gravitino.server.web.filter;
 
 import static javax.servlet.http.HttpServletResponse.SC_METHOD_NOT_ALLOWED;
 
+import com.apache.gravitino.Configs;
 import com.apache.gravitino.server.authorization.NameBindings;
-import com.datastrato.gravitino.Configs;
 import java.io.IOException;
 import java.util.Collections;
 import javax.ws.rs.container.ContainerRequestContext;

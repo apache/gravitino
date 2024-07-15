@@ -18,8 +18,8 @@
  */
 package com.apache.gravitino.catalog.lakehouse.paimon;
 
-import com.datastrato.gravitino.config.ConfigBuilder;
-import com.datastrato.gravitino.config.ConfigEntry;
+import com.apache.gravitino.config.ConfigBuilder;
+import com.apache.gravitino.config.ConfigEntry;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;

@@ -18,7 +18,7 @@
  */
 package com.apache.gravitino.catalog.doris;
 
-import com.datastrato.gravitino.connector.capability.Capability;
+import com.apache.gravitino.connector.capability.Capability;
 
 public class DorisCatalogCapability implements Capability {
   // Doris best practice mention that the name should be in lowercase, separated by underscores

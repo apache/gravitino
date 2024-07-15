@@ -18,7 +18,7 @@
  */
 package com.apache.gravitino.catalog.lakehouse.iceberg.integration.test;
 
-import com.datastrato.gravitino.integration.test.container.HiveContainer;
+import com.apache.gravitino.integration.test.container.HiveContainer;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
 

@@ -20,12 +20,12 @@ package com.apache.gravitino.trino.connector.catalog.jdbc.postgresql;
 
 import static java.util.Collections.emptyList;
 
+import com.apache.gravitino.catalog.property.PropertyConverter;
 import com.apache.gravitino.trino.connector.GravitinoConnectorPluginManager;
 import com.apache.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import com.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import com.apache.gravitino.trino.connector.catalog.jdbc.JDBCCatalogPropertyConverter;
 import com.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
-import com.datastrato.gravitino.catalog.property.PropertyConverter;
 import java.util.Map;
 
 /**

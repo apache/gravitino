@@ -19,7 +19,7 @@
 
 package com.apache.gravitino.server.authentication;
 
-import com.datastrato.gravitino.Config;
+import com.apache.gravitino.Config;
 
 public class ServerAuthenticator {
 

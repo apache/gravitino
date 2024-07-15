@@ -19,7 +19,7 @@
 
 package com.apache.gravitino.server.web;
 
-import com.datastrato.gravitino.Config;
+import com.apache.gravitino.Config;
 import java.util.Map;
 import org.eclipse.jetty.servlet.FilterHolder;
 import org.junit.jupiter.api.Assertions;

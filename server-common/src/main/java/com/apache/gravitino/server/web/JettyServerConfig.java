@@ -18,10 +18,10 @@
  */
 package com.apache.gravitino.server.web;
 
-import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.config.ConfigBuilder;
-import com.datastrato.gravitino.config.ConfigConstants;
-import com.datastrato.gravitino.config.ConfigEntry;
+import com.apache.gravitino.Config;
+import com.apache.gravitino.config.ConfigBuilder;
+import com.apache.gravitino.config.ConfigConstants;
+import com.apache.gravitino.config.ConfigEntry;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;

@@ -18,8 +18,8 @@
  */
 package com.apache.gravitino.catalog.jdbc;
 
-import com.datastrato.gravitino.connector.BaseTable;
-import com.datastrato.gravitino.connector.TableOperations;
+import com.apache.gravitino.connector.BaseTable;
+import com.apache.gravitino.connector.TableOperations;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import lombok.Getter;

@@ -18,9 +18,11 @@
  */
 package com.apache.gravitino.server.web.rest;
 
+import com.apache.gravitino.GravitinoEnv;
 import com.apache.gravitino.MetadataObject;
 import com.apache.gravitino.MetadataObjects;
 import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.authorization.AccessControlManager;
 import com.apache.gravitino.authorization.Privilege;
 import com.apache.gravitino.authorization.Privileges;
 import com.apache.gravitino.authorization.SecurableObject;
@@ -30,14 +32,12 @@ import com.apache.gravitino.dto.requests.RoleCreateRequest;
 import com.apache.gravitino.dto.responses.DeleteResponse;
 import com.apache.gravitino.dto.responses.RoleResponse;
 import com.apache.gravitino.dto.util.DTOConverters;
+import com.apache.gravitino.lock.LockType;
+import com.apache.gravitino.lock.TreeLockUtils;
+import com.apache.gravitino.metrics.MetricNames;
 import com.apache.gravitino.server.web.Utils;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import com.datastrato.gravitino.GravitinoEnv;
-import com.datastrato.gravitino.authorization.AccessControlManager;
-import com.datastrato.gravitino.lock.LockType;
-import com.datastrato.gravitino.lock.TreeLockUtils;
-import com.datastrato.gravitino.metrics.MetricNames;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;

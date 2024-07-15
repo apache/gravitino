@@ -18,7 +18,7 @@
 
 package com.apache.gravitino.catalog.postgresql.integration.test;
 
-import com.datastrato.gravitino.integration.test.container.PGImageName;
+import com.apache.gravitino.integration.test.container.PGImageName;
 import org.junit.jupiter.api.Tag;
 
 @Tag("gravitino-docker-test")

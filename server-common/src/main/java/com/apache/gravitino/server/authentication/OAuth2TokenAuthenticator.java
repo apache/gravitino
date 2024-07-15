@@ -18,11 +18,11 @@
  */
 package com.apache.gravitino.server.authentication;
 
+import com.apache.gravitino.Config;
+import com.apache.gravitino.UserPrincipal;
 import com.apache.gravitino.auth.AuthConstants;
 import com.apache.gravitino.auth.SignatureAlgorithmFamilyType;
 import com.apache.gravitino.exceptions.UnauthorizedException;
-import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.UserPrincipal;
 import com.google.common.base.Preconditions;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;

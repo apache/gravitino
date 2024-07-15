@@ -23,7 +23,7 @@ import com.apache.gravitino.catalog.jdbc.JdbcSchema;
 import com.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import com.apache.gravitino.exceptions.NoSuchSchemaException;
 import com.apache.gravitino.exceptions.NoSuchTableException;
-import com.datastrato.gravitino.meta.AuditInfo;
+import com.apache.gravitino.meta.AuditInfo;
 import com.google.common.collect.ImmutableSet;
 import java.sql.Connection;
 import java.sql.PreparedStatement;

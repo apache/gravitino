@@ -18,13 +18,13 @@
  */
 package com.apache.gravitino.catalog.lakehouse.iceberg;
 
-import static com.datastrato.gravitino.connector.PropertyEntry.enumImmutablePropertyEntry;
-import static com.datastrato.gravitino.connector.PropertyEntry.stringRequiredPropertyEntry;
+import static com.apache.gravitino.connector.PropertyEntry.enumImmutablePropertyEntry;
+import static com.apache.gravitino.connector.PropertyEntry.stringRequiredPropertyEntry;
 
 import com.apache.gravitino.catalog.lakehouse.iceberg.authentication.AuthenticationConfig;
 import com.apache.gravitino.catalog.lakehouse.iceberg.authentication.kerberos.KerberosConfig;
-import com.datastrato.gravitino.connector.BaseCatalogPropertiesMetadata;
-import com.datastrato.gravitino.connector.PropertyEntry;
+import com.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
+import com.apache.gravitino.connector.PropertyEntry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;

@@ -19,11 +19,11 @@
 
 package com.apache.gravitino.server.web;
 
+import com.apache.gravitino.metrics.MetricNames;
+import com.apache.gravitino.metrics.source.MetricsSource;
 import com.codahale.metrics.Clock;
 import com.codahale.metrics.SlidingTimeWindowArrayReservoir;
 import com.codahale.metrics.jersey2.InstrumentedResourceMethodApplicationListener;
-import com.datastrato.gravitino.metrics.MetricNames;
-import com.datastrato.gravitino.metrics.source.MetricsSource;
 import java.util.concurrent.TimeUnit;
 import org.glassfish.jersey.server.ResourceConfig;
 

@@ -18,10 +18,10 @@
  */
 package com.apache.gravitino.catalog.hive;
 
-import static com.datastrato.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
+import static com.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
 
-import com.datastrato.gravitino.connector.BasePropertiesMetadata;
-import com.datastrato.gravitino.connector.PropertyEntry;
+import com.apache.gravitino.connector.BasePropertiesMetadata;
+import com.apache.gravitino.connector.PropertyEntry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import java.util.List;

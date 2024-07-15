@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package com.datastrato.gravitino.catalog.property;
+package com.apache.gravitino.catalog.property;
 
 import com.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata;
 import com.apache.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata;
-import com.datastrato.gravitino.connector.PropertyEntry;
+import com.apache.gravitino.connector.PropertyEntry;
 import java.util.HashMap;
 import java.util.Map;
 import org.slf4j.Logger;

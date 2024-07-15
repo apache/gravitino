@@ -18,10 +18,10 @@
  */
 package com.apache.gravitino.catalog.lakehouse.iceberg;
 
-import com.datastrato.gravitino.connector.BaseCatalog;
-import com.datastrato.gravitino.connector.CatalogOperations;
-import com.datastrato.gravitino.connector.PropertiesMetadata;
-import com.datastrato.gravitino.connector.capability.Capability;
+import com.apache.gravitino.connector.BaseCatalog;
+import com.apache.gravitino.connector.CatalogOperations;
+import com.apache.gravitino.connector.PropertiesMetadata;
+import com.apache.gravitino.connector.capability.Capability;
 import java.util.Map;
 
 /** Implementation of an Apache Iceberg catalog in Apache Gravitino. */

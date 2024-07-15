@@ -19,7 +19,7 @@
 package com.apache.gravitino.catalog.lakehouse.paimon.integration.test;
 
 import com.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
-import com.datastrato.gravitino.integration.test.container.HiveContainer;
+import com.apache.gravitino.integration.test.container.HiveContainer;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import org.junit.jupiter.api.Tag;

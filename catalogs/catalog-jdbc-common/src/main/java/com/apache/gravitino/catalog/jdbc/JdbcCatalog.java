@@ -23,11 +23,11 @@ import com.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import com.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
-import com.datastrato.gravitino.connector.BaseCatalog;
-import com.datastrato.gravitino.connector.CatalogOperations;
-import com.datastrato.gravitino.connector.PropertiesMetadata;
-import com.datastrato.gravitino.connector.PropertyEntry;
-import com.datastrato.gravitino.connector.capability.Capability;
+import com.apache.gravitino.connector.BaseCatalog;
+import com.apache.gravitino.connector.CatalogOperations;
+import com.apache.gravitino.connector.PropertiesMetadata;
+import com.apache.gravitino.connector.PropertyEntry;
+import com.apache.gravitino.connector.capability.Capability;
 import java.util.Collections;
 import java.util.Map;
 

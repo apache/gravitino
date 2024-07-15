@@ -20,10 +20,10 @@
 package com.apache.gravitino.trino.connector.catalog.iceberg;
 
 import com.apache.gravitino.Catalog;
+import com.apache.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata;
+import com.apache.gravitino.catalog.property.PropertyConverter;
 import com.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 import com.apache.gravitino.trino.connector.metadata.TestGravitinoCatalog;
-import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata;
-import com.datastrato.gravitino.catalog.property.PropertyConverter;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;

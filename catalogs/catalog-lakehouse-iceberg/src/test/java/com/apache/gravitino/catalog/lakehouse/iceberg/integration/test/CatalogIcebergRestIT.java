@@ -18,12 +18,12 @@
  */
 package com.apache.gravitino.catalog.lakehouse.iceberg.integration.test;
 
+import com.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import com.apache.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import com.apache.gravitino.catalog.lakehouse.iceberg.IcebergRESTService;
+import com.apache.gravitino.integration.test.container.HiveContainer;
 import com.apache.gravitino.server.web.JettyServerConfig;
 import com.apache.gravitino.utils.MapUtils;
-import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
-import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import java.util.Map;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;

@@ -18,12 +18,12 @@
  */
 package com.apache.gravitino.catalog.jdbc;
 
-import static com.datastrato.gravitino.connector.PropertyEntry.integerPropertyEntry;
-import static com.datastrato.gravitino.connector.PropertyEntry.stringImmutablePropertyEntry;
+import static com.apache.gravitino.connector.PropertyEntry.integerPropertyEntry;
+import static com.apache.gravitino.connector.PropertyEntry.stringImmutablePropertyEntry;
 
 import com.apache.gravitino.catalog.jdbc.config.JdbcConfig;
-import com.datastrato.gravitino.connector.BaseCatalogPropertiesMetadata;
-import com.datastrato.gravitino.connector.PropertyEntry;
+import com.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
+import com.apache.gravitino.connector.PropertyEntry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import java.util.List;

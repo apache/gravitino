@@ -19,17 +19,17 @@
 
 package com.apache.gravitino.catalog.lakehouse.iceberg;
 
+import com.apache.gravitino.GravitinoEnv;
+import com.apache.gravitino.auxiliary.GravitinoAuxiliaryService;
 import com.apache.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOps;
 import com.apache.gravitino.catalog.lakehouse.iceberg.web.IcebergExceptionMapper;
 import com.apache.gravitino.catalog.lakehouse.iceberg.web.IcebergObjectMapperProvider;
 import com.apache.gravitino.catalog.lakehouse.iceberg.web.metrics.IcebergMetricsManager;
+import com.apache.gravitino.metrics.MetricsSystem;
+import com.apache.gravitino.metrics.source.MetricsSource;
 import com.apache.gravitino.server.web.HttpServerMetricsSource;
 import com.apache.gravitino.server.web.JettyServer;
 import com.apache.gravitino.server.web.JettyServerConfig;
-import com.datastrato.gravitino.GravitinoEnv;
-import com.datastrato.gravitino.auxiliary.GravitinoAuxiliaryService;
-import com.datastrato.gravitino.metrics.MetricsSystem;
-import com.datastrato.gravitino.metrics.source.MetricsSource;
 import java.util.Map;
 import javax.servlet.Servlet;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
@@ -58,7 +58,7 @@ public class IcebergRESTService implements GravitinoAuxiliaryService {
     server.initialize(serverConfig, SERVICE_NAME, false /* shouldEnableUI */);
 
     ResourceConfig config = new ResourceConfig();
-    config.packages("com.datastrato.gravitino.catalog.lakehouse.iceberg.web.rest");
+    config.packages("com.apache.gravitino.catalog.lakehouse.iceberg.web.rest");
 
     config.register(IcebergObjectMapperProvider.class).register(JacksonFeature.class);
     config.register(IcebergExceptionMapper.class);

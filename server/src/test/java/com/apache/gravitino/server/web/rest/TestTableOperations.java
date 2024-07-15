@@ -18,9 +18,9 @@
  */
 package com.apache.gravitino.server.web.rest;
 
-import static com.datastrato.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
-import static com.datastrato.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
-import static com.datastrato.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
+import static com.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
+import static com.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
+import static com.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -28,7 +28,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.apache.gravitino.Audit;
+import com.apache.gravitino.Config;
+import com.apache.gravitino.GravitinoEnv;
 import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.catalog.TableDispatcher;
+import com.apache.gravitino.catalog.TableOperationDispatcher;
 import com.apache.gravitino.dto.rel.ColumnDTO;
 import com.apache.gravitino.dto.rel.DistributionDTO;
 import com.apache.gravitino.dto.rel.SortOrderDTO;
@@ -52,6 +56,7 @@ import com.apache.gravitino.dto.util.DTOConverters;
 import com.apache.gravitino.exceptions.NoSuchSchemaException;
 import com.apache.gravitino.exceptions.NoSuchTableException;
 import com.apache.gravitino.exceptions.TableAlreadyExistsException;
+import com.apache.gravitino.lock.LockManager;
 import com.apache.gravitino.rel.Column;
 import com.apache.gravitino.rel.Table;
 import com.apache.gravitino.rel.TableChange;
@@ -66,11 +71,6 @@ import com.apache.gravitino.rel.indexes.Indexes;
 import com.apache.gravitino.rel.types.Type;
 import com.apache.gravitino.rel.types.Types;
 import com.apache.gravitino.rest.RESTUtils;
-import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.GravitinoEnv;
-import com.datastrato.gravitino.catalog.TableDispatcher;
-import com.datastrato.gravitino.catalog.TableOperationDispatcher;
-import com.datastrato.gravitino.lock.LockManager;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;

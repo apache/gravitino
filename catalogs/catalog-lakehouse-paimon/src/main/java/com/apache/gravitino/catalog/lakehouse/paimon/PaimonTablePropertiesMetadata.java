@@ -18,11 +18,11 @@
  */
 package com.apache.gravitino.catalog.lakehouse.paimon;
 
-import static com.datastrato.gravitino.connector.PropertyEntry.stringReservedPropertyEntry;
+import static com.apache.gravitino.connector.PropertyEntry.stringReservedPropertyEntry;
 
-import com.datastrato.gravitino.connector.BasePropertiesMetadata;
-import com.datastrato.gravitino.connector.PropertiesMetadata;
-import com.datastrato.gravitino.connector.PropertyEntry;
+import com.apache.gravitino.connector.BasePropertiesMetadata;
+import com.apache.gravitino.connector.PropertiesMetadata;
+import com.apache.gravitino.connector.PropertyEntry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import java.util.List;

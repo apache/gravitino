@@ -18,17 +18,21 @@
  */
 package com.apache.gravitino.server.web.rest;
 
-import static com.datastrato.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
-import static com.datastrato.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
-import static com.datastrato.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
+import static com.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
+import static com.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
+import static com.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.apache.gravitino.Catalog;
+import com.apache.gravitino.Config;
+import com.apache.gravitino.GravitinoEnv;
 import com.apache.gravitino.NameIdentifier;
 import com.apache.gravitino.Namespace;
+import com.apache.gravitino.catalog.CatalogDispatcher;
+import com.apache.gravitino.catalog.CatalogManager;
 import com.apache.gravitino.dto.CatalogDTO;
 import com.apache.gravitino.dto.requests.CatalogCreateRequest;
 import com.apache.gravitino.dto.requests.CatalogUpdateRequest;
@@ -42,14 +46,10 @@ import com.apache.gravitino.dto.responses.ErrorResponse;
 import com.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.apache.gravitino.exceptions.NoSuchCatalogException;
 import com.apache.gravitino.exceptions.NoSuchMetalakeException;
+import com.apache.gravitino.lock.LockManager;
+import com.apache.gravitino.meta.AuditInfo;
+import com.apache.gravitino.meta.CatalogEntity;
 import com.apache.gravitino.rest.RESTUtils;
-import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.GravitinoEnv;
-import com.datastrato.gravitino.catalog.CatalogDispatcher;
-import com.datastrato.gravitino.catalog.CatalogManager;
-import com.datastrato.gravitino.lock.LockManager;
-import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.meta.CatalogEntity;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;

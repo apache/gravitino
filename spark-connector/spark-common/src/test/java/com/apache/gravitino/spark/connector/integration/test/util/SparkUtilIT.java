@@ -19,7 +19,7 @@
 
 package com.apache.gravitino.spark.connector.integration.test.util;
 
-import com.datastrato.gravitino.integration.test.util.AbstractIT;
+import com.apache.gravitino.integration.test.util.AbstractIT;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;

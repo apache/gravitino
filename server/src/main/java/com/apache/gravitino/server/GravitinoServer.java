@@ -18,6 +18,17 @@
  */
 package com.apache.gravitino.server;
 
+import com.apache.gravitino.Configs;
+import com.apache.gravitino.GravitinoEnv;
+import com.apache.gravitino.catalog.CatalogDispatcher;
+import com.apache.gravitino.catalog.FilesetDispatcher;
+import com.apache.gravitino.catalog.PartitionDispatcher;
+import com.apache.gravitino.catalog.SchemaDispatcher;
+import com.apache.gravitino.catalog.TableDispatcher;
+import com.apache.gravitino.catalog.TopicDispatcher;
+import com.apache.gravitino.metalake.MetalakeDispatcher;
+import com.apache.gravitino.metrics.MetricsSystem;
+import com.apache.gravitino.metrics.source.MetricsSource;
 import com.apache.gravitino.server.authentication.ServerAuthenticator;
 import com.apache.gravitino.server.web.ConfigServlet;
 import com.apache.gravitino.server.web.HttpServerMetricsSource;
@@ -30,17 +41,6 @@ import com.apache.gravitino.server.web.mapper.JsonMappingExceptionMapper;
 import com.apache.gravitino.server.web.mapper.JsonParseExceptionMapper;
 import com.apache.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
 import com.apache.gravitino.server.web.ui.WebUIFilter;
-import com.datastrato.gravitino.Configs;
-import com.datastrato.gravitino.GravitinoEnv;
-import com.datastrato.gravitino.catalog.CatalogDispatcher;
-import com.datastrato.gravitino.catalog.FilesetDispatcher;
-import com.datastrato.gravitino.catalog.PartitionDispatcher;
-import com.datastrato.gravitino.catalog.SchemaDispatcher;
-import com.datastrato.gravitino.catalog.TableDispatcher;
-import com.datastrato.gravitino.catalog.TopicDispatcher;
-import com.datastrato.gravitino.metalake.MetalakeDispatcher;
-import com.datastrato.gravitino.metrics.MetricsSystem;
-import com.datastrato.gravitino.metrics.source.MetricsSource;
 import java.io.File;
 import java.util.Properties;
 import javax.servlet.Servlet;
@@ -89,7 +89,7 @@ public class GravitinoServer extends ResourceConfig {
   }
 
   private void initializeRestApi() {
-    packages("com.datastrato.gravitino.server.web.rest");
+    packages("com.apache.gravitino.server.web.rest");
     boolean enableAuthorization = serverConfig.get(Configs.ENABLE_AUTHORIZATION);
     register(
         new AbstractBinder() {

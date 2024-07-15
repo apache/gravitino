@@ -26,13 +26,13 @@ import com.apache.gravitino.catalog.lakehouse.iceberg.converter.FromIcebergSortO
 import com.apache.gravitino.catalog.lakehouse.iceberg.converter.ToIcebergPartitionSpec;
 import com.apache.gravitino.catalog.lakehouse.iceberg.converter.ToIcebergSortOrder;
 import com.apache.gravitino.catalog.lakehouse.iceberg.utils.IcebergTablePropertiesUtil;
+import com.apache.gravitino.connector.BaseTable;
+import com.apache.gravitino.connector.TableOperations;
+import com.apache.gravitino.meta.AuditInfo;
 import com.apache.gravitino.rel.expressions.distributions.Distribution;
 import com.apache.gravitino.rel.expressions.distributions.Distributions;
 import com.apache.gravitino.rel.expressions.sorts.SortOrder;
 import com.apache.gravitino.rel.expressions.transforms.Transform;
-import com.datastrato.gravitino.connector.BaseTable;
-import com.datastrato.gravitino.connector.TableOperations;
-import com.datastrato.gravitino.meta.AuditInfo;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;

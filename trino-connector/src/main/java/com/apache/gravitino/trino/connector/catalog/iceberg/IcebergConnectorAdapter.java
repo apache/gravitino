@@ -20,11 +20,11 @@ package com.apache.gravitino.trino.connector.catalog.iceberg;
 
 import static java.util.Collections.emptyList;
 
+import com.apache.gravitino.catalog.property.PropertyConverter;
 import com.apache.gravitino.trino.connector.GravitinoConnectorPluginManager;
 import com.apache.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import com.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import com.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
-import com.datastrato.gravitino.catalog.property.PropertyConverter;
 import io.trino.spi.session.PropertyMetadata;
 import java.util.List;
 import java.util.Map;

@@ -18,10 +18,10 @@
  */
 package com.apache.gravitino.catalog.lakehouse.paimon;
 
-import static com.datastrato.gravitino.meta.AuditInfo.EMPTY;
+import static com.apache.gravitino.meta.AuditInfo.EMPTY;
 
 import com.apache.gravitino.Schema;
-import com.datastrato.gravitino.connector.BaseSchema;
+import com.apache.gravitino.connector.BaseSchema;
 import java.util.Map;
 import java.util.Optional;
 import lombok.ToString;

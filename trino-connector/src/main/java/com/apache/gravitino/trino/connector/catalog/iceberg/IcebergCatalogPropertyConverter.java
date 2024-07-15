@@ -19,9 +19,9 @@
 
 package com.apache.gravitino.trino.connector.catalog.iceberg;
 
+import com.apache.gravitino.catalog.property.PropertyConverter;
+import com.apache.gravitino.connector.PropertyEntry;
 import com.apache.gravitino.trino.connector.GravitinoErrorCode;
-import com.datastrato.gravitino.catalog.property.PropertyConverter;
-import com.datastrato.gravitino.connector.PropertyEntry;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import io.trino.spi.TrinoException;

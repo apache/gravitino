@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.datastrato.gravitino.catalog.common;
+package com.apache.gravitino.catalog.common;
 
 import com.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta;
 import com.apache.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
@@ -27,9 +27,9 @@ import com.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMe
 import com.apache.gravitino.catalog.lakehouse.iceberg.IcebergSchemaPropertiesMetadata;
 import com.apache.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata;
 import com.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata;
-import com.datastrato.gravitino.connector.BasePropertiesMetadata;
-import com.datastrato.gravitino.connector.PropertiesMetadata;
-import com.datastrato.gravitino.connector.PropertyEntry;
+import com.apache.gravitino.connector.BasePropertiesMetadata;
+import com.apache.gravitino.connector.PropertiesMetadata;
+import com.apache.gravitino.connector.PropertyEntry;
 import java.util.HashSet;
 import java.util.Set;
 

@@ -18,14 +18,17 @@
  */
 package com.apache.gravitino.server.web.rest;
 
-import static com.datastrato.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
-import static com.datastrato.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
-import static com.datastrato.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
+import static com.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
+import static com.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
+import static com.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.apache.gravitino.Config;
+import com.apache.gravitino.GravitinoEnv;
+import com.apache.gravitino.authorization.AccessControlManager;
 import com.apache.gravitino.authorization.User;
 import com.apache.gravitino.dto.authorization.UserDTO;
 import com.apache.gravitino.dto.requests.UserAddRequest;
@@ -36,13 +39,10 @@ import com.apache.gravitino.dto.responses.UserResponse;
 import com.apache.gravitino.exceptions.NoSuchMetalakeException;
 import com.apache.gravitino.exceptions.NoSuchUserException;
 import com.apache.gravitino.exceptions.UserAlreadyExistsException;
+import com.apache.gravitino.lock.LockManager;
+import com.apache.gravitino.meta.AuditInfo;
+import com.apache.gravitino.meta.UserEntity;
 import com.apache.gravitino.rest.RESTUtils;
-import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.GravitinoEnv;
-import com.datastrato.gravitino.authorization.AccessControlManager;
-import com.datastrato.gravitino.lock.LockManager;
-import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.meta.UserEntity;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;

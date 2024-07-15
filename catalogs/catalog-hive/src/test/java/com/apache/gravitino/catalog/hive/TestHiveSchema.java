@@ -19,7 +19,7 @@
 package com.apache.gravitino.catalog.hive;
 
 import static com.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
-import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static com.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import com.apache.gravitino.NameIdentifier;
 import com.apache.gravitino.Namespace;
@@ -27,8 +27,8 @@ import com.apache.gravitino.Schema;
 import com.apache.gravitino.SchemaChange;
 import com.apache.gravitino.catalog.hive.miniHMS.MiniHiveMetastoreService;
 import com.apache.gravitino.exceptions.SchemaAlreadyExistsException;
-import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.meta.CatalogEntity;
+import com.apache.gravitino.meta.AuditInfo;
+import com.apache.gravitino.meta.CatalogEntity;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Arrays;

@@ -19,13 +19,13 @@
 
 package com.apache.gravitino.catalog.lakehouse.iceberg.integration.test;
 
+import com.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import com.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import com.apache.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import com.apache.gravitino.catalog.lakehouse.iceberg.IcebergRESTService;
-import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
-import com.datastrato.gravitino.integration.test.container.ContainerSuite;
-import com.datastrato.gravitino.integration.test.container.HiveContainer;
-import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
+import com.apache.gravitino.integration.test.container.ContainerSuite;
+import com.apache.gravitino.integration.test.container.HiveContainer;
+import com.apache.gravitino.integration.test.util.GravitinoITUtils;
 import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Tag;

@@ -262,8 +262,8 @@ public class JsonUtils {
    * {@link ObjectMapper} from the following providers:
    *
    * <ul>
-   *   <li>Client side: {@code com.datastrato.gravitino.client.ObjectMapperProvider}
-   *   <li>Server side: {@code com.datastrato.gravitino.server.web.ObjectMapperProvider}
+   *   <li>Client side: {@code com.apache.gravitino.client.ObjectMapperProvider}
+   *   <li>Server side: {@code com.apache.gravitino.server.web.ObjectMapperProvider}
    * </ul>
    *
    * @return the shared {@link ObjectMapper} instance for testing.

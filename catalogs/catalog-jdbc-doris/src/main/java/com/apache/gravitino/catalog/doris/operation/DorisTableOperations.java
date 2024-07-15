@@ -20,6 +20,7 @@ package com.apache.gravitino.catalog.doris.operation;
 
 import static com.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
+import com.apache.gravitino.StringIdentifier;
 import com.apache.gravitino.catalog.doris.utils.DorisUtils;
 import com.apache.gravitino.catalog.jdbc.JdbcColumn;
 import com.apache.gravitino.catalog.jdbc.JdbcTable;
@@ -35,7 +36,6 @@ import com.apache.gravitino.rel.expressions.transforms.Transform;
 import com.apache.gravitino.rel.expressions.transforms.Transforms;
 import com.apache.gravitino.rel.indexes.Index;
 import com.apache.gravitino.rel.indexes.Indexes;
-import com.datastrato.gravitino.StringIdentifier;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;

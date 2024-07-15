@@ -85,7 +85,7 @@ public class TestIcebergMetricsManager {
     Map<String, String> properties =
         ImmutableMap.of(
             IcebergMetricsManager.ICEBERG_METRICS_STORE,
-            "com.datastrato.gravitino.catalog.lakehouse.iceberg.web.metrics.MemoryMetricsStore",
+            "com.apache.gravitino.catalog.lakehouse.iceberg.web.metrics.MemoryMetricsStore",
             "a",
             "b");
     IcebergConfig icebergConfig = new IcebergConfig(properties);

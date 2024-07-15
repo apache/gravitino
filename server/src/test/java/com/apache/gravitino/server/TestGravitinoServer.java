@@ -18,13 +18,13 @@
  */
 package com.apache.gravitino.server;
 
-import static com.datastrato.gravitino.Configs.ENTITY_KV_ROCKSDB_BACKEND_PATH;
-import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
+import static com.apache.gravitino.Configs.ENTITY_KV_ROCKSDB_BACKEND_PATH;
+import static com.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import com.apache.gravitino.rest.RESTUtils;
 import com.apache.gravitino.server.web.JettyServerConfig;
-import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.nio.file.Path;

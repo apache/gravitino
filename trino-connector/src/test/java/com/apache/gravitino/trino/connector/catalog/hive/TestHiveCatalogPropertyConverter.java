@@ -20,9 +20,9 @@
 package com.apache.gravitino.trino.connector.catalog.hive;
 
 import com.apache.gravitino.Catalog;
+import com.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata;
 import com.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 import com.apache.gravitino.trino.connector.metadata.TestGravitinoCatalog;
-import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import java.util.Map;

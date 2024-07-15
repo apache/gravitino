@@ -30,8 +30,8 @@ import com.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import com.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import com.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
-import com.datastrato.gravitino.connector.CatalogOperations;
-import com.datastrato.gravitino.connector.capability.Capability;
+import com.apache.gravitino.connector.CatalogOperations;
+import com.apache.gravitino.connector.capability.Capability;
 import java.util.Map;
 
 /** Implementation of an Apache Doris catalog in Apache Gravitino. */

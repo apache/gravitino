@@ -22,16 +22,16 @@ import static com.apache.gravitino.spark.connector.PropertiesConverter.SPARK_PRO
 import static com.apache.gravitino.spark.connector.iceberg.IcebergPropertiesConstants.ICEBERG_CATALOG_CACHE_ENABLED;
 
 import com.apache.gravitino.Catalog;
+import com.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import com.apache.gravitino.client.GravitinoMetalake;
+import com.apache.gravitino.integration.test.container.ContainerSuite;
+import com.apache.gravitino.integration.test.container.HiveContainer;
+import com.apache.gravitino.integration.test.util.AbstractIT;
 import com.apache.gravitino.server.web.JettyServerConfig;
 import com.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import com.apache.gravitino.spark.connector.iceberg.IcebergPropertiesConstants;
 import com.apache.gravitino.spark.connector.integration.test.util.SparkUtilIT;
 import com.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin;
-import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
-import com.datastrato.gravitino.integration.test.container.ContainerSuite;
-import com.datastrato.gravitino.integration.test.container.HiveContainer;
-import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;

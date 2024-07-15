@@ -24,11 +24,11 @@ import static com.apache.gravitino.trino.connector.catalog.jdbc.JDBCCatalogPrope
 import static com.apache.gravitino.trino.connector.catalog.jdbc.JDBCCatalogPropertyConverter.JDBC_CONNECTION_USER_KEY;
 
 import com.apache.gravitino.Catalog;
+import com.apache.gravitino.catalog.property.PropertyConverter;
 import com.apache.gravitino.trino.connector.catalog.jdbc.mysql.MySQLConnectorAdapter;
 import com.apache.gravitino.trino.connector.catalog.jdbc.postgresql.PostgreSQLConnectorAdapter;
 import com.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 import com.apache.gravitino.trino.connector.metadata.TestGravitinoCatalog;
-import com.datastrato.gravitino.catalog.property.PropertyConverter;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;

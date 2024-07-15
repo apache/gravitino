@@ -22,10 +22,10 @@ package com.apache.gravitino.server.authentication;
 import static com.apache.gravitino.server.authentication.KerberosConfig.KEYTAB;
 import static com.apache.gravitino.server.authentication.KerberosConfig.PRINCIPAL;
 
+import com.apache.gravitino.Config;
 import com.apache.gravitino.auth.AuthConstants;
 import com.apache.gravitino.auth.KerberosUtils;
 import com.apache.gravitino.exceptions.UnauthorizedException;
-import com.datastrato.gravitino.Config;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;

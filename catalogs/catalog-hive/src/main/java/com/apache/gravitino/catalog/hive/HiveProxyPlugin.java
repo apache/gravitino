@@ -18,9 +18,9 @@
  */
 package com.apache.gravitino.catalog.hive;
 
-import com.datastrato.gravitino.connector.CatalogOperations;
-import com.datastrato.gravitino.connector.ProxyPlugin;
-import com.datastrato.gravitino.utils.Executable;
+import com.apache.gravitino.connector.CatalogOperations;
+import com.apache.gravitino.connector.ProxyPlugin;
+import com.apache.gravitino.utils.Executable;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.UndeclaredThrowableException;

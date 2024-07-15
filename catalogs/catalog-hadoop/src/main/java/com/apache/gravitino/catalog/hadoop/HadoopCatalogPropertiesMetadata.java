@@ -20,8 +20,8 @@ package com.apache.gravitino.catalog.hadoop;
 
 import com.apache.gravitino.catalog.hadoop.authentication.AuthenticationConfig;
 import com.apache.gravitino.catalog.hadoop.authentication.kerberos.KerberosConfig;
-import com.datastrato.gravitino.connector.BaseCatalogPropertiesMetadata;
-import com.datastrato.gravitino.connector.PropertyEntry;
+import com.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
+import com.apache.gravitino.connector.PropertyEntry;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 

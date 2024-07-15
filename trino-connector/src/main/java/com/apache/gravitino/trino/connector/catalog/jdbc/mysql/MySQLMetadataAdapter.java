@@ -18,10 +18,10 @@
  */
 package com.apache.gravitino.trino.connector.catalog.jdbc.mysql;
 
+import com.apache.gravitino.catalog.property.PropertyConverter;
 import com.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import com.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 import com.apache.gravitino.trino.connector.metadata.GravitinoTable;
-import com.datastrato.gravitino.catalog.property.PropertyConverter;
 import com.google.common.collect.Maps;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorTableMetadata;

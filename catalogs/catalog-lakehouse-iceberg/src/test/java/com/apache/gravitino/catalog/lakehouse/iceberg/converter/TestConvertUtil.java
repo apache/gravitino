@@ -22,11 +22,11 @@ import static com.apache.gravitino.catalog.lakehouse.iceberg.converter.IcebergDa
 
 import com.apache.gravitino.catalog.lakehouse.iceberg.IcebergColumn;
 import com.apache.gravitino.catalog.lakehouse.iceberg.IcebergTable;
+import com.apache.gravitino.meta.AuditInfo;
 import com.apache.gravitino.rel.Column;
 import com.apache.gravitino.rel.expressions.sorts.SortOrder;
 import com.apache.gravitino.rel.types.Types.ByteType;
 import com.apache.gravitino.rel.types.Types.ShortType;
-import com.datastrato.gravitino.meta.AuditInfo;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Arrays;

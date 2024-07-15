@@ -19,8 +19,8 @@
 
 package com.apache.gravitino.catalog.hive;
 
-import com.datastrato.gravitino.connector.BaseCatalogPropertiesMetadata;
-import com.datastrato.gravitino.connector.PropertyEntry;
+import com.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
+import com.apache.gravitino.connector.PropertyEntry;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;

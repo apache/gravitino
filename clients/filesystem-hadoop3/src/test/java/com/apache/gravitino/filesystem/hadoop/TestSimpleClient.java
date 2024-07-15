@@ -20,11 +20,11 @@ package com.apache.gravitino.filesystem.hadoop;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import com.datastrato.gravitino.auth.AuthConstants;
-import com.datastrato.gravitino.dto.AuditDTO;
-import com.datastrato.gravitino.dto.MetalakeDTO;
-import com.datastrato.gravitino.dto.responses.MetalakeResponse;
-import com.datastrato.gravitino.json.JsonUtils;
+import com.apache.gravitino.auth.AuthConstants;
+import com.apache.gravitino.dto.AuditDTO;
+import com.apache.gravitino.dto.MetalakeDTO;
+import com.apache.gravitino.dto.responses.MetalakeResponse;
+import com.apache.gravitino.json.JsonUtils;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;

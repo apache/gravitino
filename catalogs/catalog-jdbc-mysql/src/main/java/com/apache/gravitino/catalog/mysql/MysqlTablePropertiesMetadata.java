@@ -18,12 +18,12 @@
  */
 package com.apache.gravitino.catalog.mysql;
 
-import static com.datastrato.gravitino.connector.PropertyEntry.enumImmutablePropertyEntry;
-import static com.datastrato.gravitino.connector.PropertyEntry.integerOptionalPropertyEntry;
-import static com.datastrato.gravitino.connector.PropertyEntry.stringReservedPropertyEntry;
+import static com.apache.gravitino.connector.PropertyEntry.enumImmutablePropertyEntry;
+import static com.apache.gravitino.connector.PropertyEntry.integerOptionalPropertyEntry;
+import static com.apache.gravitino.connector.PropertyEntry.stringReservedPropertyEntry;
 
 import com.apache.gravitino.catalog.jdbc.JdbcTablePropertiesMetadata;
-import com.datastrato.gravitino.connector.PropertyEntry;
+import com.apache.gravitino.connector.PropertyEntry;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;

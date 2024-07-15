@@ -18,11 +18,11 @@
  */
 package com.apache.gravitino.server.web.rest;
 
-import com.datastrato.gravitino.connector.BaseCatalog;
-import com.datastrato.gravitino.connector.CatalogInfo;
-import com.datastrato.gravitino.connector.CatalogOperations;
-import com.datastrato.gravitino.connector.HasPropertyMetadata;
-import com.datastrato.gravitino.connector.PropertiesMetadata;
+import com.apache.gravitino.connector.BaseCatalog;
+import com.apache.gravitino.connector.CatalogInfo;
+import com.apache.gravitino.connector.CatalogOperations;
+import com.apache.gravitino.connector.HasPropertyMetadata;
+import com.apache.gravitino.connector.PropertiesMetadata;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Map;

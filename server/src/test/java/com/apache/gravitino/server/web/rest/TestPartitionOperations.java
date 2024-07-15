@@ -18,14 +18,18 @@
  */
 package com.apache.gravitino.server.web.rest;
 
-import static com.datastrato.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
-import static com.datastrato.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
-import static com.datastrato.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
+import static com.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
+import static com.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
+import static com.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.apache.gravitino.Config;
+import com.apache.gravitino.GravitinoEnv;
+import com.apache.gravitino.catalog.PartitionDispatcher;
+import com.apache.gravitino.catalog.PartitionOperationDispatcher;
 import com.apache.gravitino.dto.rel.partitions.PartitionDTO;
 import com.apache.gravitino.dto.requests.AddPartitionsRequest;
 import com.apache.gravitino.dto.responses.DropResponse;
@@ -37,16 +41,12 @@ import com.apache.gravitino.dto.responses.PartitionResponse;
 import com.apache.gravitino.dto.util.DTOConverters;
 import com.apache.gravitino.exceptions.NoSuchPartitionException;
 import com.apache.gravitino.exceptions.PartitionAlreadyExistsException;
+import com.apache.gravitino.lock.LockManager;
 import com.apache.gravitino.rel.expressions.literals.Literal;
 import com.apache.gravitino.rel.expressions.literals.Literals;
 import com.apache.gravitino.rel.partitions.Partition;
 import com.apache.gravitino.rel.partitions.Partitions;
 import com.apache.gravitino.rest.RESTUtils;
-import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.GravitinoEnv;
-import com.datastrato.gravitino.catalog.PartitionDispatcher;
-import com.datastrato.gravitino.catalog.PartitionOperationDispatcher;
-import com.datastrato.gravitino.lock.LockManager;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import javax.servlet.http.HttpServletRequest;

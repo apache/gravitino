@@ -20,10 +20,10 @@ package com.apache.gravitino.server.web.rest;
 
 import com.apache.gravitino.Version;
 import com.apache.gravitino.dto.responses.VersionResponse;
+import com.apache.gravitino.metrics.MetricNames;
 import com.apache.gravitino.server.web.Utils;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import com.datastrato.gravitino.metrics.MetricNames;
 import javax.servlet.http.HttpServlet;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;

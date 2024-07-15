@@ -20,10 +20,10 @@
 package com.apache.gravitino.catalog.hadoop.authentication.kerberos;
 
 import com.apache.gravitino.catalog.hadoop.authentication.AuthenticationConfig;
-import com.datastrato.gravitino.config.ConfigBuilder;
-import com.datastrato.gravitino.config.ConfigConstants;
-import com.datastrato.gravitino.config.ConfigEntry;
-import com.datastrato.gravitino.connector.PropertyEntry;
+import com.apache.gravitino.config.ConfigBuilder;
+import com.apache.gravitino.config.ConfigConstants;
+import com.apache.gravitino.config.ConfigEntry;
+import com.apache.gravitino.connector.PropertyEntry;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;

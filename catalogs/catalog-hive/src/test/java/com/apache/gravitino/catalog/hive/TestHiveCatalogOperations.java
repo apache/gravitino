@@ -31,11 +31,11 @@ import static com.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.LIST_A
 import static com.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 import static com.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.PRINCIPAL;
 import static com.apache.gravitino.catalog.hive.TestHiveCatalog.HIVE_PROPERTIES_METADATA;
-import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static com.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import com.apache.gravitino.Catalog;
-import com.datastrato.gravitino.connector.BaseCatalog;
-import com.datastrato.gravitino.connector.PropertyEntry;
+import com.apache.gravitino.connector.BaseCatalog;
+import com.apache.gravitino.connector.PropertyEntry;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;

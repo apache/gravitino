@@ -20,10 +20,10 @@
 package com.apache.gravitino.trino.connector.catalog.jdbc.mysql;
 
 import com.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata;
+import com.apache.gravitino.catalog.property.PropertyConverter;
+import com.apache.gravitino.connector.BasePropertiesMetadata;
+import com.apache.gravitino.connector.PropertyEntry;
 import com.apache.gravitino.shaded.com.google.common.collect.ImmutableMap;
-import com.datastrato.gravitino.catalog.property.PropertyConverter;
-import com.datastrato.gravitino.connector.BasePropertiesMetadata;
-import com.datastrato.gravitino.connector.PropertyEntry;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Map;
 import org.apache.commons.collections4.bidimap.TreeBidiMap;

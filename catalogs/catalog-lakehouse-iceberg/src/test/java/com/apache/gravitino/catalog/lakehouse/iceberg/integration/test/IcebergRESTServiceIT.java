@@ -19,10 +19,10 @@
 
 package com.apache.gravitino.catalog.lakehouse.iceberg.integration.test;
 
+import com.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import com.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import com.apache.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import com.apache.gravitino.catalog.lakehouse.iceberg.IcebergRESTService;
-import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;

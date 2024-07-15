@@ -17,5 +17,5 @@
 # under the License.
 #
 
-com.datastrato.gravitino.flink.connector.store.GravitinoCatalogStoreFactory
-com.datastrato.gravitino.flink.connector.hive.GravitinoHiveCatalogFactory
+com.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactory
+com.apache.gravitino.flink.connector.hive.GravitinoHiveCatalogFactory

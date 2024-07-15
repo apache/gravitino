@@ -21,12 +21,12 @@ package com.apache.gravitino.catalog.mysql.integration.test;
 import static com.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
 
 import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.integration.test.util.GravitinoITUtils;
 import com.apache.gravitino.rel.Column;
 import com.apache.gravitino.rel.Table;
 import com.apache.gravitino.rel.expressions.FunctionExpression;
 import com.apache.gravitino.rel.expressions.literals.Literals;
 import com.apache.gravitino.rel.types.Types;
-import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.google.common.collect.ImmutableMap;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;

@@ -18,7 +18,7 @@
  */
 package com.apache.gravitino.catalog.lakehouse.iceberg.converter;
 
-import com.datastrato.gravitino.connector.DataTypeConverter;
+import com.apache.gravitino.connector.DataTypeConverter;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.TypeUtil;
 

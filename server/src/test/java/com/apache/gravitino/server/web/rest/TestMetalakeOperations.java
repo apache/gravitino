@@ -18,14 +18,16 @@
  */
 package com.apache.gravitino.server.web.rest;
 
-import static com.datastrato.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
-import static com.datastrato.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
-import static com.datastrato.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
+import static com.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
+import static com.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
+import static com.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.apache.gravitino.Config;
+import com.apache.gravitino.GravitinoEnv;
 import com.apache.gravitino.MetalakeChange;
 import com.apache.gravitino.dto.MetalakeDTO;
 import com.apache.gravitino.dto.requests.MetalakeCreateRequest;
@@ -37,18 +39,16 @@ import com.apache.gravitino.dto.responses.ErrorResponse;
 import com.apache.gravitino.dto.responses.MetalakeListResponse;
 import com.apache.gravitino.dto.responses.MetalakeResponse;
 import com.apache.gravitino.exceptions.NoSuchMetalakeException;
+import com.apache.gravitino.lock.LockManager;
+import com.apache.gravitino.meta.AuditInfo;
+import com.apache.gravitino.meta.BaseMetalake;
+import com.apache.gravitino.meta.SchemaVersion;
+import com.apache.gravitino.metalake.MetalakeDispatcher;
+import com.apache.gravitino.metalake.MetalakeManager;
 import com.apache.gravitino.rest.RESTUtils;
 import com.apache.gravitino.server.web.mapper.JsonMappingExceptionMapper;
 import com.apache.gravitino.server.web.mapper.JsonParseExceptionMapper;
 import com.apache.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
-import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.GravitinoEnv;
-import com.datastrato.gravitino.lock.LockManager;
-import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.meta.BaseMetalake;
-import com.datastrato.gravitino.meta.SchemaVersion;
-import com.datastrato.gravitino.metalake.MetalakeDispatcher;
-import com.datastrato.gravitino.metalake.MetalakeManager;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;

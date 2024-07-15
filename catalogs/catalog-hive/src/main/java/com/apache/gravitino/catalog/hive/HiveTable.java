@@ -22,6 +22,10 @@ import static com.apache.gravitino.rel.expressions.transforms.Transforms.identit
 
 import com.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType;
 import com.apache.gravitino.catalog.hive.converter.HiveDataTypeConverter;
+import com.apache.gravitino.connector.BaseTable;
+import com.apache.gravitino.connector.PropertiesMetadata;
+import com.apache.gravitino.connector.TableOperations;
+import com.apache.gravitino.meta.AuditInfo;
 import com.apache.gravitino.rel.Column;
 import com.apache.gravitino.rel.SupportsPartitions;
 import com.apache.gravitino.rel.expressions.Expression;
@@ -33,10 +37,6 @@ import com.apache.gravitino.rel.expressions.sorts.SortOrder;
 import com.apache.gravitino.rel.expressions.sorts.SortOrders;
 import com.apache.gravitino.rel.expressions.transforms.Transform;
 import com.apache.gravitino.rel.expressions.transforms.Transforms;
-import com.datastrato.gravitino.connector.BaseTable;
-import com.datastrato.gravitino.connector.PropertiesMetadata;
-import com.datastrato.gravitino.connector.TableOperations;
-import com.datastrato.gravitino.meta.AuditInfo;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.time.Instant;

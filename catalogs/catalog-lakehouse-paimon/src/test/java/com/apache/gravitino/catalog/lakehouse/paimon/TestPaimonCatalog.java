@@ -23,13 +23,13 @@ import static com.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalog.SCHEMA
 import static com.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalog.TABLE_PROPERTIES_META;
 
 import com.apache.gravitino.Namespace;
+import com.apache.gravitino.catalog.PropertiesMetadataHelpers;
 import com.apache.gravitino.catalog.lakehouse.paimon.ops.PaimonCatalogOps;
-import com.datastrato.gravitino.catalog.PropertiesMetadataHelpers;
-import com.datastrato.gravitino.connector.CatalogOperations;
-import com.datastrato.gravitino.connector.HasPropertyMetadata;
-import com.datastrato.gravitino.connector.PropertiesMetadata;
-import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.meta.CatalogEntity;
+import com.apache.gravitino.connector.CatalogOperations;
+import com.apache.gravitino.connector.HasPropertyMetadata;
+import com.apache.gravitino.connector.PropertiesMetadata;
+import com.apache.gravitino.meta.AuditInfo;
+import com.apache.gravitino.meta.CatalogEntity;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;

@@ -18,11 +18,11 @@
  */
 package com.apache.gravitino.server.web;
 
+import com.apache.gravitino.Configs;
 import com.apache.gravitino.auth.AuthenticatorType;
+import com.apache.gravitino.config.ConfigEntry;
 import com.apache.gravitino.server.ServerConfig;
 import com.apache.gravitino.server.authentication.OAuthConfig;
-import com.datastrato.gravitino.Configs;
-import com.datastrato.gravitino.config.ConfigEntry;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import java.io.IOException;

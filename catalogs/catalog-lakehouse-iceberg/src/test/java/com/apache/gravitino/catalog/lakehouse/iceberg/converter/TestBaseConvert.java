@@ -57,8 +57,8 @@ public class TestBaseConvert {
   static {
     GRAVITINO_TYPE.put("BOOLEAN", com.apache.gravitino.rel.types.Types.BooleanType.get());
     // Types not supported by iceberg
-    //    GRAVITINO_TYPE.put("I8", com.datastrato.gravitino.rel.types.Types.ByteType.get());
-    //    GRAVITINO_TYPE.put("I16", com.datastrato.gravitino.rel.types.Types.ShortType.get());
+    //    GRAVITINO_TYPE.put("I8", com.apache.gravitino.rel.types.Types.ByteType.get());
+    //    GRAVITINO_TYPE.put("I16", com.apache.gravitino.rel.types.Types.ShortType.get());
     GRAVITINO_TYPE.put("I32", com.apache.gravitino.rel.types.Types.IntegerType.get());
     GRAVITINO_TYPE.put("I64", com.apache.gravitino.rel.types.Types.LongType.get());
     GRAVITINO_TYPE.put("FP32", com.apache.gravitino.rel.types.Types.FloatType.get());
@@ -74,9 +74,9 @@ public class TestBaseConvert {
     GRAVITINO_TYPE.put("UUID", com.apache.gravitino.rel.types.Types.UUIDType.get());
     // Types not supported by iceberg
     //    GRAVITINO_TYPE.put("INTERVAL_DAY",
-    // com.datastrato.gravitino.rel.types.Types.IntervalDayType.get());
+    // com.apache.gravitino.rel.types.Types.IntervalDayType.get());
     //    GRAVITINO_TYPE.put("INTERVAL_YEAR",
-    // com.datastrato.gravitino.rel.types.Types.IntervalYearType.get());
+    // com.apache.gravitino.rel.types.Types.IntervalYearType.get());
 
     ICEBERG_TYPE.put("BOOLEAN", org.apache.iceberg.types.Types.BooleanType.get());
     ICEBERG_TYPE.put("I8", org.apache.iceberg.types.Types.IntegerType.get());

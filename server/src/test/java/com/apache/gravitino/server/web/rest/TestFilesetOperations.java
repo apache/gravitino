@@ -18,16 +18,20 @@
  */
 package com.apache.gravitino.server.web.rest;
 
-import static com.datastrato.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
-import static com.datastrato.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
-import static com.datastrato.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
+import static com.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
+import static com.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
+import static com.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.apache.gravitino.Audit;
+import com.apache.gravitino.Config;
+import com.apache.gravitino.GravitinoEnv;
 import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.catalog.FilesetDispatcher;
+import com.apache.gravitino.catalog.FilesetOperationDispatcher;
 import com.apache.gravitino.dto.file.FilesetDTO;
 import com.apache.gravitino.dto.requests.FilesetCreateRequest;
 import com.apache.gravitino.dto.requests.FilesetUpdateRequest;
@@ -42,12 +46,8 @@ import com.apache.gravitino.exceptions.NoSuchFilesetException;
 import com.apache.gravitino.exceptions.NoSuchSchemaException;
 import com.apache.gravitino.file.Fileset;
 import com.apache.gravitino.file.FilesetChange;
+import com.apache.gravitino.lock.LockManager;
 import com.apache.gravitino.rest.RESTUtils;
-import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.GravitinoEnv;
-import com.datastrato.gravitino.catalog.FilesetDispatcher;
-import com.datastrato.gravitino.catalog.FilesetOperationDispatcher;
-import com.datastrato.gravitino.lock.LockManager;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;

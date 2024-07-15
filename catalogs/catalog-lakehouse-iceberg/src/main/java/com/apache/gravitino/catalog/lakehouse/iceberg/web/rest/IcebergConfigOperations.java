@@ -19,9 +19,9 @@
 package com.apache.gravitino.catalog.lakehouse.iceberg.web.rest;
 
 import com.apache.gravitino.catalog.lakehouse.iceberg.web.IcebergRestUtils;
+import com.apache.gravitino.metrics.MetricNames;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import com.datastrato.gravitino.metrics.MetricNames;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;

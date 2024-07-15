@@ -18,7 +18,7 @@
  */
 package com.apache.gravitino.catalog.jdbc.converter;
 
-import com.datastrato.gravitino.connector.DataTypeConverter;
+import com.apache.gravitino.connector.DataTypeConverter;
 import java.util.Objects;
 
 public abstract class JdbcTypeConverter

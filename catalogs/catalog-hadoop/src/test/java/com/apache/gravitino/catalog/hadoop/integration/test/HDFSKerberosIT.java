@@ -19,8 +19,8 @@
 
 package com.apache.gravitino.catalog.hadoop.integration.test;
 
-import com.datastrato.gravitino.integration.test.container.ContainerSuite;
-import com.datastrato.gravitino.integration.test.container.HiveContainer;
+import com.apache.gravitino.integration.test.container.ContainerSuite;
+import com.apache.gravitino.integration.test.container.HiveContainer;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

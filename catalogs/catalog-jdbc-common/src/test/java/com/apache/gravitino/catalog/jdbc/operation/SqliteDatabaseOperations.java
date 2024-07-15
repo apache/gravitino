@@ -23,7 +23,7 @@ import com.apache.gravitino.catalog.jdbc.converter.SqliteExceptionConverter;
 import com.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import com.apache.gravitino.exceptions.NoSuchSchemaException;
 import com.apache.gravitino.exceptions.SchemaAlreadyExistsException;
-import com.datastrato.gravitino.meta.AuditInfo;
+import com.apache.gravitino.meta.AuditInfo;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.sql.Connection;

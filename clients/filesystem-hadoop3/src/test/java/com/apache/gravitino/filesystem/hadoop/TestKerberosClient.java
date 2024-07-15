@@ -23,8 +23,8 @@ import static com.apache.gravitino.server.authentication.KerberosConfig.PRINCIPA
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockserver.model.HttpResponse.response;
 
+import com.apache.gravitino.Config;
 import com.apache.gravitino.server.authentication.KerberosAuthenticator;
-import com.datastrato.gravitino.Config;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;

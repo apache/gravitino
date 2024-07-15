@@ -20,20 +20,20 @@ package com.apache.gravitino.filesystem.hadoop;
 
 import static org.apache.hc.core5.http.HttpStatus.SC_OK;
 
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Version;
-import com.datastrato.gravitino.dto.AuditDTO;
-import com.datastrato.gravitino.dto.CatalogDTO;
-import com.datastrato.gravitino.dto.MetalakeDTO;
-import com.datastrato.gravitino.dto.file.FilesetDTO;
-import com.datastrato.gravitino.dto.responses.CatalogResponse;
-import com.datastrato.gravitino.dto.responses.FilesetResponse;
-import com.datastrato.gravitino.dto.responses.MetalakeResponse;
-import com.datastrato.gravitino.dto.responses.VersionResponse;
-import com.datastrato.gravitino.file.Fileset;
-import com.datastrato.gravitino.json.JsonUtils;
-import com.datastrato.gravitino.shaded.com.fasterxml.jackson.core.JsonProcessingException;
-import com.datastrato.gravitino.shaded.com.fasterxml.jackson.databind.ObjectMapper;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Version;
+import com.apache.gravitino.dto.AuditDTO;
+import com.apache.gravitino.dto.CatalogDTO;
+import com.apache.gravitino.dto.MetalakeDTO;
+import com.apache.gravitino.dto.file.FilesetDTO;
+import com.apache.gravitino.dto.responses.CatalogResponse;
+import com.apache.gravitino.dto.responses.FilesetResponse;
+import com.apache.gravitino.dto.responses.MetalakeResponse;
+import com.apache.gravitino.dto.responses.VersionResponse;
+import com.apache.gravitino.file.Fileset;
+import com.apache.gravitino.json.JsonUtils;
+import com.apache.gravitino.shaded.com.fasterxml.jackson.core.JsonProcessingException;
+import com.apache.gravitino.shaded.com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
 import java.util.Collections;
@@ -92,7 +92,7 @@ public abstract class GravitinoMockServerBase {
       T reqBody,
       R respBody,
       int statusCode)
-      throws com.datastrato.gravitino.shaded.com.fasterxml.jackson.core.JsonProcessingException {
+      throws com.apache.gravitino.shaded.com.fasterxml.jackson.core.JsonProcessingException {
     List<Parameter> parameters =
         queryParams.entrySet().stream()
             .map(kv -> new Parameter(kv.getKey(), kv.getValue()))
@@ -116,7 +116,7 @@ public abstract class GravitinoMockServerBase {
 
   protected static <T, R> void buildMockResource(
       Method method, String path, T reqBody, R respBody, int statusCode)
-      throws com.datastrato.gravitino.shaded.com.fasterxml.jackson.core.JsonProcessingException {
+      throws com.apache.gravitino.shaded.com.fasterxml.jackson.core.JsonProcessingException {
     buildMockResource(method, path, Collections.emptyMap(), reqBody, respBody, statusCode);
   }
 

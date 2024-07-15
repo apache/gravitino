@@ -18,7 +18,7 @@
  */
 package com.apache.gravitino.catalog.hive;
 
-import com.datastrato.gravitino.utils.ClientPool;
+import com.apache.gravitino.utils.ClientPool;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;

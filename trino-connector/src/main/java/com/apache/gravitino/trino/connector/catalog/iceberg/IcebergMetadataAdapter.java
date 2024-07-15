@@ -18,6 +18,7 @@
  */
 package com.apache.gravitino.trino.connector.catalog.iceberg;
 
+import com.apache.gravitino.catalog.property.PropertyConverter;
 import com.apache.gravitino.rel.expressions.Expression;
 import com.apache.gravitino.rel.expressions.NamedReference;
 import com.apache.gravitino.rel.expressions.sorts.SortOrder;
@@ -27,7 +28,6 @@ import com.apache.gravitino.rel.expressions.transforms.Transforms;
 import com.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import com.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 import com.apache.gravitino.trino.connector.metadata.GravitinoTable;
-import com.datastrato.gravitino.catalog.property.PropertyConverter;
 import com.google.common.collect.ImmutableSet;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorTableMetadata;

@@ -18,6 +18,7 @@
  */
 package com.apache.gravitino.trino.connector.catalog.hive;
 
+import com.apache.gravitino.catalog.property.PropertyConverter;
 import com.apache.gravitino.rel.expressions.Expression;
 import com.apache.gravitino.rel.expressions.NamedReference;
 import com.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -32,7 +33,6 @@ import com.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdap
 import com.apache.gravitino.trino.connector.catalog.hive.SortingColumn.Order;
 import com.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 import com.apache.gravitino.trino.connector.metadata.GravitinoTable;
-import com.datastrato.gravitino.catalog.property.PropertyConverter;
 import com.google.common.collect.ImmutableSet;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ColumnMetadata;

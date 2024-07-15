@@ -60,7 +60,7 @@ You can also specify filter parameters by setting configuration entries in the s
 
 ### Apache Iceberg metrics store configuration
 
-Gravitino provides a pluggable metrics store interface to store and delete Iceberg metrics. You can develop a class that implements `com.datastrato.gravitino.catalog.lakehouse.iceberg.web.metrics` and add the corresponding jar file to the Iceberg REST service classpath directory.
+Gravitino provides a pluggable metrics store interface to store and delete Iceberg metrics. You can develop a class that implements `com.apache.gravitino.catalog.lakehouse.iceberg.web.metrics` and add the corresponding jar file to the Iceberg REST service classpath directory.
 
 
 | Configuration item                                         | Description                                                                                                                         | Default value | Required | Since Version |
