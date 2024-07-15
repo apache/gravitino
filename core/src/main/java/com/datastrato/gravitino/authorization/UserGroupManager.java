@@ -28,7 +28,6 @@ import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.GroupEntity;
-import com.datastrato.gravitino.meta.RoleEntity;
 import com.datastrato.gravitino.meta.UserEntity;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.PrincipalUtils;
@@ -36,8 +35,6 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
-import java.util.List;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,12 +49,10 @@ class UserGroupManager {
 
   private final EntityStore store;
   private final IdGenerator idGenerator;
-  private final RoleManager roleManager;
 
-  UserGroupManager(EntityStore store, IdGenerator idGenerator, RoleManager roleManager) {
+  UserGroupManager(EntityStore store, IdGenerator idGenerator) {
     this.store = store;
     this.idGenerator = idGenerator;
-    this.roleManager = roleManager;
   }
 
   User addUser(String metalake, String name) throws UserAlreadyExistsException {
@@ -102,20 +97,9 @@ class UserGroupManager {
   User getUser(String metalake, String user) throws NoSuchUserException {
     try {
       AuthorizationUtils.checkMetalakeExists(metalake);
-      UserEntity entity =
-          store.get(
-              AuthorizationUtils.ofUser(metalake, user), Entity.EntityType.USER, UserEntity.class);
+      return store.get(
+          AuthorizationUtils.ofUser(metalake, user), Entity.EntityType.USER, UserEntity.class);
 
-      List<RoleEntity> roleEntities =
-          roleManager.getValidRoles(metalake, entity.roles(), entity.roleIds());
-
-      return UserEntity.builder()
-          .withId(entity.id())
-          .withName(entity.name())
-          .withAuditInfo(entity.auditInfo())
-          .withNamespace(entity.namespace())
-          .withRoleNames(roleEntities.stream().map(RoleEntity::name).collect(Collectors.toList()))
-          .build();
     } catch (NoSuchEntityException e) {
       LOG.warn("User {} does not exist in the metalake {}", user, metalake, e);
       throw new NoSuchUserException(AuthorizationUtils.USER_DOES_NOT_EXIST_MSG, user, metalake);
@@ -171,22 +155,8 @@ class UserGroupManager {
     try {
       AuthorizationUtils.checkMetalakeExists(metalake);
 
-      GroupEntity entity =
-          store.get(
-              AuthorizationUtils.ofGroup(metalake, group),
-              Entity.EntityType.GROUP,
-              GroupEntity.class);
-
-      List<RoleEntity> roleEntities =
-          roleManager.getValidRoles(metalake, entity.roles(), entity.roleIds());
-
-      return GroupEntity.builder()
-          .withId(entity.id())
-          .withName(entity.name())
-          .withAuditInfo(entity.auditInfo())
-          .withNamespace(entity.namespace())
-          .withRoleNames(roleEntities.stream().map(RoleEntity::name).collect(Collectors.toList()))
-          .build();
+      return store.get(
+          AuthorizationUtils.ofGroup(metalake, group), Entity.EntityType.GROUP, GroupEntity.class);
     } catch (NoSuchEntityException e) {
       LOG.warn("Group {} does not exist in the metalake {}", group, metalake, e);
       throw new NoSuchGroupException(AuthorizationUtils.GROUP_DOES_NOT_EXIST_MSG, group, metalake);

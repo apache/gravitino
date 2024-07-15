@@ -362,6 +362,16 @@ public class TestFilesetCatalog extends TestBase {
     Fileset res3 = catalog.asFilesetCatalog().alterFileset(fileset, req3.filesetChange());
     assertFileset(mockFileset3, res3);
 
+    // Test remove fileset comment
+    FilesetUpdateRequest req4 = new FilesetUpdateRequest.RemoveFilesetCommentRequest();
+    FilesetDTO mockFileset4 =
+        mockFilesetDTO("new name", Fileset.Type.MANAGED, null, "mock location", ImmutableMap.of());
+    FilesetResponse resp4 = new FilesetResponse(mockFileset4);
+    buildMockResource(
+        Method.PUT, filesetPath, new FilesetUpdatesRequest(ImmutableList.of(req4)), resp4, SC_OK);
+    Fileset res4 = catalog.asFilesetCatalog().alterFileset(fileset, req4.filesetChange());
+    assertFileset(mockFileset4, res4);
+
     // Test NoSuchFilesetException
     ErrorResponse errResp =
         ErrorResponse.notFound(NoSuchFilesetException.class.getSimpleName(), "fileset not found");

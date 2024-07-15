@@ -132,12 +132,12 @@ public class LockManager {
     // Check self
     node.getHoldingThreadTimestamp()
         .forEach(
-            (thread, ts) -> {
+            (threadIdentifier, ts) -> {
               // If the thread is holding the lock for more than 30 seconds, we will log it.
               if (System.currentTimeMillis() - ts > 30000) {
                 LOG.warn(
-                    "Dead lock detected for thread {} on node {}, threads that holding the node: {} ",
-                    thread,
+                    "Dead lock detected for thread with identifier {} on node {}, threads that holding the node: {} ",
+                    threadIdentifier,
                     node,
                     node.getHoldingThreadTimestamp());
               }

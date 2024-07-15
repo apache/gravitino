@@ -32,7 +32,8 @@ import org.slf4j.LoggerFactory;
 
 public final class DorisUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(DorisUtils.class);
-  private static final String PARTITION_BY = "PARTITION BY";
+  private static final Pattern PARTITION_INFO_PATTERN =
+      Pattern.compile("PARTITION BY \\b(LIST|RANGE)\\b\\((.+)\\)");
   private static final String LIST_PARTITION = "LIST";
   private static final String RANGE_PARTITION = "RANGE";
 
@@ -81,16 +82,12 @@ public final class DorisUtils {
     try {
       String[] lines = createTableSql.split("\n");
       for (String line : lines) {
-        if (line.contains(PARTITION_BY)) {
-          String partitionInfoString = line.substring(PARTITION_BY.length() + 1);
-          int partitionColumnIndex = partitionInfoString.indexOf("(");
-          String partitionType =
-              partitionInfoString.substring(0, partitionColumnIndex).toUpperCase();
+        Matcher matcher = PARTITION_INFO_PATTERN.matcher(line.trim());
+        if (matcher.matches()) {
+          String partitionType = matcher.group(1);
+          String partitionInfoString = matcher.group(2);
           String[] columns =
-              Arrays.stream(
-                      partitionInfoString
-                          .substring(partitionColumnIndex + 1, partitionInfoString.length() - 1)
-                          .split(", "))
+              Arrays.stream(partitionInfoString.split(", "))
                   .map(s -> s.substring(1, s.length() - 1))
                   .toArray(String[]::new);
           if (LIST_PARTITION.equals(partitionType)) {
@@ -99,9 +96,6 @@ public final class DorisUtils {
             return Optional.of(Transforms.list(filedNames));
           } else if (RANGE_PARTITION.equals(partitionType)) {
             return Optional.of(Transforms.range(new String[] {columns[0]}));
-          } else {
-            throw new RuntimeException(
-                "Cannot extract partition type from SQL:\n" + createTableSql);
           }
         }
       }

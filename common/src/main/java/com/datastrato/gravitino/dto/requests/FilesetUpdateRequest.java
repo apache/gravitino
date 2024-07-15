@@ -41,6 +41,9 @@ import org.apache.commons.lang3.StringUtils;
       value = FilesetUpdateRequest.UpdateFilesetCommentRequest.class,
       name = "updateComment"),
   @JsonSubTypes.Type(
+      value = FilesetUpdateRequest.RemoveFilesetCommentRequest.class,
+      name = "removeComment"),
+  @JsonSubTypes.Type(
       value = FilesetUpdateRequest.SetFilesetPropertiesRequest.class,
       name = "setProperty"),
   @JsonSubTypes.Type(
@@ -179,5 +182,26 @@ public interface FilesetUpdateRequest extends RESTRequest {
       Preconditions.checkArgument(
           StringUtils.isNotBlank(property), "\"property\" field is required and cannot be empty");
     }
+  }
+
+  /** The fileset update request for removing the comment of a fileset. */
+  @EqualsAndHashCode
+  @NoArgsConstructor(force = true)
+  @ToString
+  class RemoveFilesetCommentRequest implements FilesetUpdateRequest {
+
+    /** @return The fileset change. */
+    @Override
+    public FilesetChange filesetChange() {
+      return FilesetChange.removeComment();
+    }
+
+    /**
+     * Validates the request.
+     *
+     * @throws IllegalArgumentException if the request is invalid.
+     */
+    @Override
+    public void validate() throws IllegalArgumentException {}
   }
 }
