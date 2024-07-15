@@ -490,7 +490,7 @@ components:
         "type": "CatalogAlreadyExistsException",
         "message": "Failed to operate catalog(s) [my_catalog] operation [CREATE], reason [CatalogAlreadyExistsException]",
         "stack": [
-          "com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException: Catalog my_catalog already exists",
+          "com.apache.gravitino.exceptions.CatalogAlreadyExistsException: Catalog my_catalog already exists",
           "..."
         ]
       }
@@ -501,7 +501,7 @@ components:
         "type": "NoSuchCatalogException",
         "message": "Failed to operate catalog(s) [test] operation [LOAD] under metalake [my_test_metalake], reason [NoSuchCatalogException]",
         "stack": [
-          "com.datastrato.gravitino.exceptions.NoSuchCatalogException: Catalog my_test_metalake.test does not exist",
+          "com.apache.gravitino.exceptions.NoSuchCatalogException: Catalog my_test_metalake.test does not exist",
           "..."
         ]
       }

@@ -226,7 +226,7 @@ nexusPublishing {
     }
   }
 
-  packageGroup.set("com.datastrato.gravitino")
+  packageGroup.set("com.apache.gravitino")
 }
 
 subprojects {
@@ -435,7 +435,7 @@ subprojects {
 
   tasks.register("allDeps", DependencyReportTask::class)
 
-  group = "com.datastrato.gravitino"
+  group = "com.apache.gravitino"
   version = "$version"
 
   tasks.withType<Jar> {

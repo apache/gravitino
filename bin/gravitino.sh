@@ -143,7 +143,7 @@ function stop() {
 
 HOSTNAME=$(hostname)
 GRAVITINO_OUTFILE="${GRAVITINO_LOG_DIR}/gravitino-server.out"
-GRAVITINO_SERVER_NAME=com.datastrato.gravitino.server.GravitinoServer
+GRAVITINO_SERVER_NAME=com.apache.gravitino.server.GravitinoServer
 
 JAVA_OPTS+=" -Dfile.encoding=UTF-8"
 JAVA_OPTS+=" -Dlog4j2.configurationFile=file://${GRAVITINO_CONF_DIR}/log4j2.properties"
