@@ -395,6 +395,7 @@ Currently, Gravitino supports the following changes to a fileset:
 | Update a comment                     | `{"@type":"updateComment","newComment":"new_comment"}`       | `FilesetChange.updateComment("new_comment")`  |
 | Set a fileset property             | `{"@type":"setProperty","property":"key1","value":"value1"}` | `FilesetChange.setProperty("key1", "value1")` |
 | Remove a fileset property          | `{"@type":"removeProperty","property":"key1"}`               | `FilesetChange.removeProperty("key1")`        |
+| Remove comment                     | `{"@type":"removeComment"}`                                  | `FilesetChange.removeComment()`               |
 
 ### Drop a fileset
 

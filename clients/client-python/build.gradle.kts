@@ -249,15 +249,14 @@ tasks {
 
   val test by registering(VenvTask::class) {
     val skipUTs = project.hasProperty("skipTests")
-    val skipPyClientITs = project.hasProperty("skipPyClientITs")
     val skipITs = project.hasProperty("skipITs")
-    val skipAllTests = skipUTs && (skipITs || skipPyClientITs)
+    val skipAllTests = skipUTs && skipITs
     if (!skipAllTests) {
       dependsOn(pipInstall, pylint)
       if (!skipUTs) {
         dependsOn(unitTests)
       }
-      if (!skipITs && !skipPyClientITs) {
+      if (!skipITs) {
         dependsOn(integrationTest)
       }
     }

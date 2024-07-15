@@ -115,6 +115,15 @@ public class TestCatalog extends BaseCatalog<TestCatalog> {
                     false,
                     false,
                     false))
+            .put(
+                AUTHORIZATION_PROVIDER,
+                PropertyEntry.stringImmutablePropertyEntry(
+                    Catalog.AUTHORIZATION_PROVIDER,
+                    "The name of the authorization provider for Gravitino",
+                    false,
+                    null,
+                    false,
+                    false))
             .build();
       }
     };
