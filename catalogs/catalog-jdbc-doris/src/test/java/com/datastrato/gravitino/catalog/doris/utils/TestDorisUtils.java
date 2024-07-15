@@ -18,9 +18,12 @@
  */
 package com.datastrato.gravitino.catalog.doris.utils;
 
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -80,5 +83,35 @@ public class TestDorisUtils {
     result = DorisUtils.extractPropertiesFromSql(createTableSql);
     Assertions.assertEquals("value1", result.get("property1"));
     Assertions.assertEquals("comment", result.get("comment"));
+  }
+
+  @Test
+  public void testExtractPartitionInfoFromSql() {
+    // test range partition
+    String createTableSql =
+        "CREATE TABLE `testTable` (\n`col1` date NOT NULL\n) ENGINE=OLAP\n PARTITION BY RANGE(`col1`)\n()\n DISTRIBUTED BY HASH(`col1`) BUCKETS 2";
+    Optional<Transform> transform = DorisUtils.extractPartitionInfoFromSql(createTableSql);
+    Assertions.assertTrue(transform.isPresent());
+    Assertions.assertEquals(Transforms.range(new String[] {"col1"}), transform.get());
+
+    // test list partition
+    createTableSql =
+        "CREATE TABLE `testTable` (\n`col1` int(11) NOT NULL\n) ENGINE=OLAP\n PARTITION BY LIST(`col1`)\n()\n DISTRIBUTED BY HASH(`col1`) BUCKETS 2";
+    transform = DorisUtils.extractPartitionInfoFromSql(createTableSql);
+    Assertions.assertTrue(transform.isPresent());
+    Assertions.assertEquals(Transforms.list(new String[][] {{"col1"}}), transform.get());
+
+    // test multi-column list partition
+    createTableSql =
+        "CREATE TABLE `testTable` (\n`col1` date NOT NULL,\n`col2` int(11) NOT NULL\n) ENGINE=OLAP\n PARTITION BY LIST(`col1`, `col2`)\n()\n DISTRIBUTED BY HASH(`col1`) BUCKETS 2";
+    transform = DorisUtils.extractPartitionInfoFromSql(createTableSql);
+    Assertions.assertTrue(transform.isPresent());
+    Assertions.assertEquals(Transforms.list(new String[][] {{"col1"}, {"col2"}}), transform.get());
+
+    // test non-partitioned table
+    createTableSql =
+        "CREATE TABLE `testTable` (\n`testColumn` STRING NOT NULL COMMENT 'test comment'\n) ENGINE=OLAP\nCOMMENT \"test comment\"";
+    transform = DorisUtils.extractPartitionInfoFromSql(createTableSql);
+    Assertions.assertFalse(transform.isPresent());
   }
 }

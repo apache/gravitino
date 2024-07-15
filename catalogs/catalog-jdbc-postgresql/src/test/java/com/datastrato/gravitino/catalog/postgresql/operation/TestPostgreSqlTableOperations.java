@@ -30,6 +30,7 @@ import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.rel.TableChange;
 import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
 import com.datastrato.gravitino.rel.expressions.literals.Literals;
+import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.datastrato.gravitino.rel.types.Type;
@@ -101,7 +102,8 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
 
     // load table
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
-    assertionsTableInfo(tableName, tableComment, columns, properties, null, load);
+    assertionsTableInfo(
+        tableName, tableComment, columns, properties, null, Transforms.EMPTY_TRANSFORM, load);
 
     // rename table
     String newName = "new_table";
@@ -165,7 +167,8 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
             .build());
     alterColumns.add(newColumn);
     alterColumns.add(newColumn1);
-    assertionsTableInfo(newName, tableComment, alterColumns, properties, null, load);
+    assertionsTableInfo(
+        newName, tableComment, alterColumns, properties, null, Transforms.EMPTY_TRANSFORM, load);
 
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME,
@@ -198,7 +201,8 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
             .build());
     alterColumns.add(newColumn);
     alterColumns.add(newColumn1);
-    assertionsTableInfo(newName, tableComment, alterColumns, properties, null, load);
+    assertionsTableInfo(
+        newName, tableComment, alterColumns, properties, null, Transforms.EMPTY_TRANSFORM, load);
 
     // alter column Nullability
     TABLE_OPERATIONS.alterTable(
@@ -229,7 +233,8 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
             .build());
     alterColumns.add(newColumn);
     alterColumns.add(newColumn1);
-    assertionsTableInfo(newName, tableComment, alterColumns, properties, null, load);
+    assertionsTableInfo(
+        newName, tableComment, alterColumns, properties, null, Transforms.EMPTY_TRANSFORM, load);
 
     // delete column
     TABLE_OPERATIONS.alterTable(
@@ -241,7 +246,8 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
     load = TABLE_OPERATIONS.load(TEST_DB_NAME, newName);
     alterColumns.remove(newColumn);
     alterColumns.remove(newColumn1);
-    assertionsTableInfo(newName, tableComment, alterColumns, properties, null, load);
+    assertionsTableInfo(
+        newName, tableComment, alterColumns, properties, null, Transforms.EMPTY_TRANSFORM, load);
 
     TableChange deleteColumn = TableChange.deleteColumn(new String[] {newColumn.name()}, false);
     IllegalArgumentException illegalArgumentException =
@@ -366,7 +372,14 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
         Indexes.EMPTY_INDEXES);
 
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
-    assertionsTableInfo(tableName, tableComment, columns, Collections.emptyMap(), null, load);
+    assertionsTableInfo(
+        tableName,
+        tableComment,
+        columns,
+        Collections.emptyMap(),
+        null,
+        Transforms.EMPTY_TRANSFORM,
+        load);
   }
 
   @Test
@@ -507,7 +520,8 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
 
     // load table
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
-    assertionsTableInfo(tableName, tableComment, columns, properties, null, load);
+    assertionsTableInfo(
+        tableName, tableComment, columns, properties, null, Transforms.EMPTY_TRANSFORM, load);
 
     columns.clear();
     columns.add(
@@ -603,7 +617,8 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
         indexes);
 
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
-    assertionsTableInfo(tableName, tableComment, columns, properties, indexes, load);
+    assertionsTableInfo(
+        tableName, tableComment, columns, properties, indexes, Transforms.EMPTY_TRANSFORM, load);
 
     TABLE_OPERATIONS.drop(TEST_DB_NAME, tableName);
 

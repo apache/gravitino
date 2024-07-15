@@ -24,6 +24,7 @@ import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
 import com.datastrato.gravitino.rel.Column;
 import com.datastrato.gravitino.rel.Table;
+import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.rel.indexes.Index;
 import java.io.File;
 import java.io.IOException;
@@ -85,6 +86,7 @@ public class ITUtils {
       List<Column> columns,
       Map<String, String> properties,
       Index[] indexes,
+      Transform[] partitioning,
       Table table) {
     Assertions.assertEquals(tableName, table.name());
     Assertions.assertEquals(tableComment, table.comment());
@@ -114,6 +116,7 @@ public class ITUtils {
         }
       }
     }
+    Assertions.assertTrue(Arrays.deepEquals(table.partitioning(), partitioning));
   }
 
   public static void assertColumn(Column expected, Column actual) {
