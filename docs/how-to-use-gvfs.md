@@ -324,7 +324,7 @@ FileSystem fs = filesetPath.getFileSystem(conf);
 
 + A Hadoop environment with HDFS running. Now we only supports Fileset on HDFS.
   GVFS in Python has been tested against Hadoop 2.7.3. It is recommended to use Hadoop 2.7.3 or later,
-  it should work with Hadoop 3.x. Please create an [issue](https://www.github.com/datastrato/gravitino/issues)
+  it should work with Hadoop 3.x. Please create an [issue](https://www.github.com/apache/gravitino/issues)
   if you find any compatibility issues.
 + Python version >= 3.8. It has been tested GVFS works well with Python 3.8 and Python 3.9.
   Your Python version should be at least higher than Python 3.8.

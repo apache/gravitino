@@ -312,6 +312,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         .withComment(comment)
         .withProperties(properties)
         .withIndexes(load.index())
+        .withPartitioning(load.partitioning())
         .build();
   }
 

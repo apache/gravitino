@@ -113,7 +113,8 @@ public class TestDorisTableOperations extends TestDoris {
     List<String> listTables = TABLE_OPERATIONS.listTables(databaseName);
     Assertions.assertTrue(listTables.contains(tableName));
     JdbcTable load = TABLE_OPERATIONS.load(databaseName, tableName);
-    assertionsTableInfo(tableName, tableComment, columns, properties, indexes, load);
+    assertionsTableInfo(
+        tableName, tableComment, columns, properties, indexes, Transforms.EMPTY_TRANSFORM, load);
 
     // rename table
     String newName = GravitinoITUtils.genRandomName("new_table");
@@ -161,7 +162,8 @@ public class TestDorisTableOperations extends TestDoris {
         distribution,
         indexes);
     JdbcTable load = TABLE_OPERATIONS.load(databaseName, tableName);
-    assertionsTableInfo(tableName, tableComment, columns, properties, indexes, load);
+    assertionsTableInfo(
+        tableName, tableComment, columns, properties, indexes, Transforms.EMPTY_TRANSFORM, load);
 
     TABLE_OPERATIONS.alterTable(
         databaseName,
@@ -191,6 +193,7 @@ public class TestDorisTableOperations extends TestDoris {
                     columns,
                     properties,
                     indexes,
+                    Transforms.EMPTY_TRANSFORM,
                     TABLE_OPERATIONS.load(databaseName, tableName)));
 
     String colNewComment = "new_comment";
@@ -212,7 +215,8 @@ public class TestDorisTableOperations extends TestDoris {
     columns.add(col_1);
     columns.add(col_2);
     columns.add(col_3);
-    assertionsTableInfo(tableName, tableComment, columns, properties, indexes, load);
+    assertionsTableInfo(
+        tableName, tableComment, columns, properties, indexes, Transforms.EMPTY_TRANSFORM, load);
 
     // add new column
     TABLE_OPERATIONS.alterTable(
@@ -238,6 +242,7 @@ public class TestDorisTableOperations extends TestDoris {
                     columns,
                     properties,
                     indexes,
+                    Transforms.EMPTY_TRANSFORM,
                     TABLE_OPERATIONS.load(databaseName, tableName)));
 
     // change column position
@@ -263,6 +268,7 @@ public class TestDorisTableOperations extends TestDoris {
                     columns,
                     properties,
                     indexes,
+                    Transforms.EMPTY_TRANSFORM,
                     TABLE_OPERATIONS.load(databaseName, tableName)));
 
     // drop column if exist
@@ -283,6 +289,7 @@ public class TestDorisTableOperations extends TestDoris {
                     columns,
                     properties,
                     indexes,
+                    Transforms.EMPTY_TRANSFORM,
                     TABLE_OPERATIONS.load(databaseName, tableName)));
 
     // delete column that does not exist
@@ -322,6 +329,7 @@ public class TestDorisTableOperations extends TestDoris {
                     columns,
                     properties,
                     newIndexes,
+                    Transforms.EMPTY_TRANSFORM,
                     TABLE_OPERATIONS.load(databaseName, tableName)));
 
     // test delete index
@@ -338,6 +346,7 @@ public class TestDorisTableOperations extends TestDoris {
                     columns,
                     properties,
                     indexes,
+                    Transforms.EMPTY_TRANSFORM,
                     TABLE_OPERATIONS.load(databaseName, tableName)));
   }
 
@@ -377,7 +386,14 @@ public class TestDorisTableOperations extends TestDoris {
         indexes);
 
     JdbcTable load = TABLE_OPERATIONS.load(databaseName, tableName);
-    assertionsTableInfo(tableName, tableComment, columns, Collections.emptyMap(), null, load);
+    assertionsTableInfo(
+        tableName,
+        tableComment,
+        columns,
+        Collections.emptyMap(),
+        null,
+        Transforms.EMPTY_TRANSFORM,
+        load);
   }
 
   @Test
@@ -470,6 +486,7 @@ public class TestDorisTableOperations extends TestDoris {
         columns,
         Collections.emptyMap(),
         null,
+        rangePartition,
         rangePartitionTable);
 
     // create table with list partition
@@ -492,6 +509,7 @@ public class TestDorisTableOperations extends TestDoris {
         columns,
         Collections.emptyMap(),
         null,
+        listPartition,
         listPartitionTable);
   }
 }

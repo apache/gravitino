@@ -28,6 +28,7 @@ import com.apache.gravitino.rel.Column;
 import com.apache.gravitino.rel.TableChange;
 import com.apache.gravitino.rel.expressions.distributions.Distributions;
 import com.apache.gravitino.rel.expressions.literals.Literals;
+import com.apache.gravitino.rel.expressions.transforms.Transforms;
 import com.apache.gravitino.rel.indexes.Index;
 import com.apache.gravitino.rel.indexes.Indexes;
 import com.apache.gravitino.rel.types.Decimal;
@@ -107,7 +108,8 @@ public class TestMysqlTableOperations extends TestMysql {
 
     // load table
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
-    assertionsTableInfo(tableName, tableComment, columns, properties, indexes, load);
+    assertionsTableInfo(
+        tableName, tableComment, columns, properties, indexes, Transforms.EMPTY_TRANSFORM, load);
 
     // rename table
     String newName = "new_table";
@@ -146,7 +148,8 @@ public class TestMysqlTableOperations extends TestMysql {
             add(columns.get(3));
           }
         };
-    assertionsTableInfo(newName, tableComment, alterColumns, properties, indexes, load);
+    assertionsTableInfo(
+        newName, tableComment, alterColumns, properties, indexes, Transforms.EMPTY_TRANSFORM, load);
 
     // Detect unsupported properties
     TableChange setProperty = TableChange.setProperty(MYSQL_ENGINE_KEY, "ABC");
@@ -164,7 +167,8 @@ public class TestMysqlTableOperations extends TestMysql {
         newName,
         TableChange.deleteColumn(new String[] {newColumn.name()}, true));
     load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), newName);
-    assertionsTableInfo(newName, tableComment, columns, properties, indexes, load);
+    assertionsTableInfo(
+        newName, tableComment, columns, properties, indexes, Transforms.EMPTY_TRANSFORM, load);
 
     TableChange deleteColumn = TableChange.deleteColumn(new String[] {newColumn.name()}, false);
     IllegalArgumentException illegalArgumentException =
@@ -241,7 +245,8 @@ public class TestMysqlTableOperations extends TestMysql {
         Distributions.NONE,
         indexes);
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
-    assertionsTableInfo(tableName, tableComment, columns, properties, indexes, load);
+    assertionsTableInfo(
+        tableName, tableComment, columns, properties, indexes, Transforms.EMPTY_TRANSFORM, load);
 
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME.toString(),
@@ -264,7 +269,8 @@ public class TestMysqlTableOperations extends TestMysql {
     columns.add(col_1);
     columns.add(col_2);
     columns.add(col_3);
-    assertionsTableInfo(tableName, tableComment, columns, properties, indexes, load);
+    assertionsTableInfo(
+        tableName, tableComment, columns, properties, indexes, Transforms.EMPTY_TRANSFORM, load);
 
     String newComment = "new_comment";
     // update table comment and column comment
@@ -300,7 +306,8 @@ public class TestMysqlTableOperations extends TestMysql {
     columns.add(col_1);
     columns.add(col_2);
     columns.add(col_3);
-    assertionsTableInfo(tableName, tableComment, columns, properties, indexes, load);
+    assertionsTableInfo(
+        tableName, tableComment, columns, properties, indexes, Transforms.EMPTY_TRANSFORM, load);
 
     String newColName_1 = "new_col_1";
     String newColName_2 = "new_col_2";
@@ -340,7 +347,8 @@ public class TestMysqlTableOperations extends TestMysql {
     columns.add(col_1);
     columns.add(col_2);
     columns.add(col_3);
-    assertionsTableInfo(tableName, tableComment, columns, properties, indexes, load);
+    assertionsTableInfo(
+        tableName, tableComment, columns, properties, indexes, Transforms.EMPTY_TRANSFORM, load);
 
     newComment = "txt3";
     String newCol2Comment = "xxx";
@@ -391,7 +399,8 @@ public class TestMysqlTableOperations extends TestMysql {
             .withDefaultValue(Literals.of("hello world", VARCHAR))
             .withNullable(true)
             .build());
-    assertionsTableInfo(tableName, newComment, columns, properties, indexes, load);
+    assertionsTableInfo(
+        tableName, newComment, columns, properties, indexes, Transforms.EMPTY_TRANSFORM, load);
 
     // `new_col_2` varchar(255) NOT NULL DEFAULT 'hello world' COMMENT 'xxx' ,
     // `col_3` varchar(255) NULL DEFAULT NULL COMMENT 'name' ,
@@ -432,7 +441,8 @@ public class TestMysqlTableOperations extends TestMysql {
     columns.add(col_5);
     columns.add(col_1);
 
-    assertionsTableInfo(tableName, newComment, columns, properties, indexes, load);
+    assertionsTableInfo(
+        tableName, newComment, columns, properties, indexes, Transforms.EMPTY_TRANSFORM, load);
 
     TableChange updateColumn =
         TableChange.updateColumnNullability(new String[] {col3.name()}, !col3.nullable());
@@ -501,7 +511,8 @@ public class TestMysqlTableOperations extends TestMysql {
         indexes);
 
     JdbcTable loaded = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
-    assertionsTableInfo(tableName, tableComment, columns, properties, indexes, loaded);
+    assertionsTableInfo(
+        tableName, tableComment, columns, properties, indexes, Transforms.EMPTY_TRANSFORM, loaded);
 
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME.toString(),
@@ -585,7 +596,8 @@ public class TestMysqlTableOperations extends TestMysql {
         indexes);
 
     JdbcTable loaded = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
-    assertionsTableInfo(tableName, tableComment, columns, properties, indexes, loaded);
+    assertionsTableInfo(
+        tableName, tableComment, columns, properties, indexes, Transforms.EMPTY_TRANSFORM, loaded);
   }
 
   @Test
@@ -683,7 +695,14 @@ public class TestMysqlTableOperations extends TestMysql {
         Indexes.EMPTY_INDEXES);
 
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
-    assertionsTableInfo(tableName, tableComment, columns, Collections.emptyMap(), null, load);
+    assertionsTableInfo(
+        tableName,
+        tableComment,
+        columns,
+        Collections.emptyMap(),
+        null,
+        Transforms.EMPTY_TRANSFORM,
+        load);
   }
 
   @Test
@@ -861,6 +880,7 @@ public class TestMysqlTableOperations extends TestMysql {
         Arrays.stream(columns).collect(Collectors.toList()),
         properties,
         indexes,
+        Transforms.EMPTY_TRANSFORM,
         table);
     TABLE_OPERATIONS.drop(TEST_DB_NAME.toString(), tableName);
 
@@ -887,6 +907,7 @@ public class TestMysqlTableOperations extends TestMysql {
         Arrays.stream(columns).collect(Collectors.toList()),
         properties,
         indexes,
+        Transforms.EMPTY_TRANSFORM,
         table);
     TABLE_OPERATIONS.drop(TEST_DB_NAME.toString(), tableName);
 
@@ -909,6 +930,7 @@ public class TestMysqlTableOperations extends TestMysql {
         Arrays.stream(columns).collect(Collectors.toList()),
         properties,
         indexes,
+        Transforms.EMPTY_TRANSFORM,
         table);
     TABLE_OPERATIONS.drop(TEST_DB_NAME.toString(), tableName);
 

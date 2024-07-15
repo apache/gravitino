@@ -698,10 +698,22 @@ public class CatalogPostgreSqlIT extends AbstractIT {
             new SortOrder[0],
             indexes);
     ITUtils.assertionsTableInfo(
-        tableName, table_comment, Arrays.asList(newColumns), properties, indexes, createdTable);
+        tableName,
+        table_comment,
+        Arrays.asList(newColumns),
+        properties,
+        indexes,
+        Transforms.EMPTY_TRANSFORM,
+        createdTable);
     Table table = tableCatalog.loadTable(tableIdentifier);
     ITUtils.assertionsTableInfo(
-        tableName, table_comment, Arrays.asList(newColumns), properties, indexes, table);
+        tableName,
+        table_comment,
+        Arrays.asList(newColumns),
+        properties,
+        indexes,
+        Transforms.EMPTY_TRANSFORM,
+        table);
 
     // Test create index complex fields fail.
     NameIdentifier id = NameIdentifier.of(schemaName, "test_failed");
@@ -1059,22 +1071,46 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Table t1 = tableCatalog.loadTable(NameIdentifier.of(schemaName, t1_name));
     Arrays.stream(t1.columns()).anyMatch(c -> Objects.equals(c.name(), "t112"));
     ITUtils.assertionsTableInfo(
-        t1_name, table_comment, Arrays.asList(t1_col), properties, t1_indexes, t1);
+        t1_name,
+        table_comment,
+        Arrays.asList(t1_col),
+        properties,
+        t1_indexes,
+        Transforms.EMPTY_TRANSFORM,
+        t1);
 
     Table t2 = tableCatalog.loadTable(NameIdentifier.of(schemaName, t2_name));
     Arrays.stream(t2.columns()).anyMatch(c -> Objects.equals(c.name(), "t212"));
     ITUtils.assertionsTableInfo(
-        t2_name, table_comment, Arrays.asList(t2_col), properties, t2_indexes, t2);
+        t2_name,
+        table_comment,
+        Arrays.asList(t2_col),
+        properties,
+        t2_indexes,
+        Transforms.EMPTY_TRANSFORM,
+        t2);
 
     Table t3 = tableCatalog.loadTable(NameIdentifier.of(schemaName, t3_name));
     Arrays.stream(t3.columns()).anyMatch(c -> Objects.equals(c.name(), "t_12"));
     ITUtils.assertionsTableInfo(
-        t3_name, table_comment, Arrays.asList(t3_col), properties, t3_indexes, t3);
+        t3_name,
+        table_comment,
+        Arrays.asList(t3_col),
+        properties,
+        t3_indexes,
+        Transforms.EMPTY_TRANSFORM,
+        t3);
 
     Table t4 = tableCatalog.loadTable(NameIdentifier.of(schemaName, t4_name));
     Arrays.stream(t4.columns()).anyMatch(c -> Objects.equals(c.name(), "_1__"));
     ITUtils.assertionsTableInfo(
-        t4_name, table_comment, Arrays.asList(t4_col), properties, t4_indexes, t4);
+        t4_name,
+        table_comment,
+        Arrays.asList(t4_col),
+        properties,
+        t4_indexes,
+        Transforms.EMPTY_TRANSFORM,
+        t4);
   }
 
   @Test
@@ -1244,10 +1280,17 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         Arrays.asList(newColumns),
         properties,
         indexes,
+        Transforms.EMPTY_TRANSFORM,
         createdTable);
     Table table = tableCatalog.loadTable(tableIdentifier);
     ITUtils.assertionsTableInfo(
-        "tablename", "low case table name", Arrays.asList(newColumns), properties, indexes, table);
+        "tablename",
+        "low case table name",
+        Arrays.asList(newColumns),
+        properties,
+        indexes,
+        Transforms.EMPTY_TRANSFORM,
+        table);
 
     // Test create table with same name but different case
     NameIdentifier tableIdentifier2 = NameIdentifier.of(schemaName, "TABLENAME");
@@ -1484,7 +1527,13 @@ public class CatalogPostgreSqlIT extends AbstractIT {
           Indexes.primary("pk1_key", new String[][] {{"col_1"}})
         };
     ITUtils.assertionsTableInfo(
-        tableName, table_comment, Arrays.asList(newColumns), createProperties(), indexes, table);
+        tableName,
+        table_comment,
+        Arrays.asList(newColumns),
+        createProperties(),
+        indexes,
+        Transforms.EMPTY_TRANSFORM,
+        table);
 
     // delete index and add new column and index.
     tableCatalog.alterTable(
@@ -1505,7 +1554,13 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Column col4 = Column.of("col_4", Types.VarCharType.of(255), null, true, false, null);
     newColumns = new Column[] {col1, col2, col3, col4};
     ITUtils.assertionsTableInfo(
-        tableName, table_comment, Arrays.asList(newColumns), createProperties(), indexes, table);
+        tableName,
+        table_comment,
+        Arrays.asList(newColumns),
+        createProperties(),
+        indexes,
+        Transforms.EMPTY_TRANSFORM,
+        table);
 
     // Add a previously existing index
     tableCatalog.alterTable(
@@ -1524,7 +1579,13 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         };
     table = tableCatalog.loadTable(NameIdentifier.of(schemaName, tableName));
     ITUtils.assertionsTableInfo(
-        tableName, table_comment, Arrays.asList(newColumns), createProperties(), indexes, table);
+        tableName,
+        table_comment,
+        Arrays.asList(newColumns),
+        createProperties(),
+        indexes,
+        Transforms.EMPTY_TRANSFORM,
+        table);
   }
 
   @Test
@@ -1568,6 +1629,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         Arrays.asList(newColumns),
         properties,
         Indexes.EMPTY_INDEXES,
+        Transforms.EMPTY_TRANSFORM,
         table);
 
     // Test drop auto increment column
@@ -1582,6 +1644,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         Arrays.asList(newColumns),
         properties,
         Indexes.EMPTY_INDEXES,
+        Transforms.EMPTY_TRANSFORM,
         table);
 
     // Test add auto increment column
@@ -1596,6 +1659,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         Arrays.asList(newColumns),
         properties,
         Indexes.EMPTY_INDEXES,
+        Transforms.EMPTY_TRANSFORM,
         table);
   }
 
@@ -1643,6 +1707,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
         Arrays.asList(newColumns),
         properties,
         Indexes.EMPTY_INDEXES,
+        Transforms.EMPTY_TRANSFORM,
         table);
   }
 

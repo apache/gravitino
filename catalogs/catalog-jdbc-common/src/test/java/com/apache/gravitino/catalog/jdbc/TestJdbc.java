@@ -29,6 +29,7 @@ import com.apache.gravitino.dto.rel.ColumnDTO;
 import com.apache.gravitino.dto.rel.expressions.LiteralDTO;
 import com.apache.gravitino.exceptions.NoSuchSchemaException;
 import com.apache.gravitino.rel.Column;
+import com.apache.gravitino.rel.expressions.transforms.Transform;
 import com.apache.gravitino.rel.indexes.Index;
 import com.apache.gravitino.utils.RandomNameUtils;
 import java.util.Arrays;
@@ -110,6 +111,7 @@ public abstract class TestJdbc {
       List<JdbcColumn> columns,
       Map<String, String> properties,
       Index[] indexes,
+      Transform[] partitioning,
       JdbcTable table) {
     Assertions.assertEquals(tableName, table.name());
     Assertions.assertEquals(tableComment, table.comment());
@@ -138,6 +140,7 @@ public abstract class TestJdbc {
         }
       }
     }
+    Assertions.assertTrue(Arrays.deepEquals(table.partitioning(), partitioning));
   }
 
   public static void assertColumn(Column expected, Column actual) {

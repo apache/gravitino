@@ -28,7 +28,7 @@ import io.trino.spi.connector.SortOrder;
 import java.util.Objects;
 
 // This class is referred from Trino:
-// plugin/trino-gravitino/src/main/java/com/datastrato/gravitino/trino/connector/catalog/hive/SortingColumn.java
+// plugin/trino-gravitino/src/main/java/com/apache/gravitino/trino/connector/catalog/hive/SortingColumn.java
 @Immutable
 public class SortingColumn {
   public enum Order {
