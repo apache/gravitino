@@ -22,17 +22,28 @@ hive_dir="$(dirname "${BASH_SOURCE-$0}")"
 hive_dir="$(cd "${hive_dir}">/dev/null; pwd)"
 
 # Environment variables definition
-HADOOP_VERSION=${HADOOP_VERSION:-"2.7.3"}
-HIVE_VERSION=${HIVE_VERSION:-"2.3.9"}
+#HADOOP_VERSION=${HADOOP_VERSION:-"2.7.3"}
+HADOOP2_VERSION="2.7.3"
+HADOOP3_VERSION="3.1.0"
+#HIVE_VERSION=${HIVE_VERSION:-"2.3.9"}
+
+HIVE2_VERSION="2.3.9"
+HIVE3_VERSION="3.1.3"
 MYSQL_JDBC_DRIVER_VERSION=${MYSQL_VERSION:-"8.0.15"}
 ZOOKEEPER_VERSION=${ZOOKEEPER_VERSION:-"3.4.13"}
 RANGER_VERSION=${RANGER_VERSION:-"2.4.0"} # Notice: Currently only tested Ranger plugin 2.4.0 in the Hadoop 3.1.0 and Hive 3.1.3
 
-HADOOP_PACKAGE_NAME="hadoop-${HADOOP_VERSION}.tar.gz"
-HADOOP_DOWNLOAD_URL="https://archive.apache.org/dist/hadoop/core/hadoop-${HADOOP_VERSION}/${HADOOP_PACKAGE_NAME}"
+HADOOP2_PACKAGE_NAME="hadoop-${HADOOP2_VERSION}.tar.gz"
+HADOOP2_DOWNLOAD_URL="https://archive.apache.org/dist/hadoop/core/hadoop-${HADOOP2_VERSION}/${HADOOP2_PACKAGE_NAME}"
 
-HIVE_PACKAGE_NAME="apache-hive-${HIVE_VERSION}-bin.tar.gz"
-HIVE_DOWNLOAD_URL="https://archive.apache.org/dist/hive/hive-${HIVE_VERSION}/${HIVE_PACKAGE_NAME}"
+HADOOP3_PACKAGE_NAME="hadoop-${HADOOP3_VERSION}.tar.gz"
+HADOOP3_DOWNLOAD_URL="https://archive.apache.org/dist/hadoop/core/hadoop-${HADOOP3_VERSION}/${HADOOP3_PACKAGE_NAME}"
+
+HIVE2_PACKAGE_NAME="apache-hive-${HIVE2_VERSION}-bin.tar.gz"
+HIVE2_DOWNLOAD_URL="https://archive.apache.org/dist/hive/hive-${HIVE2_VERSION}/${HIVE2_PACKAGE_NAME}"
+
+HIVE3_PACKAGE_NAME="apache-hive-${HIVE3_VERSION}-bin.tar.gz"
+HIVE3_DOWNLOAD_URL="https://archive.apache.org/dist/hive/hive-${HIVE3_VERSION}/${HIVE3_PACKAGE_NAME}"
 
 JDBC_DIVER_PACKAGE_NAME="mysql-connector-java-${MYSQL_JDBC_DRIVER_VERSION}.tar.gz"
 JDBC_DIVER_DOWNLOAD_URL="https://downloads.mysql.com/archives/get/p/3/file/${JDBC_DIVER_PACKAGE_NAME}"
@@ -51,12 +62,20 @@ if [[ ! -d "${hive_dir}/packages" ]]; then
   mkdir -p "${hive_dir}/packages"
 fi
 
-if [ ! -f "${hive_dir}/packages/${HADOOP_PACKAGE_NAME}" ]; then
-  curl -L -s -o "${hive_dir}/packages/${HADOOP_PACKAGE_NAME}" ${HADOOP_DOWNLOAD_URL}
+if [ ! -f "${hive_dir}/packages/${HADOOP2_PACKAGE_NAME}" ]; then
+  curl -L -s -o "${hive_dir}/packages/${HADOOP2_PACKAGE_NAME}" ${HADOOP2_DOWNLOAD_URL}
 fi
 
-if [ ! -f "${hive_dir}/packages/${HIVE_PACKAGE_NAME}" ]; then
-  curl -L -s -o "${hive_dir}/packages/${HIVE_PACKAGE_NAME}" ${HIVE_DOWNLOAD_URL}
+if [ ! -f "${hive_dir}/packages/${HADOOP3_PACKAGE_NAME}" ]; then
+  curl -L -s -o "${hive_dir}/packages/${HADOOP3_PACKAGE_NAME}" ${HADOOP3_DOWNLOAD_URL}
+fi
+
+if [ ! -f "${hive_dir}/packages/${HIVE2_PACKAGE_NAME}" ]; then
+  curl -L -s -o "${hive_dir}/packages/${HIVE2_PACKAGE_NAME}" ${HIVE2_DOWNLOAD_URL}
+fi
+
+if [ ! -f "${hive_dir}/packages/${HIVE3_PACKAGE_NAME}" ]; then
+  curl -L -s -o "${hive_dir}/packages/${HIVE3_PACKAGE_NAME}" ${HIVE3_DOWNLOAD_URL}
 fi
 
 if [ ! -f "${hive_dir}/packages/${JDBC_DIVER_PACKAGE_NAME}" ]; then

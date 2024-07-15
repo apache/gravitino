@@ -20,8 +20,10 @@
 FROM ubuntu:16.04
 LABEL maintainer="dev@gravitino.apache.org"
 
-ARG HADOOP_VERSION
-ARG HIVE_VERSION
+ARG HADOOP2_VERSION
+ARG HADOOP3_VERSION
+ARG HIVE2_VERSION
+ARG HIVE3_VERSION
 ARG ZOOKEEPER_VERSION
 ARG RANGER_VERSION
 ARG MYSQL_JDBC_DRIVER_VERSION
@@ -30,6 +32,12 @@ ARG DEBIAN_FRONTEND=noninteractive
 WORKDIR /
 
 ################################################################################
+# prepare MySQL installation
+ENV MYSQL_PWD=ds123
+RUN echo "mysql-server mysql-server/root_password password ${MYSQL_PWD}" | debconf-set-selections
+RUN echo "mysql-server mysql-server/root_password_again password ${MYSQL_PWD}" | debconf-set-selections
+
+###############################################################################
 # update and install basic tools
 RUN apt-get update && apt-get upgrade -y && apt-get install --fix-missing -yq \
   git \
@@ -54,7 +62,13 @@ RUN apt-get update && apt-get upgrade -y && apt-get install --fix-missing -yq \
   openssh-server \
   wget \
   sudo \
-  openjdk-8-jdk
+  openjdk-8-jdk \
+  mysql-server
+
+# setup mysql configuration
+RUN chown -R mysql:mysql /var/lib/mysql
+RUN usermod -d /var/lib/mysql/ mysql
+RUN sed -i "s/.*bind-address.*/bind-address = 0.0.0.0/" /etc/mysql/mysql.conf.d/mysqld.cnf
 
 #################################################################################
 # setup ssh
@@ -65,7 +79,12 @@ RUN cat /dev/zero | ssh-keygen -q -N "" > /dev/null && cat /root/.ssh/id_rsa.pub
 # set environment variables
 ENV JAVA_HOME=/usr/local/jdk
 ENV HIVE_HOME=/usr/local/hive
+ENV HIVE2_HOME=/usr/local/hive2
+ENV HIVE3_HOME=/usr/local/hive3
+ENV HIVE_CONF_DIR=${HIVE_HOME}/conf
 ENV HADOOP_HOME=/usr/local/hadoop
+ENV HADOOP2_HOME=/usr/local/hadoop2
+ENV HADOOP3_HOME=/usr/local/hadoop3
 ENV HADOOP_HEAPSIZE=512
 ENV HADOOP_INSTALL=${HADOOP_HOME}
 ENV HADOOP_MAPRED_HOME=${HADOOP_INSTALL}
@@ -79,6 +98,7 @@ ENV RANGER_HIVE_PLUGIN_HOME=/usr/local/ranger-hive-plugin
 ENV PATH=${JAVA_HOME}/bin:${HADOOP_HOME}/bin:${HADOOP_INSTALL}/sbin:${HIVE_HOME}/bin:${PATH}
 ENV CLASSPATH=${HADOOP_HOME}/lib/*:HIVE_HOME/lib/*:.
 ENV LD_LIBRARY_PATH=${HADOOP_HOME}/lib/native
+ENV MYSQL_JDBC_DRIVER_VERSION=${MYSQL_JDBC_DRIVER_VERSION}
 
 ################################################################################
 # add the above env for all users
@@ -123,8 +143,10 @@ RUN ln -s /opt/ranger-${RANGER_VERSION}-hive-plugin ${RANGER_HIVE_PLUGIN_HOME}
 
 ################################################################################
 # install hadoop
-ADD packages/hadoop-${HADOOP_VERSION}.tar.gz /opt/
-RUN ln -s /opt/hadoop-${HADOOP_VERSION} ${HADOOP_HOME}
+ADD packages/hadoop-${HADOOP2_VERSION}.tar.gz /opt/
+RUN ln -s /opt/hadoop-${HADOOP2_VERSION} ${HADOOP2_HOME}
+ADD packages/hadoop-${HADOOP3_VERSION}.tar.gz /opt/
+RUN ln -s /opt/hadoop-${HADOOP3_VERSION} ${HADOOP3_HOME}
 
 # replace configuration templates
 RUN rm -f ${HADOOP_CONF_DIR}/core-site.xml
@@ -139,27 +161,21 @@ ADD mapred-site.xml ${HADOOP_CONF_DIR}/mapred-site.xml
 ADD check-status.sh /tmp/check-status.sh
 
 ################################################################################
-# install hive
-ADD packages/apache-hive-${HIVE_VERSION}-bin.tar.gz /opt/
-RUN ln -s /opt/apache-hive-${HIVE_VERSION}-bin ${HIVE_HOME}
 
-ADD hive-site.xml ${HIVE_HOME}/conf/hive-site.xml
+# install hive2
+ADD packages/apache-hive-${HIVE2_VERSION}-bin.tar.gz /opt/
+RUN ln -s /opt/apache-hive-${HIVE2_VERSION}-bin ${HIVE2_HOME}
 
-################################################################################
-# install MySQL
-ENV MYSQL_PWD=ds123
-RUN echo "mysql-server mysql-server/root_password password ${MYSQL_PWD}" | debconf-set-selections
-RUN echo "mysql-server mysql-server/root_password_again password ${MYSQL_PWD}" | debconf-set-selections
-RUN apt-get install -y mysql-server
+# install hive3
+ADD packages/apache-hive-${HIVE3_VERSION}-bin.tar.gz /opt/
+RUN ln -s /opt/apache-hive-${HIVE3_VERSION}-bin ${HIVE3_HOME}
 
-RUN chown -R mysql:mysql /var/lib/mysql
-RUN usermod -d /var/lib/mysql/ mysql
-RUN sed -i "s/.*bind-address.*/bind-address = 0.0.0.0/" /etc/mysql/mysql.conf.d/mysqld.cnf
+ADD hive-site.xml ${HIVE_CONF_DIR}/hive-site.xml
 
 ################################################################################
 # add mysql jdbc driver
 ADD packages/mysql-connector-java-${MYSQL_JDBC_DRIVER_VERSION}.tar.gz /opt/
-RUN ln -s /opt/mysql-connector-java-${MYSQL_JDBC_DRIVER_VERSION}/* ${HIVE_HOME}/lib
+#RUN ln -s /opt/mysql-connector-java-${MYSQL_JDBC_DRIVER_VERSION}/* ${HIVE_HOME}/lib
 
 ################################################################################
 # add users and groups
