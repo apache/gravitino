@@ -21,9 +21,9 @@ package com.datastrato.gravitino.iceberg.common.utils;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION;
 
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import com.datastrato.gravitino.iceberg.common.IcebergCatalogBackend;
 import com.datastrato.gravitino.iceberg.common.IcebergConfig;
-import com.datastrato.gravitino.iceberg.common.IcebergConstants;
 import com.datastrato.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import com.datastrato.gravitino.iceberg.common.authentication.kerberos.HiveBackendProxy;
 import com.datastrato.gravitino.iceberg.common.authentication.kerberos.KerberosClient;

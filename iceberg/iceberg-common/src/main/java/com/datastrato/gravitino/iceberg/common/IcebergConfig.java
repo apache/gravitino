@@ -20,6 +20,7 @@
 package com.datastrato.gravitino.iceberg.common;
 
 import com.datastrato.gravitino.Config;
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import com.datastrato.gravitino.config.ConfigBuilder;
 import com.datastrato.gravitino.config.ConfigConstants;
 import com.datastrato.gravitino.config.ConfigEntry;

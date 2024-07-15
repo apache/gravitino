@@ -18,9 +18,9 @@
  */
 package com.datastrato.gravitino.iceberg.integration.test;
 
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import com.datastrato.gravitino.iceberg.common.IcebergCatalogBackend;
 import com.datastrato.gravitino.iceberg.common.IcebergConfig;
-import com.datastrato.gravitino.iceberg.common.IcebergConstants;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;

@@ -22,8 +22,8 @@ package com.datastrato.gravitino.iceberg.service.metrics;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import com.datastrato.gravitino.iceberg.common.IcebergConfig;
-import com.datastrato.gravitino.iceberg.common.IcebergConstants;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;

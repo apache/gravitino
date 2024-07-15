@@ -18,8 +18,8 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.integration.test;
 
+import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import com.datastrato.gravitino.iceberg.common.IcebergConfig;
-import com.datastrato.gravitino.iceberg.common.IcebergConstants;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
 import java.util.Map;
