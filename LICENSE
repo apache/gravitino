@@ -207,7 +207,7 @@
    Apache Software License 2.0.
 
    Apache Spark
-   ./api/src/main/java/com/com.apache.gravitino/gravitino/SchemaChange.java
+   ./api/src/main/java/com/com/apache/gravitino/SchemaChange.java
    ./api/src/main/java/com/apache/gravitino/SupportsSchemas.java
    ./core/src/main/java/com/apache/gravitino/connector/SupportsSchemas.java
    ./api/src/main/java/com/apache/gravitino/rel/TableCatalog.java
