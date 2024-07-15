@@ -18,8 +18,8 @@
  */
 package com.datastrato.gravitino;
 
+import com.apache.gravitino.utils.MapUtils;
 import com.datastrato.gravitino.config.ConfigEntry;
-import com.datastrato.gravitino.utils.MapUtils;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;

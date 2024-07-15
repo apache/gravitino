@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datastrato.gravitino.proto;
+package com.apache.gravitino.proto;
 
 import com.google.protobuf.Timestamp;
 import java.time.Instant;

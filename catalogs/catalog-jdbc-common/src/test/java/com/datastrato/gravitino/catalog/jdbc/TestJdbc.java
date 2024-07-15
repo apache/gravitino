@@ -18,19 +18,19 @@
  */
 package com.datastrato.gravitino.catalog.jdbc;
 
-import static com.datastrato.gravitino.dto.util.DTOConverters.toDTO;
+import static com.apache.gravitino.dto.util.DTOConverters.toDTO;
 
+import com.apache.gravitino.dto.rel.ColumnDTO;
+import com.apache.gravitino.dto.rel.expressions.LiteralDTO;
 import com.apache.gravitino.exceptions.NoSuchSchemaException;
 import com.apache.gravitino.rel.Column;
 import com.apache.gravitino.rel.indexes.Index;
+import com.apache.gravitino.utils.RandomNameUtils;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import com.datastrato.gravitino.catalog.jdbc.utils.DataSourceUtils;
-import com.datastrato.gravitino.dto.rel.ColumnDTO;
-import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
-import com.datastrato.gravitino.utils.RandomNameUtils;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;

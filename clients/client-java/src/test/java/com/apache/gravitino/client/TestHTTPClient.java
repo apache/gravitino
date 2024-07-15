@@ -27,10 +27,10 @@ import static org.mockserver.integration.ClientAndServer.startClientAndServer;
 import static org.mockserver.model.HttpRequest.request;
 import static org.mockserver.model.HttpResponse.response;
 
+import com.apache.gravitino.dto.responses.ErrorResponse;
 import com.apache.gravitino.exceptions.NotFoundException;
-import com.datastrato.gravitino.dto.responses.ErrorResponse;
-import com.datastrato.gravitino.rest.RESTRequest;
-import com.datastrato.gravitino.rest.RESTResponse;
+import com.apache.gravitino.rest.RESTRequest;
+import com.apache.gravitino.rest.RESTResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;

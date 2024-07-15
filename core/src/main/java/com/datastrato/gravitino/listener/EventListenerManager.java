@@ -18,8 +18,8 @@
 
 package com.datastrato.gravitino.listener;
 
+import com.apache.gravitino.utils.MapUtils;
 import com.datastrato.gravitino.listener.api.EventListenerPlugin;
-import com.datastrato.gravitino.utils.MapUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;

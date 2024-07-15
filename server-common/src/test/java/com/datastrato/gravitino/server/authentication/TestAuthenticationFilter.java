@@ -27,9 +27,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.apache.gravitino.auth.AuthConstants;
 import com.apache.gravitino.exceptions.UnauthorizedException;
 import com.datastrato.gravitino.UserPrincipal;
-import com.datastrato.gravitino.auth.AuthConstants;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Vector;

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datastrato.gravitino.proto;
+package com.apache.gravitino.proto;
 
 import com.apache.gravitino.Namespace;
 import com.apache.gravitino.authorization.Privilege;
@@ -46,7 +46,7 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
 
     for (SecurableObject securableObject : roleEntity.securableObjects()) {
       builder.addSecurableObjects(
-          com.datastrato.gravitino.proto.SecurableObject.newBuilder()
+          com.apache.gravitino.proto.SecurableObject.newBuilder()
               .setFullName(securableObject.fullName())
               .setType(securableObject.type().name())
               .addAllPrivilegeConditions(
@@ -81,7 +81,7 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
 
     for (int index = 0; index < role.getSecurableObjectsCount(); index++) {
       List<Privilege> privileges = Lists.newArrayList();
-      com.datastrato.gravitino.proto.SecurableObject object = role.getSecurableObjects(index);
+      com.apache.gravitino.proto.SecurableObject object = role.getSecurableObjects(index);
       for (int privIndex = 0; privIndex < object.getPrivilegeConditionsCount(); privIndex++) {
         if (Privilege.Condition.ALLOW.name().equals(object.getPrivilegeConditions(privIndex))) {
           privileges.add(Privileges.allow(object.getPrivilegeNames(privIndex)));

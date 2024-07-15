@@ -18,9 +18,9 @@
  */
 package com.apache.gravitino.client;
 
-import com.datastrato.gravitino.dto.responses.ErrorResponse;
-import com.datastrato.gravitino.rest.RESTRequest;
-import com.datastrato.gravitino.rest.RESTResponse;
+import com.apache.gravitino.dto.responses.ErrorResponse;
+import com.apache.gravitino.rest.RESTRequest;
+import com.apache.gravitino.rest.RESTResponse;
 import com.google.common.collect.ImmutableMap;
 import java.io.Closeable;
 import java.util.Map;

@@ -18,7 +18,7 @@
  */
 package com.apache.gravitino.client;
 
-import com.datastrato.gravitino.auth.AuthConstants;
+import com.apache.gravitino.auth.AuthConstants;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;

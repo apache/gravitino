@@ -18,6 +18,9 @@
  */
 package com.apache.gravitino.client;
 
+import com.apache.gravitino.dto.responses.ErrorConstants;
+import com.apache.gravitino.dto.responses.ErrorResponse;
+import com.apache.gravitino.dto.responses.OAuth2ErrorResponse;
 import com.apache.gravitino.exceptions.BadRequestException;
 import com.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import com.apache.gravitino.exceptions.FilesetAlreadyExistsException;
@@ -43,9 +46,6 @@ import com.apache.gravitino.exceptions.TableAlreadyExistsException;
 import com.apache.gravitino.exceptions.TopicAlreadyExistsException;
 import com.apache.gravitino.exceptions.UnauthorizedException;
 import com.apache.gravitino.exceptions.UserAlreadyExistsException;
-import com.datastrato.gravitino.dto.responses.ErrorConstants;
-import com.datastrato.gravitino.dto.responses.ErrorResponse;
-import com.datastrato.gravitino.dto.responses.OAuth2ErrorResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
 import java.util.List;

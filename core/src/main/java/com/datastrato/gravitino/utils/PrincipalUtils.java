@@ -19,8 +19,8 @@
 
 package com.datastrato.gravitino.utils;
 
+import com.apache.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.UserPrincipal;
-import com.datastrato.gravitino.auth.AuthConstants;
 import com.google.common.base.Throwables;
 import java.security.Principal;
 import java.security.PrivilegedActionException;

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datastrato.gravitino.proto;
+package com.apache.gravitino.proto;
 
 import com.apache.gravitino.Namespace;
 import com.datastrato.gravitino.Entity;
@@ -36,58 +36,58 @@ public class ProtoEntitySerDe implements EntitySerDe {
       ImmutableMap.<String, String>builder()
           .put(
               "com.datastrato.gravitino.meta.AuditInfo",
-              "com.datastrato.gravitino.proto.AuditInfoSerDe")
+              "com.apache.gravitino.proto.AuditInfoSerDe")
           .put(
               "com.datastrato.gravitino.meta.BaseMetalake",
-              "com.datastrato.gravitino.proto.BaseMetalakeSerDe")
+              "com.apache.gravitino.proto.BaseMetalakeSerDe")
           .put(
               "com.datastrato.gravitino.meta.CatalogEntity",
-              "com.datastrato.gravitino.proto.CatalogEntitySerDe")
+              "com.apache.gravitino.proto.CatalogEntitySerDe")
           .put(
               "com.datastrato.gravitino.meta.SchemaEntity",
-              "com.datastrato.gravitino.proto.SchemaEntitySerDe")
+              "com.apache.gravitino.proto.SchemaEntitySerDe")
           .put(
               "com.datastrato.gravitino.meta.TableEntity",
-              "com.datastrato.gravitino.proto.TableEntitySerDe")
+              "com.apache.gravitino.proto.TableEntitySerDe")
           .put(
               "com.datastrato.gravitino.meta.FilesetEntity",
-              "com.datastrato.gravitino.proto.FilesetEntitySerDe")
+              "com.apache.gravitino.proto.FilesetEntitySerDe")
           .put(
               "com.datastrato.gravitino.meta.TopicEntity",
-              "com.datastrato.gravitino.proto.TopicEntitySerDe")
+              "com.apache.gravitino.proto.TopicEntitySerDe")
           .put(
               "com.datastrato.gravitino.meta.UserEntity",
-              "com.datastrato.gravitino.proto.UserEntitySerDe")
+              "com.apache.gravitino.proto.UserEntitySerDe")
           .put(
               "com.datastrato.gravitino.meta.GroupEntity",
-              "com.datastrato.gravitino.proto.GroupEntitySerDe")
+              "com.apache.gravitino.proto.GroupEntitySerDe")
           .put(
               "com.datastrato.gravitino.meta.RoleEntity",
-              "com.datastrato.gravitino.proto.RoleEntitySerDe")
+              "com.apache.gravitino.proto.RoleEntitySerDe")
           .build();
 
   private static final Map<String, String> ENTITY_TO_PROTO =
       ImmutableMap.of(
           "com.datastrato.gravitino.meta.AuditInfo",
-          "com.datastrato.gravitino.proto.AuditInfo",
+          "com.apache.gravitino.proto.AuditInfo",
           "com.datastrato.gravitino.meta.BaseMetalake",
-          "com.datastrato.gravitino.proto.Metalake",
+          "com.apache.gravitino.proto.Metalake",
           "com.datastrato.gravitino.meta.CatalogEntity",
-          "com.datastrato.gravitino.proto.Catalog",
+          "com.apache.gravitino.proto.Catalog",
           "com.datastrato.gravitino.meta.SchemaEntity",
-          "com.datastrato.gravitino.proto.Schema",
+          "com.apache.gravitino.proto.Schema",
           "com.datastrato.gravitino.meta.TableEntity",
-          "com.datastrato.gravitino.proto.Table",
+          "com.apache.gravitino.proto.Table",
           "com.datastrato.gravitino.meta.FilesetEntity",
-          "com.datastrato.gravitino.proto.Fileset",
+          "com.apache.gravitino.proto.Fileset",
           "com.datastrato.gravitino.meta.TopicEntity",
-          "com.datastrato.gravitino.proto.Topic",
+          "com.apache.gravitino.proto.Topic",
           "com.datastrato.gravitino.meta.UserEntity",
-          "com.datastrato.gravitino.proto.User",
+          "com.apache.gravitino.proto.User",
           "com.datastrato.gravitino.meta.GroupEntity",
-          "com.datastrato.gravitino.proto.Group",
+          "com.apache.gravitino.proto.Group",
           "com.datastrato.gravitino.meta.RoleEntity",
-          "com.datastrato.gravitino.proto.Role");
+          "com.apache.gravitino.proto.Role");
 
   private final Map<Class<? extends Entity>, ProtoSerDe<? extends Entity, ? extends Message>>
       entityToSerDe;

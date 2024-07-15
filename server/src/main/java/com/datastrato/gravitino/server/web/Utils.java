@@ -18,9 +18,9 @@
  */
 package com.datastrato.gravitino.server.web;
 
+import com.apache.gravitino.auth.AuthConstants;
+import com.apache.gravitino.dto.responses.ErrorResponse;
 import com.datastrato.gravitino.UserPrincipal;
-import com.datastrato.gravitino.auth.AuthConstants;
-import com.datastrato.gravitino.dto.responses.ErrorResponse;
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import java.security.PrivilegedExceptionAction;
 import java.util.Optional;

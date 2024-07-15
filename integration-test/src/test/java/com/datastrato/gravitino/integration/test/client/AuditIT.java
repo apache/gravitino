@@ -20,11 +20,11 @@
 package com.datastrato.gravitino.integration.test.client;
 
 import com.apache.gravitino.MetalakeChange;
+import com.apache.gravitino.auth.AuthenticatorType;
 import com.apache.gravitino.client.GravitinoMetalake;
+import com.apache.gravitino.utils.RandomNameUtils;
 import com.datastrato.gravitino.Configs;
-import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
-import com.datastrato.gravitino.utils.RandomNameUtils;
 import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Map;

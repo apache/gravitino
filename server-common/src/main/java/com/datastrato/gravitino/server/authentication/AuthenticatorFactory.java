@@ -19,9 +19,9 @@
 
 package com.datastrato.gravitino.server.authentication;
 
+import com.apache.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
-import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.google.common.collect.ImmutableMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

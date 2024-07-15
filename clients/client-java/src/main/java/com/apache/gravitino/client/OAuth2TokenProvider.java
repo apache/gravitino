@@ -19,7 +19,7 @@
 
 package com.apache.gravitino.client;
 
-import com.datastrato.gravitino.auth.AuthConstants;
+import com.apache.gravitino.auth.AuthConstants;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

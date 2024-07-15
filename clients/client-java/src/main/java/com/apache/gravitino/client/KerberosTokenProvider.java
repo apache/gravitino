@@ -19,8 +19,8 @@
 
 package com.apache.gravitino.client;
 
-import com.datastrato.gravitino.auth.AuthConstants;
-import com.datastrato.gravitino.auth.KerberosUtils;
+import com.apache.gravitino.auth.AuthConstants;
+import com.apache.gravitino.auth.KerberosUtils;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import java.io.File;

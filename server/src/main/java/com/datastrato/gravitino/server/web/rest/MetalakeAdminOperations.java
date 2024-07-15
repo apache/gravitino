@@ -18,14 +18,14 @@
  */
 package com.datastrato.gravitino.server.web.rest;
 
+import com.apache.gravitino.dto.requests.UserAddRequest;
+import com.apache.gravitino.dto.responses.RemoveResponse;
+import com.apache.gravitino.dto.responses.UserResponse;
+import com.apache.gravitino.dto.util.DTOConverters;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.authorization.AccessControlManager;
-import com.datastrato.gravitino.dto.requests.UserAddRequest;
-import com.datastrato.gravitino.dto.responses.RemoveResponse;
-import com.datastrato.gravitino.dto.responses.UserResponse;
-import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.server.authorization.NameBindings;
 import com.datastrato.gravitino.server.web.Utils;

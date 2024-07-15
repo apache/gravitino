@@ -19,8 +19,8 @@
 
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.web.rest;
 
+import com.apache.gravitino.rest.RESTUtils;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.IcebergObjectMapperProvider;
-import com.datastrato.gravitino.rest.RESTUtils;
 import com.google.common.base.Joiner;
 import java.io.IOException;
 import java.util.Map;

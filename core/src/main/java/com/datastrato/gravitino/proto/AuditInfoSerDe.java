@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.datastrato.gravitino.proto;
+package com.apache.gravitino.proto;
 
 import com.apache.gravitino.Namespace;
 import java.util.Optional;

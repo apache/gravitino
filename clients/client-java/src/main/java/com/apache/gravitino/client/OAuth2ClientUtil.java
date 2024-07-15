@@ -18,8 +18,8 @@
  */
 package com.apache.gravitino.client;
 
-import com.datastrato.gravitino.dto.responses.OAuth2TokenResponse;
-import com.datastrato.gravitino.json.JsonUtils;
+import com.apache.gravitino.dto.responses.OAuth2TokenResponse;
+import com.apache.gravitino.json.JsonUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;

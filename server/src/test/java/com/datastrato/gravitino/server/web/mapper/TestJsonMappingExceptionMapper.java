@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.server.web.mapper;
 
-import com.datastrato.gravitino.dto.responses.ErrorResponse;
+import com.apache.gravitino.dto.responses.ErrorResponse;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import javax.ws.rs.core.Response;

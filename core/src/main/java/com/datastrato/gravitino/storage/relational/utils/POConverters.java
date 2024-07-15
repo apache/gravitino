@@ -27,7 +27,7 @@ import com.apache.gravitino.authorization.Privileges;
 import com.apache.gravitino.authorization.SecurableObject;
 import com.apache.gravitino.authorization.SecurableObjects;
 import com.apache.gravitino.file.Fileset;
-import com.datastrato.gravitino.json.JsonUtils;
+import com.apache.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;

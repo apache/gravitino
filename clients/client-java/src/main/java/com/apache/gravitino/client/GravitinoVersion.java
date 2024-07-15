@@ -18,8 +18,8 @@
  */
 package com.apache.gravitino.client;
 
+import com.apache.gravitino.dto.VersionDTO;
 import com.apache.gravitino.exceptions.GravitinoRuntimeException;
-import com.datastrato.gravitino.dto.VersionDTO;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;

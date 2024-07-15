@@ -19,6 +19,7 @@
 
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.integration.test;
 
+import com.apache.gravitino.utils.MapUtils;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
@@ -26,7 +27,6 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergRESTService;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.server.web.JettyServerConfig;
-import com.datastrato.gravitino.utils.MapUtils;
 import com.google.common.collect.ImmutableList;
 import com.google.errorprone.annotations.FormatMethod;
 import java.util.ArrayList;

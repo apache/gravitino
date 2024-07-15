@@ -19,12 +19,12 @@
 
 package com.apache.gravitino.client;
 
+import com.apache.gravitino.auth.AuthConstants;
+import com.apache.gravitino.dto.responses.ErrorResponse;
 import com.apache.gravitino.exceptions.RESTException;
-import com.datastrato.gravitino.auth.AuthConstants;
-import com.datastrato.gravitino.dto.responses.ErrorResponse;
-import com.datastrato.gravitino.rest.RESTRequest;
-import com.datastrato.gravitino.rest.RESTResponse;
-import com.datastrato.gravitino.rest.RESTUtils;
+import com.apache.gravitino.rest.RESTRequest;
+import com.apache.gravitino.rest.RESTResponse;
+import com.apache.gravitino.rest.RESTUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;

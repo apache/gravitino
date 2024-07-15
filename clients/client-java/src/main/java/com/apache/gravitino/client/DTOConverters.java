@@ -18,7 +18,7 @@
  */
 package com.apache.gravitino.client;
 
-import static com.datastrato.gravitino.dto.util.DTOConverters.toFunctionArg;
+import static com.apache.gravitino.dto.util.DTOConverters.toFunctionArg;
 
 import com.apache.gravitino.Catalog;
 import com.apache.gravitino.CatalogChange;
@@ -26,22 +26,22 @@ import com.apache.gravitino.MetalakeChange;
 import com.apache.gravitino.Namespace;
 import com.apache.gravitino.SchemaChange;
 import com.apache.gravitino.authorization.SecurableObject;
+import com.apache.gravitino.dto.AuditDTO;
+import com.apache.gravitino.dto.CatalogDTO;
+import com.apache.gravitino.dto.MetalakeDTO;
+import com.apache.gravitino.dto.authorization.PrivilegeDTO;
+import com.apache.gravitino.dto.authorization.SecurableObjectDTO;
+import com.apache.gravitino.dto.requests.CatalogUpdateRequest;
+import com.apache.gravitino.dto.requests.FilesetUpdateRequest;
+import com.apache.gravitino.dto.requests.MetalakeUpdateRequest;
+import com.apache.gravitino.dto.requests.SchemaUpdateRequest;
+import com.apache.gravitino.dto.requests.TableUpdateRequest;
+import com.apache.gravitino.dto.requests.TopicUpdateRequest;
 import com.apache.gravitino.file.FilesetChange;
 import com.apache.gravitino.messaging.TopicChange;
 import com.apache.gravitino.rel.Column;
 import com.apache.gravitino.rel.TableChange;
 import com.apache.gravitino.rel.expressions.Expression;
-import com.datastrato.gravitino.dto.AuditDTO;
-import com.datastrato.gravitino.dto.CatalogDTO;
-import com.datastrato.gravitino.dto.MetalakeDTO;
-import com.datastrato.gravitino.dto.authorization.PrivilegeDTO;
-import com.datastrato.gravitino.dto.authorization.SecurableObjectDTO;
-import com.datastrato.gravitino.dto.requests.CatalogUpdateRequest;
-import com.datastrato.gravitino.dto.requests.FilesetUpdateRequest;
-import com.datastrato.gravitino.dto.requests.MetalakeUpdateRequest;
-import com.datastrato.gravitino.dto.requests.SchemaUpdateRequest;
-import com.datastrato.gravitino.dto.requests.TableUpdateRequest;
-import com.datastrato.gravitino.dto.requests.TopicUpdateRequest;
 
 class DTOConverters {
   private DTOConverters() {}

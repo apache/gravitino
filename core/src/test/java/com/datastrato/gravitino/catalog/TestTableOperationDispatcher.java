@@ -34,6 +34,7 @@ import static org.mockito.Mockito.reset;
 
 import com.apache.gravitino.NameIdentifier;
 import com.apache.gravitino.Namespace;
+import com.apache.gravitino.auth.AuthConstants;
 import com.apache.gravitino.exceptions.NoSuchEntityException;
 import com.apache.gravitino.rel.Column;
 import com.apache.gravitino.rel.Table;
@@ -43,7 +44,6 @@ import com.apache.gravitino.rel.types.Types;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.TestColumn;
-import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.lock.LockManager;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.TableEntity;

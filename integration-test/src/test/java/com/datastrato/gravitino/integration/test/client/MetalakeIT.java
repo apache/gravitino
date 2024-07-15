@@ -25,12 +25,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.apache.gravitino.MetalakeChange;
 import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.auth.AuthConstants;
 import com.apache.gravitino.client.GravitinoMetalake;
 import com.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import com.apache.gravitino.exceptions.NoSuchMetalakeException;
-import com.datastrato.gravitino.auth.AuthConstants;
+import com.apache.gravitino.utils.RandomNameUtils;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
-import com.datastrato.gravitino.utils.RandomNameUtils;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Map;

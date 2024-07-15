@@ -18,8 +18,8 @@
  */
 package com.datastrato.gravitino.server.authentication;
 
+import com.apache.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.auth.AuthConstants;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import org.junit.jupiter.api.Assertions;

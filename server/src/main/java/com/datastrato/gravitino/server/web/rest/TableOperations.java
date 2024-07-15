@@ -18,23 +18,23 @@
  */
 package com.datastrato.gravitino.server.web.rest;
 
-import static com.datastrato.gravitino.dto.util.DTOConverters.fromDTO;
-import static com.datastrato.gravitino.dto.util.DTOConverters.fromDTOs;
+import static com.apache.gravitino.dto.util.DTOConverters.fromDTO;
+import static com.apache.gravitino.dto.util.DTOConverters.fromDTOs;
 
 import com.apache.gravitino.NameIdentifier;
 import com.apache.gravitino.Namespace;
+import com.apache.gravitino.dto.requests.TableCreateRequest;
+import com.apache.gravitino.dto.requests.TableUpdateRequest;
+import com.apache.gravitino.dto.requests.TableUpdatesRequest;
+import com.apache.gravitino.dto.responses.DropResponse;
+import com.apache.gravitino.dto.responses.EntityListResponse;
+import com.apache.gravitino.dto.responses.TableResponse;
+import com.apache.gravitino.dto.util.DTOConverters;
 import com.apache.gravitino.rel.Table;
 import com.apache.gravitino.rel.TableChange;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.catalog.TableDispatcher;
-import com.datastrato.gravitino.dto.requests.TableCreateRequest;
-import com.datastrato.gravitino.dto.requests.TableUpdateRequest;
-import com.datastrato.gravitino.dto.requests.TableUpdatesRequest;
-import com.datastrato.gravitino.dto.responses.DropResponse;
-import com.datastrato.gravitino.dto.responses.EntityListResponse;
-import com.datastrato.gravitino.dto.responses.TableResponse;
-import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.lock.LockType;
 import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.metrics.MetricNames;

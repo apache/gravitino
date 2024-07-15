@@ -18,10 +18,10 @@
  */
 package com.datastrato.gravitino.server.web.rest;
 
+import com.apache.gravitino.Version;
+import com.apache.gravitino.dto.responses.VersionResponse;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import com.datastrato.gravitino.Version;
-import com.datastrato.gravitino.dto.responses.VersionResponse;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.server.web.Utils;
 import javax.servlet.http.HttpServlet;

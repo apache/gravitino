@@ -18,7 +18,7 @@
  */
 package com.apache.gravitino.client;
 
-import static com.datastrato.gravitino.dto.util.DTOConverters.toDTO;
+import static com.apache.gravitino.dto.util.DTOConverters.toDTO;
 import static javax.servlet.http.HttpServletResponse.SC_CONFLICT;
 import static javax.servlet.http.HttpServletResponse.SC_NOT_FOUND;
 import static javax.servlet.http.HttpServletResponse.SC_OK;
@@ -28,17 +28,17 @@ import com.apache.gravitino.authorization.Privileges;
 import com.apache.gravitino.authorization.Role;
 import com.apache.gravitino.authorization.SecurableObject;
 import com.apache.gravitino.authorization.SecurableObjects;
+import com.apache.gravitino.dto.AuditDTO;
+import com.apache.gravitino.dto.authorization.PrivilegeDTO;
+import com.apache.gravitino.dto.authorization.RoleDTO;
+import com.apache.gravitino.dto.authorization.SecurableObjectDTO;
+import com.apache.gravitino.dto.requests.RoleCreateRequest;
+import com.apache.gravitino.dto.responses.DeleteResponse;
+import com.apache.gravitino.dto.responses.ErrorResponse;
+import com.apache.gravitino.dto.responses.RoleResponse;
 import com.apache.gravitino.exceptions.NoSuchMetalakeException;
 import com.apache.gravitino.exceptions.NoSuchRoleException;
 import com.apache.gravitino.exceptions.RoleAlreadyExistsException;
-import com.datastrato.gravitino.dto.AuditDTO;
-import com.datastrato.gravitino.dto.authorization.PrivilegeDTO;
-import com.datastrato.gravitino.dto.authorization.RoleDTO;
-import com.datastrato.gravitino.dto.authorization.SecurableObjectDTO;
-import com.datastrato.gravitino.dto.requests.RoleCreateRequest;
-import com.datastrato.gravitino.dto.responses.DeleteResponse;
-import com.datastrato.gravitino.dto.responses.ErrorResponse;
-import com.datastrato.gravitino.dto.responses.RoleResponse;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.time.Instant;

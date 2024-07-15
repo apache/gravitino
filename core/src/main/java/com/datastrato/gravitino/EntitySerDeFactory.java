@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino;
 
-import com.datastrato.gravitino.proto.ProtoEntitySerDe;
+import com.apache.gravitino.proto.ProtoEntitySerDe;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.slf4j.Logger;

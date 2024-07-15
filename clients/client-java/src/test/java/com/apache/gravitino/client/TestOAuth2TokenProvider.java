@@ -22,11 +22,11 @@ package com.apache.gravitino.client;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockserver.integration.ClientAndServer.startClientAndServer;
 
+import com.apache.gravitino.auth.AuthConstants;
+import com.apache.gravitino.dto.responses.OAuth2ErrorResponse;
+import com.apache.gravitino.dto.responses.OAuth2TokenResponse;
 import com.apache.gravitino.exceptions.BadRequestException;
 import com.apache.gravitino.exceptions.UnauthorizedException;
-import com.datastrato.gravitino.auth.AuthConstants;
-import com.datastrato.gravitino.dto.responses.OAuth2ErrorResponse;
-import com.datastrato.gravitino.dto.responses.OAuth2TokenResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;

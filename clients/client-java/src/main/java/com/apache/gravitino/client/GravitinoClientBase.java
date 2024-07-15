@@ -21,12 +21,12 @@ package com.apache.gravitino.client;
 
 import com.apache.gravitino.NameIdentifier;
 import com.apache.gravitino.Namespace;
+import com.apache.gravitino.Version;
+import com.apache.gravitino.dto.responses.MetalakeResponse;
+import com.apache.gravitino.dto.responses.VersionResponse;
 import com.apache.gravitino.exceptions.GravitinoRuntimeException;
 import com.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import com.apache.gravitino.exceptions.NoSuchMetalakeException;
-import com.datastrato.gravitino.Version;
-import com.datastrato.gravitino.dto.responses.MetalakeResponse;
-import com.datastrato.gravitino.dto.responses.VersionResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 import com.google.errorprone.annotations.InlineMe;

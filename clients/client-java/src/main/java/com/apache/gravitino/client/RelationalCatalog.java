@@ -18,12 +18,20 @@
  */
 package com.apache.gravitino.client;
 
-import static com.datastrato.gravitino.dto.util.DTOConverters.toDTO;
-import static com.datastrato.gravitino.dto.util.DTOConverters.toDTOs;
+import static com.apache.gravitino.dto.util.DTOConverters.toDTO;
+import static com.apache.gravitino.dto.util.DTOConverters.toDTOs;
 
 import com.apache.gravitino.Catalog;
 import com.apache.gravitino.NameIdentifier;
 import com.apache.gravitino.Namespace;
+import com.apache.gravitino.dto.AuditDTO;
+import com.apache.gravitino.dto.CatalogDTO;
+import com.apache.gravitino.dto.requests.TableCreateRequest;
+import com.apache.gravitino.dto.requests.TableUpdateRequest;
+import com.apache.gravitino.dto.requests.TableUpdatesRequest;
+import com.apache.gravitino.dto.responses.DropResponse;
+import com.apache.gravitino.dto.responses.EntityListResponse;
+import com.apache.gravitino.dto.responses.TableResponse;
 import com.apache.gravitino.exceptions.NoSuchSchemaException;
 import com.apache.gravitino.exceptions.NoSuchTableException;
 import com.apache.gravitino.exceptions.TableAlreadyExistsException;
@@ -35,15 +43,7 @@ import com.apache.gravitino.rel.expressions.distributions.Distribution;
 import com.apache.gravitino.rel.expressions.sorts.SortOrder;
 import com.apache.gravitino.rel.expressions.transforms.Transform;
 import com.apache.gravitino.rel.indexes.Index;
-import com.datastrato.gravitino.dto.AuditDTO;
-import com.datastrato.gravitino.dto.CatalogDTO;
-import com.datastrato.gravitino.dto.requests.TableCreateRequest;
-import com.datastrato.gravitino.dto.requests.TableUpdateRequest;
-import com.datastrato.gravitino.dto.requests.TableUpdatesRequest;
-import com.datastrato.gravitino.dto.responses.DropResponse;
-import com.datastrato.gravitino.dto.responses.EntityListResponse;
-import com.datastrato.gravitino.dto.responses.TableResponse;
-import com.datastrato.gravitino.rest.RESTUtils;
+import com.apache.gravitino.rest.RESTUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;

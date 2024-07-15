@@ -32,13 +32,13 @@ import static org.mockito.Mockito.reset;
 
 import com.apache.gravitino.NameIdentifier;
 import com.apache.gravitino.Namespace;
+import com.apache.gravitino.auth.AuthConstants;
 import com.apache.gravitino.exceptions.NoSuchEntityException;
 import com.apache.gravitino.messaging.Topic;
 import com.apache.gravitino.messaging.TopicChange;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.GravitinoEnv;
-import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.lock.LockManager;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.TopicEntity;

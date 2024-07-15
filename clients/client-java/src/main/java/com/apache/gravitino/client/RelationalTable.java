@@ -18,11 +18,18 @@
  */
 package com.apache.gravitino.client;
 
-import static com.datastrato.gravitino.dto.util.DTOConverters.fromDTO;
-import static com.datastrato.gravitino.dto.util.DTOConverters.toDTO;
+import static com.apache.gravitino.dto.util.DTOConverters.fromDTO;
+import static com.apache.gravitino.dto.util.DTOConverters.toDTO;
 
 import com.apache.gravitino.Audit;
 import com.apache.gravitino.Namespace;
+import com.apache.gravitino.dto.rel.TableDTO;
+import com.apache.gravitino.dto.rel.partitions.PartitionDTO;
+import com.apache.gravitino.dto.requests.AddPartitionsRequest;
+import com.apache.gravitino.dto.responses.DropResponse;
+import com.apache.gravitino.dto.responses.PartitionListResponse;
+import com.apache.gravitino.dto.responses.PartitionNameListResponse;
+import com.apache.gravitino.dto.responses.PartitionResponse;
 import com.apache.gravitino.exceptions.NoSuchPartitionException;
 import com.apache.gravitino.exceptions.PartitionAlreadyExistsException;
 import com.apache.gravitino.rel.Column;
@@ -33,14 +40,7 @@ import com.apache.gravitino.rel.expressions.sorts.SortOrder;
 import com.apache.gravitino.rel.expressions.transforms.Transform;
 import com.apache.gravitino.rel.indexes.Index;
 import com.apache.gravitino.rel.partitions.Partition;
-import com.datastrato.gravitino.dto.rel.TableDTO;
-import com.datastrato.gravitino.dto.rel.partitions.PartitionDTO;
-import com.datastrato.gravitino.dto.requests.AddPartitionsRequest;
-import com.datastrato.gravitino.dto.responses.DropResponse;
-import com.datastrato.gravitino.dto.responses.PartitionListResponse;
-import com.datastrato.gravitino.dto.responses.PartitionNameListResponse;
-import com.datastrato.gravitino.dto.responses.PartitionResponse;
-import com.datastrato.gravitino.rest.RESTUtils;
+import com.apache.gravitino.rest.RESTUtils;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Collections;
 import java.util.HashMap;

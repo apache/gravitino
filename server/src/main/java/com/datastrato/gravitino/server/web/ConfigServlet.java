@@ -18,8 +18,8 @@
  */
 package com.datastrato.gravitino.server.web;
 
+import com.apache.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.Configs;
-import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.config.ConfigEntry;
 import com.datastrato.gravitino.server.ServerConfig;
 import com.datastrato.gravitino.server.authentication.OAuthConfig;

@@ -19,7 +19,7 @@
 
 package com.apache.gravitino.client;
 
-import com.datastrato.gravitino.dto.responses.ErrorResponse;
+import com.apache.gravitino.dto.responses.ErrorResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.function.Consumer;
 

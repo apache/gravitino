@@ -18,10 +18,10 @@
  */
 package com.apache.gravitino.client;
 
+import static com.apache.gravitino.dto.rel.partitioning.Partitioning.EMPTY_PARTITIONING;
+import static com.apache.gravitino.dto.util.DTOConverters.fromDTO;
+import static com.apache.gravitino.dto.util.DTOConverters.fromDTOs;
 import static com.apache.gravitino.rel.expressions.sorts.SortDirection.DESCENDING;
-import static com.datastrato.gravitino.dto.rel.partitioning.Partitioning.EMPTY_PARTITIONING;
-import static com.datastrato.gravitino.dto.util.DTOConverters.fromDTO;
-import static com.datastrato.gravitino.dto.util.DTOConverters.fromDTOs;
 import static org.apache.hc.core5.http.HttpStatus.SC_BAD_REQUEST;
 import static org.apache.hc.core5.http.HttpStatus.SC_CONFLICT;
 import static org.apache.hc.core5.http.HttpStatus.SC_INTERNAL_SERVER_ERROR;
@@ -34,6 +34,36 @@ import com.apache.gravitino.NameIdentifier;
 import com.apache.gravitino.Namespace;
 import com.apache.gravitino.Schema;
 import com.apache.gravitino.SupportsSchemas;
+import com.apache.gravitino.dto.AuditDTO;
+import com.apache.gravitino.dto.CatalogDTO;
+import com.apache.gravitino.dto.SchemaDTO;
+import com.apache.gravitino.dto.rel.ColumnDTO;
+import com.apache.gravitino.dto.rel.DistributionDTO;
+import com.apache.gravitino.dto.rel.SortOrderDTO;
+import com.apache.gravitino.dto.rel.TableDTO;
+import com.apache.gravitino.dto.rel.expressions.FieldReferenceDTO;
+import com.apache.gravitino.dto.rel.expressions.FunctionArg;
+import com.apache.gravitino.dto.rel.expressions.LiteralDTO;
+import com.apache.gravitino.dto.rel.indexes.IndexDTO;
+import com.apache.gravitino.dto.rel.partitioning.DayPartitioningDTO;
+import com.apache.gravitino.dto.rel.partitioning.IdentityPartitioningDTO;
+import com.apache.gravitino.dto.rel.partitioning.Partitioning;
+import com.apache.gravitino.dto.rel.partitioning.RangePartitioningDTO;
+import com.apache.gravitino.dto.rel.partitions.RangePartitionDTO;
+import com.apache.gravitino.dto.requests.CatalogCreateRequest;
+import com.apache.gravitino.dto.requests.SchemaCreateRequest;
+import com.apache.gravitino.dto.requests.SchemaUpdateRequest;
+import com.apache.gravitino.dto.requests.SchemaUpdatesRequest;
+import com.apache.gravitino.dto.requests.TableCreateRequest;
+import com.apache.gravitino.dto.requests.TableUpdateRequest;
+import com.apache.gravitino.dto.requests.TableUpdatesRequest;
+import com.apache.gravitino.dto.responses.CatalogResponse;
+import com.apache.gravitino.dto.responses.DropResponse;
+import com.apache.gravitino.dto.responses.EntityListResponse;
+import com.apache.gravitino.dto.responses.ErrorResponse;
+import com.apache.gravitino.dto.responses.SchemaResponse;
+import com.apache.gravitino.dto.responses.TableResponse;
+import com.apache.gravitino.dto.util.DTOConverters;
 import com.apache.gravitino.exceptions.NoSuchCatalogException;
 import com.apache.gravitino.exceptions.NoSuchSchemaException;
 import com.apache.gravitino.exceptions.NoSuchTableException;
@@ -50,35 +80,6 @@ import com.apache.gravitino.rel.expressions.sorts.SortDirection;
 import com.apache.gravitino.rel.expressions.sorts.SortOrder;
 import com.apache.gravitino.rel.types.Type;
 import com.apache.gravitino.rel.types.Types;
-import com.datastrato.gravitino.dto.AuditDTO;
-import com.datastrato.gravitino.dto.CatalogDTO;
-import com.datastrato.gravitino.dto.SchemaDTO;
-import com.datastrato.gravitino.dto.rel.ColumnDTO;
-import com.datastrato.gravitino.dto.rel.DistributionDTO;
-import com.datastrato.gravitino.dto.rel.SortOrderDTO;
-import com.datastrato.gravitino.dto.rel.TableDTO;
-import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
-import com.datastrato.gravitino.dto.rel.expressions.FunctionArg;
-import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
-import com.datastrato.gravitino.dto.rel.indexes.IndexDTO;
-import com.datastrato.gravitino.dto.rel.partitioning.DayPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitioning.IdentityPartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitioning.Partitioning;
-import com.datastrato.gravitino.dto.rel.partitioning.RangePartitioningDTO;
-import com.datastrato.gravitino.dto.rel.partitions.RangePartitionDTO;
-import com.datastrato.gravitino.dto.requests.CatalogCreateRequest;
-import com.datastrato.gravitino.dto.requests.SchemaCreateRequest;
-import com.datastrato.gravitino.dto.requests.SchemaUpdateRequest;
-import com.datastrato.gravitino.dto.requests.SchemaUpdatesRequest;
-import com.datastrato.gravitino.dto.requests.TableCreateRequest;
-import com.datastrato.gravitino.dto.requests.TableUpdateRequest;
-import com.datastrato.gravitino.dto.requests.TableUpdatesRequest;
-import com.datastrato.gravitino.dto.responses.CatalogResponse;
-import com.datastrato.gravitino.dto.responses.DropResponse;
-import com.datastrato.gravitino.dto.responses.EntityListResponse;
-import com.datastrato.gravitino.dto.responses.ErrorResponse;
-import com.datastrato.gravitino.dto.responses.SchemaResponse;
-import com.datastrato.gravitino.dto.responses.TableResponse;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -442,9 +443,7 @@ public class TestRelationalCatalog extends TestBase {
     buildMockResource(Method.POST, tablePath, req, errorResp, SC_NOT_FOUND);
 
     SortOrder[] sortOrder =
-        Arrays.stream(sortOrderDTOs)
-            .map(com.datastrato.gravitino.dto.util.DTOConverters::fromDTO)
-            .toArray(SortOrder[]::new);
+        Arrays.stream(sortOrderDTOs).map(DTOConverters::fromDTO).toArray(SortOrder[]::new);
     Throwable ex =
         Assertions.assertThrows(
             NoSuchSchemaException.class,

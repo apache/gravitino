@@ -18,21 +18,21 @@
  */
 package com.datastrato.gravitino.server.web.rest;
 
-import static com.datastrato.gravitino.dto.util.DTOConverters.fromDTO;
-import static com.datastrato.gravitino.dto.util.DTOConverters.toDTOs;
+import static com.apache.gravitino.dto.util.DTOConverters.fromDTO;
+import static com.apache.gravitino.dto.util.DTOConverters.toDTOs;
 
 import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.dto.rel.partitions.PartitionDTO;
+import com.apache.gravitino.dto.requests.AddPartitionsRequest;
+import com.apache.gravitino.dto.responses.DropResponse;
+import com.apache.gravitino.dto.responses.PartitionListResponse;
+import com.apache.gravitino.dto.responses.PartitionNameListResponse;
+import com.apache.gravitino.dto.responses.PartitionResponse;
+import com.apache.gravitino.dto.util.DTOConverters;
 import com.apache.gravitino.rel.partitions.Partition;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.catalog.PartitionDispatcher;
-import com.datastrato.gravitino.dto.rel.partitions.PartitionDTO;
-import com.datastrato.gravitino.dto.requests.AddPartitionsRequest;
-import com.datastrato.gravitino.dto.responses.DropResponse;
-import com.datastrato.gravitino.dto.responses.PartitionListResponse;
-import com.datastrato.gravitino.dto.responses.PartitionNameListResponse;
-import com.datastrato.gravitino.dto.responses.PartitionResponse;
-import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.lock.LockType;
 import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.metrics.MetricNames;

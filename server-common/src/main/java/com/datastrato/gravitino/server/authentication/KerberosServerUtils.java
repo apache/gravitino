@@ -14,6 +14,7 @@
  */
 package com.datastrato.gravitino.server.authentication;
 
+import com.apache.gravitino.auth.KerberosUtils;
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -278,10 +279,8 @@ public class KerberosServerUtils {
 
   // basic ASN.1 DER decoder to traverse encoded byte arrays.
   private static class DER implements Iterator<DER> {
-    static final DER SPNEGO_MECH_OID =
-        getDER(com.datastrato.gravitino.auth.KerberosUtils.GSS_SPNEGO_MECH_OID);
-    static final DER KRB5_MECH_OID =
-        getDER(com.datastrato.gravitino.auth.KerberosUtils.GSS_KRB5_MECH_OID);
+    static final DER SPNEGO_MECH_OID = getDER(KerberosUtils.GSS_SPNEGO_MECH_OID);
+    static final DER KRB5_MECH_OID = getDER(KerberosUtils.GSS_KRB5_MECH_OID);
 
     private static DER getDER(Oid oid) {
       try {

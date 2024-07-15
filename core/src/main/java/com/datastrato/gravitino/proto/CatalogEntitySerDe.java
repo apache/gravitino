@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.datastrato.gravitino.proto;
+package com.apache.gravitino.proto;
 
 import com.apache.gravitino.Namespace;
 import com.datastrato.gravitino.meta.AuditInfo;
@@ -49,8 +49,8 @@ public class CatalogEntitySerDe implements ProtoSerDe<CatalogEntity, Catalog> {
       builder.putAllProperties(catalogEntity.getProperties());
     }
 
-    com.datastrato.gravitino.proto.Catalog.Type type =
-        com.datastrato.gravitino.proto.Catalog.Type.valueOf(catalogEntity.getType().name());
+    com.apache.gravitino.proto.Catalog.Type type =
+        com.apache.gravitino.proto.Catalog.Type.valueOf(catalogEntity.getType().name());
     builder.setType(type);
 
     // Note we have ignored the namespace field here

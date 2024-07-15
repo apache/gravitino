@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datastrato.gravitino.proto;
+package com.apache.gravitino.proto;
 
 import com.apache.gravitino.Namespace;
 import com.datastrato.gravitino.meta.TableEntity;
