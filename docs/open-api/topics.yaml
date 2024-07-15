@@ -332,7 +332,7 @@ components:
         "type": "TopicAlreadyExistsException",
         "message": "Topic already exists",
         "stack": [
-          "com.datastrato.gravitino.exceptions.TopicAlreadyExistsException: Topic already exists: topic1"
+          "com.apache.gravitino.exceptions.TopicAlreadyExistsException: Topic already exists: topic1"
         ]
       }
 
@@ -342,7 +342,7 @@ components:
         "type": "NoSuchTopicException",
         "message": "Topic does not exist",
         "stack": [
-          "com.datastrato.gravitino.exceptions.NoSuchTopicException: Topic does not exist",
+          "com.apache.gravitino.exceptions.NoSuchTopicException: Topic does not exist",
           "..."
         ]
       }

@@ -135,8 +135,8 @@ fun generatePypiProjectHomePage() {
     }
 
     // Use regular expression to match the `![](./a/b/c.png)` link in the content
-    // Convert `![](./a/b/c.png)` to `[](https://raw.githubusercontent.com/datastrato/gravitino/main/docs/a/b/c.png)`
-    val assertUrl = "https://raw.githubusercontent.com/datastrato/gravitino/main/docs"
+    // Convert `![](./a/b/c.png)` to `[](https://raw.githubusercontent.com/apache/gravitino/main/docs/a/b/c.png)`
+    val assertUrl = "https://raw.githubusercontent.com/apache/gravitino/main/docs"
     val patternImage = """!\[([^\]]+)]\(\./assets/([^)]+)\)""".toRegex()
     val contentUpdateImage = patternImage.replace(contentUpdateDocs) { matchResult ->
       val altText = matchResult.groupValues[1]
@@ -249,15 +249,14 @@ tasks {
 
   val test by registering(VenvTask::class) {
     val skipUTs = project.hasProperty("skipTests")
-    val skipPyClientITs = project.hasProperty("skipPyClientITs")
     val skipITs = project.hasProperty("skipITs")
-    val skipAllTests = skipUTs && (skipITs || skipPyClientITs)
+    val skipAllTests = skipUTs && skipITs
     if (!skipAllTests) {
       dependsOn(pipInstall, pylint)
       if (!skipUTs) {
         dependsOn(unitTests)
       }
-      if (!skipITs && !skipPyClientITs) {
+      if (!skipITs) {
         dependsOn(integrationTest)
       }
     }
