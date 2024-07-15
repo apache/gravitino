@@ -41,30 +41,42 @@ public interface RoleMetaMapper {
   String GROUP_ROLE_RELATION_TABLE_NAME = "group_role_rel";
 
   @Select(
-      "SELECT role_id as roleId, role_name as roleName,"
-          + " metalake_id as metalakeId, properties as properties,"
-          + " audit_info as auditInfo, current_version as currentVersion,"
-          + " last_version as lastVersion, deleted_at as deletedAt"
+      "SELECT role_id as roleId, "
+          + " role_name as roleName,"
+          + " metalake_id as metalakeId, "
+          + " catalog_id as catalogId,"
+          + " schema_id as schemaId,"
+          + " properties as properties,"
+          + " audit_info as auditInfo,"
+          + " current_version as currentVersion,"
+          + " last_version as lastVersion,"
+          + " deleted_at as deletedAt"
           + " FROM "
           + ROLE_TABLE_NAME
-          + " WHERE metalake_id = #{metalakeId} AND role_name = #{roleName}"
+          + " WHERE schema_id = #{schemaId} AND role_name = #{roleName}"
           + " AND deleted_at = 0")
-  RolePO selectRoleMetaByMetalakeIdAndName(
-      @Param("metalakeId") Long metalakeId, @Param("roleName") String roleName);
+  RolePO selectRoleMetaBySchemaIdAndName(
+      @Param("schemaId") Long schemaId, @Param("roleName") String roleName);
 
   @Select(
       "SELECT role_id as roleId FROM "
           + ROLE_TABLE_NAME
-          + " WHERE metalake_id = #{metalakeId} AND role_name = #{roleName}"
+          + " WHERE schema_id = #{schemaId} AND role_name = #{roleName}"
           + " AND deleted_at = 0")
-  Long selectRoleIdByMetalakeIdAndName(
-      @Param("metalakeId") Long metalakeId, @Param("roleName") String name);
+  Long selectRoleIdBySchemaIdAndName(
+      @Param("schemaId") Long schemaId, @Param("roleName") String name);
 
   @Select(
-      "SELECT ro.role_id as roleId, ro.role_name as roleName,"
-          + " ro.metalake_id as metalakeId, ro.properties as properties,"
-          + " ro.audit_info as auditInfo, ro.current_version as currentVersion,"
-          + " ro.last_version as lastVersion, ro.deleted_at as deletedAt"
+      "SELECT ro.role_id as roleId,"
+          + " ro.role_name as roleName,"
+          + " ro.metalake_id as metalakeId,"
+          + " ro.catalog_id as catalogId,"
+          + " ro.schema_id as schemaId,"
+          + " ro.properties as properties,"
+          + " ro.audit_info as auditInfo,"
+          + " ro.current_version as currentVersion,"
+          + " ro.last_version as lastVersion,"
+          + " ro.deleted_at as deletedAt"
           + " FROM "
           + ROLE_TABLE_NAME
           + " ro JOIN "
@@ -75,10 +87,16 @@ public interface RoleMetaMapper {
   List<RolePO> listRolesByUserId(@Param("userId") Long userId);
 
   @Select(
-      "SELECT ro.role_id as roleId, ro.role_name as roleName,"
-          + " ro.metalake_id as metalakeId, ro.properties as properties,"
-          + " ro.audit_info as auditInfo, ro.current_version as currentVersion,"
-          + " ro.last_version as lastVersion, ro.deleted_at as deletedAt"
+      "SELECT ro.role_id as roleId,"
+          + " ro.role_name as roleName,"
+          + " ro.metalake_id as metalakeId,"
+          + " ro.catalog_id as catalogId,"
+          + " ro.schema_id as schemaId,"
+          + " ro.properties as properties,"
+          + " ro.audit_info as auditInfo,"
+          + " ro.current_version as currentVersion,"
+          + " ro.last_version as lastVersion,"
+          + " ro.deleted_at as deletedAt"
           + " FROM "
           + ROLE_TABLE_NAME
           + " ro JOIN "
@@ -92,12 +110,16 @@ public interface RoleMetaMapper {
       "INSERT INTO "
           + ROLE_TABLE_NAME
           + "(role_id, role_name,"
-          + " metalake_id, properties,"
-          + " audit_info, current_version, last_version, deleted_at)"
+          + " metalake_id, catalog_id, schema_id,"
+          + " properties,"
+          + " audit_info, current_version,"
+          + " last_version, deleted_at)"
           + " VALUES("
           + " #{roleMeta.roleId},"
           + " #{roleMeta.roleName},"
           + " #{roleMeta.metalakeId},"
+          + " #{roleMeta.catalogId},"
+          + " #{roleMeta.schemaId},"
           + " #{roleMeta.properties},"
           + " #{roleMeta.auditInfo},"
           + " #{roleMeta.currentVersion},"
@@ -110,12 +132,16 @@ public interface RoleMetaMapper {
       "INSERT INTO "
           + ROLE_TABLE_NAME
           + "(role_id, role_name,"
-          + " metalake_id, properties,"
-          + " audit_info, current_version, last_version, deleted_at)"
+          + " metalake_id, catalog_id, schema_id,"
+          + " properties,"
+          + " audit_info, current_version,"
+          + " last_version, deleted_at)"
           + " VALUES("
           + " #{roleMeta.roleId},"
           + " #{roleMeta.roleName},"
           + " #{roleMeta.metalakeId},"
+          + " #{roleMeta.catalogId},"
+          + " #{roleMeta.schemaId},"
           + " #{roleMeta.properties},"
           + " #{roleMeta.auditInfo},"
           + " #{roleMeta.currentVersion},"
@@ -124,6 +150,8 @@ public interface RoleMetaMapper {
           + " ) ON DUPLICATE KEY UPDATE"
           + " role_name = #{roleMeta.roleName},"
           + " metalake_id = #{roleMeta.metalakeId},"
+          + " catalog_id = #{roleMeta.catalogId},"
+          + " schema_id = #{roleMeta.schemaId},"
           + " properties = #{roleMeta.properties},"
           + " audit_info = #{roleMeta.auditInfo},"
           + " current_version = #{roleMeta.currentVersion},"

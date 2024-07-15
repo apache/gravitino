@@ -25,6 +25,8 @@ public class UserPO {
   private Long userId;
   private String userName;
   private Long metalakeId;
+  private Long catalogId;
+  private Long schemaId;
   private String auditInfo;
   private Long currentVersion;
   private Long lastVersion;
@@ -40,6 +42,14 @@ public class UserPO {
 
   public Long getMetalakeId() {
     return metalakeId;
+  }
+
+  public Long getCatalogId() {
+    return catalogId;
+  }
+
+  public Long getSchemaId() {
+    return schemaId;
   }
 
   public String getAuditInfo() {
@@ -70,6 +80,8 @@ public class UserPO {
     return Objects.equal(getUserId(), tablePO.getUserId())
         && Objects.equal(getUserName(), tablePO.getUserName())
         && Objects.equal(getMetalakeId(), tablePO.getMetalakeId())
+        && Objects.equal(getCatalogId(), tablePO.getCatalogId())
+        && Objects.equal(getSchemaId(), tablePO.getSchemaId())
         && Objects.equal(getAuditInfo(), tablePO.getAuditInfo())
         && Objects.equal(getCurrentVersion(), tablePO.getCurrentVersion())
         && Objects.equal(getLastVersion(), tablePO.getLastVersion())
@@ -82,6 +94,8 @@ public class UserPO {
         getUserId(),
         getUserName(),
         getMetalakeId(),
+        getCatalogId(),
+        getSchemaId(),
         getAuditInfo(),
         getCurrentVersion(),
         getLastVersion(),
@@ -110,6 +124,16 @@ public class UserPO {
       return this;
     }
 
+    public Builder withCatalogId(Long catalogId) {
+      userPO.catalogId = catalogId;
+      return this;
+    }
+
+    public Builder withSchemaId(Long schemaId) {
+      userPO.schemaId = schemaId;
+      return this;
+    }
+
     public Builder withAuditInfo(String auditInfo) {
       userPO.auditInfo = auditInfo;
       return this;
@@ -134,6 +158,8 @@ public class UserPO {
       Preconditions.checkArgument(userPO.userId != null, "User id is required");
       Preconditions.checkArgument(userPO.userName != null, "User name is required");
       Preconditions.checkArgument(userPO.metalakeId != null, "Metalake id is required");
+      Preconditions.checkArgument(userPO.catalogId != null, "Catalog id is required");
+      Preconditions.checkArgument(userPO.schemaId != null, "Schema id is required");
       Preconditions.checkArgument(userPO.auditInfo != null, "Audit info is required");
       Preconditions.checkArgument(userPO.currentVersion != null, "Current version is required");
       Preconditions.checkArgument(userPO.lastVersion != null, "Last version is required");

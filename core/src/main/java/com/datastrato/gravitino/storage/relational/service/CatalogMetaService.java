@@ -43,6 +43,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
 /**
@@ -118,6 +119,10 @@ public class CatalogMetaService {
         SessionUtils.getWithoutCommit(
             CatalogMetaMapper.class, mapper -> mapper.listCatalogPOsByMetalakeId(metalakeId));
 
+    catalogPOS =
+        catalogPOS.stream()
+            .filter(i -> !i.getCatalogName().equals(Entity.SYSTEM_CATALOG_RESERVED_NAME))
+            .collect(Collectors.toList());
     return POConverters.fromCatalogPOs(catalogPOS, namespace);
   }
 

@@ -1,0 +1,204 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+package com.datastrato.gravitino.storage.relational.service;
+
+import com.datastrato.gravitino.Entity;
+import com.datastrato.gravitino.exceptions.NoSuchEntityException;
+import com.datastrato.gravitino.meta.AuditInfo;
+import com.datastrato.gravitino.meta.BaseMetalake;
+import com.datastrato.gravitino.meta.CatalogEntity;
+import com.datastrato.gravitino.storage.RandomIdGenerator;
+import com.datastrato.gravitino.storage.relational.TestJDBCBackend;
+import com.datastrato.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import com.datastrato.gravitino.storage.relational.po.CatalogPO;
+import com.datastrato.gravitino.storage.relational.po.SchemaPO;
+import com.datastrato.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import com.datastrato.gravitino.storage.relational.utils.SessionUtils;
+import com.datastrato.gravitino.utils.NameIdentifierUtil;
+import com.datastrato.gravitino.utils.NamespaceUtil;
+import java.io.IOException;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.time.Instant;
+import java.util.List;
+import org.apache.ibatis.session.SqlSession;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+
+class TestMetalakeMetaService extends TestJDBCBackend {
+
+  String metalakeName = "metalake";
+
+  @Test
+  void insertMetalake() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    MetalakeMetaService metalakeMetaService = MetalakeMetaService.getInstance();
+
+    Assertions.assertDoesNotThrow(() -> metalakeMetaService.insertMetalake(metalake, false));
+    BaseMetalake metalakeResult =
+        metalakeMetaService.getMetalakeByIdentifier(NameIdentifierUtil.ofMetalake(metalakeName));
+    Assertions.assertEquals(metalake, metalakeResult);
+
+    List<CatalogEntity> catalogEntities =
+        CatalogMetaService.getInstance()
+            .listCatalogsByNamespace(NamespaceUtil.ofCatalog(metalakeName));
+    Assertions.assertEquals(0, catalogEntities.size());
+
+    List<CatalogPO> catalogPOs =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class, mapper -> mapper.listCatalogPOsByMetalakeId(metalake.id()));
+    Assertions.assertEquals(1, catalogPOs.size());
+    Assertions.assertEquals(
+        Entity.SYSTEM_CATALOG_RESERVED_NAME, catalogPOs.get(0).getCatalogName());
+
+    List<SchemaPO> schemaPOS =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class,
+            mapper -> mapper.listSchemaPOsByCatalogId(catalogPOs.get(0).getCatalogId()));
+    Assertions.assertEquals(3, schemaPOS.size());
+    Assertions.assertTrue(
+        schemaPOS.stream()
+            .anyMatch(schemaPO -> schemaPO.getSchemaName().equals(Entity.USER_SCHEMA_NAME)));
+    Assertions.assertTrue(
+        schemaPOS.stream()
+            .anyMatch(schemaPO -> schemaPO.getSchemaName().equals(Entity.GROUP_SCHEMA_NAME)));
+    Assertions.assertTrue(
+        schemaPOS.stream()
+            .anyMatch(schemaPO -> schemaPO.getSchemaName().equals(Entity.ROLE_SCHEMA_NAME)));
+  }
+
+  @Test
+  void deleteMetalake() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    MetalakeMetaService metalakeMetaService = MetalakeMetaService.getInstance();
+
+    // insert metalake
+    metalakeMetaService.insertMetalake(metalake, false);
+    BaseMetalake metalakeResult =
+        metalakeMetaService.getMetalakeByIdentifier(NameIdentifierUtil.ofMetalake(metalakeName));
+    Assertions.assertEquals(metalake, metalakeResult);
+
+    List<CatalogEntity> catalogEntities =
+        CatalogMetaService.getInstance()
+            .listCatalogsByNamespace(NamespaceUtil.ofCatalog(metalakeName));
+    Assertions.assertEquals(0, catalogEntities.size());
+
+    List<CatalogPO> catalogPOs =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class, mapper -> mapper.listCatalogPOsByMetalakeId(metalake.id()));
+    Assertions.assertEquals(1, catalogPOs.size());
+    Assertions.assertEquals(
+        Entity.SYSTEM_CATALOG_RESERVED_NAME, catalogPOs.get(0).getCatalogName());
+
+    List<SchemaPO> schemaPOs =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class,
+            mapper -> mapper.listSchemaPOsByCatalogId(catalogPOs.get(0).getCatalogId()));
+    Assertions.assertEquals(3, schemaPOs.size());
+    Assertions.assertTrue(
+        schemaPOs.stream()
+            .anyMatch(schemaPO -> schemaPO.getSchemaName().equals(Entity.USER_SCHEMA_NAME)));
+    Assertions.assertTrue(
+        schemaPOs.stream()
+            .anyMatch(schemaPO -> schemaPO.getSchemaName().equals(Entity.GROUP_SCHEMA_NAME)));
+    Assertions.assertTrue(
+        schemaPOs.stream()
+            .anyMatch(schemaPO -> schemaPO.getSchemaName().equals(Entity.ROLE_SCHEMA_NAME)));
+
+    // delete metalake
+    metalakeMetaService.deleteMetalake(NameIdentifierUtil.ofMetalake(metalakeName), false);
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            metalakeMetaService.getMetalakeByIdentifier(
+                NameIdentifierUtil.ofMetalake(metalakeName)));
+
+    List<CatalogPO> catalogPOs1 =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class, mapper -> mapper.listCatalogPOsByMetalakeId(metalake.id()));
+    Assertions.assertEquals(0, catalogPOs1.size());
+    int schemaNum = countSchemas(metalake.id());
+    Assertions.assertEquals(0, schemaNum);
+
+    // insert metalake
+    BaseMetalake metalake1 =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake1", auditInfo);
+    metalakeMetaService.insertMetalake(metalake1, false);
+    List<CatalogEntity> catalogEntities2 =
+        CatalogMetaService.getInstance()
+            .listCatalogsByNamespace(NamespaceUtil.ofCatalog("metalake1"));
+    Assertions.assertEquals(0, catalogEntities2.size());
+
+    List<CatalogPO> catalogPOs2 =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class, mapper -> mapper.listCatalogPOsByMetalakeId(metalake1.id()));
+    Assertions.assertEquals(1, catalogPOs2.size());
+
+    List<SchemaPO> schemaPOs2 =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class,
+            mapper -> mapper.listSchemaPOsByCatalogId(catalogPOs2.get(0).getCatalogId()));
+    Assertions.assertEquals(3, schemaPOs2.size());
+
+    // delete metalake with cascade
+    metalakeMetaService.deleteMetalake(NameIdentifierUtil.ofMetalake("metalake1"), true);
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            metalakeMetaService.getMetalakeByIdentifier(
+                NameIdentifierUtil.ofMetalake("metalake1")));
+
+    List<CatalogPO> catalogPOs3 =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class, mapper -> mapper.listCatalogPOsByMetalakeId(metalake1.id()));
+    Assertions.assertEquals(0, catalogPOs3.size());
+    int schemaNum1 = countSchemas(metalake1.id());
+    Assertions.assertEquals(0, schemaNum1);
+  }
+
+  private Integer countSchemas(Long metalakeId) {
+    int count = 0;
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM schema_meta where metalake_id = %d and deleted_at = 0",
+                    metalakeId))) {
+      while (rs.next()) {
+        count = rs.getInt(1);
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("SQL execution failed", e);
+    }
+    return count;
+  }
+}
