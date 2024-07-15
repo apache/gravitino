@@ -193,7 +193,7 @@ public class IcebergTableOpsHelper {
     if (parentName != null) {
       org.apache.iceberg.types.Type parent = icebergTableSchema.findType(parentName);
       Preconditions.checkArgument(
-          parent != null, "Couldn't find parent field: " + parentName + " in iceberg table");
+          parent != null, "Couldn't find parent field: " + parentName + " in Iceberg table");
       Preconditions.checkArgument(
           parent instanceof StructType,
           "Couldn't add column to non-struct field, name:"

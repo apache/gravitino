@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from gravitino.dto.version_dto import VersionDTO
-from gravitino.exceptions.gravitino_runtime_exception import GravitinoRuntimeException
+from gravitino.exceptions.base import GravitinoRuntimeException
 
 
 class Version(Enum):

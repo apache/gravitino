@@ -68,9 +68,9 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 
 /**
- * The GravitinoMetadata class provides operations for Gravitino metadata on the Gravitino server.
- * It also transforms the different metadata formats between Trino and Gravitino. Additionally, it
- * wraps the internal connector metadata for accessing data.
+ * The GravitinoMetadata class provides operations for Apache Gravitino metadata on the Gravitino
+ * server. It also transforms the different metadata formats between Trino and Gravitino.
+ * Additionally, it wraps the internal connector metadata for accessing data.
  */
 public class GravitinoMetadata implements ConnectorMetadata {
   // Handling metadata operations on gravitino server

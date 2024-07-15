@@ -24,7 +24,7 @@ import java.time.Instant;
 import java.util.Map;
 import org.apache.iceberg.metrics.MetricsReport;
 
-/** A store API to save Iceberg metrics. */
+/** A store API to save Apache Iceberg metrics. */
 public interface IcebergMetricsStore {
 
   /**

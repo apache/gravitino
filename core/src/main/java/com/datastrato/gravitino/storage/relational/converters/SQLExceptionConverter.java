@@ -22,7 +22,7 @@ import com.datastrato.gravitino.Entity;
 import java.io.IOException;
 import java.sql.SQLException;
 
-/** Interface for converter JDBC SQL exceptions to Gravitino exceptions. */
+/** Interface for converter JDBC SQL exceptions to Apache Gravitino exceptions. */
 public interface SQLExceptionConverter {
   /**
    * Convert JDBC exception to GravitinoException.

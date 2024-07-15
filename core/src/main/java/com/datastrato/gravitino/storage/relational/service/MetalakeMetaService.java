@@ -36,6 +36,8 @@ import com.datastrato.gravitino.storage.relational.mapper.RoleMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import com.datastrato.gravitino.storage.relational.mapper.TableMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.TagMetaMapper;
+import com.datastrato.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import com.datastrato.gravitino.storage.relational.mapper.TopicMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.UserMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.UserRoleRelMapper;
@@ -275,7 +277,15 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     SecurableObjectMapper.class,
-                    mapper -> mapper.softDeleteRoleMetasByMetalakeId(metalakeId)));
+                    mapper -> mapper.softDeleteRoleMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    TagMetaMapper.class,
+                    mapper -> mapper.softDeleteTagMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    TagMetadataObjectRelMapper.class,
+                    mapper -> mapper.softDeleteTagMetadataObjectRelsByMetalakeId(metalakeId)));
       } else {
         List<CatalogEntity> catalogEntities =
             CatalogMetaService.getInstance()
@@ -369,7 +379,15 @@ public class MetalakeMetaService {
                       if (roleSchemaId != null) {
                         mapper.softDeleteSchemaMetasBySchemaId(roleSchemaId);
                       }
-                    }));
+                    }),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    TagMetaMapper.class,
+                    mapper -> mapper.softDeleteTagMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    TagMetadataObjectRelMapper.class,
+                    mapper -> mapper.softDeleteTagMetadataObjectRelsByMetalakeId(metalakeId)));
       }
     }
     return true;

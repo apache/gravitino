@@ -25,7 +25,7 @@ import com.google.common.collect.Lists;
 import java.util.List;
 
 /**
- * Type converter belonging to gravitino.
+ * Type converter belonging to Apache Gravitino.
  *
  * <p>Referred from core/src/main/java/org/apache/iceberg/spark/SparkTypeVisitor.java
  */
@@ -34,7 +34,7 @@ public class ToIcebergTypeVisitor<T> {
   /**
    * Traverse the Gravitino data type and convert the fields into Iceberg fields.
    *
-   * @param type Gravitino a data type in a gravitino.
+   * @param type Gravitino a data type in a Gravitino.
    * @param visitor Visitor of Iceberg type
    * @param <T> Iceberg type
    * @return Iceberg type

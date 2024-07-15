@@ -107,7 +107,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
   /**
    * Load the table with specified identifier.
    *
-   * @param ident The identifier of the table to load, which should be a "schema.table" style.
+   * @param ident The identifier of the table to load, which should be "schema.table" format.
    * @return The {@link Table} with specified identifier.
    * @throws NoSuchTableException if the table with specified identifier does not exist.
    */
@@ -130,7 +130,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
   /**
    * Create a new table with specified identifier, columns, comment and properties.
    *
-   * @param ident The identifier of the table, which should be a "schema.table" style.
+   * @param ident The identifier of the table, which should be "schema.table" format.
    * @param columns The columns of the table.
    * @param comment The comment of the table.
    * @param properties The properties of the table.
@@ -181,7 +181,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
   /**
    * Alter the table with specified identifier by applying the changes.
    *
-   * @param ident The identifier of the table, which should be a "schema.table" style.
+   * @param ident The identifier of the table, which should be "schema.table" format.
    * @param changes Table changes to apply to the table.
    * @return The altered {@link Table}.
    * @throws NoSuchTableException if the table with specified identifier does not exist.
@@ -215,7 +215,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
   /**
    * Drop the table with specified identifier.
    *
-   * @param ident The identifier of the table, which should be a "schema.table" style.
+   * @param ident The identifier of the table, which should be "schema.table" format.
    * @return true if the table is dropped successfully, false if the table does not exist.
    */
   @Override
@@ -236,8 +236,8 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
   /**
    * Purge the table with specified identifier.
    *
-   * @param ident The identifier of the table, which should be a "schema.table" style.
-   * @return true if the table is purged successfully, false otherwise.
+   * @param ident The identifier of the table, which should be "schema.table" format.
+   * @return true if the table is purged successfully, false if the table does not exist.
    */
   @Override
   public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
@@ -246,21 +246,15 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
     Namespace fullNamespace = getTableFullNamespace(ident.namespace());
     Map<String, String> params = new HashMap<>();
     params.put("purge", "true");
-    try {
-      DropResponse resp =
-          restClient.delete(
-              formatTableRequestPath(fullNamespace) + "/" + RESTUtils.encodeString(ident.name()),
-              params,
-              DropResponse.class,
-              Collections.emptyMap(),
-              ErrorHandlers.tableErrorHandler());
-      resp.validate();
-      return resp.dropped();
-    } catch (UnsupportedOperationException e) {
-      throw e;
-    } catch (Exception e) {
-      return false;
-    }
+    DropResponse resp =
+        restClient.delete(
+            formatTableRequestPath(fullNamespace) + "/" + RESTUtils.encodeString(ident.name()),
+            params,
+            DropResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.tableErrorHandler());
+    resp.validate();
+    return resp.dropped();
   }
 
   @VisibleForTesting
@@ -277,7 +271,7 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
   /**
    * Check whether the namespace of a table is valid, which should be "schema".
    *
-   * @param namespace The namespace to check
+   * @param namespace The namespace to check.
    */
   static void checkTableNamespace(Namespace namespace) {
     Namespace.check(
@@ -287,9 +281,9 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
   }
 
   /**
-   * Check whether the NameIdentifier of a table is valid, which should be a "schema.table" style.
+   * Check whether the NameIdentifier of a table is valid.
    *
-   * @param ident The NameIdentifier to check
+   * @param ident The NameIdentifier to check, which should be "schema.table" format.
    */
   static void checkTableNameIdentifier(NameIdentifier ident) {
     NameIdentifier.check(ident != null, "NameIdentifier must not be null");
@@ -301,8 +295,8 @@ public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog
   /**
    * Get the full namespace of the table with the given table's short namespace (schema name).
    *
-   * @param tableNamespace The table's short namespace (schema name).
-   * @return full namespace of the table (metalake.catalog.schema).
+   * @param tableNamespace The table's short namespace, which is the schema name.
+   * @return full namespace of the table, which is "metalake.catalog.schema" format.
    */
   private Namespace getTableFullNamespace(Namespace tableNamespace) {
     return Namespace.of(this.catalogNamespace().level(0), this.name(), tableNamespace.level(0));

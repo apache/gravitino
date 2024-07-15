@@ -32,7 +32,7 @@ import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.schema.Schema;
 import org.apache.paimon.table.Table;
 
-/** Table operation proxy that handles table operations of an underlying Paimon catalog. */
+/** Table operation proxy that handles table operations of an underlying Apache Paimon catalog. */
 public class PaimonCatalogOps implements AutoCloseable {
 
   protected Catalog catalog;
@@ -74,9 +74,9 @@ public class PaimonCatalogOps implements AutoCloseable {
     return catalog.getTable(tableIdentifier(tableName));
   }
 
-  public void createTable(String tablename, Schema schema)
+  public void createTable(String tableName, Schema schema)
       throws Catalog.TableAlreadyExistException, DatabaseNotExistException {
-    catalog.createTable(tableIdentifier(tablename), schema, false);
+    catalog.createTable(tableIdentifier(tableName), schema, false);
   }
 
   public void dropTable(String tableName) throws TableNotExistException {

@@ -50,6 +50,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
@@ -57,7 +58,7 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 
-/** Table operations for Doris. */
+/** Table operations for Apache Doris. */
 public class DorisTableOperations extends JdbcTableOperations {
   private static final String BACK_QUOTE = "`";
   private static final String DORIS_AUTO_INCREMENT = "AUTO_INCREMENT";
@@ -174,12 +175,14 @@ public class DorisTableOperations extends JdbcTableOperations {
       // Check if the distribution column exists
       Arrays.stream(distribution.expressions())
           .forEach(
-              expression -> {
-                Preconditions.checkArgument(
-                    Arrays.stream(columns)
-                        .anyMatch(column -> column.name().equalsIgnoreCase(expression.toString())),
-                    "Distribution column " + expression + " does not exist in the table columns");
-              });
+              expression ->
+                  Preconditions.checkArgument(
+                      Arrays.stream(columns)
+                          .anyMatch(
+                              column -> column.name().equalsIgnoreCase(expression.toString())),
+                      "Distribution column "
+                          + expression
+                          + " does not exist in the table columns"));
     }
   }
 
@@ -305,6 +308,22 @@ public class DorisTableOperations extends JdbcTableOperations {
       return indexes;
     } catch (SQLException e) {
       throw exceptionMapper.toGravitinoException(e);
+    }
+  }
+
+  @Override
+  protected Transform[] getTablePartitioning(
+      Connection connection, String databaseName, String tableName) throws SQLException {
+    String showCreateTableSql = String.format("SHOW CREATE TABLE `%s`", tableName);
+    try (Statement statement = connection.createStatement();
+        ResultSet result = statement.executeQuery(showCreateTableSql)) {
+      StringBuilder createTableSql = new StringBuilder();
+      if (result.next()) {
+        createTableSql.append(result.getString("Create Table"));
+      }
+      Optional<Transform> transform =
+          DorisUtils.extractPartitionInfoFromSql(createTableSql.toString());
+      return transform.map(t -> new Transform[] {t}).orElse(Transforms.EMPTY_TRANSFORM);
     }
   }
 
@@ -468,7 +487,7 @@ public class DorisTableOperations extends JdbcTableOperations {
     if (null != updateComment) {
       String newComment = updateComment.getNewComment();
       if (null == StringIdentifier.fromComment(newComment)) {
-        // Detect and add gravitino id.
+        // Detect and add Gravitino id.
         JdbcTable jdbcTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         StringIdentifier identifier = StringIdentifier.fromComment(jdbcTable.comment());
         if (null != identifier) {

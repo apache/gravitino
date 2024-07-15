@@ -71,7 +71,7 @@ import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Operations for interacting with the Iceberg catalog in Gravitino. */
+/** Operations for interacting with an Apache Iceberg catalog in Apache Gravitino. */
 public class IcebergCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
 
   private static final String ICEBERG_TABLE_DOES_NOT_EXIST_MSG = "Iceberg table does not exist: %s";
@@ -547,6 +547,8 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
     } catch (org.apache.iceberg.exceptions.NoSuchTableException e) {
       LOG.warn("Iceberg table {} does not exist", tableIdent.name());
       return false;
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     }
   }
 

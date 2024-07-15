@@ -27,8 +27,8 @@ import java.util.Optional;
 import lombok.ToString;
 
 /**
- * Implementation of {@link Schema} that represents a Paimon Schema (Database) entity in the Paimon
- * schema.
+ * Implementation of {@link Schema} that represents an Apache Paimon Schema (Database) entity in the
+ * Paimon schema.
  */
 @ToString
 public class PaimonSchema extends BaseSchema {

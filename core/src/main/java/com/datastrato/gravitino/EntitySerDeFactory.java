@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
 /**
  * This class is responsible for creating instances of EntitySerDe implementations. EntitySerDe
  * (Entity Serialization/Deserialization) implementations are used to serialize and deserialize
- * entities within the Gravitino framework.
+ * entities within the Apache Gravitino framework.
  */
 public class EntitySerDeFactory {
 

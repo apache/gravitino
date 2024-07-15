@@ -21,9 +21,9 @@ package com.datastrato.gravitino.connector;
 import com.datastrato.gravitino.rel.types.Type;
 
 /**
- * The interface for converting data types between Gravitino and catalogs. In most cases, the ToType
- * and FromType are the same. But in some cases, such as converting between Gravitino and JDBC
- * types, the ToType is String and the FromType is JdbcTypeBean.
+ * The interface for converting data types between Apache Gravitino and catalogs. In most cases, the
+ * ToType and FromType are the same. But in some cases, such as converting between Gravitino and
+ * JDBC types, the ToType is String and the FromType is JdbcTypeBean.
  *
  * @param <ToType> The Gravitino type will be converted to.
  * @param <FromType> The type will be converted to Gravitino type.

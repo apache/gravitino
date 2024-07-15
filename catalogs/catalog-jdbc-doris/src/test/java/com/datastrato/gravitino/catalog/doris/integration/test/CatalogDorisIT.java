@@ -247,7 +247,7 @@ public class CatalogDorisIT extends AbstractIT {
         .createTable(
             NameIdentifier.of(schemaName, tableName),
             createColumns(),
-            "Created by gravitino client",
+            "Created by Gravitino client",
             createTableProperties(),
             Transforms.EMPTY_TRANSFORM,
             createDistribution(),
@@ -360,12 +360,24 @@ public class CatalogDorisIT extends AbstractIT {
             indexes);
 
     ITUtils.assertionsTableInfo(
-        tableName, table_comment, Arrays.asList(columns), properties, indexes, createdTable);
+        tableName,
+        table_comment,
+        Arrays.asList(columns),
+        properties,
+        indexes,
+        Transforms.EMPTY_TRANSFORM,
+        createdTable);
 
     // load table
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
     ITUtils.assertionsTableInfo(
-        tableName, table_comment, Arrays.asList(columns), properties, indexes, loadTable);
+        tableName,
+        table_comment,
+        Arrays.asList(columns),
+        properties,
+        indexes,
+        Transforms.EMPTY_TRANSFORM,
+        loadTable);
 
     // rename table
     String newTableName = GravitinoITUtils.genRandomName("new_table_name");
@@ -373,7 +385,13 @@ public class CatalogDorisIT extends AbstractIT {
     NameIdentifier newTableIdentifier = NameIdentifier.of(schemaName, newTableName);
     Table renamedTable = tableCatalog.loadTable(newTableIdentifier);
     ITUtils.assertionsTableInfo(
-        newTableName, table_comment, Arrays.asList(columns), properties, indexes, renamedTable);
+        newTableName,
+        table_comment,
+        Arrays.asList(columns),
+        properties,
+        indexes,
+        Transforms.EMPTY_TRANSFORM,
+        renamedTable);
   }
 
   @Test
@@ -515,7 +533,13 @@ public class CatalogDorisIT extends AbstractIT {
             indexes);
 
     ITUtils.assertionsTableInfo(
-        tableName, table_comment, Arrays.asList(columns), properties, indexes, createdTable);
+        tableName,
+        table_comment,
+        Arrays.asList(columns),
+        properties,
+        indexes,
+        Transforms.EMPTY_TRANSFORM,
+        createdTable);
 
     // Alter column type
     tableCatalog.alterTable(

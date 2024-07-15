@@ -23,7 +23,7 @@ import java.util.Map;
 import org.apache.flink.configuration.Configuration;
 
 /**
- * PropertiesConverter is used to convert properties between Flink properties and Gravitino
+ * PropertiesConverter is used to convert properties between Flink properties and Apache Gravitino
  * properties
  */
 public interface PropertiesConverter {
@@ -69,5 +69,25 @@ public interface PropertiesConverter {
    */
   default Map<String, String> toFlinkDatabaseProperties(Map<String, String> gravitinoProperties) {
     return gravitinoProperties;
+  }
+
+  /**
+   * Converts properties from Gravitino table properties to Flink connector table properties.
+   *
+   * @param gravitinoProperties The table properties provided by Gravitino.
+   * @return The table properties for the Flink connector.
+   */
+  default Map<String, String> toFlinkTableProperties(Map<String, String> gravitinoProperties) {
+    return gravitinoProperties;
+  }
+
+  /**
+   * Converts properties from Flink connector table properties to Gravitino table properties.
+   *
+   * @param flinkProperties The table properties provided by Flink.
+   * @return The table properties for the Gravitino.
+   */
+  default Map<String, String> toGravitinoTableProperties(Map<String, String> flinkProperties) {
+    return flinkProperties;
   }
 }

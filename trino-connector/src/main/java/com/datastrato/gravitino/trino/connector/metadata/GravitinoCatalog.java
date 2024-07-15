@@ -31,7 +31,7 @@ import java.time.Instant;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 
-/** Help Gravitino connector access CatalogMetadata from gravitino client. */
+/** Help Apache Gravitino connector access CatalogMetadata from Gravitino client. */
 public class GravitinoCatalog {
 
   private static ObjectMapper objectMapper = new ObjectMapper();

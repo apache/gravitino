@@ -26,7 +26,7 @@ import com.datastrato.gravitino.trino.connector.util.GeneralDataTypeTransformer;
 import io.trino.spi.TrinoException;
 import io.trino.spi.type.VarcharType;
 
-/** Type transformer between Hive and Trino */
+/** Type transformer between Apache Hive and Trino */
 public class HiveDataTypeTransformer extends GeneralDataTypeTransformer {
   // Max length of Hive varchar is 65535
   private static final int HIVE_VARCHAR_MAX_LENGTH = 65535;

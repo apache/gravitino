@@ -35,6 +35,7 @@ import com.datastrato.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
 import com.datastrato.gravitino.rel.expressions.literals.Literals;
 import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.rel.indexes.Indexes;
 import com.google.common.collect.Lists;
@@ -199,11 +200,15 @@ public abstract class JdbcTableOperations implements TableOperation {
       List<Index> indexes = getIndexes(connection, databaseName, tableName);
       jdbcTableBuilder.withIndexes(indexes.toArray(new Index[0]));
 
-      // 4.Get table properties
+      // 4.Get partitioning
+      Transform[] tablePartitioning = getTablePartitioning(connection, databaseName, tableName);
+      jdbcTableBuilder.withPartitioning(tablePartitioning);
+
+      // 5.Get table properties
       Map<String, String> tableProperties = getTableProperties(connection, tableName);
       jdbcTableBuilder.withProperties(tableProperties);
 
-      // 5.Leave the information to the bottom layer to append the table
+      // 6.Leave the information to the bottom layer to append the table
       correctJdbcTableFields(connection, databaseName, tableName, jdbcTableBuilder);
       return jdbcTableBuilder.build();
     } catch (SQLException e) {
@@ -223,6 +228,11 @@ public abstract class JdbcTableOperations implements TableOperation {
   protected Map<String, String> getTableProperties(Connection connection, String tableName)
       throws SQLException {
     return Collections.emptyMap();
+  }
+
+  protected Transform[] getTablePartitioning(
+      Connection connection, String databaseName, String tableName) throws SQLException {
+    return Transforms.EMPTY_TRANSFORM;
   }
 
   protected boolean getAutoIncrementInfo(ResultSet resultSet) throws SQLException {
@@ -266,7 +276,16 @@ public abstract class JdbcTableOperations implements TableOperation {
   }
 
   @Override
-  public void purge(String databaseName, String tableName) throws NoSuchTableException {
+  public boolean purge(String databaseName, String tableName) {
+    try {
+      purgeTable(databaseName, tableName);
+    } catch (NoSuchTableException | NoSuchSchemaException e) {
+      return false;
+    }
+    return true;
+  }
+
+  protected void purgeTable(String databaseName, String tableName) {
     LOG.info("Attempting to purge table {} from database {}", tableName, databaseName);
     try (Connection connection = getConnection(databaseName)) {
       JdbcConnectorUtils.executeUpdate(connection, generatePurgeTableSql(tableName));

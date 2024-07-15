@@ -48,7 +48,7 @@
 
 ### Schema Entities
 
-The schema system in Gravitino is organized like below:
+The schema system in Apache Gravitino is organized like below:
 
 ![Schema System](schema-overview.png)
 

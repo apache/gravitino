@@ -37,7 +37,7 @@ import java.util.Map;
  * AccessControlManager is used for manage users, roles, admin, grant information, this class is an
  * entrance class for tenant management. This lock policy about this is as follows: First, admin
  * operations are prevented by one lock. Then, other operations are prevented by the other lock. For
- * non-admin operations, Gravitino doesn't choose metalake level lock. There are some reasons
+ * non-admin operations, Apache Gravitino doesn't choose metalake level lock. There are some reasons
  * mainly: First, the metalake can be renamed by users. It's hard to maintain a map with metalake as
  * the key. Second, the lock will be couped with life cycle of the metalake.
  */
@@ -53,7 +53,7 @@ public class AccessControlManager {
   public AccessControlManager(EntityStore store, IdGenerator idGenerator, Config config) {
     this.adminManager = new AdminManager(store, idGenerator, config);
     this.roleManager = new RoleManager(store, idGenerator, config);
-    this.userGroupManager = new UserGroupManager(store, idGenerator, roleManager);
+    this.userGroupManager = new UserGroupManager(store, idGenerator);
     this.permissionManager = new PermissionManager(store, roleManager);
   }
 

@@ -25,7 +25,7 @@ import com.datastrato.gravitino.rel.TableCatalog;
 import java.util.Map;
 
 /**
- * The interface of a catalog. The catalog is the second level entity in the gravitino system,
+ * The interface of a catalog. The catalog is the second level entity in the Gravitino system,
  * containing a set of tables. The server side should use the other one with the same name in the
  * core module.
  */
@@ -87,6 +87,12 @@ public interface Catalog extends Auditable {
    * should be the region code of the cloud provider.
    */
   String CLOUD_REGION_CODE = "cloud.region-code";
+
+  /**
+   * This variable is used as a key in properties of catalogs to use authorization provider in
+   * Gravitino.
+   */
+  String AUTHORIZATION_PROVIDER = "authorization-provider";
 
   /** @return The name of the catalog. */
   String name();

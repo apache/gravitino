@@ -35,7 +35,7 @@ import java.util.Set;
 
 /**
  * The {@link ClassProvider} class serves as a container for the necessary classes used by the
- * Gravitino query engine, with a primary focus on classes related to property metadata.
+ * Apache Gravitino query engine, with a primary focus on classes related to property metadata.
  *
  * <p>Purpose of this module and class:
  *

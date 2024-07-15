@@ -18,7 +18,7 @@
 #
 
 FROM ubuntu:16.04
-LABEL maintainer="support@datastrato.com"
+LABEL maintainer="dev@gravitino.apache.org"
 
 ARG HADOOP_PACKAGE_NAME
 ARG HIVE_PACKAGE_NAME

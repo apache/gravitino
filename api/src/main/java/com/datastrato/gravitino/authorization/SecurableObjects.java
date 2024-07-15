@@ -40,7 +40,7 @@ public class SecurableObjects {
    * @return The created metalake {@link SecurableObject}
    */
   public static SecurableObject ofMetalake(String metalake, List<Privilege> privileges) {
-    return of(SecurableObject.Type.METALAKE, Lists.newArrayList(metalake), privileges);
+    return of(MetadataObject.Type.METALAKE, Lists.newArrayList(metalake), privileges);
   }
 
   /**
@@ -51,7 +51,7 @@ public class SecurableObjects {
    * @return The created catalog {@link SecurableObject}
    */
   public static SecurableObject ofCatalog(String catalog, List<Privilege> privileges) {
-    return of(SecurableObject.Type.CATALOG, Lists.newArrayList(catalog), privileges);
+    return of(MetadataObject.Type.CATALOG, Lists.newArrayList(catalog), privileges);
   }
 
   /**
@@ -66,7 +66,7 @@ public class SecurableObjects {
   public static SecurableObject ofSchema(
       SecurableObject catalog, String schema, List<Privilege> privileges) {
     return of(
-        SecurableObject.Type.SCHEMA, Lists.newArrayList(catalog.fullName(), schema), privileges);
+        MetadataObject.Type.SCHEMA, Lists.newArrayList(catalog.fullName(), schema), privileges);
   }
 
   /**
@@ -81,7 +81,7 @@ public class SecurableObjects {
       SecurableObject schema, String table, List<Privilege> privileges) {
     List<String> names = Lists.newArrayList(DOT_SPLITTER.splitToList(schema.fullName()));
     names.add(table);
-    return of(SecurableObject.Type.TABLE, names, privileges);
+    return of(MetadataObject.Type.TABLE, names, privileges);
   }
 
   /**
@@ -96,7 +96,7 @@ public class SecurableObjects {
       SecurableObject schema, String topic, List<Privilege> privileges) {
     List<String> names = Lists.newArrayList(DOT_SPLITTER.splitToList(schema.fullName()));
     names.add(topic);
-    return of(SecurableObject.Type.TOPIC, names, privileges);
+    return of(MetadataObject.Type.TOPIC, names, privileges);
   }
 
   /**
@@ -112,7 +112,7 @@ public class SecurableObjects {
       SecurableObject schema, String fileset, List<Privilege> privileges) {
     List<String> names = Lists.newArrayList(DOT_SPLITTER.splitToList(schema.fullName()));
     names.add(fileset);
-    return of(SecurableObject.Type.FILESET, names, privileges);
+    return of(MetadataObject.Type.FILESET, names, privileges);
   }
 
   /**
@@ -125,7 +125,7 @@ public class SecurableObjects {
    * @return The created {@link SecurableObject}
    */
   public static SecurableObject ofAllMetalakes(List<Privilege> privileges) {
-    return new SecurableObjectImpl(null, "*", SecurableObject.Type.METALAKE, privileges);
+    return new SecurableObjectImpl(null, "*", MetadataObject.Type.METALAKE, privileges);
   }
 
   private static class SecurableObjectImpl extends MetadataObjects.MetadataObjectImpl

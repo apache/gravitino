@@ -530,6 +530,35 @@ public class HadoopCatalogIT extends AbstractIT {
   }
 
   @Test
+  public void testFilesetRemoveComment() throws IOException {
+    // create fileset
+    String filesetName = "test_remove_fileset_comment";
+    String storageLocation = storageLocation(filesetName);
+
+    createFileset(
+        filesetName, "comment", Fileset.Type.MANAGED, storageLocation, ImmutableMap.of("k1", "v1"));
+    assertFilesetExists(filesetName);
+
+    // remove fileset comment
+    Fileset newFileset =
+        catalog
+            .asFilesetCatalog()
+            .alterFileset(
+                NameIdentifier.of(schemaName, filesetName), FilesetChange.removeComment());
+    assertFilesetExists(filesetName);
+
+    // verify fileset is updated
+    Assertions.assertNotNull(newFileset, "fileset should be created");
+    Assertions.assertNull(newFileset.comment(), "comment should be removed");
+    Assertions.assertEquals(Fileset.Type.MANAGED, newFileset.type(), "type should not be changed");
+    Assertions.assertEquals(
+        storageLocation, newFileset.storageLocation(), "storage location should not be changed");
+    Assertions.assertEquals(1, newFileset.properties().size(), "properties should not be changed");
+    Assertions.assertEquals(
+        "v1", newFileset.properties().get("k1"), "properties should not be changed");
+  }
+
+  @Test
   public void testDropCatalogWithEmptySchema() {
     String catalogName =
         GravitinoITUtils.genRandomName("test_drop_catalog_with_empty_schema_catalog");

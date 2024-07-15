@@ -69,7 +69,7 @@ public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
                 FORMAT_VERSION, "The Iceberg table format version, ", false, null, false, false),
             stringImmutablePropertyEntry(
                 PROVIDER,
-                "Iceberg provider for Iceberg table fileFormat, such as parquet, orc, avro, iceberg",
+                "Iceberg provider for Iceberg table fileFormat, such as Parquet, Orc, Avro, or Iceberg",
                 false,
                 null,
                 false,

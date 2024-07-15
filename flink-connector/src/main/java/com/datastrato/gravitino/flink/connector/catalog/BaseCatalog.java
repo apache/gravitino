@@ -20,19 +20,30 @@
 package com.datastrato.gravitino.flink.connector.catalog;
 
 import com.datastrato.gravitino.Catalog;
+import com.datastrato.gravitino.NameIdentifier;
+import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.SchemaChange;
 import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
 import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
+import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
+import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.flink.connector.PropertiesConverter;
+import com.datastrato.gravitino.flink.connector.utils.TypeUtils;
+import com.datastrato.gravitino.rel.Column;
+import com.datastrato.gravitino.rel.Table;
+import com.datastrato.gravitino.rel.TableChange;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.MapDifference;
 import com.google.common.collect.Maps;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.commons.compress.utils.Lists;
 import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.CatalogBaseTable;
@@ -41,7 +52,9 @@ import org.apache.flink.table.catalog.CatalogDatabaseImpl;
 import org.apache.flink.table.catalog.CatalogFunction;
 import org.apache.flink.table.catalog.CatalogPartition;
 import org.apache.flink.table.catalog.CatalogPartitionSpec;
+import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.ObjectPath;
+import org.apache.flink.table.catalog.ResolvedCatalogBaseTable;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.exceptions.DatabaseAlreadyExistException;
 import org.apache.flink.table.catalog.exceptions.DatabaseNotEmptyException;
@@ -58,6 +71,7 @@ import org.apache.flink.table.catalog.exceptions.TablePartitionedException;
 import org.apache.flink.table.catalog.stats.CatalogColumnStatistics;
 import org.apache.flink.table.catalog.stats.CatalogTableStatistics;
 import org.apache.flink.table.expressions.Expression;
+import org.apache.flink.table.types.DataType;
 
 /**
  * The BaseCatalog that provides a default implementation for all methods in the {@link
@@ -149,8 +163,17 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   @Override
-  public List<String> listTables(String s) throws DatabaseNotExistException, CatalogException {
-    throw new UnsupportedOperationException();
+  public List<String> listTables(String databaseName)
+      throws DatabaseNotExistException, CatalogException {
+    try {
+      return Stream.of(catalog().asTableCatalog().listTables(Namespace.of(databaseName)))
+          .map(NameIdentifier::name)
+          .collect(Collectors.toList());
+    } catch (NoSuchSchemaException e) {
+      throw new DatabaseNotExistException(catalogName(), databaseName, e);
+    } catch (Exception e) {
+      throw new CatalogException(e);
+    }
   }
 
   @Override
@@ -159,32 +182,95 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   @Override
-  public CatalogBaseTable getTable(ObjectPath objectPath)
+  public CatalogBaseTable getTable(ObjectPath tablePath)
       throws TableNotExistException, CatalogException {
-    throw new UnsupportedOperationException();
+    try {
+      Table table =
+          catalog()
+              .asTableCatalog()
+              .loadTable(NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName()));
+      return toFlinkTable(table);
+    } catch (NoSuchTableException e) {
+      throw new TableNotExistException(catalogName(), tablePath, e);
+    } catch (Exception e) {
+      throw new CatalogException(e);
+    }
   }
 
   @Override
-  public boolean tableExists(ObjectPath objectPath) throws CatalogException {
-    throw new UnsupportedOperationException();
+  public boolean tableExists(ObjectPath tablePath) throws CatalogException {
+    try {
+      return catalog()
+          .asTableCatalog()
+          .tableExists(NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName()));
+    } catch (Exception e) {
+      throw new CatalogException(e);
+    }
   }
 
   @Override
-  public void dropTable(ObjectPath objectPath, boolean b)
+  public void dropTable(ObjectPath tablePath, boolean ignoreIfNotExists)
       throws TableNotExistException, CatalogException {
-    throw new UnsupportedOperationException();
+    boolean dropped =
+        catalog()
+            .asTableCatalog()
+            .dropTable(NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName()));
+    if (!dropped && !ignoreIfNotExists) {
+      throw new TableNotExistException(catalogName(), tablePath);
+    }
   }
 
   @Override
-  public void renameTable(ObjectPath objectPath, String s, boolean b)
+  public void renameTable(ObjectPath tablePath, String newTableName, boolean ignoreIfNotExists)
       throws TableNotExistException, TableAlreadyExistException, CatalogException {
-    throw new UnsupportedOperationException();
+    NameIdentifier identifier =
+        NameIdentifier.of(Namespace.of(tablePath.getDatabaseName()), newTableName);
+
+    if (catalog().asTableCatalog().tableExists(identifier)) {
+      throw new TableAlreadyExistException(
+          catalogName(), ObjectPath.fromString(tablePath.getDatabaseName() + newTableName));
+    }
+
+    try {
+      catalog()
+          .asTableCatalog()
+          .alterTable(
+              NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName()),
+              TableChange.rename(newTableName));
+    } catch (NoSuchTableException e) {
+      if (!ignoreIfNotExists) {
+        throw new TableNotExistException(catalogName(), tablePath, e);
+      }
+    } catch (Exception e) {
+      throw new CatalogException(e);
+    }
   }
 
   @Override
-  public void createTable(ObjectPath objectPath, CatalogBaseTable catalogBaseTable, boolean b)
+  public void createTable(ObjectPath tablePath, CatalogBaseTable table, boolean ignoreIfExists)
       throws TableAlreadyExistException, DatabaseNotExistException, CatalogException {
-    throw new UnsupportedOperationException();
+    NameIdentifier identifier =
+        NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName());
+
+    ResolvedCatalogBaseTable<?> resolvedTable = (ResolvedCatalogBaseTable<?>) table;
+    Column[] columns =
+        resolvedTable.getResolvedSchema().getColumns().stream()
+            .map(this::toGravitinoColumn)
+            .toArray(Column[]::new);
+    String comment = table.getComment();
+    Map<String, String> properties =
+        propertiesConverter.toGravitinoTableProperties(table.getOptions());
+    try {
+      catalog().asTableCatalog().createTable(identifier, columns, comment, properties);
+    } catch (NoSuchSchemaException e) {
+      throw new DatabaseNotExistException(catalogName(), tablePath.getDatabaseName(), e);
+    } catch (TableAlreadyExistsException e) {
+      if (!ignoreIfExists) {
+        throw new TableAlreadyExistException(catalogName(), tablePath, e);
+      }
+    } catch (Exception e) {
+      throw new CatalogException(e);
+    }
   }
 
   @Override
@@ -350,6 +436,31 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   protected abstract PropertiesConverter getPropertiesConverter();
+
+  protected CatalogBaseTable toFlinkTable(Table table) {
+    org.apache.flink.table.api.Schema.Builder builder =
+        org.apache.flink.table.api.Schema.newBuilder();
+    for (Column column : table.columns()) {
+      DataType flinkType = TypeUtils.toFlinkType(column.dataType());
+      builder
+          .column(column.name(), column.nullable() ? flinkType.nullable() : flinkType.notNull())
+          .withComment(column.comment());
+    }
+    Map<String, String> flinkTableProperties =
+        propertiesConverter.toFlinkTableProperties(table.properties());
+    return CatalogTable.of(
+        builder.build(), table.comment(), ImmutableList.of(), flinkTableProperties);
+  }
+
+  private Column toGravitinoColumn(org.apache.flink.table.catalog.Column column) {
+    return Column.of(
+        column.getName(),
+        TypeUtils.toGravitinoType(column.getDataType().getLogicalType()),
+        column.getComment().orElse(null),
+        column.getDataType().getLogicalType().isNullable(),
+        false,
+        null);
+  }
 
   @VisibleForTesting
   static SchemaChange[] getSchemaChange(CatalogDatabase current, CatalogDatabase updated) {

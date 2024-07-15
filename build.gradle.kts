@@ -178,13 +178,12 @@ allprojects {
 
       // Change poll image pause time from 30s to 60s
       param.environment("TESTCONTAINERS_PULL_PAUSE_TIMEOUT", "60")
-      if (project.hasProperty("jdbcBackend")) {
-        param.environment("jdbcBackend", "true")
-      }
+      val jdbcDatabase = project.properties["jdbcBackend"] as? String ?: "h2"
+      param.environment("jdbcBackend", jdbcDatabase)
 
       val testMode = project.properties["testMode"] as? String ?: "embedded"
-      param.systemProperty("gravitino.log.path", project.buildDir.path + "/${project.name}-integration-test.log")
-      project.delete(project.buildDir.path + "/${project.name}-integration-test.log")
+      param.systemProperty("gravitino.log.path", "build/${project.name}-integration-test.log")
+      project.delete("build/${project.name}-integration-test.log")
       if (testMode == "deploy") {
         param.environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package")
         param.systemProperty("testMode", "deploy")
@@ -373,7 +372,7 @@ subprojects {
         pom {
           name.set("Gravitino")
           description.set("Gravitino is a high-performance, geo-distributed and federated metadata lake.")
-          url.set("https://datastrato.ai")
+          url.set("https://gravitino.apache.org")
           licenses {
             license {
               name.set("The Apache Software License, Version 2.0")
@@ -382,14 +381,14 @@ subprojects {
           }
           developers {
             developer {
-              id.set("The maintainers of Gravitino")
+              id.set("The Gravitino community")
               name.set("support")
-              email.set("support@datastrato.com")
+              email.set("dev@gravitino.apache.org")
             }
           }
           scm {
-            url.set("https://github.com/datastrato/gravitino")
-            connection.set("scm:git:git://github.com/datastrato/gravitino.git")
+            url.set("https://github.com/apache/gravitino")
+            connection.set("scm:git:git://github.com/apache/gravitino.git")
           }
         }
       }
@@ -484,8 +483,11 @@ tasks.rat {
     "web/src/lib/icons/svg/**/*.svg",
     "**/LICENSE.*",
     "**/NOTICE.*",
+    "DISCLAIMER_WIP.txt",
+    "DISCLAIMER.txt",
     "ROADMAP.md",
     "clients/client-python/.pytest_cache/*",
+    "clients/client-python/.venv/*",
     "clients/client-python/gravitino.egg-info/*",
     "clients/client-python/gravitino/utils/exceptions.py",
     "clients/client-python/gravitino/utils/http_client.py"
@@ -708,7 +710,7 @@ fun printDockerCheckInfo() {
   if (dockerTest) {
     println("Using Docker container to run all tests. [$testMode test]")
   } else {
-    println("Run test cases without `gravitino-docker-test` tag ................ [$testMode test]")
+    println("Run test cases without `gravitino-docker-test` tag .............. [$testMode test]")
   }
   println("-----------------------------------------------------------------")
 

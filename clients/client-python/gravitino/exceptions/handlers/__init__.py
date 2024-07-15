@@ -16,13 +16,3 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 """
-
-
-class IllegalNameIdentifierException(Exception):
-    """An exception thrown when a name identifier is invalid."""
-
-    def __init__(self, message=None):
-        if message:
-            super().__init__(message)
-        else:
-            super().__init__()

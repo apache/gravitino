@@ -73,11 +73,11 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Operations for interacting with the Jdbc catalog in Gravitino. */
+/** Operations for interacting with the Jdbc catalog in Apache Gravitino. */
 public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
 
   private static final String GRAVITINO_ATTRIBUTE_DOES_NOT_EXIST_MSG =
-      "The gravitino id attribute does not exist in properties";
+      "The Gravitino id attribute does not exist in properties";
 
   public static final Logger LOG = LoggerFactory.getLogger(JdbcCatalogOperations.class);
 
@@ -223,7 +223,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     String comment = load.comment();
     StringIdentifier id = StringIdentifier.fromComment(comment);
     if (id == null) {
-      LOG.warn("The comment {} does not contain gravitino id attribute", comment);
+      LOG.warn("The comment {} does not contain Gravitino id attribute", comment);
       return load;
     }
     Map<String, String> properties =
@@ -298,7 +298,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     StringIdentifier id = StringIdentifier.fromComment(comment);
     if (id == null) {
       LOG.warn(
-          "The table {} comment {} does not contain gravitino id attribute", tableName, comment);
+          "The table {} comment {} does not contain Gravitino id attribute", tableName, comment);
     } else {
       properties = StringIdentifier.newPropertiesWithId(id, properties);
       // Remove id from comment
@@ -312,6 +312,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         .withComment(comment)
         .withProperties(properties)
         .withIndexes(load.index())
+        .withPartitioning(load.partitioning())
         .build();
   }
 
@@ -442,8 +443,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public boolean purgeTable(NameIdentifier tableIdent) throws UnsupportedOperationException {
     String databaseName = NameIdentifier.of(tableIdent.namespace().levels()).name();
-    tableOperation.purge(databaseName, tableIdent.name());
-    return true;
+    return tableOperation.purge(databaseName, tableIdent.name());
   }
 
   /**
