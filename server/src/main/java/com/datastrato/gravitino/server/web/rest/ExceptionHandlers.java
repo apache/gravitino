@@ -29,6 +29,7 @@ import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
+import com.datastrato.gravitino.exceptions.TagAlreadyAssociatedException;
 import com.datastrato.gravitino.exceptions.TagAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.TopicAlreadyExistsException;
 import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
@@ -518,6 +519,9 @@ public class ExceptionHandlers {
         return Utils.notFound(errorMsg, e);
 
       } else if (e instanceof TagAlreadyExistsException) {
+        return Utils.alreadyExists(errorMsg, e);
+
+      } else if (e instanceof TagAlreadyAssociatedException) {
         return Utils.alreadyExists(errorMsg, e);
 
       } else {

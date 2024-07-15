@@ -313,8 +313,6 @@ public class TagManager {
             .map(tag -> ofTagIdent(metalake, tag))
             .toArray(NameIdentifier[]::new);
 
-    // TODO. We need to add a write lock to Tag's namespace to avoid tag alteration and deletion
-    //  during the association operation.
     return TreeLockUtils.doWithTreeLock(
         entityIdent,
         LockType.READ,

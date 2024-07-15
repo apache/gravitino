@@ -27,9 +27,11 @@ import com.datastrato.gravitino.dto.requests.TagUpdateRequest;
 import com.datastrato.gravitino.dto.requests.TagUpdatesRequest;
 import com.datastrato.gravitino.dto.requests.TagsAssociateRequest;
 import com.datastrato.gravitino.dto.responses.DropResponse;
+import com.datastrato.gravitino.dto.responses.MetadataObjectListResponse;
 import com.datastrato.gravitino.dto.responses.NameListResponse;
 import com.datastrato.gravitino.dto.responses.TagListResponse;
 import com.datastrato.gravitino.dto.responses.TagResponse;
+import com.datastrato.gravitino.dto.tag.MetadataObjectDTO;
 import com.datastrato.gravitino.dto.tag.TagDTO;
 import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.exceptions.NoSuchTagException;
@@ -370,6 +372,38 @@ public class TagOperations {
 
     } catch (Exception e) {
       return ExceptionHandlers.handleTagException(OperationType.GET, tagName, fullName, e);
+    }
+  }
+
+  @GET
+  @Path("{tag}/objects")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "list-objects-for-tag." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-objects-for-tag", absolute = true)
+  public Response listMetadataObjectsForTag(
+      @PathParam("metalake") String metalake, @PathParam("tag") String tagName) {
+    LOG.info("Received list objects for tag: {} under metalake: {}", tagName, metalake);
+
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            MetadataObject[] objects = tagManager.listMetadataObjectsForTag(metalake, tagName);
+            objects = objects == null ? new MetadataObject[0] : objects;
+
+            LOG.info(
+                "List {} objects for tag: {} under metalake: {}",
+                objects.length,
+                tagName,
+                metalake);
+
+            MetadataObjectDTO[] objectDTOs =
+                Arrays.stream(objects).map(DTOConverters::toDTO).toArray(MetadataObjectDTO[]::new);
+            return Utils.ok(new MetadataObjectListResponse(objectDTOs));
+          });
+
+    } catch (Exception e) {
+      return ExceptionHandlers.handleTagException(OperationType.LIST, "", tagName, e);
     }
   }
 

@@ -32,11 +32,13 @@ import com.datastrato.gravitino.dto.requests.TagsAssociateRequest;
 import com.datastrato.gravitino.dto.responses.DropResponse;
 import com.datastrato.gravitino.dto.responses.ErrorConstants;
 import com.datastrato.gravitino.dto.responses.ErrorResponse;
+import com.datastrato.gravitino.dto.responses.MetadataObjectListResponse;
 import com.datastrato.gravitino.dto.responses.NameListResponse;
 import com.datastrato.gravitino.dto.responses.TagListResponse;
 import com.datastrato.gravitino.dto.responses.TagResponse;
 import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.exceptions.NoSuchTagException;
+import com.datastrato.gravitino.exceptions.TagAlreadyAssociatedException;
 import com.datastrato.gravitino.exceptions.TagAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.TagEntity;
@@ -1012,11 +1014,10 @@ public class TestTagOperations extends JerseyTest {
 
     Assertions.assertEquals(0, nameListResponse1.getNames().length);
 
-    // Test throw RuntimeException
-    doThrow(new RuntimeException("mock error"))
+    // Test throw TagAlreadyAssociatedException
+    doThrow(new TagAlreadyAssociatedException("mock error"))
         .when(tagManager)
-        .associateTagsForMetadataObject(any(), any(), any(), any());
-
+        .associateTagsForMetadataObject(metalake, catalog, tagsToAdd, tagsToRemove);
     Response response2 =
         target(tagPath(metalake))
             .path(catalog.type().toString())
@@ -1025,12 +1026,107 @@ public class TestTagOperations extends JerseyTest {
             .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
 
+    Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), response2.getStatus());
+
+    ErrorResponse errorResponse = response2.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ALREADY_EXISTS_CODE, errorResponse.getCode());
+    Assertions.assertEquals(
+        TagAlreadyAssociatedException.class.getSimpleName(), errorResponse.getType());
+
+    // Test throw RuntimeException
+    doThrow(new RuntimeException("mock error"))
+        .when(tagManager)
+        .associateTagsForMetadataObject(any(), any(), any(), any());
+
+    Response response3 =
+        target(tagPath(metalake))
+            .path(catalog.type().toString())
+            .path(catalog.fullName())
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response3.getStatus());
+
+    ErrorResponse errorResponse1 = response3.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse1.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse1.getType());
+  }
+
+  @Test
+  public void testListMetadataObjectForTag() {
+    MetadataObject[] objects =
+        new MetadataObject[] {
+          MetadataObjects.parse("object1", MetadataObject.Type.CATALOG),
+          MetadataObjects.parse("object1.object2", MetadataObject.Type.SCHEMA),
+          MetadataObjects.parse("object1.object2.object3", MetadataObject.Type.TABLE),
+          MetadataObjects.parse("object1.object2.object3.object4", MetadataObject.Type.COLUMN)
+        };
+
+    when(tagManager.listMetadataObjectsForTag(metalake, "tag1")).thenReturn(objects);
+
+    Response response =
+        target(tagPath(metalake))
+            .path("tag1")
+            .path("objects")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getMediaType());
+
+    MetadataObjectListResponse objectListResponse =
+        response.readEntity(MetadataObjectListResponse.class);
+    Assertions.assertEquals(0, objectListResponse.getCode());
+
+    MetadataObject[] respObjects = objectListResponse.getMetadataObjects();
+    Assertions.assertEquals(objects.length, respObjects.length);
+
+    for (int i = 0; i < objects.length; i++) {
+      Assertions.assertEquals(objects[i].type(), respObjects[i].type());
+      Assertions.assertEquals(objects[i].fullName(), respObjects[i].fullName());
+    }
+
+    // Test throw NoSuchTagException
+    doThrow(new NoSuchTagException("mock error"))
+        .when(tagManager)
+        .listMetadataObjectsForTag(metalake, "tag1");
+
+    Response response1 =
+        target(tagPath(metalake))
+            .path("tag1")
+            .path("objects")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response1.getStatus());
+
+    ErrorResponse errorResponse = response1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
+    Assertions.assertEquals(NoSuchTagException.class.getSimpleName(), errorResponse.getType());
+
+    // Test throw RuntimeException
+    doThrow(new RuntimeException("mock error"))
+        .when(tagManager)
+        .listMetadataObjectsForTag(any(), any());
+
+    Response response2 =
+        target(tagPath(metalake))
+            .path("tag1")
+            .path("objects")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
     Assertions.assertEquals(
         Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response2.getStatus());
 
-    ErrorResponse errorResponse = response2.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
-    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
+    ErrorResponse errorResponse1 = response2.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse1.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse1.getType());
   }
 
   private String tagPath(String metalake) {
