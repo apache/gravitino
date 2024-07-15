@@ -55,10 +55,10 @@ import java.util.stream.Collectors;
 import javax.sql.DataSource;
 
 public final class DorisTablePartitionOperations extends JdbcTablePartitionOperations {
-  private static final String RANGE_PARTITION_PATTERN_STRING =
+  private static final String PARTITION_TYPE_VALUE_PATTERN_STRING =
       "types: \\[([^\\]]+)\\]; keys: \\[([^\\]]+)\\];";
-  private static final Pattern RANGE_PARTITION_PATTERN =
-      Pattern.compile(RANGE_PARTITION_PATTERN_STRING);
+  private static final Pattern PARTITION_TYPE_VALUE_PATTERN =
+      Pattern.compile(PARTITION_TYPE_VALUE_PATTERN_STRING);
 
   private final JdbcExceptionConverter exceptionConverter;
   private final JdbcTypeConverter typeConverter;
@@ -245,7 +245,7 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
       Type partitionColumnType = columnTypes.get(partitionKeys[0]);
       Literal<?> lower = Literals.NULL;
       Literal<?> upper = Literals.NULL;
-      Matcher matcher = RANGE_PARTITION_PATTERN.matcher(partitionValues);
+      Matcher matcher = PARTITION_TYPE_VALUE_PATTERN.matcher(partitionValues);
       if (matcher.find()) {
         String lowerValue = matcher.group(2);
         lower = Literals.of(lowerValue, partitionColumnType);
@@ -256,7 +256,7 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
       }
       return Partitions.range(partitionName, upper, lower, properties);
     } else if (partitionInfo instanceof Transforms.ListTransform) {
-      Matcher matcher = RANGE_PARTITION_PATTERN.matcher(partitionValues);
+      Matcher matcher = PARTITION_TYPE_VALUE_PATTERN.matcher(partitionValues);
       ImmutableList.Builder<Literal<?>[]> lists = ImmutableList.builder();
       while (matcher.find()) {
         String[] values = matcher.group(2).split(", ");
