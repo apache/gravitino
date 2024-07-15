@@ -19,6 +19,9 @@
 
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
+import com.apache.gravitino.server.web.HttpServerMetricsSource;
+import com.apache.gravitino.server.web.JettyServer;
+import com.apache.gravitino.server.web.JettyServerConfig;
 import com.datastrato.gravitino.GravitinoEnv;
 import com.datastrato.gravitino.auxiliary.GravitinoAuxiliaryService;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOps;
@@ -27,9 +30,6 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.IcebergObjectMappe
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.metrics.IcebergMetricsManager;
 import com.datastrato.gravitino.metrics.MetricsSystem;
 import com.datastrato.gravitino.metrics.source.MetricsSource;
-import com.datastrato.gravitino.server.web.HttpServerMetricsSource;
-import com.datastrato.gravitino.server.web.JettyServer;
-import com.datastrato.gravitino.server.web.JettyServerConfig;
 import java.util.Map;
 import javax.servlet.Servlet;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;

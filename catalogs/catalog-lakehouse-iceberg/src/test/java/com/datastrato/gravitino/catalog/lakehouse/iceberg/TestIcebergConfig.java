@@ -19,7 +19,7 @@
 
 package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
-import com.datastrato.gravitino.server.web.JettyServerConfig;
+import com.apache.gravitino.server.web.JettyServerConfig;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;

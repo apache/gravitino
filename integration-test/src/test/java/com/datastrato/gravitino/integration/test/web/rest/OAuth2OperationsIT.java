@@ -20,11 +20,11 @@ package com.datastrato.gravitino.integration.test.web.rest;
 
 import com.apache.gravitino.auth.AuthenticatorType;
 import com.apache.gravitino.client.GravitinoVersion;
+import com.apache.gravitino.server.authentication.OAuthConfig;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.integration.test.util.OAuthMockDataProvider;
-import com.datastrato.gravitino.server.authentication.OAuthConfig;
 import com.google.common.collect.Maps;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;

@@ -18,11 +18,14 @@
  */
 package com.datastrato.gravitino.integration.test.util;
 
+import static com.apache.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
-import static com.datastrato.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
 import com.apache.gravitino.auth.AuthenticatorType;
 import com.apache.gravitino.client.GravitinoAdminClient;
+import com.apache.gravitino.server.GravitinoServer;
+import com.apache.gravitino.server.ServerConfig;
+import com.apache.gravitino.server.web.JettyServerConfig;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.config.ConfigConstants;
@@ -30,9 +33,6 @@ import com.datastrato.gravitino.integration.test.MiniGravitino;
 import com.datastrato.gravitino.integration.test.MiniGravitinoContext;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.MySQLContainer;
-import com.datastrato.gravitino.server.GravitinoServer;
-import com.datastrato.gravitino.server.ServerConfig;
-import com.datastrato.gravitino.server.web.JettyServerConfig;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

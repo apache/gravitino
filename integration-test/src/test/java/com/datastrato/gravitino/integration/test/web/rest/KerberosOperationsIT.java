@@ -19,8 +19,8 @@
 
 package com.datastrato.gravitino.integration.test.web.rest;
 
-import static com.datastrato.gravitino.server.authentication.KerberosConfig.KEYTAB;
-import static com.datastrato.gravitino.server.authentication.KerberosConfig.PRINCIPAL;
+import static com.apache.gravitino.server.authentication.KerberosConfig.KEYTAB;
+import static com.apache.gravitino.server.authentication.KerberosConfig.PRINCIPAL;
 import static org.apache.hadoop.minikdc.MiniKdc.MAX_TICKET_LIFETIME;
 
 import com.apache.gravitino.auth.AuthenticatorType;

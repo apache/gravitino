@@ -18,9 +18,9 @@
  */
 package com.datastrato.gravitino.catalog.hive.integration.test;
 
+import static com.apache.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.IMPERSONATION_ENABLE;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
-import static com.datastrato.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
 import com.apache.gravitino.Catalog;
 import com.apache.gravitino.NameIdentifier;
@@ -39,13 +39,13 @@ import com.apache.gravitino.rel.expressions.transforms.Transforms;
 import com.apache.gravitino.rel.partitions.Partition;
 import com.apache.gravitino.rel.partitions.Partitions;
 import com.apache.gravitino.rel.types.Types;
+import com.apache.gravitino.server.web.JettyServerConfig;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.catalog.hive.HiveClientPool;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
-import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.lang.reflect.Field;

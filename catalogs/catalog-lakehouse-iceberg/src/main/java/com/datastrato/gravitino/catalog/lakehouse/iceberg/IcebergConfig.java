@@ -26,13 +26,13 @@ import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogP
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.URI;
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.WAREHOUSE;
 
+import com.apache.gravitino.server.web.JettyServerConfig;
+import com.apache.gravitino.server.web.OverwriteDefaultConfig;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.web.metrics.IcebergMetricsManager;
 import com.datastrato.gravitino.config.ConfigBuilder;
 import com.datastrato.gravitino.config.ConfigConstants;
 import com.datastrato.gravitino.config.ConfigEntry;
-import com.datastrato.gravitino.server.web.JettyServerConfig;
-import com.datastrato.gravitino.server.web.OverwriteDefaultConfig;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import java.util.Optional;

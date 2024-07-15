@@ -23,11 +23,11 @@ import static com.datastrato.gravitino.spark.connector.iceberg.IcebergProperties
 
 import com.apache.gravitino.Catalog;
 import com.apache.gravitino.client.GravitinoMetalake;
+import com.apache.gravitino.server.web.JettyServerConfig;
 import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
-import com.datastrato.gravitino.server.web.JettyServerConfig;
 import com.datastrato.gravitino.spark.connector.GravitinoSparkConfig;
 import com.datastrato.gravitino.spark.connector.iceberg.IcebergPropertiesConstants;
 import com.datastrato.gravitino.spark.connector.integration.test.util.SparkUtilIT;

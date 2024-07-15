@@ -25,6 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockserver.model.HttpRequest.request;
 import static org.mockserver.model.HttpResponse.response;
 
+import com.apache.gravitino.server.authentication.OAuthConfig;
+import com.apache.gravitino.server.authentication.ServerAuthenticator;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.client.DefaultOAuth2TokenProvider;
 import com.datastrato.gravitino.client.ErrorHandlers;
@@ -37,8 +39,6 @@ import com.datastrato.gravitino.exceptions.RESTException;
 import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.rest.RESTUtils;
-import com.datastrato.gravitino.server.authentication.OAuthConfig;
-import com.datastrato.gravitino.server.authentication.ServerAuthenticator;
 import com.datastrato.gravitino.shaded.com.fasterxml.jackson.core.JsonProcessingException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;

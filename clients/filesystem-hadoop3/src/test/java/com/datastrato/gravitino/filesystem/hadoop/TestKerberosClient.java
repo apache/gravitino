@@ -18,13 +18,13 @@
  */
 package com.datastrato.gravitino.filesystem.hadoop;
 
-import static com.datastrato.gravitino.server.authentication.KerberosConfig.KEYTAB;
-import static com.datastrato.gravitino.server.authentication.KerberosConfig.PRINCIPAL;
+import static com.apache.gravitino.server.authentication.KerberosConfig.KEYTAB;
+import static com.apache.gravitino.server.authentication.KerberosConfig.PRINCIPAL;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockserver.model.HttpResponse.response;
 
+import com.apache.gravitino.server.authentication.KerberosAuthenticator;
 import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.server.authentication.KerberosAuthenticator;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
