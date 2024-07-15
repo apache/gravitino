@@ -118,16 +118,16 @@ public class MiniGravitino {
     this.port = jettyServerConfig.getHttpPort();
     String URI = String.format("http://%s:%d", host, port);
     if (COMMA
-            .splitToList(context.customConfig.get(Configs.AUTHENTICATOR.getKey()))
-            .contains(AuthenticatorType.OAUTH.name().toLowerCase())) {
+        .splitToList(context.customConfig.get(Configs.AUTHENTICATOR.getKey()))
+        .contains(AuthenticatorType.OAUTH.name().toLowerCase())) {
       restClient =
           HTTPClient.builder(ImmutableMap.of())
               .uri(URI)
               .withAuthDataProvider(OAuthMockDataProvider.getInstance())
               .build();
     } else if (COMMA
-            .splitToList(context.customConfig.get(Configs.AUTHENTICATOR.getKey()))
-            .contains(AuthenticatorType.KERBEROS.name().toLowerCase())) {
+        .splitToList(context.customConfig.get(Configs.AUTHENTICATOR.getKey()))
+        .contains(AuthenticatorType.KERBEROS.name().toLowerCase())) {
       restClient =
           HTTPClient.builder(ImmutableMap.of())
               .uri(URI)
