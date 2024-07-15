@@ -226,7 +226,7 @@ nexusPublishing {
     }
   }
 
-  packageGroup.set("com.apache.gravitino")
+  packageGroup.set("org.apache.gravitino")
 }
 
 subprojects {
@@ -387,8 +387,8 @@ subprojects {
             }
           }
           scm {
-            url.set("https://github.com/apache/gravitino")
-            connection.set("scm:git:git://github.com/apache/gravitino.git")
+            url.set("https://github.org/apache/gravitino")
+            connection.set("scm:git:git://github.org/apache/gravitino.git")
           }
         }
       }
@@ -435,7 +435,7 @@ subprojects {
 
   tasks.register("allDeps", DependencyReportTask::class)
 
-  group = "com.apache.gravitino"
+  group = "org.apache.gravitino"
   version = "$version"
 
   tasks.withType<Jar> {

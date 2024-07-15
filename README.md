@@ -19,13 +19,13 @@
 
 # Apache Gravitino (incubating)
 
-[![GitHub Actions Build](https://github.com/apache/gravitino/actions/workflows/build.yml/badge.svg)](https://github.com/apache/gravitino/actions/workflows/build.yml)
-[![GitHub Actions Integration Test](https://github.com/apache/gravitino/actions/workflows/integration-test.yml/badge.svg)](https://github.com/apache/gravitino/actions/workflows/integration-test.yml)
-[![License](https://img.shields.io/github/license/apache/gravitino)](https://github.com/apache/gravitino/blob/main/LICENSE)
-[![Contributors](https://img.shields.io/github/contributors/apache/gravitino)](https://github.com/apache/gravitino/graphs/contributors)
-[![Release](https://img.shields.io/github/v/release/apache/gravitino)](https://github.com/apache/gravitino/releases)
-[![Open Issues](https://img.shields.io/github/issues-raw/apache/gravitino)](https://github.com/apache/gravitino/issues)
-[![Last Committed](https://img.shields.io/github/last-commit/apache/gravitino)](https://github.com/apache/gravitino/commits/main/)
+[![GitHub Actions Build](https://github.org/apache/gravitino/actions/workflows/build.yml/badge.svg)](https://github.org/apache/gravitino/actions/workflows/build.yml)
+[![GitHub Actions Integration Test](https://github.org/apache/gravitino/actions/workflows/integration-test.yml/badge.svg)](https://github.org/apache/gravitino/actions/workflows/integration-test.yml)
+[![License](https://img.shields.io/github/license/apache/gravitino)](https://github.org/apache/gravitino/blob/main/LICENSE)
+[![Contributors](https://img.shields.io/github/contributors/apache/gravitino)](https://github.org/apache/gravitino/graphs/contributors)
+[![Release](https://img.shields.io/github/v/release/apache/gravitino)](https://github.org/apache/gravitino/releases)
+[![Open Issues](https://img.shields.io/github/issues-raw/apache/gravitino)](https://github.org/apache/gravitino/issues)
+[![Last Committed](https://img.shields.io/github/last-commit/apache/gravitino)](https://github.org/apache/gravitino/commits/main/)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/8358/badge)](https://www.bestpractices.dev/projects/8358)
 
 ## Introduction

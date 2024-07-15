@@ -48,9 +48,9 @@ tasks.withType<ShadowJar>(ShadowJar::class.java) {
   archiveClassifier.set("")
 
   // Relocate dependencies to avoid conflicts
-  relocate("com.google", "com.apache.gravitino.shaded.com.google")
-  relocate("google", "com.apache.gravitino.shaded.google")
-  relocate("org.apache.hc", "com.apache.gravitino.shaded.org.apache.hc")
+  relocate("com.google", "org.apache.gravitino.shaded.com.google")
+  relocate("google", "org.apache.gravitino.shaded.google")
+  relocate("org.apache.hc", "org.apache.gravitino.shaded.org.apache.hc")
 }
 
 publishing {

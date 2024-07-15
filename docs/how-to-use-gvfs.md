@@ -44,15 +44,15 @@ the path mapping and convert automatically.
 
 + A Hadoop environment with HDFS running. GVFS has been tested against
   Hadoop 3.1.0. It is recommended to use Hadoop 3.1.0 or later, but it should work with Hadoop 2.
-  x. Please create an [issue](https://www.github.com/apache/gravitino/issues) if you find any
+  x. Please create an [issue](https://www.github.org/apache/gravitino/issues) if you find any
   compatibility issues.
 
 ### Configuration
 
 | Configuration item                                    | Description                                                                                                                                                                                             | Default value | Required                            | Since version |
 |-------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|-------------------------------------|---------------|
-| `fs.AbstractFileSystem.gvfs.impl`                     | The Gravitino Virtual File System abstract class, set it to `com.apache.gravitino.filesystem.hadoop.Gvfs`.                                                                                          | (none)        | Yes                                 | 0.5.0         |
-| `fs.gvfs.impl`                                        | The Gravitino Virtual File System implementation class, set it to `com.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem`.                                                              | (none)        | Yes                                 | 0.5.0         |
+| `fs.AbstractFileSystem.gvfs.impl`                     | The Gravitino Virtual File System abstract class, set it to `org.apache.gravitino.filesystem.hadoop.Gvfs`.                                                                                          | (none)        | Yes                                 | 0.5.0         |
+| `fs.gvfs.impl`                                        | The Gravitino Virtual File System implementation class, set it to `org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem`.                                                              | (none)        | Yes                                 | 0.5.0         |
 | `fs.gvfs.impl.disable.cache`                          | Disable the Gravitino Virtual File System cache in the Hadoop environment. If you need to proxy multi-user operations, please set this value to `true` and create a separate File System for each user. | `false`       | No                                  | 0.5.0         |
 | `fs.gravitino.server.uri`                             | The Gravitino server URI which GVFS needs to load the fileset metadata.                                                                                                                                 | (none)        | Yes                                 | 0.5.0         |
 | `fs.gravitino.client.metalake`                        | The metalake to which the fileset belongs.                                                                                                                                                              | (none)        | Yes                                 | 0.5.0         |
@@ -72,8 +72,8 @@ You can configure these properties in two ways:
 
     ```java
     Configuration conf = new Configuration();
-    conf.set("fs.AbstractFileSystem.gvfs.impl","com.apache.gravitino.filesystem.hadoop.Gvfs");
-    conf.set("fs.gvfs.impl","com.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
+    conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
+    conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
     conf.set("fs.gravitino.server.uri","http://localhost:8090");
     conf.set("fs.gravitino.client.metalake","test_metalake");
     Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_fileset_1");
@@ -85,12 +85,12 @@ You can configure these properties in two ways:
     ```xml
       <property>
         <name>fs.AbstractFileSystem.gvfs.impl</name>
-        <value>com.apache.gravitino.filesystem.hadoop.Gvfs</value>
+        <value>org.apache.gravitino.filesystem.hadoop.Gvfs</value>
       </property>
 
       <property>
         <name>fs.gvfs.impl</name>
-        <value>com.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem</value>
+        <value>org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem</value>
       </property>
 
       <property>
@@ -114,7 +114,7 @@ two ways:
 
 2. Compile from the source code:
 
-   Download or clone the [Gravitino source code](https://github.com/apache/gravitino), and compile it
+   Download or clone the [Gravitino source code](https://github.org/apache/gravitino), and compile it
    locally using the following command in the Gravitino source code directory:
 
     ```shell
@@ -151,8 +151,8 @@ For example:
 
 ```java
 Configuration conf = new Configuration();
-conf.set("fs.AbstractFileSystem.gvfs.impl","com.apache.gravitino.filesystem.hadoop.Gvfs");
-conf.set("fs.gvfs.impl","com.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
+conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
+conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
 conf.set("fs.gravitino.server.uri","http://localhost:8090");
 conf.set("fs.gravitino.client.metalake","test_metalake");
 Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_fileset_1");
@@ -168,7 +168,7 @@ fs.getFileStatus(filesetPath);
     File System runtime jar, like so:
 
     ```shell
-    ./${SPARK_HOME}/bin/spark-submit --packages com.apache.gravitino:filesystem-hadoop3-runtime:${version}
+    ./${SPARK_HOME}/bin/spark-submit --packages org.apache.gravitino:filesystem-hadoop3-runtime:${version}
     ```
 
     If you want to include the Gravitino Virtual File System runtime jar in your Spark installation, add it to the `${SPARK_HOME}/jars/` folder.
@@ -178,8 +178,8 @@ fs.getFileStatus(filesetPath);
     You can configure in the shell command in this way:
 
     ```shell
-    --conf spark.hadoop.fs.AbstractFileSystem.gvfs.impl=com.apache.gravitino.filesystem.hadoop.Gvfs
-    --conf spark.hadoop.fs.gvfs.impl=com.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem
+    --conf spark.hadoop.fs.AbstractFileSystem.gvfs.impl=org.apache.gravitino.filesystem.hadoop.Gvfs
+    --conf spark.hadoop.fs.gvfs.impl=org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem
     --conf spark.hadoop.fs.gravitino.server.uri=${your_gravitino_server_uri}
     --conf spark.hadoop.fs.gravitino.client.metalake=${your_gravitino_metalake}
     ```
@@ -260,8 +260,8 @@ Then, you can configure the Hadoop configuration like this:
 System.setProperty("GRAVITINO_USER", "test");
 
 Configuration conf = new Configuration();
-conf.set("fs.AbstractFileSystem.gvfs.impl","com.apache.gravitino.filesystem.hadoop.Gvfs");
-conf.set("fs.gvfs.impl","com.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
+conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
+conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
 conf.set("fs.gravitino.server.uri","http://localhost:8090");
 conf.set("fs.gravitino.client.metalake","test_metalake");
 // Configure the auth type to simple,
@@ -280,8 +280,8 @@ Then, you can configure the Hadoop configuration like this:
 
 ```java
 Configuration conf = new Configuration();
-conf.set("fs.AbstractFileSystem.gvfs.impl","com.apache.gravitino.filesystem.hadoop.Gvfs");
-conf.set("fs.gvfs.impl","com.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
+conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
+conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
 conf.set("fs.gravitino.server.uri","http://localhost:8090");
 conf.set("fs.gravitino.client.metalake","test_metalake");
 // Configure the auth type to oauth2.
@@ -304,8 +304,8 @@ Then, you can configure the Hadoop configuration like this:
 
 ```java
 Configuration conf = new Configuration();
-conf.set("fs.AbstractFileSystem.gvfs.impl","com.apache.gravitino.filesystem.hadoop.Gvfs");
-conf.set("fs.gvfs.impl","com.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
+conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
+conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
 conf.set("fs.gravitino.server.uri","http://localhost:8090");
 conf.set("fs.gravitino.client.metalake","test_metalake");
 // Configure the auth type to kerberos.
@@ -324,7 +324,7 @@ FileSystem fs = filesetPath.getFileSystem(conf);
 
 + A Hadoop environment with HDFS running. Now we only supports Fileset on HDFS.
   GVFS in Python has been tested against Hadoop 2.7.3. It is recommended to use Hadoop 2.7.3 or later,
-  it should work with Hadoop 3.x. Please create an [issue](https://www.github.com/apache/gravitino/issues)
+  it should work with Hadoop 3.x. Please create an [issue](https://www.github.org/apache/gravitino/issues)
   if you find any compatibility issues.
 + Python version >= 3.8. It has been tested GVFS works well with Python 3.8 and Python 3.9.
   Your Python version should be at least higher than Python 3.8.

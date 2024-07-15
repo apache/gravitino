@@ -76,7 +76,7 @@ to launch a Gravitino server, HDFS and Jupyter notebook environment in you local
 Waiting for the playground Docker environment to start, you can directly open
 `http://localhost:8888/lab/tree/gravitino-fileset-example.ipynb` in the browser and run the example.
 
-The [gravitino-fileset-example](https://github.com/apache/gravitino-playground/blob/main/init/jupyter/gravitino-fileset-example.ipynb)
+The [gravitino-fileset-example](https://github.org/apache/gravitino-playground/blob/main/init/jupyter/gravitino-fileset-example.ipynb)
 contains the following code snippets:
 
 1. Install HDFS Python client.

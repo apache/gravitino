@@ -46,7 +46,7 @@ Changelog
 
 ## Playground Docker image
 
-You can use the [playground](https://github.com/apache/gravitino-playground) to experience the whole Gravitino system with other components.
+You can use the [playground](https://github.org/apache/gravitino-playground) to experience the whole Gravitino system with other components.
 
 The playground consists of multiple Docker images.
 
