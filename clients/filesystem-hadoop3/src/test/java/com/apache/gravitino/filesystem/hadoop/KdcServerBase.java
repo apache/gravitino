@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.datastrato.gravitino.filesystem.hadoop;
+package com.apache.gravitino.filesystem.hadoop;
 
 import java.io.File;
 import java.util.UUID;

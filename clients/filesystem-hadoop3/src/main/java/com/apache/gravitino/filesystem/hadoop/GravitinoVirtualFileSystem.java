@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datastrato.gravitino.filesystem.hadoop;
+package com.apache.gravitino.filesystem.hadoop;
 
 import com.apache.gravitino.Catalog;
 import com.apache.gravitino.NameIdentifier;

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datastrato.gravitino.filesystem.hadoop;
+package com.apache.gravitino.filesystem.hadoop;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -169,8 +169,7 @@ public class TestOauth2Client extends TestGvfsBase {
     configuration.set(
         GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY, metalakeName);
     configuration.set(
-        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY,
-        GravitinoMockServerBase.serverUri());
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY, serverUri());
 
     // set auth type, but do not set other configs
     configuration.set(
@@ -300,7 +299,7 @@ public class TestOauth2Client extends TestGvfsBase {
             .withMethod(Method.GET.name())
             .withQueryStringParameters(Collections.emptyMap());
 
-    GravitinoMockServerBase.mockServer()
+    mockServer()
         .when(mockRequest, Times.unlimited())
         .respond(
             httpRequest -> {
