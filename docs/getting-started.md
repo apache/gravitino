@@ -223,7 +223,7 @@ newgrp docker
 ```
 
 You can install and run all the programs as Docker containers by using the
-[gravitino-playground](https://github.org/apache/gravitino-playground). For details about
+[gravitino-playground](https://github.com/apache/gravitino-playground). For details about
 how to run the playground, see [how-to-use-the-playground](./how-to-use-the-playground.md)
 
 ## Installing Apache Gravitino playground locally
@@ -321,7 +321,7 @@ After completing these steps, you should be able to access the Gravitino REST in
 
 2. **Community engagement:**
    - Join the Gravitino community forums to connect with other users, share experiences, and seek assistance if needed.
-   - Check out our GitHub repository: https://github.org/apache/gravitino
+   - Check out our GitHub repository: https://github.com/apache/gravitino
    - Check out our Slack channel in ASF Slack: https://the-asf.slack.com
    
 3. **Read our blogs:**

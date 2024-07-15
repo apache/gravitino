@@ -33,7 +33,7 @@ setup(
     version="0.6.0.dev1",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.org/apache/gravitino",
+    url="https://github.com/apache/gravitino",
     author="gravitino",
     author_email="dev@gravitino.apache.org",
     python_requires=">=3.8",

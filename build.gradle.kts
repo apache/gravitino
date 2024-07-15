@@ -387,8 +387,8 @@ subprojects {
             }
           }
           scm {
-            url.set("https://github.org/apache/gravitino")
-            connection.set("scm:git:git://github.org/apache/gravitino.git")
+            url.set("https://github.com/apache/gravitino")
+            connection.set("scm:git:git://github.com/apache/gravitino.git")
           }
         }
       }

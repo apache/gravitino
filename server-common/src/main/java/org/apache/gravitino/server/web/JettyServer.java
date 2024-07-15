@@ -413,7 +413,7 @@ public final class JettyServer {
 
     ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
     // Use QueuedThreadPool not ExecutorThreadPool to work around the accidental test failures.
-    // see https://github.org/apache/gravitino/issues/546
+    // see https://github.com/apache/gravitino/issues/546
     QueuedThreadPool threadPool =
         new QueuedThreadPool(
             maxThreads, minThreads, 60000, new LinkedBlockingQueue(threadPoolWorkQueueSize)) {

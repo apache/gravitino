@@ -36,8 +36,8 @@ public class MetalakePageTest extends AbstractWebIT {
   private static final String FOOTER_LINK_DATASTRATO = "https://gravitino.apache.org/";
   private static final String FOOTER_LINK_DOCS = "https://datastrato.ai/docs/";
   private static final String FOOTER_LINK_LICENSE =
-      "https://github.org/apache/gravitino/blob/main/LICENSE";
-  private static final String FOOTER_LINK_SUPPORT = "https://github.org/apache/gravitino/issues";
+      "https://github.com/apache/gravitino/blob/main/LICENSE";
+  private static final String FOOTER_LINK_SUPPORT = "https://github.com/apache/gravitino/issues";
   MetalakePage metalakePage = new MetalakePage();
 
   // Create a metalake by name, set the default comment and properties.
