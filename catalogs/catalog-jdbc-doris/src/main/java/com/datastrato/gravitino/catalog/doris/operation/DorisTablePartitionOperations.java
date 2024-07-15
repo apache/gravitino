@@ -79,7 +79,6 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
   @Override
   public String[] listPartitionNames() {
     try (Connection connection = getConnection(databaseName)) {
-      getPartitionInfo(connection);
       String showPartitionsSql = String.format("SHOW PARTITIONS FROM `%s`", tableName);
       try (Statement statement = connection.createStatement();
           ResultSet result = statement.executeQuery(showPartitionsSql)) {
@@ -189,7 +188,6 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
   @Override
   public boolean dropPartition(String partitionName) {
     try (Connection connection = getConnection(databaseName)) {
-      getPartitionInfo(connection);
       String dropPartitionsSql =
           String.format("ALTER TABLE `%s` DROP PARTITION `%s`", tableName, partitionName);
       try (Statement statement = connection.createStatement()) {

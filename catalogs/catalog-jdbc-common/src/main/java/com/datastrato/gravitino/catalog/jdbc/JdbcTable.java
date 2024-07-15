@@ -25,6 +25,7 @@ import com.datastrato.gravitino.rel.SupportsPartitions;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import lombok.ToString;
+import org.apache.commons.lang3.ArrayUtils;
 
 /** Represents a Jdbc Table entity in the jdbc table. */
 @ToString
@@ -36,6 +37,10 @@ public class JdbcTable extends BaseTable {
 
   @Override
   protected TableOperations newOps() {
+    if (ArrayUtils.isEmpty(partitioning)) {
+      throw new UnsupportedOperationException(
+          "Table partition operation is not supported for non-partitioned table: " + name);
+    }
     return tableOperation.createJdbcTablePartitionOperations(databaseName, name);
   }
 
