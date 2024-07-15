@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.dto.responses;
 
-import com.datastrato.gravitino.NameIdentifier;
+import com.apache.gravitino.NameIdentifier;
 import com.datastrato.gravitino.json.JsonUtils;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;

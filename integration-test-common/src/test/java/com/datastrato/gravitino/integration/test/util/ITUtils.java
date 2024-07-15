@@ -20,11 +20,11 @@ package com.datastrato.gravitino.integration.test.util;
 
 import static com.datastrato.gravitino.dto.util.DTOConverters.toDTO;
 
+import com.apache.gravitino.rel.Column;
+import com.apache.gravitino.rel.Table;
+import com.apache.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
-import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Table;
-import com.datastrato.gravitino.rel.indexes.Index;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;

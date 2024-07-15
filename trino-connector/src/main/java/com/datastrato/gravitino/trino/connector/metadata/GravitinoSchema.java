@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.trino.connector.metadata;
 
-import com.datastrato.gravitino.Schema;
+import com.apache.gravitino.Schema;
 import java.util.Map;
 
 /** Help Apache Gravitino connector access SchemaMetadata from Gravitino client. */

@@ -20,10 +20,10 @@ package com.datastrato.gravitino.dto.rel.partitioning;
 
 import static com.datastrato.gravitino.dto.rel.PartitionUtils.validateFieldExistence;
 
+import com.apache.gravitino.rel.expressions.Expression;
+import com.apache.gravitino.rel.expressions.NamedReference;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.partitions.ListPartitionDTO;
-import com.datastrato.gravitino.rel.expressions.Expression;
-import com.datastrato.gravitino.rel.expressions.NamedReference;
 import java.util.Arrays;
 import lombok.EqualsAndHashCode;
 

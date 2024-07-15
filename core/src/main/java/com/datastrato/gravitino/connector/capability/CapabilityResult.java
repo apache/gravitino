@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.connector.capability;
 
-import com.datastrato.gravitino.annotation.Evolving;
+import com.apache.gravitino.annotation.Evolving;
 import com.google.common.base.Preconditions;
 
 /** The CapabilityResult class is responsible for managing the capability result. */

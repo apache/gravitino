@@ -24,13 +24,13 @@ import static com.datastrato.gravitino.catalog.hadoop.authentication.kerberos.Ke
 import static com.datastrato.gravitino.catalog.hadoop.authentication.kerberos.KerberosConfig.KEY_TAB_URI_KEY;
 import static com.datastrato.gravitino.catalog.hadoop.authentication.kerberos.KerberosConfig.PRINCIPAL_KEY;
 
-import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.SchemaChange;
-import com.datastrato.gravitino.client.GravitinoAdminClient;
-import com.datastrato.gravitino.client.GravitinoMetalake;
-import com.datastrato.gravitino.client.KerberosTokenProvider;
-import com.datastrato.gravitino.file.Fileset;
+import com.apache.gravitino.Catalog;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.SchemaChange;
+import com.apache.gravitino.client.GravitinoAdminClient;
+import com.apache.gravitino.client.GravitinoMetalake;
+import com.apache.gravitino.client.KerberosTokenProvider;
+import com.apache.gravitino.file.Fileset;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;

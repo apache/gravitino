@@ -20,10 +20,10 @@ package com.datastrato.gravitino.metalake;
 
 import static com.datastrato.gravitino.Entity.SYSTEM_METALAKE_RESERVED_NAME;
 
+import com.apache.gravitino.Metalake;
+import com.apache.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.EntityStore;
-import com.datastrato.gravitino.Metalake;
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.datastrato.gravitino.storage.memory.TestMemoryEntityStore;
 import java.io.IOException;

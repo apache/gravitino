@@ -23,8 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
 import com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonConfig;
 import com.google.common.collect.ImmutableMap;

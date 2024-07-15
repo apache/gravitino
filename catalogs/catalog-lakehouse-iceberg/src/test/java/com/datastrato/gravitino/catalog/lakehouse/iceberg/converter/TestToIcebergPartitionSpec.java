@@ -18,14 +18,14 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.converter;
 
-import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.bucket;
-import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.day;
-import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.hour;
-import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.identity;
-import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.month;
-import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.truncate;
+import static com.apache.gravitino.rel.expressions.transforms.Transforms.bucket;
+import static com.apache.gravitino.rel.expressions.transforms.Transforms.day;
+import static com.apache.gravitino.rel.expressions.transforms.Transforms.hour;
+import static com.apache.gravitino.rel.expressions.transforms.Transforms.identity;
+import static com.apache.gravitino.rel.expressions.transforms.Transforms.month;
+import static com.apache.gravitino.rel.expressions.transforms.Transforms.truncate;
 
-import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.apache.gravitino.rel.expressions.transforms.Transform;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;

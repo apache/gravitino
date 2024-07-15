@@ -18,10 +18,10 @@
  */
 package com.datastrato.gravitino.authorization;
 
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.exceptions.IllegalNameIdentifierException;
-import com.datastrato.gravitino.exceptions.IllegalNamespaceException;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.exceptions.IllegalNameIdentifierException;
+import com.apache.gravitino.exceptions.IllegalNamespaceException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

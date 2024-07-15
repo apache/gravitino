@@ -19,8 +19,8 @@
 
 package com.datastrato.gravitino.catalog.hive;
 
-import static com.datastrato.gravitino.Catalog.CLOUD_NAME;
-import static com.datastrato.gravitino.Catalog.CLOUD_REGION_CODE;
+import static com.apache.gravitino.Catalog.CLOUD_NAME;
+import static com.apache.gravitino.Catalog.CLOUD_REGION_CODE;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CHECK_INTERVAL_SEC;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE;
@@ -33,7 +33,7 @@ import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.PR
 import static com.datastrato.gravitino.catalog.hive.TestHiveCatalog.HIVE_PROPERTIES_METADATA;
 import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
-import com.datastrato.gravitino.Catalog;
+import com.apache.gravitino.Catalog;
 import com.datastrato.gravitino.connector.BaseCatalog;
 import com.datastrato.gravitino.connector.PropertyEntry;
 import com.google.common.collect.Maps;

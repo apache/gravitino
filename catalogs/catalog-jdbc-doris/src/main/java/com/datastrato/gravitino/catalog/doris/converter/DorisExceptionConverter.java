@@ -18,14 +18,14 @@
  */
 package com.datastrato.gravitino.catalog.doris.converter;
 
+import com.apache.gravitino.exceptions.GravitinoRuntimeException;
+import com.apache.gravitino.exceptions.NoSuchColumnException;
+import com.apache.gravitino.exceptions.NoSuchSchemaException;
+import com.apache.gravitino.exceptions.NoSuchTableException;
+import com.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import com.apache.gravitino.exceptions.TableAlreadyExistsException;
+import com.apache.gravitino.exceptions.UnauthorizedException;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
-import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
-import com.datastrato.gravitino.exceptions.NoSuchColumnException;
-import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
-import com.datastrato.gravitino.exceptions.NoSuchTableException;
-import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
-import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
-import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import com.google.common.annotations.VisibleForTesting;
 import java.sql.SQLException;
 import java.util.regex.Pattern;

@@ -18,8 +18,8 @@
  */
 package com.datastrato.gravitino.connector;
 
-import com.datastrato.gravitino.annotation.Evolving;
-import com.datastrato.gravitino.rel.SupportsPartitions;
+import com.apache.gravitino.annotation.Evolving;
+import com.apache.gravitino.rel.SupportsPartitions;
 import java.io.Closeable;
 
 /**

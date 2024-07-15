@@ -19,22 +19,22 @@
 
 package com.datastrato.gravitino.flink.connector.catalog;
 
-import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.Schema;
-import com.datastrato.gravitino.SchemaChange;
-import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
-import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
-import com.datastrato.gravitino.exceptions.NoSuchTableException;
-import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
-import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
-import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
+import com.apache.gravitino.Catalog;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.Schema;
+import com.apache.gravitino.SchemaChange;
+import com.apache.gravitino.exceptions.NoSuchCatalogException;
+import com.apache.gravitino.exceptions.NoSuchSchemaException;
+import com.apache.gravitino.exceptions.NoSuchTableException;
+import com.apache.gravitino.exceptions.NonEmptySchemaException;
+import com.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import com.apache.gravitino.exceptions.TableAlreadyExistsException;
+import com.apache.gravitino.rel.Column;
+import com.apache.gravitino.rel.Table;
+import com.apache.gravitino.rel.TableChange;
 import com.datastrato.gravitino.flink.connector.PropertiesConverter;
 import com.datastrato.gravitino.flink.connector.utils.TypeUtils;
-import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Table;
-import com.datastrato.gravitino.rel.TableChange;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.MapDifference;

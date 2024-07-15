@@ -23,16 +23,16 @@ import static com.datastrato.gravitino.trino.connector.catalog.hive.HiveProperty
 import static com.datastrato.gravitino.trino.connector.catalog.hive.HivePropertyMeta.HIVE_PARTITION_KEY;
 import static com.datastrato.gravitino.trino.connector.catalog.hive.HivePropertyMeta.HIVE_SORT_ORDER_KEY;
 
+import com.apache.gravitino.rel.expressions.Expression;
+import com.apache.gravitino.rel.expressions.NamedReference;
+import com.apache.gravitino.rel.expressions.distributions.Distributions;
+import com.apache.gravitino.rel.expressions.distributions.Strategy;
+import com.apache.gravitino.rel.expressions.sorts.SortDirection;
+import com.apache.gravitino.rel.expressions.sorts.SortOrder;
+import com.apache.gravitino.rel.expressions.sorts.SortOrders;
+import com.apache.gravitino.rel.expressions.transforms.Transform;
+import com.apache.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.catalog.property.PropertyConverter;
-import com.datastrato.gravitino.rel.expressions.Expression;
-import com.datastrato.gravitino.rel.expressions.NamedReference;
-import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
-import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
-import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
-import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
-import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
-import com.datastrato.gravitino.rel.expressions.transforms.Transform;
-import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.trino.connector.GravitinoErrorCode;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.hive.SortingColumn.Order;

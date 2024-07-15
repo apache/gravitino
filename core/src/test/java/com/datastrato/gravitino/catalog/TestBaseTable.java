@@ -21,11 +21,11 @@ package com.datastrato.gravitino.catalog;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.apache.gravitino.rel.Column;
+import com.apache.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.connector.BaseTable;
 import com.datastrato.gravitino.connector.TableOperations;
 import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;

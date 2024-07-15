@@ -20,7 +20,7 @@ package com.datastrato.gravitino.catalog.lakehouse.paimon;
 
 import static com.datastrato.gravitino.meta.AuditInfo.EMPTY;
 
-import com.datastrato.gravitino.Schema;
+import com.apache.gravitino.Schema;
 import com.datastrato.gravitino.connector.BaseSchema;
 import java.util.Map;
 import java.util.Optional;

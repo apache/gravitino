@@ -19,18 +19,18 @@
 
 package com.datastrato.gravitino.catalog.jdbc.operation;
 
+import com.apache.gravitino.exceptions.NoSuchSchemaException;
+import com.apache.gravitino.exceptions.NoSuchTableException;
+import com.apache.gravitino.exceptions.TableAlreadyExistsException;
+import com.apache.gravitino.rel.TableChange;
+import com.apache.gravitino.rel.expressions.distributions.Distribution;
+import com.apache.gravitino.rel.expressions.transforms.Transform;
+import com.apache.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
-import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
-import com.datastrato.gravitino.exceptions.NoSuchTableException;
-import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
-import com.datastrato.gravitino.rel.TableChange;
-import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
-import com.datastrato.gravitino.rel.expressions.transforms.Transform;
-import com.datastrato.gravitino.rel.indexes.Index;
 import java.util.List;
 import java.util.Map;
 import javax.sql.DataSource;

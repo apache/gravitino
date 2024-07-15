@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.dto.requests;
 
-import com.datastrato.gravitino.Catalog;
+import com.apache.gravitino.Catalog;
 import com.datastrato.gravitino.rest.RESTRequest;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;

@@ -20,14 +20,14 @@ package com.datastrato.gravitino.catalog;
 
 import static com.datastrato.gravitino.Entity.SYSTEM_CATALOG_RESERVED_NAME;
 
-import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.CatalogChange;
-import com.datastrato.gravitino.MetadataObjects;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
-import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
-import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
+import com.apache.gravitino.Catalog;
+import com.apache.gravitino.CatalogChange;
+import com.apache.gravitino.MetadataObjects;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import com.apache.gravitino.exceptions.NoSuchCatalogException;
+import com.apache.gravitino.exceptions.NoSuchMetalakeException;
 import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;
 import java.util.Map;

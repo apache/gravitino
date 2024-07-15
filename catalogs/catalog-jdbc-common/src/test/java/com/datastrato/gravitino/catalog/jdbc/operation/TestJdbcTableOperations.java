@@ -18,6 +18,13 @@
  */
 package com.datastrato.gravitino.catalog.jdbc.operation;
 
+import com.apache.gravitino.exceptions.NoSuchTableException;
+import com.apache.gravitino.rel.Column;
+import com.apache.gravitino.rel.TableChange;
+import com.apache.gravitino.rel.expressions.distributions.Distributions;
+import com.apache.gravitino.rel.indexes.Indexes;
+import com.apache.gravitino.rel.types.Type;
+import com.apache.gravitino.rel.types.Types;
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
@@ -27,13 +34,6 @@ import com.datastrato.gravitino.catalog.jdbc.converter.SqliteExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.SqliteTypeConverter;
 import com.datastrato.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import com.datastrato.gravitino.connector.BaseColumn;
-import com.datastrato.gravitino.exceptions.NoSuchTableException;
-import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.TableChange;
-import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
-import com.datastrato.gravitino.rel.indexes.Indexes;
-import com.datastrato.gravitino.rel.types.Type;
-import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;

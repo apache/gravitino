@@ -20,17 +20,17 @@ package com.datastrato.gravitino.catalog;
 
 import static com.datastrato.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.exceptions.FilesetAlreadyExistsException;
+import com.apache.gravitino.exceptions.NoSuchFilesetException;
+import com.apache.gravitino.exceptions.NoSuchSchemaException;
+import com.apache.gravitino.exceptions.NonEmptyEntityException;
+import com.apache.gravitino.file.Fileset;
+import com.apache.gravitino.file.FilesetChange;
 import com.datastrato.gravitino.EntityStore;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;
-import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
-import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
-import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
-import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
-import com.datastrato.gravitino.file.Fileset;
-import com.datastrato.gravitino.file.FilesetChange;
 import com.datastrato.gravitino.storage.IdGenerator;
 import java.util.Map;
 

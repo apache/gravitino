@@ -21,7 +21,7 @@ package com.datastrato.gravitino.trino.connector.util;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_UNSUPPORTED_GRAVITINO_DATATYPE;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_UNSUPPORTED_TRINO_DATATYPE;
 
-import com.datastrato.gravitino.rel.types.Types;
+import com.apache.gravitino.rel.types.Types;
 import io.trino.spi.TrinoException;
 import io.trino.spi.type.ArrayType;
 import io.trino.spi.type.BigintType;

@@ -18,14 +18,14 @@
  */
 package com.datastrato.gravitino.catalog;
 
-import static com.datastrato.gravitino.Catalog.Type.RELATIONAL;
+import static com.apache.gravitino.Catalog.Type.RELATIONAL;
 
-import com.datastrato.gravitino.Catalog;
+import com.apache.gravitino.Catalog;
+import com.apache.gravitino.MetadataObjects;
+import com.apache.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.EntityStore;
-import com.datastrato.gravitino.MetadataObjects;
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.SchemaVersion;

@@ -28,6 +28,10 @@ import static com.datastrato.gravitino.storage.kv.BinaryEntityEncoderUtil.genera
 import static com.datastrato.gravitino.storage.kv.BinaryEntityEncoderUtil.getSubEntitiesPrefix;
 import static com.datastrato.gravitino.storage.kv.BinaryEntityEncoderUtil.replacePrefixTypeInfo;
 
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.exceptions.NoSuchEntityException;
+import com.apache.gravitino.exceptions.NonEmptyEntityException;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Entity.EntityType;
@@ -36,10 +40,6 @@ import com.datastrato.gravitino.EntitySerDe;
 import com.datastrato.gravitino.EntitySerDeFactory;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.HasIdentifier;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.exceptions.NoSuchEntityException;
-import com.datastrato.gravitino.exceptions.NonEmptyEntityException;
 import com.datastrato.gravitino.storage.EntityKeyEncoder;
 import com.datastrato.gravitino.storage.FunctionUtils;
 import com.datastrato.gravitino.storage.NameMappingService;

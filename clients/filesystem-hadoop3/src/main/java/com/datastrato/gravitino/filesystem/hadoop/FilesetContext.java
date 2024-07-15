@@ -18,9 +18,9 @@
  */
 package com.datastrato.gravitino.filesystem.hadoop;
 
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.file.Fileset;
-import com.datastrato.gravitino.shaded.com.google.common.base.Preconditions;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.file.Fileset;
+import com.apache.gravitino.shaded.com.google.common.base.Preconditions;
 import com.google.common.base.Objects;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;

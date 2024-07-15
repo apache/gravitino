@@ -18,8 +18,8 @@
  */
 package com.datastrato.gravitino.dto.rel.partitions;
 
+import com.apache.gravitino.rel.partitions.IdentityPartition;
 import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
-import com.datastrato.gravitino.rel.partitions.IdentityPartition;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;

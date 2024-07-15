@@ -18,16 +18,20 @@
  */
 package com.datastrato.gravitino.authorization;
 
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.authorization.Group;
+import com.apache.gravitino.authorization.Privileges;
+import com.apache.gravitino.authorization.SecurableObjects;
+import com.apache.gravitino.authorization.User;
+import com.apache.gravitino.exceptions.NoSuchGroupException;
+import com.apache.gravitino.exceptions.NoSuchMetalakeException;
+import com.apache.gravitino.exceptions.NoSuchRoleException;
+import com.apache.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.GravitinoEnv;
-import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.exceptions.NoSuchGroupException;
-import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
-import com.datastrato.gravitino.exceptions.NoSuchRoleException;
-import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.GroupEntity;

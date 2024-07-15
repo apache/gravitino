@@ -18,20 +18,20 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.converter;
 
-import static com.datastrato.gravitino.rel.expressions.NamedReference.field;
+import static com.apache.gravitino.rel.expressions.NamedReference.field;
 
+import com.apache.gravitino.rel.Column;
+import com.apache.gravitino.rel.expressions.Expression;
+import com.apache.gravitino.rel.expressions.FunctionExpression;
+import com.apache.gravitino.rel.expressions.NamedReference;
+import com.apache.gravitino.rel.expressions.literals.Literal;
+import com.apache.gravitino.rel.expressions.literals.Literals;
+import com.apache.gravitino.rel.expressions.sorts.NullOrdering;
+import com.apache.gravitino.rel.expressions.sorts.SortDirection;
+import com.apache.gravitino.rel.expressions.sorts.SortOrder;
+import com.apache.gravitino.rel.expressions.sorts.SortOrders;
+import com.apache.gravitino.rel.types.Type;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergColumn;
-import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.expressions.Expression;
-import com.datastrato.gravitino.rel.expressions.FunctionExpression;
-import com.datastrato.gravitino.rel.expressions.NamedReference;
-import com.datastrato.gravitino.rel.expressions.literals.Literal;
-import com.datastrato.gravitino.rel.expressions.literals.Literals;
-import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
-import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
-import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
-import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
-import com.datastrato.gravitino.rel.types.Type;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
@@ -55,23 +55,23 @@ public class TestBaseConvert {
   protected static final Map<String, org.apache.iceberg.types.Type> ICEBERG_TYPE = new HashMap<>();
 
   static {
-    GRAVITINO_TYPE.put("BOOLEAN", com.datastrato.gravitino.rel.types.Types.BooleanType.get());
+    GRAVITINO_TYPE.put("BOOLEAN", com.apache.gravitino.rel.types.Types.BooleanType.get());
     // Types not supported by iceberg
     //    GRAVITINO_TYPE.put("I8", com.datastrato.gravitino.rel.types.Types.ByteType.get());
     //    GRAVITINO_TYPE.put("I16", com.datastrato.gravitino.rel.types.Types.ShortType.get());
-    GRAVITINO_TYPE.put("I32", com.datastrato.gravitino.rel.types.Types.IntegerType.get());
-    GRAVITINO_TYPE.put("I64", com.datastrato.gravitino.rel.types.Types.LongType.get());
-    GRAVITINO_TYPE.put("FP32", com.datastrato.gravitino.rel.types.Types.FloatType.get());
-    GRAVITINO_TYPE.put("FP64", com.datastrato.gravitino.rel.types.Types.DoubleType.get());
-    GRAVITINO_TYPE.put("STRING", com.datastrato.gravitino.rel.types.Types.StringType.get());
-    GRAVITINO_TYPE.put("BINARY", com.datastrato.gravitino.rel.types.Types.BinaryType.get());
+    GRAVITINO_TYPE.put("I32", com.apache.gravitino.rel.types.Types.IntegerType.get());
+    GRAVITINO_TYPE.put("I64", com.apache.gravitino.rel.types.Types.LongType.get());
+    GRAVITINO_TYPE.put("FP32", com.apache.gravitino.rel.types.Types.FloatType.get());
+    GRAVITINO_TYPE.put("FP64", com.apache.gravitino.rel.types.Types.DoubleType.get());
+    GRAVITINO_TYPE.put("STRING", com.apache.gravitino.rel.types.Types.StringType.get());
+    GRAVITINO_TYPE.put("BINARY", com.apache.gravitino.rel.types.Types.BinaryType.get());
     GRAVITINO_TYPE.put(
-        "TIMESTAMP", com.datastrato.gravitino.rel.types.Types.TimestampType.withoutTimeZone());
+        "TIMESTAMP", com.apache.gravitino.rel.types.Types.TimestampType.withoutTimeZone());
     GRAVITINO_TYPE.put(
-        "TIMESTAMP_TZ", com.datastrato.gravitino.rel.types.Types.TimestampType.withTimeZone());
-    GRAVITINO_TYPE.put("DATE", com.datastrato.gravitino.rel.types.Types.DateType.get());
-    GRAVITINO_TYPE.put("TIME", com.datastrato.gravitino.rel.types.Types.TimeType.get());
-    GRAVITINO_TYPE.put("UUID", com.datastrato.gravitino.rel.types.Types.UUIDType.get());
+        "TIMESTAMP_TZ", com.apache.gravitino.rel.types.Types.TimestampType.withTimeZone());
+    GRAVITINO_TYPE.put("DATE", com.apache.gravitino.rel.types.Types.DateType.get());
+    GRAVITINO_TYPE.put("TIME", com.apache.gravitino.rel.types.Types.TimeType.get());
+    GRAVITINO_TYPE.put("UUID", com.apache.gravitino.rel.types.Types.UUIDType.get());
     // Types not supported by iceberg
     //    GRAVITINO_TYPE.put("INTERVAL_DAY",
     // com.datastrato.gravitino.rel.types.Types.IntervalDayType.get());
@@ -187,7 +187,7 @@ public class TestBaseConvert {
         Preconditions.checkArgument(
             firstArg instanceof Literal
                 && ((Literal<?>) firstArg).dataType()
-                    instanceof com.datastrato.gravitino.rel.types.Types.IntegerType,
+                    instanceof com.apache.gravitino.rel.types.Types.IntegerType,
             "The first argument must be a integer literal");
         return String.format(
             "%s(%s, %s)",

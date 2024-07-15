@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.storage.relational.service;
 
-import com.datastrato.gravitino.exceptions.NoSuchEntityException;
+import com.apache.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.TagEntity;

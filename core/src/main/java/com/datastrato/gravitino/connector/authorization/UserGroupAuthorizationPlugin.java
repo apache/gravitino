@@ -18,9 +18,9 @@
  */
 package com.datastrato.gravitino.connector.authorization;
 
-import com.datastrato.gravitino.authorization.Group;
-import com.datastrato.gravitino.authorization.Role;
-import com.datastrato.gravitino.authorization.User;
+import com.apache.gravitino.authorization.Group;
+import com.apache.gravitino.authorization.Role;
+import com.apache.gravitino.authorization.User;
 import java.util.List;
 
 /**

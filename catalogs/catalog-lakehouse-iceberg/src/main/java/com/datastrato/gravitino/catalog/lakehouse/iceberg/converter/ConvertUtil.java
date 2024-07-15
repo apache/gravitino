@@ -36,7 +36,7 @@ public class ConvertUtil {
    * @return Iceberg schema.
    */
   public static Schema toIcebergSchema(IcebergTable gravitinoTable) {
-    com.datastrato.gravitino.rel.types.Types.StructType gravitinoStructType =
+    com.apache.gravitino.rel.types.Types.StructType gravitinoStructType =
         toGravitinoStructType(gravitinoTable);
     Type converted =
         ToIcebergTypeVisitor.visit(gravitinoStructType, new ToIcebergType(gravitinoStructType));
@@ -64,16 +64,16 @@ public class ConvertUtil {
    * @param icebergTable Gravitino Iceberg table
    * @return Gravitino StructType
    */
-  private static com.datastrato.gravitino.rel.types.Types.StructType toGravitinoStructType(
+  private static com.apache.gravitino.rel.types.Types.StructType toGravitinoStructType(
       IcebergTable icebergTable) {
-    com.datastrato.gravitino.rel.types.Types.StructType.Field[] fields =
+    com.apache.gravitino.rel.types.Types.StructType.Field[] fields =
         Arrays.stream(icebergTable.columns())
             .map(
                 column ->
-                    com.datastrato.gravitino.rel.types.Types.StructType.Field.of(
+                    com.apache.gravitino.rel.types.Types.StructType.Field.of(
                         column.name(), column.dataType(), column.nullable(), column.comment()))
-            .toArray(com.datastrato.gravitino.rel.types.Types.StructType.Field[]::new);
-    return com.datastrato.gravitino.rel.types.Types.StructType.of(fields);
+            .toArray(com.apache.gravitino.rel.types.Types.StructType.Field[]::new);
+    return com.apache.gravitino.rel.types.Types.StructType.of(fields);
   }
 
   private ConvertUtil() {}

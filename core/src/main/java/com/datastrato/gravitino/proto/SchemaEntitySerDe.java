@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.proto;
 
-import com.datastrato.gravitino.Namespace;
+import com.apache.gravitino.Namespace;
 import com.datastrato.gravitino.meta.SchemaEntity;
 
 public class SchemaEntitySerDe implements ProtoSerDe<SchemaEntity, Schema> {

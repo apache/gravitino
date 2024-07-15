@@ -18,9 +18,9 @@
 
 package com.datastrato.gravitino.listener.api.event;
 
-import com.datastrato.gravitino.CatalogChange;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.annotation.DeveloperApi;
+import com.apache.gravitino.CatalogChange;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.annotation.DeveloperApi;
 
 /**
  * Represents an event that is generated when an attempt to create a catalog fails due to an

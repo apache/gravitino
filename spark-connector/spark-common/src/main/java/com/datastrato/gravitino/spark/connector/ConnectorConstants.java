@@ -18,7 +18,7 @@
 
 package com.datastrato.gravitino.spark.connector;
 
-import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
+import com.apache.gravitino.rel.expressions.sorts.SortDirection;
 
 public class ConnectorConstants {
   public static final String COMMENT = "comment";

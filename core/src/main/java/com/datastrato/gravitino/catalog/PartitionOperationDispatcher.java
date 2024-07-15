@@ -18,13 +18,13 @@
  */
 package com.datastrato.gravitino.catalog;
 
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.exceptions.NoSuchPartitionException;
+import com.apache.gravitino.exceptions.NoSuchTableException;
+import com.apache.gravitino.exceptions.PartitionAlreadyExistsException;
+import com.apache.gravitino.rel.SupportsPartitions;
+import com.apache.gravitino.rel.partitions.Partition;
 import com.datastrato.gravitino.EntityStore;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
-import com.datastrato.gravitino.exceptions.NoSuchTableException;
-import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
-import com.datastrato.gravitino.rel.SupportsPartitions;
-import com.datastrato.gravitino.rel.partitions.Partition;
 import com.datastrato.gravitino.storage.IdGenerator;
 
 public class PartitionOperationDispatcher extends OperationDispatcher

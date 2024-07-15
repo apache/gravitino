@@ -18,13 +18,13 @@
  */
 package com.datastrato.gravitino.dto.rel.partitioning;
 
+import static com.apache.gravitino.rel.expressions.NamedReference.field;
 import static com.datastrato.gravitino.dto.rel.PartitionUtils.validateFieldExistence;
-import static com.datastrato.gravitino.rel.expressions.NamedReference.field;
 
+import com.apache.gravitino.rel.expressions.Expression;
+import com.apache.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.json.JsonUtils;
-import com.datastrato.gravitino.rel.expressions.Expression;
-import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import java.util.Arrays;

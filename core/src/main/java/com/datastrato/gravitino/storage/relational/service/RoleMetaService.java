@@ -18,13 +18,13 @@
  */
 package com.datastrato.gravitino.storage.relational.service;
 
+import com.apache.gravitino.MetadataObject;
+import com.apache.gravitino.MetadataObjects;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.authorization.SecurableObject;
+import com.apache.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.Entity;
-import com.datastrato.gravitino.MetadataObject;
-import com.datastrato.gravitino.MetadataObjects;
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.authorization.AuthorizationUtils;
-import com.datastrato.gravitino.authorization.SecurableObject;
-import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.RoleEntity;
 import com.datastrato.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import com.datastrato.gravitino.storage.relational.mapper.RoleMetaMapper;

@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.flink.connector.catalog;
 
-import com.datastrato.gravitino.SchemaChange;
+import com.apache.gravitino.SchemaChange;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.flink.table.catalog.CatalogDatabase;

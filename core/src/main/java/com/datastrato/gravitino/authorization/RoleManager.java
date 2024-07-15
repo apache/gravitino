@@ -19,15 +19,16 @@
 
 package com.datastrato.gravitino.authorization;
 
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.authorization.SecurableObject;
+import com.apache.gravitino.exceptions.NoSuchEntityException;
+import com.apache.gravitino.exceptions.NoSuchRoleException;
+import com.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.EntityStore;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.exceptions.NoSuchEntityException;
-import com.datastrato.gravitino.exceptions.NoSuchRoleException;
-import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.RoleEntity;
 import com.datastrato.gravitino.storage.IdGenerator;

@@ -18,31 +18,31 @@
  */
 package com.datastrato.gravitino.catalog;
 
-import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
-import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.NAME_OF_IDENTITY;
+import static com.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+import static com.apache.gravitino.rel.expressions.transforms.Transforms.NAME_OF_IDENTITY;
 
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.file.FilesetChange;
+import com.apache.gravitino.rel.Column;
+import com.apache.gravitino.rel.TableChange;
+import com.apache.gravitino.rel.expressions.Expression;
+import com.apache.gravitino.rel.expressions.FunctionExpression;
+import com.apache.gravitino.rel.expressions.NamedReference;
+import com.apache.gravitino.rel.expressions.distributions.Distribution;
+import com.apache.gravitino.rel.expressions.distributions.Distributions;
+import com.apache.gravitino.rel.expressions.sorts.SortOrder;
+import com.apache.gravitino.rel.expressions.sorts.SortOrders;
+import com.apache.gravitino.rel.expressions.transforms.Transform;
+import com.apache.gravitino.rel.expressions.transforms.Transforms;
+import com.apache.gravitino.rel.indexes.Index;
+import com.apache.gravitino.rel.indexes.Indexes;
+import com.apache.gravitino.rel.partitions.IdentityPartition;
+import com.apache.gravitino.rel.partitions.ListPartition;
+import com.apache.gravitino.rel.partitions.Partition;
+import com.apache.gravitino.rel.partitions.Partitions;
+import com.apache.gravitino.rel.partitions.RangePartition;
 import com.datastrato.gravitino.connector.capability.Capability;
-import com.datastrato.gravitino.file.FilesetChange;
-import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.TableChange;
-import com.datastrato.gravitino.rel.expressions.Expression;
-import com.datastrato.gravitino.rel.expressions.FunctionExpression;
-import com.datastrato.gravitino.rel.expressions.NamedReference;
-import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
-import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
-import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
-import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
-import com.datastrato.gravitino.rel.expressions.transforms.Transform;
-import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
-import com.datastrato.gravitino.rel.indexes.Index;
-import com.datastrato.gravitino.rel.indexes.Indexes;
-import com.datastrato.gravitino.rel.partitions.IdentityPartition;
-import com.datastrato.gravitino.rel.partitions.ListPartition;
-import com.datastrato.gravitino.rel.partitions.Partition;
-import com.datastrato.gravitino.rel.partitions.Partitions;
-import com.datastrato.gravitino.rel.partitions.RangePartition;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 

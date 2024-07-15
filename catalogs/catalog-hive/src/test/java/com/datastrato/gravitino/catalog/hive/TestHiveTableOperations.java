@@ -18,25 +18,25 @@
  */
 package com.datastrato.gravitino.catalog.hive;
 
+import static com.apache.gravitino.rel.expressions.transforms.Transforms.identity;
 import static com.datastrato.gravitino.catalog.hive.TestHiveTable.HIVE_CATALOG_NAME;
 import static com.datastrato.gravitino.catalog.hive.TestHiveTable.HIVE_COMMENT;
 import static com.datastrato.gravitino.catalog.hive.TestHiveTable.HIVE_SCHEMA_NAME;
 import static com.datastrato.gravitino.catalog.hive.TestHiveTable.META_LAKE_NAME;
 import static com.datastrato.gravitino.catalog.hive.TestHiveTable.initHiveCatalog;
 import static com.datastrato.gravitino.catalog.hive.TestHiveTable.initHiveSchema;
-import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.identity;
 
-import com.datastrato.gravitino.NameIdentifier;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.exceptions.NoSuchPartitionException;
+import com.apache.gravitino.rel.Column;
+import com.apache.gravitino.rel.SupportsPartitions;
+import com.apache.gravitino.rel.expressions.literals.Literal;
+import com.apache.gravitino.rel.expressions.literals.Literals;
+import com.apache.gravitino.rel.expressions.transforms.Transform;
+import com.apache.gravitino.rel.partitions.Partition;
+import com.apache.gravitino.rel.partitions.Partitions;
+import com.apache.gravitino.rel.types.Types;
 import com.datastrato.gravitino.catalog.hive.miniHMS.MiniHiveMetastoreService;
-import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
-import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.SupportsPartitions;
-import com.datastrato.gravitino.rel.expressions.literals.Literal;
-import com.datastrato.gravitino.rel.expressions.literals.Literals;
-import com.datastrato.gravitino.rel.expressions.transforms.Transform;
-import com.datastrato.gravitino.rel.partitions.Partition;
-import com.datastrato.gravitino.rel.partitions.Partitions;
-import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.Maps;
 import java.time.LocalDate;
 import java.util.Arrays;

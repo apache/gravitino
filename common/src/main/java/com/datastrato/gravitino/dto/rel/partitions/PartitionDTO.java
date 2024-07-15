@@ -18,8 +18,8 @@
  */
 package com.datastrato.gravitino.dto.rel.partitions;
 
+import com.apache.gravitino.rel.partitions.Partition;
 import com.datastrato.gravitino.json.JsonUtils;
-import com.datastrato.gravitino.rel.partitions.Partition;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 

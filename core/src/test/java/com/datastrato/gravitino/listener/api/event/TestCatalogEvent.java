@@ -22,12 +22,12 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.CatalogChange;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
+import com.apache.gravitino.Catalog;
+import com.apache.gravitino.CatalogChange;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.exceptions.GravitinoRuntimeException;
 import com.datastrato.gravitino.catalog.CatalogDispatcher;
-import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
 import com.datastrato.gravitino.listener.CatalogEventDispatcher;
 import com.datastrato.gravitino.listener.DummyEventListener;
 import com.datastrato.gravitino.listener.EventBus;

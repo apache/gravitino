@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.dto.requests;
 
-import com.datastrato.gravitino.messaging.TopicChange;
+import com.apache.gravitino.messaging.TopicChange;
 import com.datastrato.gravitino.rest.RESTRequest;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;

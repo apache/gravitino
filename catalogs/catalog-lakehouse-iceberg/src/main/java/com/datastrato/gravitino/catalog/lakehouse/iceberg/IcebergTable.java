@@ -21,6 +21,10 @@ package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata.DISTRIBUTION_MODE;
 import static org.apache.iceberg.TableProperties.DEFAULT_FILE_FORMAT;
 
+import com.apache.gravitino.rel.expressions.distributions.Distribution;
+import com.apache.gravitino.rel.expressions.distributions.Distributions;
+import com.apache.gravitino.rel.expressions.sorts.SortOrder;
+import com.apache.gravitino.rel.expressions.transforms.Transform;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.ConvertUtil;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.FromIcebergPartitionSpec;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.FromIcebergSortOrder;
@@ -30,10 +34,6 @@ import com.datastrato.gravitino.catalog.lakehouse.iceberg.utils.IcebergTableProp
 import com.datastrato.gravitino.connector.BaseTable;
 import com.datastrato.gravitino.connector.TableOperations;
 import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
-import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
-import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
-import com.datastrato.gravitino.rel.expressions.transforms.Transform;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;

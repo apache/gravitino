@@ -21,10 +21,10 @@ package com.datastrato.gravitino.integration.test.util;
 import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
 import static com.datastrato.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
+import com.apache.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.auth.AuthenticatorType;
-import com.datastrato.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.config.ConfigConstants;
 import com.datastrato.gravitino.integration.test.MiniGravitino;
 import com.datastrato.gravitino.integration.test.MiniGravitinoContext;

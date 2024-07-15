@@ -18,8 +18,8 @@
  */
 package com.datastrato.gravitino.catalog;
 
-import com.datastrato.gravitino.Audit;
-import com.datastrato.gravitino.file.Fileset;
+import com.apache.gravitino.Audit;
+import com.apache.gravitino.file.Fileset;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.FilesetEntity;
 import java.util.Map;

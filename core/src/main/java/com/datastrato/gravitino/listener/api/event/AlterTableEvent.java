@@ -18,10 +18,10 @@
 
 package com.datastrato.gravitino.listener.api.event;
 
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.annotation.DeveloperApi;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.annotation.DeveloperApi;
+import com.apache.gravitino.rel.TableChange;
 import com.datastrato.gravitino.listener.api.info.TableInfo;
-import com.datastrato.gravitino.rel.TableChange;
 
 /** Represents an event fired when a table is successfully altered. */
 @DeveloperApi

@@ -19,7 +19,7 @@
 
 package com.datastrato.gravitino.integration.test.util;
 
-import com.datastrato.gravitino.client.KerberosTokenProvider;
+import com.apache.gravitino.client.KerberosTokenProvider;
 
 public class KerberosProviderHelper {
 

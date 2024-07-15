@@ -18,16 +18,16 @@
 
 package com.datastrato.gravitino.listener.api.info;
 
-import com.datastrato.gravitino.Audit;
-import com.datastrato.gravitino.annotation.DeveloperApi;
-import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Table;
-import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
-import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
-import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
-import com.datastrato.gravitino.rel.expressions.transforms.Transform;
-import com.datastrato.gravitino.rel.indexes.Index;
-import com.datastrato.gravitino.rel.indexes.Indexes;
+import com.apache.gravitino.Audit;
+import com.apache.gravitino.annotation.DeveloperApi;
+import com.apache.gravitino.rel.Column;
+import com.apache.gravitino.rel.Table;
+import com.apache.gravitino.rel.expressions.distributions.Distribution;
+import com.apache.gravitino.rel.expressions.distributions.Distributions;
+import com.apache.gravitino.rel.expressions.sorts.SortOrder;
+import com.apache.gravitino.rel.expressions.transforms.Transform;
+import com.apache.gravitino.rel.indexes.Index;
+import com.apache.gravitino.rel.indexes.Indexes;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import javax.annotation.Nullable;

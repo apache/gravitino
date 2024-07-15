@@ -19,7 +19,7 @@
 
 package com.datastrato.gravitino.trino.connector.catalog.hive;
 
-import com.datastrato.gravitino.rel.types.Types;
+import com.apache.gravitino.rel.types.Types;
 import com.datastrato.gravitino.trino.connector.util.GeneralDataTypeTransformer;
 import io.trino.spi.TrinoException;
 import org.junit.Assert;

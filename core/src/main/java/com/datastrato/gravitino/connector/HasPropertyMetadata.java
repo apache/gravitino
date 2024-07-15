@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.connector;
 
-import com.datastrato.gravitino.annotation.Evolving;
+import com.apache.gravitino.annotation.Evolving;
 
 /** This interface represents entities that have property metadata. */
 @Evolving

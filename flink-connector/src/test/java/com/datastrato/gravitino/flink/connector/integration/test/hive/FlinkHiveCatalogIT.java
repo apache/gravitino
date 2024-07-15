@@ -51,7 +51,7 @@ import org.junit.jupiter.api.TestInstance;
 public class FlinkHiveCatalogIT extends FlinkCommonIT {
   private static final String DEFAULT_HIVE_CATALOG = "test_flink_hive_schema_catalog";
 
-  private static com.datastrato.gravitino.Catalog hiveCatalog;
+  private static com.apache.gravitino.Catalog hiveCatalog;
 
   @BeforeAll
   static void hiveStartUp() {
@@ -69,7 +69,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
     hiveCatalog =
         metalake.createCatalog(
             DEFAULT_HIVE_CATALOG,
-            com.datastrato.gravitino.Catalog.Type.RELATIONAL,
+            com.apache.gravitino.Catalog.Type.RELATIONAL,
             "hive",
             null,
             ImmutableMap.of("metastore.uris", hiveMetastoreUri));
@@ -92,7 +92,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
     Assertions.assertTrue(metalake.catalogExists(catalogName));
 
     // Check the catalog properties.
-    com.datastrato.gravitino.Catalog gravitinoCatalog = metalake.loadCatalog(catalogName);
+    com.apache.gravitino.Catalog gravitinoCatalog = metalake.loadCatalog(catalogName);
     Map<String, String> properties = gravitinoCatalog.properties();
     Assertions.assertEquals(hiveMetastoreUri, properties.get(METASTORE_URIS));
     Map<String, String> flinkProperties =
@@ -158,7 +158,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
     Assertions.assertTrue(metalake.catalogExists(catalogName));
 
     // Check the properties of the created catalog.
-    com.datastrato.gravitino.Catalog gravitinoCatalog = metalake.loadCatalog(catalogName);
+    com.apache.gravitino.Catalog gravitinoCatalog = metalake.loadCatalog(catalogName);
     Map<String, String> properties = gravitinoCatalog.properties();
     Assertions.assertEquals(hiveMetastoreUri, properties.get(METASTORE_URIS));
     Map<String, String> flinkProperties =
@@ -243,10 +243,10 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
 
     // create a new catalog.
     String catalogName = "hive_catalog_in_gravitino";
-    com.datastrato.gravitino.Catalog gravitinoCatalog =
+    com.apache.gravitino.Catalog gravitinoCatalog =
         metalake.createCatalog(
             catalogName,
-            com.datastrato.gravitino.Catalog.Type.RELATIONAL,
+            com.apache.gravitino.Catalog.Type.RELATIONAL,
             "hive",
             null,
             ImmutableMap.of(
@@ -282,7 +282,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
   }
 
   @Override
-  protected com.datastrato.gravitino.Catalog currentCatalog() {
+  protected com.apache.gravitino.Catalog currentCatalog() {
     return hiveCatalog;
   }
 }

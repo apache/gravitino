@@ -18,11 +18,11 @@
  */
 package com.datastrato.gravitino.meta;
 
-import com.datastrato.gravitino.Auditable;
+import com.apache.gravitino.Auditable;
+import com.apache.gravitino.Namespace;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Field;
 import com.datastrato.gravitino.HasIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.google.common.base.Objects;
 import com.google.common.collect.Maps;
 import java.util.Collections;

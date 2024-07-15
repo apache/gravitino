@@ -18,14 +18,16 @@
  */
 package com.datastrato.gravitino.authorization;
 
+import com.apache.gravitino.authorization.Group;
+import com.apache.gravitino.authorization.User;
+import com.apache.gravitino.exceptions.GroupAlreadyExistsException;
+import com.apache.gravitino.exceptions.NoSuchEntityException;
+import com.apache.gravitino.exceptions.NoSuchGroupException;
+import com.apache.gravitino.exceptions.NoSuchUserException;
+import com.apache.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.EntityStore;
-import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
-import com.datastrato.gravitino.exceptions.NoSuchEntityException;
-import com.datastrato.gravitino.exceptions.NoSuchGroupException;
-import com.datastrato.gravitino.exceptions.NoSuchUserException;
-import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.GroupEntity;
 import com.datastrato.gravitino.meta.UserEntity;

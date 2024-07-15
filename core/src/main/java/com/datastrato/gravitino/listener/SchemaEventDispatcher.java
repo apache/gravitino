@@ -18,16 +18,16 @@
 
 package com.datastrato.gravitino.listener;
 
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.Schema;
-import com.datastrato.gravitino.SchemaChange;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.Schema;
+import com.apache.gravitino.SchemaChange;
+import com.apache.gravitino.exceptions.NoSuchCatalogException;
+import com.apache.gravitino.exceptions.NoSuchSchemaException;
+import com.apache.gravitino.exceptions.NonEmptySchemaException;
+import com.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.catalog.SchemaDispatcher;
 import com.datastrato.gravitino.catalog.SchemaOperationDispatcher;
-import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
-import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
-import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
-import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.listener.api.event.AlterSchemaEvent;
 import com.datastrato.gravitino.listener.api.event.AlterSchemaFailureEvent;
 import com.datastrato.gravitino.listener.api.event.CreateSchemaEvent;

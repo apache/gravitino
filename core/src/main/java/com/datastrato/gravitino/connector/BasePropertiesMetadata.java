@@ -20,7 +20,7 @@ package com.datastrato.gravitino.connector;
 
 import static com.datastrato.gravitino.StringIdentifier.ID_KEY;
 
-import com.datastrato.gravitino.annotation.Evolving;
+import com.apache.gravitino.annotation.Evolving;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;

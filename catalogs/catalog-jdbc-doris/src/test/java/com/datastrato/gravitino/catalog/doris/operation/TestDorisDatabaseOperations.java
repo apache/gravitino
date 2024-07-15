@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.catalog.doris.operation;
 
-import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
+import com.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.utils.RandomNameUtils;
 import java.util.HashMap;
 import java.util.List;

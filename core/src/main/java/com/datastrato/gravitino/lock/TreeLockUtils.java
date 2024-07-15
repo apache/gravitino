@@ -19,8 +19,8 @@
 
 package com.datastrato.gravitino.lock;
 
+import com.apache.gravitino.NameIdentifier;
 import com.datastrato.gravitino.GravitinoEnv;
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.utils.Executable;
 
 /** Utility class for tree locks. */

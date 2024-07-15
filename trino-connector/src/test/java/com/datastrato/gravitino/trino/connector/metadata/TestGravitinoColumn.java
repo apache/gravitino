@@ -20,8 +20,8 @@ package com.datastrato.gravitino.trino.connector.metadata;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.types.Types;
+import com.apache.gravitino.rel.Column;
+import com.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Test;
 
 public class TestGravitinoColumn {

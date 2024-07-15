@@ -18,11 +18,11 @@
  */
 package com.datastrato.gravitino.catalog.doris.operation;
 
+import com.apache.gravitino.exceptions.NoSuchSchemaException;
+import com.apache.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.catalog.doris.utils.DorisUtils;
 import com.datastrato.gravitino.catalog.jdbc.JdbcSchema;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
-import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
-import com.datastrato.gravitino.exceptions.NoSuchTableException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.google.common.collect.ImmutableSet;
 import java.sql.Connection;

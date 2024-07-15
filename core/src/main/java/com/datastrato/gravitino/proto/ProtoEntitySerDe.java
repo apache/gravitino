@@ -18,9 +18,9 @@
  */
 package com.datastrato.gravitino.proto;
 
+import com.apache.gravitino.Namespace;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntitySerDe;
-import com.datastrato.gravitino.Namespace;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.protobuf.Any;

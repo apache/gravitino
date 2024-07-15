@@ -18,25 +18,25 @@
  */
 package com.datastrato.gravitino.catalog.mysql.operation;
 
+import static com.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 import static com.datastrato.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.MYSQL_AUTO_INCREMENT_OFFSET_KEY;
 import static com.datastrato.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.MYSQL_ENGINE_KEY;
-import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
+import com.apache.gravitino.exceptions.NoSuchColumnException;
+import com.apache.gravitino.exceptions.NoSuchSchemaException;
+import com.apache.gravitino.exceptions.NoSuchTableException;
+import com.apache.gravitino.rel.Column;
+import com.apache.gravitino.rel.TableChange;
+import com.apache.gravitino.rel.expressions.distributions.Distribution;
+import com.apache.gravitino.rel.expressions.distributions.Distributions;
+import com.apache.gravitino.rel.expressions.transforms.Transform;
+import com.apache.gravitino.rel.indexes.Index;
+import com.apache.gravitino.rel.indexes.Indexes;
+import com.apache.gravitino.rel.types.Types;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcTableOperations;
-import com.datastrato.gravitino.exceptions.NoSuchColumnException;
-import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
-import com.datastrato.gravitino.exceptions.NoSuchTableException;
-import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.TableChange;
-import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
-import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
-import com.datastrato.gravitino.rel.expressions.transforms.Transform;
-import com.datastrato.gravitino.rel.indexes.Index;
-import com.datastrato.gravitino.rel.indexes.Indexes;
-import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;

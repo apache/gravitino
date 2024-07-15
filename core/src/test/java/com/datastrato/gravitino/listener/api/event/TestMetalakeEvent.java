@@ -22,10 +22,10 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.datastrato.gravitino.Metalake;
-import com.datastrato.gravitino.MetalakeChange;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
+import com.apache.gravitino.Metalake;
+import com.apache.gravitino.MetalakeChange;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.exceptions.GravitinoRuntimeException;
 import com.datastrato.gravitino.listener.DummyEventListener;
 import com.datastrato.gravitino.listener.EventBus;
 import com.datastrato.gravitino.listener.MetalakeEventDispatcher;

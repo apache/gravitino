@@ -19,10 +19,10 @@
 
 package com.datastrato.gravitino.storage.relational.service;
 
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.authorization.AuthorizationUtils;
-import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;

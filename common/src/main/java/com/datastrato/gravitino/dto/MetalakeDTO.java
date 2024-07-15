@@ -18,8 +18,8 @@
  */
 package com.datastrato.gravitino.dto;
 
-import com.datastrato.gravitino.Audit;
-import com.datastrato.gravitino.Metalake;
+import com.apache.gravitino.Audit;
+import com.apache.gravitino.Metalake;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;

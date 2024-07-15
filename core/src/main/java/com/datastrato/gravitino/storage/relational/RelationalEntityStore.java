@@ -20,6 +20,9 @@ package com.datastrato.gravitino.storage.relational;
 
 import static com.datastrato.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.Entity;
@@ -27,9 +30,6 @@ import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.EntitySerDe;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.HasIdentifier;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.utils.Executable;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;

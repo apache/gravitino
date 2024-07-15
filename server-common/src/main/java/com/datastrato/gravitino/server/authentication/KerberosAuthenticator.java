@@ -11,11 +11,11 @@
  */
 package com.datastrato.gravitino.server.authentication;
 
+import com.apache.gravitino.exceptions.UnauthorizedException;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.UserPrincipal;
 import com.datastrato.gravitino.auth.AuthConstants;
 import com.datastrato.gravitino.auth.KerberosUtils;
-import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import com.google.common.base.Splitter;
 import java.io.File;
 import java.nio.charset.StandardCharsets;

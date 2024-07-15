@@ -18,11 +18,14 @@
 
 package com.datastrato.gravitino.listener;
 
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.exceptions.NoSuchTopicException;
+import com.apache.gravitino.exceptions.TopicAlreadyExistsException;
+import com.apache.gravitino.messaging.DataLayout;
+import com.apache.gravitino.messaging.Topic;
+import com.apache.gravitino.messaging.TopicChange;
 import com.datastrato.gravitino.catalog.TopicDispatcher;
-import com.datastrato.gravitino.exceptions.NoSuchTopicException;
-import com.datastrato.gravitino.exceptions.TopicAlreadyExistsException;
 import com.datastrato.gravitino.listener.api.event.AlterTopicEvent;
 import com.datastrato.gravitino.listener.api.event.AlterTopicFailureEvent;
 import com.datastrato.gravitino.listener.api.event.CreateTopicEvent;
@@ -34,9 +37,6 @@ import com.datastrato.gravitino.listener.api.event.ListTopicFailureEvent;
 import com.datastrato.gravitino.listener.api.event.LoadTopicEvent;
 import com.datastrato.gravitino.listener.api.event.LoadTopicFailureEvent;
 import com.datastrato.gravitino.listener.api.info.TopicInfo;
-import com.datastrato.gravitino.messaging.DataLayout;
-import com.datastrato.gravitino.messaging.Topic;
-import com.datastrato.gravitino.messaging.TopicChange;
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import java.util.Map;
 

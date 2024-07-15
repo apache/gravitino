@@ -18,11 +18,11 @@
  */
 package com.datastrato.gravitino.proto;
 
-import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.authorization.Privilege;
-import com.datastrato.gravitino.authorization.Privileges;
-import com.datastrato.gravitino.authorization.SecurableObject;
-import com.datastrato.gravitino.authorization.SecurableObjects;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.authorization.Privilege;
+import com.apache.gravitino.authorization.Privileges;
+import com.apache.gravitino.authorization.SecurableObject;
+import com.apache.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.meta.RoleEntity;
 import com.google.common.collect.Lists;
 import java.util.List;

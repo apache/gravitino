@@ -18,14 +18,14 @@
 
 package com.datastrato.gravitino.listener;
 
-import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.CatalogChange;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
+import com.apache.gravitino.Catalog;
+import com.apache.gravitino.CatalogChange;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import com.apache.gravitino.exceptions.NoSuchCatalogException;
+import com.apache.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.catalog.CatalogDispatcher;
-import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
-import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
-import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.listener.api.event.AlterCatalogEvent;
 import com.datastrato.gravitino.listener.api.event.AlterCatalogFailureEvent;
 import com.datastrato.gravitino.listener.api.event.CreateCatalogEvent;

@@ -18,9 +18,9 @@
  */
 package com.datastrato.gravitino.dto.rel.expressions;
 
-import com.datastrato.gravitino.rel.expressions.literals.Literal;
-import com.datastrato.gravitino.rel.types.Type;
-import com.datastrato.gravitino.rel.types.Types;
+import com.apache.gravitino.rel.expressions.literals.Literal;
+import com.apache.gravitino.rel.types.Type;
+import com.apache.gravitino.rel.types.Types;
 import lombok.EqualsAndHashCode;
 
 /** Represents a Literal Data Transfer Object (DTO) that implements the Literal interface. */

@@ -18,7 +18,7 @@
 
 package com.datastrato.gravitino.catalog;
 
-import com.datastrato.gravitino.file.FilesetCatalog;
+import com.apache.gravitino.file.FilesetCatalog;
 
 /**
  * {@code FilesetDispatcher} interface acts as a specialization of the {@link FilesetCatalog}

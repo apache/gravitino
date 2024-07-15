@@ -21,11 +21,13 @@ package com.datastrato.gravitino.authorization;
 import static com.datastrato.gravitino.authorization.AuthorizationUtils.GROUP_DOES_NOT_EXIST_MSG;
 import static com.datastrato.gravitino.authorization.AuthorizationUtils.USER_DOES_NOT_EXIST_MSG;
 
+import com.apache.gravitino.authorization.Group;
+import com.apache.gravitino.authorization.User;
+import com.apache.gravitino.exceptions.NoSuchEntityException;
+import com.apache.gravitino.exceptions.NoSuchGroupException;
+import com.apache.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityStore;
-import com.datastrato.gravitino.exceptions.NoSuchEntityException;
-import com.datastrato.gravitino.exceptions.NoSuchGroupException;
-import com.datastrato.gravitino.exceptions.NoSuchUserException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.GroupEntity;
 import com.datastrato.gravitino.meta.RoleEntity;

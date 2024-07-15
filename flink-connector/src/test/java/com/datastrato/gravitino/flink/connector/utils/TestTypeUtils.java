@@ -19,7 +19,7 @@
 
 package com.datastrato.gravitino.flink.connector.utils;
 
-import com.datastrato.gravitino.rel.types.Types;
+import com.apache.gravitino.rel.types.Types;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.catalog.UnresolvedIdentifier;
 import org.apache.flink.table.types.logical.DoubleType;

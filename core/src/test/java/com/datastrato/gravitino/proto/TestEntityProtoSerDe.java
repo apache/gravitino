@@ -18,13 +18,15 @@
  */
 package com.datastrato.gravitino.proto;
 
+import com.apache.gravitino.Catalog;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.authorization.Privileges;
+import com.apache.gravitino.authorization.SecurableObject;
+import com.apache.gravitino.authorization.SecurableObjects;
+import com.apache.gravitino.file.Fileset;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntitySerDe;
 import com.datastrato.gravitino.EntitySerDeFactory;
-import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.authorization.Privileges;
-import com.datastrato.gravitino.authorization.SecurableObject;
-import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.meta.GroupEntity;
 import com.datastrato.gravitino.meta.RoleEntity;
 import com.datastrato.gravitino.meta.SchemaVersion;
@@ -149,7 +151,7 @@ public class TestEntityProtoSerDe {
             .withName(catalogName)
             .withNamespace(catalogNamespace)
             .withComment(comment)
-            .withType(com.datastrato.gravitino.Catalog.Type.RELATIONAL)
+            .withType(Catalog.Type.RELATIONAL)
             .withProvider(provider)
             .withAuditInfo(auditInfo)
             .build();
@@ -167,7 +169,7 @@ public class TestEntityProtoSerDe {
             .withName(catalogName)
             .withNamespace(catalogNamespace)
             .withComment(comment)
-            .withType(com.datastrato.gravitino.Catalog.Type.FILESET)
+            .withType(Catalog.Type.FILESET)
             .withProvider(provider)
             .withAuditInfo(auditInfo)
             .build();
@@ -243,7 +245,7 @@ public class TestEntityProtoSerDe {
             .withName(fileName)
             .withNamespace(filesetNamespace)
             .withAuditInfo(auditInfo)
-            .withFilesetType(com.datastrato.gravitino.file.Fileset.Type.MANAGED)
+            .withFilesetType(Fileset.Type.MANAGED)
             .withStorageLocation("testLocation")
             .withProperties(props)
             .withComment(comment)
@@ -260,7 +262,7 @@ public class TestEntityProtoSerDe {
             .withName(fileName)
             .withNamespace(filesetNamespace)
             .withAuditInfo(auditInfo)
-            .withFilesetType(com.datastrato.gravitino.file.Fileset.Type.MANAGED)
+            .withFilesetType(Fileset.Type.MANAGED)
             .withStorageLocation("testLocation")
             .build();
     byte[] fileBytes1 = protoEntitySerDe.serialize(fileEntity1);
@@ -277,7 +279,7 @@ public class TestEntityProtoSerDe {
             .withName(fileName)
             .withNamespace(filesetNamespace)
             .withAuditInfo(auditInfo)
-            .withFilesetType(com.datastrato.gravitino.file.Fileset.Type.EXTERNAL)
+            .withFilesetType(Fileset.Type.EXTERNAL)
             .withProperties(props)
             .withComment(comment)
             .withStorageLocation("testLocation")
@@ -288,8 +290,7 @@ public class TestEntityProtoSerDe {
             fileBytes2, com.datastrato.gravitino.meta.FilesetEntity.class, filesetNamespace);
     Assertions.assertEquals(fileEntity2, fileEntityFromBytes2);
     Assertions.assertEquals("testLocation", fileEntityFromBytes2.storageLocation());
-    Assertions.assertEquals(
-        com.datastrato.gravitino.file.Fileset.Type.EXTERNAL, fileEntityFromBytes2.filesetType());
+    Assertions.assertEquals(Fileset.Type.EXTERNAL, fileEntityFromBytes2.filesetType());
 
     // Test TopicEntity
     Namespace topicNamespace = Namespace.of("metalake", "catalog", "default");

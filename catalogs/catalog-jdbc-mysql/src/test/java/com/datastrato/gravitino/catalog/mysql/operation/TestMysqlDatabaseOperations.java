@@ -20,11 +20,11 @@ package com.datastrato.gravitino.catalog.mysql.operation;
 
 import static com.datastrato.gravitino.catalog.mysql.operation.MysqlDatabaseOperations.SYS_MYSQL_DATABASE_NAMES;
 
+import com.apache.gravitino.rel.expressions.distributions.Distributions;
+import com.apache.gravitino.rel.expressions.transforms.Transform;
+import com.apache.gravitino.rel.indexes.Index;
+import com.apache.gravitino.rel.types.Types;
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
-import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
-import com.datastrato.gravitino.rel.expressions.transforms.Transform;
-import com.datastrato.gravitino.rel.indexes.Index;
-import com.datastrato.gravitino.rel.types.Types;
 import com.datastrato.gravitino.utils.RandomNameUtils;
 import java.util.ArrayList;
 import java.util.HashMap;

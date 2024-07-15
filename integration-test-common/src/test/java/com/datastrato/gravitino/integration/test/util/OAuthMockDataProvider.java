@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.integration.test.util;
 
-import com.datastrato.gravitino.client.OAuth2TokenProvider;
+import com.apache.gravitino.client.OAuth2TokenProvider;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 

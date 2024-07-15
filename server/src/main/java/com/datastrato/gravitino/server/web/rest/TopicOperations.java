@@ -18,10 +18,12 @@
  */
 package com.datastrato.gravitino.server.web.rest;
 
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.messaging.Topic;
+import com.apache.gravitino.messaging.TopicChange;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.TopicDispatcher;
 import com.datastrato.gravitino.dto.requests.TopicCreateRequest;
 import com.datastrato.gravitino.dto.requests.TopicUpdateRequest;
@@ -32,8 +34,6 @@ import com.datastrato.gravitino.dto.responses.TopicResponse;
 import com.datastrato.gravitino.dto.util.DTOConverters;
 import com.datastrato.gravitino.lock.LockType;
 import com.datastrato.gravitino.lock.TreeLockUtils;
-import com.datastrato.gravitino.messaging.Topic;
-import com.datastrato.gravitino.messaging.TopicChange;
 import com.datastrato.gravitino.metrics.MetricNames;
 import com.datastrato.gravitino.server.web.Utils;
 import com.datastrato.gravitino.utils.NameIdentifierUtil;

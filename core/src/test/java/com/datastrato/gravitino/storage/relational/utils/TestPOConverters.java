@@ -22,9 +22,10 @@ package com.datastrato.gravitino.storage.relational.utils;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-import com.datastrato.gravitino.Catalog;
+import com.apache.gravitino.Catalog;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.file.Fileset;
 import com.datastrato.gravitino.Entity;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
@@ -845,7 +846,7 @@ public class TestPOConverters {
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
-        .withFilesetType(com.datastrato.gravitino.file.Fileset.Type.MANAGED)
+        .withFilesetType(Fileset.Type.MANAGED)
         .withStorageLocation(storageLocation)
         .withProperties(properties)
         .withComment(comment)
@@ -871,7 +872,7 @@ public class TestPOConverters {
         .withCatalogId(catalogId)
         .withSchemaId(schemaId)
         .withFilesetId(filesetId)
-        .withType(com.datastrato.gravitino.file.Fileset.Type.MANAGED.name())
+        .withType(Fileset.Type.MANAGED.name())
         .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
         .withCurrentVersion(1L)
         .withLastVersion(1L)

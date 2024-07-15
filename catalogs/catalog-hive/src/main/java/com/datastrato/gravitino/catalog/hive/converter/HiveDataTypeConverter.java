@@ -41,9 +41,9 @@ import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getUnionTyp
 import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getVarcharTypeInfo;
 import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils.getTypeInfoFromTypeString;
 
+import com.apache.gravitino.rel.types.Type;
+import com.apache.gravitino.rel.types.Types;
 import com.datastrato.gravitino.connector.DataTypeConverter;
-import com.datastrato.gravitino.rel.types.Type;
-import com.datastrato.gravitino.rel.types.Types;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;

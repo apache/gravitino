@@ -18,8 +18,8 @@
  */
 package com.datastrato.gravitino.dto.authorization;
 
-import com.datastrato.gravitino.authorization.Privilege;
-import com.datastrato.gravitino.authorization.Privileges;
+import com.apache.gravitino.authorization.Privilege;
+import com.apache.gravitino.authorization.Privileges;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 

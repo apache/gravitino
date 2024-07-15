@@ -18,8 +18,8 @@
 
 package com.datastrato.gravitino.listener.api.event;
 
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.annotation.DeveloperApi;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.annotation.DeveloperApi;
 
 /** Represents an event that occurs when an attempt to load a topic fails due to an exception. */
 @DeveloperApi

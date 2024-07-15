@@ -18,8 +18,8 @@
  */
 package com.datastrato.gravitino;
 
+import com.apache.gravitino.exceptions.GravitinoRuntimeException;
 import com.datastrato.gravitino.dto.VersionDTO;
-import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
 import java.io.IOException;
 import java.util.Properties;
 

@@ -27,9 +27,9 @@ import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.gen
 import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.getBinaryTransactionId;
 import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.getTransactionId;
 
+import com.apache.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Entity.EntityType;
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.storage.EntityKeyEncoder;
 import com.datastrato.gravitino.utils.Bytes;
 import com.google.common.annotations.VisibleForTesting;

@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.connector;
 
-import com.datastrato.gravitino.annotation.Evolving;
+import com.apache.gravitino.annotation.Evolving;
 import com.datastrato.gravitino.utils.Executable;
 import java.security.Principal;
 import java.util.Map;

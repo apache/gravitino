@@ -18,8 +18,8 @@
  */
 package com.datastrato.gravitino.catalog;
 
-import com.datastrato.gravitino.Audit;
-import com.datastrato.gravitino.Schema;
+import com.apache.gravitino.Audit;
+import com.apache.gravitino.Schema;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.SchemaEntity;

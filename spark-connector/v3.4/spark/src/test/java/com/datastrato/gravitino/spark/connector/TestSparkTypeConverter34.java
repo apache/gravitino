@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.spark.connector;
 
-import com.datastrato.gravitino.rel.types.Types.TimestampType;
+import com.apache.gravitino.rel.types.Types.TimestampType;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;

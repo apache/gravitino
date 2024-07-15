@@ -18,9 +18,9 @@
  */
 package com.datastrato.gravitino.connector;
 
-import com.datastrato.gravitino.Audit;
-import com.datastrato.gravitino.annotation.Evolving;
-import com.datastrato.gravitino.messaging.Topic;
+import com.apache.gravitino.Audit;
+import com.apache.gravitino.annotation.Evolving;
+import com.apache.gravitino.messaging.Topic;
 import com.datastrato.gravitino.meta.AuditInfo;
 import java.util.Map;
 import javax.annotation.Nullable;

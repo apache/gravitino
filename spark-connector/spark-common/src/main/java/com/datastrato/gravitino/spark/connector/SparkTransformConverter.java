@@ -18,14 +18,14 @@
 
 package com.datastrato.gravitino.spark.connector;
 
-import com.datastrato.gravitino.rel.expressions.Expression;
-import com.datastrato.gravitino.rel.expressions.NamedReference;
-import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
-import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
-import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
-import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
-import com.datastrato.gravitino.rel.expressions.transforms.Transform;
-import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
+import com.apache.gravitino.rel.expressions.Expression;
+import com.apache.gravitino.rel.expressions.NamedReference;
+import com.apache.gravitino.rel.expressions.distributions.Distribution;
+import com.apache.gravitino.rel.expressions.distributions.Distributions;
+import com.apache.gravitino.rel.expressions.sorts.SortOrder;
+import com.apache.gravitino.rel.expressions.sorts.SortOrders;
+import com.apache.gravitino.rel.expressions.transforms.Transform;
+import com.apache.gravitino.rel.expressions.transforms.Transforms;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -174,7 +174,7 @@ public class SparkTransformConverter {
   }
 
   public org.apache.spark.sql.connector.expressions.Transform[] toSparkTransform(
-      com.datastrato.gravitino.rel.expressions.transforms.Transform[] partitions,
+      com.apache.gravitino.rel.expressions.transforms.Transform[] partitions,
       Distribution distribution,
       SortOrder[] sortOrder) {
     List<org.apache.spark.sql.connector.expressions.Transform> sparkTransforms = new ArrayList<>();

@@ -19,7 +19,7 @@
 
 package com.datastrato.gravitino.meta;
 
-import com.datastrato.gravitino.Audit;
+import com.apache.gravitino.Audit;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Field;
 import java.time.Instant;

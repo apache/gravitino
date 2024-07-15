@@ -18,12 +18,12 @@
  */
 package com.datastrato.gravitino.meta;
 
-import com.datastrato.gravitino.Audit;
-import com.datastrato.gravitino.Auditable;
+import com.apache.gravitino.Audit;
+import com.apache.gravitino.Auditable;
+import com.apache.gravitino.Metalake;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Field;
 import com.datastrato.gravitino.HasIdentifier;
-import com.datastrato.gravitino.Metalake;
 import com.datastrato.gravitino.StringIdentifier;
 import java.util.Collections;
 import java.util.HashMap;

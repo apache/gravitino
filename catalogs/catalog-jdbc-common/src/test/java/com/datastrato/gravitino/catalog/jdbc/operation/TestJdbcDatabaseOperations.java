@@ -18,11 +18,11 @@
  */
 package com.datastrato.gravitino.catalog.jdbc.operation;
 
+import com.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.SqliteExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.utils.DataSourceUtils;
-import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;

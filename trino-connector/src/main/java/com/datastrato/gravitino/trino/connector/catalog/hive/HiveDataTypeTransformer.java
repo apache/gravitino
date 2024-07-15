@@ -19,8 +19,8 @@
 
 package com.datastrato.gravitino.trino.connector.catalog.hive;
 
-import com.datastrato.gravitino.rel.types.Type;
-import com.datastrato.gravitino.rel.types.Types;
+import com.apache.gravitino.rel.types.Type;
+import com.apache.gravitino.rel.types.Types;
 import com.datastrato.gravitino.trino.connector.GravitinoErrorCode;
 import com.datastrato.gravitino.trino.connector.util.GeneralDataTypeTransformer;
 import io.trino.spi.TrinoException;

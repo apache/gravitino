@@ -18,9 +18,9 @@
  */
 package com.datastrato.gravitino.connector;
 
-import com.datastrato.gravitino.SupportsSchemas;
-import com.datastrato.gravitino.annotation.Evolving;
-import com.datastrato.gravitino.rel.TableCatalog;
+import com.apache.gravitino.SupportsSchemas;
+import com.apache.gravitino.annotation.Evolving;
+import com.apache.gravitino.rel.TableCatalog;
 import java.io.Closeable;
 import java.util.Map;
 

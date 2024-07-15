@@ -19,12 +19,12 @@
 
 package com.datastrato.gravitino.connector;
 
-import static com.datastrato.gravitino.Catalog.CLOUD_NAME;
-import static com.datastrato.gravitino.Catalog.CLOUD_REGION_CODE;
-import static com.datastrato.gravitino.Catalog.PROPERTY_PACKAGE;
+import static com.apache.gravitino.Catalog.CLOUD_NAME;
+import static com.apache.gravitino.Catalog.CLOUD_REGION_CODE;
+import static com.apache.gravitino.Catalog.PROPERTY_PACKAGE;
 
-import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.annotation.Evolving;
+import com.apache.gravitino.Catalog;
+import com.apache.gravitino.annotation.Evolving;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import java.util.Map;

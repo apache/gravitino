@@ -23,7 +23,7 @@ import static com.datastrato.gravitino.catalog.hive.HiveCatalog.SCHEMA_PROPERTIE
 import static com.datastrato.gravitino.catalog.hive.HiveCatalog.TABLE_PROPERTIES_METADATA;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 
-import com.datastrato.gravitino.Namespace;
+import com.apache.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.PropertiesMetadataHelpers;
 import com.datastrato.gravitino.catalog.hive.miniHMS.MiniHiveMetastoreService;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;

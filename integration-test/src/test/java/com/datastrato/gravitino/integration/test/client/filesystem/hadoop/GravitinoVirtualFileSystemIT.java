@@ -20,10 +20,10 @@ package com.datastrato.gravitino.integration.test.client.filesystem.hadoop;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.client.GravitinoMetalake;
-import com.datastrato.gravitino.file.Fileset;
+import com.apache.gravitino.Catalog;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.client.GravitinoMetalake;
+import com.apache.gravitino.file.Fileset;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;

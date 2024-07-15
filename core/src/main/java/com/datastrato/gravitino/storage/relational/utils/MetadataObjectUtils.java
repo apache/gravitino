@@ -18,9 +18,9 @@
  */
 package com.datastrato.gravitino.storage.relational.utils;
 
+import com.apache.gravitino.MetadataObject;
+import com.apache.gravitino.MetadataObjects;
 import com.datastrato.gravitino.Entity;
-import com.datastrato.gravitino.MetadataObject;
-import com.datastrato.gravitino.MetadataObjects;
 import com.datastrato.gravitino.storage.relational.po.CatalogPO;
 import com.datastrato.gravitino.storage.relational.po.FilesetPO;
 import com.datastrato.gravitino.storage.relational.po.MetalakePO;

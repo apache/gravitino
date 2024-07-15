@@ -21,12 +21,12 @@ package com.datastrato.gravitino.catalog.hive;
 import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 import static com.datastrato.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.Schema;
-import com.datastrato.gravitino.SchemaChange;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.Schema;
+import com.apache.gravitino.SchemaChange;
+import com.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.catalog.hive.miniHMS.MiniHiveMetastoreService;
-import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.google.common.collect.Maps;

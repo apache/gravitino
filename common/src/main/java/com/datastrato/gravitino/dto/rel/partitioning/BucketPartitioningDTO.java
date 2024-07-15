@@ -18,11 +18,11 @@
  */
 package com.datastrato.gravitino.dto.rel.partitioning;
 
+import static com.apache.gravitino.rel.expressions.transforms.Transforms.bucket;
 import static com.datastrato.gravitino.dto.rel.PartitionUtils.validateFieldExistence;
-import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.bucket;
 
+import com.apache.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
-import com.datastrato.gravitino.rel.expressions.Expression;
 import java.util.Arrays;
 import lombok.EqualsAndHashCode;
 

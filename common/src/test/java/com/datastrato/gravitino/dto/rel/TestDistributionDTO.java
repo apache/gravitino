@@ -19,10 +19,10 @@
 
 package com.datastrato.gravitino.dto.rel;
 
+import com.apache.gravitino.rel.expressions.distributions.Strategy;
 import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FuncExpressionDTO;
 import com.datastrato.gravitino.json.JsonUtils;
-import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;

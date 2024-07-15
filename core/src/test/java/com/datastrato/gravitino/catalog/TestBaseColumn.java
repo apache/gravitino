@@ -21,8 +21,8 @@ package com.datastrato.gravitino.catalog;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
+import com.apache.gravitino.rel.types.Types;
 import com.datastrato.gravitino.connector.BaseColumn;
-import com.datastrato.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Test;
 
 final class BaseColumnExtension extends BaseColumn {

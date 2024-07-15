@@ -22,7 +22,7 @@ import static com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonCatalog.CA
 import static com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonCatalog.SCHEMA_PROPERTIES_META;
 import static com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonCatalog.TABLE_PROPERTIES_META;
 
-import com.datastrato.gravitino.Namespace;
+import com.apache.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.PropertiesMetadataHelpers;
 import com.datastrato.gravitino.catalog.lakehouse.paimon.ops.PaimonCatalogOps;
 import com.datastrato.gravitino.connector.CatalogOperations;

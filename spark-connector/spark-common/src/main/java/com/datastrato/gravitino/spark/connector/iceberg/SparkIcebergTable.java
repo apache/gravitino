@@ -18,7 +18,7 @@
 
 package com.datastrato.gravitino.spark.connector.iceberg;
 
-import com.datastrato.gravitino.rel.Table;
+import com.apache.gravitino.rel.Table;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
 import com.datastrato.gravitino.spark.connector.SparkTypeConverter;

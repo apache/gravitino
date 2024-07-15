@@ -18,15 +18,15 @@
  */
 package com.datastrato.gravitino.catalog.hadoop.integration.test;
 
-import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.Schema;
-import com.datastrato.gravitino.client.GravitinoMetalake;
-import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
-import com.datastrato.gravitino.exceptions.NoSuchFilesetException;
-import com.datastrato.gravitino.file.Fileset;
-import com.datastrato.gravitino.file.FilesetChange;
+import com.apache.gravitino.Catalog;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.Schema;
+import com.apache.gravitino.client.GravitinoMetalake;
+import com.apache.gravitino.exceptions.FilesetAlreadyExistsException;
+import com.apache.gravitino.exceptions.NoSuchFilesetException;
+import com.apache.gravitino.file.Fileset;
+import com.apache.gravitino.file.FilesetChange;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;

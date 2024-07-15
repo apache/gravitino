@@ -21,9 +21,9 @@ package com.datastrato.gravitino.utils;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.exceptions.IllegalNameIdentifierException;
-import com.datastrato.gravitino.exceptions.IllegalNamespaceException;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.exceptions.IllegalNameIdentifierException;
+import com.apache.gravitino.exceptions.IllegalNamespaceException;
 import org.junit.jupiter.api.Test;
 
 public class TestNameIdentifierUtil {

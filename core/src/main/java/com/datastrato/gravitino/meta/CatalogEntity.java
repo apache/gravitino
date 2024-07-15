@@ -18,13 +18,13 @@
  */
 package com.datastrato.gravitino.meta;
 
-import com.datastrato.gravitino.Audit;
-import com.datastrato.gravitino.Auditable;
-import com.datastrato.gravitino.Catalog;
+import com.apache.gravitino.Audit;
+import com.apache.gravitino.Auditable;
+import com.apache.gravitino.Catalog;
+import com.apache.gravitino.Namespace;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Field;
 import com.datastrato.gravitino.HasIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.connector.CatalogInfo;
 import com.google.common.base.Objects;
 import java.util.Collections;

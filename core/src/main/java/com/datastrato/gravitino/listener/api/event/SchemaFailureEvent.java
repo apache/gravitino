@@ -18,8 +18,8 @@
 
 package com.datastrato.gravitino.listener.api.event;
 
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.annotation.DeveloperApi;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.annotation.DeveloperApi;
 
 /**
  * An abstract class representing events that are triggered when a schema operation fails due to an

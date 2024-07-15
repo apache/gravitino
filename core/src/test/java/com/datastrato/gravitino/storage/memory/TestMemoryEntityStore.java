@@ -18,6 +18,13 @@
  */
 package com.datastrato.gravitino.storage.memory;
 
+import com.apache.gravitino.Metalake;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.authorization.Privileges;
+import com.apache.gravitino.authorization.SecurableObjects;
+import com.apache.gravitino.exceptions.NoSuchEntityException;
+import com.apache.gravitino.file.Fileset;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.Entity.EntityType;
@@ -25,15 +32,8 @@ import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.EntitySerDe;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.HasIdentifier;
-import com.datastrato.gravitino.Metalake;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.TestCatalog;
 import com.datastrato.gravitino.authorization.AuthorizationUtils;
-import com.datastrato.gravitino.authorization.Privileges;
-import com.datastrato.gravitino.authorization.SecurableObjects;
-import com.datastrato.gravitino.exceptions.NoSuchEntityException;
-import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;

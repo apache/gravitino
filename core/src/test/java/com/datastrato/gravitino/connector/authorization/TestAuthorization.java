@@ -18,8 +18,8 @@
  */
 package com.datastrato.gravitino.connector.authorization;
 
-import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.Namespace;
+import com.apache.gravitino.Catalog;
+import com.apache.gravitino.Namespace;
 import com.datastrato.gravitino.TestCatalog;
 import com.datastrato.gravitino.connector.authorization.mysql.TestMySQLAuthorizationPlugin;
 import com.datastrato.gravitino.connector.authorization.ranger.TestRangerAuthorizationPlugin;

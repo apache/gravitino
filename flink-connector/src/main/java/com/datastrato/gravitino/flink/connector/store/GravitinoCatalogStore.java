@@ -19,7 +19,7 @@
 
 package com.datastrato.gravitino.flink.connector.store;
 
-import com.datastrato.gravitino.Catalog;
+import com.apache.gravitino.Catalog;
 import com.datastrato.gravitino.flink.connector.PropertiesConverter;
 import com.datastrato.gravitino.flink.connector.catalog.GravitinoCatalogManager;
 import com.datastrato.gravitino.flink.connector.hive.GravitinoHiveCatalogFactoryOptions;

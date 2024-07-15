@@ -18,7 +18,7 @@
 
 package com.datastrato.gravitino.listener.api.event;
 
-import com.datastrato.gravitino.annotation.DeveloperApi;
+import com.apache.gravitino.annotation.DeveloperApi;
 
 /**
  * Represents an event that is triggered when an attempt to list metalakes fails due to an

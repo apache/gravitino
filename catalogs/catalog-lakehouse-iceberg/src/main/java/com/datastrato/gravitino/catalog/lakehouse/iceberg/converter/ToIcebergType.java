@@ -29,14 +29,14 @@ import org.apache.iceberg.types.Types;
  * <p>Referred from core/src/main/java/org/apache/iceberg/spark/SparkTypeToType.java
  */
 public class ToIcebergType extends ToIcebergTypeVisitor<Type> {
-  private final com.datastrato.gravitino.rel.types.Types.StructType root;
+  private final com.apache.gravitino.rel.types.Types.StructType root;
   private int nextId = 0;
 
   public ToIcebergType() {
     this.root = null;
   }
 
-  public ToIcebergType(com.datastrato.gravitino.rel.types.Types.StructType root) {
+  public ToIcebergType(com.apache.gravitino.rel.types.Types.StructType root) {
     this.root = root;
     // the root struct's fields use the first ids
     this.nextId = root.fields().length;
@@ -48,13 +48,13 @@ public class ToIcebergType extends ToIcebergTypeVisitor<Type> {
 
   @SuppressWarnings("ReferenceEquality")
   @Override
-  public Type struct(com.datastrato.gravitino.rel.types.Types.StructType struct, List<Type> types) {
-    com.datastrato.gravitino.rel.types.Types.StructType.Field[] fields = struct.fields();
+  public Type struct(com.apache.gravitino.rel.types.Types.StructType struct, List<Type> types) {
+    com.apache.gravitino.rel.types.Types.StructType.Field[] fields = struct.fields();
     List<Types.NestedField> newFields = Lists.newArrayListWithExpectedSize(fields.length);
     // Comparing the root node by reference equality.
     boolean isRoot = root == struct;
     for (int i = 0; i < fields.length; i += 1) {
-      com.datastrato.gravitino.rel.types.Types.StructType.Field field = fields[i];
+      com.apache.gravitino.rel.types.Types.StructType.Field field = fields[i];
       Type type = types.get(i);
 
       int id;
@@ -77,13 +77,12 @@ public class ToIcebergType extends ToIcebergTypeVisitor<Type> {
   }
 
   @Override
-  public Type field(
-      com.datastrato.gravitino.rel.types.Types.StructType.Field field, Type typeResult) {
+  public Type field(com.apache.gravitino.rel.types.Types.StructType.Field field, Type typeResult) {
     return typeResult;
   }
 
   @Override
-  public Type array(com.datastrato.gravitino.rel.types.Types.ListType array, Type elementType) {
+  public Type array(com.apache.gravitino.rel.types.Types.ListType array, Type elementType) {
     if (array.elementNullable()) {
       return Types.ListType.ofOptional(getNextId(), elementType);
     } else {
@@ -92,8 +91,7 @@ public class ToIcebergType extends ToIcebergTypeVisitor<Type> {
   }
 
   @Override
-  public Type map(
-      com.datastrato.gravitino.rel.types.Types.MapType map, Type keyType, Type valueType) {
+  public Type map(com.apache.gravitino.rel.types.Types.MapType map, Type keyType, Type valueType) {
     if (map.valueNullable()) {
       return Types.MapType.ofOptional(getNextId(), getNextId(), keyType, valueType);
     } else {
@@ -102,43 +100,43 @@ public class ToIcebergType extends ToIcebergTypeVisitor<Type> {
   }
 
   @Override
-  public Type atomic(com.datastrato.gravitino.rel.types.Type.PrimitiveType primitive) {
-    if (primitive instanceof com.datastrato.gravitino.rel.types.Types.BooleanType) {
+  public Type atomic(com.apache.gravitino.rel.types.Type.PrimitiveType primitive) {
+    if (primitive instanceof com.apache.gravitino.rel.types.Types.BooleanType) {
       return Types.BooleanType.get();
-    } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.ByteType
-        || primitive instanceof com.datastrato.gravitino.rel.types.Types.ShortType) {
+    } else if (primitive instanceof com.apache.gravitino.rel.types.Types.ByteType
+        || primitive instanceof com.apache.gravitino.rel.types.Types.ShortType) {
       throw new IllegalArgumentException(
           "Iceberg do not support Byte and Short Type, use Integer instead");
-    } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.IntegerType) {
+    } else if (primitive instanceof com.apache.gravitino.rel.types.Types.IntegerType) {
       return Types.IntegerType.get();
-    } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.LongType) {
+    } else if (primitive instanceof com.apache.gravitino.rel.types.Types.LongType) {
       return Types.LongType.get();
-    } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.FloatType) {
+    } else if (primitive instanceof com.apache.gravitino.rel.types.Types.FloatType) {
       return Types.FloatType.get();
-    } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.DoubleType) {
+    } else if (primitive instanceof com.apache.gravitino.rel.types.Types.DoubleType) {
       return Types.DoubleType.get();
-    } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.StringType) {
+    } else if (primitive instanceof com.apache.gravitino.rel.types.Types.StringType) {
       return Types.StringType.get();
-    } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.DateType) {
+    } else if (primitive instanceof com.apache.gravitino.rel.types.Types.DateType) {
       return Types.DateType.get();
-    } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.TimeType) {
+    } else if (primitive instanceof com.apache.gravitino.rel.types.Types.TimeType) {
       return Types.TimeType.get();
-    } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.TimestampType) {
-      if (((com.datastrato.gravitino.rel.types.Types.TimestampType) primitive).hasTimeZone()) {
+    } else if (primitive instanceof com.apache.gravitino.rel.types.Types.TimestampType) {
+      if (((com.apache.gravitino.rel.types.Types.TimestampType) primitive).hasTimeZone()) {
         return Types.TimestampType.withZone();
       } else {
         return Types.TimestampType.withoutZone();
       }
-    } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.DecimalType) {
+    } else if (primitive instanceof com.apache.gravitino.rel.types.Types.DecimalType) {
       return Types.DecimalType.of(
-          ((com.datastrato.gravitino.rel.types.Types.DecimalType) primitive).precision(),
-          ((com.datastrato.gravitino.rel.types.Types.DecimalType) primitive).scale());
-    } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.FixedType) {
+          ((com.apache.gravitino.rel.types.Types.DecimalType) primitive).precision(),
+          ((com.apache.gravitino.rel.types.Types.DecimalType) primitive).scale());
+    } else if (primitive instanceof com.apache.gravitino.rel.types.Types.FixedType) {
       return Types.FixedType.ofLength(
-          ((com.datastrato.gravitino.rel.types.Types.FixedType) primitive).length());
-    } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.BinaryType) {
+          ((com.apache.gravitino.rel.types.Types.FixedType) primitive).length());
+    } else if (primitive instanceof com.apache.gravitino.rel.types.Types.BinaryType) {
       return Types.BinaryType.get();
-    } else if (primitive instanceof com.datastrato.gravitino.rel.types.Types.UUIDType) {
+    } else if (primitive instanceof com.apache.gravitino.rel.types.Types.UUIDType) {
       return Types.UUIDType.get();
     }
     throw new UnsupportedOperationException("Not a supported type: " + primitive.toString());

@@ -33,14 +33,14 @@ import static com.datastrato.gravitino.storage.kv.TestKvEntityStorage.createTabl
 import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.getBinaryTransactionId;
 import static com.datastrato.gravitino.storage.kv.TransactionalKvBackendImpl.getTransactionId;
 
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntitySerDeFactory;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.EntityStoreFactory;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;

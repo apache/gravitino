@@ -18,17 +18,17 @@
  */
 package com.datastrato.gravitino.server.web.rest;
 
+import com.apache.gravitino.MetadataObject;
+import com.apache.gravitino.MetadataObjects;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.authorization.Privilege;
+import com.apache.gravitino.authorization.Privileges;
+import com.apache.gravitino.authorization.SecurableObject;
+import com.apache.gravitino.authorization.SecurableObjects;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.datastrato.gravitino.GravitinoEnv;
-import com.datastrato.gravitino.MetadataObject;
-import com.datastrato.gravitino.MetadataObjects;
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.authorization.AccessControlManager;
-import com.datastrato.gravitino.authorization.Privilege;
-import com.datastrato.gravitino.authorization.Privileges;
-import com.datastrato.gravitino.authorization.SecurableObject;
-import com.datastrato.gravitino.authorization.SecurableObjects;
 import com.datastrato.gravitino.dto.authorization.SecurableObjectDTO;
 import com.datastrato.gravitino.dto.requests.RoleCreateRequest;
 import com.datastrato.gravitino.dto.responses.DeleteResponse;

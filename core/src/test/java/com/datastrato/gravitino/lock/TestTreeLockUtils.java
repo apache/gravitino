@@ -25,9 +25,9 @@ import static com.datastrato.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 
+import com.apache.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.GravitinoEnv;
-import com.datastrato.gravitino.NameIdentifier;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.junit.jupiter.api.Test;
 

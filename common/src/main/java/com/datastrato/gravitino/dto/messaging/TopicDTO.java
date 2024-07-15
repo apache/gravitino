@@ -18,9 +18,9 @@
  */
 package com.datastrato.gravitino.dto.messaging;
 
-import com.datastrato.gravitino.Audit;
+import com.apache.gravitino.Audit;
+import com.apache.gravitino.messaging.Topic;
 import com.datastrato.gravitino.dto.AuditDTO;
-import com.datastrato.gravitino.messaging.Topic;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Map;
 import java.util.Objects;

@@ -20,12 +20,12 @@ package com.datastrato.gravitino.trino.connector.metadata;
 
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_COLUMN_NOT_EXISTS;
 
-import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Table;
-import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
-import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
-import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
-import com.datastrato.gravitino.rel.expressions.transforms.Transform;
+import com.apache.gravitino.rel.Column;
+import com.apache.gravitino.rel.Table;
+import com.apache.gravitino.rel.expressions.distributions.Distribution;
+import com.apache.gravitino.rel.expressions.distributions.Distributions;
+import com.apache.gravitino.rel.expressions.sorts.SortOrder;
+import com.apache.gravitino.rel.expressions.transforms.Transform;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.google.common.collect.ImmutableList;
 import io.trino.spi.TrinoException;

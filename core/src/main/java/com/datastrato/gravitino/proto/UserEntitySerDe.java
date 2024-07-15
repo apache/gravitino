@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.proto;
 
-import com.datastrato.gravitino.Namespace;
+import com.apache.gravitino.Namespace;
 import com.datastrato.gravitino.meta.UserEntity;
 import java.util.Collection;
 

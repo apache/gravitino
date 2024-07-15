@@ -18,8 +18,18 @@
  */
 package com.datastrato.gravitino.json;
 
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.rel.Column;
+import com.apache.gravitino.rel.TableChange;
+import com.apache.gravitino.rel.expressions.Expression;
+import com.apache.gravitino.rel.expressions.UnparsedExpression;
+import com.apache.gravitino.rel.expressions.distributions.Strategy;
+import com.apache.gravitino.rel.expressions.sorts.NullOrdering;
+import com.apache.gravitino.rel.expressions.sorts.SortDirection;
+import com.apache.gravitino.rel.indexes.Index;
+import com.apache.gravitino.rel.types.Type;
+import com.apache.gravitino.rel.types.Types;
 import com.datastrato.gravitino.dto.rel.DistributionDTO;
 import com.datastrato.gravitino.dto.rel.SortOrderDTO;
 import com.datastrato.gravitino.dto.rel.expressions.FieldReferenceDTO;
@@ -43,16 +53,6 @@ import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.ListPartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.PartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.RangePartitionDTO;
-import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.TableChange;
-import com.datastrato.gravitino.rel.expressions.Expression;
-import com.datastrato.gravitino.rel.expressions.UnparsedExpression;
-import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
-import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
-import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
-import com.datastrato.gravitino.rel.indexes.Index;
-import com.datastrato.gravitino.rel.types.Type;
-import com.datastrato.gravitino.rel.types.Types;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.core.JacksonException;

@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.dto.rel.expressions;
 
-import com.datastrato.gravitino.rel.expressions.NamedReference;
+import com.apache.gravitino.rel.expressions.NamedReference;
 import lombok.EqualsAndHashCode;
 
 /** Data transfer object representing a field reference. */

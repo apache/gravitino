@@ -18,11 +18,11 @@
  */
 package com.datastrato.gravitino.meta;
 
-import com.datastrato.gravitino.Catalog;
+import com.apache.gravitino.Catalog;
+import com.apache.gravitino.authorization.Privileges;
+import com.apache.gravitino.authorization.SecurableObjects;
+import com.apache.gravitino.file.Fileset;
 import com.datastrato.gravitino.Field;
-import com.datastrato.gravitino.authorization.Privileges;
-import com.datastrato.gravitino.authorization.SecurableObjects;
-import com.datastrato.gravitino.file.Fileset;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.time.Instant;

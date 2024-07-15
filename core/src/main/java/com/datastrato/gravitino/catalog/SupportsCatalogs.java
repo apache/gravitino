@@ -18,15 +18,15 @@
  */
 package com.datastrato.gravitino.catalog;
 
-import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.CatalogChange;
-import com.datastrato.gravitino.CatalogProvider;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.annotation.Evolving;
-import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
-import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
-import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
+import com.apache.gravitino.Catalog;
+import com.apache.gravitino.CatalogChange;
+import com.apache.gravitino.CatalogProvider;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.annotation.Evolving;
+import com.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import com.apache.gravitino.exceptions.NoSuchCatalogException;
+import com.apache.gravitino.exceptions.NoSuchMetalakeException;
 import java.util.Map;
 
 /**

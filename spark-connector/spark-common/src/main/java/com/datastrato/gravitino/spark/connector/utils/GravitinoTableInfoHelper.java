@@ -18,8 +18,8 @@
 
 package com.datastrato.gravitino.spark.connector.utils;
 
-import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
-import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
+import com.apache.gravitino.rel.expressions.distributions.Distribution;
+import com.apache.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.spark.connector.ConnectorConstants;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
@@ -46,7 +46,7 @@ public class GravitinoTableInfoHelper {
 
   private boolean isCaseSensitive;
   private Identifier identifier;
-  private com.datastrato.gravitino.rel.Table gravitinoTable;
+  private com.apache.gravitino.rel.Table gravitinoTable;
   private PropertiesConverter propertiesConverter;
   private SparkTransformConverter sparkTransformConverter;
   private SparkTypeConverter sparkTypeConverter;
@@ -54,7 +54,7 @@ public class GravitinoTableInfoHelper {
   public GravitinoTableInfoHelper(
       boolean isCaseSensitive,
       Identifier identifier,
-      com.datastrato.gravitino.rel.Table gravitinoTable,
+      com.apache.gravitino.rel.Table gravitinoTable,
       PropertiesConverter propertiesConverter,
       SparkTransformConverter sparkTransformConverter,
       SparkTypeConverter sparkTypeConverter) {
@@ -110,7 +110,7 @@ public class GravitinoTableInfoHelper {
   }
 
   public Transform[] partitioning() {
-    com.datastrato.gravitino.rel.expressions.transforms.Transform[] partitions =
+    com.apache.gravitino.rel.expressions.transforms.Transform[] partitions =
         gravitinoTable.partitioning();
     Distribution distribution = gravitinoTable.distribution();
     SortOrder[] sortOrders = gravitinoTable.sortOrder();

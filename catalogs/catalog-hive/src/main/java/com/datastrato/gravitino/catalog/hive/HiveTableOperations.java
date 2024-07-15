@@ -18,18 +18,18 @@
  */
 package com.datastrato.gravitino.catalog.hive;
 
-import com.datastrato.gravitino.MetadataObjects;
+import com.apache.gravitino.MetadataObjects;
+import com.apache.gravitino.exceptions.NoSuchPartitionException;
+import com.apache.gravitino.exceptions.NoSuchTableException;
+import com.apache.gravitino.exceptions.PartitionAlreadyExistsException;
+import com.apache.gravitino.rel.SupportsPartitions;
+import com.apache.gravitino.rel.expressions.literals.Literal;
+import com.apache.gravitino.rel.expressions.literals.Literals;
+import com.apache.gravitino.rel.expressions.transforms.Transforms;
+import com.apache.gravitino.rel.partitions.IdentityPartition;
+import com.apache.gravitino.rel.partitions.Partition;
+import com.apache.gravitino.rel.partitions.Partitions;
 import com.datastrato.gravitino.connector.TableOperations;
-import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
-import com.datastrato.gravitino.exceptions.NoSuchTableException;
-import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
-import com.datastrato.gravitino.rel.SupportsPartitions;
-import com.datastrato.gravitino.rel.expressions.literals.Literal;
-import com.datastrato.gravitino.rel.expressions.literals.Literals;
-import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
-import com.datastrato.gravitino.rel.partitions.IdentityPartition;
-import com.datastrato.gravitino.rel.partitions.Partition;
-import com.datastrato.gravitino.rel.partitions.Partitions;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Arrays;

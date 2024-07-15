@@ -20,11 +20,11 @@ package com.datastrato.gravitino.metalake;
 
 import static com.datastrato.gravitino.Entity.SYSTEM_METALAKE_RESERVED_NAME;
 
-import com.datastrato.gravitino.Metalake;
-import com.datastrato.gravitino.MetalakeChange;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
-import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
+import com.apache.gravitino.Metalake;
+import com.apache.gravitino.MetalakeChange;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
+import com.apache.gravitino.exceptions.NoSuchMetalakeException;
 import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;
 import java.util.Map;

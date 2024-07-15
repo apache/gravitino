@@ -29,9 +29,9 @@ import static com.datastrato.gravitino.storage.kv.BinaryEntityKeyEncoder.LOG;
 import static com.datastrato.gravitino.storage.kv.BinaryEntityKeyEncoder.NAMESPACE_SEPARATOR;
 import static com.datastrato.gravitino.storage.kv.BinaryEntityKeyEncoder.TYPE_AND_NAME_SEPARATOR;
 
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
 import com.datastrato.gravitino.Entity.EntityType;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.storage.NameMappingService;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableSet;

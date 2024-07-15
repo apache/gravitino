@@ -18,8 +18,8 @@
  */
 package com.datastrato.gravitino.flink.connector.integration.test;
 
-import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.client.GravitinoMetalake;
+import com.apache.gravitino.Catalog;
+import com.apache.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.flink.connector.PropertiesConverter;
 import com.datastrato.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;

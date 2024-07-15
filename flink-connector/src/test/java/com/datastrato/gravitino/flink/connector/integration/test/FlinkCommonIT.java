@@ -19,18 +19,18 @@
 
 package com.datastrato.gravitino.flink.connector.integration.test;
 
+import static com.apache.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
 import static com.datastrato.gravitino.flink.connector.integration.test.utils.TestUtils.assertColumns;
 import static com.datastrato.gravitino.flink.connector.integration.test.utils.TestUtils.toFlinkPhysicalColumn;
-import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
 
-import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Schema;
+import com.apache.gravitino.Catalog;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Schema;
+import com.apache.gravitino.rel.Column;
+import com.apache.gravitino.rel.Table;
+import com.apache.gravitino.rel.types.Types;
 import com.datastrato.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
 import com.datastrato.gravitino.flink.connector.integration.test.utils.TestUtils;
-import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Table;
-import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.ImmutableMap;
 import java.util.Optional;
 import org.apache.flink.table.api.DataTypes;

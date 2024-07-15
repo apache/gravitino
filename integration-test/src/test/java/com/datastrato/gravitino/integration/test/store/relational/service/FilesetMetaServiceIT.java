@@ -21,13 +21,13 @@ package com.datastrato.gravitino.integration.test.store.relational.service;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.datastrato.gravitino.Catalog;
+import com.apache.gravitino.Catalog;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.file.Fileset;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.config.ConfigConstants;
-import com.datastrato.gravitino.file.Fileset;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.MySQLContainer;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;

@@ -18,12 +18,12 @@
  */
 package com.datastrato.gravitino.server.web.rest;
 
+import com.apache.gravitino.Metalake;
+import com.apache.gravitino.MetalakeChange;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import com.datastrato.gravitino.Metalake;
-import com.datastrato.gravitino.MetalakeChange;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.dto.MetalakeDTO;
 import com.datastrato.gravitino.dto.requests.MetalakeCreateRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeUpdateRequest;

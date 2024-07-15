@@ -21,8 +21,8 @@ package com.datastrato.gravitino.catalog.lakehouse.paimon;
 import static com.datastrato.gravitino.catalog.lakehouse.paimon.utils.TypeUtils.fromPaimonType;
 import static com.datastrato.gravitino.catalog.lakehouse.paimon.utils.TypeUtils.toPaimonType;
 
+import com.apache.gravitino.rel.Column;
 import com.datastrato.gravitino.connector.BaseColumn;
-import com.datastrato.gravitino.rel.Column;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.EqualsAndHashCode;

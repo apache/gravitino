@@ -19,7 +19,7 @@
 
 package com.datastrato.gravitino.lock;
 
-import com.datastrato.gravitino.NameIdentifier;
+import com.apache.gravitino.NameIdentifier;
 import java.util.Deque;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;

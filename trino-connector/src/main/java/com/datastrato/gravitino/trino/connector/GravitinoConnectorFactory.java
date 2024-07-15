@@ -22,7 +22,7 @@ import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVIT
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_MISSING_CONFIG;
 import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR;
 
-import com.datastrato.gravitino.client.GravitinoAdminClient;
+import com.apache.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorFactory;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogRegister;

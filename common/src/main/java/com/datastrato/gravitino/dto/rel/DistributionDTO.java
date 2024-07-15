@@ -21,11 +21,11 @@ package com.datastrato.gravitino.dto.rel;
 
 import static com.datastrato.gravitino.dto.rel.expressions.FunctionArg.EMPTY_ARGS;
 
+import com.apache.gravitino.rel.expressions.Expression;
+import com.apache.gravitino.rel.expressions.distributions.Distribution;
+import com.apache.gravitino.rel.expressions.distributions.Strategy;
 import com.datastrato.gravitino.dto.rel.expressions.FunctionArg;
 import com.datastrato.gravitino.json.JsonUtils;
-import com.datastrato.gravitino.rel.expressions.Expression;
-import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
-import com.datastrato.gravitino.rel.expressions.distributions.Strategy;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;

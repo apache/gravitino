@@ -18,17 +18,17 @@
  */
 package com.datastrato.gravitino.filesystem.hadoop;
 
-import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.client.DefaultOAuth2TokenProvider;
-import com.datastrato.gravitino.client.GravitinoClient;
-import com.datastrato.gravitino.client.KerberosTokenProvider;
-import com.datastrato.gravitino.file.Fileset;
-import com.datastrato.gravitino.shaded.com.google.common.annotations.VisibleForTesting;
-import com.datastrato.gravitino.shaded.com.google.common.base.Preconditions;
-import com.datastrato.gravitino.shaded.com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.datastrato.gravitino.shaded.org.apache.commons.lang3.StringUtils;
-import com.datastrato.gravitino.shaded.org.apache.commons.lang3.tuple.Pair;
+import com.apache.gravitino.Catalog;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.client.DefaultOAuth2TokenProvider;
+import com.apache.gravitino.client.GravitinoClient;
+import com.apache.gravitino.client.KerberosTokenProvider;
+import com.apache.gravitino.file.Fileset;
+import com.apache.gravitino.shaded.com.google.common.annotations.VisibleForTesting;
+import com.apache.gravitino.shaded.com.google.common.base.Preconditions;
+import com.apache.gravitino.shaded.com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.apache.gravitino.shaded.org.apache.commons.lang3.StringUtils;
+import com.apache.gravitino.shaded.org.apache.commons.lang3.tuple.Pair;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;

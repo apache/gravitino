@@ -18,8 +18,8 @@
  */
 package com.datastrato.gravitino.trino.connector.metadata;
 
-import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.types.Type;
+import com.apache.gravitino.rel.Column;
+import com.apache.gravitino.rel.types.Type;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 

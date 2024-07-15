@@ -20,16 +20,16 @@ package com.datastrato.gravitino.integration.test.trino;
 
 import static java.lang.Thread.sleep;
 
-import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.SupportsSchemas;
-import com.datastrato.gravitino.client.GravitinoAdminClient;
-import com.datastrato.gravitino.client.GravitinoMetalake;
-import com.datastrato.gravitino.exceptions.RESTException;
+import com.apache.gravitino.Catalog;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.SupportsSchemas;
+import com.apache.gravitino.client.GravitinoAdminClient;
+import com.apache.gravitino.client.GravitinoMetalake;
+import com.apache.gravitino.exceptions.RESTException;
+import com.apache.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.TrinoITContainers;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
-import com.datastrato.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.utils.NameIdentifierUtil;
 import java.io.File;
 import java.io.IOException;

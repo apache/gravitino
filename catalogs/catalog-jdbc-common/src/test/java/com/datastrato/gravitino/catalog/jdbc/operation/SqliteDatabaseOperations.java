@@ -20,10 +20,10 @@ package com.datastrato.gravitino.catalog.jdbc.operation;
 
 import static com.datastrato.gravitino.catalog.jdbc.converter.SqliteExceptionConverter.SCHEMA_ALREADY_EXISTS_CODE;
 
+import com.apache.gravitino.exceptions.NoSuchSchemaException;
+import com.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.catalog.jdbc.JdbcSchema;
 import com.datastrato.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
-import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
-import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.google.common.base.Preconditions;
 import java.io.File;

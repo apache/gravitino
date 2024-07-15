@@ -18,9 +18,9 @@
  */
 package com.datastrato.gravitino.catalog.doris.converter;
 
+import com.apache.gravitino.rel.types.Type;
+import com.apache.gravitino.rel.types.Types;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
-import com.datastrato.gravitino.rel.types.Type;
-import com.datastrato.gravitino.rel.types.Types;
 
 /** Type converter for Apache Doris. */
 public class DorisTypeConverter extends JdbcTypeConverter {

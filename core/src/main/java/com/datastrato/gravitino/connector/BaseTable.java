@@ -18,14 +18,14 @@
  */
 package com.datastrato.gravitino.connector;
 
-import com.datastrato.gravitino.annotation.Evolving;
+import com.apache.gravitino.annotation.Evolving;
+import com.apache.gravitino.rel.Column;
+import com.apache.gravitino.rel.Table;
+import com.apache.gravitino.rel.expressions.distributions.Distribution;
+import com.apache.gravitino.rel.expressions.sorts.SortOrder;
+import com.apache.gravitino.rel.expressions.transforms.Transform;
+import com.apache.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Table;
-import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
-import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
-import com.datastrato.gravitino.rel.expressions.transforms.Transform;
-import com.datastrato.gravitino.rel.indexes.Index;
 import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;

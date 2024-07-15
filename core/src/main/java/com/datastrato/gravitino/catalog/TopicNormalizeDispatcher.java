@@ -21,15 +21,15 @@ package com.datastrato.gravitino.catalog;
 import static com.datastrato.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static com.datastrato.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
 
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.exceptions.NoSuchSchemaException;
+import com.apache.gravitino.exceptions.NoSuchTopicException;
+import com.apache.gravitino.exceptions.TopicAlreadyExistsException;
+import com.apache.gravitino.messaging.DataLayout;
+import com.apache.gravitino.messaging.Topic;
+import com.apache.gravitino.messaging.TopicChange;
 import com.datastrato.gravitino.connector.capability.Capability;
-import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
-import com.datastrato.gravitino.exceptions.NoSuchTopicException;
-import com.datastrato.gravitino.exceptions.TopicAlreadyExistsException;
-import com.datastrato.gravitino.messaging.DataLayout;
-import com.datastrato.gravitino.messaging.Topic;
-import com.datastrato.gravitino.messaging.TopicChange;
 import java.util.Map;
 
 public class TopicNormalizeDispatcher implements TopicDispatcher {

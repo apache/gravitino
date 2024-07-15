@@ -20,8 +20,8 @@ package com.datastrato.gravitino.dto.rel.expressions;
 
 import static com.datastrato.gravitino.dto.rel.PartitionUtils.validateFieldExistence;
 
+import com.apache.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
-import com.datastrato.gravitino.rel.expressions.Expression;
 import java.util.Arrays;
 
 /** An argument of a function. */

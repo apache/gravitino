@@ -22,7 +22,7 @@ import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalog.
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalog.SCHEMA_PROPERTIES_META;
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergCatalog.TABLE_PROPERTIES_META;
 
-import com.datastrato.gravitino.Namespace;
+import com.apache.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.PropertiesMetadataHelpers;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOps;
 import com.datastrato.gravitino.connector.CatalogOperations;

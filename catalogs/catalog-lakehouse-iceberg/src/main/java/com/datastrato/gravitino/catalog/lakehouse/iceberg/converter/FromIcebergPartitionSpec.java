@@ -18,8 +18,8 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.converter;
 
-import com.datastrato.gravitino.rel.expressions.transforms.Transform;
-import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
+import com.apache.gravitino.rel.expressions.transforms.Transform;
+import com.apache.gravitino.rel.expressions.transforms.Transforms;
 import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.Map;

@@ -22,8 +22,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.datastrato.gravitino.Audit;
-import com.datastrato.gravitino.Catalog;
+import com.apache.gravitino.Audit;
+import com.apache.gravitino.Catalog;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Map;

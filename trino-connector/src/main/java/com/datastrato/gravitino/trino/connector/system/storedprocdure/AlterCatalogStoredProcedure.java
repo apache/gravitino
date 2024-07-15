@@ -25,10 +25,10 @@ import static com.datastrato.gravitino.trino.connector.GravitinoErrorCode.GRAVIT
 import static com.datastrato.gravitino.trino.connector.system.table.GravitinoSystemTable.SYSTEM_TABLE_SCHEMA_NAME;
 import static io.trino.spi.type.VarcharType.VARCHAR;
 
-import com.datastrato.gravitino.CatalogChange;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.exceptions.NoSuchCatalogException;
-import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
+import com.apache.gravitino.CatalogChange;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.exceptions.NoSuchCatalogException;
+import com.apache.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;

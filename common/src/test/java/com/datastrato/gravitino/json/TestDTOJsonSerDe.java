@@ -18,7 +18,10 @@
  */
 package com.datastrato.gravitino.json;
 
-import com.datastrato.gravitino.Catalog;
+import com.apache.gravitino.Catalog;
+import com.apache.gravitino.rel.Column;
+import com.apache.gravitino.rel.types.Type;
+import com.apache.gravitino.rel.types.Types;
 import com.datastrato.gravitino.dto.AuditDTO;
 import com.datastrato.gravitino.dto.CatalogDTO;
 import com.datastrato.gravitino.dto.MetalakeDTO;
@@ -41,9 +44,6 @@ import com.datastrato.gravitino.dto.rel.partitioning.TruncatePartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.YearPartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitions.ListPartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.RangePartitionDTO;
-import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.types.Type;
-import com.datastrato.gravitino.rel.types.Types;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.cfg.EnumFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;

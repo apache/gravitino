@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.connector;
 
-import com.datastrato.gravitino.rel.types.Type;
+import com.apache.gravitino.rel.types.Type;
 
 /**
  * The interface for converting data types between Apache Gravitino and catalogs. In most cases, the

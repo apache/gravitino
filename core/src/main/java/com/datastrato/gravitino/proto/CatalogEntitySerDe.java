@@ -19,7 +19,7 @@
 
 package com.datastrato.gravitino.proto;
 
-import com.datastrato.gravitino.Namespace;
+import com.apache.gravitino.Namespace;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 
@@ -81,7 +81,7 @@ public class CatalogEntitySerDe implements ProtoSerDe<CatalogEntity, Catalog> {
       builder.withProperties(p.getPropertiesMap());
     }
 
-    builder.withType(com.datastrato.gravitino.Catalog.Type.valueOf(p.getType().name()));
+    builder.withType(com.apache.gravitino.Catalog.Type.valueOf(p.getType().name()));
     return builder.build();
   }
 }

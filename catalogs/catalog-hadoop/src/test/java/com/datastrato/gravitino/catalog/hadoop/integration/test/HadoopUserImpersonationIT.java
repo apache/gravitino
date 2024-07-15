@@ -25,12 +25,12 @@ import static com.datastrato.gravitino.catalog.hadoop.authentication.kerberos.Ke
 import static com.datastrato.gravitino.catalog.hadoop.authentication.kerberos.KerberosConfig.PRINCIPAL_KEY;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_DATA_TRANSFER_PROTECTION_KEY;
 
-import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Schema;
-import com.datastrato.gravitino.client.GravitinoMetalake;
-import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
-import com.datastrato.gravitino.file.Fileset;
+import com.apache.gravitino.Catalog;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Schema;
+import com.apache.gravitino.client.GravitinoMetalake;
+import com.apache.gravitino.exceptions.FilesetAlreadyExistsException;
+import com.apache.gravitino.file.Fileset;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.integration.test.util.ITUtils;

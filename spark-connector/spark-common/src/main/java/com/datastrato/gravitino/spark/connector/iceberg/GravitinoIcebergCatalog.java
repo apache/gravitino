@@ -18,7 +18,7 @@
 
 package com.datastrato.gravitino.spark.connector.iceberg;
 
-import com.datastrato.gravitino.rel.Table;
+import com.apache.gravitino.rel.Table;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.datastrato.gravitino.spark.connector.SparkTransformConverter;
 import com.datastrato.gravitino.spark.connector.SparkTypeConverter;
@@ -144,7 +144,7 @@ public class GravitinoIcebergCatalog extends BaseCatalog
   public org.apache.spark.sql.connector.catalog.Table loadTable(Identifier ident, String version)
       throws NoSuchTableException {
     try {
-      com.datastrato.gravitino.rel.Table gravitinoTable = loadGravitinoTable(ident);
+      com.apache.gravitino.rel.Table gravitinoTable = loadGravitinoTable(ident);
       org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident, version);
       // Will create a catalog specific table
       return createSparkTable(
@@ -155,7 +155,7 @@ public class GravitinoIcebergCatalog extends BaseCatalog
           propertiesConverter,
           sparkTransformConverter,
           getSparkTypeConverter());
-    } catch (com.datastrato.gravitino.exceptions.NoSuchTableException e) {
+    } catch (com.apache.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(ident);
     }
   }
@@ -164,7 +164,7 @@ public class GravitinoIcebergCatalog extends BaseCatalog
   public org.apache.spark.sql.connector.catalog.Table loadTable(Identifier ident, long timestamp)
       throws NoSuchTableException {
     try {
-      com.datastrato.gravitino.rel.Table gravitinoTable = loadGravitinoTable(ident);
+      com.apache.gravitino.rel.Table gravitinoTable = loadGravitinoTable(ident);
       org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident, timestamp);
       // Will create a catalog specific table
       return createSparkTable(
@@ -175,7 +175,7 @@ public class GravitinoIcebergCatalog extends BaseCatalog
           propertiesConverter,
           sparkTransformConverter,
           getSparkTypeConverter());
-    } catch (com.datastrato.gravitino.exceptions.NoSuchTableException e) {
+    } catch (com.apache.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(ident);
     }
   }

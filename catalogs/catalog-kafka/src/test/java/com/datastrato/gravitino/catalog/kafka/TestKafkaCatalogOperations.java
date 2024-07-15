@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.catalog.kafka;
 
-import static com.datastrato.gravitino.Catalog.Type.MESSAGING;
+import static com.apache.gravitino.Catalog.Type.MESSAGING;
 import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_KV_STORE;
 import static com.datastrato.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
 import static com.datastrato.gravitino.Configs.ENTITY_KV_ROCKSDB_BACKEND_PATH;
@@ -46,22 +46,22 @@ import static com.datastrato.gravitino.catalog.kafka.KafkaTopicPropertiesMetadat
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.Schema;
+import com.apache.gravitino.SchemaChange;
+import com.apache.gravitino.exceptions.NoSuchSchemaException;
+import com.apache.gravitino.exceptions.NoSuchTopicException;
+import com.apache.gravitino.exceptions.TopicAlreadyExistsException;
+import com.apache.gravitino.messaging.Topic;
+import com.apache.gravitino.messaging.TopicChange;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.EntityStoreFactory;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.Schema;
-import com.datastrato.gravitino.SchemaChange;
 import com.datastrato.gravitino.catalog.kafka.embedded.KafkaClusterEmbedded;
 import com.datastrato.gravitino.connector.HasPropertyMetadata;
 import com.datastrato.gravitino.connector.PropertiesMetadata;
-import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
-import com.datastrato.gravitino.exceptions.NoSuchTopicException;
-import com.datastrato.gravitino.exceptions.TopicAlreadyExistsException;
-import com.datastrato.gravitino.messaging.Topic;
-import com.datastrato.gravitino.messaging.TopicChange;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.datastrato.gravitino.storage.IdGenerator;

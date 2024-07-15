@@ -18,9 +18,9 @@
  */
 package com.datastrato.gravitino.flink.connector.catalog;
 
-import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.client.GravitinoAdminClient;
-import com.datastrato.gravitino.client.GravitinoMetalake;
+import com.apache.gravitino.Catalog;
+import com.apache.gravitino.client.GravitinoAdminClient;
+import com.apache.gravitino.client.GravitinoMetalake;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import java.util.Arrays;

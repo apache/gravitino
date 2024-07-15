@@ -20,11 +20,11 @@ package com.datastrato.gravitino.catalog.postgresql.operation;
 
 import static com.datastrato.gravitino.catalog.postgresql.operation.PostgreSqlSchemaOperations.SYS_PG_DATABASE_NAMES;
 
+import com.apache.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.catalog.jdbc.JdbcSchema;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import com.datastrato.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
-import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.utils.RandomNameUtils;
 import java.sql.Connection;
 import java.sql.SQLException;

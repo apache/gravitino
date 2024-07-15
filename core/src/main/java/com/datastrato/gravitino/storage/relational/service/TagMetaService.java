@@ -18,11 +18,11 @@
  */
 package com.datastrato.gravitino.storage.relational.service;
 
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.HasIdentifier;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.TagEntity;
 import com.datastrato.gravitino.storage.relational.mapper.TagMetaMapper;
 import com.datastrato.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;

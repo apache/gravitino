@@ -18,8 +18,8 @@
  */
 package com.datastrato.gravitino.connector.capability;
 
-import com.datastrato.gravitino.MetadataObjects;
-import com.datastrato.gravitino.annotation.Evolving;
+import com.apache.gravitino.MetadataObjects;
+import com.apache.gravitino.annotation.Evolving;
 import com.google.common.collect.ImmutableSet;
 import java.util.Set;
 

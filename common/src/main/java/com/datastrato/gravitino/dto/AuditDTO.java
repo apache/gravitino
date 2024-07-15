@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.dto;
 
-import com.datastrato.gravitino.Audit;
+import com.apache.gravitino.Audit;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 import lombok.EqualsAndHashCode;

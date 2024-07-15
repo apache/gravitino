@@ -18,13 +18,13 @@
  */
 package com.datastrato.gravitino.catalog;
 
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.expressions.literals.Literal;
-import com.datastrato.gravitino.rel.expressions.literals.Literals;
-import com.datastrato.gravitino.rel.partitions.Partition;
-import com.datastrato.gravitino.rel.partitions.Partitions;
-import com.datastrato.gravitino.rel.types.Types;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.rel.Column;
+import com.apache.gravitino.rel.expressions.literals.Literal;
+import com.apache.gravitino.rel.expressions.literals.Literals;
+import com.apache.gravitino.rel.partitions.Partition;
+import com.apache.gravitino.rel.partitions.Partitions;
+import com.apache.gravitino.rel.types.Types;
 import com.datastrato.gravitino.utils.IsolatedClassLoader;
 import com.datastrato.gravitino.utils.NameIdentifierUtil;
 import com.google.common.collect.Maps;

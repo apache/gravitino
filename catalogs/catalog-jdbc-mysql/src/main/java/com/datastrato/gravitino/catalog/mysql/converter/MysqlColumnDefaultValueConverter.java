@@ -18,6 +18,8 @@
  */
 package com.datastrato.gravitino.catalog.mysql.converter;
 
+import static com.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+import static com.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
 import static com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter.BIGINT;
 import static com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter.CHAR;
 import static com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter.DATE;
@@ -32,16 +34,14 @@ import static com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverte
 import static com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter.TIMESTAMP;
 import static com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter.TINYINT;
 import static com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter.VARCHAR;
-import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
-import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
 
+import com.apache.gravitino.rel.expressions.Expression;
+import com.apache.gravitino.rel.expressions.UnparsedExpression;
+import com.apache.gravitino.rel.expressions.literals.Literals;
+import com.apache.gravitino.rel.types.Decimal;
+import com.apache.gravitino.rel.types.Types;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
-import com.datastrato.gravitino.rel.expressions.Expression;
-import com.datastrato.gravitino.rel.expressions.UnparsedExpression;
-import com.datastrato.gravitino.rel.expressions.literals.Literals;
-import com.datastrato.gravitino.rel.types.Decimal;
-import com.datastrato.gravitino.rel.types.Types;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;

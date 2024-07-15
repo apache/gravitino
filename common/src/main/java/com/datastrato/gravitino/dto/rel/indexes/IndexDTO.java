@@ -18,8 +18,8 @@
  */
 package com.datastrato.gravitino.dto.rel.indexes;
 
+import com.apache.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.json.JsonUtils;
-import com.datastrato.gravitino.rel.indexes.Index;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;

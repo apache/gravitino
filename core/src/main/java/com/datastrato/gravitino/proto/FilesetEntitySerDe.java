@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.proto;
 
-import com.datastrato.gravitino.Namespace;
+import com.apache.gravitino.Namespace;
 import com.datastrato.gravitino.meta.FilesetEntity;
 
 public class FilesetEntitySerDe implements ProtoSerDe<FilesetEntity, Fileset> {
@@ -54,8 +54,7 @@ public class FilesetEntitySerDe implements ProtoSerDe<FilesetEntity, Fileset> {
             .withNamespace(namespace)
             .withStorageLocation(p.getStorageLocation())
             .withAuditInfo(new AuditInfoSerDe().deserialize(p.getAuditInfo(), namespace))
-            .withFilesetType(
-                com.datastrato.gravitino.file.Fileset.Type.valueOf(p.getType().name()));
+            .withFilesetType(com.apache.gravitino.file.Fileset.Type.valueOf(p.getType().name()));
 
     if (p.hasComment()) {
       builder.withComment(p.getComment());

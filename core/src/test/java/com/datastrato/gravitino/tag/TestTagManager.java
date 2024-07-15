@@ -31,13 +31,15 @@ import static com.datastrato.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static com.datastrato.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static com.datastrato.gravitino.Configs.VERSION_RETENTION_COUNT;
 
+import com.apache.gravitino.exceptions.NoSuchMetalakeException;
+import com.apache.gravitino.exceptions.NoSuchTagException;
+import com.apache.gravitino.exceptions.TagAlreadyExistsException;
+import com.apache.gravitino.tag.Tag;
+import com.apache.gravitino.tag.TagChange;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.EntityStore;
 import com.datastrato.gravitino.EntityStoreFactory;
 import com.datastrato.gravitino.GravitinoEnv;
-import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
-import com.datastrato.gravitino.exceptions.NoSuchTagException;
-import com.datastrato.gravitino.exceptions.TagAlreadyExistsException;
 import com.datastrato.gravitino.lock.LockManager;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;

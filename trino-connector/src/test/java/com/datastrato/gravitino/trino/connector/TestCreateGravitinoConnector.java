@@ -21,7 +21,7 @@ package com.datastrato.gravitino.trino.connector;
 import static io.trino.testing.TestingSession.testSessionBuilder;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.datastrato.gravitino.client.GravitinoAdminClient;
+import com.apache.gravitino.client.GravitinoAdminClient;
 import io.trino.Session;
 import io.trino.testing.DistributedQueryRunner;
 import io.trino.testing.QueryRunner;

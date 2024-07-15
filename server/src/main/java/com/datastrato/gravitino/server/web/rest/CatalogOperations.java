@@ -18,12 +18,12 @@
  */
 package com.datastrato.gravitino.server.web.rest;
 
+import com.apache.gravitino.Catalog;
+import com.apache.gravitino.CatalogChange;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.CatalogChange;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.catalog.CatalogDispatcher;
 import com.datastrato.gravitino.dto.requests.CatalogCreateRequest;
 import com.datastrato.gravitino.dto.requests.CatalogUpdateRequest;

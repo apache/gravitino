@@ -18,17 +18,17 @@
  */
 package com.datastrato.gravitino.catalog;
 
-import com.datastrato.gravitino.Audit;
+import com.apache.gravitino.Audit;
+import com.apache.gravitino.rel.Column;
+import com.apache.gravitino.rel.SupportsPartitions;
+import com.apache.gravitino.rel.Table;
+import com.apache.gravitino.rel.expressions.distributions.Distribution;
+import com.apache.gravitino.rel.expressions.sorts.SortOrder;
+import com.apache.gravitino.rel.expressions.transforms.Transform;
+import com.apache.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.TableEntity;
-import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.SupportsPartitions;
-import com.datastrato.gravitino.rel.Table;
-import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
-import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
-import com.datastrato.gravitino.rel.expressions.transforms.Transform;
-import com.datastrato.gravitino.rel.indexes.Index;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;

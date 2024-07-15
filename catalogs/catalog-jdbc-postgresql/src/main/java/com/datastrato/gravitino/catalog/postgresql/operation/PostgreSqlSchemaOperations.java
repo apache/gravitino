@@ -18,11 +18,11 @@
  */
 package com.datastrato.gravitino.catalog.postgresql.operation;
 
+import com.apache.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.catalog.jdbc.JdbcSchema;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
-import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;

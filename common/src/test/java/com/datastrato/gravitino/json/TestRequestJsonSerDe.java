@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.json;
 
-import com.datastrato.gravitino.Catalog;
+import com.apache.gravitino.Catalog;
 import com.datastrato.gravitino.dto.requests.CatalogCreateRequest;
 import com.datastrato.gravitino.dto.requests.CatalogUpdateRequest;
 import com.datastrato.gravitino.dto.requests.MetalakeCreateRequest;

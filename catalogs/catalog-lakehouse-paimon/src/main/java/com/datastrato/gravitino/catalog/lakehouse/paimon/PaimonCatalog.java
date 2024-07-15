@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.paimon;
 
-import com.datastrato.gravitino.Catalog;
+import com.apache.gravitino.Catalog;
 import com.datastrato.gravitino.connector.BaseCatalog;
 import com.datastrato.gravitino.connector.CatalogOperations;
 import com.datastrato.gravitino.connector.PropertiesMetadata;

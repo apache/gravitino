@@ -18,12 +18,12 @@
  */
 package com.datastrato.gravitino.catalog.postgresql.converter;
 
+import com.apache.gravitino.exceptions.GravitinoRuntimeException;
+import com.apache.gravitino.exceptions.NoSuchSchemaException;
+import com.apache.gravitino.exceptions.NoSuchTableException;
+import com.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import com.apache.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
-import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
-import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
-import com.datastrato.gravitino.exceptions.NoSuchTableException;
-import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
-import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import java.sql.SQLException;
 
 public class PostgreSqlExceptionConverter extends JdbcExceptionConverter {

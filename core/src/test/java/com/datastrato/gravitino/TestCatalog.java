@@ -20,6 +20,8 @@ package com.datastrato.gravitino;
 
 import static com.datastrato.gravitino.connector.TestCatalogOperations.FAIL_CREATE;
 
+import com.apache.gravitino.Catalog;
+import com.apache.gravitino.rel.TableCatalog;
 import com.datastrato.gravitino.connector.BaseCatalog;
 import com.datastrato.gravitino.connector.BasePropertiesMetadata;
 import com.datastrato.gravitino.connector.CatalogOperations;
@@ -27,7 +29,6 @@ import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.connector.PropertyEntry;
 import com.datastrato.gravitino.connector.TestCatalogOperations;
 import com.datastrato.gravitino.connector.capability.Capability;
-import com.datastrato.gravitino.rel.TableCatalog;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 

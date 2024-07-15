@@ -18,12 +18,12 @@
  */
 package com.datastrato.gravitino.dto.rel.partitioning;
 
+import static com.apache.gravitino.rel.expressions.NamedReference.field;
 import static com.datastrato.gravitino.dto.rel.PartitionUtils.validateFieldExistence;
-import static com.datastrato.gravitino.rel.expressions.NamedReference.field;
 
+import com.apache.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
 import com.datastrato.gravitino.dto.rel.partitions.RangePartitionDTO;
-import com.datastrato.gravitino.rel.expressions.Expression;
 import lombok.EqualsAndHashCode;
 
 /** Represents the range partitioning. */

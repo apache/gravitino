@@ -18,14 +18,14 @@
  */
 package com.datastrato.gravitino.dto.requests;
 
-import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+import static com.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
+import com.apache.gravitino.rel.TableChange;
+import com.apache.gravitino.rel.indexes.Index;
+import com.apache.gravitino.rel.indexes.Indexes;
+import com.apache.gravitino.rel.types.Types;
 import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
 import com.datastrato.gravitino.json.JsonUtils;
-import com.datastrato.gravitino.rel.TableChange;
-import com.datastrato.gravitino.rel.indexes.Index;
-import com.datastrato.gravitino.rel.indexes.Indexes;
-import com.datastrato.gravitino.rel.types.Types;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableList;
 import java.util.List;

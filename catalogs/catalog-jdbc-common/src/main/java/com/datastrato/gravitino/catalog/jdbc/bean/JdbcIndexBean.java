@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.catalog.jdbc.bean;
 
-import com.datastrato.gravitino.rel.indexes.Index;
+import com.apache.gravitino.rel.indexes.Index;
 import java.util.Objects;
 
 /** Store JDBC index information. */

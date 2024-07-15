@@ -21,11 +21,11 @@ package com.datastrato.gravitino.catalog;
 import static com.datastrato.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
 import static com.datastrato.gravitino.catalog.CapabilityHelpers.applyCaseSensitiveOnName;
 
-import com.datastrato.gravitino.NameIdentifier;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.exceptions.NoSuchPartitionException;
+import com.apache.gravitino.exceptions.PartitionAlreadyExistsException;
+import com.apache.gravitino.rel.partitions.Partition;
 import com.datastrato.gravitino.connector.capability.Capability;
-import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
-import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
-import com.datastrato.gravitino.rel.partitions.Partition;
 import java.util.Arrays;
 
 public class PartitionNormalizeDispatcher implements PartitionDispatcher {

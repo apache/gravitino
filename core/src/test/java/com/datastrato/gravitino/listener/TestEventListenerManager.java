@@ -18,7 +18,7 @@
 
 package com.datastrato.gravitino.listener;
 
-import com.datastrato.gravitino.NameIdentifier;
+import com.apache.gravitino.NameIdentifier;
 import com.datastrato.gravitino.listener.DummyEventListener.DummyAsyncEventListener;
 import com.datastrato.gravitino.listener.DummyEventListener.DummyAsyncIsolatedEventListener;
 import com.datastrato.gravitino.listener.api.EventListenerPlugin;

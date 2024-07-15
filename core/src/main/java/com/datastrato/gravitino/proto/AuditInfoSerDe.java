@@ -19,7 +19,7 @@
 
 package com.datastrato.gravitino.proto;
 
-import com.datastrato.gravitino.Namespace;
+import com.apache.gravitino.Namespace;
 import java.util.Optional;
 
 /** A class for serializing and deserializing AuditInfo objects. */

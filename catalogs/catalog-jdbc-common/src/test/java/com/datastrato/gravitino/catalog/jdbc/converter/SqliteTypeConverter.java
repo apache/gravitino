@@ -18,8 +18,8 @@
  */
 package com.datastrato.gravitino.catalog.jdbc.converter;
 
-import com.datastrato.gravitino.rel.types.Type;
-import com.datastrato.gravitino.rel.types.Types;
+import com.apache.gravitino.rel.types.Type;
+import com.apache.gravitino.rel.types.Types;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;

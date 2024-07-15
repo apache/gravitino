@@ -20,10 +20,10 @@ package com.datastrato.gravitino.catalog;
 
 import static com.datastrato.gravitino.StringIdentifier.ID_KEY;
 
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.file.Fileset;
-import com.datastrato.gravitino.file.FilesetChange;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.file.Fileset;
+import com.apache.gravitino.file.FilesetChange;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Map;

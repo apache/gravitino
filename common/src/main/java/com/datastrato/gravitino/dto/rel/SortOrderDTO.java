@@ -19,12 +19,12 @@
 
 package com.datastrato.gravitino.dto.rel;
 
+import com.apache.gravitino.rel.expressions.Expression;
+import com.apache.gravitino.rel.expressions.sorts.NullOrdering;
+import com.apache.gravitino.rel.expressions.sorts.SortDirection;
+import com.apache.gravitino.rel.expressions.sorts.SortOrder;
 import com.datastrato.gravitino.dto.rel.expressions.FunctionArg;
 import com.datastrato.gravitino.json.JsonUtils;
-import com.datastrato.gravitino.rel.expressions.Expression;
-import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
-import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
-import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;

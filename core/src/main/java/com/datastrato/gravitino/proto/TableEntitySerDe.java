@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.proto;
 
-import com.datastrato.gravitino.Namespace;
+import com.apache.gravitino.Namespace;
 import com.datastrato.gravitino.meta.TableEntity;
 
 public class TableEntitySerDe implements ProtoSerDe<TableEntity, Table> {

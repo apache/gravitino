@@ -18,10 +18,10 @@
  */
 package com.datastrato.gravitino.catalog.mysql.integration.test.service;
 
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.catalog.jdbc.JdbcSchema;
-import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.integration.test.container.MySQLContainer;
 import com.datastrato.gravitino.integration.test.util.TestDatabaseName;
 import com.datastrato.gravitino.meta.AuditInfo;

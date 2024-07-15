@@ -18,16 +18,18 @@
  */
 package com.datastrato.gravitino.tag;
 
+import com.apache.gravitino.MetadataObject;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.exceptions.NoSuchEntityException;
+import com.apache.gravitino.exceptions.NoSuchMetalakeException;
+import com.apache.gravitino.exceptions.NoSuchTagException;
+import com.apache.gravitino.exceptions.TagAlreadyExistsException;
+import com.apache.gravitino.tag.Tag;
+import com.apache.gravitino.tag.TagChange;
 import com.datastrato.gravitino.Entity;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
 import com.datastrato.gravitino.EntityStore;
-import com.datastrato.gravitino.MetadataObject;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.exceptions.NoSuchEntityException;
-import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
-import com.datastrato.gravitino.exceptions.NoSuchTagException;
-import com.datastrato.gravitino.exceptions.TagAlreadyExistsException;
 import com.datastrato.gravitino.lock.LockType;
 import com.datastrato.gravitino.lock.TreeLockUtils;
 import com.datastrato.gravitino.meta.AuditInfo;

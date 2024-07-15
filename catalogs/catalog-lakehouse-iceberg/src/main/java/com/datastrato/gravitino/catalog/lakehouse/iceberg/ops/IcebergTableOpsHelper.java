@@ -21,21 +21,21 @@ package com.datastrato.gravitino.catalog.lakehouse.iceberg.ops;
 
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.converter.IcebergDataTypeConverter.CONVERTER;
 
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.rel.TableChange;
-import com.datastrato.gravitino.rel.TableChange.AddColumn;
-import com.datastrato.gravitino.rel.TableChange.After;
-import com.datastrato.gravitino.rel.TableChange.ColumnChange;
-import com.datastrato.gravitino.rel.TableChange.ColumnPosition;
-import com.datastrato.gravitino.rel.TableChange.DeleteColumn;
-import com.datastrato.gravitino.rel.TableChange.RemoveProperty;
-import com.datastrato.gravitino.rel.TableChange.RenameColumn;
-import com.datastrato.gravitino.rel.TableChange.RenameTable;
-import com.datastrato.gravitino.rel.TableChange.SetProperty;
-import com.datastrato.gravitino.rel.TableChange.UpdateColumnComment;
-import com.datastrato.gravitino.rel.TableChange.UpdateColumnPosition;
-import com.datastrato.gravitino.rel.TableChange.UpdateColumnType;
-import com.datastrato.gravitino.rel.TableChange.UpdateComment;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.rel.TableChange;
+import com.apache.gravitino.rel.TableChange.AddColumn;
+import com.apache.gravitino.rel.TableChange.After;
+import com.apache.gravitino.rel.TableChange.ColumnChange;
+import com.apache.gravitino.rel.TableChange.ColumnPosition;
+import com.apache.gravitino.rel.TableChange.DeleteColumn;
+import com.apache.gravitino.rel.TableChange.RemoveProperty;
+import com.apache.gravitino.rel.TableChange.RenameColumn;
+import com.apache.gravitino.rel.TableChange.RenameTable;
+import com.apache.gravitino.rel.TableChange.SetProperty;
+import com.apache.gravitino.rel.TableChange.UpdateColumnComment;
+import com.apache.gravitino.rel.TableChange.UpdateColumnPosition;
+import com.apache.gravitino.rel.TableChange.UpdateColumnType;
+import com.apache.gravitino.rel.TableChange.UpdateComment;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -334,7 +334,7 @@ public class IcebergTableOpsHelper {
    * @param namespace GravitinoNamespace
    * @return Iceberg Namespace
    */
-  public static Namespace getIcebergNamespace(com.datastrato.gravitino.Namespace namespace) {
+  public static Namespace getIcebergNamespace(com.apache.gravitino.Namespace namespace) {
     return getIcebergNamespace(namespace.level(namespace.length() - 1));
   }
 
@@ -351,7 +351,7 @@ public class IcebergTableOpsHelper {
    * @return Iceberg TableIdentifier
    */
   public static TableIdentifier buildIcebergTableIdentifier(
-      com.datastrato.gravitino.Namespace namespace, String name) {
+      com.apache.gravitino.Namespace namespace, String name) {
     String[] levels = namespace.levels();
     return TableIdentifier.of(levels[levels.length - 1], name);
   }

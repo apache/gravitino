@@ -19,7 +19,7 @@
 
 package com.datastrato.gravitino.storage;
 
-import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
+import com.apache.gravitino.exceptions.GravitinoRuntimeException;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 

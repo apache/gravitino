@@ -18,9 +18,9 @@
 
 package com.datastrato.gravitino.listener.api.event;
 
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.annotation.DeveloperApi;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.annotation.DeveloperApi;
 
 /** Represents an event that is triggered upon the successful list of catalogs. */
 @DeveloperApi

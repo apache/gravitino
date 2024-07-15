@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.trino.connector;
 
-import com.datastrato.gravitino.client.GravitinoAdminClient;
+import com.apache.gravitino.client.GravitinoAdminClient;
 import java.util.function.Supplier;
 
 public class TestGravitinoConnectorFactory extends GravitinoConnectorFactory {

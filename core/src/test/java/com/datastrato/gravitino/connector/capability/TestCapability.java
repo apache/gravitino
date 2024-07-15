@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.connector.capability;
 
-import com.datastrato.gravitino.MetadataObjects;
+import com.apache.gravitino.MetadataObjects;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

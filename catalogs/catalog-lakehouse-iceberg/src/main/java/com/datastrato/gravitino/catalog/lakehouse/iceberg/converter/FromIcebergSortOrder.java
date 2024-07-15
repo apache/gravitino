@@ -18,13 +18,13 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.converter;
 
-import com.datastrato.gravitino.rel.expressions.FunctionExpression;
-import com.datastrato.gravitino.rel.expressions.NamedReference;
-import com.datastrato.gravitino.rel.expressions.literals.Literals;
-import com.datastrato.gravitino.rel.expressions.sorts.NullOrdering;
-import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
-import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
-import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
+import com.apache.gravitino.rel.expressions.FunctionExpression;
+import com.apache.gravitino.rel.expressions.NamedReference;
+import com.apache.gravitino.rel.expressions.literals.Literals;
+import com.apache.gravitino.rel.expressions.sorts.NullOrdering;
+import com.apache.gravitino.rel.expressions.sorts.SortOrder;
+import com.apache.gravitino.rel.expressions.sorts.SortOrders;
+import com.apache.gravitino.rel.expressions.transforms.Transforms;
 import java.util.List;
 import java.util.Map;
 import org.apache.iceberg.NullOrder;
@@ -104,11 +104,11 @@ public class FromIcebergSortOrder implements SortOrderVisitor<SortOrder> {
         toGravitino(nullOrder));
   }
 
-  private com.datastrato.gravitino.rel.expressions.sorts.SortDirection toGravitino(
+  private com.apache.gravitino.rel.expressions.sorts.SortDirection toGravitino(
       SortDirection direction) {
     return direction == SortDirection.ASC
-        ? com.datastrato.gravitino.rel.expressions.sorts.SortDirection.ASCENDING
-        : com.datastrato.gravitino.rel.expressions.sorts.SortDirection.DESCENDING;
+        ? com.apache.gravitino.rel.expressions.sorts.SortDirection.ASCENDING
+        : com.apache.gravitino.rel.expressions.sorts.SortDirection.DESCENDING;
   }
 
   private NullOrdering toGravitino(NullOrder nullOrder) {

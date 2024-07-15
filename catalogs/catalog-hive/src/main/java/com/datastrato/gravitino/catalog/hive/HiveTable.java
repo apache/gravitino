@@ -18,6 +18,7 @@
  */
 package com.datastrato.gravitino.catalog.hive;
 
+import static com.apache.gravitino.rel.expressions.transforms.Transforms.identity;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.EXTERNAL;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.FORMAT;
@@ -31,24 +32,23 @@ import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType.EXTERNAL_TABLE;
 import static com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType.MANAGED_TABLE;
 import static com.datastrato.gravitino.catalog.hive.converter.HiveDataTypeConverter.CONVERTER;
-import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.identity;
 
+import com.apache.gravitino.rel.Column;
+import com.apache.gravitino.rel.SupportsPartitions;
+import com.apache.gravitino.rel.expressions.Expression;
+import com.apache.gravitino.rel.expressions.NamedReference;
+import com.apache.gravitino.rel.expressions.distributions.Distribution;
+import com.apache.gravitino.rel.expressions.distributions.Distributions;
+import com.apache.gravitino.rel.expressions.sorts.SortDirection;
+import com.apache.gravitino.rel.expressions.sorts.SortOrder;
+import com.apache.gravitino.rel.expressions.sorts.SortOrders;
+import com.apache.gravitino.rel.expressions.transforms.Transform;
+import com.apache.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType;
 import com.datastrato.gravitino.connector.BaseTable;
 import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.connector.TableOperations;
 import com.datastrato.gravitino.meta.AuditInfo;
-import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.SupportsPartitions;
-import com.datastrato.gravitino.rel.expressions.Expression;
-import com.datastrato.gravitino.rel.expressions.NamedReference;
-import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
-import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
-import com.datastrato.gravitino.rel.expressions.sorts.SortDirection;
-import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
-import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
-import com.datastrato.gravitino.rel.expressions.transforms.Transform;
-import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.time.Instant;

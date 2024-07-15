@@ -18,10 +18,10 @@
 
 package com.datastrato.gravitino.listener.api.event;
 
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.annotation.DeveloperApi;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.annotation.DeveloperApi;
+import com.apache.gravitino.messaging.TopicChange;
 import com.datastrato.gravitino.listener.api.info.TopicInfo;
-import com.datastrato.gravitino.messaging.TopicChange;
 
 /** Represents an event fired when a topic is successfully altered. */
 @DeveloperApi

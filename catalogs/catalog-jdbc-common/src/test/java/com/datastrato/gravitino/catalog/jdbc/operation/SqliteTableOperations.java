@@ -18,15 +18,15 @@
  */
 package com.datastrato.gravitino.catalog.jdbc.operation;
 
+import com.apache.gravitino.exceptions.NoSuchSchemaException;
+import com.apache.gravitino.rel.Column;
+import com.apache.gravitino.rel.TableChange;
+import com.apache.gravitino.rel.expressions.distributions.Distribution;
+import com.apache.gravitino.rel.expressions.distributions.Distributions;
+import com.apache.gravitino.rel.expressions.transforms.Transform;
+import com.apache.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
-import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
-import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.TableChange;
-import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
-import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
-import com.datastrato.gravitino.rel.expressions.transforms.Transform;
-import com.datastrato.gravitino.rel.indexes.Index;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.sql.Connection;

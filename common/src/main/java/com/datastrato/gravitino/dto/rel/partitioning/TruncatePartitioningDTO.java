@@ -18,11 +18,11 @@
  */
 package com.datastrato.gravitino.dto.rel.partitioning;
 
+import static com.apache.gravitino.rel.expressions.transforms.Transforms.truncate;
 import static com.datastrato.gravitino.dto.rel.PartitionUtils.validateFieldExistence;
-import static com.datastrato.gravitino.rel.expressions.transforms.Transforms.truncate;
 
+import com.apache.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.dto.rel.ColumnDTO;
-import com.datastrato.gravitino.rel.expressions.Expression;
 import lombok.EqualsAndHashCode;
 
 /** Represents the truncate partitioning. */

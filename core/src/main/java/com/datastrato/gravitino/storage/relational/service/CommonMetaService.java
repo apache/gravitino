@@ -19,7 +19,7 @@
 
 package com.datastrato.gravitino.storage.relational.service;
 
-import com.datastrato.gravitino.Namespace;
+import com.apache.gravitino.Namespace;
 import com.google.common.base.Preconditions;
 
 /** The service class for common metadata operations. */

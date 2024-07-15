@@ -18,8 +18,8 @@
  */
 package com.datastrato.gravitino.connector.authorization;
 
-import com.datastrato.gravitino.authorization.Role;
-import com.datastrato.gravitino.authorization.RoleChange;
+import com.apache.gravitino.authorization.Role;
+import com.apache.gravitino.authorization.RoleChange;
 
 /** Interface for authorization Role plugin operation of the underlying access control system */
 interface RoleAuthorizationPlugin {

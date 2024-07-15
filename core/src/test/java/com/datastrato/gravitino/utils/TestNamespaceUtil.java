@@ -18,8 +18,8 @@
  */
 package com.datastrato.gravitino.utils;
 
-import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.exceptions.IllegalNamespaceException;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.exceptions.IllegalNamespaceException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

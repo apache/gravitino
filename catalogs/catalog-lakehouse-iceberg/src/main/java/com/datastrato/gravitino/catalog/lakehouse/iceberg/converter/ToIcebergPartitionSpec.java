@@ -18,9 +18,9 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.converter;
 
+import com.apache.gravitino.rel.expressions.transforms.Transform;
+import com.apache.gravitino.rel.expressions.transforms.Transforms;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable;
-import com.datastrato.gravitino.rel.expressions.transforms.Transform;
-import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
 import com.google.common.base.Preconditions;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;

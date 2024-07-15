@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.dto.responses;
 
-import com.datastrato.gravitino.exceptions.RESTException;
+import com.apache.gravitino.exceptions.RESTException;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.io.PrintWriter;

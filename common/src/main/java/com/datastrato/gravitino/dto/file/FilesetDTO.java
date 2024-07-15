@@ -18,8 +18,8 @@
  */
 package com.datastrato.gravitino.dto.file;
 
+import com.apache.gravitino.file.Fileset;
 import com.datastrato.gravitino.dto.AuditDTO;
-import com.datastrato.gravitino.file.Fileset;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;

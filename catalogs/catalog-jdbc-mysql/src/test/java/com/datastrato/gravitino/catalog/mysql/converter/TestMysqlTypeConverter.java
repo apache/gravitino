@@ -33,9 +33,9 @@ import static com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverte
 import static com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter.INT;
 import static com.datastrato.gravitino.catalog.mysql.converter.MysqlTypeConverter.TINYINT;
 
+import com.apache.gravitino.rel.types.Type;
+import com.apache.gravitino.rel.types.Types;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
-import com.datastrato.gravitino.rel.types.Type;
-import com.datastrato.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

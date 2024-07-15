@@ -18,13 +18,13 @@
  */
 package com.datastrato.gravitino.metalake;
 
+import com.apache.gravitino.MetalakeChange;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
+import com.apache.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.EntityStore;
-import com.datastrato.gravitino.MetalakeChange;
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.StringIdentifier;
-import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
-import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.storage.RandomIdGenerator;
 import com.datastrato.gravitino.storage.memory.TestMemoryEntityStore;

@@ -18,6 +18,7 @@
  */
 package com.datastrato.gravitino;
 
+import com.apache.gravitino.Namespace;
 import java.io.IOException;
 import java.util.Optional;
 

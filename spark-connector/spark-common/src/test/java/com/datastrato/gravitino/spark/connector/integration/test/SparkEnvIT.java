@@ -21,9 +21,9 @@ package com.datastrato.gravitino.spark.connector.integration.test;
 import static com.datastrato.gravitino.spark.connector.PropertiesConverter.SPARK_PROPERTY_PREFIX;
 import static com.datastrato.gravitino.spark.connector.iceberg.IcebergPropertiesConstants.ICEBERG_CATALOG_CACHE_ENABLED;
 
-import com.datastrato.gravitino.Catalog;
+import com.apache.gravitino.Catalog;
+import com.apache.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
-import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.HiveContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;

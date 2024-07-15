@@ -18,9 +18,9 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.converter;
 
+import com.apache.gravitino.rel.types.Type;
+import com.apache.gravitino.rel.types.Types;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.IcebergTable;
-import com.datastrato.gravitino.rel.types.Type;
-import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.Lists;
 import java.util.List;
 
@@ -52,8 +52,7 @@ public class ToIcebergTypeVisitor<T> {
       for (Types.StructType.Field field : fields) {
         fieldResults.add(visitor.field(field, visit(field.type(), visitor)));
       }
-      return visitor.struct(
-          (com.datastrato.gravitino.rel.types.Types.StructType) type, fieldResults);
+      return visitor.struct((Types.StructType) type, fieldResults);
     } else {
       return visitor.atomic((Type.PrimitiveType) type);
     }
@@ -63,8 +62,7 @@ public class ToIcebergTypeVisitor<T> {
     throw new UnsupportedOperationException();
   }
 
-  public T struct(
-      com.datastrato.gravitino.rel.types.Types.StructType struct, List<T> fieldResults) {
+  public T struct(Types.StructType struct, List<T> fieldResults) {
     throw new UnsupportedOperationException();
   }
 

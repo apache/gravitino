@@ -18,8 +18,8 @@
 
 package com.datastrato.gravitino.listener.api.event;
 
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.annotation.DeveloperApi;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.annotation.DeveloperApi;
 import com.datastrato.gravitino.listener.api.info.FilesetInfo;
 
 /** Represents an event that is triggered following the successful creation of a fileset. */

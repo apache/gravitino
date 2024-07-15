@@ -23,11 +23,11 @@ import static com.datastrato.gravitino.server.authentication.KerberosConfig.KEYT
 import static com.datastrato.gravitino.server.authentication.KerberosConfig.PRINCIPAL;
 import static org.apache.hadoop.minikdc.MiniKdc.MAX_TICKET_LIFETIME;
 
+import com.apache.gravitino.client.GravitinoAdminClient;
+import com.apache.gravitino.client.GravitinoVersion;
+import com.apache.gravitino.client.KerberosTokenProvider;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.auth.AuthenticatorType;
-import com.datastrato.gravitino.client.GravitinoAdminClient;
-import com.datastrato.gravitino.client.GravitinoVersion;
-import com.datastrato.gravitino.client.KerberosTokenProvider;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.google.common.collect.Maps;

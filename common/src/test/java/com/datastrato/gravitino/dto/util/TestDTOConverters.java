@@ -19,6 +19,16 @@
 
 package com.datastrato.gravitino.dto.util;
 
+import com.apache.gravitino.rel.expressions.literals.Literal;
+import com.apache.gravitino.rel.expressions.literals.Literals;
+import com.apache.gravitino.rel.expressions.transforms.Transform;
+import com.apache.gravitino.rel.expressions.transforms.Transforms;
+import com.apache.gravitino.rel.partitions.IdentityPartition;
+import com.apache.gravitino.rel.partitions.ListPartition;
+import com.apache.gravitino.rel.partitions.Partition;
+import com.apache.gravitino.rel.partitions.Partitions;
+import com.apache.gravitino.rel.partitions.RangePartition;
+import com.apache.gravitino.rel.types.Types;
 import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.ListPartitioningDTO;
 import com.datastrato.gravitino.dto.rel.partitioning.RangePartitioningDTO;
@@ -26,16 +36,6 @@ import com.datastrato.gravitino.dto.rel.partitions.IdentityPartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.ListPartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.PartitionDTO;
 import com.datastrato.gravitino.dto.rel.partitions.RangePartitionDTO;
-import com.datastrato.gravitino.rel.expressions.literals.Literal;
-import com.datastrato.gravitino.rel.expressions.literals.Literals;
-import com.datastrato.gravitino.rel.expressions.transforms.Transform;
-import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
-import com.datastrato.gravitino.rel.partitions.IdentityPartition;
-import com.datastrato.gravitino.rel.partitions.ListPartition;
-import com.datastrato.gravitino.rel.partitions.Partition;
-import com.datastrato.gravitino.rel.partitions.Partitions;
-import com.datastrato.gravitino.rel.partitions.RangePartition;
-import com.datastrato.gravitino.rel.types.Types;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;

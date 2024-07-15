@@ -18,10 +18,10 @@
  */
 package com.datastrato.gravitino.catalog.mysql.operation;
 
+import com.apache.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.StringIdentifier;
 import com.datastrato.gravitino.catalog.jdbc.JdbcSchema;
 import com.datastrato.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
-import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.google.common.collect.ImmutableMap;
 import java.sql.Connection;

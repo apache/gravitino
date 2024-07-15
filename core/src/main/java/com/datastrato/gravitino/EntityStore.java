@@ -18,8 +18,10 @@
  */
 package com.datastrato.gravitino;
 
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.Entity.EntityType;
-import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.utils.Executable;
 import java.io.Closeable;
 import java.io.IOException;

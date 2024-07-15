@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.connector;
 
-import com.datastrato.gravitino.annotation.Evolving;
+import com.apache.gravitino.annotation.Evolving;
 import java.util.Map;
 
 /** The PropertiesMetadata class is responsible for managing property metadata. */

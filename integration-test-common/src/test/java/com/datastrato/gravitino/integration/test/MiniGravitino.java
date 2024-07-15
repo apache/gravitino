@@ -21,12 +21,12 @@ package com.datastrato.gravitino.integration.test;
 import static com.datastrato.gravitino.Configs.ENTITY_KV_ROCKSDB_BACKEND_PATH;
 import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterruptibly;
 
+import com.apache.gravitino.client.HTTPClient;
+import com.apache.gravitino.client.RESTClient;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.auxiliary.AuxiliaryServiceManager;
-import com.datastrato.gravitino.client.HTTPClient;
-import com.datastrato.gravitino.client.RESTClient;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.ITUtils;
 import com.datastrato.gravitino.integration.test.util.KerberosProviderHelper;

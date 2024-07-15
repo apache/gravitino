@@ -18,9 +18,9 @@
 
 package com.datastrato.gravitino.listener.api.event;
 
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.annotation.DeveloperApi;
-import com.datastrato.gravitino.file.FilesetChange;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.annotation.DeveloperApi;
+import com.apache.gravitino.file.FilesetChange;
 import com.datastrato.gravitino.listener.api.info.FilesetInfo;
 
 /** Represents an event that occurs when a fileset is altered. */

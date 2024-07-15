@@ -18,9 +18,9 @@
  */
 package com.datastrato.gravitino.server.authentication;
 
+import com.apache.gravitino.exceptions.UnauthorizedException;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.auth.AuthConstants;
-import com.datastrato.gravitino.exceptions.UnauthorizedException;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import io.jsonwebtoken.Claims;

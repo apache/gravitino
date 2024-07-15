@@ -19,13 +19,13 @@
 
 package com.datastrato.gravitino.storage.relational.service;
 
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.authorization.Privileges;
+import com.apache.gravitino.authorization.SecurableObject;
+import com.apache.gravitino.authorization.SecurableObjects;
+import com.apache.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.EntityAlreadyExistsException;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.authorization.AuthorizationUtils;
-import com.datastrato.gravitino.authorization.Privileges;
-import com.datastrato.gravitino.authorization.SecurableObject;
-import com.datastrato.gravitino.authorization.SecurableObjects;
-import com.datastrato.gravitino.exceptions.NoSuchEntityException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;
 import com.datastrato.gravitino.meta.CatalogEntity;

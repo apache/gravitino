@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.trino.connector.catalog;
 
-import com.datastrato.gravitino.client.GravitinoMetalake;
+import com.apache.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.trino.connector.GravitinoConnector;
 import com.datastrato.gravitino.trino.connector.GravitinoConnectorPluginManager;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;

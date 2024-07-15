@@ -18,6 +18,15 @@
  */
 package com.datastrato.gravitino.catalog.postgresql.operation;
 
+import com.apache.gravitino.exceptions.GravitinoRuntimeException;
+import com.apache.gravitino.exceptions.NoSuchTableException;
+import com.apache.gravitino.rel.TableChange;
+import com.apache.gravitino.rel.expressions.distributions.Distributions;
+import com.apache.gravitino.rel.expressions.literals.Literals;
+import com.apache.gravitino.rel.indexes.Index;
+import com.apache.gravitino.rel.indexes.Indexes;
+import com.apache.gravitino.rel.types.Type;
+import com.apache.gravitino.rel.types.Types;
 import com.datastrato.gravitino.catalog.jdbc.JdbcColumn;
 import com.datastrato.gravitino.catalog.jdbc.JdbcTable;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
@@ -25,15 +34,6 @@ import com.datastrato.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import com.datastrato.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlColumnDefaultValueConverter;
 import com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter;
-import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
-import com.datastrato.gravitino.exceptions.NoSuchTableException;
-import com.datastrato.gravitino.rel.TableChange;
-import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
-import com.datastrato.gravitino.rel.expressions.literals.Literals;
-import com.datastrato.gravitino.rel.indexes.Index;
-import com.datastrato.gravitino.rel.indexes.Indexes;
-import com.datastrato.gravitino.rel.types.Type;
-import com.datastrato.gravitino.rel.types.Types;
 import com.datastrato.gravitino.utils.RandomNameUtils;
 import java.sql.Connection;
 import java.sql.SQLException;

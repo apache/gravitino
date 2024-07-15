@@ -21,7 +21,7 @@ package com.datastrato.gravitino.spark.connector.plugin;
 import static com.datastrato.gravitino.spark.connector.ConnectorConstants.COMMA;
 import static com.datastrato.gravitino.spark.connector.utils.ConnectorUtil.removeDuplicateSparkExtensions;
 
-import com.datastrato.gravitino.Catalog;
+import com.apache.gravitino.Catalog;
 import com.datastrato.gravitino.spark.connector.GravitinoSparkConfig;
 import com.datastrato.gravitino.spark.connector.catalog.GravitinoCatalogManager;
 import com.datastrato.gravitino.spark.connector.iceberg.extensions.GravitinoIcebergSparkSessionExtensions;

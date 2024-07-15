@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.trino.connector;
 
-import com.datastrato.gravitino.client.GravitinoAdminClient;
+import com.apache.gravitino.client.GravitinoAdminClient;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import com.google.common.collect.ImmutableList;
 import io.trino.spi.connector.ConnectorFactory;

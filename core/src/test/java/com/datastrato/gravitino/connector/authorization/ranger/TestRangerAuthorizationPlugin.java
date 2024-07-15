@@ -18,10 +18,10 @@
  */
 package com.datastrato.gravitino.connector.authorization.ranger;
 
-import com.datastrato.gravitino.authorization.Group;
-import com.datastrato.gravitino.authorization.Role;
-import com.datastrato.gravitino.authorization.RoleChange;
-import com.datastrato.gravitino.authorization.User;
+import com.apache.gravitino.authorization.Group;
+import com.apache.gravitino.authorization.Role;
+import com.apache.gravitino.authorization.RoleChange;
+import com.apache.gravitino.authorization.User;
 import com.datastrato.gravitino.connector.authorization.AuthorizationPlugin;
 import java.io.IOException;
 import java.util.List;

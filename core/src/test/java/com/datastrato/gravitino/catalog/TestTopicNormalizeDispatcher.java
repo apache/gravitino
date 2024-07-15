@@ -18,11 +18,11 @@
  */
 package com.datastrato.gravitino.catalog;
 
-import com.datastrato.gravitino.MetadataObjects;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.messaging.Topic;
-import com.datastrato.gravitino.messaging.TopicChange;
+import com.apache.gravitino.MetadataObjects;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.messaging.Topic;
+import com.apache.gravitino.messaging.TopicChange;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Map;

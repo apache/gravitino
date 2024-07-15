@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.flink.connector.integration.test.utils;
 
-import com.datastrato.gravitino.rel.Column;
+import com.apache.gravitino.rel.Column;
 import com.google.common.collect.Lists;
 import java.util.List;
 import org.apache.flink.table.api.ResultKind;

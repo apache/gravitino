@@ -18,11 +18,11 @@
  */
 package com.datastrato.gravitino;
 
+import com.apache.gravitino.exceptions.NoSuchPartitionException;
+import com.apache.gravitino.exceptions.PartitionAlreadyExistsException;
+import com.apache.gravitino.rel.SupportsPartitions;
+import com.apache.gravitino.rel.partitions.Partition;
 import com.datastrato.gravitino.connector.TableOperations;
-import com.datastrato.gravitino.exceptions.NoSuchPartitionException;
-import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
-import com.datastrato.gravitino.rel.SupportsPartitions;
-import com.datastrato.gravitino.rel.partitions.Partition;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Map;

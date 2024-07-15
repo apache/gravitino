@@ -18,8 +18,8 @@
  */
 package com.datastrato.gravitino.catalog.jdbc.utils;
 
+import com.apache.gravitino.exceptions.GravitinoRuntimeException;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
-import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
 import java.sql.SQLException;
 import java.util.Map;
 import java.util.Properties;

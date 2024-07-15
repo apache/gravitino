@@ -28,10 +28,10 @@ import static io.trino.spi.type.IntegerType.INTEGER;
 import static io.trino.spi.type.VarbinaryType.VARBINARY;
 import static io.trino.spi.type.VarcharType.VARCHAR;
 
-import com.datastrato.gravitino.rel.types.Types;
-import com.datastrato.gravitino.rel.types.Types.BooleanType;
-import com.datastrato.gravitino.rel.types.Types.DecimalType;
-import com.datastrato.gravitino.rel.types.Types.StructType;
+import com.apache.gravitino.rel.types.Types;
+import com.apache.gravitino.rel.types.Types.BooleanType;
+import com.apache.gravitino.rel.types.Types.DecimalType;
+import com.apache.gravitino.rel.types.Types.StructType;
 import io.trino.spi.TrinoException;
 import io.trino.spi.type.ArrayType;
 import io.trino.spi.type.CharType;
@@ -55,7 +55,7 @@ import java.util.stream.Collectors;
 /** This class is used to transform datatype between Apache Gravitino and Trino */
 public class GeneralDataTypeTransformer {
 
-  public Type getTrinoType(com.datastrato.gravitino.rel.types.Type type) {
+  public Type getTrinoType(com.apache.gravitino.rel.types.Type type) {
     switch (type.name()) {
       case BOOLEAN:
         return BOOLEAN;
@@ -144,7 +144,7 @@ public class GeneralDataTypeTransformer {
     return StructType.of(fields);
   }
 
-  public com.datastrato.gravitino.rel.types.Type getGravitinoType(Type type) {
+  public com.apache.gravitino.rel.types.Type getGravitinoType(Type type) {
     Class<? extends Type> typeClass = type.getClass();
 
     if (typeClass == io.trino.spi.type.BooleanType.class) {

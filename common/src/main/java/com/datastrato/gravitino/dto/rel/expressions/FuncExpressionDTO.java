@@ -18,8 +18,8 @@
  */
 package com.datastrato.gravitino.dto.rel.expressions;
 
-import com.datastrato.gravitino.rel.expressions.Expression;
-import com.datastrato.gravitino.rel.expressions.FunctionExpression;
+import com.apache.gravitino.rel.expressions.Expression;
+import com.apache.gravitino.rel.expressions.FunctionExpression;
 import lombok.EqualsAndHashCode;
 
 /** Data transfer object representing a function expression. */

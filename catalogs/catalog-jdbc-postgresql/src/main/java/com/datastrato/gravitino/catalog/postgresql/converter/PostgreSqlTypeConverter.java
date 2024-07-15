@@ -18,10 +18,10 @@
  */
 package com.datastrato.gravitino.catalog.postgresql.converter;
 
+import com.apache.gravitino.rel.types.Type;
+import com.apache.gravitino.rel.types.Types;
+import com.apache.gravitino.rel.types.Types.ListType;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
-import com.datastrato.gravitino.rel.types.Type;
-import com.datastrato.gravitino.rel.types.Types;
-import com.datastrato.gravitino.rel.types.Types.ListType;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 

@@ -18,7 +18,7 @@
 
 package com.datastrato.gravitino.listener.api;
 
-import com.datastrato.gravitino.annotation.DeveloperApi;
+import com.apache.gravitino.annotation.DeveloperApi;
 import com.datastrato.gravitino.listener.api.event.Event;
 import java.util.Map;
 

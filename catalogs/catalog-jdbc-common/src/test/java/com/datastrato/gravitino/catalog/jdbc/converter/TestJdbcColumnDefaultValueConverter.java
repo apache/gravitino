@@ -18,11 +18,11 @@
  */
 package com.datastrato.gravitino.catalog.jdbc.converter;
 
-import static com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+import static com.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
-import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.expressions.Expression;
-import com.datastrato.gravitino.rel.expressions.literals.Literals;
+import com.apache.gravitino.rel.Column;
+import com.apache.gravitino.rel.expressions.Expression;
+import com.apache.gravitino.rel.expressions.literals.Literals;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

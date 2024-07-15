@@ -20,7 +20,7 @@ package com.datastrato.gravitino.dto.rel.expressions;
 
 import static com.datastrato.gravitino.dto.rel.expressions.FunctionArg.ArgType.UNPARSED;
 
-import com.datastrato.gravitino.rel.expressions.UnparsedExpression;
+import com.apache.gravitino.rel.expressions.UnparsedExpression;
 import lombok.EqualsAndHashCode;
 
 /** Data transfer object representing an unparsed expression. */

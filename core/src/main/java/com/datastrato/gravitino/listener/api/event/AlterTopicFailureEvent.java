@@ -18,9 +18,9 @@
 
 package com.datastrato.gravitino.listener.api.event;
 
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.annotation.DeveloperApi;
-import com.datastrato.gravitino.messaging.TopicChange;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.annotation.DeveloperApi;
+import com.apache.gravitino.messaging.TopicChange;
 
 /**
  * Represents an event that is triggered when an attempt to alter a topic fails due to an exception.

@@ -35,9 +35,9 @@ import static com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlTy
 import static com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.JDBC_ARRAY_PREFIX;
 import static com.datastrato.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.NUMERIC;
 
+import com.apache.gravitino.rel.types.Type;
+import com.apache.gravitino.rel.types.Types;
 import com.datastrato.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
-import com.datastrato.gravitino.rel.types.Type;
-import com.datastrato.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

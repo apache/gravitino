@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.dto;
 
-import com.datastrato.gravitino.Schema;
+import com.apache.gravitino.Schema;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;

@@ -18,8 +18,8 @@
 
 package com.datastrato.gravitino.catalog.lakehouse.paimon.utils;
 
-import com.datastrato.gravitino.rel.types.Type;
-import com.datastrato.gravitino.rel.types.Types;
+import com.apache.gravitino.rel.types.Type;
+import com.apache.gravitino.rel.types.Types;
 import java.util.Arrays;
 import org.apache.paimon.types.ArrayType;
 import org.apache.paimon.types.BigIntType;

@@ -19,8 +19,8 @@
 
 package com.datastrato.gravitino.storage;
 
+import com.apache.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Entity.EntityType;
-import com.datastrato.gravitino.NameIdentifier;
 import java.io.IOException;
 import org.apache.commons.lang3.tuple.Pair;
 

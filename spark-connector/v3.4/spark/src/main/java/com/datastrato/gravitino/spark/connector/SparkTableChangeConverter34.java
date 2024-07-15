@@ -17,7 +17,7 @@
  */
 package com.datastrato.gravitino.spark.connector;
 
-import com.datastrato.gravitino.rel.expressions.literals.Literals;
+import com.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.spark.sql.connector.catalog.TableChange;
 
 public class SparkTableChangeConverter34 extends SparkTableChangeConverter {
@@ -25,11 +25,11 @@ public class SparkTableChangeConverter34 extends SparkTableChangeConverter {
     super(sparkTypeConverter);
   }
 
-  public com.datastrato.gravitino.rel.TableChange toGravitinoTableChange(TableChange change) {
+  public com.apache.gravitino.rel.TableChange toGravitinoTableChange(TableChange change) {
     if (change instanceof TableChange.UpdateColumnDefaultValue) {
       TableChange.UpdateColumnDefaultValue updateColumnDefaultValue =
           (TableChange.UpdateColumnDefaultValue) change;
-      return com.datastrato.gravitino.rel.TableChange.updateColumnDefaultValue(
+      return com.apache.gravitino.rel.TableChange.updateColumnDefaultValue(
           updateColumnDefaultValue.fieldNames(),
           Literals.stringLiteral(updateColumnDefaultValue.newDefaultValue()));
     } else {

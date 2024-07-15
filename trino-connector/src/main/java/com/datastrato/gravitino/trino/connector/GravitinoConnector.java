@@ -18,8 +18,8 @@
  */
 package com.datastrato.gravitino.trino.connector;
 
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.client.GravitinoMetalake;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import com.google.common.base.Preconditions;

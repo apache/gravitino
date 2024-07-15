@@ -18,13 +18,20 @@
 
 package com.datastrato.gravitino.listener;
 
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.exceptions.NoSuchSchemaException;
+import com.apache.gravitino.exceptions.NoSuchTableException;
+import com.apache.gravitino.exceptions.TableAlreadyExistsException;
+import com.apache.gravitino.rel.Column;
+import com.apache.gravitino.rel.Table;
+import com.apache.gravitino.rel.TableChange;
+import com.apache.gravitino.rel.expressions.distributions.Distribution;
+import com.apache.gravitino.rel.expressions.sorts.SortOrder;
+import com.apache.gravitino.rel.expressions.transforms.Transform;
+import com.apache.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.catalog.TableDispatcher;
 import com.datastrato.gravitino.catalog.TableOperationDispatcher;
-import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
-import com.datastrato.gravitino.exceptions.NoSuchTableException;
-import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
 import com.datastrato.gravitino.listener.api.event.AlterTableEvent;
 import com.datastrato.gravitino.listener.api.event.AlterTableFailureEvent;
 import com.datastrato.gravitino.listener.api.event.CreateTableEvent;
@@ -38,13 +45,6 @@ import com.datastrato.gravitino.listener.api.event.LoadTableFailureEvent;
 import com.datastrato.gravitino.listener.api.event.PurgeTableEvent;
 import com.datastrato.gravitino.listener.api.event.PurgeTableFailureEvent;
 import com.datastrato.gravitino.listener.api.info.TableInfo;
-import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Table;
-import com.datastrato.gravitino.rel.TableChange;
-import com.datastrato.gravitino.rel.expressions.distributions.Distribution;
-import com.datastrato.gravitino.rel.expressions.sorts.SortOrder;
-import com.datastrato.gravitino.rel.expressions.transforms.Transform;
-import com.datastrato.gravitino.rel.indexes.Index;
 import com.datastrato.gravitino.utils.PrincipalUtils;
 import java.util.Map;
 

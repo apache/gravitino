@@ -18,8 +18,8 @@
 
 package com.datastrato.gravitino.spark.connector;
 
-import com.datastrato.gravitino.rel.types.Type;
-import com.datastrato.gravitino.rel.types.Types;
+import com.apache.gravitino.rel.types.Type;
+import com.apache.gravitino.rel.types.Types;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;

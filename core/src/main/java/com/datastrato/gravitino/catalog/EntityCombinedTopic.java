@@ -18,9 +18,9 @@
  */
 package com.datastrato.gravitino.catalog;
 
-import com.datastrato.gravitino.Audit;
+import com.apache.gravitino.Audit;
+import com.apache.gravitino.messaging.Topic;
 import com.datastrato.gravitino.StringIdentifier;
-import com.datastrato.gravitino.messaging.Topic;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.TopicEntity;
 import java.util.Map;

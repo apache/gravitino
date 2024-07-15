@@ -18,10 +18,10 @@
  */
 package com.datastrato.gravitino.connector;
 
-import com.datastrato.gravitino.Audit;
-import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.annotation.Evolving;
+import com.apache.gravitino.Audit;
+import com.apache.gravitino.Catalog;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.annotation.Evolving;
 import java.util.Map;
 
 /**

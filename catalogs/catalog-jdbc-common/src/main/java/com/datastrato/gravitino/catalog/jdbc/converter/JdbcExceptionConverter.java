@@ -18,7 +18,7 @@
  */
 package com.datastrato.gravitino.catalog.jdbc.converter;
 
-import com.datastrato.gravitino.exceptions.GravitinoRuntimeException;
+import com.apache.gravitino.exceptions.GravitinoRuntimeException;
 import java.sql.SQLException;
 
 /** Interface for converter JDBC exceptions to Gravitino exceptions. */

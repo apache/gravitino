@@ -19,14 +19,14 @@
 
 package com.datastrato.gravitino.storage.relational.utils;
 
-import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.MetadataObject;
-import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.authorization.Privilege;
-import com.datastrato.gravitino.authorization.Privileges;
-import com.datastrato.gravitino.authorization.SecurableObject;
-import com.datastrato.gravitino.authorization.SecurableObjects;
-import com.datastrato.gravitino.file.Fileset;
+import com.apache.gravitino.Catalog;
+import com.apache.gravitino.MetadataObject;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.authorization.Privilege;
+import com.apache.gravitino.authorization.Privileges;
+import com.apache.gravitino.authorization.SecurableObject;
+import com.apache.gravitino.authorization.SecurableObjects;
+import com.apache.gravitino.file.Fileset;
 import com.datastrato.gravitino.json.JsonUtils;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.BaseMetalake;

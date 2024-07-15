@@ -19,10 +19,10 @@
 
 package com.datastrato.gravitino.connector;
 
-import com.datastrato.gravitino.annotation.Evolving;
-import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.expressions.Expression;
-import com.datastrato.gravitino.rel.types.Type;
+import com.apache.gravitino.annotation.Evolving;
+import com.apache.gravitino.rel.Column;
+import com.apache.gravitino.rel.expressions.Expression;
+import com.apache.gravitino.rel.types.Type;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;

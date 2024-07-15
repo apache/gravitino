@@ -18,19 +18,19 @@
  */
 package com.datastrato.gravitino.server.web.rest;
 
-import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
-import com.datastrato.gravitino.exceptions.FilesetAlreadyExistsException;
-import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
-import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
-import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
-import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
-import com.datastrato.gravitino.exceptions.NotFoundException;
-import com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException;
-import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
-import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
-import com.datastrato.gravitino.exceptions.TableAlreadyExistsException;
-import com.datastrato.gravitino.exceptions.TopicAlreadyExistsException;
-import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
+import com.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import com.apache.gravitino.exceptions.FilesetAlreadyExistsException;
+import com.apache.gravitino.exceptions.GroupAlreadyExistsException;
+import com.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
+import com.apache.gravitino.exceptions.NoSuchMetalakeException;
+import com.apache.gravitino.exceptions.NonEmptySchemaException;
+import com.apache.gravitino.exceptions.NotFoundException;
+import com.apache.gravitino.exceptions.PartitionAlreadyExistsException;
+import com.apache.gravitino.exceptions.RoleAlreadyExistsException;
+import com.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import com.apache.gravitino.exceptions.TableAlreadyExistsException;
+import com.apache.gravitino.exceptions.TopicAlreadyExistsException;
+import com.apache.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.server.web.Utils;
 import com.google.common.annotations.VisibleForTesting;
 import javax.ws.rs.core.Response;

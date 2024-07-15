@@ -18,9 +18,9 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.paimon.utils;
 
+import com.apache.gravitino.rel.Column;
+import com.apache.gravitino.rel.expressions.Expression;
 import com.datastrato.gravitino.catalog.lakehouse.paimon.ops.PaimonCatalogOps;
-import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.expressions.Expression;
 import com.google.common.base.Preconditions;
 
 /** Utilities of {@link PaimonCatalogOps} to support table operation. */

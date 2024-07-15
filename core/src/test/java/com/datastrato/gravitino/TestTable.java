@@ -18,9 +18,9 @@
  */
 package com.datastrato.gravitino;
 
+import com.apache.gravitino.rel.SupportsPartitions;
 import com.datastrato.gravitino.connector.BaseTable;
 import com.datastrato.gravitino.connector.TableOperations;
-import com.datastrato.gravitino.rel.SupportsPartitions;
 import lombok.EqualsAndHashCode;
 
 @EqualsAndHashCode(callSuper = true)

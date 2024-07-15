@@ -18,14 +18,14 @@
 
 package com.datastrato.gravitino.spark.connector.catalog;
 
-import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.Schema;
-import com.datastrato.gravitino.SchemaChange;
-import com.datastrato.gravitino.exceptions.NoSuchSchemaException;
-import com.datastrato.gravitino.exceptions.NonEmptySchemaException;
-import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
+import com.apache.gravitino.Catalog;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.Schema;
+import com.apache.gravitino.SchemaChange;
+import com.apache.gravitino.exceptions.NoSuchSchemaException;
+import com.apache.gravitino.exceptions.NonEmptySchemaException;
+import com.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.spark.connector.ConnectorConstants;
 import com.datastrato.gravitino.spark.connector.PropertiesConverter;
 import com.datastrato.gravitino.spark.connector.SparkTableChangeConverter;
@@ -114,7 +114,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
    */
   protected abstract Table createSparkTable(
       Identifier identifier,
-      com.datastrato.gravitino.rel.Table gravitinoTable,
+      com.apache.gravitino.rel.Table gravitinoTable,
       Table sparkTable,
       TableCatalog sparkCatalog,
       PropertiesConverter propertiesConverter,
@@ -191,10 +191,10 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
       Identifier ident, StructType schema, Transform[] transforms, Map<String, String> properties)
       throws TableAlreadyExistsException, NoSuchNamespaceException {
     NameIdentifier gravitinoIdentifier = NameIdentifier.of(getDatabase(ident), ident.name());
-    com.datastrato.gravitino.rel.Column[] gravitinoColumns =
+    com.apache.gravitino.rel.Column[] gravitinoColumns =
         Arrays.stream(schema.fields())
             .map(structField -> createGravitinoColumn(structField))
-            .toArray(com.datastrato.gravitino.rel.Column[]::new);
+            .toArray(com.apache.gravitino.rel.Column[]::new);
 
     Map<String, String> gravitinoProperties =
         propertiesConverter.toGravitinoTableProperties(properties);
@@ -203,11 +203,11 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
 
     DistributionAndSortOrdersInfo distributionAndSortOrdersInfo =
         sparkTransformConverter.toGravitinoDistributionAndSortOrders(transforms);
-    com.datastrato.gravitino.rel.expressions.transforms.Transform[] partitionings =
+    com.apache.gravitino.rel.expressions.transforms.Transform[] partitionings =
         sparkTransformConverter.toGravitinoPartitionings(transforms);
 
     try {
-      com.datastrato.gravitino.rel.Table gravitinoTable =
+      com.apache.gravitino.rel.Table gravitinoTable =
           gravitinoCatalogClient
               .asTableCatalog()
               .createTable(
@@ -229,7 +229,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
           sparkTypeConverter);
     } catch (NoSuchSchemaException e) {
       throw new NoSuchNamespaceException(ident.namespace());
-    } catch (com.datastrato.gravitino.exceptions.TableAlreadyExistsException e) {
+    } catch (com.apache.gravitino.exceptions.TableAlreadyExistsException e) {
       throw new TableAlreadyExistsException(ident);
     }
   }
@@ -237,7 +237,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
   @Override
   public Table loadTable(Identifier ident) throws NoSuchTableException {
     try {
-      com.datastrato.gravitino.rel.Table gravitinoTable = loadGravitinoTable(ident);
+      com.apache.gravitino.rel.Table gravitinoTable = loadGravitinoTable(ident);
       org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident);
       // Will create a catalog specific table
       return createSparkTable(
@@ -248,20 +248,20 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
           propertiesConverter,
           sparkTransformConverter,
           sparkTypeConverter);
-    } catch (com.datastrato.gravitino.exceptions.NoSuchTableException e) {
+    } catch (com.apache.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(ident);
     }
   }
 
   @Override
   public Table alterTable(Identifier ident, TableChange... changes) throws NoSuchTableException {
-    com.datastrato.gravitino.rel.TableChange[] gravitinoTableChanges =
+    com.apache.gravitino.rel.TableChange[] gravitinoTableChanges =
         Arrays.stream(changes)
             .map(sparkTableChangeConverter::toGravitinoTableChange)
-            .toArray(com.datastrato.gravitino.rel.TableChange[]::new);
+            .toArray(com.apache.gravitino.rel.TableChange[]::new);
     try {
       sparkCatalog.invalidateTable(ident);
-      com.datastrato.gravitino.rel.Table gravitinoTable =
+      com.apache.gravitino.rel.Table gravitinoTable =
           gravitinoCatalogClient
               .asTableCatalog()
               .alterTable(
@@ -275,7 +275,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
           propertiesConverter,
           sparkTransformConverter,
           sparkTypeConverter);
-    } catch (com.datastrato.gravitino.exceptions.NoSuchTableException e) {
+    } catch (com.apache.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(ident);
     }
   }
@@ -303,14 +303,14 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
     String newDatabase = getDatabase(newIdent);
     Preconditions.checkArgument(
         newDatabase.equals(oldDatabase), "Doesn't support rename table to different database");
-    com.datastrato.gravitino.rel.TableChange rename =
-        com.datastrato.gravitino.rel.TableChange.rename(newIdent.name());
+    com.apache.gravitino.rel.TableChange rename =
+        com.apache.gravitino.rel.TableChange.rename(newIdent.name());
     try {
       sparkCatalog.invalidateTable(oldIdent);
       gravitinoCatalogClient
           .asTableCatalog()
           .alterTable(NameIdentifier.of(getDatabase(oldIdent), oldIdent.name()), rename);
-    } catch (com.datastrato.gravitino.exceptions.NoSuchTableException e) {
+    } catch (com.apache.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(oldIdent);
     }
   }
@@ -398,14 +398,14 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
     }
   }
 
-  protected com.datastrato.gravitino.rel.Table loadGravitinoTable(Identifier ident)
+  protected com.apache.gravitino.rel.Table loadGravitinoTable(Identifier ident)
       throws NoSuchTableException {
     try {
       String database = getDatabase(ident);
       return gravitinoCatalogClient
           .asTableCatalog()
           .loadTable(NameIdentifier.of(database, ident.name()));
-    } catch (com.datastrato.gravitino.exceptions.NoSuchTableException e) {
+    } catch (com.apache.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(ident);
     }
   }
@@ -431,8 +431,8 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
     return catalogDefaultNamespace[0];
   }
 
-  private com.datastrato.gravitino.rel.Column createGravitinoColumn(StructField structField) {
-    return com.datastrato.gravitino.rel.Column.of(
+  private com.apache.gravitino.rel.Column createGravitinoColumn(StructField structField) {
+    return com.apache.gravitino.rel.Column.of(
         structField.name(),
         sparkTypeConverter.toGravitinoType(structField.dataType()),
         structField.getComment().isEmpty() ? null : structField.getComment().get(),
@@ -440,7 +440,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
         // Spark doesn't support autoIncrement
         false,
         // todo: support default value
-        com.datastrato.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET);
+        com.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET);
   }
 
   private String getDatabase(NameIdentifier gravitinoIdentifier) {

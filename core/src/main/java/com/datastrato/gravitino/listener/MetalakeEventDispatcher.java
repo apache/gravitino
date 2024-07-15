@@ -18,11 +18,11 @@
 
 package com.datastrato.gravitino.listener;
 
-import com.datastrato.gravitino.Metalake;
-import com.datastrato.gravitino.MetalakeChange;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException;
-import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
+import com.apache.gravitino.Metalake;
+import com.apache.gravitino.MetalakeChange;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
+import com.apache.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.listener.api.event.AlterMetalakeEvent;
 import com.datastrato.gravitino.listener.api.event.AlterMetalakeFailureEvent;
 import com.datastrato.gravitino.listener.api.event.CreateMetalakeEvent;

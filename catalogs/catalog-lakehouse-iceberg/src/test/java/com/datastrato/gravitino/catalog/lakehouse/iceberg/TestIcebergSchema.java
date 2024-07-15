@@ -20,14 +20,14 @@ package com.datastrato.gravitino.catalog.lakehouse.iceberg;
 
 import static com.datastrato.gravitino.catalog.lakehouse.iceberg.TestIcebergCatalog.ICEBERG_PROPERTIES_METADATA;
 
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
-import com.datastrato.gravitino.Schema;
-import com.datastrato.gravitino.SchemaChange;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
+import com.apache.gravitino.Schema;
+import com.apache.gravitino.SchemaChange;
+import com.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.catalog.PropertiesMetadataHelpers;
 import com.datastrato.gravitino.connector.PropertiesMetadata;
 import com.datastrato.gravitino.connector.SupportsSchemas;
-import com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException;
 import com.datastrato.gravitino.meta.AuditInfo;
 import com.datastrato.gravitino.meta.CatalogEntity;
 import com.google.common.collect.Maps;

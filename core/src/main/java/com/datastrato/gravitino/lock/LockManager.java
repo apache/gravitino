@@ -23,8 +23,8 @@ import static com.datastrato.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static com.datastrato.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static com.datastrato.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 
+import com.apache.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.NameIdentifier;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;

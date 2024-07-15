@@ -19,24 +19,24 @@
 
 package com.datastrato.gravitino.catalog.mysql.integration.test;
 
-import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.CatalogChange;
+import com.apache.gravitino.Catalog;
+import com.apache.gravitino.CatalogChange;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Schema;
+import com.apache.gravitino.client.GravitinoMetalake;
+import com.apache.gravitino.rel.Column;
+import com.apache.gravitino.rel.Table;
+import com.apache.gravitino.rel.TableChange;
+import com.apache.gravitino.rel.types.Types;
 import com.datastrato.gravitino.Configs;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Schema;
 import com.datastrato.gravitino.auth.AuthenticatorType;
 import com.datastrato.gravitino.catalog.jdbc.config.JdbcConfig;
 import com.datastrato.gravitino.catalog.mysql.integration.test.service.MysqlService;
-import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.integration.test.container.ContainerSuite;
 import com.datastrato.gravitino.integration.test.container.MySQLContainer;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
 import com.datastrato.gravitino.integration.test.util.TestDatabaseName;
-import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Table;
-import com.datastrato.gravitino.rel.TableChange;
-import com.datastrato.gravitino.rel.types.Types;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.sql.SQLException;

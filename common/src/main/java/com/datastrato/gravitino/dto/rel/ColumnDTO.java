@@ -18,12 +18,12 @@
  */
 package com.datastrato.gravitino.dto.rel;
 
+import com.apache.gravitino.rel.Column;
+import com.apache.gravitino.rel.expressions.Expression;
+import com.apache.gravitino.rel.types.Type;
+import com.apache.gravitino.rel.types.Types;
 import com.datastrato.gravitino.dto.rel.expressions.LiteralDTO;
 import com.datastrato.gravitino.json.JsonUtils;
-import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.expressions.Expression;
-import com.datastrato.gravitino.rel.types.Type;
-import com.datastrato.gravitino.rel.types.Types;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;

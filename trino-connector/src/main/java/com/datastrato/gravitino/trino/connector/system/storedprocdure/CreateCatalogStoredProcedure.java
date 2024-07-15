@@ -26,10 +26,10 @@ import static com.datastrato.gravitino.trino.connector.system.table.GravitinoSys
 import static io.trino.spi.type.BooleanType.BOOLEAN;
 import static io.trino.spi.type.VarcharType.VARCHAR;
 
-import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException;
-import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
+import com.apache.gravitino.Catalog;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import com.apache.gravitino.exceptions.NoSuchMetalakeException;
 import com.datastrato.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import io.trino.spi.TrinoException;
 import io.trino.spi.procedure.Procedure;

@@ -28,8 +28,8 @@ import static com.datastrato.gravitino.Entity.EntityType.TABLE;
 import static com.datastrato.gravitino.Entity.EntityType.TOPIC;
 import static com.datastrato.gravitino.Entity.EntityType.USER;
 
+import com.apache.gravitino.NameIdentifier;
 import com.datastrato.gravitino.Entity.EntityType;
-import com.datastrato.gravitino.NameIdentifier;
 import com.datastrato.gravitino.storage.EntityKeyEncoder;
 import com.datastrato.gravitino.storage.NameMappingService;
 import com.datastrato.gravitino.utils.ByteUtils;

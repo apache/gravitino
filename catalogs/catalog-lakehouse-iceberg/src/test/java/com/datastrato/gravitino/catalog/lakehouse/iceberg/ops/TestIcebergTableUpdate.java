@@ -18,11 +18,11 @@
  */
 package com.datastrato.gravitino.catalog.lakehouse.iceberg.ops;
 
-import com.datastrato.gravitino.NameIdentifier;
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.rel.TableChange;
+import com.apache.gravitino.rel.TableChange.ColumnPosition;
+import com.apache.gravitino.rel.types.Types;
 import com.datastrato.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper.IcebergTableChange;
-import com.datastrato.gravitino.rel.TableChange;
-import com.datastrato.gravitino.rel.TableChange.ColumnPosition;
-import com.datastrato.gravitino.rel.types.Types;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.iceberg.Schema;

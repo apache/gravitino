@@ -18,6 +18,9 @@
  */
 package com.datastrato.gravitino;
 
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
+
 /** This interface represents entities that have identifiers. */
 public interface HasIdentifier {
 

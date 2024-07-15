@@ -28,13 +28,13 @@ import static com.datastrato.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
 import static com.datastrato.gravitino.storage.kv.BinaryEntityKeyEncoder.BYTABLE_NAMESPACE_SEPARATOR;
 import static com.datastrato.gravitino.storage.kv.BinaryEntityKeyEncoder.WILD_CARD;
 
+import com.apache.gravitino.NameIdentifier;
+import com.apache.gravitino.Namespace;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.Configs;
 import com.datastrato.gravitino.Entity.EntityType;
 import com.datastrato.gravitino.EntitySerDeFactory;
 import com.datastrato.gravitino.EntityStoreFactory;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.Namespace;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.ByteUtils;
 import com.datastrato.gravitino.utils.Bytes;

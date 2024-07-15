@@ -18,15 +18,19 @@
  */
 package com.datastrato.gravitino.authorization;
 
+import com.apache.gravitino.authorization.Group;
+import com.apache.gravitino.authorization.Role;
+import com.apache.gravitino.authorization.SecurableObject;
+import com.apache.gravitino.authorization.User;
+import com.apache.gravitino.exceptions.GroupAlreadyExistsException;
+import com.apache.gravitino.exceptions.NoSuchGroupException;
+import com.apache.gravitino.exceptions.NoSuchMetalakeException;
+import com.apache.gravitino.exceptions.NoSuchRoleException;
+import com.apache.gravitino.exceptions.NoSuchUserException;
+import com.apache.gravitino.exceptions.RoleAlreadyExistsException;
+import com.apache.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.Config;
 import com.datastrato.gravitino.EntityStore;
-import com.datastrato.gravitino.exceptions.GroupAlreadyExistsException;
-import com.datastrato.gravitino.exceptions.NoSuchGroupException;
-import com.datastrato.gravitino.exceptions.NoSuchMetalakeException;
-import com.datastrato.gravitino.exceptions.NoSuchRoleException;
-import com.datastrato.gravitino.exceptions.NoSuchUserException;
-import com.datastrato.gravitino.exceptions.RoleAlreadyExistsException;
-import com.datastrato.gravitino.exceptions.UserAlreadyExistsException;
 import com.datastrato.gravitino.storage.IdGenerator;
 import com.datastrato.gravitino.utils.Executable;
 import com.google.common.annotations.VisibleForTesting;

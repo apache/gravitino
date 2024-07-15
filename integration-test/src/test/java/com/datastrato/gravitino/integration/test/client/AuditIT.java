@@ -19,10 +19,10 @@
 
 package com.datastrato.gravitino.integration.test.client;
 
+import com.apache.gravitino.MetalakeChange;
+import com.apache.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.Configs;
-import com.datastrato.gravitino.MetalakeChange;
 import com.datastrato.gravitino.auth.AuthenticatorType;
-import com.datastrato.gravitino.client.GravitinoMetalake;
 import com.datastrato.gravitino.integration.test.util.AbstractIT;
 import com.datastrato.gravitino.utils.RandomNameUtils;
 import com.google.common.collect.Maps;
