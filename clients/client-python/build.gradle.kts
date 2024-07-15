@@ -135,8 +135,8 @@ fun generatePypiProjectHomePage() {
     }
 
     // Use regular expression to match the `![](./a/b/c.png)` link in the content
-    // Convert `![](./a/b/c.png)` to `[](https://raw.githubusercontent.com/apache/gravitino/main/docs/a/b/c.png)`
-    val assertUrl = "https://raw.githubusercontent.com/apache/gravitino/main/docs"
+    // Convert `![](./a/b/c.png)` to `[](https://raw.githubusercontent.com/datastrato/gravitino/main/docs/a/b/c.png)`
+    val assertUrl = "https://raw.githubusercontent.com/datastrato/gravitino/main/docs"
     val patternImage = """!\[([^\]]+)]\(\./assets/([^)]+)\)""".toRegex()
     val contentUpdateImage = patternImage.replace(contentUpdateDocs) { matchResult ->
       val altText = matchResult.groupValues[1]
