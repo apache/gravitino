@@ -17,7 +17,7 @@
 # under the License.
 #
 FROM trinodb/trino:435
-LABEL maintainer="support@datastrato.com"
+LABEL maintainer="dev@gravitino.apache.org"
 
 USER root
 

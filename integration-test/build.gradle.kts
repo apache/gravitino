@@ -160,8 +160,8 @@ tasks.test {
       environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.12")
       environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "datastrato/gravitino-ci-trino:0.1.5")
       environment("GRAVITINO_CI_KAFKA_DOCKER_IMAGE", "apache/kafka:3.7.0")
-      environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "datastrato/gravitino-ci-doris:0.1.4")
-      environment("GRAVITINO_CI_RANGER_DOCKER_IMAGE", "datastrato/gravitino-ci-ranger:0.1.0")
+      environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "datastrato/gravitino-ci-doris:0.1.5")
+      environment("GRAVITINO_CI_RANGER_DOCKER_IMAGE", "datastrato/gravitino-ci-ranger:0.1.1")
 
       copy {
         from("${project.rootDir}/dev/docker/trino/conf")
@@ -204,7 +204,7 @@ tasks.clean {
 
 tasks.register<JavaExec>("TrinoTest") {
   classpath = sourceSets["test"].runtimeClasspath
-  mainClass.set("com.datastrato.gravitino.integration.test.trino.TrinoQueryTestTool")
+  mainClass.set("org.apache.gravitino.integration.test.trino.TrinoQueryTestTool")
 
   if (JavaVersion.current() > JavaVersion.VERSION_1_8) {
     jvmArgs = listOf(

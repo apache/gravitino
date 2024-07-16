@@ -32,6 +32,7 @@ val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat
 
 dependencies {
   implementation(project(":api"))
+  implementation(project(":catalogs:bundled-catalog", configuration = "shadow"))
   implementation(project(":common"))
   implementation(project(":core"))
   implementation(project(":server-common"))
