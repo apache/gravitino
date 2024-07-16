@@ -42,13 +42,13 @@ tasks.withType<ShadowJar>(ShadowJar::class.java) {
 
   dependencies {
     exclude("javax.*")
-    exclude("org.*")
+    exclude("org.slf4j.*")
   }
 
   exclude("**/package-info.class")
   exclude("**/*.properties")
   exclude("**/*.html")
-  exclude("org/**")
+  exclude("org/slf4j/**")
   exclude("META-INF")
   exclude("META-INF/**")
   exclude("module-info.class")
