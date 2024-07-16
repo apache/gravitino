@@ -1208,7 +1208,7 @@ components:
         "type": "TableAlreadyExistsException",
         "message": "Failed to operate table(s) [my_hive_table] operation [CREATE] under schema [my_hive_schema], reason [TableAlreadyExistsException]",
         "stack": [
-          "com.datastrato.gravitino.exceptions.TableAlreadyExistsException: Table already exists: my_hive_table",
+          "org.apache.gravitino.exceptions.TableAlreadyExistsException: Table already exists: my_hive_table",
           "..."
         ]
       }
@@ -1219,7 +1219,7 @@ components:
         "type": "NoSuchTableException",
         "message": "Failed to operate table(s) [test_table] operation [LOAD] under schema [test_schema], reason [NoSuchTableException]",
         "stack": [
-          "com.datastrato.gravitino.exceptions.NoSuchTableException: Hive table does not exist: test_table in Hive Metastore",
+          "org.apache.gravitino.exceptions.NoSuchTableException: Hive table does not exist: test_table in Hive Metastore",
           "..."
         ]
       }

@@ -16,4 +16,4 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-com.datastrato.gravitino.trino.connector.GravitinoPlugin
+org.apache.gravitino.trino.connector.GravitinoPlugin

@@ -77,6 +77,15 @@ class FilesetChange(ABC):
         """
         return FilesetChange.RemoveProperty(fileset_property)
 
+    @staticmethod
+    def remove_comment():
+        """Creates a new fileset change to remove comment from the fileset.
+
+        Returns:
+            The fileset change.
+        """
+        return FilesetChange.RemoveComment()
+
     @dataclass
     class RenameFileset:
         """A fileset change to rename the fileset."""
@@ -269,3 +278,37 @@ class FilesetChange(ABC):
                  A string summary of the property removal operation.
             """
             return f"REMOVEPROPERTY {self._property}"
+
+    @dataclass
+    class RemoveComment:
+        """A fileset change to remove comment from the fileset."""
+
+        def __eq__(self, other) -> bool:
+            """Compares this RemoveComment instance with another object for equality.
+            Two instances are considered equal if they are RemoveComment instance.
+
+            Args:
+                 other: The object to compare with this instance.
+
+            Returns:
+                 true if the given object represents the comment removal; false otherwise.
+            """
+            return isinstance(other, FilesetChange.RemoveComment)
+
+        def __hash__(self):
+            """Generates a hash code for this RemoveComment instance.
+            The hash code is based on the RemoveComment instance name.
+
+            Returns:
+                 A hash code value for comment removal operation.
+            """
+            return hash("REMOVECOMMENT")
+
+        def __str__(self):
+            """Provides a string representation of the RemoveComment instance.
+            This string format includes the class name.
+
+            Returns:
+                 A string summary of the comment removal operation.
+            """
+            return "REMOVECOMMENT"

@@ -339,7 +339,7 @@ Displays a confirmation dialog, clicking on the SUBMIT button deletes this catal
 
 End-to-end testing for web frontends is conducted using the [Selenium](https://www.selenium.dev/documentation/) testing framework, which is Java-based.
 
-Test cases can be found in the project directory: `integration-test/src/test/java/com/datastrato/gravitino/integration/test/web/ui`, where the `pages` directory is designated for storing definitions of frontend elements, among others.
+Test cases can be found in the project directory: `integration-test/src/test/java/org/apache/gravitino/integration/test/web/ui`, where the `pages` directory is designated for storing definitions of frontend elements, among others.
 The root directory contains the actual steps for the test cases.
 
 :::tip

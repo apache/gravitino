@@ -458,7 +458,7 @@ components:
         "type": "PartitionAlreadyExistsException",
         "message": "Failed to operate partition(s) operation [CREATE] of table [table1], reason [p1]",
         "stack": [
-          "com.datastrato.gravitino.exceptions.PartitionAlreadyExistsException: p1",
+          "org.apache.gravitino.exceptions.PartitionAlreadyExistsException: p1",
           "..."
         ]
       }
@@ -469,7 +469,7 @@ components:
         "type": "NoSuchPartitionException",
         "message": "Failed to operate partition(s) operation [GET] of table [table1], reason [p3]",
         "stack": [
-          "com.datastrato.gravitino.exceptions.NoSuchPartitionException: p3",
+          "org.apache.gravitino.exceptions.NoSuchPartitionException: p3",
           "..."
         ]
       }
