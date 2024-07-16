@@ -70,7 +70,7 @@ public class PermissionOperations {
           httpRequest,
           () ->
               TreeLockUtils.doWithTreeLock(
-                  NameIdentifier.of(AuthorizationUtils.ofUserNamespace(metalake).levels()),
+                  AuthorizationUtils.ofUser(metalake, user),
                   LockType.WRITE,
                   () ->
                       TreeLockUtils.doWithTreeLock(
@@ -102,7 +102,7 @@ public class PermissionOperations {
           httpRequest,
           () ->
               TreeLockUtils.doWithTreeLock(
-                  NameIdentifier.of(AuthorizationUtils.ofGroupNamespace(metalake).levels()),
+                  AuthorizationUtils.ofGroup(metalake, group),
                   LockType.WRITE,
                   () ->
                       TreeLockUtils.doWithTreeLock(
@@ -134,7 +134,7 @@ public class PermissionOperations {
           httpRequest,
           () ->
               TreeLockUtils.doWithTreeLock(
-                  NameIdentifier.of(AuthorizationUtils.ofUserNamespace(metalake).levels()),
+                  AuthorizationUtils.ofUser(metalake, user),
                   LockType.WRITE,
                   () ->
                       TreeLockUtils.doWithTreeLock(
@@ -166,7 +166,7 @@ public class PermissionOperations {
           httpRequest,
           () ->
               TreeLockUtils.doWithTreeLock(
-                  NameIdentifier.of(AuthorizationUtils.ofGroupNamespace(metalake).levels()),
+                  AuthorizationUtils.ofGroup(metalake, group),
                   LockType.WRITE,
                   () ->
                       TreeLockUtils.doWithTreeLock(
