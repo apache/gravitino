@@ -1112,7 +1112,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       Map<String, String> properties) {
     try {
       clientPool.run(IMetaStoreClient::getAllDatabases);
-    } catch (TException | InterruptedException e) {
+    } catch (Exception e) {
       throw new ConnectionFailedException(
           e, "Failed to run getAllDatabases in Hive Metastore: %s", e.getMessage());
     }

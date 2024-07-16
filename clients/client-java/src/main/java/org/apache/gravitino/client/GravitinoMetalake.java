@@ -252,6 +252,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
       return;
     }
 
+    // Throw the corresponding exception
     ErrorHandlers.catalogErrorHandler().accept(resp);
   }
 
