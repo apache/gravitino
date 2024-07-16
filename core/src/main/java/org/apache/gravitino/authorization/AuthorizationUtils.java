@@ -32,6 +32,7 @@ import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.hook.DispatcherHooks;
 import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -131,58 +132,127 @@ public class AuthorizationUtils {
       hooks.addPostHook(
           "createMetalake",
           (args, metalake) -> {
-            // TODO: Add the logic of setting the owner
+            NameIdentifier identifier = (NameIdentifier) ((Object[]) args)[0];
+            GravitinoEnv.getInstance()
+                .ownershipManager()
+                .setOwner(
+                    identifier,
+                    Entity.EntityType.METALAKE,
+                    PrincipalUtils.getCurrentUserName(),
+                    Owner.Type.USER);
           });
 
     } else if (manager instanceof SupportsCatalogs) {
       hooks.addPostHook(
           "createCatalog",
           (args, catalog) -> {
-            // TODO: Add the logic of setting the owner
+            NameIdentifier identifier = (NameIdentifier) ((Object[]) args)[0];
+            GravitinoEnv.getInstance()
+                .ownershipManager()
+                .setOwner(
+                    identifier,
+                    Entity.EntityType.CATALOG,
+                    PrincipalUtils.getCurrentUserName(),
+                    Owner.Type.USER);
           });
 
     } else if (manager instanceof SupportsSchemas) {
       hooks.addPostHook(
           "createSchema",
           (args, schema) -> {
-            // TODO: Add the logic of setting the owner
+            NameIdentifier identifier = (NameIdentifier) ((Object[]) args)[0];
+            GravitinoEnv.getInstance()
+                .ownershipManager()
+                .setOwner(
+                    identifier,
+                    Entity.EntityType.SCHEMA,
+                    PrincipalUtils.getCurrentUserName(),
+                    Owner.Type.USER);
           });
 
     } else if (manager instanceof TableCatalog) {
       hooks.addPostHook(
           "createTable",
-          (args, schema) -> {
-            // TODO: Add the logic of setting the owner
+          (args, table) -> {
+            NameIdentifier identifier = (NameIdentifier) ((Object[]) args)[0];
+            GravitinoEnv.getInstance()
+                .ownershipManager()
+                .setOwner(
+                    identifier,
+                    Entity.EntityType.TABLE,
+                    PrincipalUtils.getCurrentUserName(),
+                    Owner.Type.USER);
           });
 
     } else if (manager instanceof TopicCatalog) {
       hooks.addPostHook(
           "createTopic",
-          (args, schema) -> {
-            // TODO: Add the logic of setting the owner
+          (args, topic) -> {
+            NameIdentifier identifier = (NameIdentifier) ((Object[]) args)[0];
+            GravitinoEnv.getInstance()
+                .ownershipManager()
+                .setOwner(
+                    identifier,
+                    Entity.EntityType.TOPIC,
+                    PrincipalUtils.getCurrentUserName(),
+                    Owner.Type.USER);
           });
 
     } else if (manager instanceof FilesetCatalog) {
       hooks.addPostHook(
           "createFileset",
-          (args, schema) -> {
-            // TODO: Add the logic of setting the owner
+          (args, fileset) -> {
+            NameIdentifier identifier = (NameIdentifier) ((Object[]) args)[0];
+            GravitinoEnv.getInstance()
+                .ownershipManager()
+                .setOwner(
+                    identifier,
+                    Entity.EntityType.FILESET,
+                    PrincipalUtils.getCurrentUserName(),
+                    Owner.Type.USER);
           });
-    } else if (manager instanceof AccessControlManager) {
+    } else if (manager instanceof AccessControlDispatcher) {
       hooks.addPostHook(
           "addUser",
           (args, user) -> {
-            // TODO: Add the logic of setting the owner
+            NameIdentifier identifier =
+                AuthorizationUtils.ofUser(
+                    (String) ((Object[]) args)[0], (String) ((Object[]) args)[1]);
+            GravitinoEnv.getInstance()
+                .ownershipManager()
+                .setOwner(
+                    identifier,
+                    Entity.EntityType.USER,
+                    PrincipalUtils.getCurrentUserName(),
+                    Owner.Type.USER);
           });
       hooks.addPostHook(
           "addGroup",
           (args, group) -> {
-            // TODO: Add the logic of setting the owner
+            NameIdentifier identifier =
+                AuthorizationUtils.ofGroup(
+                    (String) ((Object[]) args)[0], (String) ((Object[]) args)[1]);
+            GravitinoEnv.getInstance()
+                .ownershipManager()
+                .setOwner(
+                    identifier,
+                    Entity.EntityType.GROUP,
+                    PrincipalUtils.getCurrentUserName(),
+                    Owner.Type.USER);
           });
       hooks.addPostHook(
           "createRole",
           (args, role) -> {
-            // TODO: Add the logic of setting the owner
+            NameIdentifier identifier =
+                AuthorizationUtils.ofRole(
+                    (String) ((Object[]) args)[0], (String) ((Object[]) args)[1]);
+            GravitinoEnv.getInstance()
+                .ownershipManager()
+                .setOwner(
+                    identifier,
+                    Entity.EntityType.ROLE,
+                    PrincipalUtils.getCurrentUserName(),
+                    Owner.Type.USER);
           });
     }
   }

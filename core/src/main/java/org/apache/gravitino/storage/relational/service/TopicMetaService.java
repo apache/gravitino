@@ -29,6 +29,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.po.TopicPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
@@ -194,8 +195,13 @@ public class TopicMetaService {
 
     Long topicId = getTopicIdBySchemaIdAndName(schemaId, topicName);
 
-    SessionUtils.doWithCommit(
-        TopicMetaMapper.class, mapper -> mapper.softDeleteTopicMetasByTopicId(topicId));
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            SessionUtils.doWithoutCommit(
+                TopicMetaMapper.class, mapper -> mapper.softDeleteTopicMetasByTopicId(topicId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                OwnerMetaMapper.class, mapper -> mapper.softDeleteOwnerRelByEntityId(topicId)));
 
     return true;
   }

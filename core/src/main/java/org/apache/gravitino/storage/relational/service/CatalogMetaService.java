@@ -35,6 +35,7 @@ import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
@@ -220,7 +221,11 @@ public class CatalogMetaService {
           () ->
               SessionUtils.doWithoutCommit(
                   TopicMetaMapper.class,
-                  mapper -> mapper.softDeleteTopicMetasByCatalogId(catalogId)));
+                  mapper -> mapper.softDeleteTopicMetasByCatalogId(catalogId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  OwnerMetaMapper.class,
+                  mapper -> mapper.softDeleteOwnerRelByCatalogId(catalogId)));
     } else {
       List<SchemaEntity> schemaEntities =
           SchemaMetaService.getInstance()
@@ -230,8 +235,14 @@ public class CatalogMetaService {
         throw new NonEmptyEntityException(
             "Entity %s has sub-entities, you should remove sub-entities first", identifier);
       }
-      SessionUtils.doWithCommit(
-          CatalogMetaMapper.class, mapper -> mapper.softDeleteCatalogMetasByCatalogId(catalogId));
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              SessionUtils.doWithoutCommit(
+                  CatalogMetaMapper.class,
+                  mapper -> mapper.softDeleteCatalogMetasByCatalogId(catalogId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  OwnerMetaMapper.class, mapper -> mapper.softDeleteOwnerRelByEntityId(catalogId)));
     }
 
     return true;

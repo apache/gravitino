@@ -51,6 +51,7 @@ import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.gravitino.storage.relational.po.FilesetVersionPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
+import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
@@ -669,6 +670,23 @@ public class TestPOConverters {
     assertEquals(1, tagMetadataObjectRelPO.getCurrentVersion());
     assertEquals(1, tagMetadataObjectRelPO.getLastVersion());
     assertEquals(0, tagMetadataObjectRelPO.getDeletedAt());
+  }
+
+  @Test
+  public void testOwnerRelPO() {
+    OwnerRelPO ownerRelPO =
+        POConverters.initializeOwnerRelPOsWithVersion(
+            1L, Entity.EntityType.USER.name(), 1L, Entity.EntityType.METALAKE.name(), 1L);
+
+    assertEquals(1L, ownerRelPO.getOwnerId());
+    assertEquals(1L, ownerRelPO.getMetalakeId());
+    assertEquals(1L, ownerRelPO.getEntityId());
+    assertEquals(Entity.EntityType.METALAKE.name(), ownerRelPO.getEntityType());
+    assertEquals(Entity.EntityType.USER.name(), ownerRelPO.getOwnerType());
+
+    assertEquals(1, ownerRelPO.getCurrentVersion());
+    assertEquals(1, ownerRelPO.getLastVersion());
+    assertEquals(0, ownerRelPO.getDeletedAt());
   }
 
   private static BaseMetalake createMetalake(Long id, String name, String comment) {

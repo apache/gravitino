@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -35,6 +36,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.GroupRoleRelPO;
 import org.apache.gravitino.storage.relational.po.RolePO;
@@ -67,7 +69,7 @@ public class GroupMetaService {
     return GroupPO;
   }
 
-  private Long getGroupIdByMetalakeIdAndName(Long metalakeId, String groupName) {
+  public Long getGroupIdByMetalakeIdAndName(Long metalakeId, String groupName) {
     Long groupId =
         SessionUtils.getWithoutCommit(
             GroupMetaMapper.class,
@@ -91,6 +93,20 @@ public class GroupMetaService {
     List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByGroupId(groupPO.getGroupId());
 
     return POConverters.fromGroupPO(groupPO, rolePOs, identifier.namespace());
+  }
+
+  public GroupEntity getGroupById(String metalake, Long groupId) {
+    GroupPO groupPO =
+        SessionUtils.getWithoutCommit(
+            GroupMetaMapper.class, mapper -> mapper.selectGroupMetaById(groupId));
+    if (groupPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.GROUP.name().toLowerCase(),
+          String.valueOf(groupId));
+    }
+    return POConverters.fromGroupPO(
+        groupPO, Collections.emptyList(), AuthorizationUtils.ofGroupNamespace(metalake));
   }
 
   public void insertGroup(GroupEntity groupEntity, boolean overwritten) throws IOException {
@@ -150,7 +166,10 @@ public class GroupMetaService {
         () ->
             SessionUtils.doWithoutCommit(
                 GroupRoleRelMapper.class,
-                mapper -> mapper.softDeleteGroupRoleRelByGroupId(groupId)));
+                mapper -> mapper.softDeleteGroupRoleRelByGroupId(groupId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                OwnerMetaMapper.class, mapper -> mapper.softDeleteOwnerRelByEntityId(groupId)));
     return true;
   }
 
