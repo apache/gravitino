@@ -516,6 +516,18 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   }
 
   @Override
+  public short getDefaultReplication(Path f) {
+    FilesetContext context = getFilesetContext(f);
+    return context.getFileSystem().getDefaultReplication(context.getActualPath());
+  }
+
+  @Override
+  public long getDefaultBlockSize(Path f) {
+    FilesetContext context = getFilesetContext(f);
+    return context.getFileSystem().getDefaultBlockSize(context.getActualPath());
+  }
+
+  @Override
   public synchronized void close() throws IOException {
     // close all actual FileSystems
     for (Pair<Fileset, FileSystem> filesetPair : filesetCache.asMap().values()) {

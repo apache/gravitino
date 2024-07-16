@@ -21,9 +21,6 @@ package org.apache.gravitino.catalog.property;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata;
-import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata;
-import org.apache.gravitino.connector.PropertyEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,14 +38,7 @@ public abstract class PropertyConverter {
    */
   public abstract Map<String, String> engineToGravitinoMapping();
 
-  /**
-   * Get the property metadata for the catalog. for more please see {@link
-   * HiveTablePropertiesMetadata#propertyEntries()} or {@link
-   * IcebergTablePropertiesMetadata#propertyEntries()}
-   */
-  public abstract Map<String, PropertyEntry<?>> gravitinoPropertyMeta();
-
-  Map<String, String> revsereMap(Map<String, String> map) {
+  Map<String, String> reverseMap(Map<String, String> map) {
     Map<String, String> res = new HashMap<>();
     for (Map.Entry<String, String> entry : map.entrySet()) {
       res.put(entry.getValue(), entry.getKey());
@@ -60,7 +50,7 @@ public abstract class PropertyConverter {
   /** Convert Gravitino properties to engine properties. */
   public Map<String, String> gravitinoToEngineProperties(Map<String, String> gravitinoProperties) {
     Map<String, String> engineProperties = new HashMap<>();
-    Map<String, String> gravitinoToEngineMapping = revsereMap(engineToGravitinoMapping());
+    Map<String, String> gravitinoToEngineMapping = reverseMap(engineToGravitinoMapping());
     for (Map.Entry<String, String> entry : gravitinoProperties.entrySet()) {
       String engineKey = gravitinoToEngineMapping.get(entry.getKey());
       if (engineKey != null) {
@@ -82,30 +72,14 @@ public abstract class PropertyConverter {
     Map<String, Object> gravitinoProperties = new HashMap<>();
     Map<String, String> engineToGravitinoMapping = engineToGravitinoMapping();
 
-    Map<String, PropertyEntry<?>> propertyEntryMap = gravitinoPropertyMeta();
     for (Map.Entry<String, Object> entry : engineProperties.entrySet()) {
       String gravitinoKey = engineToGravitinoMapping.get(entry.getKey());
       if (gravitinoKey != null) {
-        PropertyEntry<?> propertyEntry = propertyEntryMap.get(gravitinoKey);
-        if (propertyEntry != null) {
-          // Check value is valid.
-          propertyEntry.decode(entry.getValue().toString());
-        }
         gravitinoProperties.put(gravitinoKey, entry.getValue());
       } else {
         LOG.info("Property {} is not supported by Gravitino", entry.getKey());
       }
     }
-
-    // Check the required properties.
-    for (Map.Entry<String, PropertyEntry<?>> propertyEntry : propertyEntryMap.entrySet()) {
-      if (propertyEntry.getValue().isRequired()
-          && !gravitinoProperties.containsKey(propertyEntry.getKey())) {
-        throw new IllegalArgumentException(
-            "Property " + propertyEntry.getKey() + " is required, you should ");
-      }
-    }
-
     return gravitinoProperties;
   }
 }

@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections4.bidimap.TreeBidiMap;
 import org.apache.gravitino.catalog.property.PropertyConverter;
-import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 
 public class IcebergCatalogPropertyConverter extends PropertyConverter {
@@ -355,10 +354,5 @@ public class IcebergCatalogPropertyConverter extends PropertyConverter {
     jdbcProperties.put("iceberg.jdbc-catalog.catalog-name", "jdbc");
 
     return jdbcProperties;
-  }
-
-  @Override
-  public Map<String, PropertyEntry<?>> gravitinoPropertyMeta() {
-    return ImmutableMap.of();
   }
 }

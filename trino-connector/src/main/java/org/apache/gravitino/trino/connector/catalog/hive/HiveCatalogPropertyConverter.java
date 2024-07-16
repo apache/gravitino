@@ -20,10 +20,8 @@
 package org.apache.gravitino.trino.connector.catalog.hive;
 
 import com.google.common.collect.ImmutableMap;
-import java.util.Map;
 import org.apache.commons.collections4.bidimap.TreeBidiMap;
 import org.apache.gravitino.catalog.property.PropertyConverter;
-import org.apache.gravitino.connector.PropertyEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -240,10 +238,5 @@ public class HiveCatalogPropertyConverter extends PropertyConverter {
   @Override
   public TreeBidiMap<String, String> engineToGravitinoMapping() {
     return TRINO_KEY_TO_GRAVITINO_KEY;
-  }
-
-  @Override
-  public Map<String, PropertyEntry<?>> gravitinoPropertyMeta() {
-    return ImmutableMap.of();
   }
 }
