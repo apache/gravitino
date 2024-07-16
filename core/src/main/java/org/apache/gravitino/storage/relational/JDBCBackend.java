@@ -50,8 +50,8 @@ import org.apache.gravitino.storage.relational.database.H2Database;
 import org.apache.gravitino.storage.relational.service.CatalogMetaService;
 import org.apache.gravitino.storage.relational.service.FilesetMetaService;
 import org.apache.gravitino.storage.relational.service.GroupMetaService;
-import org.apache.gravitino.storage.relational.service.NameIdMappingService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
+import org.apache.gravitino.storage.relational.service.NameIdMappingService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
@@ -249,7 +249,6 @@ public class JDBCBackend implements RelationalBackend {
     } finally {
       // Remove the entity from the cache again because we may add the cache during the deletion
       // process
-      NameIdMappingService.getInstance().invalidate(ident);
       NameIdMappingService.getInstance().invalidateWithPrefix(ident);
     }
   }
