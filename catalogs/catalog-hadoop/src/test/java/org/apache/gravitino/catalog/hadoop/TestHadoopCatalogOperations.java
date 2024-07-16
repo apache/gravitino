@@ -721,7 +721,7 @@ public class TestHadoopCatalogOperations {
 
     FilesetChange change1 = FilesetChange.removeComment();
     try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
-      ops.initialize(Maps.newHashMap(), null, HADOOP_PROPERTIES_METADATA);
+      ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
       NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
 
       Fileset fileset1 = ops.alterFileset(filesetIdent, change1);
