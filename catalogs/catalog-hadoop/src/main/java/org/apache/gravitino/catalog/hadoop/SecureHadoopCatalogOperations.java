@@ -28,6 +28,7 @@ import java.security.PrivilegedExceptionAction;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
@@ -222,6 +223,17 @@ public class SecureHadoopCatalogOperations
   @Override
   public void close() throws IOException {
     hadoopCatalogOperations.close();
+  }
+
+  @Override
+  public void testConnection(
+      NameIdentifier catalogIdent,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties)
+      throws Exception {
+    hadoopCatalogOperations.testConnection(catalogIdent, type, provider, comment, properties);
   }
 
   private UserGroupInformation getUGIByIdent(Map<String, String> properties, NameIdentifier ident) {
