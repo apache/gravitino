@@ -226,7 +226,7 @@ nexusPublishing {
     }
   }
 
-  packageGroup.set("com.datastrato.gravitino")
+  packageGroup.set("org.apache.gravitino")
 }
 
 subprojects {
@@ -435,7 +435,7 @@ subprojects {
 
   tasks.register("allDeps", DependencyReportTask::class)
 
-  group = "com.datastrato.gravitino"
+  group = "org.apache.gravitino"
   version = "$version"
 
   tasks.withType<Jar> {
@@ -487,6 +487,7 @@ tasks.rat {
     "DISCLAIMER.txt",
     "ROADMAP.md",
     "clients/client-python/.pytest_cache/*",
+    "clients/client-python/.venv/*",
     "clients/client-python/gravitino.egg-info/*",
     "clients/client-python/gravitino/utils/exceptions.py",
     "clients/client-python/gravitino/utils/http_client.py"
@@ -709,7 +710,7 @@ fun printDockerCheckInfo() {
   if (dockerTest) {
     println("Using Docker container to run all tests. [$testMode test]")
   } else {
-    println("Run test cases without `gravitino-docker-test` tag ................ [$testMode test]")
+    println("Run test cases without `gravitino-docker-test` tag .............. [$testMode test]")
   }
   println("-----------------------------------------------------------------")
 

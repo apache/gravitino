@@ -274,8 +274,8 @@ gravitino.server.webserver.managerPassword = localhost
    Copy the code to a file named Main.java
 
 ```java
-import com.datastrato.gravitino.client.GravitinoClient;
-import com.datastrato.gravitino.client.GravitinoVersion;
+import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.client.GravitinoVersion;
 
 public class Main {
     public static void main(String[] args) {
