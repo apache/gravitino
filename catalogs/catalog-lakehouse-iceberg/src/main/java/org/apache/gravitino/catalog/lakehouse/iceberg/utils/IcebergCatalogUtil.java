@@ -32,7 +32,7 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import org.apache.gravitino.catalog.lakehouse.iceberg.authentication.AuthenticationConfig;
 import org.apache.gravitino.catalog.lakehouse.iceberg.authentication.kerberos.HiveBackendProxy;
 import org.apache.gravitino.catalog.lakehouse.iceberg.authentication.kerberos.KerberosClient;
-import org.apache.gravitino.catalog.lakehouse.iceberg.catalog.WrappedHiveCatalog;
+import org.apache.gravitino.catalog.lakehouse.iceberg.catalog.ClosableHiveCatalog;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.iceberg.CatalogProperties;
@@ -59,7 +59,7 @@ public class IcebergCatalogUtil {
   }
 
   private static HiveCatalog loadHiveCatalog(Map<String, String> properties) {
-    WrappedHiveCatalog hiveCatalog = new WrappedHiveCatalog();
+    ClosableHiveCatalog hiveCatalog = new ClosableHiveCatalog();
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
     properties.forEach(hdfsConfiguration::set);
     IcebergConfig icebergConfig = new IcebergConfig(properties);

@@ -28,16 +28,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * WrappedHiveCatalog is a wrapper class to wrap Iceberg HiveCatalog to do some clean-up work like
+ * ClosableHiveCatalog is a wrapper class to wrap Iceberg HiveCatalog to do some clean-up work like
  * closing resources.
  */
-public class WrappedHiveCatalog extends HiveCatalog implements Closeable {
+public class ClosableHiveCatalog extends HiveCatalog implements Closeable {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(WrappedHiveCatalog.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ClosableHiveCatalog.class);
 
   private final List<Closeable> resources = Lists.newArrayList();
 
-  public WrappedHiveCatalog() {
+  public ClosableHiveCatalog() {
     super();
   }
 
