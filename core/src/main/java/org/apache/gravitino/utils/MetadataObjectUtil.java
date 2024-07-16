@@ -21,11 +21,10 @@ package org.apache.gravitino.utils;
 import com.google.common.base.Joiner;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.ImmutableBiMap;
+import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
-
-import java.util.Optional;
 
 public class MetadataObjectUtil {
 

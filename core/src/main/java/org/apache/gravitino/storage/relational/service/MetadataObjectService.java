@@ -31,12 +31,6 @@ import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.po.TopicPO;
-import org.apache.gravitino.storage.relational.service.CatalogMetaService;
-import org.apache.gravitino.storage.relational.service.FilesetMetaService;
-import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
-import org.apache.gravitino.storage.relational.service.SchemaMetaService;
-import org.apache.gravitino.storage.relational.service.TableMetaService;
-import org.apache.gravitino.storage.relational.service.TopicMetaService;
 
 /**
  * MetadataObjectService is used for converting full name to entity id and converting entity id to

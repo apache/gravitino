@@ -19,7 +19,8 @@
 
 package org.apache.gravitino.tag;
 
-
+import java.io.IOException;
+import java.util.List;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
@@ -27,9 +28,6 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.TagEntity;
-
-import java.io.IOException;
-import java.util.List;
 
 /**
  * An interface to support extra tag operations, this interface should be mixed with {@link

@@ -107,7 +107,8 @@ public class RoleMetaService {
             POConverters.initializeSecurablePOBuilderWithVersion(
                 roleEntity.id(), object, getEntityType(object));
         objectBuilder.withEntityId(
-            MetadataObjectService.getMetadataObjectId(metalakeId, object.fullName(), object.type()));
+            MetadataObjectService.getMetadataObjectId(
+                metalakeId, object.fullName(), object.type()));
         securableObjectPOs.add(objectBuilder.build());
       }
 
