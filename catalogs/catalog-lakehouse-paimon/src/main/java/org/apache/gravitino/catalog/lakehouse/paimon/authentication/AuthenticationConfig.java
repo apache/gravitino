@@ -18,11 +18,11 @@
  */
 package org.apache.gravitino.catalog.lakehouse.paimon.authentication;
 
-import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.config.ConfigBuilder;
-import com.datastrato.gravitino.config.ConfigConstants;
-import com.datastrato.gravitino.config.ConfigEntry;
-import com.datastrato.gravitino.connector.PropertyEntry;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.config.ConfigBuilder;
+import org.apache.gravitino.config.ConfigConstants;
+import org.apache.gravitino.config.ConfigEntry;
+import org.apache.gravitino.connector.PropertyEntry;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 

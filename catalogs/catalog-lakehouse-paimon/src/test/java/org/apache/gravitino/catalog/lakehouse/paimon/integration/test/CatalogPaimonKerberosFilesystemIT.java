@@ -18,26 +18,26 @@
  */
 package org.apache.gravitino.catalog.lakehouse.paimon.integration.test;
 
-import static com.datastrato.gravitino.catalog.lakehouse.paimon.authentication.AuthenticationConfig.AUTH_TYPE_KEY;
-import static com.datastrato.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosConfig.KEY_TAB_URI_KEY;
-import static com.datastrato.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosConfig.PRINCIPAL_KEY;
+import static org.apache.gravitino.catalog.lakehouse.paimon.authentication.AuthenticationConfig.AUTH_TYPE_KEY;
+import static org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosConfig.KEY_TAB_URI_KEY;
+import static org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosConfig.PRINCIPAL_KEY;
 
-import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.NameIdentifier;
-import com.datastrato.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
-import com.datastrato.gravitino.client.GravitinoAdminClient;
-import com.datastrato.gravitino.client.GravitinoMetalake;
-import com.datastrato.gravitino.client.KerberosTokenProvider;
-import com.datastrato.gravitino.integration.test.container.ContainerSuite;
-import com.datastrato.gravitino.integration.test.container.HiveContainer;
-import com.datastrato.gravitino.integration.test.util.AbstractIT;
-import com.datastrato.gravitino.integration.test.util.GravitinoITUtils;
-import com.datastrato.gravitino.rel.Column;
-import com.datastrato.gravitino.rel.Table;
-import com.datastrato.gravitino.rel.expressions.distributions.Distributions;
-import com.datastrato.gravitino.rel.expressions.sorts.SortOrders;
-import com.datastrato.gravitino.rel.expressions.transforms.Transforms;
-import com.datastrato.gravitino.rel.types.Types;
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
+import org.apache.gravitino.client.GravitinoAdminClient;
+import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.client.KerberosTokenProvider;
+import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.sorts.SortOrders;
+import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.apache.gravitino.rel.types.Types;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
