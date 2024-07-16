@@ -50,3 +50,4 @@ class TestSimpleAuthProvider(unittest.TestCase):
             token[len(AuthConstants.AUTHORIZATION_BASIC_HEADER) :]
         ).decode("utf-8")
         self.assertEqual(f"{user}:dummy", token_string)
+        os.environ["GRAVITINO_USER"] = ""

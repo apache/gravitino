@@ -26,7 +26,7 @@ from gravitino.dto.responses.oauth2_token_response import OAuth2TokenResponse
 from gravitino.dto.requests.oauth2_client_credential_request import (
     OAuth2ClientCredentialRequest,
 )
-from gravitino.exceptions.gravitino_runtime_exception import GravitinoRuntimeException
+from gravitino.exceptions.base import GravitinoRuntimeException
 
 CLIENT_CREDENTIALS = "client_credentials"
 CREDENTIAL_SPLITTER = ":"

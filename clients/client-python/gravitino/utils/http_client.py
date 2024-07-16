@@ -150,6 +150,7 @@ class HTTPClient:
 
             return (False, err_resp)
 
+    # pylint: disable=too-many-locals
     def _request(
         self,
         method,
@@ -224,8 +225,11 @@ class HTTPClient:
         return self._request(
             "put", endpoint, json=json, error_handler=error_handler, **kwargs
         )
+
     def post_form(self, endpoint, data=None, error_handler=None, **kwargs):
-        return self._request("post", endpoint, data=data, error_handler=error_handler **kwargs)
+        return self._request(
+            "post", endpoint, data=data, error_handler=error_handler**kwargs
+        )
 
     def close(self):
         self._request("close", "/")
