@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.function.Function;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.relation.SupportsRelationOperations;
 import org.apache.gravitino.tag.SupportsTagOperations;
 import org.apache.gravitino.utils.Executable;
 
@@ -193,5 +194,9 @@ public interface EntityStore extends Closeable {
    */
   default SupportsTagOperations tagOperations() {
     throw new UnsupportedOperationException("tag operations are not supported");
+  }
+
+  default SupportsRelationOperations relationOperations() {
+    throw new UnsupportedOperationException("relation operations are not supported");
   }
 }

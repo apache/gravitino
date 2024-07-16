@@ -246,3 +246,20 @@ CREATE TABLE IF NOT EXISTS `tag_relation_meta` (
     KEY `idx_tid` (`tag_id`),
     KEY `idx_mid` (`metadata_object_id`)
     ) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `owner_meta` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `owner_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'owner id',
+    `owner_type` VARCHAR(64) NOT NULL COMMENT 'owner type',
+    `entity_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'entity id',
+    `entity_type` VARCHAR(64) NOT NULL COMMENT 'entity type',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'owner relation audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'owner relation current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'owner relation last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'owner relation deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_ow_en_del` (`owner_id`, `entity_id`, `deleted_at`),
+    KEY `idx_oid` (`owner_id`),
+    KEY `idx_eid` (`entity_id`)
+   ) ENGINE=InnoDB;

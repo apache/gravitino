@@ -20,6 +20,8 @@ package org.apache.gravitino;
 
 import com.google.common.base.Preconditions;
 import org.apache.gravitino.authorization.AccessControlManager;
+import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.OwnershipManager;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
@@ -39,6 +41,8 @@ import org.apache.gravitino.catalog.TableOperationDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
 import org.apache.gravitino.catalog.TopicNormalizeDispatcher;
 import org.apache.gravitino.catalog.TopicOperationDispatcher;
+import org.apache.gravitino.lifecycle.LifecycleHookHelper;
+import org.apache.gravitino.lifecycle.LifecycleHooks;
 import org.apache.gravitino.listener.CatalogEventDispatcher;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.EventListenerManager;
@@ -101,6 +105,7 @@ public class GravitinoEnv {
 
   private TagManager tagManager;
   private EventBus eventBus;
+  private OwnershipManager ownershipManager;
 
   private GravitinoEnv() {}
 
@@ -257,6 +262,10 @@ public class GravitinoEnv {
     return tagManager;
   }
 
+  public OwnershipManager ownershipManager() {
+    return ownershipManager;
+  }
+
   public void start() {
     auxServiceManager.serviceStart();
     metricsSystem.start();
@@ -374,5 +383,24 @@ public class GravitinoEnv {
 
     // Tag manager
     this.tagManager = new TagManager(idGenerator, entityStore);
+  }
+
+  // Provides a universal entrance to install lifecycle hooks. This method
+  // focuses the logic of installing hooks.
+  // We should reuse the ability of *NormalizeDispatcher to avoid solving
+  // normalization names, this is useful for pre-hooks.
+  // so we can't install the hooks for the outside of *NormalizeDispatcher.
+  private <T> T installLifecycleHooks(T manager) {
+    boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);
+    LifecycleHooks hooks = new LifecycleHooks();
+    if (enableAuthorization) {
+      AuthorizationUtils.prepareAuthorizationHooks(manager, hooks);
+    }
+
+    if (hooks.isEmpty()) {
+      return manager;
+    }
+
+    return LifecycleHookHelper.installHooks(manager, hooks);
   }
 }

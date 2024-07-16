@@ -24,7 +24,15 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsCatalogs;
+import org.apache.gravitino.SupportsMetalakes;
+import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.file.FilesetCatalog;
+import org.apache.gravitino.lifecycle.LifecycleHooks;
+import org.apache.gravitino.messaging.TopicCatalog;
+import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -115,5 +123,92 @@ public class AuthorizationUtils {
         namespace != null && namespace.length() == 3,
         "Role namespace must have 3 levels, the input namespace is %s",
         namespace);
+  }
+
+  public static <T> void prepareAuthorizationHooks(T manager, LifecycleHooks hooks) {
+    if (manager instanceof SupportsMetalakes) {
+      hooks.addPostHook(
+          "createMetalake",
+          (args, metalake) -> {
+            NameIdentifier identifier = (NameIdentifier) ((Object[]) args)[0];
+            GravitinoEnv.getInstance()
+                .ownershipManager()
+                .setOwner(
+                    identifier,
+                    Entity.EntityType.METALAKE,
+                    PrincipalUtils.getCurrentUserName(),
+                    "USER");
+          });
+
+    } else if (manager instanceof SupportsCatalogs) {
+      hooks.addPostHook(
+          "createCatalog",
+          (args, catalog) -> {
+            NameIdentifier identifier = (NameIdentifier) ((Object[]) args)[0];
+            GravitinoEnv.getInstance()
+                .ownershipManager()
+                .setOwner(
+                    identifier,
+                    Entity.EntityType.CATALOG,
+                    PrincipalUtils.getCurrentUserName(),
+                    "USER");
+          });
+
+    } else if (manager instanceof SupportsSchemas) {
+      hooks.addPostHook(
+          "createSchema",
+          (args, schema) -> {
+            NameIdentifier identifier = (NameIdentifier) ((Object[]) args)[0];
+            GravitinoEnv.getInstance()
+                .ownershipManager()
+                .setOwner(
+                    identifier,
+                    Entity.EntityType.SCHEMA,
+                    PrincipalUtils.getCurrentUserName(),
+                    "USER");
+          });
+
+    } else if (manager instanceof TableCatalog) {
+      hooks.addPostHook(
+          "createTable",
+          (args, schema) -> {
+            NameIdentifier identifier = (NameIdentifier) ((Object[]) args)[0];
+            GravitinoEnv.getInstance()
+                .ownershipManager()
+                .setOwner(
+                    identifier,
+                    Entity.EntityType.TABLE,
+                    PrincipalUtils.getCurrentUserName(),
+                    "USER");
+          });
+
+    } else if (manager instanceof TopicCatalog) {
+      hooks.addPostHook(
+          "createTopic",
+          (args, schema) -> {
+            NameIdentifier identifier = (NameIdentifier) ((Object[]) args)[0];
+            GravitinoEnv.getInstance()
+                .ownershipManager()
+                .setOwner(
+                    identifier,
+                    Entity.EntityType.TOPIC,
+                    PrincipalUtils.getCurrentUserName(),
+                    "USER");
+          });
+
+    } else if (manager instanceof FilesetCatalog) {
+      hooks.addPostHook(
+          "createFileset",
+          (args, schema) -> {
+            NameIdentifier identifier = (NameIdentifier) ((Object[]) args)[0];
+            GravitinoEnv.getInstance()
+                .ownershipManager()
+                .setOwner(
+                    identifier,
+                    Entity.EntityType.FILESET,
+                    PrincipalUtils.getCurrentUserName(),
+                    "USER");
+          });
+    }
   }
 }
