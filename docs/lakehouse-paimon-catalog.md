@@ -76,10 +76,10 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 ### Table capabilities
 
 - Supporting createTable, dropTable, loadTable and listTable.
-
 :::info
 dropTable will delete the table location directly, similar with purgeTable.
 :::
+- Supporting Column default value through table properties, such as 
 
 - Doesn't support alterTable now.
 
