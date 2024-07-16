@@ -71,6 +71,13 @@ public class GravitinoConfig {
           "true",
           false);
 
+  private static final ConfigEntry GRAVITINO_CLUSTER =
+      new ConfigEntry(
+          "gravitino.cluster",
+          "The cluster name of the trino, if it's empty, all the catalogs handled by locally",
+          "",
+          false);
+
   private static final ConfigEntry TRINO_JDBC_USER =
       new ConfigEntry("trino.jdbc.user", "The jdbc user name of Trino", "admin", false);
 
@@ -137,6 +144,10 @@ public class GravitinoConfig {
           GRAVITINO_MISSING_CONFIG,
           "The Trino configuration of `discovery.uri` = " + uriString + " is not correct");
     }
+  }
+
+  public String getCluster() {
+    return config.getOrDefault(GRAVITINO_CLUSTER.key, GRAVITINO_CLUSTER.defaultValue);
   }
 
   public String getCatalogConfigDirectory() {

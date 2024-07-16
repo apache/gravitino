@@ -24,6 +24,7 @@ import com.datastrato.gravitino.trino.connector.catalog.hive.HiveConnectorAdapte
 import com.datastrato.gravitino.trino.connector.catalog.iceberg.IcebergConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.jdbc.mysql.MySQLConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.jdbc.postgresql.PostgreSQLConnectorAdapter;
+import com.datastrato.gravitino.trino.connector.catalog.jdbc.trino.TrinoClusterConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.catalog.memory.MemoryConnectorAdapter;
 import com.datastrato.gravitino.trino.connector.metadata.GravitinoCatalog;
 import io.trino.spi.TrinoException;
@@ -36,8 +37,11 @@ public class CatalogConnectorFactory {
   private static final Logger LOG = LoggerFactory.getLogger(CatalogConnectorFactory.class);
 
   private final HashMap<String, CatalogConnectorContext.Builder> catalogBuilders = new HashMap<>();
+  private final String cluster;
 
-  public CatalogConnectorFactory() {
+  public CatalogConnectorFactory(String cluster) {
+    this.cluster = cluster;
+
     catalogBuilders.put("hive", new CatalogConnectorContext.Builder(new HiveConnectorAdapter()));
     catalogBuilders.put(
         "memory", new CatalogConnectorContext.Builder(new MemoryConnectorAdapter()));
@@ -47,11 +51,17 @@ public class CatalogConnectorFactory {
         "jdbc-mysql", new CatalogConnectorContext.Builder(new MySQLConnectorAdapter()));
     catalogBuilders.put(
         "jdbc-postgresql", new CatalogConnectorContext.Builder(new PostgreSQLConnectorAdapter()));
+    catalogBuilders.put(
+        "trino-cluster", new CatalogConnectorContext.Builder(new TrinoClusterConnectorAdapter()));
   }
 
   public CatalogConnectorContext.Builder createCatalogConnectorContextBuilder(
       GravitinoCatalog catalog) {
     String catalogProvider = catalog.getProvider();
+    if (!catalog.isLocally(cluster)) {
+      catalogProvider = "trino-cluster";
+    }
+
     CatalogConnectorContext.Builder builder = catalogBuilders.get(catalogProvider);
     if (builder == null) {
       String message = String.format("Unsupported catalog provider %s.", catalogProvider);

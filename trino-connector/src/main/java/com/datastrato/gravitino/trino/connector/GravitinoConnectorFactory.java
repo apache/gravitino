@@ -80,7 +80,8 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
       if (catalogConnectorManager == null) {
         try {
           CatalogRegister catalogRegister = new CatalogRegister();
-          CatalogConnectorFactory catalogConnectorFactory = new CatalogConnectorFactory();
+          CatalogConnectorFactory catalogConnectorFactory =
+              new CatalogConnectorFactory(config.getCluster());
 
           catalogConnectorManager =
               new CatalogConnectorManager(catalogRegister, catalogConnectorFactory);

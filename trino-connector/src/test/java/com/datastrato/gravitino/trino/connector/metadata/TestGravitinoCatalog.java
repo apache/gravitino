@@ -19,6 +19,8 @@
 package com.datastrato.gravitino.trino.connector.metadata;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -26,6 +28,7 @@ import com.datastrato.gravitino.Audit;
 import com.datastrato.gravitino.Catalog;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
@@ -41,6 +44,57 @@ public class TestGravitinoCatalog {
     GravitinoCatalog catalog = new GravitinoCatalog("test", mockCatalog);
     assertEquals(catalogName, catalog.getName());
     assertEquals(provider, catalog.getProvider());
+    assertEquals(catalog.getCluster(), "");
+  }
+
+  @Test
+  public void testCatalogWithClusterInfo() {
+    String catalogName = "mock";
+    String provider = "hive";
+
+    HashMap<String, String> properties = new HashMap<>();
+    properties.put("cluster", "c1");
+    properties.put("cluster.connection-url", "jdbc:trino://gt01.orb.local:8080");
+    properties.put("cluster.connection-user", "admin");
+    properties.put("cluster.connection-password", "123");
+
+    Catalog mockCatalog =
+        mockCatalog(catalogName, provider, "test catalog", Catalog.Type.RELATIONAL, properties);
+    GravitinoCatalog catalog = new GravitinoCatalog("test", mockCatalog);
+    assertEquals(catalogName, catalog.getName());
+    assertEquals(provider, catalog.getProvider());
+    assertEquals(catalog.getCluster(), "c1");
+
+    assertEquals(
+        catalog.getProperty("cluster.connection-url", ""), "jdbc:trino://gt01.orb.local:8080");
+    assertEquals(catalog.getProperty("cluster.connection-user", ""), "admin");
+    assertEquals(catalog.getProperty("cluster.connection-password", ""), "123");
+  }
+
+  @Test
+  public void testCatalogIsLocally() {
+    String catalogName = "mock";
+    String provider = "hive";
+
+    // test with cluster info
+    HashMap<String, String> properties = new HashMap<>();
+    properties.put("cluster", "c1");
+    Catalog mockCatalog =
+        mockCatalog(catalogName, provider, "test catalog", Catalog.Type.RELATIONAL, properties);
+    GravitinoCatalog catalog = new GravitinoCatalog("test", mockCatalog);
+    assertTrue(catalog.isLocally(""));
+    assertTrue(catalog.isLocally("c1"));
+    assertFalse(catalog.isLocally("c2"));
+
+    // test with non cluster info
+    properties.put("cluster", "");
+    mockCatalog =
+        mockCatalog(catalogName, provider, "test catalog", Catalog.Type.RELATIONAL, properties);
+    catalog = new GravitinoCatalog("test", mockCatalog);
+
+    assertTrue(catalog.isLocally(""));
+    assertTrue(catalog.isLocally("c1"));
+    assertTrue(catalog.isLocally("c2"));
   }
 
   public static Catalog mockCatalog(

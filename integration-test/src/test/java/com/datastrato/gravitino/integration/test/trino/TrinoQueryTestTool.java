@@ -48,6 +48,10 @@ public class TrinoQueryTestTool {
           "Generate the output file for the test set, the default value is 'false'");
 
       options.addOption(
+          "test_host",
+          true,
+          "host for test server, if --auto is set to 'all', this option is ignored");
+      options.addOption(
           "gravitino_uri",
           true,
           "URL for Gravitino server, if --auto is set to 'all', this option is ignored");
@@ -91,7 +95,7 @@ public class TrinoQueryTestTool {
                 + "TrinoTestTool --testset=tpch --tester_id=00005 --catalog=hive --auto=all\n\n"
                 + "Run all the tpch testset's testers in the 'testsets/tpch' directory under 'mysql' "
                 + "catalog with manual start the test environment:\n"
-                + "TrinoTestTool --testset=tpch -- catalog=mysql --auto=none --gravition_uri=http://10.3.21.12:8090 "
+                + "TrinoTestTool --testset=tpch -- catalog=mysql --auto=none --gravitino_uri=http://10.3.21.12:8090 "
                 + "--trino_uri=http://10.3.21.12:8080 --mysql_url=jdbc:mysql:/10.3.21.12 \n";
         System.out.println(example);
         return;
@@ -123,6 +127,8 @@ public class TrinoQueryTestTool {
 
       TrinoQueryIT.ciTestsets.clear();
 
+      String testHost = commandLine.getOptionValue("test_host");
+      TrinoQueryIT.testHost = Strings.isBlank(testHost) ? TrinoQueryIT.testHost : testHost;
       String gravitinoUri = commandLine.getOptionValue("gravitino_uri");
       TrinoQueryIT.gravitinoUri =
           Strings.isBlank(gravitinoUri) ? TrinoQueryIT.gravitinoUri : gravitinoUri;

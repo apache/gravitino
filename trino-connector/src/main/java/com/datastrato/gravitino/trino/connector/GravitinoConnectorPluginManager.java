@@ -58,6 +58,7 @@ public class GravitinoConnectorPluginManager {
   public static final String CONNECTOR_MYSQL = "mysql";
   public static final String CONNECTOR_POSTGRESQL = "postgresql";
   public static final String CONNECTOR_MEMORY = "memory";
+  public static final String CONNECTOR_CLUSTER = "cluster";
 
   private static final String PLUGIN_NAME_PREFIX = "gravitino-";
   private static final String PLUGIN_CLASSLOADER_CLASS_NAME = "io.trino.server.PluginClassLoader";
@@ -72,7 +73,8 @@ public class GravitinoConnectorPluginManager {
           CONNECTOR_ICEBERG,
           CONNECTOR_MYSQL,
           CONNECTOR_POSTGRESQL,
-          CONNECTOR_MEMORY);
+          CONNECTOR_MEMORY,
+          CONNECTOR_CLUSTER);
 
   private final Map<String, Plugin> connectorPlugins = new HashMap<>();
   private final ClassLoader appClassloader;
@@ -240,7 +242,11 @@ public class GravitinoConnectorPluginManager {
               if (!usePlugins.contains(key)) {
                 return;
               }
-              loadPluginByPom(artifactResolver.resolvePom(new File(v)), key);
+              try {
+                loadPluginByPom(artifactResolver.resolvePom(new File(v)), key);
+              } catch (Throwable t) {
+                LOG.error("Fatal error in load plugin by {}", v, t);
+              }
             });
   }
 
