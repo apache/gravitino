@@ -217,7 +217,7 @@ public class TagMetaService {
     return POConverters.fromTagPO(tagPO, TagManager.ofTagNamespace(metalake));
   }
 
-  public List<MetadataObject> listAssociatedMetadataObjectIdentsForTag(NameIdentifier tagIdent)
+  public List<MetadataObject> listAssociatedMetadataObjectsForTag(NameIdentifier tagIdent)
       throws IOException {
     String metalakeName = tagIdent.namespace().level(0);
     String tagName = tagIdent.name();

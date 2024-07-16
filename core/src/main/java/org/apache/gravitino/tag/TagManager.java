@@ -31,6 +31,7 @@ import java.util.Set;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -213,6 +214,8 @@ public class TagManager {
         tagId,
         LockType.READ,
         () -> {
+          checkMetalakeExists(metalake, entityStore);
+
           try {
             if (!entityStore.exists(tagId, Entity.EntityType.TAG)) {
               throw new NoSuchTagException(
@@ -241,6 +244,11 @@ public class TagManager {
     NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
 
+    if (!checkAndImportEntity(metalake, metadataObject, GravitinoEnv.getInstance())) {
+      throw new NotFoundException(
+          "Failed to list tags for metadata object %s due to not found", metadataObject);
+    }
+
     return TreeLockUtils.doWithTreeLock(
         entityIdent,
         LockType.READ,
@@ -264,6 +272,11 @@ public class TagManager {
     NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
     NameIdentifier tagIdent = ofTagIdent(metalake, name);
+
+    if (!checkAndImportEntity(metalake, metadataObject, GravitinoEnv.getInstance())) {
+      throw new NotFoundException(
+          "Failed to get tag for metadata object %s due to not found", metadataObject);
+    }
 
     return TreeLockUtils.doWithTreeLock(
         entityIdent,
@@ -297,6 +310,11 @@ public class TagManager {
 
     NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
+
+    if (!checkAndImportEntity(metalake, metadataObject, GravitinoEnv.getInstance())) {
+      throw new NotFoundException(
+          "Failed to associate tags for metadata object %s due to not found", metadataObject);
+    }
 
     // Remove all the tags that are both set to add and remove
     Set<String> tagsToAddSet = tagsToAdd == null ? Sets.newHashSet() : Sets.newHashSet(tagsToAdd);
@@ -360,7 +378,6 @@ public class TagManager {
     }
   }
 
-  @VisibleForTesting
   public static Namespace ofTagNamespace(String metalake) {
     return Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.TAG_SCHEMA_NAME);
   }
@@ -407,5 +424,34 @@ public class TagManager {
                 .withLastModifiedTime(Instant.now())
                 .build())
         .build();
+  }
+
+  // This method will check if the entity is existed explicitly, internally this check will load
+  // the entity from underlying sources to entity store if not stored, and will allocate an uid
+  // for this entity, with this uid tags can be associated with this entity.
+  // This method should be called out of the tree lock, otherwise it will cause deadlock.
+  @VisibleForTesting
+  boolean checkAndImportEntity(String metalake, MetadataObject metadataObject, GravitinoEnv env) {
+    NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
+
+    switch (entityType) {
+      case METALAKE:
+        return env.metalakeDispatcher().metalakeExists(entityIdent);
+      case CATALOG:
+        return env.catalogDispatcher().catalogExists(entityIdent);
+      case SCHEMA:
+        return env.schemaDispatcher().schemaExists(entityIdent);
+      case TABLE:
+        return env.tableDispatcher().tableExists(entityIdent);
+      case TOPIC:
+        return env.topicDispatcher().topicExists(entityIdent);
+      case FILESET:
+        return env.filesetDispatcher().filesetExists(entityIdent);
+      case COLUMN:
+      default:
+        throw new IllegalArgumentException(
+            "Unsupported metadata object type: " + metadataObject.type());
+    }
   }
 }
