@@ -29,7 +29,6 @@ dependencies {
   implementation(project(":catalogs:catalog-jdbc-common"))
   implementation(project(":catalogs:catalog-jdbc-mysql"))
   implementation(project(":catalogs:catalog-jdbc-postgresql"))
-  implementation(project(":catalogs:catalog-lakehouse-iceberg"))
   implementation(project(":catalogs:catalog-lakehouse-paimon"))
   implementation(project(":core"))
   implementation(libs.slf4j.api)
@@ -42,13 +41,13 @@ tasks.withType<ShadowJar>(ShadowJar::class.java) {
 
   dependencies {
     exclude("javax.*")
-    exclude("org.*")
+    exclude("org.slf4j.*")
   }
 
   exclude("**/package-info.class")
   exclude("**/*.properties")
   exclude("**/*.html")
-  exclude("org/**")
+  exclude("org/slf4j/**")
   exclude("META-INF")
   exclude("META-INF/**")
   exclude("module-info.class")
@@ -94,7 +93,6 @@ tasks.jar {
 
 tasks.compileJava {
   dependsOn(":catalogs:catalog-jdbc-postgresql:runtimeJars")
-  dependsOn(":catalogs:catalog-lakehouse-iceberg:runtimeJars")
   dependsOn(":catalogs:catalog-lakehouse-paimon:runtimeJars")
   dependsOn(":catalogs:catalog-jdbc-mysql:runtimeJars")
   dependsOn(":catalogs:catalog-hive:runtimeJars")
