@@ -40,7 +40,7 @@ license: "This software is licensed under the Apache License version 2."
 
 1. Clone the Gravitino project.
 
-If you want to contribute to this open-source project, please fork the project on GitHub first. After forking, clone the forked project to your local environment, make your changes, and submit a pull request (PR).
+    If you want to contribute to this open-source project, please fork the project on GitHub first. After forking, clone the forked project to your local environment, make your changes, and submit a pull request (PR).
 
     ```shell
     git clone git@github.com:apache/gravitino.git
