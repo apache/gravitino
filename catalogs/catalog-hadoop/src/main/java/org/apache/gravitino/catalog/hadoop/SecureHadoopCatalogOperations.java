@@ -173,24 +173,24 @@ public class SecureHadoopCatalogOperations
   @Override
   public Fileset alterFileset(NameIdentifier ident, FilesetChange... changes)
       throws NoSuchFilesetException, IllegalArgumentException {
-    try {
-      return hadoopCatalogOperations.alterFileset(ident, changes);
-    } finally {
-      String finalName = ident.name();
-      for (FilesetChange change : changes) {
-        if (change instanceof FilesetChange.RenameFileset) {
-          finalName = ((FilesetChange.RenameFileset) change).getNewName();
-        }
-      }
-      if (!ident.name().equals(finalName)) {
-        UserInfo userInfo = hadoopCatalogOperations.getUserInfoMap().remove(ident);
-        if (userInfo != null) {
-          hadoopCatalogOperations
-              .getUserInfoMap()
-              .put(NameIdentifier.of(ident.namespace(), finalName), userInfo);
-        }
+    Fileset fileset = hadoopCatalogOperations.alterFileset(ident, changes);
+
+    String finalName = ident.name();
+    for (FilesetChange change : changes) {
+      if (change instanceof FilesetChange.RenameFileset) {
+        finalName = ((FilesetChange.RenameFileset) change).getNewName();
       }
     }
+    if (!ident.name().equals(finalName)) {
+      UserInfo userInfo = hadoopCatalogOperations.getUserInfoMap().remove(ident);
+      if (userInfo != null) {
+        hadoopCatalogOperations
+            .getUserInfoMap()
+            .put(NameIdentifier.of(ident.namespace(), finalName), userInfo);
+      }
+    }
+
+    return fileset;
   }
 
   @Override
