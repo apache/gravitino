@@ -16,16 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datastrato.gravitino.catalog.jdbc.operation;
+package org.apache.gravitino.catalog.jdbc.operation;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
-import com.datastrato.gravitino.connector.TableOperations;
-import com.datastrato.gravitino.rel.SupportsPartitions;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import javax.sql.DataSource;
+import org.apache.gravitino.connector.TableOperations;
+import org.apache.gravitino.rel.SupportsPartitions;
 
 public abstract class JdbcTablePartitionOperations implements TableOperations, SupportsPartitions {
   protected final DataSource dataSource;

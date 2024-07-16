@@ -22,8 +22,10 @@ import com.google.common.collect.Maps;
 import java.util.Map;
 import lombok.ToString;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.gravitino.catalog.jdbc.operation.TableOperation;
 import org.apache.gravitino.connector.BaseTable;
 import org.apache.gravitino.connector.TableOperations;
+import org.apache.gravitino.rel.SupportsPartitions;
 
 /** Represents a Jdbc Table entity in the jdbc table. */
 @ToString

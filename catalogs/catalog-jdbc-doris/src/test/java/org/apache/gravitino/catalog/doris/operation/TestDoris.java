@@ -21,7 +21,6 @@ package org.apache.gravitino.catalog.doris.operation;
 import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Map;
-import javax.sql.DataSource;
 import org.apache.gravitino.catalog.doris.converter.DorisColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.doris.converter.DorisExceptionConverter;
 import org.apache.gravitino.catalog.doris.converter.DorisTypeConverter;
