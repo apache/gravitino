@@ -30,11 +30,15 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AccessControlManager;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.dto.requests.GroupAddRequest;
 import org.apache.gravitino.dto.responses.GroupResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.lock.LockType;
+import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.web.Utils;
@@ -69,9 +73,14 @@ public class GroupOperations {
       return Utils.doAs(
           httpRequest,
           () ->
-              Utils.ok(
-                  new GroupResponse(
-                      DTOConverters.toDTO(accessControlManager.getGroup(metalake, group)))));
+              TreeLockUtils.doWithTreeLock(
+                  AuthorizationUtils.ofGroup(metalake, group),
+                  LockType.READ,
+                  () ->
+                      Utils.ok(
+                          new GroupResponse(
+                              DTOConverters.toDTO(
+                                  accessControlManager.getGroup(metalake, group))))));
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupException(OperationType.GET, group, metalake, e);
     }
@@ -86,10 +95,14 @@ public class GroupOperations {
       return Utils.doAs(
           httpRequest,
           () ->
-              Utils.ok(
-                  new GroupResponse(
-                      DTOConverters.toDTO(
-                          accessControlManager.addGroup(metalake, request.getName())))));
+              TreeLockUtils.doWithTreeLock(
+                  NameIdentifier.of(AuthorizationUtils.ofGroupNamespace(metalake).levels()),
+                  LockType.WRITE,
+                  () ->
+                      Utils.ok(
+                          new GroupResponse(
+                              DTOConverters.toDTO(
+                                  accessControlManager.addGroup(metalake, request.getName()))))));
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupException(
           OperationType.ADD, request.getName(), metalake, e);
@@ -107,7 +120,11 @@ public class GroupOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            boolean removed = accessControlManager.removeGroup(metalake, group);
+            boolean removed =
+                TreeLockUtils.doWithTreeLock(
+                    NameIdentifier.of(AuthorizationUtils.ofGroupNamespace(metalake).levels()),
+                    LockType.WRITE,
+                    () -> accessControlManager.removeGroup(metalake, group));
             if (!removed) {
               LOG.warn("Failed to remove group {} under metalake {}", group, metalake);
             }
