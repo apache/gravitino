@@ -30,6 +30,5 @@ public enum OperationType {
   REMOVE,
   DELETE,
   GRANT,
-  REVOKE,
-  TEST_CONNECTION,
+  REVOKE
 }
