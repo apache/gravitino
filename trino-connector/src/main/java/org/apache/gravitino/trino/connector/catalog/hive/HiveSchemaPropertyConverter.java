@@ -21,17 +21,11 @@ package org.apache.gravitino.trino.connector.catalog.hive;
 import static org.apache.gravitino.trino.connector.catalog.hive.HivePropertyMeta.HIVE_SCHEMA_LOCATION;
 
 import com.google.common.collect.ImmutableMap;
-import java.util.Map;
 import org.apache.commons.collections4.bidimap.TreeBidiMap;
 import org.apache.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
 import org.apache.gravitino.catalog.property.PropertyConverter;
-import org.apache.gravitino.connector.BasePropertiesMetadata;
-import org.apache.gravitino.connector.PropertyEntry;
 
 public class HiveSchemaPropertyConverter extends PropertyConverter {
-  private final BasePropertiesMetadata hiveSchemaPropertiesMetadata =
-      new HiveSchemaPropertiesMetadata();
-
   // Trino property key does not allow upper case character and '-', so we need to map it to
   // Gravitino
   private static final TreeBidiMap<String, String> TRINO_KEY_TO_GRAVITINO_KEY =
@@ -43,10 +37,5 @@ public class HiveSchemaPropertyConverter extends PropertyConverter {
   @Override
   public TreeBidiMap<String, String> engineToGravitinoMapping() {
     return TRINO_KEY_TO_GRAVITINO_KEY;
-  }
-
-  @Override
-  public Map<String, PropertyEntry<?>> gravitinoPropertyMeta() {
-    return hiveSchemaPropertiesMetadata.propertyEntries();
   }
 }

@@ -29,7 +29,7 @@ import org.apache.gravitino.connector.PropertyEntry;
 
 public class IcebergSchemaPropertiesMetadata extends BasePropertiesMetadata {
 
-  public static final String COMMENT = "comment";
+  public static final String COMMENT = IcebergConstants.COMMENT;
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
   static {

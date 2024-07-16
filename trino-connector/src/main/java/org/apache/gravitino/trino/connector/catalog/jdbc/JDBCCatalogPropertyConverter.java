@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections4.bidimap.TreeBidiMap;
 import org.apache.gravitino.catalog.property.PropertyConverter;
-import org.apache.gravitino.connector.PropertyEntry;
 
 public class JDBCCatalogPropertyConverter extends PropertyConverter {
 
@@ -124,10 +123,5 @@ public class JDBCCatalogPropertyConverter extends PropertyConverter {
     }
 
     return trinoProperties;
-  }
-
-  @Override
-  public Map<String, PropertyEntry<?>> gravitinoPropertyMeta() {
-    return ImmutableMap.of();
   }
 }
