@@ -325,6 +325,20 @@ components:
         "property": "key1"
       }
 
+    RemoveFilesetCommentRequest:
+      type: object
+      required:
+        - "@type"
+      properties:
+        "@type":
+          type: string
+          description: The type of the update
+          enum:
+            - removeComment
+      example: {
+        "@type": "removeComment"
+      }
+
   responses:
     FilesetResponse:
       description: The response of fileset object

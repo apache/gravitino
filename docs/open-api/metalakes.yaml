@@ -364,7 +364,7 @@ components:
         "type": "MetalakeAlreadyExistsException",
         "message": "Failed to operate metalake(s) [my_metalake] operation [CREATE], reason [MetalakeAlreadyExistsException]",
         "stack": [
-          "com.datastrato.gravitino.exceptions.MetalakeAlreadyExistsException: Metalake my_metalake already exists",
+          "org.apache.gravitino.exceptions.MetalakeAlreadyExistsException: Metalake my_metalake already exists",
           "..."
         ]
       }
@@ -375,7 +375,7 @@ components:
         "type": "NoSuchMetalakeException",
         "message": "Failed to operate metalake(s) [test] operation [LOAD], reason [NoSuchMetalakeException]",
         "stack": [
-          "com.datastrato.gravitino.exceptions.NoSuchMetalakeException: Metalake test does not exist",
+          "org.apache.gravitino.exceptions.NoSuchMetalakeException: Metalake test does not exist",
           "..." ]
       }
 
