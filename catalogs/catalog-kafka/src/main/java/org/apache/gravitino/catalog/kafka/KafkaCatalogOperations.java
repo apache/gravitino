@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.kafka;
 
+import static org.apache.gravitino.StringIdentifier.DUMMY_ID;
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.apache.gravitino.StringIdentifier.newPropertiesWithId;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
@@ -38,6 +39,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -50,6 +52,7 @@ import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.SupportsSchemas;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -178,6 +181,21 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
           e);
     } catch (InterruptedException e) {
       throw new RuntimeException("Failed to list topics under the schema " + namespace, e);
+    }
+  }
+
+  @Override
+  public void testConnection(
+      NameIdentifier catalogIdent,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties) {
+    try {
+      adminClient.listTopics().names().get();
+    } catch (Exception e) {
+      throw new ConnectionFailedException(
+          e, "Failed to run listTopics in Kafka: %s", e.getMessage());
     }
   }
 
@@ -552,9 +570,10 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   }
 
   private void createDefaultSchemaIfNecessary() {
-    // If the default schema already exists, do nothing
+    // If the default schema already exists or is testConnection operation, do nothing
     try {
-      if (store.exists(defaultSchemaIdent, Entity.EntityType.SCHEMA)) {
+      if (DUMMY_ID.toString().equals(info.properties().get(ID_KEY))
+          || store.exists(defaultSchemaIdent, Entity.EntityType.SCHEMA)) {
         return;
       }
     } catch (IOException e) {

@@ -50,6 +50,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
@@ -730,6 +731,19 @@ public class TestHadoopCatalogOperations {
       Assertions.assertNull(fileset1.comment());
       Assertions.assertEquals(fileset.storageLocation(), fileset1.storageLocation());
     }
+  }
+
+  @Test
+  public void testTestConnection() {
+    HadoopCatalogOperations catalogOperations = new HadoopCatalogOperations(store);
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalogOperations.testConnection(
+                NameIdentifier.of("metalake", "catalog"),
+                Catalog.Type.FILESET,
+                "hadoop",
+                "comment",
+                ImmutableMap.of()));
   }
 
   private static Stream<Arguments> locationArguments() {

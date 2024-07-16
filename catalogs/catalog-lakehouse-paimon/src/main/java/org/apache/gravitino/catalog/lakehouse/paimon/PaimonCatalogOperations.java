@@ -39,6 +39,7 @@ import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.SupportsSchemas;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -118,6 +119,30 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
     return paimonCatalogOps.listDatabases().stream()
         .map(paimonNamespace -> NameIdentifier.of(namespace, paimonNamespace))
         .toArray(NameIdentifier[]::new);
+  }
+
+  /**
+   * Performs `listDatabases` operation on the Paimon catalog to test the catalog creation.
+   *
+   * @param catalogIdent the name of the catalog.
+   * @param type the type of the catalog.
+   * @param provider the provider of the catalog.
+   * @param comment the comment of the catalog.
+   * @param properties the properties of the catalog.
+   */
+  @Override
+  public void testConnection(
+      NameIdentifier catalogIdent,
+      org.apache.gravitino.Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties) {
+    try {
+      paimonCatalogOps.listDatabases();
+    } catch (Exception e) {
+      throw new ConnectionFailedException(
+          e, "Failed to run listDatabases on Paimon catalog: %s", e.getMessage());
+    }
   }
 
   /**

@@ -84,12 +84,19 @@ public class CatalogIT extends AbstractIT {
   }
 
   @Test
-  public void testCreateCatalog() {
+  public void testTestConnection() {
     String catalogName = GravitinoITUtils.genRandomName("catalog");
     Assertions.assertFalse(metalake.catalogExists(catalogName));
 
     Map<String, String> properties = Maps.newHashMap();
     properties.put("metastore.uris", hmsUri);
+    // test before creation
+    Assertions.assertDoesNotThrow(
+        () ->
+            metalake.testConnection(
+                catalogName, Catalog.Type.RELATIONAL, "hive", "catalog comment", properties));
+
+    // test creation
     Catalog catalog =
         metalake.createCatalog(
             catalogName, Catalog.Type.RELATIONAL, "hive", "catalog comment", properties);
@@ -140,7 +147,16 @@ public class CatalogIT extends AbstractIT {
 
     // test cloud related properties
     ImmutableMap<String, String> illegalProps = ImmutableMap.of("cloud.name", "myCloud");
-    IllegalArgumentException exception =
+    // test before creation
+    Exception exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                metalake.testConnection(
+                    catalogName, Catalog.Type.FILESET, "hadoop", "catalog comment", illegalProps));
+    Assertions.assertTrue(exception.getMessage().contains("Invalid value [myCloud]"));
+
+    exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () ->
