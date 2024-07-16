@@ -100,28 +100,17 @@ public class SecureHadoopCatalogOperations
       String storageLocation,
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
-
-    // Why I need to do this? When we call getUGIByIdent, `PrincipalUtils.getCurrentUserName()` is
-    // Not the api user, but the Kerberos principal name.
-    String apiUser = PrincipalUtils.getCurrentUserName();
-    hadoopCatalogOperations.setCurrentUser(apiUser);
-
     UserGroupInformation currentUser = getUGIByIdent(properties, ident);
-    try {
-      return doAs(
-          currentUser,
-          () ->
-              hadoopCatalogOperations.createFileset(
-                  ident, comment, type, storageLocation, properties),
-          ident);
-    } finally {
-      hadoopCatalogOperations.setCurrentUser(null);
-    }
+    return doAs(
+        currentUser,
+        () ->
+            hadoopCatalogOperations.createFileset(
+                ident, comment, type, storageLocation, properties),
+        ident);
   }
 
   @Override
   public boolean dropFileset(NameIdentifier ident) {
-
     FilesetEntity filesetEntity;
     try {
       filesetEntity =
@@ -146,20 +135,11 @@ public class SecureHadoopCatalogOperations
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-
-    String apiUser = PrincipalUtils.getCurrentUserName();
-    hadoopCatalogOperations.setCurrentUser(apiUser);
     // Reset the current user based on the name identifier and properties.
     UserGroupInformation currentUser = getUGIByIdent(properties, ident);
 
-    try {
-      return doAs(
-          currentUser,
-          () -> hadoopCatalogOperations.createSchema(ident, comment, properties),
-          ident);
-    } finally {
-      hadoopCatalogOperations.setCurrentUser(null);
-    }
+    return doAs(
+        currentUser, () -> hadoopCatalogOperations.createSchema(ident, comment, properties), ident);
   }
 
   @Override
@@ -248,7 +228,7 @@ public class SecureHadoopCatalogOperations
     KerberosConfig kerberosConfig = new KerberosConfig(properties);
     if (kerberosConfig.isKerberosAuth()) {
       // We assume that the realm of catalog is the same as the realm of the schema and table.
-      hadoopCatalogOperations.initKerberos(properties, new Configuration(), ident);
+      hadoopCatalogOperations.initKerberos(properties, new Configuration(), ident, false);
     }
     // If the kerberos is not enabled (Simple mode), we will use the current user
     return getUserBaseOnNameIdentifier(ident);

@@ -40,14 +40,16 @@ import org.slf4j.LoggerFactory;
 public class KerberosClient implements Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(KerberosClient.class);
 
-  private final ScheduledThreadPoolExecutor checkTgtExecutor;
+  private ScheduledThreadPoolExecutor checkTgtExecutor;
   private final Map<String, String> conf;
   private final Configuration hadoopConf;
+  private final boolean refreshCredentials;
 
-  public KerberosClient(Map<String, String> conf, Configuration hadoopConf) {
+  public KerberosClient(
+      Map<String, String> conf, Configuration hadoopConf, boolean refreshCredentials) {
     this.conf = conf;
     this.hadoopConf = hadoopConf;
-    this.checkTgtExecutor = new ScheduledThreadPoolExecutor(1, getThreadFactory("check-tgt"));
+    this.refreshCredentials = refreshCredentials;
   }
 
   public String login(String keytabFilePath) throws IOException {
@@ -70,18 +72,21 @@ public class KerberosClient implements Closeable {
     UserGroupInformation.setLoginUser(kerberosLoginUgi);
 
     // Refresh the cache if it's out of date.
-    int checkInterval = kerberosConfig.getCheckIntervalSec();
-    checkTgtExecutor.scheduleAtFixedRate(
-        () -> {
-          try {
-            kerberosLoginUgi.checkTGTAndReloginFromKeytab();
-          } catch (Exception e) {
-            LOG.error("Fail to refresh ugi token: ", e);
-          }
-        },
-        checkInterval,
-        checkInterval,
-        TimeUnit.SECONDS);
+    if (refreshCredentials) {
+      this.checkTgtExecutor = new ScheduledThreadPoolExecutor(1, getThreadFactory("check-tgt"));
+      int checkInterval = kerberosConfig.getCheckIntervalSec();
+      checkTgtExecutor.scheduleAtFixedRate(
+          () -> {
+            try {
+              kerberosLoginUgi.checkTGTAndReloginFromKeytab();
+            } catch (Exception e) {
+              LOG.error("Fail to refresh ugi token: ", e);
+            }
+          },
+          checkInterval,
+          checkInterval,
+          TimeUnit.SECONDS);
+    }
 
     return principalComponents.get(1);
   }

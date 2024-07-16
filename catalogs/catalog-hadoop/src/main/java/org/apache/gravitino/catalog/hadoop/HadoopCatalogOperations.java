@@ -105,8 +105,6 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-%s";
 
-  private final ThreadLocal<String> currentUser = ThreadLocal.withInitial(() -> null);
-
   HadoopCatalogOperations(EntityStore store) {
     this.store = store;
   }
@@ -121,10 +119,6 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   public EntityStore getStore() {
     return store;
-  }
-
-  public void setCurrentUser(String userName) {
-    currentUser.set(userName);
   }
 
   public Map<NameIdentifier, UserInfo> getUserInfoMap() {
@@ -186,7 +180,10 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     if (config.isKerberosAuth()) {
       this.kerberosRealm =
           initKerberos(
-              conf, hadoopConf, NameIdentifier.of(catalogInfo.namespace(), catalogInfo.name()));
+              conf,
+              hadoopConf,
+              NameIdentifier.of(catalogInfo.namespace(), catalogInfo.name()),
+              true);
     } else if (config.isSimpleAuth()) {
       UserGroupInformation u =
           UserGroupInformation.createRemoteUser(PrincipalUtils.getCurrentUserName());
@@ -245,8 +242,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
 
-    String apiUser =
-        currentUser.get() == null ? PrincipalUtils.getCurrentUserName() : currentUser.get();
+    String apiUser = PrincipalUtils.getCurrentUserName();
 
     // Reset the current user based on the name identifier.
     try {
@@ -433,7 +429,10 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
    * to use synchronized to ensure the thread safety: Make login and getLoginUser atomic.
    */
   public synchronized String initKerberos(
-      Map<String, String> properties, Configuration configuration, NameIdentifier ident) {
+      Map<String, String> properties,
+      Configuration configuration,
+      NameIdentifier ident,
+      boolean refreshCredentials) {
     // Init schema level kerberos authentication.
     String keytabPath =
         String.format(
@@ -445,7 +444,8 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
           AuthenticationMethod.KERBEROS.name().toLowerCase(Locale.ROOT));
       try {
         UserGroupInformation.setConfiguration(configuration);
-        KerberosClient kerberosClient = new KerberosClient(properties, configuration);
+        KerberosClient kerberosClient =
+            new KerberosClient(properties, configuration, refreshCredentials);
         // Add the kerberos client to the closable to close resources.
         closeables.add(kerberosClient);
 
@@ -472,9 +472,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
 
-    String apiUser =
-        currentUser.get() == null ? PrincipalUtils.getCurrentUserName() : currentUser.get();
-
+    String apiUser = PrincipalUtils.getCurrentUserName();
     try {
       if (store.exists(ident, Entity.EntityType.SCHEMA)) {
         throw new SchemaAlreadyExistsException("Schema %s already exists", ident);
