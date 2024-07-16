@@ -5,8 +5,7 @@ keywords:
 - jdbc
 - Apache Doris
 - metadata
-license: "Copyright 2024 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
 import Tabs from '@theme/Tabs';
@@ -14,7 +13,7 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Gravitino provides the ability to manage [Apache Doris](https://doris.apache.org/) metadata through JDBC connection..
+Apache Gravitino provides the ability to manage [Apache Doris](https://doris.apache.org/) metadata through JDBC connection..
 
 :::caution
 Gravitino saves some system information in schema and table comments, like

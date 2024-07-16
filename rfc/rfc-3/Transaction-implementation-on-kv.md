@@ -1,6 +1,20 @@
 <!--
-  Copyright 2023 Datastrato Pvt Ltd.
-  This software is licensed under the Apache License version 2.
+  Licensed to the Apache Software Foundation (ASF) under one
+  or more contributor license agreements.  See the NOTICE file
+  distributed with this work for additional information
+  regarding copyright ownership.  The ASF licenses this file
+  to you under the Apache License, Version 2.0 (the
+  "License"); you may not use this file except in compliance
+  with the License.  You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing,
+  software distributed under the License is distributed on an
+  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  KIND, either express or implied.  See the License for the
+  specific language governing permissions and limitations
+  under the License.
 -->
 
 # RFC-1: Design of transaction mechanism on key-value store
@@ -9,11 +23,9 @@
 | :------- |-------|------------|
 | v0.1     | Qi Yu | 21/11/2023 |
 
-
-
 ## Background
-Currently, our storage layer heavily relies on the transaction mechanism provided by key-value storage backend such as RocksDB to ensure reliability. However, some key-value pair databases do not support transaction operations, making it challenging for Gravitino to adapt to other
-KV databases such as Redis, Cassandra, Hbase, and so on.
+
+Currently, our storage layer heavily relies on the transaction mechanism provided by key-value storage backend such as RocksDB to ensure reliability. However, some key-value pair databases do not support transaction operations, making it challenging for Apache Gravitino to adapt to other KV databases such as Redis, Cassandra, Hbase, and so on.
 
 To make gravitino adapt different key-value stores, we need to eliminate transactional dependency and come up with alternative solutions.
 

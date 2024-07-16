@@ -82,10 +82,6 @@ jobs:
         run: |
           ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
 
-      - name: Setup debug Github Action
-        if: ${{ contains(github.event.pull_request.labels.*.name, 'debug action') }}
-        uses: csexton/debugger-action@master
-
       - name: Free up disk space
         run: |
           dev/ci/util_free_space.sh
@@ -93,8 +89,8 @@ jobs:
       - name: Frontend Integration Test
         id: integrationTest
         run: |
-          ./gradlew -PskipTests -PtestMode=embedded -PjdkVersion=${{ matrix.java-version }} :integration-test:test --tests "com.datastrato.gravitino.integration.test.web.ui.**"
-          ./gradlew -PskipTests -PtestMode=deploy -PjdkVersion=${{ matrix.java-version }} :integration-test:test --tests "com.datastrato.gravitino.integration.test.web.ui.**"
+          ./gradlew -PskipTests -PtestMode=embedded -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :integration-test:test --tests "org.apache.gravitino.integration.test.web.ui.**"
+          ./gradlew -PskipTests -PtestMode=deploy -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :integration-test:test --tests "org.apache.gravitino.integration.test.web.ui.**"
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3

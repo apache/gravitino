@@ -1,6 +1,20 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 description = "catalog-lakehouse-paimon"
 
@@ -10,6 +24,11 @@ plugins {
   id("idea")
 }
 
+val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
+val sparkVersion: String = libs.versions.spark34.get()
+val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
+val paimonVersion: String = libs.versions.paimon.get()
+
 dependencies {
   implementation(project(":api"))
   implementation(project(":common"))
@@ -18,6 +37,7 @@ dependencies {
     exclude("com.sun.jersey")
     exclude("javax.servlet")
   }
+  implementation(libs.bundles.log4j)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.hadoop2.common) {
@@ -41,6 +61,19 @@ dependencies {
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
+  testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion") {
+    exclude("org.apache.hadoop")
+  }
+  testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion") {
+    exclude("org.apache.avro")
+    exclude("org.apache.hadoop")
+    exclude("org.apache.zookeeper")
+    exclude("io.dropwizard.metrics")
+    exclude("org.rocksdb")
+  }
+  testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
+    exclude("org.apache.hadoop")
+  }
   testImplementation(libs.slf4j.api)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mysql.driver)

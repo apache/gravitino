@@ -5,8 +5,7 @@ keywords:
   - lakehouse
   - iceberg
   - metadata
-license: "Copyright 2023 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
 import Tabs from '@theme/Tabs';
@@ -14,7 +13,7 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Gravitino provides the ability to manage Apache Iceberg metadata.
+Apache Gravitino provides the ability to manage Apache Iceberg metadata.
 
 ### Requirements and limitations
 
@@ -235,7 +234,7 @@ Meanwhile, the data types other than listed above are mapped to Gravitino **[Ext
 
 ### Table properties
 
-You can pass [Iceberg table properties](https://iceberg.apache.org/docs/1.3.1/configuration/) to Gravitino when creating an Iceberg table.
+You can pass [Iceberg table properties](https://web.archive.org/web/20231210013537/https://iceberg.apache.org/docs/1.3.1/configuration/) to Gravitino when creating an Iceberg table.
 
 The Gravitino server doesn't allow passing the following reserved fields.
 
