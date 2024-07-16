@@ -242,9 +242,6 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
 
-    String apiUser = PrincipalUtils.getCurrentUserName();
-
-    // Reset the current user based on the name identifier.
     try {
       if (store.exists(ident, Entity.EntityType.FILESET)) {
         throw new FilesetAlreadyExistsException("Fileset %s already exists", ident);
@@ -269,8 +266,8 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
           "Storage location must be set for external fileset " + ident);
     }
 
-    // Either catalog property "location", or schema property "location", or
-    // storageLocation must be set for managed fileset.
+    // Either catalog property "location", or schema property "location", or storageLocation must be
+    // set for managed fileset.
     Path schemaPath = getSchemaPath(schemaIdent.name(), schemaEntity.properties());
     if (schemaPath == null && StringUtils.isBlank(storageLocation)) {
       throw new IllegalArgumentException(
@@ -315,13 +312,16 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
             .withNamespace(ident.namespace())
             .withComment(comment)
             .withFilesetType(type)
-            // Store the storageLocation to the store. If the "storageLocation" is null
-            // for managed fileset, Gravitino will get and store the location based on the
-            // catalog/schema's location and store it to the store.
+            // Store the storageLocation to the store. If the "storageLocation" is null for managed
+            // fileset, Gravitino will get and store the location based on the catalog/schema's
+            // location and store it to the store.
             .withStorageLocation(filesetPath.toString())
             .withProperties(properties)
             .withAuditInfo(
-                AuditInfo.builder().withCreator(apiUser).withCreateTime(Instant.now()).build())
+                AuditInfo.builder()
+                    .withCreator(PrincipalUtils.getCurrentUserName())
+                    .withCreateTime(Instant.now())
+                    .build())
             .build();
 
     try {
@@ -471,8 +471,6 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-
-    String apiUser = PrincipalUtils.getCurrentUserName();
     try {
       if (store.exists(ident, Entity.EntityType.SCHEMA)) {
         throw new SchemaAlreadyExistsException("Schema %s already exists", ident);
@@ -513,7 +511,10 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
             .withComment(comment)
             .withProperties(properties)
             .withAuditInfo(
-                AuditInfo.builder().withCreator(apiUser).withCreateTime(Instant.now()).build())
+                AuditInfo.builder()
+                    .withCreator(PrincipalUtils.getCurrentUserName())
+                    .withCreateTime(Instant.now())
+                    .build())
             .build();
     try {
       store.put(schemaEntity, true /* overwrite */);
@@ -615,6 +616,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
       LOG.info("Deleted schema {} location {}", ident, schemaPath);
       return true;
+
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to delete schema " + ident + " location", ioe);
     }

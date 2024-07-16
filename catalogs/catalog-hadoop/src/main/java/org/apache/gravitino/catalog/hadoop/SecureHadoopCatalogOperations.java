@@ -230,7 +230,7 @@ public class SecureHadoopCatalogOperations
       // We assume that the realm of catalog is the same as the realm of the schema and table.
       hadoopCatalogOperations.initKerberos(properties, new Configuration(), ident, false);
     }
-    // If the kerberos is not enabled (Simple mode), we will use the current user
+    // If the kerberos is not enabled (simple mode), we will use the current user
     return getUserBaseOnNameIdentifier(ident);
   }
 
