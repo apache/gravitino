@@ -87,7 +87,7 @@ public class RoleMetaService {
   public Long getRoleIdByNameIdentifier(NameIdentifier identifier) {
     AuthorizationUtils.checkRole(identifier);
 
-    return IdNameMappingService.getInstance()
+    return NameIdMappingService.getInstance()
         .get(
             identifier,
             ident -> {

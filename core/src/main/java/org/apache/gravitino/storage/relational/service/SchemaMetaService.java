@@ -92,7 +92,7 @@ public class SchemaMetaService {
   }
 
   public Long getSchemaIdByNameIdentifier(NameIdentifier identifier) {
-    return IdNameMappingService.getInstance()
+    return NameIdMappingService.getInstance()
         .get(
             identifier,
             ident -> {
@@ -198,7 +198,7 @@ public class SchemaMetaService {
     String schemaName = identifier.name();
     Long schemaId = getSchemaIdByNameIdentifier(identifier);
     // Invalidate it in the cache.
-    IdNameMappingService.getInstance().invalidate(identifier);
+    NameIdMappingService.getInstance().invalidate(identifier);
 
     if (schemaId != null) {
       if (cascade) {

@@ -89,7 +89,7 @@ public class TableMetaService {
   public Long getTableByNameIdentifier(NameIdentifier identifier) {
     NameIdentifierUtil.checkTable(identifier);
 
-    return IdNameMappingService.getInstance()
+    return NameIdMappingService.getInstance()
         .get(
             identifier,
             ident -> {

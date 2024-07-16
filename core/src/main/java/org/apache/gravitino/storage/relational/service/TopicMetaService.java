@@ -207,7 +207,7 @@ public class TopicMetaService {
   public Long getTopicIdByNameIdentifier(NameIdentifier identifier) {
     NameIdentifierUtil.checkTopic(identifier);
 
-    return IdNameMappingService.getInstance()
+    return NameIdMappingService.getInstance()
         .get(
             identifier,
             ident -> {

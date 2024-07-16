@@ -83,7 +83,7 @@ public class FilesetMetaService {
   public Long getFilesetIdByNameIdentifier(NameIdentifier identifier) {
     NameIdentifierUtil.checkFileset(identifier);
 
-    return IdNameMappingService.getInstance()
+    return NameIdMappingService.getInstance()
         .get(
             identifier,
             ident -> {

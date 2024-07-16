@@ -74,7 +74,7 @@ public class MetalakeMetaService {
 
   public Long getMetalakeIdByNameIdentifier(NameIdentifier nameIdentifier) {
     NameIdentifierUtil.checkMetalake(nameIdentifier);
-    return IdNameMappingService.getInstance()
+    return NameIdMappingService.getInstance()
         .get(
             nameIdentifier,
             ident -> {
@@ -93,7 +93,7 @@ public class MetalakeMetaService {
   }
 
   public Long getMetalakeIdByName(String metalakeName) {
-    return IdNameMappingService.getInstance()
+    return NameIdMappingService.getInstance()
         .get(
             NameIdentifierUtil.ofMetalake(metalakeName),
             ident -> {

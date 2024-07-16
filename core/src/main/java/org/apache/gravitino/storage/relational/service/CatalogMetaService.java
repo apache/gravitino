@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
@@ -82,7 +83,8 @@ public class CatalogMetaService {
     return catalogPO;
   }
 
-  private Long getCatalogIdByMetalakeIdAndName(Long metalakeId, String catalogName) {
+  @VisibleForTesting
+  public Long getCatalogIdByMetalakeIdAndName(Long metalakeId, String catalogName) {
     Long catalogId =
         SessionUtils.getWithoutCommit(
             CatalogMetaMapper.class,
@@ -100,7 +102,7 @@ public class CatalogMetaService {
   public Long getCatalogIdByNameIdentifier(NameIdentifier identifier) {
     NameIdentifierUtil.checkCatalog(identifier);
 
-    return IdNameMappingService.getInstance()
+    return NameIdMappingService.getInstance()
         .get(
             identifier,
             ident -> {

@@ -21,6 +21,8 @@ package org.apache.gravitino.storage.relational.service;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
+import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
 import java.io.IOException;
@@ -29,13 +31,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import org.apache.gravitino.NameIdentifier;
 
-public class IdNameMappingService implements Closeable {
+public class NameIdMappingService implements Closeable {
 
-  private static volatile IdNameMappingService instance;
+  private static volatile NameIdMappingService instance;
 
   private Cache<NameIdentifier, Long> ident2IdCache;
 
-  private IdNameMappingService() {
+  private NameIdMappingService() {
     this.ident2IdCache =
         Caffeine.newBuilder()
             .expireAfterAccess(24 * 3600 * 1000L /* 1 day */, TimeUnit.MILLISECONDS)
@@ -52,11 +54,11 @@ public class IdNameMappingService implements Closeable {
             .build();
   }
 
-  public static IdNameMappingService getInstance() {
+  public static NameIdMappingService getInstance() {
     if (instance == null) {
-      synchronized (IdNameMappingService.class) {
+      synchronized (NameIdMappingService.class) {
         if (instance == null) {
-          instance = new IdNameMappingService();
+          instance = new NameIdMappingService();
         }
       }
     }
@@ -70,6 +72,35 @@ public class IdNameMappingService implements Closeable {
 
   public Long get(NameIdentifier key, Function<NameIdentifier, Long> mappingFunction) {
     return ident2IdCache.get(key, mappingFunction);
+  }
+
+  public Long get(NameIdentifier key) {
+    return ident2IdCache.getIfPresent(key);
+  }
+
+  public NameIdentifier getById(Long value, Function<Long, NameIdentifier> mappingFunction) {
+    synchronized (this) {
+      BiMap<NameIdentifier, Long> map = HashBiMap.create(ident2IdCache.asMap());
+      if (map.containsValue(value)) {
+        return map.inverse().get(value);
+      } else {
+        NameIdentifier nameIdentifier = mappingFunction.apply(value);
+        if (nameIdentifier != null) {
+          ident2IdCache.put(nameIdentifier, value);
+        }
+        return nameIdentifier;
+      }
+    }
+  }
+
+  public NameIdentifier getById(Long value) {
+    synchronized (this) {
+      BiMap<NameIdentifier, Long> map = HashBiMap.create(ident2IdCache.asMap());
+      if (map.containsValue(value)) {
+        return map.inverse().get(value);
+      }
+      return null;
+    }
   }
 
   public void invalidate(NameIdentifier key) {

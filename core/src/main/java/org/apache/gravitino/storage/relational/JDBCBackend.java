@@ -50,7 +50,7 @@ import org.apache.gravitino.storage.relational.database.H2Database;
 import org.apache.gravitino.storage.relational.service.CatalogMetaService;
 import org.apache.gravitino.storage.relational.service.FilesetMetaService;
 import org.apache.gravitino.storage.relational.service.GroupMetaService;
-import org.apache.gravitino.storage.relational.service.IdNameMappingService;
+import org.apache.gravitino.storage.relational.service.NameIdMappingService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
@@ -145,7 +145,7 @@ public class JDBCBackend implements RelationalBackend {
           "Unsupported entity type: %s for insert operation", e.getClass());
     }
 
-    IdNameMappingService.getInstance().put(e.nameIdentifier(), e.id());
+    NameIdMappingService.getInstance().put(e.nameIdentifier(), e.id());
   }
 
   @Override
@@ -154,7 +154,7 @@ public class JDBCBackend implements RelationalBackend {
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     // Remove all the children entities in the cache as we can't guarantee the children entities
     // are still valid after the parent entity is updated.
-    IdNameMappingService.getInstance().invalidateWithPrefix(ident);
+    NameIdMappingService.getInstance().invalidateWithPrefix(ident);
     switch (entityType) {
       case METALAKE:
         return (E) MetalakeMetaService.getInstance().updateMetalake(ident, updater);
@@ -214,10 +214,10 @@ public class JDBCBackend implements RelationalBackend {
   @Override
   public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade) {
     // Invalidate the cache first
-    IdNameMappingService.getInstance().invalidate(ident);
+    NameIdMappingService.getInstance().invalidate(ident);
     if (cascade) {
       // Remove all the children entities in the cache;
-      IdNameMappingService.getInstance().invalidateWithPrefix(ident);
+      NameIdMappingService.getInstance().invalidateWithPrefix(ident);
     }
 
     try {
@@ -249,8 +249,8 @@ public class JDBCBackend implements RelationalBackend {
     } finally {
       // Remove the entity from the cache again because we may add the cache during the deletion
       // process
-      IdNameMappingService.getInstance().invalidate(ident);
-      IdNameMappingService.getInstance().invalidateWithPrefix(ident);
+      NameIdMappingService.getInstance().invalidate(ident);
+      NameIdMappingService.getInstance().invalidateWithPrefix(ident);
     }
   }
 
@@ -342,7 +342,7 @@ public class JDBCBackend implements RelationalBackend {
   public void close() throws IOException {
     SqlSessionFactoryHelper.getInstance().close();
 
-    IdNameMappingService.getInstance().close();
+    NameIdMappingService.getInstance().close();
 
     if (jdbcDatabase != null) {
       jdbcDatabase.close();
