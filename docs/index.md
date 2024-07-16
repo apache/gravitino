@@ -149,5 +149,4 @@ Gravitino provides several ways to configure and manage the Gravitino server. Se
   a Gravitino release.
 * [Publish Docker images](./publish-docker-images.md): a guide to publishing Gravitino Docker images;
   also lists the change logs of Gravitino CI Docker images and release images.
-* [How to upgrade Gravitino](./how-to-upgrade.md): a guide to upgrading the schema of backed
-  Gravitino instance from one release version to another.
+* [How to upgrade Gravitino](./how-to-upgrade.md): a guide to upgrading the schema of Gravitino storage backend from one release version to another.

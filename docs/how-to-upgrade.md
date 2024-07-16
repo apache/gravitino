@@ -80,7 +80,7 @@ from 0.6.0 to 0.8.0 you will need to run the 0.6.0 to 0.7.0 upgrade
 script followed by the 0.7.0 to 0.8.0 upgrade script.
 
 #### MySQL
-You can use the following command to apply the upgrade script:
+Assuming you are upgrading the version of Gravitino server from 0.6.0 to 0.8.0
 
 ```shell
 mysql --verbose
