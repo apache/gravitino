@@ -67,7 +67,6 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
   private static final String API_METALAKES_USERS_PATH = "api/metalakes/%s/users/%s";
   private static final String API_METALAKES_GROUPS_PATH = "api/metalakes/%s/groups/%s";
   private static final String API_METALAKES_ROLES_PATH = "api/metalakes/%s/roles/%s";
-  private static final String API_ADMIN_PATH = "api/admins/%s";
   private static final String API_PERMISSION_PATH = "api/metalakes/%s/permissions/%s";
   private static final String BLANK_PLACE_HOLDER = "";
 
@@ -332,50 +331,6 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
     resp.validate();
 
     return resp.getGroup();
-  }
-
-  /**
-   * Adds a new metalake admin.
-   *
-   * @param user The name of the User.
-   * @return The added User instance.
-   * @throws UserAlreadyExistsException If a metalake admin with the same name already exists.
-   * @throws RuntimeException If adding the User encounters storage issues.
-   */
-  public User addMetalakeAdmin(String user) throws UserAlreadyExistsException {
-    UserAddRequest req = new UserAddRequest(user);
-    req.validate();
-
-    UserResponse resp =
-        restClient.post(
-            String.format(API_ADMIN_PATH, BLANK_PLACE_HOLDER),
-            req,
-            UserResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.userErrorHandler());
-    resp.validate();
-
-    return resp.getUser();
-  }
-
-  /**
-   * Removes a metalake admin.
-   *
-   * @param user The name of the User.
-   * @return True if the User was successfully removed, false only when there's no such metalake
-   *     admin, otherwise it will throw an exception.
-   * @throws RuntimeException If removing the User encounters storage issues.
-   */
-  public boolean removeMetalakeAdmin(String user) {
-    RemoveResponse resp =
-        restClient.delete(
-            String.format(API_ADMIN_PATH, user),
-            RemoveResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.userErrorHandler());
-    resp.validate();
-
-    return resp.removed();
   }
 
   /**
