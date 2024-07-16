@@ -33,7 +33,6 @@ import java.nio.file.Paths;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
@@ -49,6 +48,11 @@ import org.slf4j.LoggerFactory;
 public class RocksDBKvBackend implements KvBackend {
   public static final Logger LOGGER = LoggerFactory.getLogger(RocksDBKvBackend.class);
   private RocksDB db;
+  private RocksDBOptions rocksDBOptions;
+
+  public RocksDBKvBackend() {
+    this.rocksDBOptions = new RocksDBOptions();
+  }
 
   /**
    * Initialize the RocksDB backend instance. We have used the {@link TransactionDB} to support
@@ -59,16 +63,17 @@ public class RocksDBKvBackend implements KvBackend {
 
     String dbPath = getStoragePath(config);
     File dbDir = new File(dbPath, "instance");
-    try (final Options options = new Options()) {
-      options.setCreateIfMissing(true);
+    try {
+      // apply user-defined options
+      rocksDBOptions.setOptions(config);
+      rocksDBOptions.getOptions().setCreateIfMissing(true);
 
       if (!dbDir.exists() && !dbDir.mkdirs()) {
         throw new RocksDBException(
             String.format("Can't create RocksDB path '%s'", dbDir.getAbsolutePath()));
       }
       LOGGER.info("Rocksdb storage directory:{}", dbDir);
-      // TODO (yuqi), make options configurable
-      return RocksDB.open(options, dbDir.getAbsolutePath());
+      return RocksDB.open(rocksDBOptions.getOptions(), dbDir.getAbsolutePath());
     } catch (RocksDBException ex) {
       LOGGER.error(
           "Error initializing RocksDB, check configurations and permissions, exception: {}, message: {}, stackTrace: {}",
