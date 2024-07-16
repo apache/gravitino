@@ -192,6 +192,6 @@ public interface EntityStore extends Closeable {
    * @throws UnsupportedOperationException if the extra operations are not supported
    */
   default SupportsTagOperations tagOperations() {
-    throw new UnsupportedOperationException("extra operations are not supported");
+    throw new UnsupportedOperationException("tag operations are not supported");
   }
 }

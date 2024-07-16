@@ -112,7 +112,7 @@ public interface TagMetadataObjectRelMapper {
         + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE tag_id IN",
+        + " WHERE tag_id IN ",
     "<foreach item='tagId' collection='tagIds' open='(' separator=',' close=')'>",
     "#{tagId}",
     "</foreach>",

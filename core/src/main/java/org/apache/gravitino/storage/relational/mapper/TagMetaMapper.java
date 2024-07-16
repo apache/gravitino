@@ -62,7 +62,7 @@ public interface TagMetaMapper {
           + " tm JOIN "
           + MetalakeMetaMapper.TABLE_NAME
           + " mm ON tm.metalake_id = mm.metalake_id"
-          + " WHERE mm.metalake_name = #{metalakeName} AND tm.tag_name IN"
+          + " WHERE mm.metalake_name = #{metalakeName} AND tm.tag_name IN "
           + " <foreach"
           + " item='tagName' index='index' collection='tagNames' open='(' separator=',' close=')'>"
           + " #{tagName}"
