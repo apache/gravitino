@@ -26,7 +26,7 @@ import docker
 from docker import types as tp
 from docker.errors import NotFound
 
-from gravitino.exceptions.gravitino_runtime_exception import GravitinoRuntimeException
+from gravitino.exceptions.base import GravitinoRuntimeException
 
 logger = logging.getLogger(__name__)
 

@@ -29,6 +29,7 @@ from gravitino import (
     Fileset,
     FilesetChange,
 )
+from gravitino.exceptions.base import NoSuchFilesetException
 from tests.integration.integration_test_env import IntegrationTestEnv
 
 logger = logging.getLogger(__name__)
@@ -174,15 +175,22 @@ class TestFilesetCatalog(IntegrationTestEnv):
         self.assertEqual(fileset.properties(), self.fileset_properties)
         self.assertEqual(fileset.audit_info().creator(), "anonymous")
 
+    def test_failed_load_fileset(self):
+        catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
+        with self.assertRaises(NoSuchFilesetException):
+            _ = catalog.as_fileset_catalog().load_fileset(ident=self.fileset_ident)
+
     def test_alter_fileset(self):
         self.create_fileset()
-        fileset_propertie_new_value = self.fileset_properties_value2 + "_new"
+        fileset_properties_new_value = self.fileset_properties_value2 + "_new"
+        fileset_new_comment = self.fileset_comment + "_new"
 
         changes = (
             FilesetChange.remove_property(self.fileset_properties_key1),
             FilesetChange.set_property(
-                self.fileset_properties_key2, fileset_propertie_new_value
+                self.fileset_properties_key2, fileset_properties_new_value
             ),
+            FilesetChange.update_comment(fileset_new_comment),
         )
         catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
         fileset_new = catalog.as_fileset_catalog().alter_fileset(
@@ -190,6 +198,13 @@ class TestFilesetCatalog(IntegrationTestEnv):
         )
         self.assertEqual(
             fileset_new.properties().get(self.fileset_properties_key2),
-            fileset_propertie_new_value,
+            fileset_properties_new_value,
         )
         self.assertTrue(self.fileset_properties_key1 not in fileset_new.properties())
+        self.assertEqual(fileset_new.comment(), fileset_new_comment)
+
+        fileset_comment_removed = catalog.as_fileset_catalog().alter_fileset(
+            self.fileset_ident, FilesetChange.remove_comment()
+        )
+        self.assertEqual(fileset_comment_removed.name(), self.fileset_name)
+        self.assertIsNone(fileset_comment_removed.comment())

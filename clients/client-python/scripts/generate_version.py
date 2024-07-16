@@ -23,7 +23,7 @@ import subprocess
 from datetime import datetime
 
 from gravitino.constants.version import Version, VERSION_INI, SETUP_FILE
-from gravitino.exceptions.gravitino_runtime_exception import GravitinoRuntimeException
+from gravitino.exceptions.base import GravitinoRuntimeException
 
 VERSION_PATTERN = r"version\s*=\s*['\"]([^'\"]+)['\"]"
 

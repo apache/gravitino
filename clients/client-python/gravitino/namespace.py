@@ -19,8 +19,7 @@ under the License.
 
 import json
 from typing import List, ClassVar
-
-# TODO: delete redundant methods
+from gravitino.exceptions.base import IllegalNamespaceException
 
 
 class Namespace:
@@ -137,4 +136,4 @@ class Namespace:
             args: The arguments to the message.
         """
         if not expression:
-            raise ValueError(message.format(*args))
+            raise IllegalNamespaceException(message.format(*args))
