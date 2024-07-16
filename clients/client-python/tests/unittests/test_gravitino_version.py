@@ -21,7 +21,7 @@ import unittest
 
 from gravitino.client.gravitino_version import GravitinoVersion
 from gravitino.dto.version_dto import VersionDTO
-from gravitino.exceptions.gravitino_runtime_exception import GravitinoRuntimeException
+from gravitino.exceptions.base import GravitinoRuntimeException
 
 
 class TestGravitinoVersion(unittest.TestCase):

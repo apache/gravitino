@@ -17,11 +17,11 @@
   under the License.
 -->
 
-# Gravitino Web UI
+# Apache Gravitino Web UI
 
 > **ℹ️ Tips**
 >
-> Under normal circumstances, you only need to visit [http://localhost:8090](http://localhost:8090) if you're just using the web UI to manage the Gravitino.
+> Under normal circumstances, you only need to visit [http://localhost:8090](http://localhost:8090) if you're just using the web UI to manage the Apache Gravitino.
 >
 > You don't need to start the web development mode. If you need to modify the web part of the code, you can refer to the following document content for development and testing.
 

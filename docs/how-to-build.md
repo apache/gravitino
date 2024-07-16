@@ -1,12 +1,12 @@
 ---
-title: How to build Gravitino
+title: How to build Apache Gravitino
 slug: /how-to-build
 license: "This software is licensed under the Apache License version 2."
 ---
 
 - [Prerequisites](#prerequisites)
 - [Quick start](#quick-start)
-- [How to Build Gravitino on Windows (Using WSL)](#how-to-build-gravitino-on-windows-using-wsl)
+- [How to Build Apache Gravitino on Windows (Using WSL)](#how-to-build-gravitino-on-windows-using-wsl)
 
 ## Prerequisites
 
@@ -40,10 +40,10 @@ license: "This software is licensed under the Apache License version 2."
 
 1. Clone the Gravitino project.
 
-If you want to contribute to this open-source project, please fork the project on GitHub first. After forking, clone the forked project to your local environment, make your changes, and submit a pull request (PR).
+    If you want to contribute to this open-source project, please fork the project on GitHub first. After forking, clone the forked project to your local environment, make your changes, and submit a pull request (PR).
 
     ```shell
-    git clone git@github.com:datastrato/gravitino.git
+    git clone git@github.com:apache/gravitino.git
     ```
 
 2. Build the Gravitino project.
@@ -165,7 +165,7 @@ If you want to contribute to this open-source project, please fork the project o
    `gravitino-trino-connector-{version}.tar.gz.sha256` under the `distribution` directory. You 
    can uncompress and deploy it to Trino to use the Gravitino Trino connector.
 
-## How to Build Gravitino on Windows (Using WSL)
+## How to Build Apache Gravitino on Windows (Using WSL)
 
 ### Download WSL (Ubuntu)
 
@@ -243,12 +243,12 @@ python3.11 --version
 
 These commands add a repository that provides the latest Python versions and then installs Python 3.11.
 
-### Download Gravitino Project to WSL
+### Download Apache Gravitino Project to WSL
 
 **On Ubuntu (WSL):**
 
 ```shell
-git clone https://github.com/datastrato/gravitino.git
+git clone https://github.com/apache/gravitino.git
 cd gravitino
 ./gradlew compileDistribution -x test
 cd distribution/package/
