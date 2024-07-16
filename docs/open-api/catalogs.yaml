@@ -79,6 +79,65 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
+  /metalakes/{metalake}/catalogs/testConnection:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+    post:
+      tags:
+        - catalog
+      summary: Test catalog connection
+      operationId: testConnection
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CatalogCreateRequest"
+            examples:
+              CatalogCreate:
+                $ref: "#/components/examples/CatalogCreate"
+      responses:
+        "200":
+          description: Test connection completed
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                type: object
+                required:
+                  - code
+                properties:
+                  code:
+                      type: integer
+                      format: int32
+                      description: Status code of the response
+                  type:
+                    type: string
+                    description: Internal type definition of the exception
+                  message:
+                    type: string
+                    description: The message of the exception
+                  stack:
+                    type: array
+                    items:
+                      type: string
+                      description: The stack trace of the exception
+              examples:
+                TestConnectionSuccess:
+                  value: {
+                    "code": 0
+                  }
+                TestConnectionFailed:
+                  $ref: "#/components/examples/ConnectionFailedException"
+                CatalogAlreadyExists:
+                  $ref: "#/components/examples/CatalogAlreadyExistsException"
+                MetalakeNotFound:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+
+
   /metalakes/{metalake}/catalogs/{catalog}:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
@@ -490,7 +549,18 @@ components:
         "type": "CatalogAlreadyExistsException",
         "message": "Failed to operate catalog(s) [my_catalog] operation [CREATE], reason [CatalogAlreadyExistsException]",
         "stack": [
-          "com.datastrato.gravitino.exceptions.CatalogAlreadyExistsException: Catalog my_catalog already exists",
+          "org.apache.gravitino.exceptions.CatalogAlreadyExistsException: Catalog my_catalog already exists",
+          "..."
+        ]
+      }
+
+    ConnectionFailedException:
+      value: {
+        "code": 1007,
+        "type": "ConnectionFailedException",
+        "message": "Failed to run getAllDatabases in Hive Metastore: Failed to connect to Hive Metastore",
+        "stack": [
+          "org.apache.gravitino.exceptions.ConnectionFailedException: Failed to run getAllDatabases in Hive Metastore: Failed to connect to Hive Metastore",
           "..."
         ]
       }
@@ -501,7 +571,7 @@ components:
         "type": "NoSuchCatalogException",
         "message": "Failed to operate catalog(s) [test] operation [LOAD] under metalake [my_test_metalake], reason [NoSuchCatalogException]",
         "stack": [
-          "com.datastrato.gravitino.exceptions.NoSuchCatalogException: Catalog my_test_metalake.test does not exist",
+          "org.apache.gravitino.exceptions.NoSuchCatalogException: Catalog my_test_metalake.test does not exist",
           "..."
         ]
       }
