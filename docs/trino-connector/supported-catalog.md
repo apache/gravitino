@@ -14,7 +14,6 @@ The catalogs currently supported by the Apache Gravitino connector are as follow
 
 ## Create catalog
 
-Trino itself does not support creating catalogs. 
 Users can create catalogs through the Gravitino connector and then load them into Trino. 
 The Gravitino connector provides the following stored procedures to create, delete, and alter catalogs.
 User can also use the system table `catalog` to describe all the catalogs.
@@ -87,9 +86,9 @@ call gravitino.system.create_catalog(
     'jdbc-mysql',
     Map(
         Array['jdbc-url', 'jdbc-user', 'jdbc-password', 'jdbc-driver'],
-        Array['jdbc:mysql:192.168.164.4:3306?useSSL=false', 'trino', 'ds123', 'com.mysql.cj.jdbc.Driver']
+        Array['jdbc:mysql://192.168.164.4:3306?useSSL=false', 'trino', 'ds123', 'com.mysql.cj.jdbc.Driver']
     )
-)
+);
 call gravitino.system.drop_datalog('mysql');
 
 -- Call stored procedures with name.
@@ -98,10 +97,10 @@ call gravitino.system.create_catalog(
     provider => 'jdbc-mysql',
     properties => Map(
         Array['jdbc-url', 'jdbc-user', 'jdbc-password', 'jdbc-driver'],
-        Array['jdbc:mysql:192.168.164.4:3306?useSSL=false', 'trino', 'ds123', 'com.mysql.cj.jdbc.Driver']
+        Array['jdbc:mysql://192.168.164.4:3306?useSSL=false', 'trino', 'ds123', 'com.mysql.cj.jdbc.Driver']
     ),
     ignore_exist => true
-)
+);
 
 call gravitino.system.drop_datalog(
     catalog => 'mysql'
@@ -112,10 +111,10 @@ call gravitino.system.alter_catalog(
     catalog => 'mysql',
     set_properties=> Map(
         Array['jdbc-url'],
-        Array['jdbc:mysql:127.0.0.1:3306?useSSL=false']
+        Array['jdbc:mysql://127.0.0.1:3306?useSSL=false']
     ),
     remove_properties => Array['jdbc-driver']
-)
+);
 ```
 
 if you need more information about catalog, please refer to:

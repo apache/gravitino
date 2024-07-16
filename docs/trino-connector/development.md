@@ -133,13 +133,13 @@ then you can see the `gravitino-trino-connecor` source files and directories in 
             ./gradlew publishToMavenLocal
         -->
         <dependency>
-            <groupId>com.datastrato.gravitino</groupId>
+            <groupId>org.apache.gravitino</groupId>
             <artifactId>client-java-runtime</artifactId>
             <version>0.5.1</version>
         </dependency>
 
         <dependency>
-            <groupId>com.datastrato.gravitino</groupId>
+            <groupId>org.apache.gravitino</groupId>
             <artifactId>bundled-catalog</artifactId>
             <version>0.5.1</version>
         </dependency>
@@ -159,7 +159,7 @@ then you can see the `gravitino-trino-connecor` source files and directories in 
 ./mvnw clean -pl 'plugin/trino-gravitino' package -DskipTests -Dcheckstyle.skip -Dair.check.skip-checkstyle=true -DskipTests -Dair.check.skip-all=true
 ```
 :::note
-If a compile error occurs due to `The following artifacts could not be resolved: com.datastrato.gravitino:xxx:jar`, which can be resolved by executing `./gradlew publishToMavenLocal` in gravitino beforehand.
+If a compile error occurs due to `The following artifacts could not be resolved: org.apache.gravitino:xxx:jar`, which can be resolved by executing `./gradlew publishToMavenLocal` in gravitino beforehand.
 :::
 
 7. Set up the configuration for the Gravitino connector in the Trino project. You can do as the following picture shows:
