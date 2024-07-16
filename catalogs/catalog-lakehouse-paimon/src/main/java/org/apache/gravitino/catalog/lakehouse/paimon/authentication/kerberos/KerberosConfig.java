@@ -18,14 +18,14 @@
  */
 package org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos;
 
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.paimon.authentication.AuthenticationConfig;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.connector.PropertyEntry;
-import com.google.common.collect.ImmutableMap;
-import java.util.Map;
-import org.apache.commons.lang3.StringUtils;
 
 public class KerberosConfig extends AuthenticationConfig {
   public static final String KEY_TAB_URI_KEY = "authentication.kerberos.keytab-uri";

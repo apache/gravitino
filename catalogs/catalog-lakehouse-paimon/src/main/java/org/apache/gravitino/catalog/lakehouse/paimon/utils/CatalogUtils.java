@@ -24,17 +24,17 @@ import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig.CATALOG
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION;
 
-import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogBackend;
-import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig;
-import org.apache.gravitino.catalog.lakehouse.paimon.authentication.AuthenticationConfig;
-import org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosClient;
-import org.apache.gravitino.catalog.lakehouse.paimon.ops.PaimonBackendCatalogWrapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogBackend;
+import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig;
+import org.apache.gravitino.catalog.lakehouse.paimon.authentication.AuthenticationConfig;
+import org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosClient;
+import org.apache.gravitino.catalog.lakehouse.paimon.ops.PaimonBackendCatalogWrapper;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.CatalogContext;

@@ -18,13 +18,13 @@
  */
 package org.apache.gravitino.catalog.lakehouse.paimon.authentication;
 
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.connector.PropertyEntry;
-import com.google.common.collect.ImmutableMap;
-import java.util.Map;
 
 public class AuthenticationConfig extends Config {
 

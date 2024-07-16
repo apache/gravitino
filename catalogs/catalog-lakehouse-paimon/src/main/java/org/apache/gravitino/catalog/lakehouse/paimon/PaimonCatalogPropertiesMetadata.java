@@ -22,11 +22,6 @@ import static org.apache.gravitino.connector.PropertyEntry.enumImmutableProperty
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringRequiredPropertyEntry;
 
-import org.apache.gravitino.catalog.lakehouse.paimon.authentication.AuthenticationConfig;
-import org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosConfig;
-import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
-import org.apache.gravitino.connector.PropertiesMetadata;
-import org.apache.gravitino.connector.PropertyEntry;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -34,6 +29,11 @@ import com.google.common.collect.Maps;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.catalog.lakehouse.paimon.authentication.AuthenticationConfig;
+import org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosConfig;
+import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
+import org.apache.gravitino.connector.PropertiesMetadata;
+import org.apache.gravitino.connector.PropertyEntry;
 
 /**
  * Implementation of {@link PropertiesMetadata} that represents Paimon catalog properties metadata.
