@@ -44,6 +44,7 @@ public class PrincipalUtils {
     }
   }
 
+  // This method can't be used in nested `Subject#doAs` block.
   public static Principal getCurrentPrincipal() {
     java.security.AccessControlContext context = java.security.AccessController.getContext();
     Subject subject = Subject.getSubject(context);
@@ -53,10 +54,6 @@ public class PrincipalUtils {
 
     if (!subject.getPrincipals(UserPrincipal.class).isEmpty()) {
       return subject.getPrincipals(UserPrincipal.class).iterator().next();
-    }
-
-    if (!subject.getPrincipals().isEmpty()) {
-      return new UserPrincipal(subject.getPrincipals().iterator().next().getName());
     }
 
     return new UserPrincipal(AuthConstants.ANONYMOUS_USER);
