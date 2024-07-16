@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.storage.relational.po;
 
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;
@@ -47,20 +48,20 @@ public class TagPO {
       return false;
     }
     TagPO tagPO = (TagPO) o;
-    return java.util.Objects.equals(tagId, tagPO.tagId)
-        && java.util.Objects.equals(tagName, tagPO.tagName)
-        && java.util.Objects.equals(metalakeId, tagPO.metalakeId)
-        && java.util.Objects.equals(comment, tagPO.comment)
-        && java.util.Objects.equals(properties, tagPO.properties)
-        && java.util.Objects.equals(auditInfo, tagPO.auditInfo)
-        && java.util.Objects.equals(currentVersion, tagPO.currentVersion)
-        && java.util.Objects.equals(lastVersion, tagPO.lastVersion)
-        && java.util.Objects.equals(deletedAt, tagPO.deletedAt);
+    return Objects.equal(tagId, tagPO.tagId)
+        && Objects.equal(tagName, tagPO.tagName)
+        && Objects.equal(metalakeId, tagPO.metalakeId)
+        && Objects.equal(comment, tagPO.comment)
+        && Objects.equal(properties, tagPO.properties)
+        && Objects.equal(auditInfo, tagPO.auditInfo)
+        && Objects.equal(currentVersion, tagPO.currentVersion)
+        && Objects.equal(lastVersion, tagPO.lastVersion)
+        && Objects.equal(deletedAt, tagPO.deletedAt);
   }
 
   @Override
   public int hashCode() {
-    return java.util.Objects.hash(
+    return Objects.hashCode(
         tagId,
         tagName,
         metalakeId,
