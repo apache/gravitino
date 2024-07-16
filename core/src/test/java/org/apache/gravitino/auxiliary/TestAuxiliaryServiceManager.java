@@ -29,9 +29,9 @@ import static org.mockito.Mockito.verify;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
+import java.util.Map;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.utils.IsolatedClassLoader;
-import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

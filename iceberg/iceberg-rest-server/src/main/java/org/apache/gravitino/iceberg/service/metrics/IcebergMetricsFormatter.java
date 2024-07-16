@@ -1,4 +1,4 @@
-package org.apache.gravitino.iceberg.service.metrics;/*
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,6 +16,7 @@ package org.apache.gravitino.iceberg.service.metrics;/*
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.iceberg.service.metrics;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;

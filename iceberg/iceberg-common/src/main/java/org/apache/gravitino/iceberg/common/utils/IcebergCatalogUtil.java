@@ -20,6 +20,10 @@ package org.apache.gravitino.iceberg.common.utils;
 
 import org.apache.gravitino.iceberg.common.ClosableHiveCatalog;
 import org.apache.gravitino.iceberg.common.IcebergConstants;
+
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION;
+
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
@@ -71,8 +75,8 @@ public class IcebergCatalogUtil {
     } else if (authenticationConfig.isKerberosAuth()) {
       Map<String, String> resultProperties = new HashMap<>(properties);
       resultProperties.put(CatalogProperties.CLIENT_POOL_CACHE_KEYS, "USER_NAME");
-      // hdfsConfiguration.set(HADOOP_SECURITY_AUTHORIZATION, "true");
-      // hdfsConfiguration.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
+      hdfsConfiguration.set(HADOOP_SECURITY_AUTHORIZATION, "true");
+      hdfsConfiguration.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
       hiveCatalog.setConf(hdfsConfiguration);
       hiveCatalog.initialize(icebergCatalogName, properties);
 

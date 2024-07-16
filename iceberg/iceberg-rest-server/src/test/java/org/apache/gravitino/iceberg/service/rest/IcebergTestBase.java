@@ -1,4 +1,4 @@
-package org.apache.gravitino.iceberg.service.rest;/*
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,6 +16,7 @@ package org.apache.gravitino.iceberg.service.rest;/*
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.iceberg.service.rest;
 
 import com.google.common.base.Joiner;
 import java.util.Map;
@@ -113,7 +114,6 @@ public class IcebergTestBase extends JerseyTest {
         target = target.queryParam(entry.getKey(), entry.getValue());
       }
     }
-
 
     return target
         .register(IcebergObjectMapperProvider.class)

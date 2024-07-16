@@ -18,6 +18,7 @@
  */
 
 package org.apache.gravitino.iceberg.common.authentication.kerberos;
+
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -56,7 +57,7 @@ public class HiveBackendProxy implements MethodInterceptor {
     try {
       proxyUser = UserGroupInformation.getCurrentUser();
 
-      // Replace the original client pool with org.apache.gravitino.iceberg.common.utils.IcebergHiveCachedClientPool. Why do we need to do
+      // Replace the original client pool with IcebergHiveCachedClientPool. Why do we need to do
       // this? Because the original client pool in Iceberg uses a fixed username to create the
       // client pool, and it will not work with kerberos authentication. We need to create a new
       // client pool with the current user. For more, please see CachedClientPool#clientPool and

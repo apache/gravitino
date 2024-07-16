@@ -18,11 +18,11 @@
  */
 package org.apache.gravitino.iceberg.integration.test;
 
-import org.apache.gravitino.iceberg.common.IcebergCatalogBackend;
-import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.common.IcebergConstants;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.iceberg.common.IcebergCatalogBackend;
+import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;

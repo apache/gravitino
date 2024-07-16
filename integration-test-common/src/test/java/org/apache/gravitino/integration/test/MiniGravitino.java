@@ -41,7 +41,7 @@ import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.client.HTTPClient;
 import org.apache.gravitino.client.RESTClient;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.HttpUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.integration.test.util.KerberosProviderHelper;
 import org.apache.gravitino.integration.test.util.OAuthMockDataProvider;
@@ -156,7 +156,7 @@ public class MiniGravitino {
 
     String url = URI + "/metrics";
     while (System.currentTimeMillis() - beginTime < 1000 * 60 * 3) {
-      started = AbstractIT.isHttpServerUp(url);
+      started = HttpUtils.isHttpServerUp(url);
       if (started || future.isDone()) {
         break;
       }
@@ -187,7 +187,7 @@ public class MiniGravitino {
     String url = String.format("http://%s:%d/metrics", host, port);
     while (System.currentTimeMillis() - beginTime < 1000 * 60 * 3) {
       sleepUninterruptibly(500, TimeUnit.MILLISECONDS);
-      started = AbstractIT.isHttpServerUp(url);
+      started = HttpUtils.isHttpServerUp(url);
       if (!started) {
         break;
       }

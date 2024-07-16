@@ -143,7 +143,7 @@ function stop() {
 
 HOSTNAME=$(hostname)
 GRAVITINO_OUTFILE="${GRAVITINO_LOG_DIR}/iceberg-rest-server.out"
-GRAVITINO_SERVER_NAME=com.datastrato.gravitino.server.IcebergRESTServer
+GRAVITINO_SERVER_NAME=org.apache.gravitino.server.IcebergRESTServer
 GRAVITINO_SIMPLE_SERVER_NAME=iceberg-rest-server
 
 JAVA_OPTS+=" -Dfile.encoding=UTF-8"

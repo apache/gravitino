@@ -1,4 +1,4 @@
-package org.apache.gravitino.iceberg.common.utils;/*
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -17,6 +17,7 @@ package org.apache.gravitino.iceberg.common.utils;/*
  * under the License.
  *
  */
+package org.apache.gravitino.iceberg.common.utils;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -51,7 +52,7 @@ import org.apache.thrift.TException;
  * Referred from Apache Iceberg's CachedClientPool implementation
  * hive-metastore/src/main/java/org/apache/iceberg/hive/CachedClientPool.java
  *
- * <p>org.apache.gravitino.iceberg.common.utils.IcebergHiveCachedClientPool is used for every Iceberg catalog with Hive backend, I changed the
+ * <p>IcebergHiveCachedClientPool is used for every Iceberg catalog with Hive backend, I changed the
  * method clientPool() from
  *
  * <pre>{@code

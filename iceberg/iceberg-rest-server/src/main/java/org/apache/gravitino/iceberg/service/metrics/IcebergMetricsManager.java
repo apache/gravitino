@@ -1,4 +1,4 @@
-package org.apache.gravitino.iceberg.service.metrics;/*
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,6 +16,7 @@ package org.apache.gravitino.iceberg.service.metrics;/*
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.iceberg.service.metrics;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
@@ -38,7 +39,7 @@ import org.slf4j.LoggerFactory;
 public class IcebergMetricsManager {
   private static final Logger LOG = LoggerFactory.getLogger(IcebergTableOps.class);
 
-  // Register org.apache.metrics.service.iceberg.gravitino.IcebergMetricsStore's short name to its full qualified class name in the map. So
+  // Register IcebergMetricsStore's short name to its full qualified class name in the map. So
   // that user doesn't need to specify the full qualified class name when creating an
   // org.apache.metrics.service.iceberg.gravitino.IcebergMetricsStore.
   private static final ImmutableMap<String, String> ICEBERG_METRICS_STORE_NAMES =

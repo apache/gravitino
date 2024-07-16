@@ -25,6 +25,7 @@ plugins {
 }
 
 dependencies {
+  implementation(project(":catalogs:bundled-catalog", configuration = "shadow"))
   implementation(project(":core"))
   implementation(project(":common"))
   implementation(project(":server-common"))

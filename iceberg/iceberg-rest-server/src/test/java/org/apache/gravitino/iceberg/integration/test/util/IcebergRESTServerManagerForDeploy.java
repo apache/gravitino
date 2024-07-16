@@ -37,8 +37,7 @@ public class IcebergRESTServerManagerForDeploy extends IcebergRESTServerManager 
 
   public IcebergRESTServerManagerForDeploy() {
     String gravitinoRootDir = System.getenv("GRAVITINO_ROOT_DIR");
-    this.icebergRESTServerHome =
-        Paths.get(gravitinoRootDir, "distribution", "package", "iceberg-rest-server");
+    this.icebergRESTServerHome = Paths.get(gravitinoRootDir, "distribution", "package");
   }
 
   @Override
@@ -49,7 +48,8 @@ public class IcebergRESTServerManagerForDeploy extends IcebergRESTServerManager 
   @Override
   public Optional<Future<?>> doStartIcebergRESTServer() throws Exception {
     JdbcDriverDownloader.downloadJdbcDriver(
-        SQLITE_DRIVER_DOWNLOAD_URL, Paths.get(icebergRESTServerHome.toString(), "libs").toString());
+        SQLITE_DRIVER_DOWNLOAD_URL,
+        Paths.get(icebergRESTServerHome.toString(), "iceberg-rest-server", "libs").toString());
 
     String cmd = String.format("%s/bin/%s start", icebergRESTServerHome.toString(), SCRIPT_NAME);
     CommandExecutor.executeCommandLocalHost(

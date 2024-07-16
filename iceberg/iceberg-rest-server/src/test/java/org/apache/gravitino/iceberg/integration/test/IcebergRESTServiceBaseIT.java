@@ -1,4 +1,4 @@
-package org.apache.gravitino.iceberg.integration.test;/*
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,8 +16,8 @@ package org.apache.gravitino.iceberg.integration.test;/*
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.iceberg.integration.test;
 
-import org.apache.gravitino.iceberg.integration.test.util.IcebergRESTServerManager;
 import com.google.common.collect.ImmutableList;
 import com.google.errorprone.annotations.FormatMethod;
 import java.util.ArrayList;
@@ -30,6 +30,7 @@ import java.util.stream.IntStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.iceberg.common.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.integration.test.util.IcebergRESTServerManager;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;

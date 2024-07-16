@@ -19,8 +19,6 @@
 package org.apache.gravitino.catalog.lakehouse.iceberg.integration.test;
 
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
-
-
 import static org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig.AUTH_TYPE_KEY;
 import static org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosConfig.IMPERSONATION_ENABLE_KEY;
 import static org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosConfig.KET_TAB_URI_KEY;

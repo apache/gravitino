@@ -46,4 +46,10 @@ public class IcebergConstants {
   public static final String PROVIDER = "provider";
   public static final String FORMAT = "format";
   public static final String FORMAT_VERSION = "format-version";
+
+  public static final String ICEBERG_METRICS_STORE = "metricsStore";
+  public static final String ICEBERG_METRICS_STORE_RETAIN_DAYS = "metricsStoreRetainDays";
+  public static final String ICEBERG_METRICS_QUEUE_CAPACITY = "metricsQueueCapacity";
+
+  public static final String GRAVITINO_ICEBERG_REST_SERVICE_NAME = "iceberg-rest";
 }

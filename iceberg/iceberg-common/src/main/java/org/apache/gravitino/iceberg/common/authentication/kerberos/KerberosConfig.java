@@ -18,6 +18,7 @@
  */
 
 package org.apache.gravitino.iceberg.common.authentication.kerberos;
+
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;

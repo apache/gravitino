@@ -18,12 +18,12 @@
  */
 package org.apache.gravitino.server;
 
+import java.io.File;
+import java.util.Properties;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
-import java.io.File;
-import java.util.Properties;
 
 public class ServerConfig extends Config {
 

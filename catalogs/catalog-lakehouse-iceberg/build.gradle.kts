@@ -70,8 +70,6 @@ dependencies {
     exclude("org.rocksdb")
   }
 
-  testImplementation(libs.bundles.log4j)
-  testImplementation(libs.bundles.jersey)
   testImplementation(libs.hadoop2.common) {
     exclude("com.github.spotbugs")
   }
@@ -100,6 +98,10 @@ tasks {
   val runtimeJars by registering(Copy::class) {
     from(configurations.runtimeClasspath)
     into("build/libs")
+  }
+
+  jar {
+    finalizedBy("runtimeJars")
   }
 
   val copyCatalogLibs by registering(Copy::class) {

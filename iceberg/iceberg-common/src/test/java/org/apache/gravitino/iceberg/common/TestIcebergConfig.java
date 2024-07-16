@@ -21,7 +21,6 @@ package org.apache.gravitino.iceberg.common;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;

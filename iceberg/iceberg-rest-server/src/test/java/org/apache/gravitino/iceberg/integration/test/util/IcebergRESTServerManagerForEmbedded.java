@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.iceberg.integration.test.util;
 
-import org.apache.gravitino.server.IcebergRESTServer;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -27,6 +26,7 @@ import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import org.apache.gravitino.server.IcebergRESTServer;
 
 public class IcebergRESTServerManagerForEmbedded extends IcebergRESTServerManager {
 

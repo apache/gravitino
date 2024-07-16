@@ -20,11 +20,6 @@ package org.apache.gravitino.iceberg.integration.test.util;
 
 import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterruptibly;
 
-import org.apache.gravitino.Config;
-import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.integration.test.util.ITUtils;
-import org.apache.gravitino.rest.RESTUtils;
-import org.apache.gravitino.server.IcebergRESTServer;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -34,13 +29,14 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.integration.test.util.HttpUtils;
+import org.apache.gravitino.integration.test.util.ITUtils;
+import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.server.IcebergRESTServer;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.web.JettyServerConfig;
-import org.apache.hc.client5.http.classic.methods.HttpGet;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.core5.http.ClassicHttpResponse;
-import org.apache.iceberg.rest.RESTUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,7 +79,7 @@ public abstract class IcebergRESTServerManager {
     boolean started = false;
 
     while (System.currentTimeMillis() - beginTime < 1000 * 60) {
-      started = isHttpServerUp(checkUri);
+      started = HttpUtils.isHttpServerUp(checkUri);
       if (started || (future.isPresent() && future.get().isDone())) {
         break;
       }
@@ -97,7 +93,7 @@ public abstract class IcebergRESTServerManager {
       } catch (Exception e) {
         throw new RuntimeException("IcebergRESTServer start failed", e);
       }
-      throw new RuntimeException("Can not start IcebergRESTServer");
+      throw new RuntimeException("Can not start IcebergRESTServer in one minute");
     }
   }
 
@@ -107,15 +103,15 @@ public abstract class IcebergRESTServerManager {
 
     long beginTime = System.currentTimeMillis();
     boolean started = true;
-    while (System.currentTimeMillis() - beginTime < 3 * 1000 * 60) {
+    while (System.currentTimeMillis() - beginTime < 1000 * 60) {
       sleepUninterruptibly(500, TimeUnit.MILLISECONDS);
-      started = isHttpServerUp(checkUri);
+      started = HttpUtils.isHttpServerUp(checkUri);
       if (!started) {
         break;
       }
     }
     if (started) {
-      throw new RuntimeException("Can not stop IcebergRESTServer");
+      throw new RuntimeException("Can not stop IcebergRESTServer in one minute");
     }
   }
 
@@ -151,16 +147,5 @@ public abstract class IcebergRESTServerManager {
     int port = jettyServerConfig.getHttpPort();
     this.checkUri = String.format("http://%s:%d/metrics", host, port);
     LOG.info("Check uri:{}.", checkUri);
-  }
-
-  private static boolean isHttpServerUp(String testUrl) {
-    try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
-      HttpGet request = new HttpGet(testUrl);
-      ClassicHttpResponse response = httpClient.execute(request, a -> a);
-      return response.getCode() == 200;
-    } catch (Exception e) {
-      LOG.warn("Check server failed: url:{}, error message:{}", testUrl, e.getMessage());
-      return false;
-    }
   }
 }

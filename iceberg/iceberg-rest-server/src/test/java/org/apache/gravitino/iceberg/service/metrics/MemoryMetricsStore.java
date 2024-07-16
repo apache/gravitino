@@ -1,4 +1,4 @@
-package org.apache.gravitino.iceberg.service.metrics;/*
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -17,9 +17,10 @@ package org.apache.gravitino.iceberg.service.metrics;/*
  * under the License.
  */
 
+package org.apache.gravitino.iceberg.service.metrics;
+
 import java.time.Instant;
 import java.util.Map;
-import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsStore;
 import org.apache.iceberg.metrics.MetricsReport;
 
 /** Store Iceberg metrics in memory, used for test */

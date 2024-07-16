@@ -18,9 +18,9 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg.integration.test;
 
-import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.common.IcebergConstants;
 import java.util.Map;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.junit.jupiter.api.Tag;

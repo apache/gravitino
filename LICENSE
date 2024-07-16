@@ -232,10 +232,8 @@
    ./catalogs/catalog-hive/src/test/java/org/apache/gravitino/catalog/hive/miniHMS/MiniHiveMetastoreService.java
    ./catalogs/catalog-hive/src/test/java/org/apache/gravitino/catalog/hive/miniHMS/ScriptRunner.java
    ./catalogs/catalog-hive/src/test/java/org/apache/gravitino/catalog/hive/TestCachedClientPool.java
-   ./catalogs/catalog-lakehouse-iceberg/src/main/java/org/apache/gravitino/catalog/lakehouse/iceberg/web/org.apache.service.iceberg.gravitino.IcebergExceptionMapper.java
    ./catalogs/catalog-lakehouse-iceberg/src/main/java/org/apache/gravitino/catalog/lakehouse/iceberg/converter/DescribeIcebergSortOrderVisitor.java
    ./catalogs/catalog-lakehouse-iceberg/src/main/java/org/apache/gravitino/catalog/lakehouse/iceberg/utils/IcebergTablePropertiesUtil.java
-   ./catalogs/catalog-lakehouse-iceberg/src/main/java/org/apache/gravitino/catalog/lakehouse/iceberg/org.apache.gravitino.iceberg.common.utils.IcebergHiveCachedClientPool.java
    ./clients/client-java/src/main/java/org/apache/gravitino/client/HTTPClient.java
    ./clients/client-java/src/main/java/org/apache/gravitino/client/RESTClient.java
    ./clients/client-java/src/test/java/org/apache/gravitino/client/TestHTTPClient.java
@@ -245,6 +243,8 @@
    ./core/src/main/java/org/apache/gravitino/utils/ClientPoolImpl.java
    ./common/src/main/java/org/apache/gravitino/dto/responses/OAuth2TokenResponse.java
    ./clients/client-java/src/main/java/org/apache/gravitino/client/OAuth2ClientUtil.java
+   ./iceberg/iceberg-rest-server/src/main/java/org/apache/gravitino/iceberg/service/IcebergExceptionMapper.java
+   ./iceberg/iceberg-common/src/main/java/org/apache/gravitino/iceberg/common/utils/IcebergHiveCachedClientPool.java
    ./gradlew
 
    Apache Paimon
