@@ -31,6 +31,7 @@ import org.apache.gravitino.connector.ProxyPlugin;
 import org.apache.gravitino.utils.Executable;
 import org.apache.hadoop.security.UserGroupInformation;
 
+@Deprecated
 public class HadoopProxyPlugin implements ProxyPlugin {
   private SecureHadoopCatalogOperations ops;
   private final UserGroupInformation realUser;
@@ -83,6 +84,5 @@ public class HadoopProxyPlugin implements ProxyPlugin {
   @Override
   public void bindCatalogOperation(CatalogOperations ops) {
     this.ops = ((SecureHadoopCatalogOperations) ops);
-    this.ops.setProxyPlugin(this);
   }
 }

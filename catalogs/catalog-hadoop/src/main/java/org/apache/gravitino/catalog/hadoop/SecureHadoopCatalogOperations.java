@@ -19,6 +19,11 @@
 
 package org.apache.gravitino.catalog.hadoop;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
+
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
@@ -26,6 +31,8 @@ import java.lang.reflect.UndeclaredThrowableException;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.Catalog;
@@ -35,7 +42,8 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
-import org.apache.gravitino.catalog.hadoop.HadoopCatalogOperations.UserInfo;
+import org.apache.gravitino.catalog.hadoop.authentication.AuthenticationConfig;
+import org.apache.gravitino.catalog.hadoop.authentication.kerberos.KerberosClient;
 import org.apache.gravitino.catalog.hadoop.authentication.kerberos.KerberosConfig;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
@@ -56,6 +64,7 @@ import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,6 +79,14 @@ public class SecureHadoopCatalogOperations
 
   private final HadoopCatalogOperations hadoopCatalogOperations;
 
+  private final List<Closeable> closeables = Lists.newArrayList();
+
+  private final Map<NameIdentifier, UserInfo> userInfoMap = Maps.newConcurrentMap();
+
+  public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-%s";
+
+  private String kerberosRealm;
+
   public SecureHadoopCatalogOperations() {
     this.hadoopCatalogOperations = new HadoopCatalogOperations();
   }
@@ -83,11 +100,27 @@ public class SecureHadoopCatalogOperations
   }
 
   public String getKerberosRealm() {
-    return hadoopCatalogOperations.getKerberosRealm();
+    return kerberosRealm;
   }
 
-  public void setProxyPlugin(HadoopProxyPlugin plugin) {
-    hadoopCatalogOperations.setProxyPlugin(plugin);
+  static class UserInfo {
+    UserGroupInformation loginUser;
+    boolean enableUserImpersonation;
+    String keytabPath;
+    String realm;
+
+    static UserInfo of(
+        UserGroupInformation loginUser,
+        boolean enableUserImpersonation,
+        String keytabPath,
+        String kerberosRealm) {
+      UserInfo userInfo = new UserInfo();
+      userInfo.loginUser = loginUser;
+      userInfo.enableUserImpersonation = enableUserImpersonation;
+      userInfo.keytabPath = keytabPath;
+      userInfo.realm = kerberosRealm;
+      return userInfo;
+    }
   }
 
   // We have overridden the createFileset, dropFileset, createSchema, dropSchema method to reset
@@ -169,6 +202,7 @@ public class SecureHadoopCatalogOperations
       Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
       throws RuntimeException {
     hadoopCatalogOperations.initialize(config, info, propertiesMetadata);
+    initAuthentication(hadoopCatalogOperations.getConf(), hadoopCatalogOperations.getHadoopConf());
   }
 
   @Override
@@ -183,11 +217,9 @@ public class SecureHadoopCatalogOperations
       }
     }
     if (!ident.name().equals(finalName)) {
-      UserInfo userInfo = hadoopCatalogOperations.getUserInfoMap().remove(ident);
+      UserInfo userInfo = userInfoMap.remove(ident);
       if (userInfo != null) {
-        hadoopCatalogOperations
-            .getUserInfoMap()
-            .put(NameIdentifier.of(ident.namespace(), finalName), userInfo);
+        userInfoMap.put(NameIdentifier.of(ident.namespace(), finalName), userInfo);
       }
     }
 
@@ -223,6 +255,16 @@ public class SecureHadoopCatalogOperations
   @Override
   public void close() throws IOException {
     hadoopCatalogOperations.close();
+
+    userInfoMap.clear();
+    closeables.forEach(
+        c -> {
+          try {
+            c.close();
+          } catch (IOException e) {
+            LOG.error("Failed to close resource", e);
+          }
+        });
   }
 
   @Override
@@ -236,11 +278,74 @@ public class SecureHadoopCatalogOperations
     hadoopCatalogOperations.testConnection(catalogIdent, type, provider, comment, properties);
   }
 
+  private void initAuthentication(Map<String, String> conf, Configuration hadoopConf) {
+    AuthenticationConfig config = new AuthenticationConfig(conf);
+    CatalogInfo catalogInfo = hadoopCatalogOperations.getCatalogInfo();
+    if (config.isKerberosAuth()) {
+      initKerberos(
+          conf, hadoopConf, NameIdentifier.of(catalogInfo.namespace(), catalogInfo.name()), true);
+    } else if (config.isSimpleAuth()) {
+      UserGroupInformation u =
+          UserGroupInformation.createRemoteUser(PrincipalUtils.getCurrentUserName());
+      userInfoMap.put(
+          NameIdentifier.of(catalogInfo.namespace(), catalogInfo.name()),
+          UserInfo.of(u, config.isImpersonationEnabled(), null, null));
+    }
+  }
+
+  /**
+   * Get the UserGroupInformation based on the NameIdentifier and properties.
+   *
+   * <p>Note: As UserGroupInformation is a static class, to avoid the thread safety issue, we need
+   * to use synchronized to ensure the thread safety: Make login and getLoginUser atomic.
+   */
+  public synchronized String initKerberos(
+      Map<String, String> properties,
+      Configuration configuration,
+      NameIdentifier ident,
+      boolean refreshCredentials) {
+    // Init schema level kerberos authentication.
+
+    CatalogInfo catalogInfo = hadoopCatalogOperations.getCatalogInfo();
+    String keytabPath =
+        String.format(
+            GRAVITINO_KEYTAB_FORMAT, catalogInfo.id() + "-" + ident.toString().replace(".", "-"));
+    KerberosConfig kerberosConfig = new KerberosConfig(properties);
+    if (kerberosConfig.isKerberosAuth()) {
+      configuration.set(
+          HADOOP_SECURITY_AUTHENTICATION,
+          AuthenticationMethod.KERBEROS.name().toLowerCase(Locale.ROOT));
+      try {
+        UserGroupInformation.setConfiguration(configuration);
+        KerberosClient kerberosClient =
+            new KerberosClient(properties, configuration, refreshCredentials);
+        // Add the kerberos client to the closable to close resources.
+        closeables.add(kerberosClient);
+
+        File keytabFile = kerberosClient.saveKeyTabFileFromUri(keytabPath);
+        String kerberosRealm = kerberosClient.login(keytabFile.getAbsolutePath());
+        // Should this kerberosRealm need to be equals to the realm in the principal?
+        userInfoMap.put(
+            ident,
+            UserInfo.of(
+                UserGroupInformation.getLoginUser(),
+                kerberosConfig.isImpersonationEnabled(),
+                keytabPath,
+                kerberosRealm));
+        return kerberosRealm;
+      } catch (IOException e) {
+        throw new RuntimeException("Failed to login with Kerberos", e);
+      }
+    }
+
+    return null;
+  }
+
   private UserGroupInformation getUGIByIdent(Map<String, String> properties, NameIdentifier ident) {
     KerberosConfig kerberosConfig = new KerberosConfig(properties);
     if (kerberosConfig.isKerberosAuth()) {
       // We assume that the realm of catalog is the same as the realm of the schema and table.
-      hadoopCatalogOperations.initKerberos(properties, new Configuration(), ident, false);
+      initKerberos(properties, new Configuration(), ident, false);
     }
     // If the kerberos is not enabled (simple mode), we will use the current user
     return getUserBaseOnNameIdentifier(ident);
@@ -270,8 +375,8 @@ public class SecureHadoopCatalogOperations
   private UserInfo getNearestUserGroupInformation(NameIdentifier nameIdentifier) {
     NameIdentifier currentNameIdentifier = nameIdentifier;
     while (currentNameIdentifier != null) {
-      if (hadoopCatalogOperations.getUserInfoMap().containsKey(currentNameIdentifier)) {
-        return hadoopCatalogOperations.getUserInfoMap().get(currentNameIdentifier);
+      if (userInfoMap.containsKey(currentNameIdentifier)) {
+        return userInfoMap.get(currentNameIdentifier);
       }
 
       String[] levels = currentNameIdentifier.namespace().levels();
@@ -285,7 +390,7 @@ public class SecureHadoopCatalogOperations
   }
 
   private void cleanUserInfo(NameIdentifier identifier) {
-    UserInfo userInfo = hadoopCatalogOperations.getUserInfoMap().remove(identifier);
+    UserInfo userInfo = userInfoMap.remove(identifier);
     if (userInfo != null) {
       removeFile(userInfo.keytabPath);
     }

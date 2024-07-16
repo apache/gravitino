@@ -19,19 +19,14 @@
 package org.apache.gravitino.catalog.hadoop;
 
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import java.io.Closeable;
-import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -45,13 +40,9 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.StringIdentifier;
-import org.apache.gravitino.catalog.hadoop.authentication.AuthenticationConfig;
-import org.apache.gravitino.catalog.hadoop.authentication.kerberos.KerberosClient;
-import org.apache.gravitino.catalog.hadoop.authentication.kerberos.KerberosConfig;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
-import org.apache.gravitino.connector.ProxyPlugin;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
@@ -71,8 +62,6 @@ import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -93,18 +82,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   private Map<String, String> conf;
 
-  @SuppressWarnings("unused")
-  private ProxyPlugin proxyPlugin;
-
-  private String kerberosRealm;
-
   private CatalogInfo catalogInfo;
-
-  private final List<Closeable> closeables = Lists.newArrayList();
-
-  private final Map<NameIdentifier, UserInfo> userInfoMap = Maps.newConcurrentMap();
-
-  public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-%s";
 
   HadoopCatalogOperations(EntityStore store) {
     this.store = store;
@@ -114,36 +92,20 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     this(GravitinoEnv.getInstance().entityStore());
   }
 
-  public String getKerberosRealm() {
-    return kerberosRealm;
-  }
-
   public EntityStore getStore() {
     return store;
   }
 
-  public Map<NameIdentifier, UserInfo> getUserInfoMap() {
-    return userInfoMap;
+  public CatalogInfo getCatalogInfo() {
+    return catalogInfo;
   }
 
-  static class UserInfo {
-    UserGroupInformation loginUser;
-    boolean enableUserImpersonation;
-    String keytabPath;
-    String realm;
+  public Configuration getHadoopConf() {
+    return hadoopConf;
+  }
 
-    static UserInfo of(
-        UserGroupInformation loginUser,
-        boolean enableUserImpersonation,
-        String keytabPath,
-        String kerberosRealm) {
-      UserInfo userInfo = new UserInfo();
-      userInfo.loginUser = loginUser;
-      userInfo.enableUserImpersonation = enableUserImpersonation;
-      userInfo.keytabPath = keytabPath;
-      userInfo.realm = kerberosRealm;
-      return userInfo;
-    }
+  public Map<String, String> getConf() {
+    return conf;
   }
 
   @Override
@@ -171,27 +133,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
                 .getOrDefault(config, HadoopCatalogPropertiesMetadata.LOCATION);
     conf.forEach(hadoopConf::set);
 
-    initAuthentication(conf, hadoopConf);
     this.catalogStorageLocation = Optional.ofNullable(catalogLocation).map(Path::new);
-  }
-
-  private void initAuthentication(Map<String, String> conf, Configuration hadoopConf) {
-    AuthenticationConfig config = new AuthenticationConfig(conf);
-
-    if (config.isKerberosAuth()) {
-      this.kerberosRealm =
-          initKerberos(
-              conf,
-              hadoopConf,
-              NameIdentifier.of(catalogInfo.namespace(), catalogInfo.name()),
-              true);
-    } else if (config.isSimpleAuth()) {
-      UserGroupInformation u =
-          UserGroupInformation.createRemoteUser(PrincipalUtils.getCurrentUserName());
-      userInfoMap.put(
-          NameIdentifier.of(catalogInfo.namespace(), catalogInfo.name()),
-          UserInfo.of(u, false, null, null));
-    }
   }
 
   @Override
@@ -423,52 +365,6 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     }
   }
 
-  /**
-   * Get the UserGroupInformation based on the NameIdentifier and properties.
-   *
-   * <p>Note: As UserGroupInformation is a static class, to avoid the thread safety issue, we need
-   * to use synchronized to ensure the thread safety: Make login and getLoginUser atomic.
-   */
-  public synchronized String initKerberos(
-      Map<String, String> properties,
-      Configuration configuration,
-      NameIdentifier ident,
-      boolean refreshCredentials) {
-    // Init schema level kerberos authentication.
-    String keytabPath =
-        String.format(
-            GRAVITINO_KEYTAB_FORMAT, catalogInfo.id() + "-" + ident.toString().replace(".", "-"));
-    KerberosConfig kerberosConfig = new KerberosConfig(properties);
-    if (kerberosConfig.isKerberosAuth()) {
-      configuration.set(
-          HADOOP_SECURITY_AUTHENTICATION,
-          AuthenticationMethod.KERBEROS.name().toLowerCase(Locale.ROOT));
-      try {
-        UserGroupInformation.setConfiguration(configuration);
-        KerberosClient kerberosClient =
-            new KerberosClient(properties, configuration, refreshCredentials);
-        // Add the kerberos client to the closable to close resources.
-        closeables.add(kerberosClient);
-
-        File keytabFile = kerberosClient.saveKeyTabFileFromUri(keytabPath);
-        kerberosRealm = kerberosClient.login(keytabFile.getAbsolutePath());
-        // Should this kerberosRealm need to be equals to the realm in the principal?
-        userInfoMap.put(
-            ident,
-            UserInfo.of(
-                UserGroupInformation.getLoginUser(),
-                kerberosConfig.isImpersonationEnabled(),
-                keytabPath,
-                kerberosRealm));
-        return kerberosRealm;
-      } catch (IOException e) {
-        throw new RuntimeException("Failed to login with Kerberos", e);
-      }
-    }
-
-    return null;
-  }
-
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
@@ -644,17 +540,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   }
 
   @Override
-  public void close() throws IOException {
-    userInfoMap.clear();
-    closeables.forEach(
-        c -> {
-          try {
-            c.close();
-          } catch (IOException e) {
-            LOG.error("Failed to close resource", e);
-          }
-        });
-  }
+  public void close() throws IOException {}
 
   private SchemaEntity updateSchemaEntity(
       NameIdentifier ident, SchemaEntity schemaEntity, SchemaChange... changes) {
@@ -754,9 +640,5 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   static Path formalizePath(Path path, Configuration configuration) throws IOException {
     FileSystem defaultFs = FileSystem.get(configuration);
     return path.makeQualified(defaultFs.getUri(), defaultFs.getWorkingDirectory());
-  }
-
-  void setProxyPlugin(HadoopProxyPlugin hadoopProxyPlugin) {
-    this.proxyPlugin = hadoopProxyPlugin;
   }
 }
