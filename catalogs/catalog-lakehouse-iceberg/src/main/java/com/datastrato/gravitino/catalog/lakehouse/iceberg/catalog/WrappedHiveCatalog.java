@@ -28,8 +28,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * A wrapper class for HiveCatalog to support kerberos authentication. We can also make HiveCatalog
- * as a generic type and pass it as a parameter to the constructor.
+ * WrappedHiveCatalog is a wrapper class to wrap Iceberg HiveCatalog to do some clean-up work like
+ * closing resources.
  */
 public class WrappedHiveCatalog extends HiveCatalog implements Closeable {
 
@@ -55,7 +55,7 @@ public class WrappedHiveCatalog extends HiveCatalog implements Closeable {
             if (resource != null) {
               resource.close();
             }
-          } catch (IOException e) {
+          } catch (Exception e) {
             LOGGER.warn("Failed to close resource: {}", resource, e);
           }
         });
