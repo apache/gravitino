@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.storage.relational.utils;
+package org.apache.gravitino.storage.relational.service;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
@@ -39,16 +39,16 @@ import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.apache.gravitino.storage.relational.service.TopicMetaService;
 
 /**
- * MetadataObjectUtils is used for converting full name to entity id and converting entity id to
+ * MetadataObjectService is used for converting full name to entity id and converting entity id to
  * full name.
  */
-public class MetadataObjectUtils {
+public class MetadataObjectService {
 
   private static final String DOT = ".";
   private static final Joiner DOT_JOINER = Joiner.on(DOT);
   private static final Splitter DOT_SPLITTER = Splitter.on(DOT);
 
-  private MetadataObjectUtils() {}
+  private MetadataObjectService() {}
 
   public static long getMetadataObjectId(
       long metalakeId, String fullName, MetadataObject.Type type) {

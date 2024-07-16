@@ -18,8 +18,13 @@
  */
 package org.apache.gravitino.utils;
 
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
@@ -191,6 +196,56 @@ public class NameIdentifierUtil {
   public static void check(boolean expression, @FormatString String message, Object... args) {
     if (!expression) {
       throw new IllegalNamespaceException(message, args);
+    }
+  }
+
+  /**
+   * Convert the given {@link NameIdentifier} and {@link Entity.EntityType} to {@link
+   * MetadataObject}.
+   *
+   * @param ident The identifier
+   * @param entityType The entity type
+   * @return The converted {@link MetadataObject}
+   */
+  public static MetadataObject toMetadataObject(
+      NameIdentifier ident, Entity.EntityType entityType) {
+    Preconditions.checkArgument(
+        ident != null && entityType != null, "The identifier and entity type must not be null");
+
+    Joiner dot = Joiner.on(".");
+
+    switch (entityType) {
+      case METALAKE:
+        checkMetalake(ident);
+        return MetadataObjects.of(null, ident.name(), MetadataObject.Type.METALAKE);
+
+      case CATALOG:
+        checkCatalog(ident);
+        return MetadataObjects.of(null, ident.name(), MetadataObject.Type.CATALOG);
+
+      case SCHEMA:
+        checkSchema(ident);
+        String schemaParent = ident.namespace().level(1);
+        return MetadataObjects.of(schemaParent, ident.name(), MetadataObject.Type.SCHEMA);
+
+      case TABLE:
+        checkTable(ident);
+        String tableParent = dot.join(ident.namespace().level(1), ident.namespace().level(2));
+        return MetadataObjects.of(tableParent, ident.name(), MetadataObject.Type.TABLE);
+
+      case FILESET:
+        checkFileset(ident);
+        String filesetParent = dot.join(ident.namespace().level(1), ident.namespace().level(2));
+        return MetadataObjects.of(filesetParent, ident.name(), MetadataObject.Type.FILESET);
+
+      case TOPIC:
+        checkTopic(ident);
+        String topicParent = dot.join(ident.namespace().level(1), ident.namespace().level(2));
+        return MetadataObjects.of(topicParent, ident.name(), MetadataObject.Type.TOPIC);
+
+      default:
+        throw new IllegalArgumentException(
+            "Entity type " + entityType + " is not supported to convert to MetadataObject");
     }
   }
 }

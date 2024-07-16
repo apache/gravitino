@@ -36,7 +36,6 @@ import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
-import org.apache.gravitino.storage.relational.utils.MetadataObjectUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.slf4j.Logger;
@@ -108,7 +107,7 @@ public class RoleMetaService {
             POConverters.initializeSecurablePOBuilderWithVersion(
                 roleEntity.id(), object, getEntityType(object));
         objectBuilder.withEntityId(
-            MetadataObjectUtils.getMetadataObjectId(metalakeId, object.fullName(), object.type()));
+            MetadataObjectService.getMetadataObjectId(metalakeId, object.fullName(), object.type()));
         securableObjectPOs.add(objectBuilder.build());
       }
 
@@ -154,7 +153,7 @@ public class RoleMetaService {
 
     for (SecurableObjectPO securableObjectPO : securableObjectPOs) {
       String fullName =
-          MetadataObjectUtils.getMetadataObjectFullName(
+          MetadataObjectService.getMetadataObjectFullName(
               securableObjectPO.getType(), securableObjectPO.getEntityId());
       if (fullName != null) {
         securableObjects.add(
