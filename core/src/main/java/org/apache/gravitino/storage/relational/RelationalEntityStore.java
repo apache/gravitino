@@ -20,11 +20,10 @@ package org.apache.gravitino.storage.relational;
 
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.List;
 import java.util.function.Function;
-
-import com.google.common.collect.ImmutableMap;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;

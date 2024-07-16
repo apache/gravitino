@@ -19,7 +19,6 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
-
 import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
 import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.ibatis.annotations.Delete;

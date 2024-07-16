@@ -18,12 +18,12 @@
  */
 package org.apache.gravitino.dto.responses;
 
-import org.apache.gravitino.dto.tag.TagDTO;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
+import org.apache.gravitino.dto.tag.TagDTO;
 
 /** Represents a response for a list of tags. */
 @Getter

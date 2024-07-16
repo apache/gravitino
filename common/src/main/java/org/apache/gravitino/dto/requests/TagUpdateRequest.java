@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.dto.requests;
 
-import org.apache.gravitino.rest.RESTRequest;
-import org.apache.gravitino.tag.TagChange;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
@@ -29,6 +27,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.rest.RESTRequest;
+import org.apache.gravitino.tag.TagChange;
 
 /** Represents a request to update a tag. */
 @JsonIgnoreProperties(ignoreUnknown = true)

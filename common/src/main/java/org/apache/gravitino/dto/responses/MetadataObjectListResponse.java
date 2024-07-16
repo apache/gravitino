@@ -18,15 +18,14 @@
  */
 package org.apache.gravitino.dto.responses;
 
-import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
-
-import java.util.Arrays;
+import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 
 /** Represents a response containing a list of metadata objects. */
 @Getter
@@ -65,7 +64,8 @@ public class MetadataObjectListResponse extends BaseResponse {
     Arrays.stream(metadataObjects)
         .forEach(
             object ->
-              Preconditions.checkArgument(object != null && StringUtils.isNoneBlank(object.name()),
-                  "metadataObject must not be null and empty"));
+                Preconditions.checkArgument(
+                    object != null && StringUtils.isNoneBlank(object.name()),
+                    "metadataObject must not be null and empty"));
   }
 }
