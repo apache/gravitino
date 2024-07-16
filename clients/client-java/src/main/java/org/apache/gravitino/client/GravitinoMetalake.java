@@ -240,6 +240,9 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs {
         new CatalogCreateRequest(catalogName, type, provider, comment, properties);
     req.validate();
 
+    // The response maybe a `BaseResponse` (test successfully)  or an `ErrorResponse` (test failed),
+    // we use the `ErrorResponse` here because it contains all fields of `BaseResponse` (code field
+    // only)
     ErrorResponse resp =
         restClient.post(
             String.format("api/metalakes/%s/catalogs/testConnection", this.name()),
