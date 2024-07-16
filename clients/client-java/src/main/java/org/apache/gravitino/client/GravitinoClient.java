@@ -117,6 +117,28 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
     return new ClientBuilder(uri);
   }
 
+  /**
+   * Test whether a catalog can be created successfully with the specified parameters, without
+   * actually creating it.
+   *
+   * @param catalogName the name of the catalog.
+   * @param type the type of the catalog.
+   * @param provider the provider of the catalog.
+   * @param comment the comment of the catalog.
+   * @param properties the properties of the catalog.
+   * @throws Exception if the test failed.
+   */
+  @Override
+  public void testConnection(
+      String catalogName,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties)
+      throws Exception {
+    getMetalake().testConnection(catalogName, type, provider, comment, properties);
+  }
+
   /** Builder class for constructing a GravitinoClient. */
   public static class ClientBuilder extends GravitinoClientBase.Builder<GravitinoClient> {
 

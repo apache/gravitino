@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
@@ -31,6 +32,7 @@ import org.apache.gravitino.TestFileset;
 import org.apache.gravitino.TestSchema;
 import org.apache.gravitino.TestTable;
 import org.apache.gravitino.TestTopic;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
@@ -70,6 +72,8 @@ public class TestCatalogOperations
   private final Map<NameIdentifier, TestTopic> topics;
 
   public static final String FAIL_CREATE = "fail-create";
+
+  public static final String FAIL_TEST = "need-fail";
 
   public TestCatalogOperations(Map<String, String> config) {
     tables = Maps.newHashMap();
@@ -518,6 +522,18 @@ public class TestCatalogOperations
       return true;
     } else {
       return false;
+    }
+  }
+
+  @Override
+  public void testConnection(
+      NameIdentifier name,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties) {
+    if ("true".equals(properties.get(FAIL_TEST))) {
+      throw new ConnectionFailedException("Connection failed");
     }
   }
 }

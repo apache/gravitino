@@ -61,6 +61,9 @@ paths:
   /metalakes/{metalake}/catalogs:
     $ref: "./catalogs.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs"
 
+  /metalakes/{metalake}/catalogs/testConnection:
+    $ref: "./catalogs.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1testConnection"
+
   /metalakes/{metalake}/catalogs/{catalog}:
     $ref: "./catalogs.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D"
 
