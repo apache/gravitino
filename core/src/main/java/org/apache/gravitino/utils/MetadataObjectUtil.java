@@ -19,9 +19,11 @@
 package org.apache.gravitino.utils;
 
 import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.ImmutableBiMap;
 import java.util.Optional;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -51,6 +53,8 @@ public class MetadataObjectUtil {
    * @throws IllegalArgumentException if the metadata object type is unknown
    */
   public static Entity.EntityType toEntityType(MetadataObject metadataObject) {
+    Preconditions.checkArgument(metadataObject != null, "metadataObject cannot be null");
+
     return Optional.ofNullable(TYPE_TO_TYPE_MAP.get(metadataObject.type()))
         .orElseThrow(
             () ->
@@ -67,6 +71,10 @@ public class MetadataObjectUtil {
    * @throws IllegalArgumentException if the metadata object type is unsupported or unknown.
    */
   public static NameIdentifier toEntityIdent(String metalakeName, MetadataObject metadataObject) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(metalakeName), "metalakeName cannot be blank");
+    Preconditions.checkArgument(metadataObject != null, "metadataObject cannot be null");
+
     switch (metadataObject.type()) {
       case METALAKE:
         return NameIdentifierUtil.ofMetalake(metalakeName);

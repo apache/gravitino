@@ -332,7 +332,7 @@ public class JDBCBackend implements RelationalBackend {
   @Override
   public List<MetadataObject> listAssociatedMetadataObjectsForTag(NameIdentifier tagIdent)
       throws IOException {
-    return TagMetaService.getInstance().listAssociatedMetadataObjectIdentsForTag(tagIdent);
+    return TagMetaService.getInstance().listAssociatedMetadataObjectsForTag(tagIdent);
   }
 
   @Override

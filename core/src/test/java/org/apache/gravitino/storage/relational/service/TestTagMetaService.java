@@ -588,7 +588,7 @@ public class TestTagMetaService extends TestJDBCBackend {
 
     // Test list associated metadata objects for tag2
     List<MetadataObject> metadataObjects =
-        tagMetaService.listAssociatedMetadataObjectIdentsForTag(
+        tagMetaService.listAssociatedMetadataObjectsForTag(
             TagManager.ofTagIdent(metalakeName, "tag2"));
 
     Assertions.assertEquals(3, metadataObjects.size());
@@ -603,7 +603,7 @@ public class TestTagMetaService extends TestJDBCBackend {
 
     // Test list associated metadata objects for tag3
     List<MetadataObject> metadataObjects1 =
-        tagMetaService.listAssociatedMetadataObjectIdentsForTag(
+        tagMetaService.listAssociatedMetadataObjectsForTag(
             TagManager.ofTagIdent(metalakeName, "tag3"));
 
     Assertions.assertEquals(3, metadataObjects1.size());
@@ -618,7 +618,7 @@ public class TestTagMetaService extends TestJDBCBackend {
 
     // Test list associated metadata objects for non-existent tag
     List<MetadataObject> metadataObjects2 =
-        tagMetaService.listAssociatedMetadataObjectIdentsForTag(
+        tagMetaService.listAssociatedMetadataObjectsForTag(
             TagManager.ofTagIdent(metalakeName, "tag4"));
     Assertions.assertEquals(0, metadataObjects2.size());
 
@@ -629,7 +629,7 @@ public class TestTagMetaService extends TestJDBCBackend {
         false);
 
     List<MetadataObject> metadataObjects3 =
-        tagMetaService.listAssociatedMetadataObjectIdentsForTag(
+        tagMetaService.listAssociatedMetadataObjectsForTag(
             TagManager.ofTagIdent(metalakeName, "tag2"));
 
     Assertions.assertEquals(2, metadataObjects3.size());
@@ -643,7 +643,7 @@ public class TestTagMetaService extends TestJDBCBackend {
         NameIdentifier.of(metalakeName, "catalog1", "schema1"), Entity.EntityType.SCHEMA, false);
 
     List<MetadataObject> metadataObjects4 =
-        tagMetaService.listAssociatedMetadataObjectIdentsForTag(
+        tagMetaService.listAssociatedMetadataObjectsForTag(
             TagManager.ofTagIdent(metalakeName, "tag2"));
 
     Assertions.assertEquals(1, metadataObjects4.size());
@@ -653,7 +653,7 @@ public class TestTagMetaService extends TestJDBCBackend {
     backend.delete(NameIdentifier.of(metalakeName, "catalog1"), Entity.EntityType.CATALOG, false);
 
     List<MetadataObject> metadataObjects5 =
-        tagMetaService.listAssociatedMetadataObjectIdentsForTag(
+        tagMetaService.listAssociatedMetadataObjectsForTag(
             TagManager.ofTagIdent(metalakeName, "tag2"));
 
     Assertions.assertEquals(0, metadataObjects5.size());
