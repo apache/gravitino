@@ -240,8 +240,9 @@ public class TestHadoopCatalogOperations {
     Assertions.assertEquals(comment, schema.comment());
 
     Throwable exception =
-            Assertions.assertThrows(
-                    SchemaAlreadyExistsException.class, () -> createSchema(name, comment, catalogPath, null));
+        Assertions.assertThrows(
+            SchemaAlreadyExistsException.class,
+            () -> createSchema(name, comment, catalogPath, null));
     Assertions.assertEquals("Schema m1.c1.schema28 already exists", exception.getMessage());
   }
 
