@@ -50,7 +50,7 @@ public class HivePropertiesConstants {
   public static final String SPARK_HIVE_INPUT_FORMAT = HiveConstants.INPUT_FORMAT;
   public static final String SPARK_HIVE_OUTPUT_FORMAT = HiveConstants.OUTPUT_FORMAT;
   public static final String SPARK_HIVE_SERDE_LIB = HiveConstants.SERDE_LIB;
-  public static final String SPARK_HIVE_EXTERNAL = HiveConstants.EXTERNAL;
+  public static final String SPARK_HIVE_EXTERNAL = TableCatalog.PROP_EXTERNAL;
   public static final String SPARK_HIVE_LOCATION = TableCatalog.PROP_LOCATION;
 
   @VisibleForTesting
