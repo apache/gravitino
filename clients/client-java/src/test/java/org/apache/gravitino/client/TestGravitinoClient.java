@@ -24,19 +24,23 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Version;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
 import org.apache.gravitino.dto.VersionDTO;
+import org.apache.gravitino.dto.requests.CatalogCreateRequest;
 import org.apache.gravitino.dto.requests.MetalakeCreateRequest;
 import org.apache.gravitino.dto.requests.MetalakeUpdatesRequest;
+import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.MetalakeListResponse;
 import org.apache.gravitino.dto.responses.MetalakeResponse;
 import org.apache.gravitino.dto.responses.VersionResponse;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
@@ -337,5 +341,66 @@ public class TestGravitinoClient extends TestBase {
           Assertions.assertEquals(currentVersion.compileDate, version.compileDate());
           Assertions.assertEquals(currentVersion.gitCommit, version.gitCommit());
         });
+  }
+
+  @Test
+  public void testTestConnection() throws Exception {
+    MetalakeDTO mockMetalake =
+        MetalakeDTO.builder()
+            .withName("mock")
+            .withComment("comment")
+            .withAudit(
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+            .build();
+    MetalakeCreateRequest metalakeReq =
+        new MetalakeCreateRequest("mock", "comment", Collections.emptyMap());
+    MetalakeResponse metalakeResp = new MetalakeResponse(mockMetalake);
+    buildMockResource(Method.POST, "/api/metalakes", metalakeReq, metalakeResp, HttpStatus.SC_OK);
+    NameIdentifier id = NameIdentifier.parse("mock");
+    GravitinoMetalake metaLake =
+        client.createMetalake(id.name(), "comment", Collections.emptyMap());
+
+    // test TestConnection success
+    CatalogCreateRequest req =
+        new CatalogCreateRequest(
+            "catalog", Catalog.Type.RELATIONAL, "hive", "comment", Collections.emptyMap());
+    BaseResponse resp = new BaseResponse();
+    buildMockResource(
+        Method.POST, "/api/metalakes/mock/catalogs/testConnection", req, resp, HttpStatus.SC_OK);
+    Assertions.assertDoesNotThrow(
+        () ->
+            metaLake.testConnection(
+                "catalog", Catalog.Type.RELATIONAL, "hive", "comment", Collections.emptyMap()));
+
+    // test TestConnection failed
+    resp = ErrorResponse.illegalArguments("mock error");
+    buildMockResource(
+        Method.POST,
+        "/api/metalakes/mock/catalogs/testConnection",
+        req,
+        resp,
+        HttpStatus.SC_BAD_REQUEST);
+    Exception exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                metaLake.testConnection(
+                    "catalog", Catalog.Type.RELATIONAL, "hive", "comment", Collections.emptyMap()));
+    Assertions.assertTrue(exception.getMessage().contains("mock error"));
+
+    resp = ErrorResponse.connectionFailed("connection failed");
+    buildMockResource(
+        Method.POST,
+        "/api/metalakes/mock/catalogs/testConnection",
+        req,
+        resp,
+        HttpStatus.SC_BAD_GATEWAY);
+    exception =
+        Assertions.assertThrows(
+            ConnectionFailedException.class,
+            () ->
+                metaLake.testConnection(
+                    "catalog", Catalog.Type.RELATIONAL, "hive", "comment", Collections.emptyMap()));
+    Assertions.assertTrue(exception.getMessage().contains("connection failed"));
   }
 }

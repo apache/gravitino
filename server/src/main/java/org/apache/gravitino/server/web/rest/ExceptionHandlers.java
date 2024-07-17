@@ -19,8 +19,12 @@
 package org.apache.gravitino.server.web.rest;
 
 import com.google.common.annotations.VisibleForTesting;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
@@ -108,6 +112,30 @@ public class ExceptionHandlers {
   public static Response handleTagException(
       OperationType op, String tag, String parent, Exception e) {
     return TagExceptionHandler.INSTANCE.handle(op, tag, parent, e);
+  }
+
+  public static Response handleTestConnectionException(Exception e) {
+    ErrorResponse response;
+    if (e instanceof IllegalArgumentException) {
+      response = ErrorResponse.illegalArguments(e.getMessage(), e);
+
+    } else if (e instanceof ConnectionFailedException) {
+      response = ErrorResponse.connectionFailed(e.getMessage(), e);
+
+    } else if (e instanceof NotFoundException) {
+      response = ErrorResponse.notFound(e.getClass().getSimpleName(), e.getMessage(), e);
+
+    } else if (e instanceof AlreadyExistsException) {
+      response = ErrorResponse.alreadyExists(e.getClass().getSimpleName(), e.getMessage(), e);
+
+    } else {
+      return Utils.internalError(e.getMessage(), e);
+    }
+
+    return Response.status(Response.Status.OK)
+        .entity(response)
+        .type(MediaType.APPLICATION_JSON)
+        .build();
   }
 
   private static class PartitionExceptionHandler extends BaseExceptionHandler {
@@ -237,6 +265,9 @@ public class ExceptionHandlers {
 
       if (e instanceof IllegalArgumentException) {
         return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof ConnectionFailedException) {
+        return Utils.connectionFailed(errorMsg, e);
 
       } else if (e instanceof NotFoundException) {
         return Utils.notFound(errorMsg, e);

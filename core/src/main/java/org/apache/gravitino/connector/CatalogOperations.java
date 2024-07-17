@@ -20,6 +20,8 @@ package org.apache.gravitino.connector;
 
 import java.io.Closeable;
 import java.util.Map;
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.rel.TableCatalog;
@@ -46,4 +48,22 @@ public interface CatalogOperations extends Closeable {
   void initialize(
       Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
       throws RuntimeException;
+
+  /**
+   * Test whether a catalog can be created with the specified parameters, without actually creating
+   * it.
+   *
+   * @param catalogIdent the name of the catalog.
+   * @param type the type of the catalog.
+   * @param provider the provider of the catalog.
+   * @param comment the comment of the catalog.
+   * @param properties the properties of the catalog.
+   */
+  void testConnection(
+      NameIdentifier catalogIdent,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties)
+      throws Exception;
 }
