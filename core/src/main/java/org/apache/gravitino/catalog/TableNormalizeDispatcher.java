@@ -20,8 +20,10 @@ package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
+import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
 
 import java.util.Map;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
@@ -37,10 +39,11 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 
 public class TableNormalizeDispatcher implements TableDispatcher {
+  private final CatalogManager catalogManager;
+  private final TableDispatcher dispatcher;
 
-  private final TableOperationDispatcher dispatcher;
-
-  public TableNormalizeDispatcher(TableOperationDispatcher dispatcher) {
+  public TableNormalizeDispatcher(TableDispatcher dispatcher, CatalogManager catalogManager) {
+    this.catalogManager = catalogManager;
     this.dispatcher = dispatcher;
   }
 
@@ -48,16 +51,16 @@ public class TableNormalizeDispatcher implements TableDispatcher {
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
-    Namespace caseSensitiveNs = applyCaseSensitive(namespace, Capability.Scope.TABLE, dispatcher);
+    Namespace caseSensitiveNs = normalizeCaseSensitive(namespace);
     NameIdentifier[] identifiers = dispatcher.listTables(caseSensitiveNs);
-    return applyCaseSensitive(identifiers, Capability.Scope.TABLE, dispatcher);
+    return normalizeCaseSensitive(identifiers);
   }
 
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
-    return dispatcher.loadTable(applyCaseSensitive(ident, Capability.Scope.TABLE, dispatcher));
+    return dispatcher.loadTable(normalizeCaseSensitive(ident));
   }
 
   @Override
@@ -71,7 +74,7 @@ public class TableNormalizeDispatcher implements TableDispatcher {
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    Capability capability = dispatcher.getCatalogCapability(ident);
+    Capability capability = getCapability(ident, catalogManager);
     return dispatcher.createTable(
         applyCapabilities(ident, Capability.Scope.TABLE, capability),
         applyCapabilities(columns, capability),
@@ -86,12 +89,11 @@ public class TableNormalizeDispatcher implements TableDispatcher {
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
-    Capability capability = dispatcher.getCatalogCapability(ident);
+    Capability capability = getCapability(ident, catalogManager);
     return dispatcher.alterTable(
         // The constraints of the name spec may be more strict than underlying catalog,
         // and for compatibility reasons, we only apply case-sensitive capabilities here.
-        applyCaseSensitive(ident, Capability.Scope.TABLE, dispatcher),
-        applyCapabilities(capability, changes));
+        normalizeCaseSensitive(ident), applyCapabilities(capability, changes));
   }
 
   @Override
@@ -108,11 +110,30 @@ public class TableNormalizeDispatcher implements TableDispatcher {
   public boolean tableExists(NameIdentifier ident) {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
-    return dispatcher.tableExists(applyCaseSensitive(ident, Capability.Scope.TABLE, dispatcher));
+    return dispatcher.tableExists(normalizeCaseSensitive(ident));
   }
 
-  private NameIdentifier normalizeNameIdentifier(NameIdentifier ident) {
-    Capability capability = dispatcher.getCatalogCapability(ident);
-    return applyCapabilities(ident, Capability.Scope.TABLE, capability);
+  private Namespace normalizeCaseSensitive(Namespace namespace) {
+    Capability capabilities = getCapability(NameIdentifier.of(namespace.levels()), catalogManager);
+    return applyCaseSensitive(namespace, Capability.Scope.TABLE, capabilities);
+  }
+
+  private NameIdentifier normalizeCaseSensitive(NameIdentifier tableIdent) {
+    Capability capability = getCapability(tableIdent, catalogManager);
+    return applyCaseSensitive(tableIdent, Capability.Scope.TABLE, capability);
+  }
+
+  private NameIdentifier[] normalizeCaseSensitive(NameIdentifier[] tableIdents) {
+    if (ArrayUtils.isEmpty(tableIdents)) {
+      return tableIdents;
+    }
+
+    Capability capabilities = getCapability(tableIdents[0], catalogManager);
+    return applyCaseSensitive(tableIdents, Capability.Scope.TABLE, capabilities);
+  }
+
+  private NameIdentifier normalizeNameIdentifier(NameIdentifier tableIdent) {
+    Capability capability = getCapability(tableIdent, catalogManager);
+    return applyCapabilities(tableIdent, Capability.Scope.TABLE, capability);
   }
 }
