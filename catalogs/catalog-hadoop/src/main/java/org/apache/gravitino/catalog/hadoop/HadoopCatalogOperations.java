@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.hadoop;
 
+import static org.apache.gravitino.catalog.hadoop.SecureHadoopCatalogOperations.GRAVITINO_API_USER_KEY;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -185,6 +186,12 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
 
+    String apiUser =
+        properties.containsKey(GRAVITINO_API_USER_KEY)
+            ? properties.get(GRAVITINO_API_USER_KEY)
+            : PrincipalUtils.getCurrentUserName();
+    properties.remove(GRAVITINO_API_USER_KEY);
+
     try {
       if (store.exists(ident, Entity.EntityType.FILESET)) {
         throw new FilesetAlreadyExistsException("Fileset %s already exists", ident);
@@ -261,10 +268,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
             .withStorageLocation(filesetPath.toString())
             .withProperties(properties)
             .withAuditInfo(
-                AuditInfo.builder()
-                    .withCreator(PrincipalUtils.getCurrentUserName())
-                    .withCreateTime(Instant.now())
-                    .build())
+                AuditInfo.builder().withCreator(apiUser).withCreateTime(Instant.now()).build())
             .build();
 
     try {
@@ -368,6 +372,13 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
+
+    String apiUser =
+        properties.containsKey(GRAVITINO_API_USER_KEY)
+            ? properties.get(GRAVITINO_API_USER_KEY)
+            : PrincipalUtils.getCurrentUserName();
+    properties.remove(GRAVITINO_API_USER_KEY);
+
     try {
       if (store.exists(ident, Entity.EntityType.SCHEMA)) {
         throw new SchemaAlreadyExistsException("Schema %s already exists", ident);
@@ -408,10 +419,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
             .withComment(comment)
             .withProperties(properties)
             .withAuditInfo(
-                AuditInfo.builder()
-                    .withCreator(PrincipalUtils.getCurrentUserName())
-                    .withCreateTime(Instant.now())
-                    .build())
+                AuditInfo.builder().withCreator(apiUser).withCreateTime(Instant.now()).build())
             .build();
     try {
       store.put(schemaEntity, true /* overwrite */);

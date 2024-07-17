@@ -31,6 +31,7 @@ import java.lang.reflect.UndeclaredThrowableException;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -87,6 +88,8 @@ public class SecureHadoopCatalogOperations
 
   private String kerberosRealm;
 
+  static final String GRAVITINO_API_USER_KEY = "gravitino_api_user_key";
+
   public SecureHadoopCatalogOperations() {
     this.hadoopCatalogOperations = new HadoopCatalogOperations();
   }
@@ -135,12 +138,26 @@ public class SecureHadoopCatalogOperations
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
     UserGroupInformation currentUser = getUGIByIdent(properties, ident);
+
+    // Set the api user in the properties.
+    // TODO: Use a more elegant way to pass api user to inner doAs block such as
+    //  ThreadLocal or other ways.
+    Map<String, String> propertiesWithApiUser = addApiUserToProperties(properties);
+
     return doAs(
         currentUser,
         () ->
             hadoopCatalogOperations.createFileset(
-                ident, comment, type, storageLocation, properties),
+                ident, comment, type, storageLocation, propertiesWithApiUser),
         ident);
+  }
+
+  private Map<String, String> addApiUserToProperties(Map<String, String> properties) {
+    String apiUser = PrincipalUtils.getCurrentUserName();
+    Map<String, String> map = new HashMap<>(properties);
+    map.put(GRAVITINO_API_USER_KEY, apiUser);
+
+    return map;
   }
 
   @Override
@@ -171,9 +188,12 @@ public class SecureHadoopCatalogOperations
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     // Reset the current user based on the name identifier and properties.
     UserGroupInformation currentUser = getUGIByIdent(properties, ident);
+    Map<String, String> propertiesWithApiUser = addApiUserToProperties(properties);
 
     return doAs(
-        currentUser, () -> hadoopCatalogOperations.createSchema(ident, comment, properties), ident);
+        currentUser,
+        () -> hadoopCatalogOperations.createSchema(ident, comment, propertiesWithApiUser),
+        ident);
   }
 
   @Override
@@ -261,7 +281,7 @@ public class SecureHadoopCatalogOperations
         c -> {
           try {
             c.close();
-          } catch (IOException e) {
+          } catch (Exception e) {
             LOG.error("Failed to close resource", e);
           }
         });
@@ -285,11 +305,15 @@ public class SecureHadoopCatalogOperations
       initKerberos(
           conf, hadoopConf, NameIdentifier.of(catalogInfo.namespace(), catalogInfo.name()), true);
     } else if (config.isSimpleAuth()) {
-      UserGroupInformation u =
-          UserGroupInformation.createRemoteUser(PrincipalUtils.getCurrentUserName());
-      userInfoMap.put(
-          NameIdentifier.of(catalogInfo.namespace(), catalogInfo.name()),
-          UserInfo.of(u, config.isImpersonationEnabled(), null, null));
+      try {
+        // Use service login user.
+        UserGroupInformation u = UserGroupInformation.getCurrentUser();
+        userInfoMap.put(
+            NameIdentifier.of(catalogInfo.namespace(), catalogInfo.name()),
+            UserInfo.of(u, config.isImpersonationEnabled(), null, null));
+      } catch (Exception e) {
+        throw new RuntimeException("Can't get service user for Hadoop catalog", e);
+      }
     }
   }
 
