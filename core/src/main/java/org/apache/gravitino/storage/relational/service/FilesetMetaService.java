@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
@@ -71,7 +72,7 @@ public class FilesetMetaService {
     return filesetPO;
   }
 
-  // Filset may be deleted, so the FilesetPO may be null.
+  // Fileset may be deleted, so the FilesetPO may be null.
   public FilesetPO getFilesetPOById(Long filesetId) {
     FilesetPO filesetPO =
         SessionUtils.getWithoutCommit(
@@ -79,7 +80,20 @@ public class FilesetMetaService {
     return filesetPO;
   }
 
-  public Long getFilesetIdBySchemaIdAndName(Long schemaId, String filesetName) {
+  public Long getFilesetIdByNameIdentifier(NameIdentifier identifier) {
+    NameIdentifierUtil.checkFileset(identifier);
+
+    return NameIdMappingService.getInstance()
+        .get(
+            identifier,
+            ident -> {
+              Long schemaId =
+                  CommonMetaService.getInstance().getParentEntityIdByNamespace(ident.namespace());
+              return getFilesetIdBySchemaIdAndName(schemaId, ident.name());
+            });
+  }
+
+  private Long getFilesetIdBySchemaIdAndName(Long schemaId, String filesetName) {
     Long filesetId =
         SessionUtils.getWithoutCommit(
             FilesetMetaMapper.class,
@@ -221,12 +235,7 @@ public class FilesetMetaService {
   public boolean deleteFileset(NameIdentifier identifier) {
     NameIdentifierUtil.checkFileset(identifier);
 
-    String filesetName = identifier.name();
-
-    Long schemaId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
-
-    Long filesetId = getFilesetIdBySchemaIdAndName(schemaId, filesetName);
+    Long filesetId = getFilesetIdByNameIdentifier(identifier);
 
     // We should delete meta and version info
     SessionUtils.doMultipleWithCommit(
@@ -292,24 +301,24 @@ public class FilesetMetaService {
 
   private void fillFilesetPOBuilderParentEntityId(FilesetPO.Builder builder, Namespace namespace) {
     NamespaceUtil.checkFileset(namespace);
-    Long parentEntityId = null;
+    Long entityId;
+
     for (int level = 0; level < namespace.levels().length; level++) {
-      String name = namespace.level(level);
+      String[] levels = ArrayUtils.subarray(namespace.levels(), 0, level + 1);
+      NameIdentifier nameIdentifier = NameIdentifier.of(levels);
       switch (level) {
         case 0:
-          parentEntityId = MetalakeMetaService.getInstance().getMetalakeIdByName(name);
-          builder.withMetalakeId(parentEntityId);
+          entityId =
+              MetalakeMetaService.getInstance().getMetalakeIdByNameIdentifier(nameIdentifier);
+          builder.withMetalakeId(entityId);
           continue;
         case 1:
-          parentEntityId =
-              CatalogMetaService.getInstance()
-                  .getCatalogIdByMetalakeIdAndName(parentEntityId, name);
-          builder.withCatalogId(parentEntityId);
+          entityId = CatalogMetaService.getInstance().getCatalogIdByNameIdentifier(nameIdentifier);
+          builder.withCatalogId(entityId);
           continue;
         case 2:
-          parentEntityId =
-              SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(parentEntityId, name);
-          builder.withSchemaId(parentEntityId);
+          entityId = SchemaMetaService.getInstance().getSchemaIdByNameIdentifier(nameIdentifier);
+          builder.withSchemaId(entityId);
           break;
       }
     }

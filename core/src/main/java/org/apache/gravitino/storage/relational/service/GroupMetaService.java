@@ -82,6 +82,18 @@ public class GroupMetaService {
     return groupId;
   }
 
+  private Long getGroupIdByNameIdentifier(NameIdentifier identifier) {
+    return NameIdMappingService.getInstance()
+        .get(
+            identifier,
+            ident -> {
+              Long metalakeId =
+                  MetalakeMetaService.getInstance()
+                      .getMetalakeIdByName(identifier.namespace().level(0));
+              return getGroupIdByMetalakeIdAndName(metalakeId, identifier.name());
+            });
+  }
+
   public GroupEntity getGroupByIdentifier(NameIdentifier identifier) {
     AuthorizationUtils.checkGroup(identifier);
 
@@ -139,9 +151,7 @@ public class GroupMetaService {
   public boolean deleteGroup(NameIdentifier identifier) {
     AuthorizationUtils.checkGroup(identifier);
 
-    Long metalakeId =
-        MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
-    Long groupId = getGroupIdByMetalakeIdAndName(metalakeId, identifier.name());
+    Long groupId = getGroupIdByNameIdentifier(identifier);
 
     SessionUtils.doMultipleWithCommit(
         () ->

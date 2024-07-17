@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
@@ -70,7 +71,7 @@ public class TableMetaService {
     return tablePO;
   }
 
-  public Long getTableIdBySchemaIdAndName(Long schemaId, String tableName) {
+  private Long getTableIdBySchemaIdAndName(Long schemaId, String tableName) {
     Long tableId =
         SessionUtils.getWithoutCommit(
             TableMetaMapper.class,
@@ -83,6 +84,21 @@ public class TableMetaService {
           tableName);
     }
     return tableId;
+  }
+
+  public Long getTableByNameIdentifier(NameIdentifier identifier) {
+    NameIdentifierUtil.checkTable(identifier);
+
+    return NameIdMappingService.getInstance()
+        .get(
+            identifier,
+            ident -> {
+              Long schemaId =
+                  CommonMetaService.getInstance()
+                      .getParentEntityIdByNamespace(identifier.namespace());
+
+              return getTableIdBySchemaIdAndName(schemaId, identifier.name());
+            });
   }
 
   public TableEntity getTableByIdentifier(NameIdentifier identifier) {
@@ -174,13 +190,7 @@ public class TableMetaService {
   public boolean deleteTable(NameIdentifier identifier) {
     NameIdentifierUtil.checkTable(identifier);
 
-    String tableName = identifier.name();
-
-    Long schemaId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
-
-    Long tableId = getTableIdBySchemaIdAndName(schemaId, tableName);
-
+    Long tableId = getTableByNameIdentifier(identifier);
     SessionUtils.doWithCommit(
         TableMetaMapper.class, mapper -> mapper.softDeleteTableMetasByTableId(tableId));
 
@@ -197,24 +207,24 @@ public class TableMetaService {
 
   private void fillTablePOBuilderParentEntityId(TablePO.Builder builder, Namespace namespace) {
     NamespaceUtil.checkTable(namespace);
-    Long parentEntityId = null;
+    Long entityId;
+
     for (int level = 0; level < namespace.levels().length; level++) {
-      String name = namespace.level(level);
+      String[] levels = ArrayUtils.subarray(namespace.levels(), 0, level + 1);
+      NameIdentifier nameIdentifier = NameIdentifier.of(levels);
       switch (level) {
         case 0:
-          parentEntityId = MetalakeMetaService.getInstance().getMetalakeIdByName(name);
-          builder.withMetalakeId(parentEntityId);
-          continue;
+          entityId =
+              MetalakeMetaService.getInstance().getMetalakeIdByNameIdentifier(nameIdentifier);
+          builder.withMetalakeId(entityId);
+          break;
         case 1:
-          parentEntityId =
-              CatalogMetaService.getInstance()
-                  .getCatalogIdByMetalakeIdAndName(parentEntityId, name);
-          builder.withCatalogId(parentEntityId);
-          continue;
+          entityId = CatalogMetaService.getInstance().getCatalogIdByNameIdentifier(nameIdentifier);
+          builder.withCatalogId(entityId);
+          break;
         case 2:
-          parentEntityId =
-              SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(parentEntityId, name);
-          builder.withSchemaId(parentEntityId);
+          entityId = SchemaMetaService.getInstance().getSchemaIdByNameIdentifier(nameIdentifier);
+          builder.withSchemaId(entityId);
           break;
       }
     }

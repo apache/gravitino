@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
@@ -150,24 +151,24 @@ public class TopicMetaService {
 
   private void fillTopicPOBuilderParentEntityId(TopicPO.Builder builder, Namespace namespace) {
     NamespaceUtil.checkTopic(namespace);
-    Long parentEntityId = null;
+    Long entityId;
+
     for (int level = 0; level < namespace.levels().length; level++) {
-      String name = namespace.level(level);
+      String[] levels = ArrayUtils.subarray(namespace.levels(), 0, level + 1);
+      NameIdentifier nameIdentifier = NameIdentifier.of(levels);
       switch (level) {
         case 0:
-          parentEntityId = MetalakeMetaService.getInstance().getMetalakeIdByName(name);
-          builder.withMetalakeId(parentEntityId);
-          continue;
+          entityId =
+              MetalakeMetaService.getInstance().getMetalakeIdByNameIdentifier(nameIdentifier);
+          builder.withMetalakeId(entityId);
+          break;
         case 1:
-          parentEntityId =
-              CatalogMetaService.getInstance()
-                  .getCatalogIdByMetalakeIdAndName(parentEntityId, name);
-          builder.withCatalogId(parentEntityId);
-          continue;
+          entityId = CatalogMetaService.getInstance().getCatalogIdByNameIdentifier(nameIdentifier);
+          builder.withCatalogId(entityId);
+          break;
         case 2:
-          parentEntityId =
-              SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(parentEntityId, name);
-          builder.withSchemaId(parentEntityId);
+          entityId = SchemaMetaService.getInstance().getSchemaIdByNameIdentifier(nameIdentifier);
+          builder.withSchemaId(entityId);
           break;
       }
     }
@@ -187,12 +188,7 @@ public class TopicMetaService {
   public boolean deleteTopic(NameIdentifier identifier) {
     NameIdentifierUtil.checkTopic(identifier);
 
-    String topicName = identifier.name();
-
-    Long schemaId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
-
-    Long topicId = getTopicIdBySchemaIdAndName(schemaId, topicName);
+    Long topicId = getTopicIdByNameIdentifier(identifier);
 
     SessionUtils.doWithCommit(
         TopicMetaMapper.class, mapper -> mapper.softDeleteTopicMetasByTopicId(topicId));
@@ -208,7 +204,20 @@ public class TopicMetaService {
         });
   }
 
-  public Long getTopicIdBySchemaIdAndName(Long schemaId, String topicName) {
+  public Long getTopicIdByNameIdentifier(NameIdentifier identifier) {
+    NameIdentifierUtil.checkTopic(identifier);
+
+    return NameIdMappingService.getInstance()
+        .get(
+            identifier,
+            ident -> {
+              Long schemaId =
+                  CommonMetaService.getInstance().getParentEntityIdByNamespace(ident.namespace());
+              return getTopicIdBySchemaIdAndName(schemaId, ident.name());
+            });
+  }
+
+  private Long getTopicIdBySchemaIdAndName(Long schemaId, String topicName) {
     Long topicId =
         SessionUtils.getWithoutCommit(
             TopicMetaMapper.class,
