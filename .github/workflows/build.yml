@@ -107,6 +107,11 @@ jobs:
             build/reports
             catalogs/**/*.log
             catalogs/**/*.tar
+      - name: Generate coverage report
+        run: |
+          pip install pytest
+          pip install pytest-cov
+          pytest --cov=./ --cov-report=xml      
 
       - name: Use Codecov to test
         uses: codecov/codecov-action@v4
