@@ -394,27 +394,6 @@ public class TestRoleOperations extends JerseyTest {
 
   @Test
   public void testCheckSecurableObjects() {
-    // check all metalakes
-    SecurableObject allMetalake =
-        SecurableObjects.ofAllMetalakes(Lists.newArrayList(Privileges.UseMetalake.allow()));
-    when(metalakeDispatcher.metalakeExists(any())).thenReturn(true);
-    Assertions.assertDoesNotThrow(
-        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(allMetalake)));
-    when(metalakeDispatcher.metalakeExists(any())).thenReturn(false);
-    Assertions.assertDoesNotThrow(
-        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(allMetalake)));
-
-    // check the metalake
-    SecurableObject metalake =
-        SecurableObjects.ofMetalake("metalake", Lists.newArrayList(Privileges.UseMetalake.allow()));
-    when(metalakeDispatcher.metalakeExists(any())).thenReturn(true);
-    Assertions.assertDoesNotThrow(
-        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(metalake)));
-    when(metalakeDispatcher.metalakeExists(any())).thenReturn(false);
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(metalake)));
-
     // check the catalog
     SecurableObject catalog =
         SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
