@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog;
 
+import static org.apache.gravitino.StringIdentifier.DUMMY_ID;
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForAlter;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
@@ -67,11 +68,13 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -147,6 +150,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             }
             return fn.apply(asTopics());
           });
+    }
+
+    public <R> R doWithCatalogOps(ThrowableFunction<CatalogOperations, R> fn) throws Exception {
+      return classLoader.withClassLoader(cl -> fn.apply(catalog.ops()));
     }
 
     public <R> R doWithPartitionOps(
@@ -333,10 +340,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
-    // load catalog-related configuration from catalog-specific configuration file
-    Map<String, String> newProperties = Optional.ofNullable(properties).orElse(Maps.newHashMap());
-    Map<String, String> catalogSpecificConfig = loadCatalogSpecificConfig(newProperties, provider);
-    Map<String, String> mergedConfig = mergeConf(newProperties, catalogSpecificConfig);
+    Map<String, String> mergedConfig = buildCatalogConf(provider, properties);
 
     long uid = idGenerator.nextId();
     StringIdentifier stringId = StringIdentifier.fromId(uid);
@@ -395,24 +399,69 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     }
   }
 
-  private Pair<Map<String, String>, Map<String, String>> getCatalogAlterProperty(
-      CatalogChange... catalogChanges) {
-    Map<String, String> upserts = Maps.newHashMap();
-    Map<String, String> deletes = Maps.newHashMap();
+  /**
+   * Test whether a catalog can be created with the specified parameters, without actually creating
+   * it.
+   *
+   * @param ident The identifier of the catalog to be tested.
+   * @param type the type of the catalog.
+   * @param provider the provider of the catalog.
+   * @param comment the comment of the catalog.
+   * @param properties the properties of the catalog.
+   */
+  @Override
+  public void testConnection(
+      NameIdentifier ident,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties) {
+    NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
+    try {
+      if (!store.exists(metalakeIdent, EntityType.METALAKE)) {
+        throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalakeIdent);
+      }
 
-    Arrays.stream(catalogChanges)
-        .forEach(
-            catalogChange -> {
-              if (catalogChange instanceof SetProperty) {
-                SetProperty setProperty = (SetProperty) catalogChange;
-                upserts.put(setProperty.getProperty(), setProperty.getValue());
-              } else if (catalogChange instanceof RemoveProperty) {
-                RemoveProperty removeProperty = (RemoveProperty) catalogChange;
-                deletes.put(removeProperty.getProperty(), removeProperty.getProperty());
-              }
-            });
+      if (store.exists(ident, EntityType.CATALOG)) {
+        throw new CatalogAlreadyExistsException("Catalog %s already exists", ident);
+      }
 
-    return Pair.of(upserts, deletes);
+      Map<String, String> mergedConfig = buildCatalogConf(provider, properties);
+      Instant now = Instant.now();
+      String creator = PrincipalUtils.getCurrentPrincipal().getName();
+      CatalogEntity dummyEntity =
+          CatalogEntity.builder()
+              .withId(DUMMY_ID.id())
+              .withName(ident.name())
+              .withNamespace(ident.namespace())
+              .withType(type)
+              .withProvider(provider)
+              .withComment(comment)
+              .withProperties(StringIdentifier.newPropertiesWithId(DUMMY_ID, mergedConfig))
+              .withAuditInfo(
+                  AuditInfo.builder()
+                      .withCreator(creator)
+                      .withCreateTime(now)
+                      .withLastModifier(creator)
+                      .withLastModifiedTime(now)
+                      .build())
+              .build();
+
+      CatalogWrapper wrapper = createCatalogWrapper(dummyEntity);
+      wrapper.doWithCatalogOps(
+          c -> {
+            c.testConnection(ident, type, provider, comment, mergedConfig);
+            return null;
+          });
+    } catch (GravitinoRuntimeException e) {
+      throw e;
+    } catch (Exception e) {
+      LOG.warn("Failed to test catalog creation {}", ident, e);
+      if (e instanceof RuntimeException) {
+        throw (RuntimeException) e;
+      }
+      throw new RuntimeException(e);
+    }
   }
 
   /**
@@ -548,6 +597,33 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    */
   public CatalogWrapper loadCatalogAndWrap(NameIdentifier ident) throws NoSuchCatalogException {
     return catalogCache.get(ident, this::loadCatalogInternal);
+  }
+
+  private Map<String, String> buildCatalogConf(String provider, Map<String, String> properties) {
+    Map<String, String> newProperties = Optional.ofNullable(properties).orElse(Maps.newHashMap());
+    // load catalog-related configuration from catalog-specific configuration file
+    Map<String, String> catalogSpecificConfig = loadCatalogSpecificConfig(newProperties, provider);
+    return mergeConf(newProperties, catalogSpecificConfig);
+  }
+
+  private Pair<Map<String, String>, Map<String, String>> getCatalogAlterProperty(
+      CatalogChange... catalogChanges) {
+    Map<String, String> upserts = Maps.newHashMap();
+    Map<String, String> deletes = Maps.newHashMap();
+
+    Arrays.stream(catalogChanges)
+        .forEach(
+            catalogChange -> {
+              if (catalogChange instanceof SetProperty) {
+                SetProperty setProperty = (SetProperty) catalogChange;
+                upserts.put(setProperty.getProperty(), setProperty.getValue());
+              } else if (catalogChange instanceof RemoveProperty) {
+                RemoveProperty removeProperty = (RemoveProperty) catalogChange;
+                deletes.put(removeProperty.getProperty(), removeProperty.getProperty());
+              }
+            });
+
+    return Pair.of(upserts, deletes);
   }
 
   private void checkMetalakeExists(NameIdentifier ident) throws NoSuchMetalakeException {

@@ -234,6 +234,12 @@ public class TestCatalogManager {
     props.put("key1", "value1");
     props.put("key2", "value2");
 
+    // test before creation
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalogManager.testConnection(
+                ident, Catalog.Type.RELATIONAL, provider, "comment", props));
+
     Catalog testCatalog =
         catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
     Assertions.assertEquals("test1", testCatalog.name());
@@ -243,8 +249,15 @@ public class TestCatalogManager {
 
     Assertions.assertNotNull(catalogManager.catalogCache.getIfPresent(ident));
 
-    // Test create under non-existed metalake
+    // test before creation
     NameIdentifier ident2 = NameIdentifier.of("metalake1", "test1");
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class,
+        () ->
+            catalogManager.testConnection(
+                ident2, Catalog.Type.RELATIONAL, provider, "comment", props));
+
+    // Test create under non-existed metalake
     Throwable exception1 =
         Assertions.assertThrows(
             NoSuchMetalakeException.class,
@@ -253,6 +266,13 @@ public class TestCatalogManager {
                     ident2, Catalog.Type.RELATIONAL, provider, "comment", props));
     Assertions.assertTrue(exception1.getMessage().contains("Metalake metalake1 does not exist"));
     Assertions.assertNull(catalogManager.catalogCache.getIfPresent(ident2));
+
+    // test before creation
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class,
+        () ->
+            catalogManager.testConnection(
+                ident2, Catalog.Type.RELATIONAL, provider, "comment", props));
 
     // Test create with duplicated name
     Throwable exception2 =

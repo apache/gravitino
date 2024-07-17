@@ -28,8 +28,8 @@ public abstract class JdbcExceptionConverter {
    * Convert JDBC exception to GravitinoException.
    *
    * @param sqlException The sql exception to map
-   * @return A best attempt at a corresponding connector exception or generic with the SQLException
-   *     as the cause
+   * @return The best attempt at a corresponding connector exception or generic with the
+   *     SQLException as the cause
    */
   @SuppressWarnings("FormatStringAnnotation")
   public GravitinoRuntimeException toGravitinoException(final SQLException sqlException) {

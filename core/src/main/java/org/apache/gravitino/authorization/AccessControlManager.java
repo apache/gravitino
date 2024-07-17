@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -31,30 +32,23 @@ import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.storage.IdGenerator;
-import org.apache.gravitino.utils.Executable;
 
 /**
- * AccessControlManager is used for manage users, roles, admin, grant information, this class is an
- * entrance class for tenant management. This lock policy about this is as follows: First, admin
- * operations are prevented by one lock. Then, other operations are prevented by the other lock. For
- * non-admin operations, Apache Gravitino doesn't choose metalake level lock. There are some reasons
- * mainly: First, the metalake can be renamed by users. It's hard to maintain a map with metalake as
- * the key. Second, the lock will be couped with life cycle of the metalake.
+ * AccessControlManager is used for manage users, roles, grant information, this class is an
+ * entrance class for tenant management. The operations will be protected by one lock.
  */
 public class AccessControlManager {
 
   private final UserGroupManager userGroupManager;
-  private final AdminManager adminManager;
   private final RoleManager roleManager;
   private final PermissionManager permissionManager;
-  private final Object adminOperationLock = new Object();
-  private final Object nonAdminOperationLock = new Object();
+  private final List<String> serviceAdmins;
 
   public AccessControlManager(EntityStore store, IdGenerator idGenerator, Config config) {
-    this.adminManager = new AdminManager(store, idGenerator, config);
     this.roleManager = new RoleManager(store, idGenerator, config);
     this.userGroupManager = new UserGroupManager(store, idGenerator);
     this.permissionManager = new PermissionManager(store, roleManager);
+    this.serviceAdmins = config.get(Configs.SERVICE_ADMINS);
   }
 
   /**
@@ -69,7 +63,7 @@ public class AccessControlManager {
    */
   public User addUser(String metalake, String user)
       throws UserAlreadyExistsException, NoSuchMetalakeException {
-    return doWithNonAdminLock(() -> userGroupManager.addUser(metalake, user));
+    return userGroupManager.addUser(metalake, user);
   }
 
   /**
@@ -83,7 +77,7 @@ public class AccessControlManager {
    * @throws RuntimeException If removing the User encounters storage issues.
    */
   public boolean removeUser(String metalake, String user) throws NoSuchMetalakeException {
-    return doWithNonAdminLock(() -> userGroupManager.removeUser(metalake, user));
+    return userGroupManager.removeUser(metalake, user);
   }
 
   /**
@@ -98,7 +92,7 @@ public class AccessControlManager {
    */
   public User getUser(String metalake, String user)
       throws NoSuchUserException, NoSuchMetalakeException {
-    return doWithNonAdminLock(() -> userGroupManager.getUser(metalake, user));
+    return userGroupManager.getUser(metalake, user);
   }
 
   /**
@@ -113,7 +107,7 @@ public class AccessControlManager {
    */
   public Group addGroup(String metalake, String group)
       throws GroupAlreadyExistsException, NoSuchMetalakeException {
-    return doWithNonAdminLock(() -> userGroupManager.addGroup(metalake, group));
+    return userGroupManager.addGroup(metalake, group);
   }
 
   /**
@@ -127,7 +121,7 @@ public class AccessControlManager {
    * @throws RuntimeException If removing the Group encounters storage issues.
    */
   public boolean removeGroup(String metalake, String group) throws NoSuchMetalakeException {
-    return doWithNonAdminLock(() -> userGroupManager.removeGroup(metalake, group));
+    return userGroupManager.removeGroup(metalake, group);
   }
 
   /**
@@ -142,7 +136,7 @@ public class AccessControlManager {
    */
   public Group getGroup(String metalake, String group)
       throws NoSuchGroupException, NoSuchMetalakeException {
-    return doWithNonAdminLock(() -> userGroupManager.getGroup(metalake, group));
+    return userGroupManager.getGroup(metalake, group);
   }
 
   /**
@@ -159,7 +153,7 @@ public class AccessControlManager {
    */
   public User grantRolesToUser(String metalake, List<String> roles, String user)
       throws NoSuchUserException, NoSuchRoleException, NoSuchMetalakeException {
-    return doWithNonAdminLock(() -> permissionManager.grantRolesToUser(metalake, roles, user));
+    return permissionManager.grantRolesToUser(metalake, roles, user);
   }
 
   /**
@@ -176,7 +170,7 @@ public class AccessControlManager {
    */
   public Group grantRolesToGroup(String metalake, List<String> roles, String group)
       throws NoSuchGroupException, NoSuchRoleException, NoSuchMetalakeException {
-    return doWithNonAdminLock(() -> permissionManager.grantRolesToGroup(metalake, roles, group));
+    return permissionManager.grantRolesToGroup(metalake, roles, group);
   }
 
   /**
@@ -193,7 +187,7 @@ public class AccessControlManager {
    */
   public Group revokeRolesFromGroup(String metalake, List<String> roles, String group)
       throws NoSuchGroupException, NoSuchRoleException, NoSuchMetalakeException {
-    return doWithNonAdminLock(() -> permissionManager.revokeRolesFromGroup(metalake, roles, group));
+    return permissionManager.revokeRolesFromGroup(metalake, roles, group);
   }
 
   /**
@@ -210,31 +204,7 @@ public class AccessControlManager {
    */
   public User revokeRolesFromUser(String metalake, List<String> roles, String user)
       throws NoSuchUserException, NoSuchRoleException, NoSuchMetalakeException {
-    return doWithNonAdminLock(() -> permissionManager.revokeRolesFromUser(metalake, roles, user));
-  }
-
-  /**
-   * Adds a new metalake admin.
-   *
-   * @param user The name of the User.
-   * @return The added User instance.
-   * @throws UserAlreadyExistsException If a metalake admin with the same name already exists.
-   * @throws RuntimeException If adding the User encounters storage issues.
-   */
-  public User addMetalakeAdmin(String user) throws UserAlreadyExistsException {
-    return doWithAdminLock(() -> adminManager.addMetalakeAdmin(user));
-  }
-
-  /**
-   * Removes a metalake admin.
-   *
-   * @param user The name of the User.
-   * @return True if the User was successfully removed, false only when there's no such metalake
-   *     admin, otherwise it will throw an exception.
-   * @throws RuntimeException If removing the User encounters storage issues.
-   */
-  public boolean removeMetalakeAdmin(String user) {
-    return doWithAdminLock(() -> adminManager.removeMetalakeAdmin(user));
+    return permissionManager.revokeRolesFromUser(metalake, roles, user);
   }
 
   /**
@@ -244,17 +214,7 @@ public class AccessControlManager {
    * @return True if the user is service admin, otherwise false.
    */
   public boolean isServiceAdmin(String user) {
-    return adminManager.isServiceAdmin(user);
-  }
-
-  /**
-   * Judges whether the user is the metalake admin.
-   *
-   * @param user the name of the user
-   * @return True if the user is metalake admin, otherwise false.
-   */
-  public boolean isMetalakeAdmin(String user) {
-    return doWithAdminLock(() -> adminManager.isMetalakeAdmin(user));
+    return serviceAdmins.contains(user);
   }
 
   /**
@@ -275,8 +235,7 @@ public class AccessControlManager {
       Map<String, String> properties,
       List<SecurableObject> securableObjects)
       throws RoleAlreadyExistsException, NoSuchMetalakeException {
-    return doWithNonAdminLock(
-        () -> roleManager.createRole(metalake, role, properties, securableObjects));
+    return roleManager.createRole(metalake, role, properties, securableObjects);
   }
 
   /**
@@ -291,7 +250,7 @@ public class AccessControlManager {
    */
   public Role getRole(String metalake, String role)
       throws NoSuchRoleException, NoSuchMetalakeException {
-    return doWithNonAdminLock(() -> roleManager.getRole(metalake, role));
+    return roleManager.getRole(metalake, role);
   }
 
   /**
@@ -305,23 +264,11 @@ public class AccessControlManager {
    * @throws RuntimeException If deleting the Role encounters storage issues.
    */
   public boolean deleteRole(String metalake, String role) throws NoSuchMetalakeException {
-    return doWithNonAdminLock(() -> roleManager.deleteRole(metalake, role));
+    return roleManager.deleteRole(metalake, role);
   }
 
   @VisibleForTesting
   RoleManager getRoleManager() {
     return roleManager;
-  }
-
-  private <R, E extends Exception> R doWithNonAdminLock(Executable<R, E> executable) throws E {
-    synchronized (nonAdminOperationLock) {
-      return executable.execute();
-    }
-  }
-
-  private <R, E extends Exception> R doWithAdminLock(Executable<R, E> executable) throws E {
-    synchronized (adminOperationLock) {
-      return executable.execute();
-    }
   }
 }

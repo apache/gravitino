@@ -422,6 +422,48 @@ public class GravitinoVirtualFileSystemIT extends AbstractIT {
     }
   }
 
+  @Test
+  public void testGetDefaultReplications() throws IOException {
+    String filesetName = "test_get_default_replications";
+    NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
+    Catalog catalog = metalake.loadCatalog(catalogName);
+    String storageLocation = genStorageLocation(filesetName);
+    catalog
+        .asFilesetCatalog()
+        .createFileset(
+            filesetIdent,
+            "fileset comment",
+            Fileset.Type.MANAGED,
+            storageLocation,
+            new HashMap<>());
+    Assertions.assertTrue(catalog.asFilesetCatalog().filesetExists(filesetIdent));
+    Path gvfsPath = genGvfsPath(filesetName);
+    try (FileSystem gvfs = gvfsPath.getFileSystem(conf)) {
+      assertEquals(3, gvfs.getDefaultReplication(gvfsPath));
+    }
+  }
+
+  @Test
+  public void testGetDefaultBlockSizes() throws IOException {
+    String filesetName = "test_get_default_block_sizes";
+    NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
+    Catalog catalog = metalake.loadCatalog(catalogName);
+    String storageLocation = genStorageLocation(filesetName);
+    catalog
+        .asFilesetCatalog()
+        .createFileset(
+            filesetIdent,
+            "fileset comment",
+            Fileset.Type.MANAGED,
+            storageLocation,
+            new HashMap<>());
+    Assertions.assertTrue(catalog.asFilesetCatalog().filesetExists(filesetIdent));
+    Path gvfsPath = genGvfsPath(filesetName);
+    try (FileSystem gvfs = gvfsPath.getFileSystem(conf)) {
+      assertEquals(128 * 1024 * 1024, gvfs.getDefaultBlockSize(gvfsPath));
+    }
+  }
+
   private String genStorageLocation(String fileset) {
     return String.format("%s/%s", baseHdfsPath(), fileset);
   }

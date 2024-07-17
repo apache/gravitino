@@ -93,6 +93,16 @@ public class TestUtils {
   }
 
   @Test
+  public void testConnectionFailed() {
+    Response response = Utils.connectionFailed("Connection failed");
+    assertNotNull(response);
+    assertEquals(Response.Status.BAD_GATEWAY.getStatusCode(), response.getStatus());
+    assertEquals(MediaType.APPLICATION_JSON, response.getMediaType().toString());
+    ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
+    assertEquals("Connection failed", errorResponse.getMessage());
+  }
+
+  @Test
   public void testInternalError() {
     Response response = Utils.internalError("Internal error");
     assertNotNull(response);
