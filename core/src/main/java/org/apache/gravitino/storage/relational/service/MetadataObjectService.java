@@ -20,8 +20,9 @@ package org.apache.gravitino.storage.relational.service;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
+import com.google.common.collect.Lists;
+import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -56,20 +57,21 @@ public class MetadataObjectService {
       return MetalakeMetaService.getInstance().getMetalakeIdByName(fullName);
     }
 
-    String[] levelsWithoutMetalake = DOT_SPLITTER.splitToList(fullName).toArray(new String[0]);
-    String[] fullLevels = ArrayUtils.addFirst(levelsWithoutMetalake, metalakeName);
-    NameIdentifier identifier = NameIdentifier.of(fullLevels);
+    List<String> names = DOT_SPLITTER.splitToList(fullName);
+    List<String> realNames = Lists.newArrayList(metalakeName);
+    realNames.addAll(names);
+    NameIdentifier nameIdentifier = NameIdentifier.of(realNames.toArray(new String[0]));
 
     if (type == MetadataObject.Type.CATALOG) {
-      return CatalogMetaService.getInstance().getCatalogIdByNameIdentifier(identifier);
+      return CatalogMetaService.getInstance().getCatalogIdByNameIdentifier(nameIdentifier);
     } else if (type == MetadataObject.Type.SCHEMA) {
-      return SchemaMetaService.getInstance().getSchemaIdByNameIdentifier(identifier);
+      return SchemaMetaService.getInstance().getSchemaIdByNameIdentifier(nameIdentifier);
     } else if (type == MetadataObject.Type.FILESET) {
-      return FilesetMetaService.getInstance().getFilesetIdByNameIdentifier(identifier);
+      return FilesetMetaService.getInstance().getFilesetIdByNameIdentifier(nameIdentifier);
     } else if (type == MetadataObject.Type.TOPIC) {
-      return TopicMetaService.getInstance().getTopicIdByNameIdentifier(identifier);
+      return TopicMetaService.getInstance().getTopicIdByNameIdentifier(nameIdentifier);
     } else if (type == MetadataObject.Type.TABLE) {
-      return TableMetaService.getInstance().getTableByNameIdentifier(identifier);
+      return TableMetaService.getInstance().getTableByNameIdentifier(nameIdentifier);
     }
 
     throw new IllegalArgumentException(String.format("Doesn't support the type %s", type));
