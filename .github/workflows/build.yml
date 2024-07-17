@@ -109,13 +109,13 @@ jobs:
             catalogs/**/*.tar
 
       - name: Use Codecov to test
-      uses: codecov/codecov-action@v4
-      with:
-        directory: ./coverage/reports/
-        env_vars: OS,PYTHON
-        fail_ci_if_error: true
-        files: ./coverage1.xml,./coverage2.xml,!./cache
-        flags: unittests
-        name: codecov-umbrella
-        token: ${{ secrets.GITHUB_TOKEN }}
-        verbose: true
+        uses: codecov/codecov-action@v4
+        with:
+          directory: ./coverage/reports/
+          env_vars: OS,PYTHON
+          fail_ci_if_error: true
+          files: ./coverage1.xml,./coverage2.xml,!./cache
+          flags: unittests
+          name: codecov-umbrella
+          token: ${{ secrets.GITHUB_TOKEN }}
+          verbose: true
