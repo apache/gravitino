@@ -157,6 +157,7 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
     MetalakeMetaService metalakeMetaService = MetalakeMetaService.getInstance();
     MetalakeMetaService spyMetaservice = Mockito.spy(metalakeMetaService);
     doReturn(1L).when(spyMetaservice).getMetalakeIdByName(Mockito.anyString());
+    doReturn(1L).when(spyMetaservice).getMetalakeIdByNameIdentifier(Mockito.any(NameIdentifier.class));
 
     CatalogMetaService catalogMetaService = CatalogMetaService.getInstance();
     CatalogMetaService spyCatalogMetaService = Mockito.spy(catalogMetaService);
