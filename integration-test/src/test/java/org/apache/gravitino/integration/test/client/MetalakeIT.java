@@ -30,6 +30,7 @@ import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.integration.test.util.AbstractIT;
@@ -98,7 +99,7 @@ public class MetalakeIT extends AbstractIT {
         });
 
     // metalake empty name - note it's NameIdentifier.of("") that fails not the load
-    assertThrows(IllegalArgumentException.class, () -> client.loadMetalake(""));
+    assertThrows(IllegalNameIdentifierException.class, () -> client.loadMetalake(""));
   }
 
   @Test

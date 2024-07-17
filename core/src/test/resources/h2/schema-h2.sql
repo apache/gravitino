@@ -242,7 +242,7 @@ CREATE TABLE IF NOT EXISTS `tag_relation_meta` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'tag relation last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'tag relation deleted at',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_ti_mi_del` (`tag_id`, `metadata_object_id`, `deleted_at`),
+    UNIQUE KEY `uk_ti_mi_mo_del` (`tag_id`, `metadata_object_id`, `metadata_object_type`, `deleted_at`),
     KEY `idx_tid` (`tag_id`),
     KEY `idx_mid` (`metadata_object_id`)
     ) ENGINE=InnoDB;

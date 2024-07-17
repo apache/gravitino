@@ -32,6 +32,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.catalog.jdbc.JdbcSchema;
 import org.apache.gravitino.catalog.jdbc.converter.SqliteExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -70,11 +71,16 @@ public class SqliteDatabaseOperations extends JdbcDatabaseOperations {
 
   @Override
   public List<String> listDatabases() {
-    File file = new File(dbPath);
-    Preconditions.checkArgument(file.exists(), "Database path %s does not exist", dbPath);
-    return Arrays.stream(Objects.requireNonNull(file.listFiles()))
-        .map(File::getName)
-        .collect(Collectors.toList());
+    try {
+      File file = new File(dbPath);
+      Preconditions.checkArgument(file.exists(), "Database path %s does not exist", dbPath);
+      return Arrays.stream(Objects.requireNonNull(file.listFiles()))
+          .map(File::getName)
+          .collect(Collectors.toList());
+    } catch (Exception e) {
+      throw new GravitinoRuntimeException(
+          e, "Failed to list databases in %s: %s", dbPath, e.getMessage());
+    }
   }
 
   @Override

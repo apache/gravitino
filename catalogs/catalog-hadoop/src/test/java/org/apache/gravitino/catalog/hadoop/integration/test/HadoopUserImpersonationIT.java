@@ -43,6 +43,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
+import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.integration.test.util.AbstractIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
@@ -398,7 +399,7 @@ public class HadoopUserImpersonationIT extends AbstractIT {
 
     // create fileset with null fileset name
     Assertions.assertThrows(
-        IllegalArgumentException.class,
+        IllegalNameIdentifierException.class,
         () ->
             createFileset(
                 null,

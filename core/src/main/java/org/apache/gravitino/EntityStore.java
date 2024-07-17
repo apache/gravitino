@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.function.Function;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.tag.SupportsTagOperations;
 import org.apache.gravitino.utils.Executable;
 
 public interface EntityStore extends Closeable {
@@ -183,4 +184,14 @@ public interface EntityStore extends Closeable {
    */
   <R, E extends Exception> R executeInTransaction(Executable<R, E> executable)
       throws E, IOException;
+
+  /**
+   * Get the extra tag operations that are supported by the entity store.
+   *
+   * @return the tag operations object that are supported by the entity store
+   * @throws UnsupportedOperationException if the extra operations are not supported
+   */
+  default SupportsTagOperations tagOperations() {
+    throw new UnsupportedOperationException("tag operations are not supported");
+  }
 }
