@@ -16,12 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.catalog.mysql;
 
-plugins {
-  id("java")
-}
-
-// try avoid add extra dependencies because bundled catalog is used by catalogs and connectors.
-dependencies {
-  implementation(libs.slf4j.api)
+public class MysqlConstants {
+  public static final String GRAVITINO_ENGINE_KEY = "engine";
+  public static final String MYSQL_ENGINE_KEY = "ENGINE";
+  public static final String GRAVITINO_AUTO_INCREMENT_OFFSET_KEY = "auto-increment-offset";
+  public static final String MYSQL_AUTO_INCREMENT_OFFSET_KEY = "AUTO_INCREMENT";
 }

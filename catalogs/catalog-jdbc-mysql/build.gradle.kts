@@ -26,6 +26,7 @@ plugins {
 
 dependencies {
   implementation(project(":api"))
+  implementation(project(":catalogs:bundled-catalog"))
   implementation(project(":catalogs:catalog-jdbc-common"))
   implementation(project(":common"))
   implementation(project(":core"))

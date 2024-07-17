@@ -16,12 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.catalog.jdbc;
 
-plugins {
-  id("java")
-}
-
-// try avoid add extra dependencies because bundled catalog is used by catalogs and connectors.
-dependencies {
-  implementation(libs.slf4j.api)
+public class JdbcConstants {
+  public static final String COMMENT = "comment";
 }

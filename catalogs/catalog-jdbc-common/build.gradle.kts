@@ -39,6 +39,7 @@ artifacts {
 
 dependencies {
   implementation(project(":api"))
+  implementation(project(":catalogs:bundled-catalog"))
   implementation(project(":common"))
   implementation(project(":core"))
 
