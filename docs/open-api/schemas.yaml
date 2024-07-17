@@ -330,7 +330,7 @@ components:
         "type": "SchemaAlreadyExistsException",
         "message": "Failed to operate schema(s) [my_hive_schema] operation [CREATE] under catalog [my_hive_catalog], reason [SchemaAlreadyExistsException]",
         "stack": [
-          "com.datastrato.gravitino.exceptions.SchemaAlreadyExistsException: Hive schema (database) 'my_hive_schema' already exists in Hive Metastore",
+          "org.apache.gravitino.exceptions.SchemaAlreadyExistsException: Hive schema (database) 'my_hive_schema' already exists in Hive Metastore",
           "..."
         ]
       }
@@ -341,7 +341,7 @@ components:
         "type": "NoSuchSchemaException",
         "message": "Failed to operate schema(s) [my_hive_schema1] operation [LOAD] under catalog [my_hive_catalog], reason [NoSuchSchemaException]",
         "stack": [
-          "com.datastrato.gravitino.exceptions.NoSuchSchemaException: Hive schema (database) does not exist: my_hive_schema1 in Hive Metastore",
+          "org.apache.gravitino.exceptions.NoSuchSchemaException: Hive schema (database) does not exist: my_hive_schema1 in Hive Metastore",
           "..."
         ]
       }

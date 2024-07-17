@@ -86,8 +86,8 @@ jobs:
       - name: Flink Integration Test
         id: integrationTest
         run: |
-          ./gradlew -PskipTests -PtestMode=embedded -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :flink-connector:test --tests "com.datastrato.gravitino.flink.connector.integration.test.**"
-          ./gradlew -PskipTests -PtestMode=deploy -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :flink-connector:test --tests "com.datastrato.gravitino.flink.connector.integration.test.**"
+          ./gradlew -PskipTests -PtestMode=embedded -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :flink-connector:test --tests "org.apache.gravitino.flink.connector.integration.test.**"
+          ./gradlew -PskipTests -PtestMode=deploy -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :flink-connector:test --tests "org.apache.gravitino.flink.connector.integration.test.**"
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
