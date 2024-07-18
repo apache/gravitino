@@ -40,6 +40,9 @@ class TestSimpleAuthProvider(unittest.TestCase):
         ).decode("utf-8")
         self.assertEqual(f"{user}:dummy", token_string)
 
+        original_gravitino_user = (
+            os.environ["GRAVITINO_USER"] if "GRAVITINO_USER" in os.environ else ""
+        )
         os.environ["GRAVITINO_USER"] = "test_auth2"
         provider: AuthDataProvider = SimpleAuthProvider()
         self.assertTrue(provider.has_token_data())
@@ -50,4 +53,4 @@ class TestSimpleAuthProvider(unittest.TestCase):
             token[len(AuthConstants.AUTHORIZATION_BASIC_HEADER) :]
         ).decode("utf-8")
         self.assertEqual(f"{user}:dummy", token_string)
-        os.environ["GRAVITINO_USER"] = ""
+        os.environ["GRAVITINO_USER"] = original_gravitino_user
