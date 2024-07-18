@@ -64,7 +64,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
 
   private static int testParallelism = 2;
 
-  private static Map<String, String> queryParams = new HashMap<>();
+  protected static Map<String, String> queryParams = new HashMap<>();
 
   public static Set<String> ciTestsets = new HashSet<>();
 
