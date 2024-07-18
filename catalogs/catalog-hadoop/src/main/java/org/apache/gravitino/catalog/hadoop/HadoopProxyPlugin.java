@@ -33,7 +33,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 
 @Deprecated
 public class HadoopProxyPlugin implements ProxyPlugin {
-  private SecureHadoopCatalogOperations ops;
+  private HadoopCatalogOperations ops;
   private final UserGroupInformation realUser;
 
   public HadoopProxyPlugin() {
@@ -83,6 +83,6 @@ public class HadoopProxyPlugin implements ProxyPlugin {
 
   @Override
   public void bindCatalogOperation(CatalogOperations ops) {
-    this.ops = ((SecureHadoopCatalogOperations) ops);
+    this.ops = ((HadoopCatalogOperations) ops);
   }
 }
