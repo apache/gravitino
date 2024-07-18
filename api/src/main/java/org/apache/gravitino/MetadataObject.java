@@ -19,6 +19,7 @@
 
 package org.apache.gravitino;
 
+import java.util.Locale;
 import javax.annotation.Nullable;
 import org.apache.gravitino.annotation.Unstable;
 
@@ -57,7 +58,21 @@ public interface MetadataObject {
      */
     TOPIC,
     /** A column is a sub-collection of the table that represents a group of same type data. */
-    COLUMN
+    COLUMN;
+
+    /**
+     * Convert the string type to the Type enum.
+     *
+     * @param type The string type.
+     * @return The Type enum.
+     */
+    public static Type toType(String type) {
+      try {
+        return Type.valueOf(type.toUpperCase(Locale.ROOT));
+      } catch (IllegalArgumentException e) {
+        throw new IllegalArgumentException("Unknown type: " + type);
+      }
+    }
   }
 
   /**

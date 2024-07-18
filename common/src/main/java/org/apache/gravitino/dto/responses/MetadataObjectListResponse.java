@@ -65,7 +65,9 @@ public class MetadataObjectListResponse extends BaseResponse {
         .forEach(
             object ->
                 Preconditions.checkArgument(
-                    object != null && StringUtils.isNoneBlank(object.name()),
-                    "metadataObject must not be null and empty"));
+                    object != null
+                        && StringUtils.isNoneBlank(object.name())
+                        && object.type() != null,
+                    "metadataObject must not be null and it's field cannot null or empty"));
   }
 }

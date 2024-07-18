@@ -20,9 +20,11 @@ package org.apache.gravitino.dto.responses;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
+import org.apache.commons.lang3.StringUtils;
 
 /** Represents a response for a list of entity names. */
 @Getter
@@ -55,5 +57,10 @@ public class NameListResponse extends BaseResponse {
     super.validate();
 
     Preconditions.checkArgument(names != null, "\"names\" must not be null");
+    Arrays.stream(names)
+        .forEach(
+            name ->
+                Preconditions.checkArgument(
+                    StringUtils.isNoneBlank(name), "name must not be null"));
   }
 }

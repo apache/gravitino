@@ -409,7 +409,7 @@ public class TestTagOperations extends JerseyTest {
             .path("tag1")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
-            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
@@ -430,7 +430,7 @@ public class TestTagOperations extends JerseyTest {
             .path("tag1")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
-            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
 
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
 
@@ -446,7 +446,7 @@ public class TestTagOperations extends JerseyTest {
             .path("tag1")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
-            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
 
     Assertions.assertEquals(
         Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp2.getStatus());
@@ -508,131 +508,13 @@ public class TestTagOperations extends JerseyTest {
 
   @Test
   public void testListTagsForObject() {
-    String[] catalogTags = new String[] {"tag1", "tag2"};
     MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
-    when(tagManager.listTagsForMetadataObject(metalake, catalog)).thenReturn(catalogTags);
-
-    String[] schemaTags = new String[] {"tag3", "tag4"};
     MetadataObject schema = MetadataObjects.parse("object1.object2", MetadataObject.Type.SCHEMA);
-    when(tagManager.listTagsForMetadataObject(metalake, schema)).thenReturn(schemaTags);
-
-    String[] tableTags = new String[] {"tag5", "tag6"};
     MetadataObject table =
         MetadataObjects.parse("object1.object2.object3", MetadataObject.Type.TABLE);
-    when(tagManager.listTagsForMetadataObject(metalake, table)).thenReturn(tableTags);
-
-    String[] columnTags = new String[] {"tag7", "tag8"};
     MetadataObject column =
         MetadataObjects.parse("object1.object2.object3.object4", MetadataObject.Type.COLUMN);
-    when(tagManager.listTagsForMetadataObject(metalake, column)).thenReturn(columnTags);
 
-    // Test catalog tags
-    Response response =
-        target(tagPath(metalake))
-            .path(catalog.type().toString())
-            .path(catalog.fullName())
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
-    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getMediaType());
-
-    NameListResponse nameListResponse = response.readEntity(NameListResponse.class);
-    Assertions.assertEquals(0, nameListResponse.getCode());
-    Assertions.assertArrayEquals(catalogTags, nameListResponse.getNames());
-
-    // Test schema tags
-    Response response1 =
-        target(tagPath(metalake))
-            .path(schema.type().toString())
-            .path(schema.fullName())
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response1.getStatus());
-
-    NameListResponse nameListResponse1 = response1.readEntity(NameListResponse.class);
-    Assertions.assertEquals(0, nameListResponse1.getCode());
-
-    Set<String> expected = Sets.newHashSet(catalogTags);
-    expected.addAll(Sets.newHashSet(schemaTags));
-    Assertions.assertEquals(expected, Sets.newHashSet(nameListResponse1.getNames()));
-
-    // Test table tags
-    Response response2 =
-        target(tagPath(metalake))
-            .path(table.type().toString())
-            .path(table.fullName())
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response2.getStatus());
-
-    NameListResponse nameListResponse2 = response2.readEntity(NameListResponse.class);
-    Assertions.assertEquals(0, nameListResponse2.getCode());
-
-    Set<String> expected1 = Sets.newHashSet(catalogTags);
-    expected1.addAll(Sets.newHashSet(schemaTags));
-    expected1.addAll(Sets.newHashSet(tableTags));
-    Assertions.assertEquals(expected1, Sets.newHashSet(nameListResponse2.getNames()));
-
-    // Test column tags
-    Response response3 =
-        target(tagPath(metalake))
-            .path(column.type().toString())
-            .path(column.fullName())
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response3.getStatus());
-
-    NameListResponse nameListResponse3 = response3.readEntity(NameListResponse.class);
-    Assertions.assertEquals(0, nameListResponse3.getCode());
-
-    Set<String> expected2 = Sets.newHashSet(catalogTags);
-    expected2.addAll(Sets.newHashSet(schemaTags));
-    expected2.addAll(Sets.newHashSet(tableTags));
-    expected2.addAll(Sets.newHashSet(columnTags));
-    Assertions.assertEquals(expected2, Sets.newHashSet(nameListResponse3.getNames()));
-
-    // Test with null tags
-    when(tagManager.listTagsForMetadataObject(metalake, catalog)).thenReturn(null);
-    Response response4 =
-        target(tagPath(metalake))
-            .path(catalog.type().toString())
-            .path(catalog.fullName())
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response4.getStatus());
-
-    NameListResponse nameListResponse4 = response4.readEntity(NameListResponse.class);
-    Assertions.assertEquals(0, nameListResponse4.getCode());
-
-    Assertions.assertEquals(0, nameListResponse4.getNames().length);
-
-    Response response5 =
-        target(tagPath(metalake))
-            .path(schema.type().toString())
-            .path(schema.fullName())
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response5.getStatus());
-
-    NameListResponse nameListResponse5 = response5.readEntity(NameListResponse.class);
-    Assertions.assertEquals(0, nameListResponse5.getCode());
-
-    Set<String> expected3 = Sets.newHashSet(schemaTags);
-    Assertions.assertEquals(expected3, Sets.newHashSet(nameListResponse5.getNames()));
-
-    // Test with "details" = true
     Tag[] catalogTagInfos =
         new Tag[] {
           TagEntity.builder().withName("tag1").withId(1L).withAuditInfo(testAuditInfo1).build()
@@ -658,7 +540,7 @@ public class TestTagOperations extends JerseyTest {
     when(tagManager.listTagsInfoForMetadataObject(metalake, column)).thenReturn(columnTagInfos);
 
     // Test catalog tags
-    Response response6 =
+    Response response =
         target(tagPath(metalake))
             .path(catalog.type().toString())
             .path(catalog.fullName())
@@ -667,9 +549,9 @@ public class TestTagOperations extends JerseyTest {
             .accept("application/vnd.gravitino.v1+json")
             .get();
 
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response6.getStatus());
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
 
-    TagListResponse tagListResponse = response6.readEntity(TagListResponse.class);
+    TagListResponse tagListResponse = response.readEntity(TagListResponse.class);
     Assertions.assertEquals(0, tagListResponse.getCode());
     Assertions.assertEquals(catalogTagInfos.length, tagListResponse.getTags().length);
 
@@ -680,8 +562,25 @@ public class TestTagOperations extends JerseyTest {
     Assertions.assertTrue(resultTags.containsKey("tag1"));
     Assertions.assertFalse(resultTags.get("tag1").inherited().get());
 
+    Response response1 =
+        target(tagPath(metalake))
+            .path(catalog.type().toString())
+            .path(catalog.fullName())
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response1.getStatus());
+
+    NameListResponse nameListResponse = response1.readEntity(NameListResponse.class);
+    Assertions.assertEquals(0, nameListResponse.getCode());
+    Assertions.assertEquals(catalogTagInfos.length, nameListResponse.getNames().length);
+    Assertions.assertArrayEquals(
+        Arrays.stream(catalogTagInfos).map(Tag::name).toArray(String[]::new),
+        nameListResponse.getNames());
+
     // Test schema tags
-    Response response7 =
+    Response response2 =
         target(tagPath(metalake))
             .path(schema.type().toString())
             .path(schema.fullName())
@@ -690,9 +589,9 @@ public class TestTagOperations extends JerseyTest {
             .accept("application/vnd.gravitino.v1+json")
             .get();
 
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response7.getStatus());
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response2.getStatus());
 
-    TagListResponse tagListResponse1 = response7.readEntity(TagListResponse.class);
+    TagListResponse tagListResponse1 = response2.readEntity(TagListResponse.class);
     Assertions.assertEquals(0, tagListResponse1.getCode());
     Assertions.assertEquals(
         schemaTagInfos.length + catalogTagInfos.length, tagListResponse1.getTags().length);
@@ -707,8 +606,26 @@ public class TestTagOperations extends JerseyTest {
     Assertions.assertTrue(resultTags1.get("tag1").inherited().get());
     Assertions.assertFalse(resultTags1.get("tag3").inherited().get());
 
+    Response response3 =
+        target(tagPath(metalake))
+            .path(schema.type().toString())
+            .path(schema.fullName())
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response3.getStatus());
+
+    NameListResponse nameListResponse1 = response3.readEntity(NameListResponse.class);
+    Assertions.assertEquals(0, nameListResponse1.getCode());
+    Assertions.assertEquals(
+        schemaTagInfos.length + catalogTagInfos.length, nameListResponse1.getNames().length);
+    Set<String> resultNames = Sets.newHashSet(nameListResponse1.getNames());
+    Assertions.assertTrue(resultNames.contains("tag1"));
+    Assertions.assertTrue(resultNames.contains("tag3"));
+
     // Test table tags
-    Response response8 =
+    Response response4 =
         target(tagPath(metalake))
             .path(table.type().toString())
             .path(table.fullName())
@@ -717,9 +634,9 @@ public class TestTagOperations extends JerseyTest {
             .accept("application/vnd.gravitino.v1+json")
             .get();
 
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response8.getStatus());
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response4.getStatus());
 
-    TagListResponse tagListResponse2 = response8.readEntity(TagListResponse.class);
+    TagListResponse tagListResponse2 = response4.readEntity(TagListResponse.class);
     Assertions.assertEquals(0, tagListResponse2.getCode());
     Assertions.assertEquals(
         schemaTagInfos.length + catalogTagInfos.length + tableTagInfos.length,
@@ -737,8 +654,29 @@ public class TestTagOperations extends JerseyTest {
     Assertions.assertTrue(resultTags2.get("tag3").inherited().get());
     Assertions.assertFalse(resultTags2.get("tag5").inherited().get());
 
+    Response response5 =
+        target(tagPath(metalake))
+            .path(table.type().toString())
+            .path(table.fullName())
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response5.getStatus());
+
+    NameListResponse nameListResponse2 = response5.readEntity(NameListResponse.class);
+    Assertions.assertEquals(0, nameListResponse2.getCode());
+    Assertions.assertEquals(
+        schemaTagInfos.length + catalogTagInfos.length + tableTagInfos.length,
+        nameListResponse2.getNames().length);
+
+    Set<String> resultNames1 = Sets.newHashSet(nameListResponse2.getNames());
+    Assertions.assertTrue(resultNames1.contains("tag1"));
+    Assertions.assertTrue(resultNames1.contains("tag3"));
+    Assertions.assertTrue(resultNames1.contains("tag5"));
+
     // Test column tags
-    Response response9 =
+    Response response6 =
         target(tagPath(metalake))
             .path(column.type().toString())
             .path(column.fullName())
@@ -747,9 +685,9 @@ public class TestTagOperations extends JerseyTest {
             .accept("application/vnd.gravitino.v1+json")
             .get();
 
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response9.getStatus());
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response6.getStatus());
 
-    TagListResponse tagListResponse3 = response9.readEntity(TagListResponse.class);
+    TagListResponse tagListResponse3 = response6.readEntity(TagListResponse.class);
     Assertions.assertEquals(0, tagListResponse3.getCode());
     Assertions.assertEquals(
         schemaTagInfos.length
@@ -771,6 +709,32 @@ public class TestTagOperations extends JerseyTest {
     Assertions.assertTrue(resultTags3.get("tag3").inherited().get());
     Assertions.assertTrue(resultTags3.get("tag5").inherited().get());
     Assertions.assertFalse(resultTags3.get("tag7").inherited().get());
+
+    Response response7 =
+        target(tagPath(metalake))
+            .path(column.type().toString())
+            .path(column.fullName())
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response7.getStatus());
+
+    NameListResponse nameListResponse3 = response7.readEntity(NameListResponse.class);
+    Assertions.assertEquals(0, nameListResponse3.getCode());
+
+    Assertions.assertEquals(
+        schemaTagInfos.length
+            + catalogTagInfos.length
+            + tableTagInfos.length
+            + columnTagInfos.length,
+        nameListResponse3.getNames().length);
+
+    Set<String> resultNames2 = Sets.newHashSet(nameListResponse3.getNames());
+    Assertions.assertTrue(resultNames2.contains("tag1"));
+    Assertions.assertTrue(resultNames2.contains("tag3"));
+    Assertions.assertTrue(resultNames2.contains("tag5"));
+    Assertions.assertTrue(resultNames2.contains("tag7"));
   }
 
   @Test

@@ -24,7 +24,6 @@ import com.google.common.collect.Lists;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
@@ -32,6 +31,7 @@ import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
+import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -164,7 +164,7 @@ public class TagOperations {
     }
   }
 
-  @POST
+  @PUT
   @Path("{tag}")
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "alter-tag." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
@@ -226,7 +226,7 @@ public class TagOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-object-tags." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-object-tags", absolute = true)
-  public Response listTagsForMetdataObject(
+  public Response listTagsForMetadataObject(
       @PathParam("metalake") String metalake,
       @PathParam("type") String type,
       @PathParam("fullName") String fullName,
@@ -242,33 +242,34 @@ public class TagOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            MetadataObject object = MetadataObjects.parse(fullName, toType(type));
+            MetadataObject object =
+                MetadataObjects.parse(fullName, MetadataObject.Type.toType(type));
 
-            if (verbose) {
-              List<TagDTO> tags = Lists.newArrayList();
-              Tag[] nonInheritedTags = tagManager.listTagsInfoForMetadataObject(metalake, object);
-              if (ArrayUtils.isNotEmpty(nonInheritedTags)) {
+            List<TagDTO> tags = Lists.newArrayList();
+            Tag[] nonInheritedTags = tagManager.listTagsInfoForMetadataObject(metalake, object);
+            if (ArrayUtils.isNotEmpty(nonInheritedTags)) {
+              Collections.addAll(
+                  tags,
+                  Arrays.stream(nonInheritedTags)
+                      .map(t -> DTOConverters.toDTO(t, Optional.of(false)))
+                      .toArray(TagDTO[]::new));
+            }
+
+            MetadataObject parentObject = MetadataObjects.parent(object);
+            while (parentObject != null) {
+              Tag[] inheritedTags =
+                  tagManager.listTagsInfoForMetadataObject(metalake, parentObject);
+              if (ArrayUtils.isNotEmpty(inheritedTags)) {
                 Collections.addAll(
                     tags,
-                    Arrays.stream(nonInheritedTags)
-                        .map(t -> DTOConverters.toDTO(t, Optional.of(false)))
+                    Arrays.stream(inheritedTags)
+                        .map(t -> DTOConverters.toDTO(t, Optional.of(true)))
                         .toArray(TagDTO[]::new));
               }
+              parentObject = MetadataObjects.parent(parentObject);
+            }
 
-              MetadataObject parentObject = MetadataObjects.parent(object);
-              while (parentObject != null) {
-                Tag[] inheritedTags =
-                    tagManager.listTagsInfoForMetadataObject(metalake, parentObject);
-                if (ArrayUtils.isNotEmpty(inheritedTags)) {
-                  Collections.addAll(
-                      tags,
-                      Arrays.stream(inheritedTags)
-                          .map(t -> DTOConverters.toDTO(t, Optional.of(true)))
-                          .toArray(TagDTO[]::new));
-                }
-                parentObject = MetadataObjects.parent(parentObject);
-              }
-
+            if (verbose) {
               LOG.info(
                   "List {} tags info for object type: {}, full name: {} under metalake: {}",
                   tags.size(),
@@ -278,30 +279,15 @@ public class TagOperations {
               return Utils.ok(new TagListResponse(tags.toArray(new TagDTO[0])));
 
             } else {
-              List<String> tagNames = Lists.newArrayList();
-              String[] nonInheritedTagNames =
-                  tagManager.listTagsForMetadataObject(metalake, object);
-              if (ArrayUtils.isNotEmpty(nonInheritedTagNames)) {
-                Collections.addAll(tagNames, nonInheritedTagNames);
-              }
-
-              MetadataObject parentObject = MetadataObjects.parent(object);
-              while (parentObject != null) {
-                String[] inheritedTagNames =
-                    tagManager.listTagsForMetadataObject(metalake, parentObject);
-                if (ArrayUtils.isNotEmpty(inheritedTagNames)) {
-                  Collections.addAll(tagNames, inheritedTagNames);
-                }
-                parentObject = MetadataObjects.parent(parentObject);
-              }
+              String[] tagNames = tags.stream().map(TagDTO::name).toArray(String[]::new);
 
               LOG.info(
                   "List {} tags for object type: {}, full name: {} under metalake: {}",
-                  tagNames.stream(),
+                  tagNames.length,
                   type,
                   fullName,
                   metalake);
-              return Utils.ok(new NameListResponse(tagNames.toArray(new String[0])));
+              return Utils.ok(new NameListResponse(tagNames));
             }
           });
 
@@ -331,7 +317,8 @@ public class TagOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            MetadataObject object = MetadataObjects.parse(fullName, toType(type));
+            MetadataObject object =
+                MetadataObjects.parse(fullName, MetadataObject.Type.toType(type));
             Optional<Tag> tag = getTagForObject(metalake, object, tagName);
             Optional<TagDTO> tagDTO = tag.map(t -> DTOConverters.toDTO(t, Optional.of(false)));
 
@@ -428,7 +415,8 @@ public class TagOperations {
           httpRequest,
           () -> {
             request.validate();
-            MetadataObject object = MetadataObjects.parse(fullName, toType(type));
+            MetadataObject object =
+                MetadataObjects.parse(fullName, MetadataObject.Type.toType(type));
             String[] tagNames =
                 tagManager.associateTagsForMetadataObject(
                     metalake, object, request.getTagsToAdd(), request.getTagsToRemove());
@@ -445,14 +433,6 @@ public class TagOperations {
 
     } catch (Exception e) {
       return ExceptionHandlers.handleTagException(OperationType.ASSOCIATE, "", fullName, e);
-    }
-  }
-
-  private MetadataObject.Type toType(String type) {
-    try {
-      return MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT));
-    } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException("Invalid type: " + type);
     }
   }
 
