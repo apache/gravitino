@@ -263,17 +263,22 @@ public class AbstractIT {
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
 
     serverUri = "http://" + jettyServerConfig.getHost() + ":" + jettyServerConfig.getHttpPort();
-    if (COMMA
-        .splitToList(customConfigs.get(Configs.AUTHENTICATOR.getKey()))
-        .contains(AuthenticatorType.OAUTH.name().toLowerCase())) {
+    String authenticator = customConfigs.get(Configs.AUTHENTICATOR.getKey());
+
+    if (authenticator != null
+        && COMMA
+            .splitToList(authenticator)
+            .contains(AuthenticatorType.OAUTH.name().toLowerCase())) {
       client = GravitinoAdminClient.builder(serverUri).withOAuth(mockDataProvider).build();
-    } else if (COMMA
-        .splitToList(customConfigs.get(Configs.AUTHENTICATOR.getKey()))
-        .contains(AuthenticatorType.SIMPLE.name().toLowerCase())) {
+    } else if (authenticator != null
+        && COMMA
+            .splitToList(authenticator)
+            .contains(AuthenticatorType.SIMPLE.name().toLowerCase())) {
       client = GravitinoAdminClient.builder(serverUri).withSimpleAuth().build();
-    } else if (COMMA
-        .splitToList(customConfigs.get(Configs.AUTHENTICATOR.getKey()))
-        .contains(AuthenticatorType.KERBEROS.name().toLowerCase())) {
+    } else if (authenticator != null
+        && COMMA
+            .splitToList(authenticator)
+            .contains(AuthenticatorType.KERBEROS.name().toLowerCase())) {
       serverUri = "http://localhost:" + jettyServerConfig.getHttpPort();
       client = null;
     } else {
