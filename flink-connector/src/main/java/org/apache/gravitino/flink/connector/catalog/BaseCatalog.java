@@ -289,7 +289,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
   @Override
   public List<CatalogPartitionSpec> listPartitions(ObjectPath tablePath)
       throws TableNotExistException, TableNotPartitionedException, CatalogException {
-    return realCatalog().listPartitions(tablePath);
+    throw new UnsupportedOperationException();
   }
 
   @Override
@@ -297,20 +297,20 @@ public abstract class BaseCatalog extends AbstractCatalog {
       ObjectPath tablePath, CatalogPartitionSpec partitionSpec)
       throws TableNotExistException, TableNotPartitionedException, PartitionSpecInvalidException,
           CatalogException {
-    return realCatalog().listPartitions(tablePath, partitionSpec);
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public List<CatalogPartitionSpec> listPartitionsByFilter(
       ObjectPath tablePath, List<Expression> filter)
       throws TableNotExistException, TableNotPartitionedException, CatalogException {
-    return realCatalog().listPartitionsByFilter(tablePath, filter);
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public CatalogPartition getPartition(ObjectPath tablePath, CatalogPartitionSpec partitionSpec)
       throws PartitionNotExistException, CatalogException {
-    return realCatalog().getPartition(tablePath, partitionSpec);
+    throw new UnsupportedOperationException();
   }
 
   @Override
