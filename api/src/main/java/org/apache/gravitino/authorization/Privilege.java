@@ -51,9 +51,9 @@ public interface Privilege {
     USE_SCHEMA(0L, 1L << 4),
     /** The privilege to create a table. */
     CREATE_TABLE(0L, 1L << 5),
-    /** The privilege to write a table. */
+    /** The privilege to alter, insert, update, or delete a table. */
     MODIFY_TABLE(0L, 1L << 6),
-    /** The privilege to read a table. */
+    /** The privilege to select data from a table. */
     SELECT_TABLE(0L, 1L << 7),
     /** The privilege to create a fileset. */
     CREATE_FILESET(0L, 1L << 8),
@@ -63,9 +63,9 @@ public interface Privilege {
     READ_FILESET(0L, 1L << 10),
     /** The privilege to create a topic. */
     CREATE_TOPIC(0L, 1L << 11),
-    /** The privilege to write a topic. */
+    /** The privilege to produce a topic. */
     PRODUCE_TOPIC(0L, 1L << 12),
-    /** The privilege to read a topic. */
+    /** The privilege to consume a topic. */
     CONSUME_TOPIC(0L, 1L << 13),
     /** The privilege to add a user */
     ADD_USER(0L, 1L << 14),

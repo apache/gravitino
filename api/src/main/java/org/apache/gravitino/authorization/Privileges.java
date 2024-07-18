@@ -379,7 +379,7 @@ public class Privileges {
     }
   }
 
-  /** The privilege to write a table. */
+  /** The privilege to alter, insert, update, or delete a table. */
   public static class ModifyTable extends GenericPrivilege<ModifyTable> {
     private static final ModifyTable ALLOW_INSTANCE =
         new ModifyTable(Condition.ALLOW, Name.MODIFY_TABLE);
