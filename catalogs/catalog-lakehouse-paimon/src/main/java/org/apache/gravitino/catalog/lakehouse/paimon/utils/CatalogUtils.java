@@ -21,11 +21,21 @@ package org.apache.gravitino.catalog.lakehouse.paimon.utils;
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig.CATALOG_BACKEND;
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig.CATALOG_URI;
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig.CATALOG_WAREHOUSE;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.io.File;
+import java.util.Map;
+import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig;
+import org.apache.gravitino.catalog.lakehouse.paimon.authentication.AuthenticationConfig;
+import org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosClient;
+import org.apache.gravitino.catalog.lakehouse.paimon.ops.PaimonBackendCatalogWrapper;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.CatalogContext;
 import org.apache.paimon.catalog.CatalogFactory;
@@ -36,27 +46,80 @@ public class CatalogUtils {
 
   private CatalogUtils() {}
 
+  @VisibleForTesting
+  public static PaimonBackendCatalogWrapper loadCatalogBackend(PaimonConfig paimonConfig) {
+    Map<String, String> allConfig = paimonConfig.getAllConfig();
+    AuthenticationConfig authenticationConfig = new AuthenticationConfig(allConfig);
+    if (authenticationConfig.isSimpleAuth()) {
+      return new PaimonBackendCatalogWrapper(loadCatalogBackendWithSimpleAuth(paimonConfig), null);
+    } else if (authenticationConfig.isKerberosAuth()) {
+      Configuration configuration = new Configuration();
+      allConfig.forEach(configuration::set);
+      configuration.set(HADOOP_SECURITY_AUTHORIZATION, "true");
+      configuration.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
+
+      try {
+        KerberosClient kerberosClient = new KerberosClient(allConfig, configuration);
+        File keytabFile =
+            kerberosClient.saveKeyTabFileFromUri(UUID.randomUUID().toString().replace("-", ""));
+        kerberosClient.login(keytabFile.getAbsolutePath());
+        Catalog catalog = loadCatalogBackendWithKerberosAuth(paimonConfig, configuration);
+        return new PaimonBackendCatalogWrapper(catalog, kerberosClient);
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to login with kerberos", e);
+      }
+    } else {
+      throw new UnsupportedOperationException(
+          "Unsupported authentication method: " + authenticationConfig.getAuthType());
+    }
+  }
+
   /**
-   * Loads {@link Catalog} instance with given {@link PaimonConfig}.
+   * Loads {@link Catalog} instance with given {@link PaimonConfig} with kerberos auth.
    *
    * @param paimonConfig The Paimon configuration.
    * @return The {@link Catalog} instance of catalog backend.
    */
-  public static Catalog loadCatalogBackend(PaimonConfig paimonConfig) {
-    String metastore = paimonConfig.get(CATALOG_BACKEND);
+  public static Catalog loadCatalogBackendWithKerberosAuth(
+      PaimonConfig paimonConfig, Configuration configuration) {
+    checkPaimonConfig(paimonConfig);
+
+    // TODO: Now we only support kerberos auth for Filesystem backend, and will support it for Hive
+    // backend later.
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(metastore), "Paimon Catalog metastore can not be null or empty.");
-    String warehouse = paimonConfig.get(CATALOG_WAREHOUSE);
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(warehouse), "Paimon Catalog warehouse can not be null or empty.");
-    if (!PaimonCatalogBackend.FILESYSTEM.name().equalsIgnoreCase(metastore)) {
-      String uri = paimonConfig.get(CATALOG_URI);
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(uri),
-          String.format("Paimon Catalog uri can not be null or empty for %s.", metastore));
-    }
+        PaimonCatalogBackend.FILESYSTEM.name().equalsIgnoreCase(paimonConfig.get(CATALOG_BACKEND)));
+
+    CatalogContext catalogContext =
+        CatalogContext.create(Options.fromMap(paimonConfig.getAllConfig()), configuration);
+    return CatalogFactory.createCatalog(catalogContext);
+  }
+
+  /**
+   * Loads {@link Catalog} instance with given {@link PaimonConfig} with simple auth.
+   *
+   * @param paimonConfig The Paimon configuration.
+   * @return The {@link Catalog} instance of catalog backend.
+   */
+  public static Catalog loadCatalogBackendWithSimpleAuth(PaimonConfig paimonConfig) {
+    checkPaimonConfig(paimonConfig);
     CatalogContext catalogContext =
         CatalogContext.create(Options.fromMap(paimonConfig.getAllConfig()));
     return CatalogFactory.createCatalog(catalogContext);
+  }
+
+  private static void checkPaimonConfig(PaimonConfig paimonConfig) {
+    String metastore = paimonConfig.get(CATALOG_BACKEND);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(metastore), "Paimon Catalog metastore can not be null or empty.");
+
+    String warehouse = paimonConfig.get(CATALOG_WAREHOUSE);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(warehouse), "Paimon Catalog warehouse can not be null or empty.");
+
+    if (!PaimonCatalogBackend.FILESYSTEM.name().equalsIgnoreCase(metastore)) {
+      String uri = paimonConfig.get(CATALOG_URI);
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(uri), "Paimon Catalog uri can not be null or empty.");
+    }
   }
 }
