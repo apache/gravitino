@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.flink.connector.integration.test.hive;
 
-import static com.datastrato.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
+import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 import static org.apache.gravitino.flink.connector.integration.test.utils.TestUtils.assertColumns;
 
 import com.google.common.base.Preconditions;
