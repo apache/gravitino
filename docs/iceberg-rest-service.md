@@ -119,6 +119,22 @@ The `clients` property for example:
 `catalog-impl` has no effect.
 :::
 
+### S3 configuration
+
+Gravitino Iceberg REST service support using static access-key-id and secret-access-key to access S3 data.
+
+| Configuration item                            | Description                                                                                                                                                                                                            | Default value | Required | Since Version |
+|-----------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.iceberg-rest.io-impl`              | The io implementation for `FileIO` in Iceberg, use `org.apache.iceberg.aws.s3.S3FileIO` for s3.                                                                                                                        | (none)        | No       | 0.6.0         |
+| `gravitino.iceberg-rest.s3-access-key-id`     | The static access key ID used to access S3 data.                                                                                                                                                                       | (none)        | No       | 0.6.0         |
+| `gravitino.iceberg-rest.s3-secret-access-key` | The static secret access key used to access S3 data.                                                                                                                                                                   | (none)        | No       | 0.6.0         |
+| `gravitino.iceberg-rest.s3-endpoint`          | An alternative endpoint of the S3 service, This could be used to use S3FileIO with any s3-compatible object storage service that has a different endpoint, or access a private S3 endpoint in a virtual private cloud. | (none)        | No       | 0.6.0         |
+| `gravitino.iceberg-rest.s3-region`            | The region of the S3 service, like `us-west-2`.                                                                                                                                                                        | (none)        | No       | 0.6.0         |
+
+:::info
+Please set `gravitino.iceberg-rest.warehouse` to `s3://{bucket_name}/${prefix_name}` for Jdbc catalog backend, `s3a://{bucket_name}/${prefix_name}` for Hive catalog backend. 
+:::
+
 ### HDFS configuration
 
 The Gravitino Iceberg REST catalog service adds the HDFS configuration files `core-site.xml` and `hdfs-site.xml` from the directory defined by `gravitino.auxService.iceberg-rest.classpath`, for example, `catalogs/lakehouse-iceberg/conf`, to the classpath.
@@ -163,7 +179,7 @@ For example, we can configure Spark catalog options to use Gravitino Iceberg RES
 --conf spark.sql.catalog.rest.uri=http://127.0.0.1:9001/iceberg/
 ```
 
-You may need to adjust the Iceberg Spark runtime jar file name according to the real version number in your environment.
+You may need to adjust the Iceberg Spark runtime jar file name according to the real version number in your environment. If you want to access the data stored in S3, you should download [iceberg-aws-bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle) and set catalog properties `s3.access-key-id`, `s3.secret-access-key` in spark configuration explicitly.
 
 ### Exploring Apache Iceberg with Apache Spark SQL
 

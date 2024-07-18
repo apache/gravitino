@@ -25,6 +25,7 @@ import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergPropertiesUtils;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
@@ -72,7 +73,6 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
-
   public static final ConfigEntry<String> JDBC_DRIVER =
       new ConfigBuilder(IcebergConstants.GRAVITINO_JDBC_DRIVER)
           .doc("The driver of the Jdbc connection")
@@ -87,6 +87,14 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .version(ConfigConstants.VERSION_0_2_0)
           .booleanConf()
           .createWithDefault(true);
+
+  public static final ConfigEntry<String> S3_ENDPOINT =
+      new ConfigBuilder(IcebergConstants.GRAVITINO_S3_ENDPOINT)
+          .doc("S3 endpoint")
+          .version(ConfigConstants.VERSION_0_6_0)
+          .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .create();
 
   public static final ConfigEntry<String> ICEBERG_METRICS_STORE =
       new ConfigBuilder(IcebergConstants.ICEBERG_METRICS_STORE)
@@ -133,6 +141,14 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
 
   public IcebergConfig() {
     super(false);
+  }
+
+  public Map<String, String> getIcebergCatalogProperties() {
+    Map<String, String> config = getAllConfig();
+    Map<String, String> transformedConfig =
+        IcebergPropertiesUtils.toIcebergCatalogProperties(config);
+    transformedConfig.putAll(config);
+    return transformedConfig;
   }
 
   @Override

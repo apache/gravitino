@@ -22,6 +22,7 @@ package org.apache.gravitino.iceberg.common.utils;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.iceberg.common.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.catalog.Catalog;
@@ -66,7 +67,9 @@ public class TestIcebergCatalogUtil {
     properties.put(IcebergConstants.ICEBERG_JDBC_USER, "test");
     properties.put(IcebergConstants.ICEBERG_JDBC_PASSWORD, "test");
     properties.put(IcebergConstants.ICEBERG_JDBC_INITIALIZE, "false");
-    catalog = IcebergCatalogUtil.loadCatalogBackend("jdbc", properties);
+    catalog =
+        IcebergCatalogUtil.loadCatalogBackend(
+            IcebergCatalogBackend.JDBC, new IcebergConfig(properties));
     Assertions.assertTrue(catalog instanceof JdbcCatalog);
 
     Assertions.assertThrowsExactly(

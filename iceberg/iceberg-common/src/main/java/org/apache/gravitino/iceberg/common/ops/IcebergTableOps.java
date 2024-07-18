@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.sql.Driver;
 import java.sql.DriverManager;
 import java.util.Collections;
+import java.util.Locale;
 import java.util.Optional;
 import lombok.Getter;
 import lombok.Setter;
@@ -50,20 +51,24 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class IcebergTableOps implements AutoCloseable {
+
   public static final Logger LOG = LoggerFactory.getLogger(IcebergTableOps.class);
 
   @Getter protected Catalog catalog;
   private SupportsNamespaces asNamespaceCatalog;
-  private final String catalogType;
+  private final IcebergCatalogBackend catalogBackend;
   private String catalogUri = null;
 
   public IcebergTableOps(IcebergConfig icebergConfig) {
-    this.catalogType = icebergConfig.get(IcebergConfig.CATALOG_BACKEND);
-    if (!IcebergCatalogBackend.MEMORY.name().equalsIgnoreCase(catalogType)) {
+    this.catalogBackend =
+        IcebergCatalogBackend.valueOf(
+            icebergConfig.get(IcebergConfig.CATALOG_BACKEND).toUpperCase(Locale.ROOT));
+    if (!IcebergCatalogBackend.MEMORY.equals(catalogBackend)) {
+      // check whether IcebergConfig.CATALOG_WAREHOUSE exists
       icebergConfig.get(IcebergConfig.CATALOG_WAREHOUSE);
       this.catalogUri = icebergConfig.get(IcebergConfig.CATALOG_URI);
     }
-    catalog = IcebergCatalogUtil.loadCatalogBackend(catalogType, icebergConfig.getAllConfig());
+    this.catalog = IcebergCatalogUtil.loadCatalogBackend(catalogBackend, icebergConfig);
     if (catalog instanceof SupportsNamespaces) {
       asNamespaceCatalog = (SupportsNamespaces) catalog;
     }
@@ -172,7 +177,7 @@ public class IcebergTableOps implements AutoCloseable {
       closeMySQLCatalogResource();
     } else if (catalogUri != null && catalogUri.contains("postgresql")) {
       closePostgreSQLCatalogResource();
-    } else if (catalogType.equalsIgnoreCase(IcebergCatalogBackend.HIVE.name())) {
+    } else if (catalogBackend.equals(IcebergCatalogBackend.HIVE)) {
       // TODO(yuqi) add close for other catalog types such Hive catalog, for more, please refer to
       // https://github.com/apache/gravitino/pull/2548/commits/ab876b69b7e094bbd8c174d48a2365a18ed5176d
     }
