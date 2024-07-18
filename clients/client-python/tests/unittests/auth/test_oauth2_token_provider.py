@@ -21,7 +21,7 @@ import unittest
 from unittest.mock import patch
 
 from gravitino.auth.auth_constants import AuthConstants
-from gravitino.auth.default_oauth_to_token_provider import DefaultOAuth2TokenProvider
+from gravitino.auth.default_oauth2_token_provider import DefaultOAuth2TokenProvider
 from tests.unittests.auth import mock_base
 
 OAUTH_PORT = 1082
