@@ -70,10 +70,7 @@ public class AuthenticationFilter implements Filter {
 
       Principal principal = null;
       for (Authenticator authenticator : authenticators) {
-        if (!authenticator.supports(authData)) {
-          continue;
-        }
-        if (authenticator.isDataFromToken()) {
+        if (authenticator.supports(authData) && authenticator.isDataFromToken()) {
           principal = authenticator.authenticateToken(authData);
           if (principal != null) {
             request.setAttribute(AuthConstants.AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME, principal);
