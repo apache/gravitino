@@ -27,7 +27,9 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
@@ -118,20 +120,19 @@ public class MiniGravitino {
     this.port = jettyServerConfig.getHttpPort();
     String URI = String.format("http://%s:%d", host, port);
 
-    String authenticator = context.customConfig.get(Configs.AUTHENTICATOR.getKey());
-    if (authenticator != null
-        && COMMA
-            .splitToList(authenticator)
-            .contains(AuthenticatorType.OAUTH.name().toLowerCase())) {
+    List<String> authenticators = new ArrayList<>();
+    String authenticatorStr = context.customConfig.get(Configs.AUTHENTICATOR.getKey());
+    if (authenticatorStr != null) {
+      authenticators = COMMA.splitToList(authenticatorStr);
+    }
+
+    if (authenticators.contains(AuthenticatorType.OAUTH.name().toLowerCase())) {
       restClient =
           HTTPClient.builder(ImmutableMap.of())
               .uri(URI)
               .withAuthDataProvider(OAuthMockDataProvider.getInstance())
               .build();
-    } else if (authenticator != null
-        && COMMA
-            .splitToList(authenticator)
-            .contains(AuthenticatorType.KERBEROS.name().toLowerCase())) {
+    } else if (authenticators.contains(AuthenticatorType.KERBEROS.name().toLowerCase())) {
       restClient =
           HTTPClient.builder(ImmutableMap.of())
               .uri(URI)

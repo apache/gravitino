@@ -51,7 +51,9 @@ public class ConfigServlet extends HttpServlet {
       String config = String.valueOf(serverConfig.get(key));
       configs.put(key.getKey(), config);
     }
-    if (serverConfig.get(Configs.AUTHENTICATOR).equalsIgnoreCase(AuthenticatorType.OAUTH.name())) {
+    if (serverConfig
+        .get(Configs.AUTHENTICATOR)
+        .contains(AuthenticatorType.OAUTH.name().toLowerCase())) {
       for (ConfigEntry<?> key : oauthConfigEntries) {
         String config = String.valueOf(serverConfig.get(key));
         configs.put(key.getKey(), config);

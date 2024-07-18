@@ -75,8 +75,8 @@ class SimpleAuthenticator implements Authenticator {
 
   @Override
   public boolean supports(byte[] tokenData) {
-    return tokenData != null
-        && new String(tokenData, StandardCharsets.UTF_8)
+    return tokenData == null
+        || new String(tokenData, StandardCharsets.UTF_8)
             .startsWith(AuthConstants.AUTHORIZATION_BASIC_HEADER);
   }
 }

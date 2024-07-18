@@ -31,8 +31,10 @@ import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
@@ -263,22 +265,18 @@ public class AbstractIT {
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
 
     serverUri = "http://" + jettyServerConfig.getHost() + ":" + jettyServerConfig.getHttpPort();
-    String authenticator = customConfigs.get(Configs.AUTHENTICATOR.getKey());
 
-    if (authenticator != null
-        && COMMA
-            .splitToList(authenticator)
-            .contains(AuthenticatorType.OAUTH.name().toLowerCase())) {
+    List<String> authenticators = new ArrayList<>();
+    String authenticatorStr = customConfigs.get(Configs.AUTHENTICATOR.getKey());
+    if (authenticatorStr != null) {
+      authenticators = COMMA.splitToList(authenticatorStr);
+    }
+
+    if (authenticators.contains(AuthenticatorType.OAUTH.name().toLowerCase())) {
       client = GravitinoAdminClient.builder(serverUri).withOAuth(mockDataProvider).build();
-    } else if (authenticator != null
-        && COMMA
-            .splitToList(authenticator)
-            .contains(AuthenticatorType.SIMPLE.name().toLowerCase())) {
+    } else if (authenticators.contains(AuthenticatorType.SIMPLE.name().toLowerCase())) {
       client = GravitinoAdminClient.builder(serverUri).withSimpleAuth().build();
-    } else if (authenticator != null
-        && COMMA
-            .splitToList(authenticator)
-            .contains(AuthenticatorType.KERBEROS.name().toLowerCase())) {
+    } else if (authenticators.contains(AuthenticatorType.KERBEROS.name().toLowerCase())) {
       serverUri = "http://localhost:" + jettyServerConfig.getHttpPort();
       client = null;
     } else {
