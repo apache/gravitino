@@ -16,20 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
-package org.apache.gravitino.catalog.lakehouse.iceberg.authentication.kerberos;
+package org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.catalog.lakehouse.iceberg.authentication.AuthenticationConfig;
+import org.apache.gravitino.catalog.lakehouse.paimon.authentication.AuthenticationConfig;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.connector.PropertyEntry;
 
 public class KerberosConfig extends AuthenticationConfig {
-  public static final String KET_TAB_URI_KEY = "authentication.kerberos.keytab-uri";
+  public static final String KEY_TAB_URI_KEY = "authentication.kerberos.keytab-uri";
 
   public static final String PRINCIPAL_KEY = "authentication.kerberos.principal";
 
@@ -38,20 +37,17 @@ public class KerberosConfig extends AuthenticationConfig {
   public static final String FETCH_TIMEOUT_SEC_KEY =
       "authentication.kerberos.keytab-fetch-timeout-sec";
 
-  public static final String GRAVITINO_KEYTAB_FORMAT =
-      "keytabs/gravitino-lakehouse-iceberg-%s-keytab";
-
   public static final ConfigEntry<String> PRINCIPAL_ENTRY =
       new ConfigBuilder(PRINCIPAL_KEY)
-          .doc("The principal of the Kerberos for Iceberg catalog with Kerberos authentication")
+          .doc("The principal of the Kerberos connection")
           .version(ConfigConstants.VERSION_0_6_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<String> KEYTAB_ENTRY =
-      new ConfigBuilder(KET_TAB_URI_KEY)
-          .doc("The keytab of the Kerberos for Iceberg catalog with Kerberos authentication")
+      new ConfigBuilder(KEY_TAB_URI_KEY)
+          .doc("The keytab of the Kerberos connection")
           .version(ConfigConstants.VERSION_0_6_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
@@ -59,8 +55,7 @@ public class KerberosConfig extends AuthenticationConfig {
 
   public static final ConfigEntry<Integer> CHECK_INTERVAL_SEC_ENTRY =
       new ConfigBuilder(CHECK_INTERVAL_SEC_KEY)
-          .doc(
-              "The check interval of the Kerberos credential for Iceberg catalog with Kerberos authentication")
+          .doc("The check interval of the Kerberos connection for Paimon catalog")
           .version(ConfigConstants.VERSION_0_6_0)
           .intConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
@@ -68,8 +63,7 @@ public class KerberosConfig extends AuthenticationConfig {
 
   public static final ConfigEntry<Integer> FETCH_TIMEOUT_SEC_ENTRY =
       new ConfigBuilder(FETCH_TIMEOUT_SEC_KEY)
-          .doc(
-              "The fetch timeout of the Kerberos key table of Iceberg catalog with Kerberos authentication")
+          .doc("The fetch timeout of the Kerberos connection")
           .version(ConfigConstants.VERSION_0_6_0)
           .intConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
@@ -78,10 +72,6 @@ public class KerberosConfig extends AuthenticationConfig {
   public KerberosConfig(Map<String, String> properties) {
     super(properties);
     loadFromMap(properties, k -> true);
-  }
-
-  public boolean isImpersonationEnabled() {
-    return get(ENABLE_IMPERSONATION_ENTRY);
   }
 
   public String getPrincipalName() {
@@ -103,38 +93,24 @@ public class KerberosConfig extends AuthenticationConfig {
   public static final Map<String, PropertyEntry<?>> KERBEROS_PROPERTY_ENTRIES =
       new ImmutableMap.Builder<String, PropertyEntry<?>>()
           .put(
-              KET_TAB_URI_KEY,
+              KEY_TAB_URI_KEY,
               PropertyEntry.stringImmutablePropertyEntry(
-                  KET_TAB_URI_KEY,
-                  "The keytab of the Kerberos for Iceberg catalog with Kerberos authentication",
-                  false,
-                  null,
-                  false,
-                  false))
+                  KEY_TAB_URI_KEY, "The uri of key tab for the catalog", false, null, false, false))
           .put(
               PRINCIPAL_KEY,
               PropertyEntry.stringImmutablePropertyEntry(
-                  PRINCIPAL_KEY,
-                  "The principal of the Kerberos for Iceberg catalog with Kerberos authentication",
-                  false,
-                  null,
-                  false,
-                  false))
+                  PRINCIPAL_KEY, "The principal for the catalog", false, null, false, false))
           .put(
               CHECK_INTERVAL_SEC_KEY,
               PropertyEntry.integerOptionalPropertyEntry(
                   CHECK_INTERVAL_SEC_KEY,
-                  "The check interval of the Kerberos credential for Iceberg catalog with Kerberos authentication",
+                  "The interval to check validness of the principal",
                   true,
                   60,
                   false))
           .put(
               FETCH_TIMEOUT_SEC_KEY,
               PropertyEntry.integerOptionalPropertyEntry(
-                  FETCH_TIMEOUT_SEC_KEY,
-                  "The fetch timeout of the Kerberos key table of Iceberg catalog with Kerberos authentication",
-                  true,
-                  60,
-                  false))
+                  FETCH_TIMEOUT_SEC_KEY, "The timeout to fetch key tab", true, 60, false))
           .build();
 }

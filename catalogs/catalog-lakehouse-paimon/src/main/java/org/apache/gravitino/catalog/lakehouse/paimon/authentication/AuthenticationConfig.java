@@ -16,13 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
-package org.apache.gravitino.catalog.hadoop.authentication;
+package org.apache.gravitino.catalog.lakehouse.paimon.authentication;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.Config;
-import org.apache.gravitino.catalog.hadoop.authentication.kerberos.KerberosConfig;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
@@ -32,8 +30,6 @@ public class AuthenticationConfig extends Config {
 
   // The key for the authentication type, currently we support Kerberos and simple
   public static final String AUTH_TYPE_KEY = "authentication.type";
-
-  public static final String IMPERSONATION_ENABLE_KEY = "authentication.impersonation-enable";
 
   enum AuthenticationType {
     SIMPLE,
@@ -48,24 +44,13 @@ public class AuthenticationConfig extends Config {
   public static final ConfigEntry<String> AUTH_TYPE_ENTRY =
       new ConfigBuilder(AUTH_TYPE_KEY)
           .doc(
-              "The type of authentication for Hadoop catalog, currently we only support simple and Kerberos")
-          .version(ConfigConstants.VERSION_0_5_1)
+              "The type of authentication for Paimon catalog, currently we only support simple and Kerberos")
+          .version(ConfigConstants.VERSION_0_6_0)
           .stringConf()
           .createWithDefault("simple");
 
-  public static final ConfigEntry<Boolean> ENABLE_IMPERSONATION_ENTRY =
-      new ConfigBuilder(IMPERSONATION_ENABLE_KEY)
-          .doc("Whether to enable impersonation for the Hadoop catalog")
-          .version(ConfigConstants.VERSION_0_5_1)
-          .booleanConf()
-          .createWithDefault(KerberosConfig.DEFAULT_IMPERSONATION_ENABLE);
-
   public String getAuthType() {
     return get(AUTH_TYPE_ENTRY);
-  }
-
-  public boolean isImpersonationEnabled() {
-    return get(ENABLE_IMPERSONATION_ENTRY);
   }
 
   public boolean isSimpleAuth() {
@@ -79,20 +64,10 @@ public class AuthenticationConfig extends Config {
   public static final Map<String, PropertyEntry<?>> AUTHENTICATION_PROPERTY_ENTRIES =
       new ImmutableMap.Builder<String, PropertyEntry<?>>()
           .put(
-              IMPERSONATION_ENABLE_KEY,
-              PropertyEntry.booleanPropertyEntry(
-                  IMPERSONATION_ENABLE_KEY,
-                  "Whether to enable impersonation for the Hadoop catalog",
-                  false,
-                  true,
-                  KerberosConfig.DEFAULT_IMPERSONATION_ENABLE,
-                  false,
-                  false))
-          .put(
               AUTH_TYPE_KEY,
               PropertyEntry.stringImmutablePropertyEntry(
                   AUTH_TYPE_KEY,
-                  "The type of authentication for Hadoop catalog, currently we only support simple and Kerberos",
+                  "The type of authentication for Paimon catalog, currently we only support simple and Kerberos",
                   false,
                   null,
                   false,

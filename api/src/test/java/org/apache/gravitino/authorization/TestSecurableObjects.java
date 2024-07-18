@@ -27,30 +27,6 @@ public class TestSecurableObjects {
 
   @Test
   public void testSecurableObjects() {
-    SecurableObject allMetalakes =
-        SecurableObjects.ofAllMetalakes(Lists.newArrayList(Privileges.CreateMetalake.allow()));
-    Assertions.assertEquals("*", allMetalakes.fullName());
-    Assertions.assertEquals(MetadataObject.Type.METALAKE, allMetalakes.type());
-
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            SecurableObjects.of(
-                MetadataObject.Type.METALAKE,
-                Lists.newArrayList("*"),
-                Lists.newArrayList(Privileges.UseMetalake.allow())));
-
-    SecurableObject metalake =
-        SecurableObjects.ofMetalake("metalake", Lists.newArrayList(Privileges.UseMetalake.allow()));
-    Assertions.assertEquals("metalake", metalake.fullName());
-    Assertions.assertEquals(MetadataObject.Type.METALAKE, metalake.type());
-    SecurableObject anotherMetalake =
-        SecurableObjects.of(
-            MetadataObject.Type.METALAKE,
-            Lists.newArrayList("metalake"),
-            Lists.newArrayList(Privileges.UseMetalake.allow()));
-    Assertions.assertEquals(metalake, anotherMetalake);
-
     SecurableObject catalog =
         SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
     Assertions.assertEquals("catalog", catalog.fullName());
