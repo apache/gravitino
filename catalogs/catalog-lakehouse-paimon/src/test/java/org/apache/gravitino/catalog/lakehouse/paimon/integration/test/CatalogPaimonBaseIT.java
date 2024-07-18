@@ -38,6 +38,7 @@ import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig;
+import org.apache.gravitino.catalog.lakehouse.paimon.ops.PaimonBackendCatalogWrapper;
 import org.apache.gravitino.catalog.lakehouse.paimon.utils.CatalogUtils;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.dto.util.DTOConverters;
