@@ -62,12 +62,12 @@ import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-class BaseHadoopCatalogOperations {
+class HadoopCatalogOperationsImpl {
 
   private static final String SCHEMA_DOES_NOT_EXIST_MSG = "Schema %s does not exist";
   private static final String FILESET_DOES_NOT_EXIST_MSG = "Fileset %s does not exist";
 
-  private static final Logger LOG = LoggerFactory.getLogger(BaseHadoopCatalogOperations.class);
+  private static final Logger LOG = LoggerFactory.getLogger(HadoopCatalogOperationsImpl.class);
 
   private final EntityStore store;
 
@@ -81,11 +81,11 @@ class BaseHadoopCatalogOperations {
 
   private CatalogInfo catalogInfo;
 
-  BaseHadoopCatalogOperations(EntityStore store) {
+  HadoopCatalogOperationsImpl(EntityStore store) {
     this.store = store;
   }
 
-  public BaseHadoopCatalogOperations() {
+  public HadoopCatalogOperationsImpl() {
     this(GravitinoEnv.getInstance().entityStore());
   }
 

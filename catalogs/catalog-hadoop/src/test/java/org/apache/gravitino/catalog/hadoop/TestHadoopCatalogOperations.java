@@ -222,7 +222,7 @@ public class TestHadoopCatalogOperations {
     Map<String, String> emptyProps = Maps.newHashMap();
     HadoopCatalogOperations secOps = new HadoopCatalogOperations(store);
 
-    BaseHadoopCatalogOperations ops = secOps.getBaseHadoopCatalogOperations();
+    HadoopCatalogOperationsImpl ops = secOps.getBaseHadoopCatalogOperations();
 
     CatalogInfo catalogInfo = randomCatalogInfo();
     ops.initialize(emptyProps, catalogInfo, HADOOP_PROPERTIES_METADATA);
@@ -683,7 +683,7 @@ public class TestHadoopCatalogOperations {
 
     for (int i = 0; i < paths.length; i++) {
       Path actual =
-          BaseHadoopCatalogOperations.formalizePath(new Path(paths[i]), new Configuration());
+          HadoopCatalogOperationsImpl.formalizePath(new Path(paths[i]), new Configuration());
       Assertions.assertEquals(expected[i], actual.toString());
     }
   }

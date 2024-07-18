@@ -73,7 +73,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   public static final Logger LOG = LoggerFactory.getLogger(HadoopCatalogOperations.class);
 
-  private final BaseHadoopCatalogOperations hadoopCatalogOperations;
+  private final HadoopCatalogOperationsImpl hadoopCatalogOperations;
 
   private final List<Closeable> closeables = Lists.newArrayList();
 
@@ -84,15 +84,15 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   private String kerberosRealm;
 
   public HadoopCatalogOperations() {
-    this.hadoopCatalogOperations = new BaseHadoopCatalogOperations();
+    this.hadoopCatalogOperations = new HadoopCatalogOperationsImpl();
   }
 
   public HadoopCatalogOperations(EntityStore store) {
-    this.hadoopCatalogOperations = new BaseHadoopCatalogOperations(store);
+    this.hadoopCatalogOperations = new HadoopCatalogOperationsImpl(store);
   }
 
   @VisibleForTesting
-  public BaseHadoopCatalogOperations getBaseHadoopCatalogOperations() {
+  public HadoopCatalogOperationsImpl getBaseHadoopCatalogOperations() {
     return hadoopCatalogOperations;
   }
 
