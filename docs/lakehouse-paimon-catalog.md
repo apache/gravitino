@@ -79,7 +79,7 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 :::info
 dropTable will delete the table location directly, similar with purgeTable.
 :::
-- Supporting Column default value through table properties, such as 
+- Supporting Column default value through table properties, such as fields.{columnName}.default-value.
 
 - Doesn't support alterTable now.
 
@@ -113,23 +113,24 @@ dropTable will delete the table location directly, similar with purgeTable.
 | `Long`                        | `BigInt`                       |
 | `Float`                       | `Float`                        |
 | `Double`                      | `Double`                       |
+| `Decimal`                     | `Decimal`                      |
 | `String`                      | `VarChar(Integer.MAX_VALUE)`   |
-| `VarChar`                     | `VarChar(length)`              |
+| `VarChar`                     | `VarChar`                      |
+| `FixedChar`                   | `Char`                         |
 | `Date`                        | `Date`                         |
 | `Time`                        | `Time`                         |
 | `TimestampType withZone`      | `LocalZonedTimestamp`          |
 | `TimestampType withoutZone`   | `Timestamp`                    |
-| `Decimal`                     | `Decimal`                      |
 | `Binary`                      | `Binary`                       |
+| `Fixed`                       | `VarBinary`                    |
 
 :::info
-Gravitino Paimon table column types doesn't support Paimon `Char` and `VarBinary` type now.
-Gravitino types doesn't support Paimon `MultisetType` type.
+Gravitino doesn't support Paimon `MultisetType` type.
 :::
 
 ### Table properties
 
-You can pass [Paimon table properties](https://paimon.apache.org/docs/0.8/maintenance/configurations/) to Gravitino when creating an Paimon table.
+You can pass [Paimon table properties](https://paimon.apache.org/docs/0.8/maintenance/configurations/) to Gravitino when creating a Paimon table.
 
 The Gravitino server doesn't allow passing the following reserved fields.
 
