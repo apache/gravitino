@@ -129,7 +129,10 @@ class HadoopCatalogOperationsImpl {
                 .getOrDefault(config, HadoopCatalogPropertiesMetadata.LOCATION);
     conf.forEach(hadoopConf::set);
 
-    this.catalogStorageLocation = Optional.ofNullable(catalogLocation).map(Path::new);
+    this.catalogStorageLocation =
+        StringUtils.isNotBlank(catalogLocation)
+            ? Optional.of(catalogLocation).map(Path::new)
+            : Optional.empty();
   }
 
   public NameIdentifier[] listFilesets(Namespace namespace) throws NoSuchSchemaException {
