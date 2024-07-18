@@ -93,9 +93,7 @@ public class TestTypeUtils {
     Arrays.asList(
             Types.IntervalYearType.get(),
             Types.IntervalDayType.get(),
-            Types.FixedCharType.of(10),
             Types.UUIDType.get(),
-            Types.FixedType.of(20),
             Types.UnionType.of(Types.IntegerType.get()),
             Types.NullType.get(),
             Types.UnparsedType.of("unparsed"))
