@@ -172,34 +172,42 @@ public class CatalogRegister {
 
   private boolean checkCatalogExist(String name) {
     String showCatalogCommand = String.format("SHOW CATALOGS like '%s'", name);
-    Exception failedException = null;
-    try {
-      int retries = EXECUTE_QUERY_MAX_RETRIES;
-      while (retries-- > 0) {
-        try (Statement statement = connection.createStatement()) {
-          // check the catalog is already created
-          statement.execute(showCatalogCommand);
-          ResultSet rs = statement.getResultSet();
-          while (rs.next()) {
-            String catalogName = rs.getString(1);
-            if (catalogName.equals(name) || catalogName.equals("\"" + name + "\"")) {
-              return true;
-            }
+    int retries = EXECUTE_QUERY_MAX_RETRIES;
+    // Removed failedException variable as it's no longer needed
+    while (retries-- > 0) {
+      try (Statement statement = connection.createStatement()) {
+        // check the catalog is already created
+        statement.execute(showCatalogCommand);
+        ResultSet rs = statement.getResultSet();
+        while (rs.next()) {
+          String catalogName = rs.getString(1);
+          if (catalogName.equals(name) || catalogName.equals("\"" + name + "\"")) {
+            return true;
           }
-          return false;
-        } catch (Exception e) {
-          failedException = e;
-          LOG.warn("Execute command failed: {}, ", showCatalogCommand, e);
+        }
+        return false;
+      } catch (Exception e) {
+        LOG.warn("Execute command failed: {}, ", showCatalogCommand, e);
+        // Exception handling moved inside the retry loop
+        // Throw TrinoException directly when retries are exhausted
+        if (retries == 0) {
+          throw new TrinoException(
+                  GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, "Failed to check catalog exist", e);
+        }
+        try {
           Thread.sleep(EXECUTE_QUERY_BACKOFF_TIME_SECOND * 1000);
+        } catch (InterruptedException ie) {
+          // Added proper handling for InterruptedException
+          Thread.currentThread().interrupt();
+          throw new TrinoException(
+                  GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, "Thread interrupted while checking catalog exist", ie);
         }
       }
-      throw failedException;
-    } catch (Exception e) {
-      throw new TrinoException(
-          GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, "Failed to check catalog exist", e);
     }
+    // This return statement is added to satisfy the compiler
+    // It should never be reached due to the exception throw when retries are exhausted
+    return false;
   }
-
   private void executeSql(String sql) {
     try {
       int retries = EXECUTE_QUERY_MAX_RETRIES;
