@@ -69,10 +69,6 @@ import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * HadoopCatalogOperations is a secure version of HadoopCatalogOperations that can manage Schema and
- * fileset level of user authentication.
- */
 public class HadoopCatalogOperations implements CatalogOperations, SupportsSchemas, FilesetCatalog {
 
   public static final Logger LOG = LoggerFactory.getLogger(HadoopCatalogOperations.class);
