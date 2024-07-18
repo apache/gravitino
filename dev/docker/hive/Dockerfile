@@ -82,6 +82,7 @@ ENV HIVE_HOME=/usr/local/hive
 ENV HIVE2_HOME=/usr/local/hive2
 ENV HIVE3_HOME=/usr/local/hive3
 ENV HIVE_CONF_DIR=${HIVE_HOME}/conf
+ENV HIVE_TMP_CONF_DIR=/tmp/hive-conf
 ENV HADOOP_HOME=/usr/local/hadoop
 ENV HADOOP2_HOME=/usr/local/hadoop2
 ENV HADOOP3_HOME=/usr/local/hadoop3
@@ -91,6 +92,7 @@ ENV HADOOP_MAPRED_HOME=${HADOOP_INSTALL}
 ENV HADOOP_COMMON_HOME=${HADOOP_INSTALL}
 ENV HADOOP_HDFS_HOME=${HADOOP_INSTALL}
 ENV HADOOP_CONF_DIR=${HADOOP_HOME}/etc/hadoop
+ENV HADOOP_TMP_CONF_DIR=/tmp/hadoop-conf
 ENV YARN_HOME=${HADOOP_INSTALL}
 ENV ZK_HOME=/usr/local/zookeeper
 ENV RANGER_HDFS_PLUGIN_HOME=/usr/local/ranger-hdfs-plugin
@@ -142,40 +144,32 @@ ADD packages/ranger-${RANGER_VERSION}-hive-plugin.tar.gz /opt/
 RUN ln -s /opt/ranger-${RANGER_VERSION}-hive-plugin ${RANGER_HIVE_PLUGIN_HOME}
 
 ################################################################################
-# install hadoop
+# install hadoop2 and hadoop3
 ADD packages/hadoop-${HADOOP2_VERSION}.tar.gz /opt/
 RUN ln -s /opt/hadoop-${HADOOP2_VERSION} ${HADOOP2_HOME}
 ADD packages/hadoop-${HADOOP3_VERSION}.tar.gz /opt/
 RUN ln -s /opt/hadoop-${HADOOP3_VERSION} ${HADOOP3_HOME}
 
-# replace configuration templates
-RUN rm -f ${HADOOP_CONF_DIR}/core-site.xml
-RUN rm -f ${HADOOP_CONF_DIR}/hadoop-env.sh
-RUN rm -f ${HADOOP_CONF_DIR}/hdfs-site.xml
-RUN rm -f ${HADOOP_CONF_DIR}/mapred-site.xml
-
-ADD core-site.xml ${HADOOP_CONF_DIR}/core-site.xml
-ADD hadoop-env.sh ${HADOOP_CONF_DIR}/hadoop-env.sh
-ADD hdfs-site.xml ${HADOOP_CONF_DIR}/hdfs-site.xml
-ADD mapred-site.xml ${HADOOP_CONF_DIR}/mapred-site.xml
+# Add hadoop configuration to temporary directory
+ADD core-site.xml ${HADOOP_TMP_CONF_DIR}/core-site.xml
+ADD hadoop-env.sh ${HADOOP_TMP_CONF_DIR}/hadoop-env.sh
+ADD hdfs-site.xml ${HADOOP_TMP_CONF_DIR}/hdfs-site.xml
+ADD mapred-site.xml ${HADOOP_TMP_CONF_DIR}/mapred-site.xml
 ADD check-status.sh /tmp/check-status.sh
 
 ################################################################################
-
-# install hive2
+# install hive2 and hive3
 ADD packages/apache-hive-${HIVE2_VERSION}-bin.tar.gz /opt/
 RUN ln -s /opt/apache-hive-${HIVE2_VERSION}-bin ${HIVE2_HOME}
-
-# install hive3
 ADD packages/apache-hive-${HIVE3_VERSION}-bin.tar.gz /opt/
 RUN ln -s /opt/apache-hive-${HIVE3_VERSION}-bin ${HIVE3_HOME}
 
-ADD hive-site.xml ${HIVE_CONF_DIR}/hive-site.xml
+# Add hive configuration to temporary directory
+ADD hive-site.xml ${HIVE_TMP_CONF_DIR}/hive-site.xml
 
 ################################################################################
 # add mysql jdbc driver
 ADD packages/mysql-connector-java-${MYSQL_JDBC_DRIVER_VERSION}.tar.gz /opt/
-#RUN ln -s /opt/mysql-connector-java-${MYSQL_JDBC_DRIVER_VERSION}/* ${HIVE_HOME}/lib
 
 ################################################################################
 # add users and groups

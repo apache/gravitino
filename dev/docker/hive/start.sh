@@ -18,14 +18,8 @@
 # under the License.
 #
 
-# backup config dir, and after symbolic linking, copied content back to config dir
-cp -r ${HIVE_CONF_DIR} /opt/hive-conf
-cp -r ${HADOOP_CONF_DIR} /opt/hadoop-conf
-
-rm -r ${HIVE_HOME}
-rm -r ${HADOOP_HOME}
-
-if [[ "${HIVE_VERSION}" =~ 3.* ]]; then
+# Special Hive runtime version environment variable to decide which version of Hive to install
+if [[ "${HIVE_RUNTIME_VERSION}" == "hive3" ]]; then
   ln -s ${HIVE3_HOME} ${HIVE_HOME}
   ln -s ${HADOOP3_HOME} ${HADOOP_HOME}
 else
@@ -33,17 +27,15 @@ else
   ln -s ${HADOOP2_HOME} ${HADOOP_HOME}
 fi
 
-# Add back hive configuration
-cp /opt/hive-conf/* ${HIVE_CONF_DIR}
-cp /opt/hadoop-conf/* ${HADOOP_CONF_DIR}
+# Copy Hadoop and Hive configuration file and update hostname
+cp -f ${HADOOP_TMP_CONF_DIR}/* ${HADOOP_CONF_DIR}
+cp -f ${HIVE_TMP_CONF_DIR}/* ${HIVE_CONF_DIR}
+sed -i "s/__REPLACE__HOST_NAME/$(hostname)/g" ${HADOOP_CONF_DIR}/core-site.xml
+sed -i "s/__REPLACE__HOST_NAME/$(hostname)/g" ${HADOOP_CONF_DIR}/hdfs-site.xml
+sed -i "s/__REPLACE__HOST_NAME/$(hostname)/g" ${HIVE_CONF_DIR}/hive-site.xml
 
 # Link mysql-connector-java after deciding where HIVE_HOME symbolic link points to.
 ln -s /opt/mysql-connector-java-${MYSQL_JDBC_DRIVER_VERSION}/mysql-connector-java-${MYSQL_JDBC_DRIVER_VERSION}.jar ${HIVE_HOME}/lib
-
-# Fix guava problem
-# See https://issues.apache.org/jira/browse/HIVE-22915
-rm ${HIVE_HOME}/lib/guava-*.jar
-cp ${HADOOP_HOME}/share/hadoop/hdfs/lib/guava-*-jre.jar ${HIVE_HOME}/lib/
 
 # install Ranger hive plugin
 if [[ -n "${RANGER_HIVE_REPOSITORY_NAME}" && -n "${RANGER_SERVER_URL}" ]]; then
@@ -110,11 +102,6 @@ log4j.appender.RANGERAUDIT.layout.ConversionPattern=%d{ISO8601} %p %c{2}: %L %m%
 log4j.appender.RANGERAUDIT.DatePattern=.yyyy-MM-dd
 EOF
 fi
-
-# update hadoop config use hostname
-sed -i "s/__REPLACE__HOST_NAME/$(hostname)/g" ${HADOOP_CONF_DIR}/core-site.xml
-sed -i "s/__REPLACE__HOST_NAME/$(hostname)/g" ${HADOOP_CONF_DIR}/hdfs-site.xml
-sed -i "s/__REPLACE__HOST_NAME/$(hostname)/g" ${HIVE_HOME}/conf/hive-site.xml
 
 # start hdfs
 echo "Starting HDFS..."

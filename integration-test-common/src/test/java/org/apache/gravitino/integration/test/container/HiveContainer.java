@@ -42,9 +42,13 @@ public class HiveContainer extends BaseContainer {
   public static final String KERBEROS_IMAGE =
       System.getenv("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE");
 
-  public static final String RANGER_IMAGE = System.getenv("GRAVITINO_CI_RANGER_HIVE_DOCKER_IMAGE");
   public static final String HOST_NAME = "gravitino-ci-hive";
   public static final String HADOOP_USER_NAME = "HADOOP_USER_NAME";
+  // Specify the Hive version to start the Hive container, currently support `hive2`(default) and
+  // `hive3`
+  public static final String HIVE_RUNTIME_VERSION = "HIVE_RUNTIME_VERSION";
+  public static final String HIVE2 = "hive2"; // The Hive container default version
+  public static final String HIVE3 = "hive3";
   private static final int MYSQL_PORT = 3306;
   public static final int HDFS_DEFAULTFS_PORT = 9000;
   public static final int HIVE_METASTORE_PORT = 9083;
@@ -205,8 +209,6 @@ public class HiveContainer extends BaseContainer {
   }
 
   public static class Builder extends BaseContainer.Builder<Builder, HiveContainer> {
-    boolean rangerEnablePlugin = false;
-
     private Builder() {
       this.image = DEFAULT_IMAGE;
       this.hostName = HOST_NAME;
@@ -214,17 +216,10 @@ public class HiveContainer extends BaseContainer {
           ImmutableSet.of(MYSQL_PORT, HDFS_DEFAULTFS_PORT, HIVE_METASTORE_PORT, HIVE_SERVICE_PORT);
     }
 
-    public Builder withEnableRangerPlugin(Boolean enable) {
-      this.rangerEnablePlugin = enable;
-      return this;
-    }
-
     private String generateImageName() {
       String hiveDockerImageName = image;
       if (kerberosEnabled) {
         hiveDockerImageName = KERBEROS_IMAGE;
-      } else if (rangerEnablePlugin) {
-        hiveDockerImageName = RANGER_IMAGE;
       }
       return hiveDockerImageName;
     }

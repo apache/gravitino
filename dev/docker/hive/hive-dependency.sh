@@ -22,16 +22,14 @@ hive_dir="$(dirname "${BASH_SOURCE-$0}")"
 hive_dir="$(cd "${hive_dir}">/dev/null; pwd)"
 
 # Environment variables definition
-#HADOOP_VERSION=${HADOOP_VERSION:-"2.7.3"}
 HADOOP2_VERSION="2.7.3"
 HADOOP3_VERSION="3.1.0"
-#HIVE_VERSION=${HIVE_VERSION:-"2.3.9"}
 
 HIVE2_VERSION="2.3.9"
 HIVE3_VERSION="3.1.3"
 MYSQL_JDBC_DRIVER_VERSION=${MYSQL_VERSION:-"8.0.15"}
 ZOOKEEPER_VERSION=${ZOOKEEPER_VERSION:-"3.4.13"}
-RANGER_VERSION=${RANGER_VERSION:-"2.4.0"} # Notice: Currently only tested Ranger plugin 2.4.0 in the Hadoop 3.1.0 and Hive 3.1.3
+RANGER_VERSION="2.4.0" # Notice: Currently only tested Ranger plugin 2.4.0 in the Hadoop 3.1.0 and Hive 3.1.3
 
 HADOOP2_PACKAGE_NAME="hadoop-${HADOOP2_VERSION}.tar.gz"
 HADOOP2_DOWNLOAD_URL="https://archive.apache.org/dist/hadoop/core/hadoop-${HADOOP2_VERSION}/${HADOOP2_PACKAGE_NAME}"

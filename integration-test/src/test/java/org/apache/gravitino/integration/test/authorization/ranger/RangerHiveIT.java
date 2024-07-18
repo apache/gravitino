@@ -18,9 +18,6 @@
  */
 package org.apache.gravitino.integration.test.authorization.ranger;
 
-import org.apache.gravitino.integration.test.container.ContainerSuite;
-import org.apache.gravitino.integration.test.container.HiveContainer;
-import org.apache.gravitino.integration.test.container.RangerContainer;
 import com.google.common.collect.ImmutableMap;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -33,6 +30,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.container.RangerContainer;
 import org.apache.ranger.plugin.model.RangerPolicy;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -51,9 +51,11 @@ public class RangerHiveIT extends RangerIT {
   public static void setup() {
     RangerIT.setup();
 
-    containerSuite.startHiveRangerContainer(
+    containerSuite.startHiveContainer(
         new HashMap<>(
             ImmutableMap.of(
+                HiveContainer.HIVE_RUNTIME_VERSION,
+                HiveContainer.HIVE3,
                 RangerContainer.DOCKER_ENV_RANGER_SERVER_URL,
                 String.format(
                     "http://%s:%d",
@@ -62,12 +64,12 @@ public class RangerHiveIT extends RangerIT {
                 RangerContainer.DOCKER_ENV_RANGER_HIVE_REPOSITORY_NAME,
                 RangerIT.RANGER_HIVE_REPO_NAME,
                 RangerContainer.DOCKER_ENV_RANGER_HDFS_REPOSITORY_NAME,
-                RangerIT.RANGER_HDFS_REPO_NAME)));
+                RangerIT.RANGER_HDFS_REPO_NAME,
+                HiveContainer.HADOOP_USER_NAME,
+                adminUser)));
 
-    createRangerHdfsRepository(
-        containerSuite.getHiveRangerContainer().getContainerIpAddress(), true);
-    createRangerHiveRepository(
-        containerSuite.getHiveRangerContainer().getContainerIpAddress(), true);
+    createRangerHdfsRepository(containerSuite.getHiveContainer().getContainerIpAddress(), true);
+    createRangerHiveRepository(containerSuite.getHiveContainer().getContainerIpAddress(), true);
     allowAnyoneAccessHDFS();
     allowAnyoneAccessInformationSchema();
 
@@ -75,7 +77,7 @@ public class RangerHiveIT extends RangerIT {
     String url =
         String.format(
             "jdbc:hive2://%s:%d/default",
-            containerSuite.getHiveRangerContainer().getContainerIpAddress(),
+            containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HIVE_SERVICE_PORT);
     try {
       Class.forName("org.apache.hive.jdbc.HiveDriver");

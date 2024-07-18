@@ -22,10 +22,6 @@ on:
         description: 'Docker tag to apply to this image'
         required: true
         type: string
-      environments:
-        description: 'Environments variables for the build image'
-        required: false
-        type: string
       token:
         description: 'Publish Docker token'
         required: true
@@ -100,4 +96,4 @@ jobs:
         run: | 
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /opt/hostedtoolcache/CodeQL
-          ${{ github.event.inputs.environments }} ./dev/docker/build-docker.sh --platform all --type ${image_type} --image ${image_name} --tag ${{ github.event.inputs.tag }} --latest
+          ./dev/docker/build-docker.sh --platform all --type ${image_type} --image ${image_name} --tag ${{ github.event.inputs.tag }} --latest
