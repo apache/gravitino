@@ -171,33 +171,34 @@ public class CatalogRegister {
   }
 
   private boolean checkCatalogExist(String name) {
-    String showCatalogCommand = String.format("SHOW CATALOGS like '%s'", name);
-    Exception failedException = null;
-    try {
-      int retries = EXECUTE_QUERY_MAX_RETRIES;
-      while (retries-- > 0) {
-        try (Statement statement = connection.createStatement()) {
-          // check the catalog is already created
-          statement.execute(showCatalogCommand);
-          ResultSet rs = statement.getResultSet();
-          while (rs.next()) {
-            String catalogName = rs.getString(1);
-            if (catalogName.equals(name) || catalogName.equals("\"" + name + "\"")) {
-              return true;
-            }
+    String showCatalogCommand = String.format("SHOW CATALOGS LIKE '%s'", name);
+    long endTime = System.currentTimeMillis() + EXECUTE_QUERY_TIMEOUT_MS;
+
+    do {
+      try (Statement statement = connection.createStatement();
+           ResultSet rs = statement.executeQuery(showCatalogCommand)) {
+
+        while (rs.next()) {
+          if (name.equalsIgnoreCase(rs.getString(1).replace("\"", ""))) {
+            return true;
           }
-          return false;
-        } catch (Exception e) {
-          failedException = e;
-          LOG.warn("Execute command failed: {}, ", showCatalogCommand, e);
-          Thread.sleep(EXECUTE_QUERY_BACKOFF_TIME_SECOND * 1000);
+        }
+        return false;
+      } catch (SQLException e) {
+        LOG.warn("Execute command failed: {}", showCatalogCommand, e);
+        if (System.currentTimeMillis() >= endTime) {
+          throw new TrinoException(GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR,
+                  "Failed to check catalog exist after " + EXECUTE_QUERY_TIMEOUT_MS + "ms", e);
+        }
+        try {
+          Thread.sleep(EXECUTE_QUERY_BACKOFF_TIME_MS);
+        } catch (InterruptedException ie) {
+          Thread.currentThread().interrupt();
+          throw new TrinoException(GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR,
+                  "Thread interrupted while checking catalog exist", ie);
         }
       }
-      throw failedException;
-    } catch (Exception e) {
-      throw new TrinoException(
-          GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, "Failed to check catalog exist", e);
-    }
+    } while (true);
   }
 
   private void executeSql(String sql) {
