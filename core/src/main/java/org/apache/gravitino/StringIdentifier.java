@@ -37,6 +37,9 @@ public class StringIdentifier {
 
   public static final String ID_KEY = "gravitino.identifier";
 
+  /** For test connection only */
+  public static final StringIdentifier DUMMY_ID = fromId(-1L);
+
   @VisibleForTesting static final int CURRENT_FORMAT_VERSION = 1;
 
   @VisibleForTesting static final String CURRENT_FORMAT = "gravitino.v%d.uid%d";

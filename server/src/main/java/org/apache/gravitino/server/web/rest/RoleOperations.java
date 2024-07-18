@@ -34,9 +34,9 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AccessControlManager;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
@@ -75,9 +75,13 @@ public class RoleOperations {
       return Utils.doAs(
           httpRequest,
           () ->
-              Utils.ok(
-                  new RoleResponse(
-                      DTOConverters.toDTO(accessControlManager.getRole(metalake, role)))));
+              TreeLockUtils.doWithTreeLock(
+                  AuthorizationUtils.ofRole(metalake, role),
+                  LockType.READ,
+                  () ->
+                      Utils.ok(
+                          new RoleResponse(
+                              DTOConverters.toDTO(accessControlManager.getRole(metalake, role))))));
     } catch (Exception e) {
       return ExceptionHandlers.handleRoleException(OperationType.GET, role, metalake, e);
     }
@@ -118,14 +122,18 @@ public class RoleOperations {
                                     .collect(Collectors.toList())))
                     .collect(Collectors.toList());
 
-            return Utils.ok(
-                new RoleResponse(
-                    DTOConverters.toDTO(
-                        accessControlManager.createRole(
-                            metalake,
-                            request.getName(),
-                            request.getProperties(),
-                            securableObjects))));
+            return TreeLockUtils.doWithTreeLock(
+                NameIdentifier.of(AuthorizationUtils.ofRoleNamespace(metalake).levels()),
+                LockType.WRITE,
+                () ->
+                    Utils.ok(
+                        new RoleResponse(
+                            DTOConverters.toDTO(
+                                accessControlManager.createRole(
+                                    metalake,
+                                    request.getName(),
+                                    request.getProperties(),
+                                    securableObjects)))));
           });
 
     } catch (Exception e) {
@@ -145,7 +153,11 @@ public class RoleOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            boolean deleted = accessControlManager.deleteRole(metalake, role);
+            boolean deleted =
+                TreeLockUtils.doWithTreeLock(
+                    NameIdentifier.of(AuthorizationUtils.ofRoleNamespace(metalake).levels()),
+                    LockType.WRITE,
+                    () -> accessControlManager.deleteRole(metalake, role));
             if (!deleted) {
               LOG.warn("Failed to delete role {} under metalake {}", role, metalake);
             }
@@ -162,10 +174,6 @@ public class RoleOperations {
 
     // Securable object ignores the metalake namespace, so we should add it back.
     if (object.type() == MetadataObject.Type.METALAKE) {
-      // All metalakes don't need to check the securable object whether exists.
-      if (object.name().equals(MetadataObjects.METADATA_OBJECT_RESERVED_NAME)) {
-        return;
-      }
       identifier = NameIdentifier.parse(object.fullName());
     } else {
       identifier = NameIdentifier.parse(String.format("%s.%s", metalake, object.fullName()));

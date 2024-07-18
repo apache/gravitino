@@ -34,17 +34,6 @@ public class SecurableObjects {
   private static final Splitter DOT_SPLITTER = Splitter.on('.');
 
   /**
-   * Create the metalake {@link SecurableObject} with the given metalake name.
-   *
-   * @param metalake The metalake name
-   * @param privileges The privileges of the metalake
-   * @return The created metalake {@link SecurableObject}
-   */
-  public static SecurableObject ofMetalake(String metalake, List<Privilege> privileges) {
-    return of(MetadataObject.Type.METALAKE, Lists.newArrayList(metalake), privileges);
-  }
-
-  /**
    * Create the catalog {@link SecurableObject} with the given catalog name.
    *
    * @param catalog The catalog name
@@ -114,19 +103,6 @@ public class SecurableObjects {
     List<String> names = Lists.newArrayList(DOT_SPLITTER.splitToList(schema.fullName()));
     names.add(fileset);
     return of(MetadataObject.Type.FILESET, names, privileges);
-  }
-
-  /**
-   * All metalakes is a special securable object .You can give the securable object the privileges
-   * `CREATE METALAKE`, etc. It means that you can create any which doesn't exist. This securable
-   * object is only used for metalake admin. You can't grant any privilege to this securable object.
-   * You can't bind this securable object to any role, too.
-   *
-   * @param privileges The privileges of the all metalakes
-   * @return The created {@link SecurableObject}
-   */
-  public static SecurableObject ofAllMetalakes(List<Privilege> privileges) {
-    return new SecurableObjectImpl(null, "*", MetadataObject.Type.METALAKE, privileges);
   }
 
   private static class SecurableObjectImpl extends MetadataObjectImpl implements SecurableObject {

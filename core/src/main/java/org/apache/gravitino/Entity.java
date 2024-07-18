@@ -55,18 +55,6 @@ public interface Entity extends Serializable {
   /** The tag schema name in the system catalog. */
   String TAG_SCHEMA_NAME = "tag";
 
-  /**
-   * All metalakes are a virtual entity. It represents all the metalakes. We don't store it. We use
-   * a specific type to represent its entity type.
-   */
-  String ALL_METALAKES_ENTITY_TYPE = "ROOT";
-
-  /**
-   * All metalakes are a virtual entity. It represents all the metalakes. We don't store it. We use
-   * a specific id to represent its entity id.
-   */
-  long ALL_METALAKES_ENTITY_ID = 0;
-
   /** Enumeration defining the types of entities in the Gravitino framework. */
   @Getter
   enum EntityType {

@@ -31,6 +31,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
+import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
@@ -187,7 +188,7 @@ public class HadoopCatalogIT extends AbstractIT {
 
     // create fileset with null fileset name
     Assertions.assertThrows(
-        IllegalArgumentException.class,
+        IllegalNameIdentifierException.class,
         () ->
             createFileset(
                 null,

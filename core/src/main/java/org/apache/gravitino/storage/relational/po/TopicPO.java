@@ -18,8 +18,8 @@
  */
 package org.apache.gravitino.storage.relational.po;
 
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
-import java.util.Objects;
 import lombok.Getter;
 
 @Getter
@@ -49,22 +49,22 @@ public class TopicPO {
       return false;
     }
     TopicPO topicPO = (TopicPO) o;
-    return Objects.equals(topicId, topicPO.topicId)
-        && Objects.equals(topicName, topicPO.topicName)
-        && Objects.equals(metalakeId, topicPO.metalakeId)
-        && Objects.equals(catalogId, topicPO.catalogId)
-        && Objects.equals(schemaId, topicPO.schemaId)
-        && Objects.equals(comment, topicPO.comment)
-        && Objects.equals(properties, topicPO.properties)
-        && Objects.equals(auditInfo, topicPO.auditInfo)
-        && Objects.equals(currentVersion, topicPO.currentVersion)
-        && Objects.equals(lastVersion, topicPO.lastVersion)
-        && Objects.equals(deletedAt, topicPO.deletedAt);
+    return Objects.equal(topicId, topicPO.topicId)
+        && Objects.equal(topicName, topicPO.topicName)
+        && Objects.equal(metalakeId, topicPO.metalakeId)
+        && Objects.equal(catalogId, topicPO.catalogId)
+        && Objects.equal(schemaId, topicPO.schemaId)
+        && Objects.equal(comment, topicPO.comment)
+        && Objects.equal(properties, topicPO.properties)
+        && Objects.equal(auditInfo, topicPO.auditInfo)
+        && Objects.equal(currentVersion, topicPO.currentVersion)
+        && Objects.equal(lastVersion, topicPO.lastVersion)
+        && Objects.equal(deletedAt, topicPO.deletedAt);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(
+    return Objects.hashCode(
         topicId,
         topicName,
         metalakeId,
