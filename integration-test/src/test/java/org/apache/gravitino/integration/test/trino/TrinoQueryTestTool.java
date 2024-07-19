@@ -73,8 +73,11 @@ public class TrinoQueryTestTool {
       options.addOption("tester_id", true, "Specify the tester file name prefix to select to test");
       options.addOption("catalog", true, "Specify the catalog name to test");
 
-      options.addOption("params", true, "Addition parameters that can replace the value of ${key} in the testers contents, " +
-              "example: --params=key1,v1;key2,v2");
+      options.addOption(
+          "params",
+          true,
+          "Addition parameters that can replace the value of ${key} in the testers contents, "
+              + "example: --params=key1,v1;key2,v2");
 
       options.addOption("help", false, "Print this help message");
 
@@ -151,7 +154,8 @@ public class TrinoQueryTestTool {
           if (Strings.isNotBlank(key) && Strings.isNotBlank(value)) {
             TrinoQueryIT.queryParams.put(key, value);
           } else {
-            System.out.println("Invalid parameters:" + param + "The format should like --params=key1,v1;key2,v2");
+            System.out.println(
+                "Invalid parameters:" + param + "The format should like --params=key1,v1;key2,v2");
             System.exit(1);
           }
         }
