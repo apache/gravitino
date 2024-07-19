@@ -18,7 +18,7 @@
 # under the License.
 #
 #set -ex
-USAGE="-e Usage: bin/iceberg-rest-server.sh [--config <conf-dir>]\n\t
+USAGE="-e Usage: bin/gravitino-iceberg-rest-server.sh [--config <conf-dir>]\n\t
         {start|run|stop|restart|status}"
 
 if [[ "$1" == "--config" ]]; then
@@ -142,9 +142,9 @@ function stop() {
 }
 
 HOSTNAME=$(hostname)
-GRAVITINO_OUTFILE="${GRAVITINO_LOG_DIR}/iceberg-rest-server.out"
-GRAVITINO_SERVER_NAME=org.apache.gravitino.server.IcebergRESTServer
-GRAVITINO_SIMPLE_SERVER_NAME=iceberg-rest-server
+GRAVITINO_OUTFILE="${GRAVITINO_LOG_DIR}/gravitino-iceberg-rest-server.out"
+GRAVITINO_SERVER_NAME=org.apache.gravitino.iceberg.server.GravitinoIcebergRESTServer
+GRAVITINO_SIMPLE_SERVER_NAME=gravitino-iceberg-rest-server
 
 JAVA_OPTS+=" -Dfile.encoding=UTF-8"
 JAVA_OPTS+=" -Dlog4j2.configurationFile=file://${GRAVITINO_CONF_DIR}/log4j2.properties"

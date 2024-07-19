@@ -40,8 +40,8 @@ gravitino.iceberg-rest.requestHeaderSize = 131072
 # The response header size of the built-in web server
 gravitino.iceberg-rest.responseHeaderSize = 131072
 
-# THE CONFIGURATION FOR Iceberg backend catalog
-# The backend Iceberg catalog, it's recommanded to change to hive or jdbc 
+# THE CONFIGURATION FOR Iceberg catalog backend
+# The Iceberg catalog backend, it's recommanded to change to hive or jdbc 
 gravitino.iceberg-rest.catalog-backend = memory
 # The warehouse directory of Iceberg catalog
 gravitino.iceberg-rest.warehouse = /tmp/

@@ -99,6 +99,7 @@ public class GravitinoEnv {
   private EventListenerManager eventListenerManager;
 
   private TagManager tagManager;
+  private EventBus eventBus;
 
   private GravitinoEnv() {}
 
@@ -119,89 +120,17 @@ public class GravitinoEnv {
    * Initialize the Gravitino environment.
    *
    * @param config The configuration object to initialize the environment.
+   * @param isGravitinoServer A boolean flag indicating whether the initialization is for the
+   *     Gravitino server. If true, server-specific components will be initialized in addition to
+   *     the base components.
    */
-  public void initialize(Config config, boolean initGravitinoServerComponent) {
+  public void initialize(Config config, boolean isGravitinoServer) {
     LOG.info("Initializing Gravitino Environment...");
-
     this.config = config;
-    this.metricsSystem = new MetricsSystem();
-    metricsSystem.register(new JVMMetricsSource());
-
-    this.eventListenerManager = new EventListenerManager();
-    eventListenerManager.init(
-        config.getConfigsWithPrefix(EventListenerManager.GRAVITINO_EVENT_LISTENER_PREFIX));
-    EventBus eventBus = eventListenerManager.createEventBus();
-
-    if (!initGravitinoServerComponent) {
-      return;
+    initBaseComponent();
+    if (isGravitinoServer) {
+      initGravitinoServerComponent();
     }
-
-    // Initialize EntityStore
-    this.entityStore = EntityStoreFactory.createEntityStore(config);
-    entityStore.initialize(config);
-
-    // create and initialize a random id generator
-    this.idGenerator = new RandomIdGenerator();
-
-    // Create and initialize metalake related modules
-    MetalakeManager metalakeManager = new MetalakeManager(entityStore, idGenerator);
-    MetalakeNormalizeDispatcher metalakeNormalizeDispatcher =
-        new MetalakeNormalizeDispatcher(metalakeManager);
-    this.metalakeDispatcher = new MetalakeEventDispatcher(eventBus, metalakeNormalizeDispatcher);
-
-    // Create and initialize Catalog related modules
-    this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
-    CatalogNormalizeDispatcher catalogNormalizeDispatcher =
-        new CatalogNormalizeDispatcher(catalogManager);
-    this.catalogDispatcher = new CatalogEventDispatcher(eventBus, catalogNormalizeDispatcher);
-
-    SchemaOperationDispatcher schemaOperationDispatcher =
-        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
-    SchemaNormalizeDispatcher schemaNormalizeDispatcher =
-        new SchemaNormalizeDispatcher(schemaOperationDispatcher, catalogManager);
-    this.schemaDispatcher = new SchemaEventDispatcher(eventBus, schemaNormalizeDispatcher);
-
-    TableOperationDispatcher tableOperationDispatcher =
-        new TableOperationDispatcher(catalogManager, entityStore, idGenerator);
-    TableNormalizeDispatcher tableNormalizeDispatcher =
-        new TableNormalizeDispatcher(tableOperationDispatcher, catalogManager);
-    this.tableDispatcher = new TableEventDispatcher(eventBus, tableNormalizeDispatcher);
-
-    PartitionOperationDispatcher partitionOperationDispatcher =
-        new PartitionOperationDispatcher(catalogManager, entityStore, idGenerator);
-    // todo: support PartitionEventDispatcher
-    this.partitionDispatcher =
-        new PartitionNormalizeDispatcher(partitionOperationDispatcher, catalogManager);
-
-    FilesetOperationDispatcher filesetOperationDispatcher =
-        new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator);
-    FilesetNormalizeDispatcher filesetNormalizeDispatcher =
-        new FilesetNormalizeDispatcher(filesetOperationDispatcher, catalogManager);
-    this.filesetDispatcher = new FilesetEventDispatcher(eventBus, filesetNormalizeDispatcher);
-
-    TopicOperationDispatcher topicOperationDispatcher =
-        new TopicOperationDispatcher(catalogManager, entityStore, idGenerator);
-    TopicNormalizeDispatcher topicNormalizeDispatcher =
-        new TopicNormalizeDispatcher(topicOperationDispatcher, catalogManager);
-    this.topicDispatcher = new TopicEventDispatcher(eventBus, topicNormalizeDispatcher);
-
-    // Create and initialize access control related modules
-    boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);
-    if (enableAuthorization) {
-      this.accessControlManager = new AccessControlManager(entityStore, idGenerator, config);
-    } else {
-      this.accessControlManager = null;
-    }
-
-    this.auxServiceManager = new AuxiliaryServiceManager();
-    this.auxServiceManager.serviceInit(config);
-
-    // Tree lock
-    this.lockManager = new LockManager(config);
-
-    // Tag manager
-    this.tagManager = new TagManager(idGenerator, entityStore);
-
     LOG.info("Gravitino Environment is initialized.");
   }
 
@@ -361,5 +290,83 @@ public class GravitinoEnv {
     }
 
     LOG.info("Gravitino Environment is shut down.");
+  }
+
+  private void initBaseComponent() {
+    this.metricsSystem = new MetricsSystem();
+    metricsSystem.register(new JVMMetricsSource());
+
+    this.eventListenerManager = new EventListenerManager();
+    eventListenerManager.init(
+        config.getConfigsWithPrefix(EventListenerManager.GRAVITINO_EVENT_LISTENER_PREFIX));
+    this.eventBus = eventListenerManager.createEventBus();
+  }
+
+  private void initGravitinoServerComponent() {
+    // Initialize EntityStore
+    this.entityStore = EntityStoreFactory.createEntityStore(config);
+    entityStore.initialize(config);
+
+    // create and initialize a random id generator
+    this.idGenerator = new RandomIdGenerator();
+
+    // Create and initialize metalake related modules
+    MetalakeManager metalakeManager = new MetalakeManager(entityStore, idGenerator);
+    MetalakeNormalizeDispatcher metalakeNormalizeDispatcher =
+        new MetalakeNormalizeDispatcher(metalakeManager);
+    this.metalakeDispatcher = new MetalakeEventDispatcher(eventBus, metalakeNormalizeDispatcher);
+
+    // Create and initialize Catalog related modules
+    this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
+    CatalogNormalizeDispatcher catalogNormalizeDispatcher =
+        new CatalogNormalizeDispatcher(catalogManager);
+    this.catalogDispatcher = new CatalogEventDispatcher(eventBus, catalogNormalizeDispatcher);
+
+    SchemaOperationDispatcher schemaOperationDispatcher =
+        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
+    SchemaNormalizeDispatcher schemaNormalizeDispatcher =
+        new SchemaNormalizeDispatcher(schemaOperationDispatcher, catalogManager);
+    this.schemaDispatcher = new SchemaEventDispatcher(eventBus, schemaNormalizeDispatcher);
+
+    TableOperationDispatcher tableOperationDispatcher =
+        new TableOperationDispatcher(catalogManager, entityStore, idGenerator);
+    TableNormalizeDispatcher tableNormalizeDispatcher =
+        new TableNormalizeDispatcher(tableOperationDispatcher, catalogManager);
+    this.tableDispatcher = new TableEventDispatcher(eventBus, tableNormalizeDispatcher);
+
+    PartitionOperationDispatcher partitionOperationDispatcher =
+        new PartitionOperationDispatcher(catalogManager, entityStore, idGenerator);
+    // todo: support PartitionEventDispatcher
+    this.partitionDispatcher =
+        new PartitionNormalizeDispatcher(partitionOperationDispatcher, catalogManager);
+
+    FilesetOperationDispatcher filesetOperationDispatcher =
+        new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator);
+    FilesetNormalizeDispatcher filesetNormalizeDispatcher =
+        new FilesetNormalizeDispatcher(filesetOperationDispatcher, catalogManager);
+    this.filesetDispatcher = new FilesetEventDispatcher(eventBus, filesetNormalizeDispatcher);
+
+    TopicOperationDispatcher topicOperationDispatcher =
+        new TopicOperationDispatcher(catalogManager, entityStore, idGenerator);
+    TopicNormalizeDispatcher topicNormalizeDispatcher =
+        new TopicNormalizeDispatcher(topicOperationDispatcher, catalogManager);
+    this.topicDispatcher = new TopicEventDispatcher(eventBus, topicNormalizeDispatcher);
+
+    // Create and initialize access control related modules
+    boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);
+    if (enableAuthorization) {
+      this.accessControlManager = new AccessControlManager(entityStore, idGenerator, config);
+    } else {
+      this.accessControlManager = null;
+    }
+
+    this.auxServiceManager = new AuxiliaryServiceManager();
+    this.auxServiceManager.serviceInit(config);
+
+    // Tree lock
+    this.lockManager = new LockManager(config);
+
+    // Tag manager
+    this.tagManager = new TagManager(idGenerator, entityStore);
   }
 }

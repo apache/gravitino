@@ -80,22 +80,30 @@ dependencies {
 }
 
 tasks {
-  val runtimeJars by registering(Copy::class) {
+  val copyDepends by registering(Copy::class) {
     from(configurations.runtimeClasspath)
     into("build/libs")
   }
-
-  val copyCatalogLibs by registering(Copy::class) {
-    dependsOn("jar", "runtimeJars")
-    from("build/libs")
-    into("$rootDir/distribution/package/catalogs/lakehouse-iceberg/libs")
+  jar {
+    finalizedBy(copyDepends)
   }
 
-  val copyCatalogConfig by registering(Copy::class) {
-    from("src/main/resources")
-    into("$rootDir/distribution/package/catalogs/lakehouse-iceberg/conf")
+  register("copyLibs", Copy::class) {
+    dependsOn(copyDepends, "build")
+    from("build/libs")
+    into("$rootDir/distribution/package/iceberg-rest-server/libs")
+  }
 
-    include("lakehouse-iceberg.conf")
+  register("copyLibsToStandalonePackage", Copy::class) {
+    dependsOn(copyDepends, "build")
+    from("build/libs")
+    into("$rootDir/distribution/gravitino-iceberg-rest-server/libs")
+  }
+
+  register("copyConfigs", Copy::class) {
+    from("src/main/resources")
+    into("$rootDir/distribution/package/iceberg-rest-server/conf")
+
     include("core-site.xml.template")
     include("hdfs-site.xml.template")
 
@@ -106,14 +114,30 @@ tasks {
         original
       }
     }
+  }
 
-    exclude { details ->
-      details.file.isDirectory()
+  register("copyConfigsToStandalonePackage", Copy::class) {
+    from("src/main/resources")
+    into("$rootDir/distribution/gravitino-iceberg-rest-server/conf")
+
+    include("core-site.xml.template")
+    include("hdfs-site.xml.template")
+
+    rename { original ->
+      if (original.endsWith(".template")) {
+        original.replace(".template", "")
+      } else {
+        original
+      }
     }
   }
 
-  register("copyLibAndConfig", Copy::class) {
-    dependsOn(copyCatalogLibs, copyCatalogConfig)
+  register("copyLibAndConfigs", Copy::class) {
+    dependsOn("copyLibs", "copyConfigs")
+  }
+
+  register("copyLibAndConfigsToStandalonePackage", Copy::class) {
+    dependsOn("copyLibsToStandalonePackage", "copyConfigsToStandalonePackage")
   }
 }
 
@@ -150,23 +174,4 @@ tasks.getByName("generateMetadataFileForMavenJavaPublication") {
 }
 
 tasks {
-  val copyDepends by registering(Copy::class) {
-    from(configurations.runtimeClasspath)
-    into("build/libs")
-  }
-  jar {
-    finalizedBy(copyDepends)
-  }
-
-  register("copyLibs", Copy::class) {
-    dependsOn(copyDepends, "build")
-    from("build/libs")
-    into("$rootDir/distribution/package/iceberg-rest-server/libs")
-  }
-
-  register("copyLibsToStandalonePackage", Copy::class) {
-    dependsOn(copyDepends, "build")
-    from("build/libs")
-    into("$rootDir/distribution/iceberg-rest-server/libs")
-  }
 }

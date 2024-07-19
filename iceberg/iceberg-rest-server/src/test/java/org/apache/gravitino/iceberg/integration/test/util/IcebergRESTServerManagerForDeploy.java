@@ -30,7 +30,7 @@ import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 public class IcebergRESTServerManagerForDeploy extends IcebergRESTServerManager {
 
-  private static final String SCRIPT_NAME = "iceberg-rest-server.sh";
+  private static final String SCRIPT_NAME = "gravitino-iceberg-rest-server.sh";
   private Path icebergRESTServerHome;
   private static final String SQLITE_DRIVER_DOWNLOAD_URL =
       "https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.42.0.0/sqlite-jdbc-3.42.0.0.jar";

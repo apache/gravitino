@@ -528,7 +528,7 @@ tasks {
   val outputDir = projectDir.dir("distribution")
 
   val compileDistribution by registering {
-    dependsOn("copySubprojectDependencies", "copyCatalogLibAndConfigs", "copySubprojectLib", "iceberg:iceberg-rest-server:copyLibs")
+    dependsOn("copySubprojectDependencies", "copyCatalogLibAndConfigs", "copySubprojectLib", "iceberg:iceberg-rest-server:copyLibAndConfigs")
 
     group = "gravitino distribution"
     outputs.dir(projectDir.dir("distribution/package"))
@@ -562,18 +562,18 @@ tasks {
   }
 
   val compileIcebergRESTServer by registering {
-    dependsOn("iceberg:iceberg-rest-server:copyLibsToStandalonePackage")
+    dependsOn("iceberg:iceberg-rest-server:copyLibAndConfigsToStandalonePackage")
     group = "gravitino distribution"
-    outputs.dir(projectDir.dir("distribution/iceberg-rest-server"))
+    outputs.dir(projectDir.dir("distribution/${rootProject.name}-iceberg-rest-server"))
     doLast {
       copy {
         from(projectDir.dir("conf")) {
-          include("iceberg-rest-server.conf.template", "log4j2.properties.template")
-          into("iceberg-rest-server/conf")
+          include("${rootProject.name}-iceberg-rest-server.conf.template", "log4j2.properties.template")
+          into("${rootProject.name}-iceberg-rest-server/conf")
         }
         from(projectDir.dir("bin")) {
-          include("common.sh", "iceberg-rest-server.sh")
-          into("iceberg-rest-server/bin")
+          include("common.sh", "${rootProject.name}-iceberg-rest-server.sh")
+          into("${rootProject.name}-iceberg-rest-server/bin")
         }
         into(outputDir)
         rename { fileName ->
@@ -583,10 +583,10 @@ tasks {
       }
 
       copy {
-        from(projectDir.dir("licenses")) { into("iceberg-rest-server/licenses") }
-        from(projectDir.file("LICENSE.bin")) { into("iceberg-rest-server") }
-        from(projectDir.file("NOTICE.bin")) { into("iceberg-rest-server") }
-        from(projectDir.file("README.md")) { into("iceberg-rest-server") }
+        from(projectDir.dir("licenses")) { into("${rootProject.name}-iceberg-rest-server/licenses") }
+        from(projectDir.file("LICENSE.bin")) { into("${rootProject.name}-iceberg-rest-server") }
+        from(projectDir.file("NOTICE.bin")) { into("${rootProject.name}-iceberg-rest-server") }
+        from(projectDir.file("README.md")) { into("${rootProject.name}-iceberg-rest-server") }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".bin", "")
@@ -619,8 +619,6 @@ tasks {
 
   val assembleIcebergRESTServer by registering(Tar::class) {
     dependsOn("compileIcebergRESTServer")
-    // fix gradlew assembleDistribution error
-    mustRunAfter("compileDistribution")
     group = "gravitino distribution"
     finalizedBy("checksumIcebergRESTServerDistribution")
     into("${rootProject.name}-iceberg-rest-server-$version-bin")

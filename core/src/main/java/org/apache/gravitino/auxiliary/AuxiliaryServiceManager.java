@@ -45,6 +45,7 @@ import org.slf4j.LoggerFactory;
  * AuxiliaryServiceManager manage all GravitinoAuxiliaryServices with isolated classloader provided
  */
 public class AuxiliaryServiceManager {
+
   private static final Logger LOG = LoggerFactory.getLogger(AuxiliaryServiceManager.class);
   public static final String GRAVITINO_AUX_SERVICE_PREFIX = "gravitino.auxService.";
   public static final String AUX_SERVICE_NAMES = "names";
@@ -223,6 +224,8 @@ public class AuxiliaryServiceManager {
   }
 
   // Extract aux service configs, transform gravitino.$serviceName.key to $serviceName.key.
+  // And will transform gravitino.auxService.$serviceName.key to $serviceName.key to keep
+  // compatibility.
   @VisibleForTesting
   static Map<String, String> extractAuxiliaryServiceConfigs(Config config) {
     String auxServiceNames =
@@ -231,21 +234,31 @@ public class AuxiliaryServiceManager {
             .getOrDefault(AUX_SERVICE_NAMES, "");
     Map<String, String> serviceConfigs = new HashMap<>();
     serviceConfigs.put(AUX_SERVICE_NAMES, auxServiceNames);
+    config
+        .getAllConfig()
+        .forEach(
+            (k, v) -> {
+              if (k.startsWith(GRAVITINO_AUX_SERVICE_PREFIX)) {
+                serviceConfigs.put(k.substring(GRAVITINO_AUX_SERVICE_PREFIX.length()), v);
+              }
+            });
     splitter
         .omitEmptyStrings()
         .trimResults()
         .splitToStream(auxServiceNames)
         .forEach(
             name ->
-                config
-                    .getAllConfig()
-                    .forEach(
-                        (k, v) -> {
-                          String prefix = "gravitino." + name + ".";
-                          if (k.startsWith(prefix)) {
-                            serviceConfigs.put(k.substring("gravitino.".length()), v);
-                          }
-                        }));
+                config.getAllConfig().forEach((k, v) -> extractConfig(serviceConfigs, name, k, v)));
     return serviceConfigs;
+  }
+
+  private static void extractConfig(
+      Map<String, String> serverConfig, String serverName, String configKey, String configValue) {
+    if (configKey.startsWith(String.format("gravitino.%s.", serverName))) {
+      String extractedKey = configKey.substring("gravitino.".length());
+      Preconditions.checkArgument(
+          !serverConfig.containsKey(extractedKey), "Duplicated configuration for " + extractedKey);
+      serverConfig.put(extractedKey, configValue);
+    }
   }
 }

@@ -26,7 +26,7 @@ import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import org.apache.gravitino.server.IcebergRESTServer;
+import org.apache.gravitino.iceberg.server.GravitinoIcebergRESTServer;
 
 public class IcebergRESTServerManagerForEmbedded extends IcebergRESTServerManager {
 
@@ -56,13 +56,13 @@ public class IcebergRESTServerManagerForEmbedded extends IcebergRESTServerManage
         executor.submit(
             () -> {
               try {
-                IcebergRESTServer.main(
+                GravitinoIcebergRESTServer.main(
                     new String[] {
-                      Paths.get(mockConfDir.getAbsolutePath(), IcebergRESTServer.CONF_FILE)
+                      Paths.get(mockConfDir.getAbsolutePath(), GravitinoIcebergRESTServer.CONF_FILE)
                           .toString()
                     });
               } catch (Exception e) {
-                LOG.error("Exception in startup mini IcebergRESTServer ", e);
+                LOG.error("Exception in startup mini GravitinoIcebergRESTServer ", e);
                 throw new RuntimeException(e);
               }
             });

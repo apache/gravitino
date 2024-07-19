@@ -16,28 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.server;
+package org.apache.gravitino.iceberg.server;
 
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.iceberg.RESTService;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.authentication.ServerAuthenticator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class IcebergRESTServer {
+public class GravitinoIcebergRESTServer {
 
-  private static final Logger LOG = LoggerFactory.getLogger(IcebergRESTServer.class);
+  private static final Logger LOG = LoggerFactory.getLogger(GravitinoIcebergRESTServer.class);
 
-  public static final String CONF_FILE = "iceberg-rest-server.conf";
+  public static final String CONF_FILE = "gravitino-iceberg-rest-server.conf";
 
   private final Config serverConfig;
 
   private RESTService icebergRESTService;
   private GravitinoEnv gravitinoEnv;
 
-  public IcebergRESTServer(Config config) {
+  public GravitinoIcebergRESTServer(Config config) {
     this.serverConfig = config;
     this.gravitinoEnv = GravitinoEnv.getInstance();
     this.icebergRESTService = new RESTService();
@@ -67,7 +68,7 @@ public class IcebergRESTServer {
     LOG.info("Starting Iceberg REST Server");
     String confPath = System.getenv("GRAVITINO_TEST") == null ? "" : args[0];
     ServerConfig serverConfig = ServerConfig.loadConfig(confPath, CONF_FILE);
-    IcebergRESTServer icebergRESTServer = new IcebergRESTServer(serverConfig);
+    GravitinoIcebergRESTServer icebergRESTServer = new GravitinoIcebergRESTServer(serverConfig);
     icebergRESTServer.initialize();
 
     try {

@@ -38,6 +38,7 @@ import org.junit.jupiter.api.Test;
 public class TestAuxiliaryServiceManager {
 
   static class DummyConfig extends Config {
+
     public static DummyConfig of(Map<String, String> m) {
       DummyConfig dummyConfig = new DummyConfig();
       dummyConfig.loadFromMap(m, k -> true);
@@ -119,6 +120,8 @@ public class TestAuxiliaryServiceManager {
             "a,b",
             "gravitino.a.test1",
             "test1",
+            AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX + "a.test4",
+            "test4",
             "gravitino.b.test2",
             "test2",
             "gravitino.aa.test3",
@@ -133,6 +136,8 @@ public class TestAuxiliaryServiceManager {
             "a,b",
             "a.test1",
             "test1",
+            "a.test4",
+            "test4",
             "b.test2",
             "test2"),
         serviceConfigs);

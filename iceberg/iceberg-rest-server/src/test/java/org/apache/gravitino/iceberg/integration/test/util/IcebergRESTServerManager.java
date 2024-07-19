@@ -31,10 +31,10 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.server.GravitinoIcebergRESTServer;
 import org.apache.gravitino.integration.test.util.HttpUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.rest.RESTUtils;
-import org.apache.gravitino.server.IcebergRESTServer;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.slf4j.Logger;
@@ -91,9 +91,9 @@ public abstract class IcebergRESTServerManager {
           future.get().get(1, TimeUnit.SECONDS);
         }
       } catch (Exception e) {
-        throw new RuntimeException("IcebergRESTServer start failed", e);
+        throw new RuntimeException("GravitinoIcebergRESTServer start failed", e);
       }
-      throw new RuntimeException("Can not start IcebergRESTServer in one minute");
+      throw new RuntimeException("Can not start GravitinoIcebergRESTServer in one minute");
     }
   }
 
@@ -111,7 +111,7 @@ public abstract class IcebergRESTServerManager {
       }
     }
     if (started) {
-      throw new RuntimeException("Can not stop IcebergRESTServer in one minute");
+      throw new RuntimeException("Can not stop GravitinoIcebergRESTServer in one minute");
     }
   }
 
@@ -131,9 +131,10 @@ public abstract class IcebergRESTServerManager {
     Path configDir = getConfigDir();
     String gravitinoRootDir = System.getenv("GRAVITINO_ROOT_DIR");
 
-    Path configFile = Paths.get(configDir.toString(), IcebergRESTServer.CONF_FILE);
+    Path configFile = Paths.get(configDir.toString(), GravitinoIcebergRESTServer.CONF_FILE);
     customizeConfigFile(
-        Paths.get(gravitinoRootDir, "conf", IcebergRESTServer.CONF_FILE + ".template").toString(),
+        Paths.get(gravitinoRootDir, "conf", GravitinoIcebergRESTServer.CONF_FILE + ".template")
+            .toString(),
         configFile.toString());
     this.serverConfig = new ServerConfig();
     Properties properties = serverConfig.loadPropertiesFromFile(configFile.toFile());
