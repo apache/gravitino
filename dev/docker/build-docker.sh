@@ -96,8 +96,8 @@ if [[ "${component_type}" == "hive" ]]; then
   --build-arg RANGER_VERSION=${RANGER_VERSION} \
   --build-arg ZOOKEEPER_VERSION=${ZOOKEEPER_VERSION} \
   --build-arg HIVE2_VERSION=${HIVE2_VERSION} \
-  --build-arg HIVE3_VERSION=${HIVE3_VERSION}
-  --build-arg HADOOP2_VERSION=${HADOOP2_VERSION}
+  --build-arg HIVE3_VERSION=${HIVE3_VERSION} \
+  --build-arg HADOOP2_VERSION=${HADOOP2_VERSION} \
   --build-arg HADOOP3_VERSION=${HADOOP3_VERSION}
 "
 elif [[ "${component_type}" == "kerberos-hive" ]]; then
