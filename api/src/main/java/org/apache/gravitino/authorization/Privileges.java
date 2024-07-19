@@ -379,7 +379,7 @@ public class Privileges {
     }
   }
 
-  /** The privilege to alter, insert, update, or delete a table. */
+  /** The privilege to execute SQL `ALTER`, `INSERT`, `UPDATE`, or `DELETE` for a table. */
   public static class ModifyTable extends GenericPrivilege<ModifyTable> {
     private static final ModifyTable ALLOW_INSTANCE =
         new ModifyTable(Condition.ALLOW, Name.MODIFY_TABLE);
@@ -489,7 +489,7 @@ public class Privileges {
     }
   }
 
-  /** The privilege to consume a topic. */
+  /** The privilege to consume from a topic. */
   public static class ConsumeTopic extends GenericPrivilege<ConsumeTopic> {
     private static final ConsumeTopic ALLOW_INSTANCE =
         new ConsumeTopic(Condition.ALLOW, Name.CONSUME_TOPIC);
@@ -511,7 +511,7 @@ public class Privileges {
     }
   }
 
-  /** The privilege to produce a topic. */
+  /** The privilege to produce to a topic. */
   public static class ProduceTopic extends GenericPrivilege<ProduceTopic> {
     private static final ProduceTopic ALLOW_INSTANCE =
         new ProduceTopic(Condition.ALLOW, Name.PRODUCE_TOPIC);
