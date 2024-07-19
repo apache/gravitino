@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -134,7 +135,10 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     conf.forEach(hadoopConf::set);
 
     initAuthentication(conf, hadoopConf);
-    this.catalogStorageLocation = Optional.ofNullable(catalogLocation).map(Path::new);
+    this.catalogStorageLocation =
+        StringUtils.isNotBlank(catalogLocation)
+            ? Optional.of(catalogLocation).map(Path::new)
+            : Optional.empty();
   }
 
   private void initAuthentication(Map<String, String> conf, Configuration hadoopConf) {
@@ -536,6 +540,26 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to delete schema " + ident + " location", ioe);
     }
+  }
+
+  /**
+   * Since the Hadoop catalog was completely managed by Gravitino, we don't need to test the
+   * connection
+   *
+   * @param catalogIdent the name of the catalog.
+   * @param type the type of the catalog.
+   * @param provider the provider of the catalog.
+   * @param comment the comment of the catalog.
+   * @param properties the properties of the catalog.
+   */
+  @Override
+  public void testConnection(
+      NameIdentifier catalogIdent,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties) {
+    // Do nothing
   }
 
   @Override

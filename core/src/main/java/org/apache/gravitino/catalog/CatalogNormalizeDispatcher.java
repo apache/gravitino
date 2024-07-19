@@ -104,6 +104,18 @@ public class CatalogNormalizeDispatcher implements CatalogDispatcher {
     return dispatcher.dropCatalog(ident);
   }
 
+  @Override
+  public void testConnection(
+      NameIdentifier ident,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties)
+      throws Exception {
+    validateCatalogName(ident.name());
+    dispatcher.testConnection(ident, type, provider, comment, properties);
+  }
+
   private void validateCatalogName(String name) throws IllegalArgumentException {
     if (RESERVED_WORDS.contains(name.toLowerCase())) {
       throw new IllegalArgumentException("The catalog name '" + name + "' is reserved.");

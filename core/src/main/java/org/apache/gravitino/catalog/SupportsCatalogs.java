@@ -121,4 +121,22 @@ public interface SupportsCatalogs {
    * @return True if the catalog was dropped, false if the catalog does not exist.
    */
   boolean dropCatalog(NameIdentifier ident);
+
+  /**
+   * Test whether the catalog with specified parameters can be connected to before creating it.
+   *
+   * @param ident The identifier of the catalog to be tested.
+   * @param type the type of the catalog.
+   * @param provider the provider of the catalog.
+   * @param comment the comment of the catalog.
+   * @param properties the properties of the catalog.
+   * @throws Exception If the connection test fails.
+   */
+  void testConnection(
+      NameIdentifier ident,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties)
+      throws Exception;
 }

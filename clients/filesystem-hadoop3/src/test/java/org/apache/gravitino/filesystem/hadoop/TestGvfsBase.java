@@ -591,4 +591,20 @@ public class TestGvfsBase extends GravitinoMockServerBase {
           () -> fs.extractIdentifier(new URI("/catalog1/schema1/fileset1/dir//")));
     }
   }
+
+  @Test
+  public void testGetDefaultReplications() throws IOException {
+    try (GravitinoVirtualFileSystem fs =
+        (GravitinoVirtualFileSystem) managedFilesetPath.getFileSystem(conf)) {
+      assertEquals(1, fs.getDefaultReplication(managedFilesetPath));
+    }
+  }
+
+  @Test
+  public void testGetDefaultBlockSize() throws IOException {
+    try (GravitinoVirtualFileSystem fs =
+        (GravitinoVirtualFileSystem) managedFilesetPath.getFileSystem(conf)) {
+      assertEquals(32 * 1024 * 1024, fs.getDefaultBlockSize(managedFilesetPath));
+    }
+  }
 }

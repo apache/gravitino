@@ -25,9 +25,6 @@ import org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta;
 import org.apache.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
 import org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata;
 import org.apache.gravitino.catalog.jdbc.JdbcTablePropertiesMetadata;
-import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata;
-import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergSchemaPropertiesMetadata;
-import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata;
 import org.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata;
 import org.apache.gravitino.connector.BasePropertiesMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
@@ -68,15 +65,6 @@ public class ClassProvider {
           add(HiveTablePropertiesMetadata.class);
           add(HiveSchemaPropertiesMetadata.class);
           add(HiveCatalogPropertiesMeta.class);
-        }
-      };
-
-  private static final Set<Class<?>> ICEBERG_NEED_CLASS =
-      new HashSet<Class<?>>() {
-        {
-          add(IcebergTablePropertiesMetadata.class);
-          add(IcebergSchemaPropertiesMetadata.class);
-          add(IcebergCatalogPropertiesMetadata.class);
         }
       };
 

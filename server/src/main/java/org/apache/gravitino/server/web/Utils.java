@@ -57,6 +57,20 @@ public class Utils {
         .build();
   }
 
+  public static Response connectionFailed(String message) {
+    return Response.status(Response.Status.BAD_GATEWAY)
+        .entity(ErrorResponse.connectionFailed(message))
+        .type(MediaType.APPLICATION_JSON)
+        .build();
+  }
+
+  public static Response connectionFailed(String message, Throwable throwable) {
+    return Response.status(Response.Status.BAD_GATEWAY)
+        .entity(ErrorResponse.connectionFailed(message, throwable))
+        .type(MediaType.APPLICATION_JSON)
+        .build();
+  }
+
   public static Response internalError(String message) {
     return internalError(message, null);
   }

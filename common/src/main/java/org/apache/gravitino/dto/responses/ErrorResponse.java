@@ -27,6 +27,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.RESTException;
 
 /** Represents an error response. */
@@ -121,6 +122,31 @@ public class ErrorResponse extends BaseResponse {
     return new ErrorResponse(
         ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
         IllegalArgumentException.class.getSimpleName(),
+        message,
+        getStackTrace(throwable));
+  }
+
+  /**
+   * Create a new connection failed error instance of {@link ErrorResponse}.
+   *
+   * @param message The message of the error.
+   * @return The new instance.
+   */
+  public static ErrorResponse connectionFailed(String message) {
+    return connectionFailed(message, null);
+  }
+
+  /**
+   * Create a new connection failed error instance of {@link ErrorResponse}.
+   *
+   * @param message The message of the error.
+   * @param throwable The throwable that caused the error.
+   * @return The new instance.
+   */
+  public static ErrorResponse connectionFailed(String message, Throwable throwable) {
+    return new ErrorResponse(
+        ErrorConstants.CONNECTION_FAILED_CODE,
+        ConnectionFailedException.class.getSimpleName(),
         message,
         getStackTrace(throwable));
   }

@@ -31,6 +31,7 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.UnsupportedEntityTypeException;
@@ -326,6 +327,37 @@ public class JDBCBackend implements RelationalBackend {
     if (jdbcDatabase != null) {
       jdbcDatabase.close();
     }
+  }
+
+  @Override
+  public List<MetadataObject> listAssociatedMetadataObjectsForTag(NameIdentifier tagIdent)
+      throws IOException {
+    return TagMetaService.getInstance().listAssociatedMetadataObjectsForTag(tagIdent);
+  }
+
+  @Override
+  public List<TagEntity> listAssociatedTagsForMetadataObject(
+      NameIdentifier objectIdent, Entity.EntityType objectType)
+      throws NoSuchEntityException, IOException {
+    return TagMetaService.getInstance().listTagsForMetadataObject(objectIdent, objectType);
+  }
+
+  @Override
+  public TagEntity getTagForMetadataObject(
+      NameIdentifier objectIdent, Entity.EntityType objectType, NameIdentifier tagIdent)
+      throws NoSuchEntityException, IOException {
+    return TagMetaService.getInstance().getTagForMetadataObject(objectIdent, objectType, tagIdent);
+  }
+
+  @Override
+  public List<TagEntity> associateTagsWithMetadataObject(
+      NameIdentifier objectIdent,
+      Entity.EntityType objectType,
+      NameIdentifier[] tagsToAdd,
+      NameIdentifier[] tagsToRemove)
+      throws NoSuchEntityException, EntityAlreadyExistsException, IOException {
+    return TagMetaService.getInstance()
+        .associateTagsWithMetadataObject(objectIdent, objectType, tagsToAdd, tagsToRemove);
   }
 
   enum JDBCBackendType {

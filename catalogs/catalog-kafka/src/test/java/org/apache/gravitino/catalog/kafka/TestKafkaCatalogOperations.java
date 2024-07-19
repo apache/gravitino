@@ -186,6 +186,7 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
             .withNamespace(Namespace.of(METALAKE_NAME))
             .withType(MESSAGING)
             .withProvider("kafka")
+            .withProperties(MOCK_CATALOG_PROPERTIES)
             .withAuditInfo(
                 AuditInfo.builder()
                     .withCreator("testKafkaUser")
@@ -221,6 +222,7 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
                     .withCreator("testKafkaUser")
                     .withCreateTime(Instant.now())
                     .build())
+            .withProperties(MOCK_CATALOG_PROPERTIES)
             .build();
     KafkaCatalogOperations ops = new KafkaCatalogOperations(store, idGenerator);
     Assertions.assertNull(ops.adminClientConfig);
@@ -256,6 +258,7 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
                     .withCreator("testKafkaUser")
                     .withCreateTime(Instant.now())
                     .build())
+            .withProperties(MOCK_CATALOG_PROPERTIES)
             .build();
     KafkaCatalogOperations ops = new KafkaCatalogOperations(store, idGenerator);
     ops.initialize(
@@ -543,5 +546,17 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
                 kafkaCatalogOperations.alterTopic(
                     ident, TopicChange.setProperty(PARTITION_COUNT, "1")));
     Assertions.assertEquals("Cannot reduce partition count from 3 to 1", exception.getMessage());
+  }
+
+  @Test
+  public void testTestConnection() {
+    Assertions.assertDoesNotThrow(
+        () ->
+            kafkaCatalogOperations.testConnection(
+                NameIdentifier.of("metalake", "catalog"),
+                MESSAGING,
+                "kafka",
+                "comment",
+                ImmutableMap.of()));
   }
 }

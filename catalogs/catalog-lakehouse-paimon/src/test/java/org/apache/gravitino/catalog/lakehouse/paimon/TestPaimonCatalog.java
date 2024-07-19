@@ -22,12 +22,15 @@ import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalog.CATALO
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalog.SCHEMA_PROPERTIES_META;
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalog.TABLE_PROPERTIES_META;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.PropertiesMetadataHelpers;
 import org.apache.gravitino.catalog.lakehouse.paimon.ops.PaimonCatalogOps;
@@ -111,6 +114,16 @@ public class TestPaimonCatalog {
     Assertions.assertEquals(
         paimonCatalogOperations.listSchemas(Namespace.empty()).length,
         paimonCatalogOps.listDatabases().size());
+
+    // test testConnection
+    Assertions.assertDoesNotThrow(
+        () ->
+            paimonCatalogOperations.testConnection(
+                NameIdentifier.of("metalake", "catalog"),
+                Catalog.Type.RELATIONAL,
+                "paimon",
+                "comment",
+                ImmutableMap.of()));
   }
 
   @Test

@@ -18,10 +18,12 @@
  */
 package org.apache.gravitino.server.web.rest;
 
+import static javax.ws.rs.core.Response.Status.INTERNAL_SERVER_ERROR;
 import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -48,6 +50,7 @@ import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.requests.CatalogCreateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdatesRequest;
+import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.CatalogListResponse;
 import org.apache.gravitino.dto.responses.CatalogResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
@@ -280,12 +283,51 @@ public class TestCatalogOperations extends JerseyTest {
             .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
 
-    Assertions.assertEquals(
-        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp3.getStatus());
+    Assertions.assertEquals(INTERNAL_SERVER_ERROR.getStatusCode(), resp3.getStatus());
 
     ErrorResponse errorResponse2 = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
+  }
+
+  @Test
+  public void testConnection() {
+    CatalogCreateRequest req =
+        new CatalogCreateRequest(
+            "catalog1",
+            Catalog.Type.RELATIONAL,
+            "test",
+            "comment",
+            ImmutableMap.of("key", "value"));
+    doNothing().when(manager).testConnection(any(), any(), any(), any(), any());
+    Response resp =
+        target("/metalakes/metalake1/catalogs/testConnection")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+
+    BaseResponse testResponse = resp.readEntity(BaseResponse.class);
+    Assertions.assertEquals(0, testResponse.getCode());
+
+    // test throw RuntimeException
+    doThrow(new RuntimeException("connection failed"))
+        .when(manager)
+        .testConnection(any(), any(), any(), any(), any());
+    Response resp1 =
+        target("/metalakes/metalake1/catalogs/testConnection")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(INTERNAL_SERVER_ERROR.getStatusCode(), resp1.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp1.getMediaType());
+
+    ErrorResponse errorResponse = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
   }
 
   @Test
@@ -347,8 +389,7 @@ public class TestCatalogOperations extends JerseyTest {
             .accept("application/vnd.gravitino.v1+json")
             .get();
 
-    Assertions.assertEquals(
-        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp3.getStatus());
+    Assertions.assertEquals(INTERNAL_SERVER_ERROR.getStatusCode(), resp3.getStatus());
 
     ErrorResponse errorResponse2 = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
@@ -418,8 +459,7 @@ public class TestCatalogOperations extends JerseyTest {
             .accept("application/vnd.gravitino.v1+json")
             .put(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
 
-    Assertions.assertEquals(
-        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp4.getStatus());
+    Assertions.assertEquals(INTERNAL_SERVER_ERROR.getStatusCode(), resp4.getStatus());
 
     ErrorResponse errorResponse2 = resp4.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
@@ -463,8 +503,7 @@ public class TestCatalogOperations extends JerseyTest {
             .accept("application/vnd.gravitino.v1+json")
             .delete();
 
-    Assertions.assertEquals(
-        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp3.getStatus());
+    Assertions.assertEquals(INTERNAL_SERVER_ERROR.getStatusCode(), resp3.getStatus());
 
     ErrorResponse errorResponse = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
