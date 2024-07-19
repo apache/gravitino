@@ -171,8 +171,8 @@ public class HiveContainer extends BaseContainer {
         "CREATE TABLE IF NOT EXISTS default.employee ( eid int, name String, "
             + "salary String, destination String) ";
     await()
-        .atMost(150, TimeUnit.SECONDS)
-        .pollInterval(150 / retryLimit, TimeUnit.SECONDS)
+        .atMost(30, TimeUnit.SECONDS)
+        .pollInterval(30 / retryLimit, TimeUnit.SECONDS)
         .until(
             () -> {
               try {
