@@ -56,9 +56,11 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
   public static void initialize() throws IOException, IllegalAccessException {
     TestTableOperationDispatcher.initialize();
     tableNormalizeDispatcher =
-        new TableNormalizeDispatcher(TestTableOperationDispatcher.tableOperationDispatcher);
+        new TableNormalizeDispatcher(
+            TestTableOperationDispatcher.tableOperationDispatcher, catalogManager);
     schemaNormalizeDispatcher =
-        new SchemaNormalizeDispatcher(TestTableOperationDispatcher.schemaOperationDispatcher);
+        new SchemaNormalizeDispatcher(
+            TestTableOperationDispatcher.schemaOperationDispatcher, catalogManager);
   }
 
   @Test

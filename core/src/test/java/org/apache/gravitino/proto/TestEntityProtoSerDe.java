@@ -398,7 +398,7 @@ public class TestEntityProtoSerDe {
     SecurableObject securableObject =
         SecurableObjects.ofCatalog(
             catalogName,
-            Lists.newArrayList(Privileges.UseCatalog.allow(), Privileges.DropCatalog.deny()));
+            Lists.newArrayList(Privileges.UseCatalog.allow(), Privileges.CreateSchema.deny()));
     SecurableObject anotherSecurableObject =
         SecurableObjects.ofCatalog(
             anotherCatalogName, Lists.newArrayList(Privileges.UseCatalog.allow()));

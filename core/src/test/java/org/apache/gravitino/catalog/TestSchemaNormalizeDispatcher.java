@@ -37,7 +37,7 @@ public class TestSchemaNormalizeDispatcher extends TestOperationDispatcher {
   public static void initialize() throws IOException, IllegalAccessException {
     TestSchemaOperationDispatcher.initialize();
     schemaNormalizeDispatcher =
-        new SchemaNormalizeDispatcher(TestSchemaOperationDispatcher.dispatcher);
+        new SchemaNormalizeDispatcher(TestSchemaOperationDispatcher.dispatcher, catalogManager);
   }
 
   @Test

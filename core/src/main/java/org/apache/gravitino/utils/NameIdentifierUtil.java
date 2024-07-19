@@ -22,10 +22,15 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
 
@@ -115,6 +120,33 @@ public class NameIdentifierUtil {
   public static NameIdentifier ofTopic(
       String metalake, String catalog, String schema, String topic) {
     return NameIdentifier.of(metalake, catalog, schema, topic);
+  }
+
+  /**
+   * Try to get the catalog {@link NameIdentifier} from the given {@link NameIdentifier}.
+   *
+   * @param ident The {@link NameIdentifier} to check.
+   * @return The catalog {@link NameIdentifier}
+   * @throws IllegalNameIdentifierException If the given {@link NameIdentifier} does not include
+   *     catalog name
+   */
+  public static NameIdentifier getCatalogIdentifier(NameIdentifier ident)
+      throws IllegalNameIdentifierException {
+    NameIdentifier.check(
+        ident.name() != null, "The name variable in the NameIdentifier must have value.");
+    Namespace.check(
+        ident.namespace() != null && !ident.namespace().isEmpty(),
+        "Catalog namespace must be non-null and have 1 level, the input namespace is %s",
+        ident.namespace());
+
+    List<String> allElems =
+        Stream.concat(Arrays.stream(ident.namespace().levels()), Stream.of(ident.name()))
+            .collect(Collectors.toList());
+    if (allElems.size() < 2) {
+      throw new IllegalNameIdentifierException(
+          "Cannot create a catalog NameIdentifier less than two elements.");
+    }
+    return NameIdentifier.of(allElems.get(0), allElems.get(1));
   }
 
   /**

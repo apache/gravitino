@@ -20,8 +20,10 @@ package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
+import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
 
 import java.util.Map;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
@@ -33,34 +35,35 @@ import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicChange;
 
 public class TopicNormalizeDispatcher implements TopicDispatcher {
+  private final CatalogManager catalogManager;
+  private final TopicDispatcher dispatcher;
 
-  private final TopicOperationDispatcher dispatcher;
-
-  public TopicNormalizeDispatcher(TopicOperationDispatcher dispatcher) {
+  public TopicNormalizeDispatcher(TopicDispatcher dispatcher, CatalogManager catalogManager) {
     this.dispatcher = dispatcher;
+    this.catalogManager = catalogManager;
   }
 
   @Override
   public NameIdentifier[] listTopics(Namespace namespace) throws NoSuchSchemaException {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
-    Namespace caseSensitiveNs = applyCaseSensitive(namespace, Capability.Scope.TOPIC, dispatcher);
+    Namespace caseSensitiveNs = normalizeCaseSensitive(namespace);
     NameIdentifier[] identifiers = dispatcher.listTopics(caseSensitiveNs);
-    return applyCaseSensitive(identifiers, Capability.Scope.TOPIC, dispatcher);
+    return normalizeCaseSensitive(identifiers);
   }
 
   @Override
   public Topic loadTopic(NameIdentifier ident) throws NoSuchTopicException {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
-    return dispatcher.loadTopic(applyCaseSensitive(ident, Capability.Scope.TOPIC, dispatcher));
+    return dispatcher.loadTopic(normalizeCaseSensitive(ident));
   }
 
   @Override
   public boolean topicExists(NameIdentifier ident) {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
-    return dispatcher.topicExists(applyCaseSensitive(ident, Capability.Scope.TOPIC, dispatcher));
+    return dispatcher.topicExists(normalizeCaseSensitive(ident));
   }
 
   @Override
@@ -75,19 +78,37 @@ public class TopicNormalizeDispatcher implements TopicDispatcher {
       throws NoSuchTopicException, IllegalArgumentException {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
-    return dispatcher.alterTopic(
-        applyCaseSensitive(ident, Capability.Scope.TOPIC, dispatcher), changes);
+    return dispatcher.alterTopic(normalizeCaseSensitive(ident), changes);
   }
 
   @Override
   public boolean dropTopic(NameIdentifier ident) {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
-    return dispatcher.dropTopic(applyCaseSensitive(ident, Capability.Scope.TOPIC, dispatcher));
+    return dispatcher.dropTopic(normalizeCaseSensitive(ident));
   }
 
-  private NameIdentifier normalizeNameIdentifier(NameIdentifier ident) {
-    Capability capability = dispatcher.getCatalogCapability(ident);
-    return applyCapabilities(ident, Capability.Scope.TOPIC, capability);
+  private Namespace normalizeCaseSensitive(Namespace namespace) {
+    Capability capabilities = getCapability(NameIdentifier.of(namespace.levels()), catalogManager);
+    return applyCaseSensitive(namespace, Capability.Scope.TOPIC, capabilities);
+  }
+
+  private NameIdentifier normalizeCaseSensitive(NameIdentifier topicIdent) {
+    Capability capabilities = getCapability(topicIdent, catalogManager);
+    return applyCaseSensitive(topicIdent, Capability.Scope.TOPIC, capabilities);
+  }
+
+  private NameIdentifier[] normalizeCaseSensitive(NameIdentifier[] topicIdents) {
+    if (ArrayUtils.isEmpty(topicIdents)) {
+      return topicIdents;
+    }
+
+    Capability capabilities = getCapability(topicIdents[0], catalogManager);
+    return applyCaseSensitive(topicIdents, Capability.Scope.TOPIC, capabilities);
+  }
+
+  private NameIdentifier normalizeNameIdentifier(NameIdentifier topicIdent) {
+    Capability capability = getCapability(topicIdent, catalogManager);
+    return applyCapabilities(topicIdent, Capability.Scope.TOPIC, capability);
   }
 }

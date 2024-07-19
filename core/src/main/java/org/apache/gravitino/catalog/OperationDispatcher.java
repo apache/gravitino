@@ -19,25 +19,21 @@
 package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForAlter;
+import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
 import com.google.common.collect.Maps;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
-import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.messaging.TopicChange;
@@ -73,20 +69,6 @@ public abstract class OperationDispatcher {
     this.catalogManager = catalogManager;
     this.store = store;
     this.idGenerator = idGenerator;
-  }
-
-  protected Capability getCatalogCapability(NameIdentifier ident) {
-    return doWithCatalog(
-        getCatalogIdentifier(ident),
-        CatalogManager.CatalogWrapper::capabilities,
-        IllegalArgumentException.class);
-  }
-
-  protected Capability getCatalogCapability(Namespace namespace) {
-    return doWithCatalog(
-        getCatalogIdentifier(NameIdentifier.of(namespace.levels())),
-        CatalogManager.CatalogWrapper::capabilities,
-        IllegalArgumentException.class);
   }
 
   protected <R, E extends Throwable> R doWithTable(
@@ -237,26 +219,6 @@ public abstract class OperationDispatcher {
     }
 
     return ret;
-  }
-
-  // TODO(xun): Remove this method when we implement a better way to get the catalog identifier
-  //  [#257] Add an explicit get catalog functions in NameIdentifier
-  protected NameIdentifier getCatalogIdentifier(NameIdentifier ident) {
-    NameIdentifier.check(
-        ident.name() != null, "The name variable in the NameIdentifier must have value.");
-    Namespace.check(
-        ident.namespace() != null && ident.namespace().length() > 0,
-        "Catalog namespace must be non-null and have 1 level, the input namespace is %s",
-        ident.namespace());
-
-    List<String> allElems =
-        Stream.concat(Arrays.stream(ident.namespace().levels()), Stream.of(ident.name()))
-            .collect(Collectors.toList());
-    if (allElems.size() < 2) {
-      throw new IllegalNameIdentifierException(
-          "Cannot create a catalog NameIdentifier less than two elements.");
-    }
-    return NameIdentifier.of(allElems.get(0), allElems.get(1));
   }
 
   boolean isManagedEntity(NameIdentifier catalogIdent, Capability.Scope scope) {
