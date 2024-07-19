@@ -112,7 +112,7 @@ public class TestDorisTablePartitionOperations extends TestDoris {
         distribution,
         indexes);
 
-    // Assert table info
+    // assert table info
     JdbcTable rangePartitionTable = TABLE_OPERATIONS.load(databaseName, rangePartitionTableName);
     assertionsTableInfo(
         rangePartitionTableName,
@@ -125,31 +125,27 @@ public class TestDorisTablePartitionOperations extends TestDoris {
     List<String> listTables = TABLE_OPERATIONS.listTables(databaseName);
     assertTrue(listTables.contains(rangePartitionTableName));
 
-    // Create Table Partition Operations manually
+    // create Table Partition Operations manually
     JdbcTablePartitionOperations tablePartitionOperations =
         new DorisTablePartitionOperations(
-            DATA_SOURCE,
-            databaseName,
-            rangePartitionTableName,
-            JDBC_EXCEPTION_CONVERTER,
-            TYPE_CONVERTER);
+            DATA_SOURCE, rangePartitionTable, JDBC_EXCEPTION_CONVERTER, TYPE_CONVERTER);
 
-    // Assert partition info when there is no partitions actually
+    // assert partition info when there is no partitions actually
     String[] emptyPartitionNames = tablePartitionOperations.listPartitionNames();
     assertEquals(0, emptyPartitionNames.length);
     Partition[] emptyPartitions = tablePartitionOperations.listPartitions();
     assertEquals(0, emptyPartitions.length);
 
-    // Get non-existing partition
+    // get non-existing partition
     assertThrows(NoSuchPartitionException.class, () -> tablePartitionOperations.getPartition("p1"));
 
-    // Add partition with incorrect type
+    // add partition with incorrect type
     Partition incorrect =
         Partitions.list("test_incorrect", new Literal[][] {{Literals.NULL}}, null);
     assertThrows(
         IllegalArgumentException.class, () -> tablePartitionOperations.addPartition(incorrect));
 
-    // Add different kinds of range partitions
+    // add different kinds of range partitions
     LocalDate today = LocalDate.now();
     LocalDate tomorrow = today.plusDays(1);
     Literal<LocalDate> todayLiteral = Literals.dateLiteral(today);
@@ -161,12 +157,12 @@ public class TestDorisTablePartitionOperations extends TestDoris {
     assertEquals(p2, tablePartitionOperations.addPartition(p2));
     assertEquals(p3, tablePartitionOperations.addPartition(p3));
 
-    // Add partition with same name
+    // add partition with same name
     Partition p4 = Partitions.range("p3", Literals.NULL, Literals.NULL, Collections.emptyMap());
     assertThrows(
         PartitionAlreadyExistsException.class, () -> tablePartitionOperations.addPartition(p4));
 
-    // Check partitions
+    // check partitions
     Set<String> partitionNames =
         Arrays.stream(tablePartitionOperations.listPartitionNames()).collect(Collectors.toSet());
     assertEquals(3, partitionNames.size());
@@ -198,7 +194,7 @@ public class TestDorisTablePartitionOperations extends TestDoris {
     assertEquals(Literals.of("MAXVALUE", Types.DateType.get()), actualP3.upper());
     assertEquals(tomorrowLiteral, actualP3.lower());
 
-    // Drop partition
+    // drop partition
     assertTrue(tablePartitionOperations.dropPartition("p3"));
     partitionNames =
         Arrays.stream(tablePartitionOperations.listPartitionNames()).collect(Collectors.toSet());
@@ -206,7 +202,7 @@ public class TestDorisTablePartitionOperations extends TestDoris {
     assertFalse(partitionNames.contains("p3"));
     assertThrows(NoSuchPartitionException.class, () -> tablePartitionOperations.getPartition("p3"));
 
-    // Drop non-existing partition
+    // drop non-existing partition
     assertFalse(tablePartitionOperations.dropPartition("p3"));
   }
 
@@ -262,11 +258,7 @@ public class TestDorisTablePartitionOperations extends TestDoris {
     // create Table Partition Operations manually
     JdbcTablePartitionOperations tablePartitionOperations =
         new DorisTablePartitionOperations(
-            DATA_SOURCE,
-            databaseName,
-            listPartitionTableName,
-            JDBC_EXCEPTION_CONVERTER,
-            TYPE_CONVERTER);
+            DATA_SOURCE, listPartitionTable, JDBC_EXCEPTION_CONVERTER, TYPE_CONVERTER);
 
     // assert partition info when there is no partitions actually
     String[] emptyPartitionNames = tablePartitionOperations.listPartitionNames();
@@ -349,70 +341,5 @@ public class TestDorisTablePartitionOperations extends TestDoris {
 
     // drop non-existing partition
     assertFalse(tablePartitionOperations.dropPartition("p3"));
-  }
-
-  @Test
-  public void testNonPartitionedTable() {
-    String tableComment = "not_partitioned_table_comment";
-    JdbcColumn col1 =
-        JdbcColumn.builder()
-            .withName("col_1")
-            .withType(Types.IntegerType.get())
-            .withNullable(false)
-            .build();
-    Distribution distribution =
-        Distributions.hash(DEFAULT_BUCKET_SIZE, NamedReference.field("col_1"));
-    Index[] indexes = new Index[] {};
-    JdbcColumn[] columns = {col1};
-    String tableName = GravitinoITUtils.genRandomName("not_partitioned_table");
-    Transform[] partitioning = Transforms.EMPTY_TRANSFORM;
-    TABLE_OPERATIONS.create(
-        databaseName,
-        tableName,
-        columns,
-        tableComment,
-        createProperties(),
-        partitioning,
-        distribution,
-        indexes);
-
-    // assert table info
-    JdbcTable load = TABLE_OPERATIONS.load(databaseName, tableName);
-    assertionsTableInfo(
-        tableName,
-        tableComment,
-        Arrays.stream(columns).collect(Collectors.toList()),
-        Collections.emptyMap(),
-        null,
-        partitioning,
-        load);
-    List<String> listTables = TABLE_OPERATIONS.listTables(databaseName);
-    assertTrue(listTables.contains(tableName));
-
-    // create Table Partition Operations manually
-    JdbcTablePartitionOperations tablePartitionOperations =
-        new DorisTablePartitionOperations(
-            DATA_SOURCE, databaseName, tableName, JDBC_EXCEPTION_CONVERTER, TYPE_CONVERTER);
-
-    // operations for not-partitioned table
-    // doris will create a default partition for non-partitioned table
-    assertEquals(1, tablePartitionOperations.listPartitionNames().length);
-
-    UnsupportedOperationException exception =
-        assertThrows(
-            UnsupportedOperationException.class, () -> tablePartitionOperations.listPartitions());
-    assertEquals(String.format("%s is not a partitioned table", tableName), exception.getMessage());
-
-    exception =
-        assertThrows(
-            UnsupportedOperationException.class, () -> tablePartitionOperations.getPartition("p1"));
-    assertEquals(String.format("%s is not a partitioned table", tableName), exception.getMessage());
-
-    exception =
-        assertThrows(
-            UnsupportedOperationException.class, () -> tablePartitionOperations.addPartition(null));
-    assertEquals(String.format("%s is not a partitioned table", tableName), exception.getMessage());
-
-    assertFalse(tablePartitionOperations.dropPartition("p1"));
   }
 }

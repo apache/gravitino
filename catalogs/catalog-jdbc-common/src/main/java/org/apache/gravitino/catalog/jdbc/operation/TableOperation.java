@@ -115,8 +115,7 @@ public interface TableOperation {
    */
   boolean purge(String databaseName, String tableName);
 
-  default JdbcTablePartitionOperations createJdbcTablePartitionOperations(
-      String databaseName, String tableName) {
+  default JdbcTablePartitionOperations createJdbcTablePartitionOperations(JdbcTable loadedTable) {
     throw new UnsupportedOperationException("Table partition operation is not supported yet");
   }
 }

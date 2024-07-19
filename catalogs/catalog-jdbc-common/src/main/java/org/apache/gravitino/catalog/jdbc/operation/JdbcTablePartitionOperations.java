@@ -24,22 +24,19 @@ import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import javax.sql.DataSource;
+import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.connector.TableOperations;
 import org.apache.gravitino.rel.SupportsPartitions;
 
 public abstract class JdbcTablePartitionOperations implements TableOperations, SupportsPartitions {
   protected final DataSource dataSource;
-  protected final String databaseName;
-  protected final String tableName;
+  protected final JdbcTable loadedTable;
 
-  protected JdbcTablePartitionOperations(
-      DataSource dataSource, String databaseName, String tableName) {
+  protected JdbcTablePartitionOperations(DataSource dataSource, JdbcTable loadedTable) {
     checkArgument(dataSource != null, "dataSource is null");
-    checkArgument(databaseName != null, "databaseName is null");
-    checkArgument(tableName != null, "table is null");
+    checkArgument(loadedTable != null, "loadedTable is null");
     this.dataSource = dataSource;
-    this.databaseName = databaseName;
-    this.tableName = tableName;
+    this.loadedTable = loadedTable;
   }
 
   protected Connection getConnection(String databaseName) throws SQLException {

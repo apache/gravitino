@@ -41,12 +41,16 @@ public class JdbcTable extends BaseTable {
       throw new UnsupportedOperationException(
           "Table partition operation is not supported for non-partitioned table: " + name);
     }
-    return tableOperation.createJdbcTablePartitionOperations(databaseName, name);
+    return tableOperation.createJdbcTablePartitionOperations(this);
   }
 
   @Override
   public SupportsPartitions supportPartitions() throws UnsupportedOperationException {
     return (SupportsPartitions) ops();
+  }
+
+  public String databaseName() {
+    return databaseName;
   }
 
   /** A builder class for constructing JdbcTable instances. */

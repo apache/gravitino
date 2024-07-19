@@ -19,6 +19,15 @@
 package org.apache.gravitino.catalog.doris.operation;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static org.apache.gravitino.catalog.doris.DorisTablePartitionPropertiesMetadata.DATA_SIZE;
+import static org.apache.gravitino.catalog.doris.DorisTablePartitionPropertiesMetadata.ID;
+import static org.apache.gravitino.catalog.doris.DorisTablePartitionPropertiesMetadata.IS_IN_MEMORY;
+import static org.apache.gravitino.catalog.doris.DorisTablePartitionPropertiesMetadata.KEY;
+import static org.apache.gravitino.catalog.doris.DorisTablePartitionPropertiesMetadata.NAME;
+import static org.apache.gravitino.catalog.doris.DorisTablePartitionPropertiesMetadata.STATE;
+import static org.apache.gravitino.catalog.doris.DorisTablePartitionPropertiesMetadata.VALUES_RANGE;
+import static org.apache.gravitino.catalog.doris.DorisTablePartitionPropertiesMetadata.VISIBLE_VERSION;
+import static org.apache.gravitino.catalog.doris.DorisTablePartitionPropertiesMetadata.VISIBLE_VERSION_TIME;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -32,12 +41,11 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import javax.sql.DataSource;
-import org.apache.gravitino.catalog.doris.utils.DorisUtils;
+import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTablePartitionOperations;
@@ -65,11 +73,10 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
 
   public DorisTablePartitionOperations(
       DataSource dataSource,
-      String databaseName,
-      String tableName,
+      JdbcTable loadedTable,
       JdbcExceptionConverter exceptionConverter,
       JdbcTypeConverter typeConverter) {
-    super(dataSource, databaseName, tableName);
+    super(dataSource, loadedTable);
     checkArgument(exceptionConverter != null, "exceptionConverter is null");
     checkArgument(typeConverter != null, "typeConverter is null");
     this.exceptionConverter = exceptionConverter;
@@ -78,8 +85,8 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
 
   @Override
   public String[] listPartitionNames() {
-    try (Connection connection = getConnection(databaseName)) {
-      String showPartitionsSql = String.format("SHOW PARTITIONS FROM `%s`", tableName);
+    try (Connection connection = getConnection(loadedTable.databaseName())) {
+      String showPartitionsSql = String.format("SHOW PARTITIONS FROM `%s`", loadedTable.name());
       try (Statement statement = connection.createStatement();
           ResultSet result = statement.executeQuery(showPartitionsSql)) {
         ImmutableList.Builder<String> partitionNames = ImmutableList.builder();
@@ -95,10 +102,10 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
 
   @Override
   public Partition[] listPartitions() {
-    try (Connection connection = getConnection(databaseName)) {
-      Transform partitionInfo = getPartitionInfo(connection);
+    try (Connection connection = getConnection(loadedTable.databaseName())) {
+      Transform partitionInfo = loadedTable.partitioning()[0];
       Map<String, Type> columnTypes = getColumnType(connection);
-      String showPartitionsSql = String.format("SHOW PARTITIONS FROM `%s`", tableName);
+      String showPartitionsSql = String.format("SHOW PARTITIONS FROM `%s`", loadedTable.name());
       try (Statement statement = connection.createStatement();
           ResultSet result = statement.executeQuery(showPartitionsSql)) {
         ImmutableList.Builder<Partition> partitions = ImmutableList.builder();
@@ -114,12 +121,13 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
 
   @Override
   public Partition getPartition(String partitionName) throws NoSuchPartitionException {
-    try (Connection connection = getConnection(databaseName)) {
-      Transform partitionInfo = getPartitionInfo(connection);
+    try (Connection connection = getConnection(loadedTable.databaseName())) {
+      Transform partitionInfo = loadedTable.partitioning()[0];
       Map<String, Type> columnTypes = getColumnType(connection);
       String showPartitionsSql =
           String.format(
-              "SHOW PARTITIONS FROM `%s` WHERE PartitionName = \"%s\"", tableName, partitionName);
+              "SHOW PARTITIONS FROM `%s` WHERE PartitionName = \"%s\"",
+              loadedTable.name(), partitionName);
       try (Statement statement = connection.createStatement();
           ResultSet result = statement.executeQuery(showPartitionsSql)) {
         while (result.next()) {
@@ -134,8 +142,8 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
 
   @Override
   public Partition addPartition(Partition partition) throws PartitionAlreadyExistsException {
-    try (Connection connection = getConnection(databaseName)) {
-      Transform partitionInfo = getPartitionInfo(connection);
+    try (Connection connection = getConnection(loadedTable.databaseName())) {
+      Transform partitionInfo = loadedTable.partitioning()[0];
 
       String addPartitionSqlFormat = "ALTER TABLE `%s` ADD PARTITION `%s` VALUES %s";
       String partitionValues;
@@ -145,7 +153,7 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
         Preconditions.checkArgument(
             partitionInfo instanceof Transforms.RangeTransform,
             "Table %s is partitioned by list, but trying to add a range partition",
-            tableName);
+            loadedTable.name());
 
         RangePartition rangePartition = (RangePartition) partition;
         partitionValues = buildRangePartitionValues(rangePartition);
@@ -162,7 +170,7 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
         Preconditions.checkArgument(
             partitionInfo instanceof Transforms.ListTransform,
             "Table %s is partitioned by range, but trying to add a list partition",
-            tableName);
+            loadedTable.name());
 
         ListPartition listPartition = (ListPartition) partition;
         partitionValues =
@@ -177,7 +185,8 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
 
       try (Statement statement = connection.createStatement()) {
         statement.executeUpdate(
-            String.format(addPartitionSqlFormat, tableName, partition.name(), partitionValues));
+            String.format(
+                addPartitionSqlFormat, loadedTable.name(), partition.name(), partitionValues));
         return added;
       }
     } catch (SQLException e) {
@@ -187,9 +196,9 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
 
   @Override
   public boolean dropPartition(String partitionName) {
-    try (Connection connection = getConnection(databaseName)) {
+    try (Connection connection = getConnection(loadedTable.databaseName())) {
       String dropPartitionsSql =
-          String.format("ALTER TABLE `%s` DROP PARTITION `%s`", tableName, partitionName);
+          String.format("ALTER TABLE `%s` DROP PARTITION `%s`", loadedTable.name(), partitionName);
       try (Statement statement = connection.createStatement()) {
         statement.executeUpdate(dropPartitionsSql);
         return true;
@@ -203,37 +212,20 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
     }
   }
 
-  private Transform getPartitionInfo(Connection connection) throws SQLException {
-    String showCreateTableSql = String.format("SHOW CREATE TABLE `%s`", tableName);
-    try (Statement statement = connection.createStatement();
-        ResultSet result = statement.executeQuery(showCreateTableSql)) {
-      StringBuilder createTableSql = new StringBuilder();
-      while (result.next()) {
-        createTableSql.append(result.getString("Create Table"));
-      }
-      Optional<Transform> transform =
-          DorisUtils.extractPartitionInfoFromSql(createTableSql.toString());
-      return transform.orElseThrow(
-          () ->
-              new UnsupportedOperationException(
-                  String.format("%s is not a partitioned table", tableName)));
-    }
-  }
-
   private Partition fromDorisPartition(
       ResultSet resultSet, Transform partitionInfo, Map<String, Type> columnTypes)
       throws SQLException {
-    String partitionName = resultSet.getString("PartitionName");
-    String partitionKey = resultSet.getString("PartitionKey");
-    String partitionValues = resultSet.getString("Range");
+    String partitionName = resultSet.getString(NAME);
+    String partitionKey = resultSet.getString(KEY);
+    String partitionValues = resultSet.getString(VALUES_RANGE);
     ImmutableMap.Builder<String, String> propertiesBuilder = ImmutableMap.builder();
-    propertiesBuilder.put("PartitionId", resultSet.getString("PartitionId"));
-    propertiesBuilder.put("VisibleVersion", resultSet.getString("VisibleVersion"));
-    propertiesBuilder.put("VisibleVersionTime", resultSet.getString("VisibleVersionTime"));
-    propertiesBuilder.put("State", resultSet.getString("State"));
-    propertiesBuilder.put("PartitionKey", partitionKey);
-    propertiesBuilder.put("DataSize", resultSet.getString("DataSize"));
-    propertiesBuilder.put("IsInMemory", resultSet.getString("IsInMemory"));
+    propertiesBuilder.put(ID, resultSet.getString(ID));
+    propertiesBuilder.put(VISIBLE_VERSION, resultSet.getString(VISIBLE_VERSION));
+    propertiesBuilder.put(VISIBLE_VERSION_TIME, resultSet.getString(VISIBLE_VERSION_TIME));
+    propertiesBuilder.put(STATE, resultSet.getString(STATE));
+    propertiesBuilder.put(KEY, partitionKey);
+    propertiesBuilder.put(DATA_SIZE, resultSet.getString(DATA_SIZE));
+    propertiesBuilder.put(IS_IN_MEMORY, resultSet.getString(IS_IN_MEMORY));
     ImmutableMap<String, String> properties = propertiesBuilder.build();
 
     String[] partitionKeys = partitionKey.split(", ");
@@ -271,17 +263,18 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
           partitionName, lists.build().stream().toArray(Literal<?>[][]::new), properties);
     } else {
       throw new UnsupportedOperationException(
-          String.format("%s is not a partitioned table", tableName));
+          String.format("%s is not a partitioned table", loadedTable.name()));
     }
   }
 
   private Map<String, Type> getColumnType(Connection connection) throws SQLException {
     DatabaseMetaData metaData = connection.getMetaData();
     try (ResultSet result =
-        metaData.getColumns(connection.getCatalog(), connection.getSchema(), tableName, null)) {
+        metaData.getColumns(
+            connection.getCatalog(), connection.getSchema(), loadedTable.name(), null)) {
       ImmutableMap.Builder<String, Type> columnTypes = ImmutableMap.builder();
       while (result.next()) {
-        if (Objects.equals(result.getString("TABLE_NAME"), tableName)) {
+        if (Objects.equals(result.getString("TABLE_NAME"), loadedTable.name())) {
           JdbcTypeConverter.JdbcTypeBean typeBean =
               new JdbcTypeConverter.JdbcTypeBean(result.getString("TYPE_NAME"));
           typeBean.setColumnSize(result.getString("COLUMN_SIZE"));
