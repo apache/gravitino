@@ -43,7 +43,7 @@ public class TestPartitionNormalizeDispatcher extends TestOperationDispatcher {
     TestPartitionOperationDispatcher.prepareTable();
     partitionNormalizeDispatcher =
         new PartitionNormalizeDispatcher(
-            TestPartitionOperationDispatcher.partitionOperationDispatcher);
+            TestPartitionOperationDispatcher.partitionOperationDispatcher, catalogManager);
     NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema(metalake, catalog, SCHEMA);
     TestPartitionOperationDispatcher.schemaOperationDispatcher.createSchema(
         schemaIdent, "comment", null);

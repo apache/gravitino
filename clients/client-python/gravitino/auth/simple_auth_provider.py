@@ -20,8 +20,8 @@ under the License.
 import base64
 import os
 
-from .auth_constants import AuthConstants
-from .auth_data_provider import AuthDataProvider
+from gravitino.auth.auth_constants import AuthConstants
+from gravitino.auth.auth_data_provider import AuthDataProvider
 
 
 class SimpleAuthProvider(AuthDataProvider):

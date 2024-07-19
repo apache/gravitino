@@ -128,6 +128,7 @@ mockito-inline = { group = "org.mockito", name = "mockito-inline", version.ref =
 hive2-metastore = { group = "org.apache.hive", name = "hive-metastore", version.ref = "hive2"}
 hive2-exec = { group = "org.apache.hive", name = "hive-exec", version.ref = "hive2"}
 hive2-common = { group = "org.apache.hive", name = "hive-common", version.ref = "hive2"}
+hive2-jdbc = { group = "org.apache.hive", name = "hive-jdbc", version.ref = "hive2"}
 hadoop2-hdfs = { group = "org.apache.hadoop", name = "hadoop-hdfs", version.ref = "hadoop2" }
 hadoop2-common = { group = "org.apache.hadoop", name = "hadoop-common", version.ref = "hadoop2"}
 hadoop2-mapreduce-client-core = { group = "org.apache.hadoop", name = "hadoop-mapreduce-client-core", version.ref = "hadoop2"}

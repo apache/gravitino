@@ -135,7 +135,10 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     conf.forEach(hadoopConf::set);
 
     initAuthentication(conf, hadoopConf);
-    this.catalogStorageLocation = Optional.ofNullable(catalogLocation).map(Path::new);
+    this.catalogStorageLocation =
+        StringUtils.isNotBlank(catalogLocation)
+            ? Optional.of(catalogLocation).map(Path::new)
+            : Optional.empty();
   }
 
   private void initAuthentication(Map<String, String> conf, Configuration hadoopConf) {

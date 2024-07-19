@@ -90,22 +90,20 @@ public class TestSecurableObjects extends TestJDBCBackend {
     SecurableObject catalogObject =
         SecurableObjects.ofCatalog(
             "catalog",
-            Lists.newArrayList(Privileges.UseCatalog.allow(), Privileges.DropCatalog.deny()));
+            Lists.newArrayList(Privileges.UseCatalog.allow(), Privileges.CreateSchema.deny()));
 
     SecurableObject schemaObject =
         SecurableObjects.ofSchema(
             catalogObject, "schema", Lists.newArrayList(Privileges.UseSchema.allow()));
     SecurableObject tableObject =
         SecurableObjects.ofTable(
-            schemaObject, "table", Lists.newArrayList(Privileges.ReadTable.allow()));
+            schemaObject, "table", Lists.newArrayList(Privileges.SelectTable.allow()));
     SecurableObject filesetObject =
         SecurableObjects.ofFileset(
             schemaObject, "fileset", Lists.newArrayList(Privileges.ReadFileset.allow()));
     SecurableObject topicObject =
         SecurableObjects.ofTopic(
-            schemaObject, "topic", Lists.newArrayList(Privileges.ReadTopic.deny()));
-    SecurableObject allMetalakesObject =
-        SecurableObjects.ofAllMetalakes(Lists.newArrayList(Privileges.UseMetalake.allow()));
+            schemaObject, "topic", Lists.newArrayList(Privileges.ConsumeTopic.deny()));
 
     RoleEntity role1 =
         createRoleEntity(
@@ -114,12 +112,7 @@ public class TestSecurableObjects extends TestJDBCBackend {
             "role1",
             auditInfo,
             Lists.newArrayList(
-                catalogObject,
-                schemaObject,
-                tableObject,
-                filesetObject,
-                topicObject,
-                allMetalakesObject),
+                catalogObject, schemaObject, tableObject, filesetObject, topicObject),
             ImmutableMap.of("k1", "v1"));
 
     Assertions.assertDoesNotThrow(() -> roleMetaService.insertRole(role1, false));

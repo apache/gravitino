@@ -27,11 +27,7 @@ import org.apache.commons.lang3.StringUtils;
 /** The helper class for {@link MetadataObject}. */
 public class MetadataObjects {
 
-  /**
-   * The reserved name for the metadata object.
-   *
-   * <p>It is used to represent the root metadata object of all metalakes.
-   */
+  /** The reserved name for the metadata object. */
   public static final String METADATA_OBJECT_RESERVED_NAME = "*";
 
   private static final Splitter DOT_SPLITTER = Splitter.on('.');
@@ -106,13 +102,6 @@ public class MetadataObjects {
    * @return The parsed metadata object
    */
   public static MetadataObject parse(String fullName, MetadataObject.Type type) {
-    if (METADATA_OBJECT_RESERVED_NAME.equals(fullName)) {
-      if (type != MetadataObject.Type.METALAKE) {
-        throw new IllegalArgumentException("If metadata object isn't metalake, it can't be `*`");
-      }
-      return new MetadataObjectImpl(null, METADATA_OBJECT_RESERVED_NAME, type);
-    }
-
     Preconditions.checkArgument(
         StringUtils.isNotBlank(fullName), "Metadata object full name cannot be blank");
 

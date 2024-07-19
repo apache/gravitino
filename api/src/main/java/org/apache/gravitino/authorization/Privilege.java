@@ -43,72 +43,52 @@ public interface Privilege {
   enum Name {
     /** The privilege to create a catalog. */
     CREATE_CATALOG(0L, 1L),
-    /** The privilege to drop a catalog. */
-    DROP_CATALOG(0L, 1L << 1),
-    /** The privilege to alter a catalog. */
-    ALTER_CATALOG(0L, 1L << 2),
     /** The privilege to use a catalog. */
-    USE_CATALOG(0L, 1L << 3),
+    USE_CATALOG(0L, 1L << 2),
     /** The privilege to create a schema. */
-    CREATE_SCHEMA(0L, 1L << 4),
-    /** The privilege to drop a schema. */
-    DROP_SCHEMA(0L, 1L << 5),
-    /** The privilege to alter a schema. */
-    ALTER_SCHEMA(0L, 1L << 6),
+    CREATE_SCHEMA(0L, 1L << 3),
     /** the privilege to use a schema. */
-    USE_SCHEMA(0L, 1L << 7),
+    USE_SCHEMA(0L, 1L << 4),
     /** The privilege to create a table. */
-    CREATE_TABLE(0L, 1L << 8),
-    /** The privilege to drop a table. */
-    DROP_TABLE(0L, 1L << 9),
-    /** The privilege to write a table. */
-    WRITE_TABLE(0L, 1L << 10),
-    /** The privilege to read a table. */
-    READ_TABLE(0L, 1L << 11),
+    CREATE_TABLE(0L, 1L << 5),
+    /** The privilege to execute SQL `ALTER`, `INSERT`, `UPDATE`, or `DELETE` for a table. */
+    MODIFY_TABLE(0L, 1L << 6),
+    /** The privilege to select data from a table. */
+    SELECT_TABLE(0L, 1L << 7),
     /** The privilege to create a fileset. */
-    CREATE_FILESET(0L, 1L << 12),
-    /** The privilege to drop a fileset. */
-    DROP_FILESET(0L, 1L << 13),
+    CREATE_FILESET(0L, 1L << 8),
     /** The privilege to write a fileset. */
-    WRITE_FILESET(0L, 1L << 14),
+    WRITE_FILESET(0L, 1L << 9),
     /** The privilege to read a fileset. */
-    READ_FILESET(0L, 1L << 15),
+    READ_FILESET(0L, 1L << 10),
     /** The privilege to create a topic. */
-    CREATE_TOPIC(0L, 1L << 16),
-    /** The privilege to drop a topic. */
-    DROP_TOPIC(0L, 1L << 17),
-    /** The privilege to write a topic. */
-    WRITE_TOPIC(0L, 1L << 18),
-    /** The privilege to read a topic. */
-    READ_TOPIC(0L, 1L << 19),
-    /** The privilege to create a metalake. */
-    CREATE_METALAKE(0L, 1L << 20),
-    /** The privilege to manage a metalake, including drop and alter a metalake. */
-    MANAGE_METALAKE(0L, 1L << 21),
-    /** The privilege to use a metalake, the user can load the information of the metalake. */
-    USE_METALAKE(0L, 1L << 22),
+    CREATE_TOPIC(0L, 1L << 11),
+    /** The privilege to produce to a topic. */
+    PRODUCE_TOPIC(0L, 1L << 12),
+    /** The privilege to consume from a topic. */
+    CONSUME_TOPIC(0L, 1L << 13),
     /** The privilege to add a user */
-    ADD_USER(0L, 1L << 23),
+    ADD_USER(0L, 1L << 14),
     /** The privilege to remove a user */
-    REMOVE_USER(0L, 1L << 24),
+    REMOVE_USER(0L, 1L << 15),
     /** The privilege to get a user */
-    GET_USER(0L, 1L << 25),
+    GET_USER(0L, 1L << 16),
     /** The privilege to add a group */
-    ADD_GROUP(0L, 1L << 26),
+    ADD_GROUP(0L, 1L << 17),
     /** The privilege to remove a group */
-    REMOVE_GROUP(0L, 1L << 27),
+    REMOVE_GROUP(0L, 1L << 18),
     /** The privilege to get a group */
-    GET_GROUP(0L, 1L << 28),
+    GET_GROUP(0L, 1L << 19),
     /** The privilege to create a role */
-    CREATE_ROLE(0L, 1L << 29),
+    CREATE_ROLE(0L, 1L << 20),
     /** The privilege to delete a role */
-    DELETE_ROLE(0L, 1L << 30),
+    DELETE_ROLE(0L, 1L << 21),
     /** The privilege to grant a role to the user or the group. */
-    GRANT_ROLE(0L, 1L << 31),
+    GRANT_ROLE(0L, 1L << 22),
     /** The privilege to revoke a role from the user or the group. */
-    REVOKE_ROLE(0L, 1L << 32),
+    REVOKE_ROLE(0L, 1L << 23),
     /** The privilege to get a role */
-    GET_ROLE(0L, 1L << 33);
+    GET_ROLE(0L, 1L << 24);
 
     private final long highBits;
     private final long lowBits;
