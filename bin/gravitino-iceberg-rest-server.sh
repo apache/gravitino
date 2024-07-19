@@ -45,14 +45,14 @@ function check_process_status() {
   local pid=$(found_iceberg_rest_server_pid)
 
   if [[ -z "${pid}" ]]; then
-    echo "IcebergRESTServer is not running"
+    echo "GravitinoIcebergRESTServer is not running"
   else
-    echo "IcebergRESTServer is running[PID:$pid]"
+    echo "GravitinoIcebergRESTServer is running[PID:$pid]"
   fi
 }
 
 function found_iceberg_rest_server_pid() {
-  process_name='IcebergRESTServer';
+  process_name='GravitinoIcebergRESTServer';
   RUNNING_PIDS=$(ps x | grep ${process_name} | grep -v grep | awk '{print $1}');
 
   if [[ -z "${RUNNING_PIDS}" ]]; then
@@ -60,7 +60,7 @@ function found_iceberg_rest_server_pid() {
   fi
 
   if ! kill -0 ${RUNNING_PIDS} > /dev/null 2>&1; then
-    echo "IcebergRESTServer running but process is dead"
+    echo "GravitinoIcebergRESTServer running but process is dead"
   fi
 
   echo "${RUNNING_PIDS}"
@@ -100,7 +100,7 @@ function start() {
 
   if [[ ! -z "${pid}" ]]; then
     if kill -0 ${pid} >/dev/null 2>&1; then
-      echo "IcebergRESTServer is already running"
+      echo "GravitinoIcebergRESTServer is already running"
       return 0;
     fi
   fi
@@ -114,10 +114,10 @@ function start() {
 
   pid=$!
   if [[ -z "${pid}" ]]; then
-    echo "IcebergRESTServer start error!"
+    echo "GravitinoIcebergRESTServer start error!"
     return 1;
   else
-    echo "IcebergRESTServer start success!"
+    echo "GravitinoIcebergRESTServer start success!"
   fi
 
   sleep 2
@@ -134,10 +134,10 @@ function stop() {
   pid=$(found_iceberg_rest_server_pid)
 
   if [[ -z "${pid}" ]]; then
-    echo "IcebergRESTServer is not running"
+    echo "GravitinoIcebergRESTServer is not running"
   else
     wait_for_iceberg_rest_server_to_die
-    echo "IcebergRESTServer stop"
+    echo "GravitinoIcebergRESTServer stop"
   fi
 }
 
