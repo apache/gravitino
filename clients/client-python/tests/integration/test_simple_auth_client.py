@@ -100,6 +100,8 @@ class TestSimpleAuthClient(IntegrationTestEnv):
             )
         except Exception as e:
             logger.error("Clean test data failed: %s", e)
+        finally:
+            os.environ["GRAVITINO_USER"] = ""
 
     def init_test_env(self):
         self.gravitino_admin_client.create_metalake(
