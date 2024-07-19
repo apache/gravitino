@@ -78,6 +78,17 @@ class Response:
 
 
 class HTTPClient:
+
+    FORMDATA_HEADER = {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Accept": "application/vnd.gravitino.v1+json",
+    }
+
+    JSON_HEADER = {
+        "Content-Type": "application/json",
+        "Accept": "application/vnd.gravitino.v1+json",
+    }
+
     def __init__(
         self,
         host,
@@ -139,12 +150,14 @@ class HTTPClient:
 
             return (False, err_resp)
 
+    # pylint: disable=too-many-locals
     def _request(
         self,
         method,
         endpoint,
         params=None,
         json=None,
+        data=None,
         headers=None,
         timeout=None,
         error_handler: ErrorHandler = None,
@@ -152,17 +165,17 @@ class HTTPClient:
         method = method.upper()
         request_data = None
 
+        if data:
+            request_data = urlencode(data.to_dict()).encode()
+            self._update_headers(self.FORMDATA_HEADER)
+        else:
+            if json:
+                request_data = json.to_json().encode("utf-8")
+
+            self._update_headers(self.JSON_HEADER)
+
         if headers:
             self._update_headers(headers)
-        else:
-            headers = {
-                "Content-Type": "application/json",
-                "Accept": "application/vnd.gravitino.v1+json",
-            }
-            self._update_headers(headers)
-
-        if json:
-            request_data = json.to_json().encode("utf-8")
 
         opener = build_opener()
         request = Request(self._build_url(endpoint, params), data=request_data)
@@ -211,6 +224,11 @@ class HTTPClient:
     def put(self, endpoint, json=None, error_handler=None, **kwargs):
         return self._request(
             "put", endpoint, json=json, error_handler=error_handler, **kwargs
+        )
+
+    def post_form(self, endpoint, data=None, error_handler=None, **kwargs):
+        return self._request(
+            "post", endpoint, data=data, error_handler=error_handler**kwargs
         )
 
     def close(self):
