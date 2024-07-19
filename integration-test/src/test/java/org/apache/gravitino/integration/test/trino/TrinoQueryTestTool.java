@@ -76,7 +76,7 @@ public class TrinoQueryTestTool {
       options.addOption(
           "params",
           true,
-          "Addition parameters that can replace the value of ${key} in the testers contents, "
+          "Additional parameters that can replace the value of ${key} in the testers contents, "
               + "example: --params=key1,v1;key2,v2");
 
       options.addOption("help", false, "Print this help message");
