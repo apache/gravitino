@@ -72,7 +72,7 @@ public class GravitinoConfig {
   private static final ConfigEntry GRAVITINO_CLUSTER =
       new ConfigEntry(
           "gravitino.cluster",
-          "The cluster name of the trino, if it's empty, all the catalogs handled by locally",
+          "The cluster name of the trino, if it's empty, all catalogs will be handled locally",
           "",
           false);
 

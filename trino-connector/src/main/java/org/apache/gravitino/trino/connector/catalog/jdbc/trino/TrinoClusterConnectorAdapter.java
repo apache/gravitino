@@ -56,13 +56,13 @@ public class TrinoClusterConnectorAdapter implements CatalogConnectorAdapter {
   @Override
   public Map<String, String> buildInternalConnectorConfig(GravitinoCatalog catalog) {
     Map<String, String> config = new HashMap<>();
-    String jdbc_url = catalog.getProperty(TRINO_CLUSTER_URL_KEY, "");
-    if (StringUtils.isEmpty(jdbc_url)) {
+    String jdbcUrl = catalog.getProperty(TRINO_CLUSTER_URL_KEY, "");
+    if (StringUtils.isEmpty(jdbcUrl)) {
       throw new TrinoException(
           GRAVITINO_MISSING_CONFIG, "Missing jdbc url config for the cluster catalog");
     }
-    jdbc_url += "/" + catalog.getName();
-    config.put(JDBC_CONNECTION_URL_KEY, jdbc_url);
+    jdbcUrl += "/" + catalog.getName();
+    config.put(JDBC_CONNECTION_URL_KEY, jdbcUrl);
 
     String user = catalog.getProperty(TRINO_CLUSTER_USER_KEY, TRINO_CLUSTER_DEFAULT_USER);
     config.put(JDBC_CONNECTION_USER_KEY, user);

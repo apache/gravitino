@@ -133,8 +133,8 @@ public class GravitinoCatalog {
     return properties.getOrDefault("cluster", "");
   }
 
-  public boolean isLocally(String cluster) {
-    // Locally catalog means the gravitino connector has not config the cluster or
+  public boolean isLocal(String cluster) {
+    // Locally catalog means the gravitino connector has not configured the cluster or
     // the catalog has not config the cluster or the cluster name is equals
     return StringUtils.isEmpty(cluster)
         || StringUtils.isEmpty(getCluster())
