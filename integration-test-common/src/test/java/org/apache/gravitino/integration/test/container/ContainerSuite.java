@@ -98,6 +98,17 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startHiveContainer() {
+    startHiveContainer(
+        ImmutableMap.<String, String>builder().put("HADOOP_USER_NAME", "anonymous").build());
+  }
+
+  /**
+   * To start the Hive container, you can to specify environment variables: HIVE_RUNTIME_VERSION:
+   * Hive version, currently support `hive2`(default) and `hive3` DOCKER_ENV_RANGER_SERVER_URL:
+   * Ranger server URL DOCKER_ENV_RANGER_HIVE_REPOSITORY_NAME: Ranger Hive repository name
+   * DOCKER_ENV_RANGER_HDFS_REPOSITORY_NAME: Ranger HDFS repository name
+   */
+  public void startHiveContainer(Map<String, String> envVars) {
     if (hiveContainer == null) {
       synchronized (ContainerSuite.class) {
         if (hiveContainer == null) {
@@ -105,10 +116,7 @@ public class ContainerSuite implements Closeable {
           HiveContainer.Builder hiveBuilder =
               HiveContainer.builder()
                   .withHostName("gravitino-ci-hive")
-                  .withEnvVars(
-                      ImmutableMap.<String, String>builder()
-                          .put("HADOOP_USER_NAME", "anonymous")
-                          .build())
+                  .withEnvVars(envVars)
                   .withNetwork(network);
           HiveContainer container = closer.register(hiveBuilder.build());
           container.start();

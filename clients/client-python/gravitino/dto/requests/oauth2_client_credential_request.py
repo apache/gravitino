@@ -17,10 +17,17 @@ specific language governing permissions and limitations
 under the License.
 """
 
+from typing import Optional
+from dataclasses import dataclass
 
-class AuthConstants:
-    HTTP_HEADER_AUTHORIZATION: str = "Authorization"
 
-    AUTHORIZATION_BEARER_HEADER: str = "Bearer "
+@dataclass
+class OAuth2ClientCredentialRequest:
 
-    AUTHORIZATION_BASIC_HEADER: str = "Basic "
+    grant_type: str
+    client_id: Optional[str]
+    client_secret: str
+    scope: str
+
+    def to_dict(self, **kwarg):
+        return {k: v for k, v in self.__dict__.items() if v is not None}

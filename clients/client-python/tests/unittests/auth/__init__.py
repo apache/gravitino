@@ -16,11 +16,3 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 """
-
-
-class AuthConstants:
-    HTTP_HEADER_AUTHORIZATION: str = "Authorization"
-
-    AUTHORIZATION_BEARER_HEADER: str = "Bearer "
-
-    AUTHORIZATION_BASIC_HEADER: str = "Basic "
