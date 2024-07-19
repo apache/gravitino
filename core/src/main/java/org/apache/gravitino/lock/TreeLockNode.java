@@ -77,11 +77,9 @@ public class TreeLockNode {
       if (this == o) {
         return true;
       }
-
       if (!(o instanceof ThreadIdentifier)) {
         return false;
       }
-
       ThreadIdentifier that = (ThreadIdentifier) o;
       return Objects.equal(thread, that.thread) && Objects.equal(ident, that.ident);
     }
