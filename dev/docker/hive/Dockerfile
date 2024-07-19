@@ -131,7 +131,7 @@ RUN echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}" >> /etc/environment
 # install zookeeper
 ADD packages/zookeeper-${ZOOKEEPER_VERSION}.tar.gz /opt/
 RUN ln -s /opt/zookeeper-${ZOOKEEPER_VERSION} ${ZK_HOME}
-RUN mkdir $ZK_HOME/data
+RUN mkdir ${ZK_HOME}/data
 
 ################################################################################
 # install ranger hadoop plugin
