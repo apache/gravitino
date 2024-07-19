@@ -28,3 +28,4 @@ tenacity==8.3.0
 cachetools==5.3.3
 readerwriterlock==1.0.9
 docker==7.1.0
+pyjwt[crypto]==2.8.0

@@ -41,10 +41,18 @@ public class HiveContainer extends BaseContainer {
   public static final String DEFAULT_IMAGE = System.getenv("GRAVITINO_CI_HIVE_DOCKER_IMAGE");
   public static final String KERBEROS_IMAGE =
       System.getenv("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE");
+
   public static final String HOST_NAME = "gravitino-ci-hive";
+  public static final String HADOOP_USER_NAME = "HADOOP_USER_NAME";
+  // Specify the Hive version to start the Hive container, currently support `hive2`(default) and
+  // `hive3`
+  public static final String HIVE_RUNTIME_VERSION = "HIVE_RUNTIME_VERSION";
+  public static final String HIVE2 = "hive2"; // The Hive container default version
+  public static final String HIVE3 = "hive3";
   private static final int MYSQL_PORT = 3306;
   public static final int HDFS_DEFAULTFS_PORT = 9000;
   public static final int HIVE_METASTORE_PORT = 9083;
+  public static final int HIVE_SERVICE_PORT = 10000;
 
   private static final String HIVE_LOG_PATH = "/tmp/root/";
   private static final String HDFS_LOG_PATH = "/usr/local/hadoop/logs/";
@@ -210,19 +218,22 @@ public class HiveContainer extends BaseContainer {
     private Builder() {
       this.image = DEFAULT_IMAGE;
       this.hostName = HOST_NAME;
-      this.exposePorts = ImmutableSet.of(MYSQL_PORT, HDFS_DEFAULTFS_PORT, HIVE_METASTORE_PORT);
+      this.exposePorts =
+          ImmutableSet.of(MYSQL_PORT, HDFS_DEFAULTFS_PORT, HIVE_METASTORE_PORT, HIVE_SERVICE_PORT);
+    }
+
+    private String generateImageName() {
+      String hiveDockerImageName = image;
+      if (kerberosEnabled) {
+        hiveDockerImageName = KERBEROS_IMAGE;
+      }
+      return hiveDockerImageName;
     }
 
     @Override
     public HiveContainer build() {
       return new HiveContainer(
-          kerberosEnabled ? KERBEROS_IMAGE : image,
-          kerberosEnabled ? "kerberos-" + hostName : hostName,
-          exposePorts,
-          extraHosts,
-          filesToMount,
-          envVars,
-          network);
+          generateImageName(), hostName, exposePorts, extraHosts, filesToMount, envVars, network);
     }
   }
 }
