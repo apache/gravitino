@@ -74,7 +74,7 @@ public class AuthenticationConfig extends Config {
                   "Whether to enable impersonation for the Hadoop catalog",
                   false,
                   true,
-                  KerberosConfig.DEFAULT_IMPERSONATION_ENABLE,
+                  KERBEROS_DEFAULT_IMPERSONATION_ENABLE,
                   false,
                   false))
           .put(
