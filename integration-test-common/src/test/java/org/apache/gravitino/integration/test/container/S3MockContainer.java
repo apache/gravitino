@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datastrato.gravitino.integration.test.container;
+package org.apache.gravitino.integration.test.container;
 
 import static java.lang.String.format;
 import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
