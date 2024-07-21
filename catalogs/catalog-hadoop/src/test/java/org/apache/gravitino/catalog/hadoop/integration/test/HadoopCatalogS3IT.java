@@ -54,8 +54,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
-public class HadoopS3IT extends AbstractIT {
-  private static final Logger LOGGER = LoggerFactory.getLogger(HadoopS3IT.class);
+public class HadoopCatalogS3IT extends AbstractIT {
+  private static final Logger LOGGER = LoggerFactory.getLogger(HadoopCatalogS3IT.class);
   private static final String METALAKE_NAME =
       GravitinoITUtils.genRandomName("CatalogFilesetIT_s3_metalake");
   private static final String CATALOG_NAME =
