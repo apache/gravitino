@@ -133,8 +133,11 @@ public class CatalogConnectorManager {
           LOG.error("Load Metalake {} failed.", usedMetalake, e);
         }
       }
-    } catch (Throwable t) {
-      LOG.error("Fatal errors when loading metalake", t);
+    } catch (OutOfMemoryError outOfMemoryError) {
+      LOG.error("Out of memory error when loading metalake", outOfMemoryError);
+      System.exit(-1);
+    } catch (InternalError internalError) {
+      LOG.error("Internal error when loading metalake", internalError);
       System.exit(-1);
     }
   }
