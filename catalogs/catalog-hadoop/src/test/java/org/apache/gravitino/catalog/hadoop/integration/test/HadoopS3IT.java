@@ -29,14 +29,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.integration.test.util.AbstractIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -140,7 +144,7 @@ public class HadoopS3IT extends AbstractIT {
   }
 
   @Test
-  public void testCreateManagedFilesetOnS3() throws IOException {
+  public void testCreateFilesetOnS3() throws IOException {
     // create fileset
     String filesetName = "test_create_fileset_on_s3";
     String storageLocation = DEFAULT_BASE_LOCATION + filesetName;
@@ -246,7 +250,7 @@ public class HadoopS3IT extends AbstractIT {
   }
 
   @Test
-  public void testDropManagedFilesetOnS3() throws IOException {
+  public void testDropFilesetOnS3() throws IOException {
     // create fileset
     String filesetName = "test_drop_managed_fileset_on_s3";
     String storageLocation = DEFAULT_BASE_LOCATION + filesetName;
@@ -291,6 +295,110 @@ public class HadoopS3IT extends AbstractIT {
     assertFalse(
         catalog.asFilesetCatalog().filesetExists(NameIdentifier.of(SCHEMA_NAME, filesetName)),
         "fileset should not exist");
+    assertTrue(s3fs.exists(new Path(storageLocation)), "storage location should exist");
+  }
+
+  @Test
+  public void testLoadFilesetOnS3() throws IOException {
+    // create fileset
+    String filesetName = "test_load_fileset_on_s3";
+    String storageLocation = DEFAULT_BASE_LOCATION + filesetName;
+    Fileset fileset =
+        createFileset(
+            filesetName,
+            "comment",
+            Fileset.Type.MANAGED,
+            storageLocation,
+            ImmutableMap.of("k1", "v1"));
+    assertFilesetExists(filesetName, storageLocation);
+
+    // test load fileset
+    Fileset loadFileset =
+        catalog.asFilesetCatalog().loadFileset(NameIdentifier.of(SCHEMA_NAME, filesetName));
+    assertEquals(fileset.name(), loadFileset.name(), "fileset should be loaded");
+    assertEquals(fileset.comment(), loadFileset.comment(), "comment should be loaded");
+    assertEquals(fileset.type(), loadFileset.type(), "type should be loaded");
+    assertEquals(
+        fileset.storageLocation(),
+        loadFileset.storageLocation(),
+        "storage location should be loaded");
+    assertEquals(fileset.properties(), loadFileset.properties(), "properties should be loaded");
+  }
+
+  @Test
+  public void testListFilesets() throws IOException {
+    // clear schema
+    catalog.asSchemas().dropSchema(SCHEMA_NAME, true);
+    assertFalse(catalog.asSchemas().schemaExists(SCHEMA_NAME));
+    createSchema();
+
+    // assert no fileset exists
+    NameIdentifier[] nameIdentifiers =
+        catalog.asFilesetCatalog().listFilesets(Namespace.of(SCHEMA_NAME));
+    assertEquals(0, nameIdentifiers.length, "should have no fileset");
+
+    // create fileset1
+    String filesetName1 = "test_list_filesets1_on_s3";
+    String storageLocation1 = DEFAULT_BASE_LOCATION + filesetName1;
+
+    Fileset fileset1 =
+        createFileset(
+            filesetName1,
+            "comment",
+            Fileset.Type.MANAGED,
+            storageLocation1,
+            ImmutableMap.of("k1", "v1"));
+    assertFilesetExists(filesetName1, storageLocation1);
+
+    // create fileset2
+    String filesetName2 = "test_list_filesets2_on_s3";
+    String storageLocation2 = DEFAULT_BASE_LOCATION + filesetName2;
+
+    Fileset fileset2 =
+        createFileset(
+            filesetName2,
+            "comment",
+            Fileset.Type.MANAGED,
+            storageLocation2,
+            ImmutableMap.of("k1", "v1"));
+    assertFilesetExists(filesetName2, storageLocation2);
+
+    // list filesets
+    NameIdentifier[] nameIdentifiers1 =
+        catalog.asFilesetCatalog().listFilesets(Namespace.of(SCHEMA_NAME));
+    Arrays.sort(nameIdentifiers1, Comparator.comparing(NameIdentifier::name));
+    assertEquals(2, nameIdentifiers1.length, "should have 2 filesets");
+    assertEquals(fileset1.name(), nameIdentifiers1[0].name());
+    assertEquals(fileset2.name(), nameIdentifiers1[1].name());
+  }
+
+  @Test
+  public void testRenameFileset() throws IOException {
+    // create fileset
+    String filesetName = "test_rename_fileset_on_s3";
+    String storageLocation = DEFAULT_BASE_LOCATION + filesetName;
+
+    createFileset(
+        filesetName, "comment", Fileset.Type.MANAGED, storageLocation, ImmutableMap.of("k1", "v1"));
+    assertFilesetExists(filesetName, storageLocation);
+
+    // rename fileset
+    String newFilesetName = "test_rename_fileset_new";
+    Fileset newFileset =
+        catalog
+            .asFilesetCatalog()
+            .alterFileset(
+                NameIdentifier.of(SCHEMA_NAME, filesetName), FilesetChange.rename(newFilesetName));
+
+    // verify fileset is updated
+    assertNotNull(newFileset, "fileset should be created");
+    assertEquals(newFilesetName, newFileset.name(), "fileset name should be updated");
+    assertEquals("comment", newFileset.comment(), "comment should not be change");
+    assertEquals(Fileset.Type.MANAGED, newFileset.type(), "type should not be change");
+    assertEquals(
+        storageLocation, newFileset.storageLocation(), "storage location should not be change");
+    assertEquals(1, newFileset.properties().size(), "properties should not be change");
+    assertEquals("v1", newFileset.properties().get("k1"), "properties should not be change");
     assertTrue(s3fs.exists(new Path(storageLocation)), "storage location should exist");
   }
 
