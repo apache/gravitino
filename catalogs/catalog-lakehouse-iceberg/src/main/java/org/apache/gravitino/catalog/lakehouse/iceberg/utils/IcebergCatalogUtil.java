@@ -32,6 +32,7 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import org.apache.gravitino.catalog.lakehouse.iceberg.authentication.AuthenticationConfig;
 import org.apache.gravitino.catalog.lakehouse.iceberg.authentication.kerberos.HiveBackendProxy;
 import org.apache.gravitino.catalog.lakehouse.iceberg.authentication.kerberos.KerberosClient;
+import org.apache.gravitino.catalog.lakehouse.iceberg.catalog.ClosableHiveCatalog;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.iceberg.CatalogProperties;
@@ -58,7 +59,7 @@ public class IcebergCatalogUtil {
   }
 
   private static HiveCatalog loadHiveCatalog(Map<String, String> properties) {
-    HiveCatalog hiveCatalog = new HiveCatalog();
+    ClosableHiveCatalog hiveCatalog = new ClosableHiveCatalog();
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
     properties.forEach(hdfsConfiguration::set);
     IcebergConfig icebergConfig = new IcebergConfig(properties);
@@ -77,10 +78,11 @@ public class IcebergCatalogUtil {
       hiveCatalog.setConf(hdfsConfiguration);
       hiveCatalog.initialize(icebergCatalogName, properties);
 
-      String realm = initKerberosAndReturnRealm(properties, hdfsConfiguration);
+      KerberosClient kerberosClient = initKerberosAndReturnClient(properties, hdfsConfiguration);
+      hiveCatalog.addResource(kerberosClient);
       if (authenticationConfig.isImpersonationEnabled()) {
         HiveBackendProxy proxyHiveCatalog =
-            new HiveBackendProxy(resultProperties, hiveCatalog, realm);
+            new HiveBackendProxy(resultProperties, hiveCatalog, kerberosClient.getRealm());
         return proxyHiveCatalog.getProxy();
       }
 
@@ -91,13 +93,14 @@ public class IcebergCatalogUtil {
     }
   }
 
-  private static String initKerberosAndReturnRealm(
+  private static KerberosClient initKerberosAndReturnClient(
       Map<String, String> properties, Configuration conf) {
     try {
       KerberosClient kerberosClient = new KerberosClient(properties, conf);
       File keytabFile =
           kerberosClient.saveKeyTabFileFromUri(Long.valueOf(properties.get("catalog_uuid")));
-      return kerberosClient.login(keytabFile.getAbsolutePath());
+      kerberosClient.login(keytabFile.getAbsolutePath());
+      return kerberosClient;
     } catch (IOException e) {
       throw new RuntimeException("Failed to login with kerberos", e);
     }

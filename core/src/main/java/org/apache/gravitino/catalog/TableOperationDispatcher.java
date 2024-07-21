@@ -22,6 +22,7 @@ import static org.apache.gravitino.Entity.EntityType.TABLE;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
+import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
 import java.time.Instant;
 import java.util.Arrays;

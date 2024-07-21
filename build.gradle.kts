@@ -468,7 +468,8 @@ tasks.rat {
     "**/*.log",
     "**/licenses/*.txt",
     "**/licenses/*.md",
-    "integration-test/**",
+    "integration-test/**/*.sql",
+    "integration-test/**/*.txt",
     "docs/**/*.md",
     "web/.**",
     "web/next-env.d.ts",
@@ -710,7 +711,7 @@ fun printDockerCheckInfo() {
 
   val dockerTest = project.extra["dockerTest"] as? Boolean ?: false
   if (dockerTest) {
-    println("Using Docker container to run all tests. [$testMode test]")
+    println("Using Docker container to run all tests ......................... [$testMode test]")
   } else {
     println("Run test cases without `gravitino-docker-test` tag .............. [$testMode test]")
   }

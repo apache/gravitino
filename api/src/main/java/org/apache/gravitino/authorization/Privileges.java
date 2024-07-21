@@ -45,38 +45,26 @@ public class Privileges {
         // Catalog
       case CREATE_CATALOG:
         return CreateCatalog.allow();
-      case DROP_CATALOG:
-        return DropCatalog.allow();
-      case ALTER_CATALOG:
-        return AlterCatalog.allow();
       case USE_CATALOG:
         return UseCatalog.allow();
 
         // Schema
       case CREATE_SCHEMA:
         return CreateSchema.allow();
-      case DROP_SCHEMA:
-        return DropSchema.allow();
-      case ALTER_SCHEMA:
-        return AlterSchema.allow();
       case USE_SCHEMA:
         return UseSchema.allow();
 
         // Table
       case CREATE_TABLE:
         return CreateTable.allow();
-      case DROP_TABLE:
-        return DropTable.allow();
-      case WRITE_TABLE:
-        return WriteTable.allow();
-      case READ_TABLE:
-        return ReadTable.allow();
+      case MODIFY_TABLE:
+        return ModifyTable.allow();
+      case SELECT_TABLE:
+        return SelectTable.allow();
 
         // Fileset
       case CREATE_FILESET:
         return CreateFileset.allow();
-      case DROP_FILESET:
-        return DropFileset.allow();
       case WRITE_FILESET:
         return WriteFileset.allow();
       case READ_FILESET:
@@ -85,20 +73,10 @@ public class Privileges {
         // Topic
       case CREATE_TOPIC:
         return CreateTopic.allow();
-      case DROP_TOPIC:
-        return DropTopic.allow();
-      case WRITE_TOPIC:
-        return WriteTopic.allow();
-      case READ_TOPIC:
-        return ReadTopic.allow();
-
-        // Metalake
-      case CREATE_METALAKE:
-        return CreateMetalake.allow();
-      case MANAGE_METALAKE:
-        return ManageMetalake.allow();
-      case USE_METALAKE:
-        return UseMetalake.allow();
+      case PRODUCE_TOPIC:
+        return ProduceTopic.allow();
+      case CONSUME_TOPIC:
+        return ConsumeTopic.allow();
 
         // User
       case ADD_USER:
@@ -155,38 +133,26 @@ public class Privileges {
         // Catalog
       case CREATE_CATALOG:
         return CreateCatalog.deny();
-      case DROP_CATALOG:
-        return DropCatalog.deny();
-      case ALTER_CATALOG:
-        return AlterCatalog.deny();
       case USE_CATALOG:
         return UseCatalog.deny();
 
         // Schema
       case CREATE_SCHEMA:
         return CreateSchema.deny();
-      case DROP_SCHEMA:
-        return DropSchema.deny();
-      case ALTER_SCHEMA:
-        return AlterSchema.deny();
       case USE_SCHEMA:
         return UseSchema.deny();
 
         // Table
       case CREATE_TABLE:
         return CreateTable.deny();
-      case DROP_TABLE:
-        return DropTable.deny();
-      case WRITE_TABLE:
-        return WriteTable.deny();
-      case READ_TABLE:
-        return ReadTable.deny();
+      case MODIFY_TABLE:
+        return ModifyTable.deny();
+      case SELECT_TABLE:
+        return SelectTable.deny();
 
         // Fileset
       case CREATE_FILESET:
         return CreateFileset.deny();
-      case DROP_FILESET:
-        return DropFileset.deny();
       case WRITE_FILESET:
         return WriteFileset.deny();
       case READ_FILESET:
@@ -195,20 +161,10 @@ public class Privileges {
         // Topic
       case CREATE_TOPIC:
         return CreateTopic.deny();
-      case DROP_TOPIC:
-        return DropTopic.deny();
-      case WRITE_TOPIC:
-        return WriteTopic.deny();
-      case READ_TOPIC:
-        return ReadTopic.deny();
-
-        // Metalake
-      case CREATE_METALAKE:
-        return CreateMetalake.deny();
-      case MANAGE_METALAKE:
-        return ManageMetalake.deny();
-      case USE_METALAKE:
-        return UseMetalake.deny();
+      case PRODUCE_TOPIC:
+        return ProduceTopic.deny();
+      case CONSUME_TOPIC:
+        return ConsumeTopic.deny();
 
         // User
       case ADD_USER:
@@ -250,24 +206,6 @@ public class Privileges {
    */
   public abstract static class GenericPrivilege<T extends GenericPrivilege<T>>
       implements Privilege {
-
-    /**
-     * Functional interface for creating instances of GenericPrivilege.
-     *
-     * @param <T> the type of the privilege
-     */
-    @FunctionalInterface
-    public interface GenericPrivilegeFactory<T extends GenericPrivilege<T>> {
-      /**
-       * Creates a new instance of the privilege.
-       *
-       * @param condition the condition of the privilege
-       * @param name the name of the privilege
-       * @return the created privilege instance
-       */
-      T create(Condition condition, Name name);
-    }
-
     private final Condition condition;
     private final Name name;
 
@@ -333,56 +271,12 @@ public class Privileges {
     }
   }
 
-  /** The privilege to alter a catalog. */
-  public static class AlterCatalog extends GenericPrivilege<AlterCatalog> {
-    private static final AlterCatalog ALLOW_INSTANCE =
-        new AlterCatalog(Condition.ALLOW, Name.CREATE_CATALOG);
-    private static final AlterCatalog DENY_INSTANCE =
-        new AlterCatalog(Condition.DENY, Name.CREATE_CATALOG);
-
-    private AlterCatalog(Condition condition, Name name) {
-      super(condition, name);
-    }
-
-    /** @return The instance with allow condition of the privilege. */
-    public static AlterCatalog allow() {
-      return ALLOW_INSTANCE;
-    }
-
-    /** @return The instance with deny condition of the privilege. */
-    public static AlterCatalog deny() {
-      return DENY_INSTANCE;
-    }
-  }
-
-  /** The privilege to drop a catalog. */
-  public static class DropCatalog extends GenericPrivilege<DropCatalog> {
-    private static final DropCatalog ALLOW_INSTANCE =
-        new DropCatalog(Condition.ALLOW, Name.CREATE_CATALOG);
-    private static final DropCatalog DENY_INSTANCE =
-        new DropCatalog(Condition.DENY, Name.CREATE_CATALOG);
-
-    private DropCatalog(Condition condition, Name name) {
-      super(condition, name);
-    }
-
-    /** @return The instance with allow condition of the privilege. */
-    public static DropCatalog allow() {
-      return ALLOW_INSTANCE;
-    }
-
-    /** @return The instance with deny condition of the privilege. */
-    public static DropCatalog deny() {
-      return DENY_INSTANCE;
-    }
-  }
-
   /** The privilege to use a catalog. */
   public static class UseCatalog extends GenericPrivilege<UseCatalog> {
     private static final UseCatalog ALLOW_INSTANCE =
-        new UseCatalog(Condition.ALLOW, Name.CREATE_CATALOG);
+        new UseCatalog(Condition.ALLOW, Name.USE_CATALOG);
     private static final UseCatalog DENY_INSTANCE =
-        new UseCatalog(Condition.DENY, Name.CREATE_CATALOG);
+        new UseCatalog(Condition.DENY, Name.USE_CATALOG);
 
     private UseCatalog(Condition condition, Name name) {
       super(condition, name);
@@ -401,10 +295,8 @@ public class Privileges {
 
   /** The privilege to use a schema. */
   public static class UseSchema extends GenericPrivilege<UseSchema> {
-    private static final UseSchema ALLOW_INSTANCE =
-        new UseSchema(Condition.ALLOW, Name.CREATE_CATALOG);
-    private static final UseSchema DENY_INSTANCE =
-        new UseSchema(Condition.DENY, Name.CREATE_CATALOG);
+    private static final UseSchema ALLOW_INSTANCE = new UseSchema(Condition.ALLOW, Name.USE_SCHEMA);
+    private static final UseSchema DENY_INSTANCE = new UseSchema(Condition.DENY, Name.USE_SCHEMA);
 
     private UseSchema(Condition condition, Name name) {
       super(condition, name);
@@ -424,9 +316,9 @@ public class Privileges {
   /** The privilege to create a schema. */
   public static class CreateSchema extends GenericPrivilege<CreateSchema> {
     private static final CreateSchema ALLOW_INSTANCE =
-        new CreateSchema(Condition.ALLOW, Name.CREATE_CATALOG);
+        new CreateSchema(Condition.ALLOW, Name.CREATE_SCHEMA);
     private static final CreateSchema DENY_INSTANCE =
-        new CreateSchema(Condition.DENY, Name.CREATE_CATALOG);
+        new CreateSchema(Condition.DENY, Name.CREATE_SCHEMA);
 
     private CreateSchema(Condition condition, Name name) {
       super(condition, name);
@@ -443,56 +335,12 @@ public class Privileges {
     }
   }
 
-  /** The privilege to alter a schema. */
-  public static class AlterSchema extends GenericPrivilege<AlterSchema> {
-    private static final AlterSchema ALLOW_INSTANCE =
-        new AlterSchema(Condition.ALLOW, Name.CREATE_CATALOG);
-    private static final AlterSchema DENY_INSTANCE =
-        new AlterSchema(Condition.DENY, Name.CREATE_CATALOG);
-
-    private AlterSchema(Condition condition, Name name) {
-      super(condition, name);
-    }
-
-    /** @return The instance with allow condition of the privilege. */
-    public static AlterSchema allow() {
-      return ALLOW_INSTANCE;
-    }
-
-    /** @return The instance with deny condition of the privilege. */
-    public static AlterSchema deny() {
-      return DENY_INSTANCE;
-    }
-  }
-
-  /** The privilege to drop a schema. */
-  public static class DropSchema extends GenericPrivilege<DropSchema> {
-    private static final DropSchema ALLOW_INSTANCE =
-        new DropSchema(Condition.ALLOW, Name.CREATE_CATALOG);
-    private static final DropSchema DENY_INSTANCE =
-        new DropSchema(Condition.DENY, Name.CREATE_CATALOG);
-
-    private DropSchema(Condition condition, Name name) {
-      super(condition, name);
-    }
-
-    /** @return The instance with allow condition of the privilege. */
-    public static DropSchema allow() {
-      return ALLOW_INSTANCE;
-    }
-
-    /** @return The instance with deny condition of the privilege. */
-    public static DropSchema deny() {
-      return DENY_INSTANCE;
-    }
-  }
-
   /** The privilege to create a table. */
   public static class CreateTable extends GenericPrivilege<CreateTable> {
     private static final CreateTable ALLOW_INSTANCE =
-        new CreateTable(Condition.ALLOW, Name.CREATE_CATALOG);
+        new CreateTable(Condition.ALLOW, Name.CREATE_TABLE);
     private static final CreateTable DENY_INSTANCE =
-        new CreateTable(Condition.DENY, Name.CREATE_CATALOG);
+        new CreateTable(Condition.DENY, Name.CREATE_TABLE);
 
     private CreateTable(Condition condition, Name name) {
       super(condition, name);
@@ -509,68 +357,46 @@ public class Privileges {
     }
   }
 
-  /** The privilege to drop a table. */
-  public static class DropTable extends GenericPrivilege<DropTable> {
-    private static final DropTable ALLOW_INSTANCE =
-        new DropTable(Condition.ALLOW, Name.CREATE_CATALOG);
-    private static final DropTable DENY_INSTANCE =
-        new DropTable(Condition.DENY, Name.CREATE_CATALOG);
+  /** The privilege to select data from a table. */
+  public static class SelectTable extends GenericPrivilege<SelectTable> {
+    private static final SelectTable ALLOW_INSTANCE =
+        new SelectTable(Condition.ALLOW, Name.SELECT_TABLE);
+    private static final SelectTable DENY_INSTANCE =
+        new SelectTable(Condition.DENY, Name.SELECT_TABLE);
 
-    private DropTable(Condition condition, Name name) {
+    private SelectTable(Condition condition, Name name) {
       super(condition, name);
     }
 
     /** @return The instance with allow condition of the privilege. */
-    public static DropTable allow() {
+    public static SelectTable allow() {
       return ALLOW_INSTANCE;
     }
 
     /** @return The instance with deny condition of the privilege. */
-    public static DropTable deny() {
+    public static SelectTable deny() {
       return DENY_INSTANCE;
     }
   }
 
-  /** The privilege to read a table. */
-  public static class ReadTable extends GenericPrivilege<ReadTable> {
-    private static final ReadTable ALLOW_INSTANCE =
-        new ReadTable(Condition.ALLOW, Name.CREATE_CATALOG);
-    private static final ReadTable DENY_INSTANCE =
-        new ReadTable(Condition.DENY, Name.CREATE_CATALOG);
+  /** The privilege to execute SQL `ALTER`, `INSERT`, `UPDATE`, or `DELETE` for a table. */
+  public static class ModifyTable extends GenericPrivilege<ModifyTable> {
+    private static final ModifyTable ALLOW_INSTANCE =
+        new ModifyTable(Condition.ALLOW, Name.MODIFY_TABLE);
+    private static final ModifyTable DENY_INSTANCE =
+        new ModifyTable(Condition.DENY, Name.MODIFY_TABLE);
 
-    private ReadTable(Condition condition, Name name) {
+    private ModifyTable(Condition condition, Name name) {
       super(condition, name);
     }
 
     /** @return The instance with allow condition of the privilege. */
-    public static ReadTable allow() {
+    public static ModifyTable allow() {
       return ALLOW_INSTANCE;
     }
 
     /** @return The instance with deny condition of the privilege. */
-    public static ReadTable deny() {
-      return DENY_INSTANCE;
-    }
-  }
-
-  /** The privilege to write a table. */
-  public static class WriteTable extends GenericPrivilege<WriteTable> {
-    private static final WriteTable ALLOW_INSTANCE =
-        new WriteTable(Condition.ALLOW, Name.CREATE_CATALOG);
-    private static final WriteTable DENY_INSTANCE =
-        new WriteTable(Condition.DENY, Name.CREATE_CATALOG);
-
-    private WriteTable(Condition condition, Name name) {
-      super(condition, name);
-    }
-
-    /** @return The instance with allow condition of the privilege. */
-    public static WriteTable allow() {
-      return ALLOW_INSTANCE;
-    }
-
-    /** @return The instance with deny condition of the privilege. */
-    public static WriteTable deny() {
+    public static ModifyTable deny() {
       return DENY_INSTANCE;
     }
   }
@@ -578,9 +404,9 @@ public class Privileges {
   /** The privilege to create a fileset. */
   public static class CreateFileset extends GenericPrivilege<CreateFileset> {
     private static final CreateFileset ALLOW_INSTANCE =
-        new CreateFileset(Condition.ALLOW, Name.CREATE_CATALOG);
+        new CreateFileset(Condition.ALLOW, Name.CREATE_FILESET);
     private static final CreateFileset DENY_INSTANCE =
-        new CreateFileset(Condition.DENY, Name.CREATE_CATALOG);
+        new CreateFileset(Condition.DENY, Name.CREATE_FILESET);
 
     private CreateFileset(Condition condition, Name name) {
       super(condition, name);
@@ -597,34 +423,12 @@ public class Privileges {
     }
   }
 
-  /** The privilege to drop a fileset. */
-  public static class DropFileset extends GenericPrivilege<DropFileset> {
-    private static final DropFileset ALLOW_INSTANCE =
-        new DropFileset(Condition.ALLOW, Name.CREATE_CATALOG);
-    private static final DropFileset DENY_INSTANCE =
-        new DropFileset(Condition.DENY, Name.CREATE_CATALOG);
-
-    private DropFileset(Condition condition, Name name) {
-      super(condition, name);
-    }
-
-    /** @return The instance with allow condition of the privilege. */
-    public static DropFileset allow() {
-      return ALLOW_INSTANCE;
-    }
-
-    /** @return The instance with deny condition of the privilege. */
-    public static DropFileset deny() {
-      return DENY_INSTANCE;
-    }
-  }
-
   /** The privilege to read a fileset. */
   public static class ReadFileset extends GenericPrivilege<ReadFileset> {
     private static final ReadFileset ALLOW_INSTANCE =
-        new ReadFileset(Condition.ALLOW, Name.CREATE_CATALOG);
+        new ReadFileset(Condition.ALLOW, Name.READ_FILESET);
     private static final ReadFileset DENY_INSTANCE =
-        new ReadFileset(Condition.DENY, Name.CREATE_CATALOG);
+        new ReadFileset(Condition.DENY, Name.READ_FILESET);
 
     private ReadFileset(Condition condition, Name name) {
       super(condition, name);
@@ -644,9 +448,9 @@ public class Privileges {
   /** The privilege to write a fileset. */
   public static class WriteFileset extends GenericPrivilege<WriteFileset> {
     private static final WriteFileset ALLOW_INSTANCE =
-        new WriteFileset(Condition.ALLOW, Name.CREATE_CATALOG);
+        new WriteFileset(Condition.ALLOW, Name.WRITE_FILESET);
     private static final WriteFileset DENY_INSTANCE =
-        new WriteFileset(Condition.DENY, Name.CREATE_CATALOG);
+        new WriteFileset(Condition.DENY, Name.WRITE_FILESET);
 
     private WriteFileset(Condition condition, Name name) {
       super(condition, name);
@@ -666,9 +470,9 @@ public class Privileges {
   /** The privilege to create a topic. */
   public static class CreateTopic extends GenericPrivilege<CreateTopic> {
     private static final CreateTopic ALLOW_INSTANCE =
-        new CreateTopic(Condition.ALLOW, Name.CREATE_CATALOG);
+        new CreateTopic(Condition.ALLOW, Name.CREATE_TOPIC);
     private static final CreateTopic DENY_INSTANCE =
-        new CreateTopic(Condition.DENY, Name.CREATE_CATALOG);
+        new CreateTopic(Condition.DENY, Name.CREATE_TOPIC);
 
     private CreateTopic(Condition condition, Name name) {
       super(condition, name);
@@ -685,142 +489,54 @@ public class Privileges {
     }
   }
 
-  /** The privilege to drop a topic. */
-  public static class DropTopic extends GenericPrivilege<DropTopic> {
-    private static final DropTopic ALLOW_INSTANCE =
-        new DropTopic(Condition.ALLOW, Name.CREATE_CATALOG);
-    private static final DropTopic DENY_INSTANCE =
-        new DropTopic(Condition.DENY, Name.CREATE_CATALOG);
+  /** The privilege to consume from a topic. */
+  public static class ConsumeTopic extends GenericPrivilege<ConsumeTopic> {
+    private static final ConsumeTopic ALLOW_INSTANCE =
+        new ConsumeTopic(Condition.ALLOW, Name.CONSUME_TOPIC);
+    private static final ConsumeTopic DENY_INSTANCE =
+        new ConsumeTopic(Condition.DENY, Name.CONSUME_TOPIC);
 
-    private DropTopic(Condition condition, Name name) {
+    private ConsumeTopic(Condition condition, Name name) {
       super(condition, name);
     }
 
     /** @return The instance with allow condition of the privilege. */
-    public static DropTopic allow() {
+    public static ConsumeTopic allow() {
       return ALLOW_INSTANCE;
     }
 
     /** @return The instance with deny condition of the privilege. */
-    public static DropTopic deny() {
+    public static ConsumeTopic deny() {
       return DENY_INSTANCE;
     }
   }
 
-  /** The privilege to read a topic. */
-  public static class ReadTopic extends GenericPrivilege<ReadTopic> {
-    private static final ReadTopic ALLOW_INSTANCE =
-        new ReadTopic(Condition.ALLOW, Name.CREATE_CATALOG);
-    private static final ReadTopic DENY_INSTANCE =
-        new ReadTopic(Condition.DENY, Name.CREATE_CATALOG);
+  /** The privilege to produce to a topic. */
+  public static class ProduceTopic extends GenericPrivilege<ProduceTopic> {
+    private static final ProduceTopic ALLOW_INSTANCE =
+        new ProduceTopic(Condition.ALLOW, Name.PRODUCE_TOPIC);
+    private static final ProduceTopic DENY_INSTANCE =
+        new ProduceTopic(Condition.DENY, Name.PRODUCE_TOPIC);
 
-    private ReadTopic(Condition condition, Name name) {
+    private ProduceTopic(Condition condition, Name name) {
       super(condition, name);
     }
 
     /** @return The instance with allow condition of the privilege. */
-    public static ReadTopic allow() {
+    public static ProduceTopic allow() {
       return ALLOW_INSTANCE;
     }
 
     /** @return The instance with deny condition of the privilege. */
-    public static ReadTopic deny() {
-      return DENY_INSTANCE;
-    }
-  }
-
-  /** The privilege to write a topic. */
-  public static class WriteTopic extends GenericPrivilege<WriteTopic> {
-    private static final WriteTopic ALLOW_INSTANCE =
-        new WriteTopic(Condition.ALLOW, Name.CREATE_CATALOG);
-    private static final WriteTopic DENY_INSTANCE =
-        new WriteTopic(Condition.DENY, Name.CREATE_CATALOG);
-
-    private WriteTopic(Condition condition, Name name) {
-      super(condition, name);
-    }
-
-    /** @return The instance with allow condition of the privilege. */
-    public static WriteTopic allow() {
-      return ALLOW_INSTANCE;
-    }
-
-    /** @return The instance with deny condition of the privilege. */
-    public static WriteTopic deny() {
-      return DENY_INSTANCE;
-    }
-  }
-
-  /** The privilege to manage a metalake. */
-  public static class ManageMetalake extends GenericPrivilege<ManageMetalake> {
-    private static final ManageMetalake ALLOW_INSTANCE =
-        new ManageMetalake(Condition.ALLOW, Name.CREATE_CATALOG);
-    private static final ManageMetalake DENY_INSTANCE =
-        new ManageMetalake(Condition.DENY, Name.CREATE_CATALOG);
-
-    private ManageMetalake(Condition condition, Name name) {
-      super(condition, name);
-    }
-
-    /** @return The instance with allow condition of the privilege. */
-    public static ManageMetalake allow() {
-      return ALLOW_INSTANCE;
-    }
-
-    /** @return The instance with deny condition of the privilege. */
-    public static ManageMetalake deny() {
-      return DENY_INSTANCE;
-    }
-  }
-
-  /** The privilege to create a metalake. */
-  public static class CreateMetalake extends GenericPrivilege<CreateMetalake> {
-    private static final CreateMetalake ALLOW_INSTANCE =
-        new CreateMetalake(Condition.ALLOW, Name.CREATE_CATALOG);
-    private static final CreateMetalake DENY_INSTANCE =
-        new CreateMetalake(Condition.DENY, Name.CREATE_CATALOG);
-
-    private CreateMetalake(Condition condition, Name name) {
-      super(condition, name);
-    }
-
-    /** @return The instance with allow condition of the privilege. */
-    public static CreateMetalake allow() {
-      return ALLOW_INSTANCE;
-    }
-
-    /** @return The instance with deny condition of the privilege. */
-    public static CreateMetalake deny() {
-      return DENY_INSTANCE;
-    }
-  }
-
-  /** The privilege to use a metalake. */
-  public static class UseMetalake extends GenericPrivilege<UseMetalake> {
-    private static final UseMetalake ALLOW_INSTANCE =
-        new UseMetalake(Condition.ALLOW, Name.CREATE_CATALOG);
-    private static final UseMetalake DENY_INSTANCE =
-        new UseMetalake(Condition.DENY, Name.CREATE_CATALOG);
-
-    private UseMetalake(Condition condition, Name name) {
-      super(condition, name);
-    }
-
-    /** @return The instance with allow condition of the privilege. */
-    public static UseMetalake allow() {
-      return ALLOW_INSTANCE;
-    }
-
-    /** @return The instance with deny condition of the privilege. */
-    public static UseMetalake deny() {
+    public static ProduceTopic deny() {
       return DENY_INSTANCE;
     }
   }
 
   /** The privilege to get a user. */
   public static class GetUser extends GenericPrivilege<GetUser> {
-    private static final GetUser ALLOW_INSTANCE = new GetUser(Condition.ALLOW, Name.CREATE_CATALOG);
-    private static final GetUser DENY_INSTANCE = new GetUser(Condition.DENY, Name.CREATE_CATALOG);
+    private static final GetUser ALLOW_INSTANCE = new GetUser(Condition.ALLOW, Name.GET_USER);
+    private static final GetUser DENY_INSTANCE = new GetUser(Condition.DENY, Name.GET_USER);
 
     private GetUser(Condition condition, Name name) {
       super(condition, name);
@@ -839,8 +555,8 @@ public class Privileges {
 
   /** The privilege to add a user. */
   public static class AddUser extends GenericPrivilege<AddUser> {
-    private static final AddUser ALLOW_INSTANCE = new AddUser(Condition.ALLOW, Name.CREATE_CATALOG);
-    private static final AddUser DENY_INSTANCE = new AddUser(Condition.DENY, Name.CREATE_CATALOG);
+    private static final AddUser ALLOW_INSTANCE = new AddUser(Condition.ALLOW, Name.ADD_USER);
+    private static final AddUser DENY_INSTANCE = new AddUser(Condition.DENY, Name.ADD_USER);
 
     private AddUser(Condition condition, Name name) {
       super(condition, name);
@@ -860,9 +576,9 @@ public class Privileges {
   /** The privilege to remove a user. */
   public static class RemoveUser extends GenericPrivilege<RemoveUser> {
     private static final RemoveUser ALLOW_INSTANCE =
-        new RemoveUser(Condition.ALLOW, Name.CREATE_CATALOG);
+        new RemoveUser(Condition.ALLOW, Name.REMOVE_USER);
     private static final RemoveUser DENY_INSTANCE =
-        new RemoveUser(Condition.DENY, Name.CREATE_CATALOG);
+        new RemoveUser(Condition.DENY, Name.REMOVE_USER);
 
     private RemoveUser(Condition condition, Name name) {
       super(condition, name);
@@ -881,9 +597,8 @@ public class Privileges {
 
   /** The privilege to add a group. */
   public static class AddGroup extends GenericPrivilege<AddGroup> {
-    private static final AddGroup ALLOW_INSTANCE =
-        new AddGroup(Condition.ALLOW, Name.CREATE_CATALOG);
-    private static final AddGroup DENY_INSTANCE = new AddGroup(Condition.DENY, Name.CREATE_CATALOG);
+    private static final AddGroup ALLOW_INSTANCE = new AddGroup(Condition.ALLOW, Name.ADD_GROUP);
+    private static final AddGroup DENY_INSTANCE = new AddGroup(Condition.DENY, Name.ADD_GROUP);
 
     private AddGroup(Condition condition, Name name) {
       super(condition, name);
@@ -903,9 +618,9 @@ public class Privileges {
   /** The privilege to remove a group. */
   public static class RemoveGroup extends GenericPrivilege<RemoveGroup> {
     private static final RemoveGroup ALLOW_INSTANCE =
-        new RemoveGroup(Condition.ALLOW, Name.CREATE_CATALOG);
+        new RemoveGroup(Condition.ALLOW, Name.REMOVE_GROUP);
     private static final RemoveGroup DENY_INSTANCE =
-        new RemoveGroup(Condition.DENY, Name.CREATE_CATALOG);
+        new RemoveGroup(Condition.DENY, Name.REMOVE_GROUP);
 
     private RemoveGroup(Condition condition, Name name) {
       super(condition, name);
@@ -946,9 +661,9 @@ public class Privileges {
   /** The privilege to create a role. */
   public static class CreateRole extends GenericPrivilege<CreateRole> {
     private static final CreateRole ALLOW_INSTANCE =
-        new CreateRole(Condition.ALLOW, Name.CREATE_CATALOG);
+        new CreateRole(Condition.ALLOW, Name.CREATE_ROLE);
     private static final CreateRole DENY_INSTANCE =
-        new CreateRole(Condition.DENY, Name.CREATE_CATALOG);
+        new CreateRole(Condition.DENY, Name.CREATE_ROLE);
 
     private CreateRole(Condition condition, Name name) {
       super(condition, name);
@@ -967,8 +682,8 @@ public class Privileges {
 
   /** The privilege to get a role. */
   public static class GetRole extends GenericPrivilege<GetRole> {
-    private static final GetRole ALLOW_INSTANCE = new GetRole(Condition.ALLOW, Name.CREATE_CATALOG);
-    private static final GetRole DENY_INSTANCE = new GetRole(Condition.DENY, Name.CREATE_CATALOG);
+    private static final GetRole ALLOW_INSTANCE = new GetRole(Condition.ALLOW, Name.GET_ROLE);
+    private static final GetRole DENY_INSTANCE = new GetRole(Condition.DENY, Name.GET_ROLE);
 
     private GetRole(Condition condition, Name name) {
       super(condition, name);
@@ -988,9 +703,9 @@ public class Privileges {
   /** The privilege to delete a role. */
   public static class DeleteRole extends GenericPrivilege<DeleteRole> {
     private static final DeleteRole ALLOW_INSTANCE =
-        new DeleteRole(Condition.ALLOW, Name.CREATE_CATALOG);
+        new DeleteRole(Condition.ALLOW, Name.DELETE_ROLE);
     private static final DeleteRole DENY_INSTANCE =
-        new DeleteRole(Condition.DENY, Name.CREATE_CATALOG);
+        new DeleteRole(Condition.DENY, Name.DELETE_ROLE);
 
     private DeleteRole(Condition condition, Name name) {
       super(condition, name);
@@ -1009,10 +724,8 @@ public class Privileges {
 
   /** The privilege to grant a role to the user or the group. */
   public static class GrantRole extends GenericPrivilege<GrantRole> {
-    private static final GrantRole ALLOW_INSTANCE =
-        new GrantRole(Condition.ALLOW, Name.CREATE_CATALOG);
-    private static final GrantRole DENY_INSTANCE =
-        new GrantRole(Condition.DENY, Name.CREATE_CATALOG);
+    private static final GrantRole ALLOW_INSTANCE = new GrantRole(Condition.ALLOW, Name.GRANT_ROLE);
+    private static final GrantRole DENY_INSTANCE = new GrantRole(Condition.DENY, Name.GRANT_ROLE);
 
     private GrantRole(Condition condition, Name name) {
       super(condition, name);
@@ -1032,9 +745,9 @@ public class Privileges {
   /** The privilege to revoke a role from the user or the group. */
   public static class RevokeRole extends GenericPrivilege<RevokeRole> {
     private static final RevokeRole ALLOW_INSTANCE =
-        new RevokeRole(Condition.ALLOW, Name.CREATE_CATALOG);
+        new RevokeRole(Condition.ALLOW, Name.REVOKE_ROLE);
     private static final RevokeRole DENY_INSTANCE =
-        new RevokeRole(Condition.DENY, Name.CREATE_CATALOG);
+        new RevokeRole(Condition.DENY, Name.REVOKE_ROLE);
 
     private RevokeRole(Condition condition, Name name) {
       super(condition, name);

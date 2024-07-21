@@ -231,6 +231,22 @@ public class TestHadoopCatalogOperations {
   }
 
   @Test
+  public void testCreateSchemaWithEmptyCatalogLocation() throws IOException {
+    String name = "schema28";
+    String comment = "comment28";
+    String catalogPath = "";
+    Schema schema = createSchema(name, comment, catalogPath, null);
+    Assertions.assertEquals(name, schema.name());
+    Assertions.assertEquals(comment, schema.comment());
+
+    Throwable exception =
+        Assertions.assertThrows(
+            SchemaAlreadyExistsException.class,
+            () -> createSchema(name, comment, catalogPath, null));
+    Assertions.assertEquals("Schema m1.c1.schema28 already exists", exception.getMessage());
+  }
+
+  @Test
   public void testCreateSchemaWithCatalogLocation() throws IOException {
     String name = "schema12";
     String comment = "comment12";
