@@ -66,15 +66,15 @@ public class CatalogListResponse extends BaseResponse {
 
     Preconditions.checkArgument(catalogs != null, "catalogs must be non-null");
     Arrays.stream(catalogs)
-            .forEach(
-                    catalog -> {
-                      Preconditions.checkArgument(
-                              StringUtils.isNotBlank(catalog.name()),
-                              "catalog 'name' must not be null and empty");
-                      Preconditions.checkArgument(
-                              catalog.type() != null, "catalog 'type' must not be null");
-                      Preconditions.checkArgument(
-                              catalog.auditInfo() != null, "catalog 'audit' must not be null");
-                    });
+        .forEach(
+            catalog -> {
+              Preconditions.checkArgument(
+                  StringUtils.isNotBlank(catalog.name()),
+                  "catalog 'name' must not be null and empty");
+              Preconditions.checkArgument(
+                  catalog.type() != null, "catalog 'type' must not be null");
+              Preconditions.checkArgument(
+                  catalog.auditInfo() != null, "catalog 'audit' must not be null");
+            });
   }
 }
