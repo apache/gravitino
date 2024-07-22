@@ -86,6 +86,10 @@ public class TagManager {
   }
 
   public String[] listTags(String metalake) {
+    return Arrays.stream(listTagsInfo(metalake)).map(Tag::name).toArray(String[]::new);
+  }
+
+  public Tag[] listTagsInfo(String metalake) {
     return TreeLockUtils.doWithTreeLock(
         NameIdentifier.of(ofTagNamespace(metalake).levels()),
         LockType.READ,
@@ -95,8 +99,7 @@ public class TagManager {
           try {
             return entityStore
                 .list(ofTagNamespace(metalake), TagEntity.class, Entity.EntityType.TAG).stream()
-                .map(TagEntity::name)
-                .toArray(String[]::new);
+                .toArray(Tag[]::new);
           } catch (IOException ioe) {
             LOG.error("Failed to list tags under metalake {}", metalake, ioe);
             throw new RuntimeException(ioe);
