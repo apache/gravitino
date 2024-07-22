@@ -353,9 +353,9 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   @Override
-  public CatalogFunction getFunction(ObjectPath objectPath)
+  public CatalogFunction getFunction(ObjectPath tablePath)
       throws FunctionNotExistException, CatalogException {
-    throw new UnsupportedOperationException();
+    return realCatalog().getFunction(tablePath);
   }
 
   @Override
