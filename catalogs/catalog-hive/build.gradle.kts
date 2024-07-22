@@ -31,7 +31,7 @@ val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat
 
 dependencies {
   implementation(project(":api"))
-  implementation(project(":catalogs:bundled-catalog"))
+  implementation(project(":catalogs:catalog-common"))
   implementation(project(":core"))
 
   implementation(libs.caffeine)
