@@ -19,18 +19,14 @@
 package org.apache.gravitino.integration.test.container;
 
 import static java.lang.String.format;
+import static org.apache.gravitino.integration.test.util.AbstractIT.isHttpServerUp;
 import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
 import com.google.common.collect.ImmutableSet;
-import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import org.apache.hc.client5.http.classic.methods.HttpGet;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.rnorth.ducttape.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,29 +64,15 @@ public class S3MockContainer extends BaseContainer {
 
   @Override
   protected boolean checkContainerStatus(int retryLimit) {
-    String endpoint = String.format("http://%s:%s/", getContainerIpAddress(), HTTP_PORT);
+    String testUrl =
+        String.format("http://%s:%s/%s", getContainerIpAddress(), HTTP_PORT, "favicon.ico");
 
     await()
         .atMost(30, TimeUnit.SECONDS)
         .pollInterval(30 / retryLimit, TimeUnit.SECONDS)
-        .until(
-            () -> {
-              try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
-                HttpGet request = new HttpGet(endpoint + "favicon.ico");
-                ClassicHttpResponse response = httpClient.execute(request, a -> a);
-                if (response.getCode() == 200) {
-                  LOGGER.info("S3Mock container startup success");
-                  return true;
-                } else {
-                  LOGGER.info("S3Mock container is not ready yet");
-                  return false;
-                }
-              } catch (IOException e) {
-                LOGGER.info("S3Mock container is not ready yet", e);
-                return false;
-              }
-            });
+        .until(() -> isHttpServerUp(testUrl));
 
+    LOGGER.info("S3Mock container startup success");
     return true;
   }
 

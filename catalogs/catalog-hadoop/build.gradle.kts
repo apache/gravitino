@@ -30,6 +30,8 @@ dependencies {
   implementation(project(":common"))
 
   implementation(libs.guava)
+  implementation(libs.hadoop3.aws)
+  implementation(libs.hadoop3.client)
   implementation(libs.hadoop3.common) {
     exclude("com.sun.jersey")
     exclude("javax.servlet", "servlet-api")
@@ -39,8 +41,6 @@ dependencies {
     exclude("com.sun.jersey")
     exclude("javax.servlet", "servlet-api")
   }
-  implementation(libs.hadoop3.client)
-  implementation(libs.hadoop3.aws)
 
   implementation(libs.slf4j.api)
 

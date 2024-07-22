@@ -318,12 +318,12 @@ public class AbstractIT {
   }
 
   /**
-   * Check if the http server is up, If http response status code is 200, then we're assuming the
+   * Check if the http server is up. If http response status code is 200, then we're assuming the
    * server is up. Or else we assume the server is not ready.
    *
    * <p>Note: The method will ignore the response body and only check the status code.
    *
-   * @param testUrl A url that we want to test ignore the response body.
+   * @param testUrl An url that we want to test ignore the response body.
    * @return true if the server is up, false otherwise.
    */
   public static boolean isHttpServerUp(String testUrl) {
@@ -332,7 +332,7 @@ public class AbstractIT {
       ClassicHttpResponse response = httpClient.execute(request, a -> a);
       return response.getCode() == 200;
     } catch (Exception e) {
-      LOG.warn("Check Gravitino server failed: ", e);
+      LOG.warn("Http server is not ready yet", e);
       return false;
     }
   }
