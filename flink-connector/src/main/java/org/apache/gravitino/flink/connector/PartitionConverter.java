@@ -27,7 +27,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
  * properties to store the partition transform, so we can implement this interface to achieve more
  * partition transform.
  */
-public abstract class PartitionConverter {
+public interface PartitionConverter {
   /**
    * Convert the partition keys to Flink partition keys.
    *

@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 
-public class DefaultPartitionConverter extends PartitionConverter {
+public class DefaultPartitionConverter implements PartitionConverter {
 
   private DefaultPartitionConverter() {}
 
