@@ -385,7 +385,7 @@ public class Types {
     }
   }
 
-  /** The TimestampNTZType type in Gravitino. */
+  /** The Timestamp_ntz type in Gravitino. */
   public static class TimestampNTZType extends Type.DateTimeType {
     private final boolean withoutTimeZone;
 
@@ -400,7 +400,7 @@ public class Types {
 
     @Override
     public Name name() {
-      return Name.TimestampNTZType;
+      return Name.TIMESTAMPNTZ;
     }
 
     /** @return The simple string representation of the timestamp_ntz type. */
