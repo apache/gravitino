@@ -322,4 +322,11 @@ public class Configs {
           .version(ConfigConstants.VERSION_0_5_1)
           .intConf()
           .createWithDefault(DEFAULT_METRICS_TIME_SLIDING_WINDOW_SECONDS);
+
+  public static final ConfigEntry<String> REST_API_PACKAGES =
+      new ConfigBuilder("gravitino.restApiPackages")
+          .doc("Comma-separated list of REST API packages to scan")
+          .version(ConfigConstants.VERSION_0_6_0)
+          .stringConf()
+          .createWithDefault("org.apache.gravitino.server.web.rest");
 }
