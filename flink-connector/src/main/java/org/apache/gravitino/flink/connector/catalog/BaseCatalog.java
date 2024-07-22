@@ -353,7 +353,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   @Override
-  public CatalogFunction getFunction(ObjectPath tablePath)
+  public CatalogFunction getFunction(ObjectPath objectPath)
       throws FunctionNotExistException, CatalogException {
     throw new UnsupportedOperationException();
   }
