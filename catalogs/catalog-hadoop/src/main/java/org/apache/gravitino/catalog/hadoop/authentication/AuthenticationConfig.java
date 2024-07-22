@@ -22,7 +22,6 @@ package org.apache.gravitino.catalog.hadoop.authentication;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.Config;
-import org.apache.gravitino.catalog.hadoop.authentication.kerberos.KerberosConfig;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
@@ -34,6 +33,8 @@ public class AuthenticationConfig extends Config {
   public static final String AUTH_TYPE_KEY = "authentication.type";
 
   public static final String IMPERSONATION_ENABLE_KEY = "authentication.impersonation-enable";
+
+  public static final boolean KERBEROS_DEFAULT_IMPERSONATION_ENABLE = false;
 
   public AuthenticationConfig(Map<String, String> properties) {
     super(false);
@@ -53,7 +54,7 @@ public class AuthenticationConfig extends Config {
           .doc("Whether to enable impersonation for the Hadoop catalog")
           .version(ConfigConstants.VERSION_0_5_1)
           .booleanConf()
-          .createWithDefault(KerberosConfig.DEFAULT_IMPERSONATION_ENABLE);
+          .createWithDefault(KERBEROS_DEFAULT_IMPERSONATION_ENABLE);
 
   public String getAuthType() {
     return get(AUTH_TYPE_ENTRY);
@@ -72,7 +73,7 @@ public class AuthenticationConfig extends Config {
                   "Whether to enable impersonation for the Hadoop catalog",
                   false,
                   true,
-                  KerberosConfig.DEFAULT_IMPERSONATION_ENABLE,
+                  KERBEROS_DEFAULT_IMPERSONATION_ENABLE,
                   false,
                   false))
           .put(

@@ -147,6 +147,28 @@ public class TestResponses {
   }
 
   @Test
+  void testCatalogListResponse() throws IllegalArgumentException {
+    AuditDTO audit =
+        AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    CatalogDTO catalog =
+        CatalogDTO.builder()
+            .withName("CatalogA")
+            .withComment("comment")
+            .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
+            .withAudit(audit)
+            .build();
+    CatalogListResponse response = new CatalogListResponse(new CatalogDTO[] {catalog});
+    response.validate(); // No exception thrown
+  }
+
+  @Test
+  void testCatalogListException() throws IllegalArgumentException {
+    CatalogListResponse response = new CatalogListResponse();
+    assertThrows(IllegalArgumentException.class, () -> response.validate());
+  }
+
+  @Test
   void testSchemaResponse() throws IllegalArgumentException {
     AuditDTO audit =
         AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();

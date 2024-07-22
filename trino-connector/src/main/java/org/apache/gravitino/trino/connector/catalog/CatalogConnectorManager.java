@@ -133,8 +133,8 @@ public class CatalogConnectorManager {
           LOG.error("Load Metalake {} failed.", usedMetalake, e);
         }
       }
-    } catch (Throwable t) {
-      LOG.error("Fatal errors when loading metalake", t);
+    } catch (Exception e) {
+      LOG.error("Error when loading metalake", e);
       System.exit(-1);
     }
   }
