@@ -76,10 +76,6 @@ jobs:
         run: |
           ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
 
-      - name: Setup debug Github Action
-        if: ${{ contains(github.event.pull_request.labels.*.name, 'debug action') }}
-        uses: csexton/debugger-action@master
-
       - name: Free up disk space
         run: |
           dev/ci/util_free_space.sh
@@ -87,7 +83,7 @@ jobs:
       - name: Integration Test
         id: integrationTest
         run: |
-          ./gradlew test -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }}
+          ./gradlew test -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3

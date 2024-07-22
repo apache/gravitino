@@ -1,6 +1,20 @@
 """
-Copyright 2024 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2.
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
 """
 
 import logging
@@ -11,6 +25,8 @@ import time
 import sys
 
 import requests
+
+from gravitino.exceptions.base import GravitinoRuntimeException
 
 logger = logging.getLogger(__name__)
 
@@ -118,3 +134,87 @@ class IntegrationTestEnv(unittest.TestCase):
 
         if gravitino_server_running:
             logger.error("Can't stop Gravitino server!")
+
+    @classmethod
+    def restart_server(cls):
+        logger.info("Restarting Gravitino server...")
+        gravitino_home = os.environ.get("GRAVITINO_HOME")
+        gravitino_startup_script = os.path.join(gravitino_home, "bin/gravitino.sh")
+        if not os.path.exists(gravitino_startup_script):
+            raise GravitinoRuntimeException(
+                f"Can't find Gravitino startup script: {gravitino_startup_script}, "
+                "Please execute `./gradlew compileDistribution -x test` in the Gravitino "
+                "project root directory."
+            )
+
+        # Restart Gravitino Server
+        env_vars = os.environ.copy()
+        env_vars["HADOOP_USER_NAME"] = "datastrato"
+        result = subprocess.run(
+            [gravitino_startup_script, "restart"],
+            env=env_vars,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.stdout:
+            logger.info("stdout: %s", result.stdout)
+        if result.stderr:
+            logger.info("stderr: %s", result.stderr)
+
+        if not check_gravitino_server_status():
+            raise GravitinoRuntimeException("ERROR: Can't start Gravitino server!")
+
+    @classmethod
+    def _append_catalog_hadoop_conf(cls, config):
+        logger.info("Append catalog hadoop conf.")
+        gravitino_home = os.environ.get("GRAVITINO_HOME")
+        if gravitino_home is None:
+            raise GravitinoRuntimeException("Cannot find GRAVITINO_HOME env.")
+        hadoop_conf_path = f"{gravitino_home}/catalogs/hadoop/conf/hadoop.conf"
+        if not os.path.exists(hadoop_conf_path):
+            raise GravitinoRuntimeException(
+                f"Hadoop conf file is not found at `{hadoop_conf_path}`."
+            )
+
+        with open(hadoop_conf_path, mode="a", encoding="utf-8") as f:
+            for key, value in config.items():
+                f.write(f"\n{key} = {value}")
+
+    @classmethod
+    def _reset_catalog_hadoop_conf(cls, config):
+        logger.info("Reset catalog hadoop conf.")
+        gravitino_home = os.environ.get("GRAVITINO_HOME")
+        if gravitino_home is None:
+            raise GravitinoRuntimeException("Cannot find GRAVITINO_HOME env.")
+        hadoop_conf_path = f"{gravitino_home}/catalogs/hadoop/conf/hadoop.conf"
+        if not os.path.exists(hadoop_conf_path):
+            raise GravitinoRuntimeException(
+                f"Hadoop conf file is not found at `{hadoop_conf_path}`."
+            )
+        filtered_lines = []
+        with open(hadoop_conf_path, mode="r", encoding="utf-8") as file:
+            origin_lines = file.readlines()
+
+        existed_config = {}
+        for line in origin_lines:
+            line = line.strip()
+            if line.startswith("#"):
+                # append annotations directly
+                filtered_lines.append(line + "\n")
+            else:
+                try:
+                    key, value = line.split("=")
+                    existed_config[key.strip()] = value.strip()
+                except ValueError:
+                    # cannot split to key, value, so just append
+                    filtered_lines.append(line + "\n")
+
+        for key, value in existed_config.items():
+            if config[key] is None:
+                append_line = f"{key} = {value}\n"
+                filtered_lines.append(append_line)
+
+        with open(hadoop_conf_path, mode="w", encoding="utf-8") as file:
+            for line in filtered_lines:
+                file.write(line)

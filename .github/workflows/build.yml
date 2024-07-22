@@ -96,7 +96,7 @@ jobs:
           dev/ci/util_free_space.sh
 
       - name: Build with Gradle
-        run: ./gradlew build -PskipITs -PjdkVersion=${{ matrix.java-version }} -x :clients:client-python:build
+        run: ./gradlew build -PskipITs -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false -x :clients:client-python:build
 
       - name: Upload unit tests report
         uses: actions/upload-artifact@v3
@@ -107,21 +107,3 @@ jobs:
             build/reports
             catalogs/**/*.log
             catalogs/**/*.tar
-
-      - name: Jacoco Report to PR
-        id: jacoco
-        uses: madrapps/jacoco-report@v1.6.1
-        with:
-          paths: ${{ github.workspace }}/**/build/reports/jacoco/test/jacocoTestReport.xml
-          token: ${{ secrets.GITHUB_TOKEN }}
-          min-coverage-overall: 40
-          min-coverage-changed-files: 60
-          title: 'Code Coverage Report'
-          debug-mode: false
-          update-comment: true
-          pass-emoji: ':green_circle:'
-          fail-emoji: ':red_circle:'
-      - name: Get the Coverage info
-        run: |
-          echo "Total coverage ${{ steps.jacoco.outputs.coverage-overall }}"
-          echo "Changed Files coverage ${{ steps.jacoco.outputs.coverage-changed-files }}"

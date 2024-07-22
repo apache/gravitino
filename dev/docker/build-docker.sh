@@ -1,7 +1,21 @@
 #!/bin/bash
 #
-# Copyright 2023 Datastrato Pvt Ltd.
-# This software is licensed under the Apache License version 2.
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
 #
 #set -ex
 script_dir="$(dirname "${BASH_SOURCE-$0}")"
@@ -73,7 +87,19 @@ fi
 
 if [[ "${component_type}" == "hive" ]]; then
   . ${script_dir}/hive/hive-dependency.sh
-  build_args="--build-arg HADOOP_PACKAGE_NAME=${HADOOP_PACKAGE_NAME} --build-arg HIVE_PACKAGE_NAME=${HIVE_PACKAGE_NAME} --build-arg JDBC_DIVER_PACKAGE_NAME=${JDBC_DIVER_PACKAGE_NAME} --build-arg HADOOP_VERSION=${HADOOP_VERSION} --build-arg HIVE_VERSION=${HIVE_VERSION} --build-arg MYSQL_JDBC_DRIVER_VERSION=${MYSQL_JDBC_DRIVER_VERSION}"
+  build_args="
+  --build-arg HADOOP_PACKAGE_NAME=${HADOOP_PACKAGE_NAME} \
+  --build-arg HIVE_PACKAGE_NAME=${HIVE_PACKAGE_NAME} \
+  --build-arg HADOOP_VERSION=${HADOOP_VERSION} \
+  --build-arg HIVE_VERSION=${HIVE_VERSION} \
+  --build-arg MYSQL_JDBC_DRIVER_VERSION=${MYSQL_JDBC_DRIVER_VERSION} \
+  --build-arg RANGER_VERSION=${RANGER_VERSION} \
+  --build-arg ZOOKEEPER_VERSION=${ZOOKEEPER_VERSION} \
+  --build-arg HIVE2_VERSION=${HIVE2_VERSION} \
+  --build-arg HIVE3_VERSION=${HIVE3_VERSION} \
+  --build-arg HADOOP2_VERSION=${HADOOP2_VERSION} \
+  --build-arg HADOOP3_VERSION=${HADOOP3_VERSION}
+"
 elif [[ "${component_type}" == "kerberos-hive" ]]; then
   . ${script_dir}/kerberos-hive/hive-dependency.sh
   build_args="--build-arg HADOOP_PACKAGE_NAME=${HADOOP_PACKAGE_NAME} --build-arg HIVE_PACKAGE_NAME=${HIVE_PACKAGE_NAME} --build-arg JDBC_DIVER_PACKAGE_NAME=${JDBC_DIVER_PACKAGE_NAME}"

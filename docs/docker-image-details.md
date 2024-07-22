@@ -2,15 +2,14 @@
 title: "Docker image details"
 slug: /docker-image-details
 keyword: docker
-license: "Copyright 2023 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
 # User Docker images
 
-There are two kinds of Docker images you can use: the Gravitino Docker image and playground Docker images.
+There are two kinds of Docker images you can use: the Apache Gravitino Docker image and playground Docker images.
 
-## Gravitino Docker image
+## Apache Gravitino Docker image
 
 You can deploy the service with the Gravitino Docker image.
 
@@ -47,13 +46,13 @@ Changelog
 
 ## Playground Docker image
 
-You can use the [playground](https://github.com/datastrato/gravitino-playground) to experience the whole Gravitino system with other components.
+You can use the [playground](https://github.com/apache/gravitino-playground) to experience the whole Gravitino system with other components.
 
 The playground consists of multiple Docker images.
 
 The Docker images of the playground have suitable configurations for users to experience.
 
-### Hive image
+### Apache Hive image
 
 Changelog
 
@@ -92,11 +91,15 @@ Changelog
 
 You can use these kinds of Docker images to facilitate integration testing of all catalog and connector modules within Gravitino.
 
-## Gravitino CI Apache Hive image with kerberos enabled
+## Apache Gravitino CI Apache Hive image with kerberos enabled
 
 You can use this kind of image to test the catalog of Apache Hive with kerberos enable
 
 Changelog
+- gravitino-ci-kerberos-hive:0.1.3
+  - Add more proxy users in the core-site.xml file.
+  - fix bugs in the `start.sh` script.
+
 - gravitino-ci-kerberos-hive:0.1.2
   - Add `${HOSTNAME} >> /root/.ssh/known_hosts` to the startup script.
   - Add check for the status of DataNode, if the DataNode is not running or ready within 100s, the container will exit.
@@ -109,11 +112,25 @@ Changelog
     - Set up a Hive cluster with kerberos enabled.
     - Install a KDC server and create a principal for Hive. For more please see [kerberos-hive](../dev/docker/kerberos-hive)
 
-## Gravitino CI Apache Hive image
+## Apache Gravitino CI Apache Hive image
 
 You can use this kind of image to test the catalog of Apache Hive.
 
 Changelog
+
+- gravitino-ci-hive:0.1.13
+  - Support Hive 2.3.9 and HDFS 2.7.3
+    - Docker environment variables:
+      - `HIVE_RUNTIME_VERSION`: `hive2` (default)
+  - Support Hive 3.1.3, HDFS 3.1.0 and Ranger plugin version 2.4.0
+    - Docker environment variables:
+      - `HIVE_RUNTIME_VERSION`: `hive3`
+      - `RANGER_SERVER_URL`: Ranger admin URL
+      - `RANGER_HIVE_REPOSITORY_NAME`: Hive repository name in Ranger admin
+      - `RANGER_HDFS_REPOSITORY_NAME`: HDFS repository name in Ranger admin
+    - If you want to enable Hive Ranger plugin, you need both set the `RANGER_SERVER_URL` and `RANGER_HIVE_REPOSITORY_NAME` environment variables. Hive Ranger audit logs are stored in the `/tmp/root/ranger-hive-audit.log`.
+    - If you want to enable HDFS Ranger plugin, you need both set the `RANGER_SERVER_URL` and `RANGER_HDFS_REPOSITORY_NAME` environment variables. HDFS Ranger audit logs are stored in the `/usr/local/hadoop/logs/ranger-hdfs-audit.log`
+    - Example: docker run -e HIVE_RUNTIME_VERSION='hive3' -e RANGER_SERVER_URL='http://ranger-server:6080' -e RANGER_HIVE_REPOSITORY_NAME='hiveDev' -e RANGER_HDFS_REPOSITORY_NAME='hdfsDev' ... datastrato/gravitino-ci-hive:0.1.13
 
 - gravitino-ci-hive:0.1.12
   - Shrink hive Docker image size by 420MB
@@ -180,7 +197,7 @@ Changelog
     - `10000` HiveServer2
     - `10002` HiveServer2 HTTP
 
-## Gravitino CI Trino image
+## Apache Gravitino CI Trino image
 
 You can use this image to test Trino.
 
@@ -207,11 +224,13 @@ Changelog
   - Expose ports:
     - `8080` Trino JDBC port
 
-## Gravitino CI Doris image
+## Apache Gravitino CI Doris image
 
 You can use this image to test Apache Doris.
 
 Changelog
+- gravitino-ci-doris:0.1.5
+  - Remove the chmod command in the Dockerfile to decrease the size of the Docker image.
 
 - gravitino-ci-doris:0.1.4
   - remove chmod in start.sh to accelerate the startup speed
@@ -235,7 +254,7 @@ Changelog
     - `8030` Doris FE HTTP port
     - `9030` Doris FE MySQL server port
 
-## Gravitino CI Apache Ranger image
+## Apache Gravitino CI Apache Ranger image
 
 You can use this image to control Trino's permissions.
 
@@ -246,6 +265,12 @@ Changelog
   - Use `ranger-admin` release from `datastrato/apache-ranger:2.4.0` to build docker image.
   - Remove unnecessary hack in `start-ranger-service.sh`.
   - Reduce docker image build time from `~1h` to `~5min`.
+  - How to debug Ranger admin service:
+    - Use `docker exec -it <container_id> bash` to enter the docker container.
+    - Add these context `export JAVA_OPTS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5001` into `/opt/ranger-admin/ews/webapp/WEB-INF/classes/conf/ranger-admin-env-debug.sh` in the docker container.
+    - Execute `./opt/ranger-admin/stop-ranger-admin.sh` and `./opt/ranger-admin/start-ranger-admin.sh` to restart Ranger admin.
+    - Clone the `Apache Ranger` project from GiHub and checkout the `2.4.0` release.
+    - Create a remote debug configuration (`Use model classpath` = `EmbeddedServer`) in your IDE and connect to the Ranger admin container.
 
 - gravitino-ci-ranger:0.1.0
   - Docker image `datastrato/gravitino-ci-ranger:0.1.0`
