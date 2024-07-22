@@ -132,7 +132,7 @@ class TestRoleMetaService extends TestJDBCBackend {
     SecurableObject catalogObject =
         SecurableObjects.ofCatalog(
             "catalog",
-            Lists.newArrayList(Privileges.UseCatalog.allow(), Privileges.DropCatalog.deny()));
+            Lists.newArrayList(Privileges.UseCatalog.allow(), Privileges.CreateSchema.deny()));
 
     // insert role
     RoleEntity role1 =
