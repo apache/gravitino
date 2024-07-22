@@ -60,7 +60,6 @@ public class NameListResponse extends BaseResponse {
     Arrays.stream(names)
         .forEach(
             name ->
-                Preconditions.checkArgument(
-                    StringUtils.isNoneBlank(name), "name must not be null"));
+                Preconditions.checkArgument(StringUtils.isNotBlank(name), "name must not be null"));
   }
 }

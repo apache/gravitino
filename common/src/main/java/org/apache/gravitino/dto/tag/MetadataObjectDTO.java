@@ -57,7 +57,7 @@ public class MetadataObjectDTO implements MetadataObject {
   }
 
   /**
-   * Sets the full name of the metadata object.
+   * Sets the full name of the metadata object. Only used by Jackson deserializer.
    *
    * @param fullName The full name of the metadata object.
    */

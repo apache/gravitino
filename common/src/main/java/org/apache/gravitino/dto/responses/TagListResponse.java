@@ -20,6 +20,7 @@ package org.apache.gravitino.dto.responses;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
@@ -58,5 +59,7 @@ public class TagListResponse extends BaseResponse {
     super.validate();
 
     Preconditions.checkArgument(tags != null, "\"tags\" must not be null");
+    Arrays.stream(tags)
+        .forEach(t -> Preconditions.checkArgument(t != null, "tag must not be null"));
   }
 }

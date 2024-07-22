@@ -24,6 +24,7 @@ import com.google.common.collect.Lists;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
@@ -243,7 +244,8 @@ public class TagOperations {
           httpRequest,
           () -> {
             MetadataObject object =
-                MetadataObjects.parse(fullName, MetadataObject.Type.toType(type));
+                MetadataObjects.parse(
+                    fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
 
             List<TagDTO> tags = Lists.newArrayList();
             Tag[] nonInheritedTags = tagManager.listTagsInfoForMetadataObject(metalake, object);
@@ -318,7 +320,8 @@ public class TagOperations {
           httpRequest,
           () -> {
             MetadataObject object =
-                MetadataObjects.parse(fullName, MetadataObject.Type.toType(type));
+                MetadataObjects.parse(
+                    fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
             Optional<Tag> tag = getTagForObject(metalake, object, tagName);
             Optional<TagDTO> tagDTO = tag.map(t -> DTOConverters.toDTO(t, Optional.of(false)));
 
@@ -416,7 +419,8 @@ public class TagOperations {
           () -> {
             request.validate();
             MetadataObject object =
-                MetadataObjects.parse(fullName, MetadataObject.Type.toType(type));
+                MetadataObjects.parse(
+                    fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
             String[] tagNames =
                 tagManager.associateTagsForMetadataObject(
                     metalake, object, request.getTagsToAdd(), request.getTagsToRemove());

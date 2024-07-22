@@ -61,17 +61,21 @@ public class TagsAssociateRequest implements RESTRequest {
    */
   @Override
   public void validate() throws IllegalArgumentException {
+    Preconditions.checkArgument(
+        tagsToAdd != null || tagsToRemove != null,
+        "tagsToAdd and tagsToRemove cannot both be null");
+
     if (tagsToAdd != null) {
       for (String tag : tagsToAdd) {
         Preconditions.checkArgument(
-            StringUtils.isNotBlank(tag), "tagsToAdd must not contain null or empty strings");
+            StringUtils.isNotBlank(tag), "tagsToAdd must not contain null or empty tag names");
       }
     }
 
     if (tagsToRemove != null) {
       for (String tag : tagsToRemove) {
         Preconditions.checkArgument(
-            StringUtils.isNotBlank(tag), "tagsToRemove must not contain null or empty strings");
+            StringUtils.isNotBlank(tag), "tagsToRemove must not contain null or empty tag names");
       }
     }
   }
