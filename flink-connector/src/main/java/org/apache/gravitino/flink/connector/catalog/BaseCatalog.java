@@ -20,6 +20,7 @@
 package org.apache.gravitino.flink.connector.catalog;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.MapDifference;
 import com.google.common.collect.Maps;
 import java.util.Arrays;
@@ -316,7 +317,9 @@ public abstract class BaseCatalog extends AbstractCatalog {
 
     NameIdentifier identifier =
         NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName());
-    catalog().asTableCatalog().alterTable(identifier, getTableChanges(existingTable, newTable));
+    catalog()
+        .asTableCatalog()
+        .alterTable(identifier, getGravitinoTableChanges(existingTable, newTable));
   }
 
   @Override
@@ -345,7 +348,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
 
     NameIdentifier identifier =
         NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName());
-    catalog().asTableCatalog().alterTable(identifier, getTableChanges(tableChanges));
+    catalog().asTableCatalog().alterTable(identifier, getGravitinoTableChanges(tableChanges));
   }
 
   @Override
@@ -614,7 +617,9 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   @VisibleForTesting
-  TableChange[] getTableChanges(CatalogBaseTable existingTable, CatalogBaseTable newTable) {
+  TableChange[] getGravitinoTableChanges(
+      CatalogBaseTable existingTable, CatalogBaseTable newTable) {
+    Preconditions.checkNotNull(newTable.getComment(), "The new comment should not be null");
     List<TableChange> changes = Lists.newArrayList();
     changes.addAll(optionsChanges(existingTable.getOptions(), newTable.getOptions()));
     if (!Objects.equals(newTable.getComment(), existingTable.getComment())) {
@@ -624,7 +629,8 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   @VisibleForTesting
-  TableChange[] getTableChanges(List<org.apache.flink.table.catalog.TableChange> tableChanges) {
+  TableChange[] getGravitinoTableChanges(
+      List<org.apache.flink.table.catalog.TableChange> tableChanges) {
     List<TableChange> changes = Lists.newArrayList();
     for (org.apache.flink.table.catalog.TableChange change : tableChanges) {
       if (change instanceof org.apache.flink.table.catalog.TableChange.AddColumn) {

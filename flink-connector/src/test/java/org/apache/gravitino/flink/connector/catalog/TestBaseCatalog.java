@@ -99,7 +99,7 @@ public class TestBaseCatalog {
             org.apache.gravitino.rel.TableChange.removeProperty("key"));
 
     org.apache.gravitino.rel.TableChange[] gravitinoTableChanges =
-        mockCatalog.getTableChanges(tableChanges);
+        mockCatalog.getGravitinoTableChanges(tableChanges);
     Assertions.assertArrayEquals(expected.toArray(), gravitinoTableChanges);
   }
 
@@ -114,7 +114,7 @@ public class TestBaseCatalog {
         CatalogTable.of(
             schema, "new comment", ImmutableList.of(), ImmutableMap.of("key", "new value"));
     org.apache.gravitino.rel.TableChange[] tableChanges =
-        mockCatalog.getTableChanges(table, newTable);
+        mockCatalog.getGravitinoTableChanges(table, newTable);
     List<org.apache.gravitino.rel.TableChange> expected =
         ImmutableList.of(
             org.apache.gravitino.rel.TableChange.removeProperty("key2"),

@@ -433,7 +433,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
-  public void testAlterTableAlterColumn() {
+  public void testAlterColumnTypeAndChangeOrder() {
     String databaseName = "test_alter_table_alter_column_db";
     String tableName = "test_alter_table_rename_column";
     doWithSchema(
