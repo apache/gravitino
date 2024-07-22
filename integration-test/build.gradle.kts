@@ -1,6 +1,20 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
 plugins {
@@ -24,6 +38,7 @@ dependencies {
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
 
+  testImplementation(libs.awaitility)
   testImplementation(libs.commons.cli)
   testImplementation(libs.commons.lang3)
   testImplementation(libs.guava)
@@ -59,6 +74,9 @@ dependencies {
     exclude("org.apache.logging.log4j")
     exclude("org.apache.curator")
     exclude("org.pentaho")
+    exclude("org.slf4j")
+  }
+  testImplementation(libs.hive2.jdbc) {
     exclude("org.slf4j")
   }
   testImplementation(libs.hive2.metastore) {
@@ -142,11 +160,11 @@ tasks.test {
 
     doFirst {
       // Gravitino CI Docker image
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.12")
+      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.13")
       environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "datastrato/gravitino-ci-trino:0.1.5")
       environment("GRAVITINO_CI_KAFKA_DOCKER_IMAGE", "apache/kafka:3.7.0")
-      environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "datastrato/gravitino-ci-doris:0.1.3")
-      environment("GRAVITINO_CI_RANGER_DOCKER_IMAGE", "datastrato/gravitino-ci-ranger:0.1.0")
+      environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "datastrato/gravitino-ci-doris:0.1.5")
+      environment("GRAVITINO_CI_RANGER_DOCKER_IMAGE", "datastrato/gravitino-ci-ranger:0.1.1")
 
       copy {
         from("${project.rootDir}/dev/docker/trino/conf")
@@ -161,7 +179,7 @@ tasks.test {
       // Check whether this module has already built
       val trinoConnectorBuildDir = project(":trino-connector").buildDir
       if (trinoConnectorBuildDir.exists()) {
-        // Check the version gravitino related jars in build equal to the current project version
+        // Check the version Gravitino related jars in build equal to the current project version
         val invalidGravitinoJars = trinoConnectorBuildDir.resolve("libs").listFiles { _, name -> name.startsWith("gravitino") }?.filter {
           val name = it.name
           !name.endsWith(version + ".jar")
@@ -189,7 +207,7 @@ tasks.clean {
 
 tasks.register<JavaExec>("TrinoTest") {
   classpath = sourceSets["test"].runtimeClasspath
-  mainClass.set("com.datastrato.gravitino.integration.test.trino.TrinoQueryTestTool")
+  mainClass.set("org.apache.gravitino.integration.test.trino.TrinoQueryTestTool")
 
   if (JavaVersion.current() > JavaVersion.VERSION_1_8) {
     jvmArgs = listOf(
