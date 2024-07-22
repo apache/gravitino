@@ -311,7 +311,7 @@ public class TestOauth2Client extends TestGvfsBase {
                   // should throw an UnauthorizedException here
                   try {
                     authenticator.authenticators().stream()
-                        .filter(i -> i.supportsAuthentication(tokenValue))
+                        .filter(i -> i.supportsToken(tokenValue))
                         .forEach(i -> i.authenticateToken(tokenValue));
                   } catch (UnauthorizedException e) {
                     assertTrue(e.getMessage().contains("JWT parse error"));

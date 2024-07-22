@@ -52,7 +52,7 @@ public class TestAuthenticationFilter {
     HttpServletResponse mockResponse = mock(HttpServletResponse.class);
     when(mockRequest.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION))
         .thenReturn(new Vector<>(Collections.singletonList("user")).elements());
-    when(authenticator.supportsAuthentication(any())).thenReturn(true);
+    when(authenticator.supportsToken(any())).thenReturn(true);
     when(authenticator.isDataFromToken()).thenReturn(true);
     when(authenticator.authenticateToken(any())).thenReturn(new UserPrincipal("user"));
     filter.doFilter(mockRequest, mockResponse, mockChain);
@@ -68,7 +68,7 @@ public class TestAuthenticationFilter {
     HttpServletResponse mockResponse = mock(HttpServletResponse.class);
     when(mockRequest.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION))
         .thenReturn(new Vector<>(Collections.singletonList("user")).elements());
-    when(authenticator.supportsAuthentication(any())).thenReturn(true);
+    when(authenticator.supportsToken(any())).thenReturn(true);
     when(authenticator.isDataFromToken()).thenReturn(true);
     when(authenticator.authenticateToken(any()))
         .thenThrow(new UnauthorizedException("UNAUTHORIZED"));
@@ -88,10 +88,10 @@ public class TestAuthenticationFilter {
     HttpServletResponse mockResponse = mock(HttpServletResponse.class);
     when(mockRequest.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION))
         .thenReturn(new Vector<>(Collections.singletonList("user")).elements());
-    when(authenticator1.supportsAuthentication(any())).thenReturn(false);
+    when(authenticator1.supportsToken(any())).thenReturn(false);
     when(authenticator1.isDataFromToken()).thenReturn(true);
     when(authenticator1.authenticateToken(any())).thenReturn(new UserPrincipal("user"));
-    when(authenticator2.supportsAuthentication(any())).thenReturn(true);
+    when(authenticator2.supportsToken(any())).thenReturn(true);
     when(authenticator2.isDataFromToken()).thenReturn(true);
     when(authenticator2.authenticateToken(any())).thenReturn(new UserPrincipal("user"));
 
@@ -111,10 +111,10 @@ public class TestAuthenticationFilter {
     HttpServletResponse mockResponse = mock(HttpServletResponse.class);
     when(mockRequest.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION))
         .thenReturn(new Vector<>(Collections.singletonList("user")).elements());
-    when(authenticator1.supportsAuthentication(any())).thenReturn(false);
+    when(authenticator1.supportsToken(any())).thenReturn(false);
     when(authenticator1.isDataFromToken()).thenReturn(true);
     when(authenticator1.authenticateToken(any())).thenReturn(new UserPrincipal("user"));
-    when(authenticator2.supportsAuthentication(any())).thenReturn(true);
+    when(authenticator2.supportsToken(any())).thenReturn(true);
     when(authenticator2.isDataFromToken()).thenReturn(true);
     when(authenticator2.authenticateToken(any()))
         .thenThrow(new UnauthorizedException("UNAUTHORIZED"));

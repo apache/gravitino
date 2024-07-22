@@ -67,7 +67,7 @@ public interface Authenticator {
    * @return true if the token data is supported and can be authenticated by this authenticator;
    *     false otherwise.
    */
-  default boolean supportsAuthentication(byte[] tokenData) {
+  default boolean supportsToken(byte[] tokenData) {
     return false;
   }
 }
