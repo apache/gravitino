@@ -44,28 +44,28 @@ public class GravitinoIcebergRESTServer {
     this.icebergRESTService = new RESTService();
   }
 
-  public void initialize() {
+  private void initialize() {
     gravitinoEnv.initialize(serverConfig, false);
     icebergRESTService.serviceInit(
         serverConfig.getConfigsWithPrefix(IcebergConfig.ICEBERG_CONFIG_PREFIX));
     ServerAuthenticator.getInstance().initialize(serverConfig);
   }
 
-  public void start() {
+  private void start() {
     icebergRESTService.serviceStart();
   }
 
-  public void join() {
+  private void join() {
     icebergRESTService.join();
   }
 
-  public void stop() throws Exception {
+  private void stop() throws Exception {
     icebergRESTService.serviceStop();
-    LOG.info("Iceberg REST service stopped");
+    LOG.info("Gravitino Iceberg REST service stopped");
   }
 
   public static void main(String[] args) {
-    LOG.info("Starting Iceberg REST Server");
+    LOG.info("Starting Gravitino Iceberg REST Server");
     String confPath = System.getenv("GRAVITINO_TEST") == null ? "" : args[0];
     ServerConfig serverConfig = ServerConfig.loadConfig(confPath, CONF_FILE);
     GravitinoIcebergRESTServer icebergRESTServer = new GravitinoIcebergRESTServer(serverConfig);
@@ -77,7 +77,7 @@ public class GravitinoIcebergRESTServer {
       LOG.error("Error while running jettyServer", e);
       System.exit(-1);
     }
-    LOG.info("Done, Iceberg REST server started.");
+    LOG.info("Done, Gravitino Iceberg REST server started.");
 
     Runtime.getRuntime()
         .addShutdownHook(
@@ -95,12 +95,12 @@ public class GravitinoIcebergRESTServer {
                 }));
     icebergRESTServer.join();
 
-    LOG.info("Shutting down Iceberg REST Server ... ");
+    LOG.info("Shutting down Gravitino Iceberg REST Server ... ");
     try {
       icebergRESTServer.stop();
-      LOG.info("Iceberg REST Server has shut down.");
+      LOG.info("Gravitino Iceberg REST Server has shut down.");
     } catch (Exception e) {
-      LOG.error("Error while stopping Iceberg REST Server", e);
+      LOG.error("Error while stopping Gravitino Iceberg REST Server", e);
     }
   }
 }
