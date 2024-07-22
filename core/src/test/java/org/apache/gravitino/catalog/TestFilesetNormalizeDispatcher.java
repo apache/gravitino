@@ -40,9 +40,11 @@ public class TestFilesetNormalizeDispatcher extends TestOperationDispatcher {
   public static void initialize() throws IOException {
     TestFilesetOperationDispatcher.initialize();
     filesetNormalizeDispatcher =
-        new FilesetNormalizeDispatcher(TestFilesetOperationDispatcher.filesetOperationDispatcher);
+        new FilesetNormalizeDispatcher(
+            TestFilesetOperationDispatcher.filesetOperationDispatcher, catalogManager);
     schemaNormalizeDispatcher =
-        new SchemaNormalizeDispatcher(TestFilesetOperationDispatcher.schemaOperationDispatcher);
+        new SchemaNormalizeDispatcher(
+            TestFilesetOperationDispatcher.schemaOperationDispatcher, catalogManager);
   }
 
   @Test

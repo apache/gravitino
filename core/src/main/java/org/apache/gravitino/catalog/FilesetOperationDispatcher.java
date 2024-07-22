@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
+import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
 import java.util.Map;
 import org.apache.gravitino.EntityStore;

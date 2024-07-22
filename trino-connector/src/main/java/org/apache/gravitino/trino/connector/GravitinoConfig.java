@@ -194,7 +194,10 @@ public class GravitinoConfig {
           return;
         }
 
-        properties.load(new FileInputStream(configFileName));
+        try (FileInputStream input = new FileInputStream(configFileName)) {
+          properties.load(input);
+        }
+
         if (properties.containsKey(TRINO_CATALOG_STORE)
             && !properties
                 .getProperty(TRINO_CATALOG_STORE)
