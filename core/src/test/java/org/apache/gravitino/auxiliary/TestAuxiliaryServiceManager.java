@@ -141,5 +141,21 @@ public class TestAuxiliaryServiceManager {
             "b.test2",
             "test2"),
         serviceConfigs);
+
+    // Test throw exception if both new configuration and old configuration exists.
+    m =
+        ImmutableMap.of(
+            AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+                + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
+            "a",
+            "gravitino.a.test1",
+            "test1",
+            AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX + "a.test1",
+            "test4");
+    DummyConfig config2 = new DummyConfig();
+    config2.loadFromMap(m, k -> true);
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class,
+        () -> AuxiliaryServiceManager.extractAuxiliaryServiceConfigs(config2));
   }
 }

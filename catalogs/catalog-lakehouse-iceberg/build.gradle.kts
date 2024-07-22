@@ -40,7 +40,6 @@ dependencies {
   implementation(libs.bundles.iceberg)
   implementation(libs.bundles.jersey)
   implementation(libs.bundles.jetty)
-
   implementation(libs.bundles.log4j)
   implementation(libs.cglib)
   implementation(libs.commons.collections4)

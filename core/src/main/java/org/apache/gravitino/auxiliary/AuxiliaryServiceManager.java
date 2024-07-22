@@ -239,7 +239,12 @@ public class AuxiliaryServiceManager {
         .forEach(
             (k, v) -> {
               if (k.startsWith(GRAVITINO_AUX_SERVICE_PREFIX)) {
-                serviceConfigs.put(k.substring(GRAVITINO_AUX_SERVICE_PREFIX.length()), v);
+                String extractKey = k.substring(GRAVITINO_AUX_SERVICE_PREFIX.length());
+                LOG.warn(
+                    "The configuration {} is deprecated(still working), please use gravitino.{} instead.",
+                    k,
+                    extractKey);
+                serviceConfigs.put(extractKey, v);
               }
             });
     splitter

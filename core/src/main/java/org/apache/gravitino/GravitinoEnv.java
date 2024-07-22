@@ -127,9 +127,9 @@ public class GravitinoEnv {
   public void initialize(Config config, boolean isGravitinoServer) {
     LOG.info("Initializing Gravitino Environment...");
     this.config = config;
-    initBaseComponent();
+    initBaseComponents();
     if (isGravitinoServer) {
-      initGravitinoServerComponent();
+      initGravitinoServerComponents();
     }
     LOG.info("Gravitino Environment is initialized.");
   }
@@ -292,7 +292,7 @@ public class GravitinoEnv {
     LOG.info("Gravitino Environment is shut down.");
   }
 
-  private void initBaseComponent() {
+  private void initBaseComponents() {
     this.metricsSystem = new MetricsSystem();
     metricsSystem.register(new JVMMetricsSource());
 
@@ -302,7 +302,7 @@ public class GravitinoEnv {
     this.eventBus = eventListenerManager.createEventBus();
   }
 
-  private void initGravitinoServerComponent() {
+  private void initGravitinoServerComponents() {
     // Initialize EntityStore
     this.entityStore = EntityStoreFactory.createEntityStore(config);
     entityStore.initialize(config);
