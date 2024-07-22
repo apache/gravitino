@@ -142,8 +142,14 @@ public class TestDorisTablePartitionOperations extends TestDoris {
     // add partition with incorrect type
     Partition incorrect =
         Partitions.list("test_incorrect", new Literal[][] {{Literals.NULL}}, null);
-    assertThrows(
-        IllegalArgumentException.class, () -> tablePartitionOperations.addPartition(incorrect));
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class, () -> tablePartitionOperations.addPartition(incorrect));
+    assertEquals(
+        "Table "
+            + rangePartitionTableName
+            + " is non-list-partitioned, but trying to add a list partition",
+        exception.getMessage());
 
     // add different kinds of range partitions
     LocalDate today = LocalDate.now();
@@ -272,15 +278,24 @@ public class TestDorisTablePartitionOperations extends TestDoris {
     // add partition with incorrect type
     Partition incorrectType =
         Partitions.range("p1", Literals.NULL, Literals.NULL, Collections.emptyMap());
-    assertThrows(
-        IllegalArgumentException.class, () -> tablePartitionOperations.addPartition(incorrectType));
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> tablePartitionOperations.addPartition(incorrectType));
+    assertEquals(
+        "Table "
+            + listPartitionTableName
+            + " is non-range-partitioned, but trying to add a range partition",
+        exception.getMessage());
 
     // add partition with incorrect value
     Partition incorrectValue =
         Partitions.list("p1", new Literal[][] {{Literals.NULL}}, Collections.emptyMap());
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> tablePartitionOperations.addPartition(incorrectValue));
+    exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> tablePartitionOperations.addPartition(incorrectValue));
+    assertEquals("The number of partitioning columns must be consistent", exception.getMessage());
 
     // add different kinds of list partitions
     LocalDate today = LocalDate.now();

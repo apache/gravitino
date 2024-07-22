@@ -93,7 +93,7 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
         while (result.next()) {
           partitionNames.add(result.getString("PartitionName"));
         }
-        return partitionNames.build().stream().toArray(String[]::new);
+        return partitionNames.build().toArray(new String[0]);
       }
     } catch (SQLException e) {
       throw exceptionConverter.toGravitinoException(e);
@@ -112,7 +112,7 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
         while (result.next()) {
           partitions.add(fromDorisPartition(result, partitionInfo, columnTypes));
         }
-        return partitions.build().stream().toArray(Partition[]::new);
+        return partitions.build().toArray(new Partition[0]);
       }
     } catch (SQLException e) {
       throw exceptionConverter.toGravitinoException(e);
@@ -130,7 +130,7 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
               loadedTable.name(), partitionName);
       try (Statement statement = connection.createStatement();
           ResultSet result = statement.executeQuery(showPartitionsSql)) {
-        while (result.next()) {
+        if (result.next()) {
           return fromDorisPartition(result, partitionInfo, columnTypes);
         }
       }
@@ -152,7 +152,7 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
       if (partition instanceof RangePartition) {
         Preconditions.checkArgument(
             partitionInfo instanceof Transforms.RangeTransform,
-            "Table %s is partitioned by list, but trying to add a range partition",
+            "Table %s is non-range-partitioned, but trying to add a range partition",
             loadedTable.name());
 
         RangePartition rangePartition = (RangePartition) partition;
@@ -169,7 +169,7 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
       } else if (partition instanceof ListPartition) {
         Preconditions.checkArgument(
             partitionInfo instanceof Transforms.ListTransform,
-            "Table %s is partitioned by range, but trying to add a list partition",
+            "Table %s is non-list-partitioned, but trying to add a list partition",
             loadedTable.name());
 
         ListPartition listPartition = (ListPartition) partition;
@@ -257,10 +257,10 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
           Type partitionColumnType = columnTypes.get(partitionKeys[i]);
           literValues.add(Literals.of(values[i], partitionColumnType));
         }
-        lists.add(literValues.build().stream().toArray(Literal<?>[]::new));
+        lists.add(literValues.build().toArray(new Literal<?>[0]));
       }
       return Partitions.list(
-          partitionName, lists.build().stream().toArray(Literal<?>[][]::new), properties);
+          partitionName, lists.build().toArray(new Literal<?>[0][0]), properties);
     } else {
       throw new UnsupportedOperationException(
           String.format("%s is not a partitioned table", loadedTable.name()));
