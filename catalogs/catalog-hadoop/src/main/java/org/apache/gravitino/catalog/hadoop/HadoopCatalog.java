@@ -47,7 +47,7 @@ public class HadoopCatalog extends BaseCatalog<HadoopCatalog> {
 
   @Override
   protected CatalogOperations newOps(Map<String, String> config) {
-    CatalogOperations ops = new HadoopCatalogOperations();
+    CatalogOperations ops = new SecureHadoopCatalogOperations();
     return ops;
   }
 

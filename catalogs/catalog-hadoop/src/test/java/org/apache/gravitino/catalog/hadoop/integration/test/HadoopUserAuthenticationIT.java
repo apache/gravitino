@@ -395,7 +395,7 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
   }
 
   @Test
-  void createTableWithKerberos() {
+  void createFilesetWithKerberos() {
     KerberosTokenProvider provider =
         KerberosTokenProvider.builder()
             .withClientPrincipal(GRAVITINO_CLIENT_PRINCIPAL)
