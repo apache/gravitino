@@ -58,7 +58,8 @@ RUN apt-get update && apt-get upgrade -y && apt-get install --fix-missing -yq \
   krb5-admin-server \
   krb5-user \
   krb5-config \
-  jsvc
+  jsvc \
+  net-tools
 
 #################################################################################
 ## setup ssh

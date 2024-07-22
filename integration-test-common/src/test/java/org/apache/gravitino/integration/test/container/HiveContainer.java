@@ -180,6 +180,12 @@ public class HiveContainer extends BaseContainer {
                 if (result.getExitCode() == 0) {
                   return true;
                 }
+
+                LOG.warn(
+                    "Failed to execute sql: {}, Std-out: {}, Std-error:{}",
+                    createTableSQL,
+                    result.getStdout(),
+                    result.getStderr());
               } catch (Exception e) {
                 LOG.error("Failed to execute sql: {}", createTableSQL, e);
               }
