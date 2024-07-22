@@ -71,6 +71,7 @@ import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@SuppressWarnings("removal")
 public class SecureHadoopCatalogOperations
     implements CatalogOperations, SupportsSchemas, FilesetCatalog {
 
