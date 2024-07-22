@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.Schema;
+import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogDatabase;
 import org.apache.flink.table.catalog.CatalogDatabaseImpl;
@@ -31,6 +32,7 @@ import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.TableChange;
 import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.PropertiesConverter;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
@@ -136,6 +138,16 @@ class TestCatalog extends BaseCatalog {
 
   @Override
   protected PropertiesConverter getPropertiesConverter() {
+    return null;
+  }
+
+  @Override
+  protected PartitionConverter getPartitionConverter() {
+    return null;
+  }
+
+  @Override
+  protected AbstractCatalog realCatalog() {
     return null;
   }
 }
