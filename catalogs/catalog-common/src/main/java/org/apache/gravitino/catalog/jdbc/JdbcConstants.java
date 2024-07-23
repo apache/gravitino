@@ -18,23 +18,6 @@
  */
 package org.apache.gravitino.catalog.jdbc;
 
-import com.google.common.collect.Maps;
-import java.util.HashMap;
-import java.util.Map;
-import org.apache.gravitino.StringIdentifier;
-import org.apache.gravitino.connector.BasePropertiesMetadata;
-
-public abstract class JdbcTablePropertiesMetadata extends BasePropertiesMetadata {
-
-  public static final String COMMENT_KEY = JdbcConstants.COMMENT;
-
-  public Map<String, String> transformToJdbcProperties(Map<String, String> properties) {
-    HashMap<String, String> resultProperties = Maps.newHashMap(properties);
-    resultProperties.remove(StringIdentifier.ID_KEY);
-    return resultProperties;
-  }
-
-  public Map<String, String> convertFromJdbcProperties(Map<String, String> properties) {
-    return properties;
-  }
+public class JdbcConstants {
+  public static final String COMMENT = "comment";
 }

@@ -16,25 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.jdbc;
+package org.apache.gravitino.catalog.mysql;
 
-import com.google.common.collect.Maps;
-import java.util.HashMap;
-import java.util.Map;
-import org.apache.gravitino.StringIdentifier;
-import org.apache.gravitino.connector.BasePropertiesMetadata;
-
-public abstract class JdbcTablePropertiesMetadata extends BasePropertiesMetadata {
-
-  public static final String COMMENT_KEY = JdbcConstants.COMMENT;
-
-  public Map<String, String> transformToJdbcProperties(Map<String, String> properties) {
-    HashMap<String, String> resultProperties = Maps.newHashMap(properties);
-    resultProperties.remove(StringIdentifier.ID_KEY);
-    return resultProperties;
-  }
-
-  public Map<String, String> convertFromJdbcProperties(Map<String, String> properties) {
-    return properties;
-  }
+public class MysqlConstants {
+  public static final String GRAVITINO_ENGINE_KEY = "engine";
+  public static final String MYSQL_ENGINE_KEY = "ENGINE";
+  public static final String GRAVITINO_AUTO_INCREMENT_OFFSET_KEY = "auto-increment-offset";
+  public static final String MYSQL_AUTO_INCREMENT_OFFSET_KEY = "AUTO_INCREMENT";
 }
