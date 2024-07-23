@@ -54,6 +54,7 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.types.Type.PrimitiveType;
 import org.apache.iceberg.types.Types.NestedField;
+import org.apache.iceberg.types.Types.StructType;
 
 public class IcebergTableOpsHelper {
   @VisibleForTesting public static final Joiner DOT = Joiner.on(".");
@@ -126,16 +127,19 @@ public class IcebergTableOpsHelper {
     } else if (columnPosition instanceof TableChange.First) {
       icebergUpdateSchema.moveFirst(DOT.join(fieldName));
     } else {
-      Preconditions.checkArgument(
-          columnPosition instanceof TableChange.Default,
+      throw new UnsupportedOperationException(
           "Iceberg doesn't support column position: " + columnPosition.getClass().getSimpleName());
     }
   }
 
   private void doUpdateColumnPosition(
-      UpdateSchema icebergUpdateSchema, UpdateColumnPosition updateColumnPosition) {
-    doMoveColumn(
-        icebergUpdateSchema, updateColumnPosition.fieldName(), updateColumnPosition.getPosition());
+      UpdateSchema icebergUpdateSchema,
+      UpdateColumnPosition updateColumnPosition,
+      Schema icebergTableSchema) {
+    StructType tableSchema = icebergTableSchema.asStruct();
+    ColumnPosition columnPosition =
+        getColumnPositionForIceberg(tableSchema, updateColumnPosition.getPosition());
+    doMoveColumn(icebergUpdateSchema, updateColumnPosition.fieldName(), columnPosition);
   }
 
   private void doUpdateColumnType(
@@ -154,6 +158,23 @@ public class IcebergTableOpsHelper {
     Preconditions.checkArgument(
         type.isPrimitiveType(), "Cannot update %s, not a primitive type: %s", fieldName, type);
     icebergUpdateSchema.updateColumn(fieldName, (PrimitiveType) type);
+  }
+
+  // Iceberg doesn't support LAST
+  private ColumnPosition getColumnPositionForIceberg(
+      StructType parent, ColumnPosition columnPosition) {
+    if (!(columnPosition instanceof TableChange.Default)) {
+      return columnPosition;
+    }
+
+    List<NestedField> fields = parent.fields();
+    // no column, add to first
+    if (fields.isEmpty()) {
+      return ColumnPosition.first();
+    }
+
+    NestedField last = fields.get(fields.size() - 1);
+    return ColumnPosition.after(last.name());
   }
 
   private void doAddColumn(UpdateSchema icebergUpdateSchema, AddColumn addColumn) {
@@ -177,7 +198,9 @@ public class IcebergTableOpsHelper {
           addColumn.getComment());
     }
 
-    doMoveColumn(icebergUpdateSchema, addColumn.fieldName(), addColumn.getPosition());
+    if (!ColumnPosition.defaultPos().equals(addColumn.getPosition())) {
+      doMoveColumn(icebergUpdateSchema, addColumn.fieldName(), addColumn.getPosition());
+    }
   }
 
   private void alterTableProperty(
@@ -207,7 +230,8 @@ public class IcebergTableOpsHelper {
       } else if (change instanceof DeleteColumn) {
         doDeleteColumn(icebergUpdateSchema, (DeleteColumn) change, icebergTableSchema);
       } else if (change instanceof UpdateColumnPosition) {
-        doUpdateColumnPosition(icebergUpdateSchema, (UpdateColumnPosition) change);
+        doUpdateColumnPosition(
+            icebergUpdateSchema, (UpdateColumnPosition) change, icebergTableSchema);
       } else if (change instanceof RenameColumn) {
         doRenameColumn(icebergUpdateSchema, (RenameColumn) change);
       } else if (change instanceof UpdateColumnType) {
