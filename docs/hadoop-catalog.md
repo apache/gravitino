@@ -35,6 +35,22 @@ Besides the [common catalog properties](./gravitino-server-config.md#gravitino-c
 | `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Hadoop catalog.                                  | 60            | No                                                          | 0.5.1         |
 | `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.     | 60            | No                                                          | 0.5.1         |
 
+
+### Authentication Strategy for Hadoop Catalog
+
+The Hadoop catalog supports multi-level authentication to control access, allowing different strategies for the catalog, schema, and fileset. The priority of authentication strategies is as follows: catalog < schema < fileset.
+
+- **Catalog**: Default authentication is simple.
+- **Schema**: Inherits the authentication strategy from the catalog if not explicitly set.
+- **Fileset**: Inherits the authentication strategy from the schema if not explicitly set.
+
+**Note**:
+
+- If authentication.impersonation-enable default value is `false`, the impersonation setting is not enabled.
+- If users want to enable impersonation, they must set authentication.impersonation-enable to `true` and make sure the authentication strategy is set to `kerberos`, either by setting authentication strategy explicitly or inherited from parents. Otherwise, impersonation will not work.
+- The impersonation setting is accompanied by the authentication strategy. For instance, if a schema has authentication.impersonation-enable set to true but no specific authentication strategy, it will use the parent's authentication strategy along with the authentication.impersonation-enable value.
+
+
 ### Catalog operations
 
 Refer to [Catalog operations](./manage-fileset-metadata-using-gravitino.md#catalog-operations) for more details.
@@ -47,9 +63,13 @@ The Hadoop catalog supports creating, updating, deleting, and listing schema.
 
 ### Schema properties
 
-| Property name | Description                                    | Default value | Required | Since Version |
-|---------------|------------------------------------------------|---------------|----------|---------------|
-| `location`    | The storage location managed by Hadoop schema. | (none)        | No       | 0.5.0         |
+| Property name                                      | Description                                                                                    | Default value | Required                                                    | Since Version   |
+|----------------------------------------------------|------------------------------------------------------------------------------------------------|---------------|-------------------------------------------------------------|-----------------|
+| `location`                                         | The storage location managed by Hadoop schema.                                                 | (none)        | No                                                          | 0.5.0           |
+| `authentication.type`                              | The type of authentication for Hadoop catalog, currently we only support `kerberos`, `simple`. | `simple`      | No                                                          | 0.6.0           |
+| `authentication.impersonation-enable`              | Whether to enable impersonation for the Hadoop catalog.                                        | `false`       | No                                                          | 0.6.0           |
+| `authentication.kerberos.principal`                | The principal of the Kerberos authentication                                                   | (none)        | required if the value of `authentication.type` is Kerberos. | 0.6.0           |
+| `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                         | (none)        | required if the value of `authentication.type` is Kerberos. | 0.6.0           |
 
 ### Schema operations
 
@@ -63,7 +83,12 @@ Refer to [Schema operation](./manage-fileset-metadata-using-gravitino.md#schema-
 
 ### Fileset properties
 
-None.
+| Property name                                      | Description                                                                                            | Default value | Required                                                    | Since Version   |
+|----------------------------------------------------|--------------------------------------------------------------------------------------------------------|---------------|-------------------------------------------------------------|-----------------|
+| `authentication.type`                              | The type of authentication for Hadoop catalog fileset, currently we only support `kerberos`, `simple`. | `simple`      | No                                                          | 0.6.0           |
+| `authentication.impersonation-enable`              | Whether to enable impersonation for the Hadoop catalog fileset.                                        | `false`       | No                                                          | 0.6.0           |
+| `authentication.kerberos.principal`                | The principal of the Kerberos authentication for the fileset.                                          | (none)        | required if the value of `authentication.type` is Kerberos. | 0.6.0           |
+| `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication for the fileset.                                 | (none)        | required if the value of `authentication.type` is Kerberos. | 0.6.0           |
 
 ### Fileset operations
 
