@@ -264,8 +264,10 @@ public class AuxiliaryServiceManager {
       String originValue = serverConfig.put(extractedKey, configValue);
       if (originValue != null) {
         LOG.warn(
-            "The configuration %s%s is overwrite by %s",
-            GRAVITINO_AUX_SERVICE_PREFIX, extractedKey, configKey);
+            "The configuration {}{} is overwritten by {}",
+            GRAVITINO_AUX_SERVICE_PREFIX,
+            extractedKey,
+            configKey);
       }
     }
   }
