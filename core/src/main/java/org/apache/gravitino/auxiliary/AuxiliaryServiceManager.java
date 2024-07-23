@@ -261,9 +261,12 @@ public class AuxiliaryServiceManager {
       Map<String, String> serverConfig, String serverName, String configKey, String configValue) {
     if (configKey.startsWith(String.format("gravitino.%s.", serverName))) {
       String extractedKey = configKey.substring("gravitino.".length());
-      Preconditions.checkArgument(
-          !serverConfig.containsKey(extractedKey), "Duplicated configuration for " + extractedKey);
-      serverConfig.put(extractedKey, configValue);
+      String originValue = serverConfig.put(extractedKey, configValue);
+      if (originValue != null) {
+        LOG.warn(
+            "The configuration %s%s is overwrite by %s",
+            GRAVITINO_AUX_SERVICE_PREFIX, extractedKey, configKey);
+      }
     }
   }
 }
