@@ -21,10 +21,12 @@
 # start ssh
 HOSTNAME=`hostname`
 service ssh start
-ssh-keyscan ${HOSTNAME} >> /root/.ssh/known_hosts
-ssh-keyscan localhost >> /root/.ssh/known_hosts
-ssh-keyscan 0.0.0.0 >> /root/.ssh/known_hosts
-ssh-keyscan 127.0.0.1 >> /root/.ssh/known_hosts
+
+for host in ${HOSTNAME} localhost 127.0.0.1 0.0.0.0; do
+  ssh-keygen -R ${host}
+  ssh-keyscan ${host} >> /root/.ssh/known_hosts
+  ssh -o BatchMode=yes -o ConnectTimeout=5 ${host} "exit" &>/dev/null || { echo "failed to connect to ${host}"; exit 1; }
+done
 
 # init the Kerberos database
 echo -e "${PASS}\n${PASS}" | kdb5_util create -s
