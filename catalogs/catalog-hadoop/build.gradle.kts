@@ -24,6 +24,8 @@ plugins {
   id("idea")
 }
 
+val hadoopTestVersion: String = libs.versions.hadoop.minikdc.get()
+
 dependencies {
   implementation(project(":api"))
   implementation(project(":core"))
@@ -51,7 +53,7 @@ dependencies {
 
   testImplementation(libs.minikdc)
   testImplementation(libs.hadoop3.minicluster)
-  testImplementation(libs.commons.lang)
+  testImplementation("org.apache.hadoop:hadoop-aws:$hadoopTestVersion")
 
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.mockito.core)
