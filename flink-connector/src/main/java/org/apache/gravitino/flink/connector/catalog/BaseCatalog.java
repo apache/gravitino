@@ -257,6 +257,8 @@ public abstract class BaseCatalog extends AbstractCatalog {
   @Override
   public void createTable(ObjectPath tablePath, CatalogBaseTable table, boolean ignoreIfExists)
       throws TableAlreadyExistException, DatabaseNotExistException, CatalogException {
+    Preconditions.checkArgument(
+        table instanceof ResolvedCatalogBaseTable, "table should be resolved");
     NameIdentifier identifier =
         NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName());
 
@@ -284,8 +286,8 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   /**
-   * The method only is used to change the properties and comments. To alter columns, use the other
-   * alterTable API and provide a list of TableChange's.
+   * The method only is used to change the comments. To alter columns, use the other alterTable API
+   * and provide a list of TableChanges.
    *
    * @param tablePath path of the table or view to be modified
    * @param newTable the new table definition
@@ -535,41 +537,22 @@ public abstract class BaseCatalog extends AbstractCatalog {
         null);
   }
 
-  private List<TableChange> optionsChanges(
-      Map<String, String> currentOptions, Map<String, String> updatedOptions) {
-    List<TableChange> optionsChanges = com.google.common.collect.Lists.newArrayList();
-    MapDifference<String, String> difference = Maps.difference(currentOptions, updatedOptions);
-    difference
-        .entriesOnlyOnLeft()
-        .forEach((key, value) -> optionsChanges.add(TableChange.removeProperty(key)));
-    difference
-        .entriesOnlyOnRight()
-        .forEach((key, value) -> optionsChanges.add(TableChange.setProperty(key, value)));
-    difference
-        .entriesDiffering()
-        .forEach(
-            (key, value) -> {
-              optionsChanges.add(TableChange.setProperty(key, value.rightValue()));
-            });
-    return optionsChanges;
-  }
-
-  private void removeProperty(
+  private static void removeProperty(
       org.apache.flink.table.catalog.TableChange.ResetOption change, List<TableChange> changes) {
     changes.add(TableChange.removeProperty(change.getKey()));
   }
 
-  private void setProperty(
+  private static void setProperty(
       org.apache.flink.table.catalog.TableChange.SetOption change, List<TableChange> changes) {
     changes.add(TableChange.setProperty(change.getKey(), change.getValue()));
   }
 
-  private void dropColumn(
+  private static void dropColumn(
       org.apache.flink.table.catalog.TableChange.DropColumn change, List<TableChange> changes) {
     changes.add(TableChange.deleteColumn(new String[] {change.getColumnName()}, true));
   }
 
-  private void addColumn(
+  private static void addColumn(
       org.apache.flink.table.catalog.TableChange.AddColumn change, List<TableChange> changes) {
     changes.add(
         TableChange.addColumn(
@@ -579,7 +562,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
             TableUtils.toGravitinoColumnPosition(change.getPosition())));
   }
 
-  private void modifyColumn(
+  private static void modifyColumn(
       org.apache.flink.table.catalog.TableChange change, List<TableChange> changes) {
     if (change instanceof org.apache.flink.table.catalog.TableChange.ModifyColumnName) {
       org.apache.flink.table.catalog.TableChange.ModifyColumnName modifyColumnName =
@@ -617,11 +600,10 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   @VisibleForTesting
-  TableChange[] getGravitinoTableChanges(
+  static TableChange[] getGravitinoTableChanges(
       CatalogBaseTable existingTable, CatalogBaseTable newTable) {
     Preconditions.checkNotNull(newTable.getComment(), "The new comment should not be null");
     List<TableChange> changes = Lists.newArrayList();
-    changes.addAll(optionsChanges(existingTable.getOptions(), newTable.getOptions()));
     if (!Objects.equals(newTable.getComment(), existingTable.getComment())) {
       changes.add(TableChange.updateComment(newTable.getComment()));
     }
@@ -629,7 +611,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   @VisibleForTesting
-  TableChange[] getGravitinoTableChanges(
+  static TableChange[] getGravitinoTableChanges(
       List<org.apache.flink.table.catalog.TableChange> tableChanges) {
     List<TableChange> changes = Lists.newArrayList();
     for (org.apache.flink.table.catalog.TableChange change : tableChanges) {

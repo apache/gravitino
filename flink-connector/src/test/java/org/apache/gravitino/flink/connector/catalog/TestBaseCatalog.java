@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.Schema;
-import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogDatabase;
 import org.apache.flink.table.catalog.CatalogDatabaseImpl;
@@ -32,8 +31,6 @@ import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.TableChange;
 import org.apache.gravitino.SchemaChange;
-import org.apache.gravitino.flink.connector.PartitionConverter;
-import org.apache.gravitino.flink.connector.PropertiesConverter;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -64,7 +61,6 @@ public class TestBaseCatalog {
 
   @Test
   public void testTableChanges() {
-    BaseCatalog mockCatalog = new TestCatalog();
     List<TableChange> tableChanges =
         ImmutableList.of(
             TableChange.add(Column.physical("test", DataTypes.INT())),
@@ -101,13 +97,12 @@ public class TestBaseCatalog {
             org.apache.gravitino.rel.TableChange.removeProperty("key"));
 
     org.apache.gravitino.rel.TableChange[] gravitinoTableChanges =
-        mockCatalog.getGravitinoTableChanges(tableChanges);
+        BaseCatalog.getGravitinoTableChanges(tableChanges);
     Assertions.assertArrayEquals(expected.toArray(), gravitinoTableChanges);
   }
 
   @Test
   public void testTableChangesWithoutColumnChange() {
-    BaseCatalog mockCatalog = new TestCatalog();
     Schema schema = Schema.newBuilder().column("test", "INT").build();
     CatalogBaseTable table =
         CatalogTable.of(
@@ -116,38 +111,12 @@ public class TestBaseCatalog {
         CatalogTable.of(
             schema, "new comment", ImmutableList.of(), ImmutableMap.of("key", "new value"));
     org.apache.gravitino.rel.TableChange[] tableChanges =
-        mockCatalog.getGravitinoTableChanges(table, newTable);
+        BaseCatalog.getGravitinoTableChanges(table, newTable);
     List<org.apache.gravitino.rel.TableChange> expected =
         ImmutableList.of(
             org.apache.gravitino.rel.TableChange.removeProperty("key2"),
             org.apache.gravitino.rel.TableChange.setProperty("key", "new value"),
             org.apache.gravitino.rel.TableChange.updateComment("new comment"));
     Assertions.assertArrayEquals(expected.toArray(), tableChanges);
-  }
-}
-
-class TestCatalog extends BaseCatalog {
-
-  public TestCatalog(String catalogName, String defaultDatabase) {
-    super(catalogName, defaultDatabase);
-  }
-
-  public TestCatalog() {
-    this("test", "default");
-  }
-
-  @Override
-  protected PropertiesConverter getPropertiesConverter() {
-    return null;
-  }
-
-  @Override
-  protected PartitionConverter getPartitionConverter() {
-    return null;
-  }
-
-  @Override
-  protected AbstractCatalog realCatalog() {
-    return null;
   }
 }

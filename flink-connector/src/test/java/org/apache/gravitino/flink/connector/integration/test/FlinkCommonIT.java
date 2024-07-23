@@ -22,16 +22,25 @@ package org.apache.gravitino.flink.connector.integration.test;
 import static org.apache.gravitino.flink.connector.integration.test.utils.TestUtils.assertColumns;
 import static org.apache.gravitino.flink.connector.integration.test.utils.TestUtils.toFlinkPhysicalColumn;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
+import static org.junit.jupiter.api.Assertions.fail;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.commons.compress.utils.Lists;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.ResultKind;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.ObjectPath;
+import org.apache.flink.table.catalog.ResolvedCatalogTable;
+import org.apache.flink.table.catalog.ResolvedSchema;
+import org.apache.flink.table.catalog.exceptions.DatabaseNotExistException;
+import org.apache.flink.table.catalog.exceptions.TableAlreadyExistException;
 import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.types.Row;
 import org.apache.gravitino.Catalog;
@@ -326,7 +335,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
             CatalogTable catalogTable = (CatalogTable) table;
             Assertions.assertFalse(catalogTable.isPartitioned());
           } catch (TableNotExistException e) {
-            Assertions.fail(e);
+            fail(e);
           }
         },
         true);
@@ -363,6 +372,65 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
                 Column.of("order_amount", Types.DoubleType.get(), "ORDER_AMOUNT")
               };
           assertColumns(expected, actual);
+        },
+        true);
+  }
+
+  @Test
+  public void testAlterTableComment() {
+    String databaseName = "test_alter_table_comment_database";
+    String tableName = "test_alter_table_comment";
+    String newComment = "new_table_comment";
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          Optional<org.apache.flink.table.catalog.Catalog> flinkCatalog =
+              tableEnv.getCatalog(currentCatalog().name());
+          if (flinkCatalog.isPresent()) {
+            org.apache.flink.table.catalog.Catalog currentFlinkCatalog = flinkCatalog.get();
+            ObjectPath currentTablePath = new ObjectPath(databaseName, tableName);
+            try {
+              // use java api to create a new table
+              org.apache.flink.table.api.Schema schema =
+                  org.apache.flink.table.api.Schema.newBuilder()
+                      .column("test", DataTypes.INT())
+                      .build();
+              CatalogTable newTable =
+                  CatalogTable.of(schema, "test comment", ImmutableList.of(), ImmutableMap.of());
+              List<org.apache.flink.table.catalog.Column> columns = Lists.newArrayList();
+              columns.add(org.apache.flink.table.catalog.Column.physical("test", DataTypes.INT()));
+              ResolvedSchema resolvedSchema = new ResolvedSchema(columns, new ArrayList<>(), null);
+              currentFlinkCatalog.createTable(
+                  currentTablePath, new ResolvedCatalogTable(newTable, resolvedSchema), false);
+              CatalogTable table = (CatalogTable) currentFlinkCatalog.getTable(currentTablePath);
+
+              // alter table comment
+              currentFlinkCatalog.alterTable(
+                  currentTablePath,
+                  CatalogTable.of(
+                      table.getUnresolvedSchema(),
+                      newComment,
+                      table.getPartitionKeys(),
+                      table.getOptions()),
+                  false);
+
+              CatalogTable loadedTable =
+                  (CatalogTable) currentFlinkCatalog.getTable(currentTablePath);
+              Assertions.assertEquals(newComment, loadedTable.getComment());
+              Table gravitinoTable =
+                  currentCatalog()
+                      .asTableCatalog()
+                      .loadTable(NameIdentifier.of(databaseName, tableName));
+              Assertions.assertEquals(newComment, gravitinoTable.comment());
+            } catch (DatabaseNotExistException
+                | TableAlreadyExistException
+                | TableNotExistException e) {
+              fail(e);
+            }
+          } else {
+            fail("Catalog doesn't exist");
+          }
         },
         true);
   }
