@@ -53,8 +53,6 @@ public interface Type {
     TIME,
     /** The timestamp type. */
     TIMESTAMP,
-    /** The timestamp_ntz type. */
-    TIMESTAMPNTZ,
     /** The interval year type. */
     INTERVAL_YEAR,
     /** The interval month type. */

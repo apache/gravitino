@@ -349,7 +349,7 @@ public class Types {
 
   /** The timestamp type in Gravitino. */
   public static class TimestampType extends Type.DateTimeType {
-    private static final TimestampNTZType INSTANCE_WITHOUT_TIME_ZONE = new TimestampNTZType(false);
+    private static final TimestampType INSTANCE_WITHOUT_TIME_ZONE = new TimestampType(false);
     private static final TimestampType INSTANCE_WITH_TIME_ZONE = new TimestampType(true);
 
     /** @return A {@link TimestampType} with time zone. */
@@ -358,7 +358,7 @@ public class Types {
     }
 
     /** @return A {@link TimestampType} without time zone. */
-    public static TimestampNTZType withoutTimeZone() {
+    public static TimestampType withoutTimeZone() {
       return INSTANCE_WITHOUT_TIME_ZONE;
     }
 
@@ -382,31 +382,6 @@ public class Types {
     @Override
     public String simpleString() {
       return withTimeZone ? "timestamp_tz" : "timestamp";
-    }
-  }
-
-  /** The Timestamp_ntz type in Gravitino. */
-  public static class TimestampNTZType extends Type.DateTimeType {
-    private final boolean withoutTimeZone;
-
-    private TimestampNTZType(boolean withoutTimeZone) {
-      this.withoutTimeZone = withoutTimeZone;
-    }
-
-    /** @return True if the timestamp type has time zone, false otherwise. */
-    public boolean hasTimeZone() {
-      return withoutTimeZone;
-    }
-
-    @Override
-    public Name name() {
-      return Name.TIMESTAMPNTZ;
-    }
-
-    /** @return The simple string representation of the timestamp_ntz type. */
-    @Override
-    public String simpleString() {
-      return withoutTimeZone ? "timestamp_ntz" : "timestamp";
     }
   }
 
