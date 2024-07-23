@@ -121,7 +121,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
             ErrorHandlers.topicErrorHandler());
     resp.validate();
 
-    return resp.getTopic();
+    return new GenericTopic(resp.getTopic(), restClient, fullNamespace);
   }
 
   /**
@@ -160,7 +160,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
             ErrorHandlers.topicErrorHandler());
     resp.validate();
 
-    return resp.getTopic();
+    return new GenericTopic(resp.getTopic(), restClient, fullNamespace);
   }
 
   /**
@@ -194,7 +194,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
             ErrorHandlers.topicErrorHandler());
     resp.validate();
 
-    return resp.getTopic();
+    return new GenericTopic(resp.getTopic(), restClient, fullNamespace);
   }
 
   /**

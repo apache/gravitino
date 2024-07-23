@@ -116,7 +116,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
             ErrorHandlers.filesetErrorHandler());
     resp.validate();
 
-    return resp.getFileset();
+    return new GenericFileset(resp.getFileset(), restClient, fullNamespace);
   }
 
   /**
@@ -165,7 +165,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
             ErrorHandlers.filesetErrorHandler());
     resp.validate();
 
-    return resp.getFileset();
+    return new GenericFileset(resp.getFileset(), restClient, fullNamespace);
   }
 
   /**
@@ -199,7 +199,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
             ErrorHandlers.filesetErrorHandler());
     resp.validate();
 
-    return resp.getFileset();
+    return new GenericFileset(resp.getFileset(), restClient, fullNamespace);
   }
 
   /**

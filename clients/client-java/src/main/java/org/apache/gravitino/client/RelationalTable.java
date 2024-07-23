@@ -22,12 +22,15 @@ import static org.apache.gravitino.dto.util.DTOConverters.fromDTO;
 import static org.apache.gravitino.dto.util.DTOConverters.toDTO;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Joiner;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.SneakyThrows;
 import org.apache.gravitino.Audit;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.dto.rel.TableDTO;
 import org.apache.gravitino.dto.rel.partitions.PartitionDTO;
@@ -47,9 +50,16 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.tag.SupportsTags;
 
 /** Represents a relational table. */
-public class RelationalTable implements Table, SupportsPartitions {
+public class RelationalTable implements Table, SupportsPartitions, SupportsTagOperations {
+
+  private static final Joiner DOT_JOINER = Joiner.on(".");
+
+  private final Table table;
+  private final RESTClient restClient;
+  private final Namespace namespace;
 
   /**
    * Creates a new RelationalTable.
@@ -59,14 +69,9 @@ public class RelationalTable implements Table, SupportsPartitions {
    * @param restClient The REST client.
    * @return A new RelationalTable.
    */
-  public static RelationalTable from(
-      Namespace namespace, TableDTO tableDTO, RESTClient restClient) {
+  static RelationalTable from(Namespace namespace, TableDTO tableDTO, RESTClient restClient) {
     return new RelationalTable(namespace, tableDTO, restClient);
   }
-
-  private final Table table;
-  private final RESTClient restClient;
-  private final Namespace namespace;
 
   /**
    * Creates a new RelationalTable.
@@ -154,7 +159,7 @@ public class RelationalTable implements Table, SupportsPartitions {
 
   /** @return The partition request path. */
   @VisibleForTesting
-  public String getPartitionRequestPath() {
+  String getPartitionRequestPath() {
     return "api/metalakes/"
         + namespace.level(0)
         + "/catalogs/"
@@ -262,5 +267,29 @@ public class RelationalTable implements Table, SupportsPartitions {
   @SneakyThrows // Encode charset is fixed to UTF-8, so this is safe.
   protected static String formatPartitionRequestPath(String prefix, String partitionName) {
     return prefix + "/" + RESTUtils.encodeString(partitionName);
+  }
+
+  @Override
+  public SupportsTags supportsTags() {
+    return this;
+  }
+
+  @Override
+  public String metalakeName() {
+    return namespace.level(0);
+  }
+
+  @Override
+  public MetadataObject metadataObject() {
+    return MetadataObjects.parse(tableFullName(namespace, name()), MetadataObject.Type.TABLE);
+  }
+
+  @Override
+  public RESTClient restClient() {
+    return restClient;
+  }
+
+  private static String tableFullName(Namespace tableNS, String tableName) {
+    return DOT_JOINER.join(tableNS.level(1), tableNS.level(2), tableName);
   }
 }

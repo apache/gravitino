@@ -24,6 +24,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
@@ -42,13 +44,15 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.tag.SupportsTags;
 
 /**
  * BaseSchemaCatalog is the base abstract class for all the catalog with schema. It provides the
  * common methods for managing schemas in a catalog. With {@link BaseSchemaCatalog}, users can list,
  * create, load, alter and drop a schema with specified identifier.
  */
-abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, SupportsSchemas {
+abstract class BaseSchemaCatalog extends CatalogDTO
+    implements Catalog, SupportsSchemas, SupportsTagOperations {
   /** The REST client to send the requests. */
   protected final RESTClient restClient;
 
@@ -75,6 +79,11 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
 
   @Override
   public SupportsSchemas asSchemas() throws UnsupportedOperationException {
+    return this;
+  }
+
+  @Override
+  public SupportsTags supportsTags() throws UnsupportedOperationException {
     return this;
   }
 
@@ -125,7 +134,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
             ErrorHandlers.schemaErrorHandler());
     resp.validate();
 
-    return resp.getSchema();
+    return new GenericSchema(resp.getSchema(), restClient, catalogNamespace.level(0), this.name());
   }
 
   /**
@@ -146,7 +155,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
             ErrorHandlers.schemaErrorHandler());
     resp.validate();
 
-    return resp.getSchema();
+    return new GenericSchema(resp.getSchema(), restClient, catalogNamespace.level(0), this.name());
   }
 
   /**
@@ -177,7 +186,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
             ErrorHandlers.schemaErrorHandler());
     resp.validate();
 
-    return resp.getSchema();
+    return new GenericSchema(resp.getSchema(), restClient, catalogNamespace.level(0), this.name());
   }
 
   /**
@@ -199,6 +208,21 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
             ErrorHandlers.schemaErrorHandler());
     resp.validate();
     return resp.dropped();
+  }
+
+  @Override
+  public String metalakeName() {
+    return catalogNamespace.level(0);
+  }
+
+  @Override
+  public MetadataObject metadataObject() {
+    return MetadataObjects.of(null, this.name(), MetadataObject.Type.CATALOG);
+  }
+
+  @Override
+  public RESTClient restClient() {
+    return restClient;
   }
 
   /**
