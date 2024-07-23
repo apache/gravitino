@@ -588,7 +588,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
   public void testUpdateIcebergColumnDefaultPosition() {
     Column col1 = Column.of("name", Types.StringType.get(), "comment");
     Column col2 = Column.of("address", Types.StringType.get(), "comment");
-    Column col3 = Column.of("date_of_birth", Types.DateType.get(), "comment");
+    Column col3 = Column.of("date_of_birth", Types.StringType.get(), "comment");
     Column[] newColumns = new Column[] {col1, col2, col3};
     NameIdentifier tableIdentifier =
         NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("CatalogIcebergIT_table"));
