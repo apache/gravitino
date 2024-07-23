@@ -51,23 +51,25 @@ public class TestTypeUtils {
     RowType rowType =
         RowType.builder()
             .fields(
-                DataTypes.VARCHAR(10),
-                DataTypes.STRING(),
                 DataTypes.BOOLEAN(),
-                DataTypes.BINARY(BinaryType.MAX_LENGTH),
-                DataTypes.DECIMAL(8, 3),
                 DataTypes.TINYINT(),
                 DataTypes.SMALLINT(),
                 DataTypes.INT(),
                 DataTypes.BIGINT(),
                 DataTypes.FLOAT(),
                 DataTypes.DOUBLE(),
+                DataTypes.DECIMAL(8, 3),
                 DataTypes.DATE(),
                 DataTypes.TIME(),
                 DataTypes.TIMESTAMP(),
                 DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(),
-                DataTypes.MAP(DataTypes.INT(), DataTypes.STRING()),
-                DataTypes.ARRAY(DataTypes.INT()))
+                DataTypes.STRING(),
+                DataTypes.VARCHAR(10),
+                DataTypes.CHAR(10),
+                DataTypes.BINARY(BinaryType.MAX_LENGTH),
+                DataTypes.VARBINARY(VarBinaryType.MAX_LENGTH),
+                DataTypes.ARRAY(DataTypes.INT()),
+                DataTypes.MAP(DataTypes.INT(), DataTypes.STRING()))
             .build();
 
     Type gravitinoDataType = toGravitinoDataType(rowType);
@@ -91,9 +93,7 @@ public class TestTypeUtils {
     Arrays.asList(
             Types.IntervalYearType.get(),
             Types.IntervalDayType.get(),
-            Types.FixedCharType.of(10),
             Types.UUIDType.get(),
-            Types.FixedType.of(20),
             Types.UnionType.of(Types.IntegerType.get()),
             Types.NullType.get(),
             Types.UnparsedType.of("unparsed"))
@@ -102,30 +102,8 @@ public class TestTypeUtils {
 
   private Type toGravitinoDataType(DataType dataType) {
     switch (dataType.getTypeRoot()) {
-      case VARCHAR:
-        if (((VarCharType) dataType).getLength() == Integer.MAX_VALUE) {
-          return checkDataType(dataType, Name.STRING);
-        } else {
-          return checkDataType(
-              dataType,
-              Name.VARCHAR,
-              type ->
-                  assertEquals(
-                      ((VarCharType) dataType).getLength(), ((Types.VarCharType) type).length()));
-        }
       case BOOLEAN:
         return checkDataType(dataType, Name.BOOLEAN);
-      case BINARY:
-        return checkDataType(dataType, Name.BINARY);
-      case DECIMAL:
-        return checkDataType(
-            dataType,
-            Name.DECIMAL,
-            type -> {
-              assertEquals(
-                  ((DecimalType) dataType).getPrecision(), ((Types.DecimalType) type).precision());
-              assertEquals(((DecimalType) dataType).getScale(), ((Types.DecimalType) type).scale());
-            });
       case TINYINT:
         return checkDataType(dataType, Name.BYTE);
       case SMALLINT:
@@ -138,6 +116,15 @@ public class TestTypeUtils {
         return checkDataType(dataType, Name.FLOAT);
       case DOUBLE:
         return checkDataType(dataType, Name.DOUBLE);
+      case DECIMAL:
+        return checkDataType(
+            dataType,
+            Name.DECIMAL,
+            type -> {
+              assertEquals(
+                  ((DecimalType) dataType).getPrecision(), ((Types.DecimalType) type).precision());
+              assertEquals(((DecimalType) dataType).getScale(), ((Types.DecimalType) type).scale());
+            });
       case DATE:
         return checkDataType(dataType, Name.DATE);
       case TIME_WITHOUT_TIME_ZONE:
@@ -152,6 +139,23 @@ public class TestTypeUtils {
             dataType,
             Name.TIMESTAMP,
             type -> assertTrue(((Types.TimestampType) type).hasTimeZone()));
+      case VARCHAR:
+        if (((VarCharType) dataType).getLength() == Integer.MAX_VALUE) {
+          return checkDataType(dataType, Name.STRING);
+        } else {
+          return checkDataType(
+              dataType,
+              Name.VARCHAR,
+              type ->
+                  assertEquals(
+                      ((VarCharType) dataType).getLength(), ((Types.VarCharType) type).length()));
+        }
+      case CHAR:
+        return checkDataType(dataType, Name.FIXEDCHAR);
+      case BINARY:
+        return checkDataType(dataType, Name.FIXED);
+      case VARBINARY:
+        return checkDataType(dataType, Name.BINARY);
       case ARRAY:
         return checkDataType(
             dataType,
