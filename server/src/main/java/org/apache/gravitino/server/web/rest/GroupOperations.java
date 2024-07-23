@@ -31,7 +31,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.authorization.AccessControlManager;
+import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.dto.requests.GroupAddRequest;
 import org.apache.gravitino.dto.responses.GroupResponse;
@@ -51,7 +51,7 @@ public class GroupOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(GroupOperations.class);
 
-  private final AccessControlManager accessControlManager;
+  private final AccessControlDispatcher accessControlManager;
 
   @Context private HttpServletRequest httpRequest;
 
@@ -59,7 +59,7 @@ public class GroupOperations {
     // Because accessManager may be null when Gravitino doesn't enable authorization,
     // and Jersey injection doesn't support null value. So GroupOperations chooses to retrieve
     // accessControlManager from GravitinoEnv instead of injection here.
-    this.accessControlManager = GravitinoEnv.getInstance().accessControlManager();
+    this.accessControlManager = GravitinoEnv.getInstance().accessControlDispatcher();
   }
 
   @GET
