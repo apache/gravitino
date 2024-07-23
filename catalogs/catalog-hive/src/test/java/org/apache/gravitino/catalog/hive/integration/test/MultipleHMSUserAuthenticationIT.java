@@ -22,8 +22,10 @@ package org.apache.gravitino.catalog.hive.integration.test;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+@Tag("gravitino-docker-test")
 public class MultipleHMSUserAuthenticationIT extends HiveUserAuthenticationIT {
   @BeforeAll
   static void setHiveURI() {
