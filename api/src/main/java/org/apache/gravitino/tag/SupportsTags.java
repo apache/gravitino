@@ -21,6 +21,7 @@ package org.apache.gravitino.tag;
 
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 
 /**
  * Interface for supporting getting or associate tags to objects. This interface will be mixed with
@@ -58,6 +59,8 @@ public interface SupportsTags {
    * @param tagsToAdd The arrays of tag name to be added to the object.
    * @param tagsToRemove The array of tag name to be removed from the object.
    * @return The array of tag names that are associated with the object.
+   * @throws TagAlreadyAssociatedException If the tag is already associated with the object.
    */
-  String[] associateTags(String[] tagsToAdd, String[] tagsToRemove);
+  String[] associateTags(String[] tagsToAdd, String[] tagsToRemove)
+      throws TagAlreadyAssociatedException;
 }
