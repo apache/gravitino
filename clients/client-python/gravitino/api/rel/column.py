@@ -18,12 +18,12 @@ under the License.
 """
 
 from abc import ABC, abstractmethod
-import dataclasses
+from dataclasses import dataclass
 
 from gravitino.api.rel.types.type import Type
 from gravitino.api.rel.expressions.expression import Expression
 
-@dataclasses.dataclass
+@dataclass
 class Column(ABC):
     """
     An interface representing a column of a Table. It defines basic properties of a column,
