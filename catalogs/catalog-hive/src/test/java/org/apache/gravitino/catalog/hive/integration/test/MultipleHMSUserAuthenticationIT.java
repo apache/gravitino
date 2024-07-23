@@ -33,8 +33,6 @@ public class MultipleHMSUserAuthenticationIT extends HiveUserAuthenticationIT {
     int port = HiveContainer.HIVE_METASTORE_PORT;
     // Multiple HMS URIs, I put the new one first to test the new HMS URI first.
     HIVE_METASTORE_URI = String.format("thrift://%s:1%d,thrift://%s:%d", ip, port, ip, port);
-
-
   }
 
   @Test
