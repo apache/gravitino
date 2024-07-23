@@ -19,12 +19,10 @@
 package org.apache.gravitino.catalog.lakehouse.iceberg.integration.test;
 
 import java.util.Map;
-import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
-import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
-import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergRESTService;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.server.web.JettyServerConfig;
-import org.apache.gravitino.utils.MapUtils;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
 
@@ -35,8 +33,8 @@ public class CatalogIcebergRestIT extends CatalogIcebergBaseIT {
   @Override
   protected void initIcebergCatalogProperties() {
     Map<String, String> map =
-        serverConfig.getConfigsWithPrefix(AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX);
-    map = MapUtils.getPrefixMap(map, IcebergRESTService.SERVICE_NAME + ".");
+        serverConfig.getConfigsWithPrefix(
+            String.format("gravitino.%s.", IcebergConstants.GRAVITINO_ICEBERG_REST_SERVICE_NAME));
     IcebergConfig icebergConfig = new IcebergConfig(map);
     String host = icebergConfig.get(JettyServerConfig.WEBSERVER_HOST);
     int port = icebergConfig.get(JettyServerConfig.WEBSERVER_HTTP_PORT);

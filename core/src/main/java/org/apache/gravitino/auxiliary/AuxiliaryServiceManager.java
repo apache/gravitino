@@ -35,6 +35,7 @@ import java.util.ServiceLoader;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Config;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.apache.gravitino.utils.MapUtils;
 import org.slf4j.Logger;
@@ -44,6 +45,7 @@ import org.slf4j.LoggerFactory;
  * AuxiliaryServiceManager manage all GravitinoAuxiliaryServices with isolated classloader provided
  */
 public class AuxiliaryServiceManager {
+
   private static final Logger LOG = LoggerFactory.getLogger(AuxiliaryServiceManager.class);
   public static final String GRAVITINO_AUX_SERVICE_PREFIX = "gravitino.auxService.";
   public static final String AUX_SERVICE_NAMES = "names";
@@ -124,7 +126,7 @@ public class AuxiliaryServiceManager {
         StringUtils.isNoneBlank(classpath),
         String.format(
             "AuxService:%s, %s%s.%s is not set in configuration",
-            auxServiceName, GRAVITINO_AUX_SERVICE_PREFIX, auxServiceName, AUX_SERVICE_CLASSPATH));
+            auxServiceName, "gravitino.", auxServiceName, AUX_SERVICE_CLASSPATH));
 
     List<String> validPaths =
         splitter
@@ -180,15 +182,16 @@ public class AuxiliaryServiceManager {
     }
   }
 
-  public void serviceInit(Map<String, String> config) {
-    registerAuxServices(config);
+  public void serviceInit(Config gravitinoConfig) {
+    Map<String, String> serviceConfigs = extractAuxiliaryServiceConfigs(gravitinoConfig);
+    registerAuxServices(serviceConfigs);
     auxServices.forEach(
         (auxServiceName, auxService) -> {
           doWithClassLoader(
               auxServiceName,
               cl ->
                   auxService.serviceInit(
-                      MapUtils.getPrefixMap(config, DOT.join(auxServiceName, ""))));
+                      MapUtils.getPrefixMap(serviceConfigs, DOT.join(auxServiceName, ""))));
         });
   }
 
@@ -217,6 +220,55 @@ public class AuxiliaryServiceManager {
         });
     if (firstException != null) {
       throw firstException;
+    }
+  }
+
+  // Extract aux service configs, transform gravitino.$serviceName.key to $serviceName.key.
+  // And will transform gravitino.auxService.$serviceName.key to $serviceName.key to keep
+  // compatibility.
+  @VisibleForTesting
+  static Map<String, String> extractAuxiliaryServiceConfigs(Config config) {
+    String auxServiceNames =
+        config
+            .getConfigsWithPrefix(GRAVITINO_AUX_SERVICE_PREFIX)
+            .getOrDefault(AUX_SERVICE_NAMES, "");
+    Map<String, String> serviceConfigs = new HashMap<>();
+    serviceConfigs.put(AUX_SERVICE_NAMES, auxServiceNames);
+    config
+        .getAllConfig()
+        .forEach(
+            (k, v) -> {
+              if (k.startsWith(GRAVITINO_AUX_SERVICE_PREFIX)) {
+                String extractKey = k.substring(GRAVITINO_AUX_SERVICE_PREFIX.length());
+                LOG.warn(
+                    "The configuration {} is deprecated(still working), please use gravitino.{} instead.",
+                    k,
+                    extractKey);
+                serviceConfigs.put(extractKey, v);
+              }
+            });
+    splitter
+        .omitEmptyStrings()
+        .trimResults()
+        .splitToStream(auxServiceNames)
+        .forEach(
+            name ->
+                config.getAllConfig().forEach((k, v) -> extractConfig(serviceConfigs, name, k, v)));
+    return serviceConfigs;
+  }
+
+  private static void extractConfig(
+      Map<String, String> serverConfig, String serverName, String configKey, String configValue) {
+    if (configKey.startsWith(String.format("gravitino.%s.", serverName))) {
+      String extractedKey = configKey.substring("gravitino.".length());
+      String originValue = serverConfig.put(extractedKey, configValue);
+      if (originValue != null) {
+        LOG.warn(
+            "The configuration {}{} is overwritten by {}",
+            GRAVITINO_AUX_SERVICE_PREFIX,
+            extractedKey,
+            configKey);
+      }
     }
   }
 }
