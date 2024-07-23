@@ -72,7 +72,7 @@ class BaseHadoopEnvironment:
     @classmethod
     def _configure_hadoop_environment(cls):
         logger.info("Configure hadoop environment.")
-        os.putenv("HADOOP_USER_NAME", "datastrato")
+        os.putenv("HADOOP_USER_NAME", "anonymous")
         os.putenv("HADOOP_HOME", f"{PYTHON_BUILD_PATH}/hadoop/hadoop-{HADOOP_VERSION}")
         os.putenv(
             "HADOOP_CONF_DIR",

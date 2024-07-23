@@ -34,6 +34,11 @@ public class AuthenticationConfig extends Config {
 
   public static final String IMPERSONATION_ENABLE_KEY = "authentication.impersonation-enable";
 
+  enum AuthenticationType {
+    SIMPLE,
+    KERBEROS
+  }
+
   public static final boolean KERBEROS_DEFAULT_IMPERSONATION_ENABLE = false;
 
   public AuthenticationConfig(Map<String, String> properties) {
@@ -62,6 +67,14 @@ public class AuthenticationConfig extends Config {
 
   public boolean isImpersonationEnabled() {
     return get(ENABLE_IMPERSONATION_ENTRY);
+  }
+
+  public boolean isSimpleAuth() {
+    return AuthenticationType.SIMPLE.name().equalsIgnoreCase(getAuthType());
+  }
+
+  public boolean isKerberosAuth() {
+    return AuthenticationType.KERBEROS.name().equalsIgnoreCase(getAuthType());
   }
 
   public static final Map<String, PropertyEntry<?>> AUTHENTICATION_PROPERTY_ENTRIES =
