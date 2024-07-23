@@ -29,16 +29,32 @@ import static org.mockito.Mockito.verify;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
+import java.util.Map;
+import org.apache.gravitino.Config;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestAuxiliaryServiceManager {
 
+  static class DummyConfig extends Config {
+
+    public static DummyConfig of(Map<String, String> m) {
+      DummyConfig dummyConfig = new DummyConfig();
+      dummyConfig.loadFromMap(m, k -> true);
+      return dummyConfig;
+    }
+  }
+
   @Test
   public void testGravitinoAuxServiceManagerEmptyServiceName() throws Exception {
     AuxiliaryServiceManager auxServiceManager = new AuxiliaryServiceManager();
-    auxServiceManager.serviceInit(ImmutableMap.of(AuxiliaryServiceManager.AUX_SERVICE_NAMES, ""));
+    auxServiceManager.serviceInit(
+        DummyConfig.of(
+            ImmutableMap.of(
+                AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+                    + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
+                "")));
     auxServiceManager.serviceStart();
     auxServiceManager.serviceStop();
   }
@@ -50,7 +66,11 @@ public class TestAuxiliaryServiceManager {
         IllegalArgumentException.class,
         () ->
             auxServiceManager.serviceInit(
-                ImmutableMap.of(AuxiliaryServiceManager.AUX_SERVICE_NAMES, "mock1")));
+                DummyConfig.of(
+                    ImmutableMap.of(
+                        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+                            + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
+                        "mock1"))));
   }
 
   @Test
@@ -70,13 +90,15 @@ public class TestAuxiliaryServiceManager {
     doReturn(auxService2).when(spyAuxManager).loadAuxService("mock2", isolatedClassLoader);
 
     spyAuxManager.serviceInit(
-        ImmutableMap.of(
-            AuxiliaryServiceManager.AUX_SERVICE_NAMES,
-            "mock1,mock2",
-            "mock1." + AuxiliaryServiceManager.AUX_SERVICE_CLASSPATH,
-            "/tmp",
-            "mock2." + AuxiliaryServiceManager.AUX_SERVICE_CLASSPATH,
-            "/tmp"));
+        DummyConfig.of(
+            ImmutableMap.of(
+                AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+                    + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
+                "mock1,mock2",
+                "gravitino.mock1." + AuxiliaryServiceManager.AUX_SERVICE_CLASSPATH,
+                "/tmp",
+                "gravitino.mock2." + AuxiliaryServiceManager.AUX_SERVICE_CLASSPATH,
+                "/tmp")));
     verify(auxService, times(1)).serviceInit(any());
     verify(auxService2, times(1)).serviceInit(any());
 
@@ -87,5 +109,54 @@ public class TestAuxiliaryServiceManager {
     spyAuxManager.serviceStop();
     verify(auxService, times(1)).serviceStop();
     verify(auxService2, times(1)).serviceStop();
+  }
+
+  @Test
+  void testAuxiliaryServiceConfigs() {
+    Map<String, String> m =
+        ImmutableMap.of(
+            AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+                + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
+            "a,b",
+            "gravitino.a.test1",
+            "test1",
+            AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX + "a.test4",
+            "test4",
+            "gravitino.b.test2",
+            "test2",
+            "gravitino.aa.test3",
+            "test3");
+    DummyConfig config = new DummyConfig();
+    config.loadFromMap(m, k -> true);
+    Map<String, String> serviceConfigs =
+        AuxiliaryServiceManager.extractAuxiliaryServiceConfigs(config);
+    Assertions.assertEquals(
+        ImmutableMap.of(
+            AuxiliaryServiceManager.AUX_SERVICE_NAMES,
+            "a,b",
+            "a.test1",
+            "test1",
+            "a.test4",
+            "test4",
+            "b.test2",
+            "test2"),
+        serviceConfigs);
+
+    // Test gravitino.a.test1 overwrite gravitino.auxService.a.test1
+    m =
+        ImmutableMap.of(
+            AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+                + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
+            "a",
+            "gravitino.a.test1",
+            "test1",
+            AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX + "a.test1",
+            "test4");
+    DummyConfig config2 = new DummyConfig();
+    config2.loadFromMap(m, k -> true);
+    serviceConfigs = AuxiliaryServiceManager.extractAuxiliaryServiceConfigs(config2);
+    Assertions.assertEquals(
+        ImmutableMap.of(AuxiliaryServiceManager.AUX_SERVICE_NAMES, "a", "a.test1", "test1"),
+        serviceConfigs);
   }
 }

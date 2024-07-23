@@ -32,10 +32,10 @@ val artifactName = "gravitino-${project.name}-$scalaVersion"
 
 dependencies {
   implementation(project(":api"))
+  implementation(project(":catalogs:catalog-common"))
   implementation(project(":common"))
   implementation(project(":core"))
   implementation(project(":clients:client-java"))
-  implementation(project(":catalogs:bundled-catalog", configuration = "shadow"))
 
   implementation(libs.bundles.log4j)
   implementation(libs.commons.lang3)

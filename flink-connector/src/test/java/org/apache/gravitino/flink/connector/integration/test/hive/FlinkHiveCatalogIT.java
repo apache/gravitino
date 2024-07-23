@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.flink.connector.integration.test.hive;
 
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 import static org.apache.gravitino.flink.connector.integration.test.utils.TestUtils.assertColumns;
 
 import com.google.common.base.Preconditions;
@@ -42,6 +41,7 @@ import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOptions;
 import org.apache.flink.types.Row;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.apache.gravitino.flink.connector.PropertiesConverter;
 import org.apache.gravitino.flink.connector.hive.GravitinoHiveCatalog;
 import org.apache.gravitino.flink.connector.hive.GravitinoHiveCatalogFactoryOptions;
@@ -109,7 +109,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
     // Check the catalog properties.
     org.apache.gravitino.Catalog gravitinoCatalog = metalake.loadCatalog(catalogName);
     Map<String, String> properties = gravitinoCatalog.properties();
-    Assertions.assertEquals(hiveMetastoreUri, properties.get(METASTORE_URIS));
+    Assertions.assertEquals(hiveMetastoreUri, properties.get(HiveConstants.METASTORE_URIS));
     Map<String, String> flinkProperties =
         gravitinoCatalog.properties().entrySet().stream()
             .filter(e -> e.getKey().startsWith(PropertiesConverter.FLINK_PROPERTY_PREFIX))
@@ -175,7 +175,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
     // Check the properties of the created catalog.
     org.apache.gravitino.Catalog gravitinoCatalog = metalake.loadCatalog(catalogName);
     Map<String, String> properties = gravitinoCatalog.properties();
-    Assertions.assertEquals(hiveMetastoreUri, properties.get(METASTORE_URIS));
+    Assertions.assertEquals(hiveMetastoreUri, properties.get(HiveConstants.METASTORE_URIS));
     Map<String, String> flinkProperties =
         properties.entrySet().stream()
             .filter(e -> e.getKey().startsWith(PropertiesConverter.FLINK_PROPERTY_PREFIX))
