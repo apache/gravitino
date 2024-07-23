@@ -31,7 +31,7 @@ val icebergVersion: String = libs.versions.iceberg.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
 dependencies {
-  implementation(project(":catalogs:bundled-catalog", configuration = "shadow"))
+  implementation(project(":catalogs:catalog-common"))
   implementation(project(":core"))
   implementation(project(":common"))
   implementation(project(":iceberg:iceberg-common"))
