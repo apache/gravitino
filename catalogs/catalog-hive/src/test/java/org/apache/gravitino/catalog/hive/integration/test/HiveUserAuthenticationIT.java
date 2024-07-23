@@ -87,10 +87,10 @@ public class HiveUserAuthenticationIT extends AbstractIT {
 
   protected static HiveContainer kerberosHiveContainer;
 
-  private static final String METALAKE_NAME = GravitinoITUtils.genRandomName("test_metalake");
-  private static final String CATALOG_NAME = GravitinoITUtils.genRandomName("test_catalog");
-  private static final String SCHEMA_NAME = GravitinoITUtils.genRandomName("test_schema");
-  private static final String TABLE_NAME = GravitinoITUtils.genRandomName("test_table");
+  static String METALAKE_NAME = GravitinoITUtils.genRandomName("test_metalake");
+  static String CATALOG_NAME = GravitinoITUtils.genRandomName("test_catalog");
+  static String SCHEMA_NAME = GravitinoITUtils.genRandomName("test_schema");
+  static String TABLE_NAME = GravitinoITUtils.genRandomName("test_table");
 
   private static final String HIVE_COL_NAME1 = "col1";
   private static final String HIVE_COL_NAME2 = "col2";
@@ -205,10 +205,6 @@ public class HiveUserAuthenticationIT extends AbstractIT {
             .withKeyTabFile(new File(TMP_DIR + GRAVITINO_CLIENT_KEYTAB))
             .build();
     adminClient = GravitinoAdminClient.builder(serverUri).withKerberosAuth(provider).build();
-
-    GravitinoMetalake[] metalakes = adminClient.listMetalakes();
-    Assertions.assertEquals(0, metalakes.length);
-
     GravitinoMetalake gravitinoMetalake =
         adminClient.createMetalake(METALAKE_NAME, null, ImmutableMap.of());
 
@@ -275,6 +271,12 @@ public class HiveUserAuthenticationIT extends AbstractIT {
 
     // Drop catalog
     Assertions.assertTrue(gravitinoMetalake.dropCatalog(CATALOG_NAME));
+  }
+
+  @AfterAll
+  static void restoreFilePermission() {
+    kerberosHiveContainer.executeInContainer(
+        "hadoop", "fs", "-chmod", "-R", "755", "/user/hive/warehouse");
   }
 
   private static Column[] createColumns() {

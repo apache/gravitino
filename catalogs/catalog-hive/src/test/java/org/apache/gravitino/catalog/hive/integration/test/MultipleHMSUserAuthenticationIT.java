@@ -20,7 +20,9 @@
 package org.apache.gravitino.catalog.hive.integration.test;
 
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 public class MultipleHMSUserAuthenticationIT extends HiveUserAuthenticationIT {
   @BeforeAll
@@ -29,5 +31,16 @@ public class MultipleHMSUserAuthenticationIT extends HiveUserAuthenticationIT {
     int port = HiveContainer.HIVE_METASTORE_PORT;
     // Multiple HMS URIs, I put the new one first to test the new HMS URI first.
     HIVE_METASTORE_URI = String.format("thrift://%s:1%d,thrift://%s:%d", ip, port, ip, port);
+
+
+  }
+
+  @Test
+  public void testUserAuthentication() {
+    METALAKE_NAME = GravitinoITUtils.genRandomName("test_metalake");
+    CATALOG_NAME = GravitinoITUtils.genRandomName("test_catalog");
+    SCHEMA_NAME = GravitinoITUtils.genRandomName("test_schema");
+    TABLE_NAME = GravitinoITUtils.genRandomName("test_table");
+    super.testUserAuthentication();
   }
 }
