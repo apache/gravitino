@@ -36,7 +36,7 @@ import org.apache.flink.types.Row;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
-import org.apache.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
+import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.apache.gravitino.flink.connector.integration.test.utils.TestUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -91,7 +91,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
             Assertions.assertEquals(2, loadedSchema.properties().size());
             Assertions.assertEquals(propertyValue, loadedSchema.properties().get(propertyKey));
             Assertions.assertEquals(
-                location, loadedSchema.properties().get(HiveSchemaPropertiesMetadata.LOCATION));
+                location, loadedSchema.properties().get(HiveConstants.LOCATION));
           } finally {
             catalog.asSchemas().dropSchema(schema, true);
             Assertions.assertFalse(catalog.asSchemas().schemaExists(schema));

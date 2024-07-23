@@ -163,7 +163,7 @@ allprojects {
       // Default use MiniGravitino to run integration tests
       param.environment("GRAVITINO_ROOT_DIR", project.rootDir.path)
       param.environment("IT_PROJECT_DIR", project.buildDir.path)
-      param.environment("HADOOP_USER_NAME", "datastrato")
+      param.environment("HADOOP_USER_NAME", "anonymous")
       param.environment("HADOOP_HOME", "/tmp")
       param.environment("PROJECT_VERSION", project.version)
 
@@ -690,8 +690,14 @@ fun printDockerCheckInfo() {
   val dockerRunning = project.extra["dockerRunning"] as? Boolean ?: false
   val macDockerConnector = project.extra["macDockerConnector"] as? Boolean ?: false
   val isOrbStack = project.extra["isOrbStack"] as? Boolean ?: false
-
-  if (extra["skipDockerTests"].toString().toBoolean()) {
+  val skipDockerTests = if (extra["skipDockerTests"].toString().toBoolean()) {
+    // Read the environment variable (SKIP_DOCKER_TESTS) when skipDockerTests is true
+    // which means users can enable the docker tests by setting the gradle properties or the environment variable.
+    System.getenv("SKIP_DOCKER_TESTS")?.toBoolean() ?: true
+  } else {
+    false
+  }
+  if (skipDockerTests) {
     project.extra["dockerTest"] = false
   } else if (OperatingSystem.current().isMacOsX() &&
     dockerRunning &&

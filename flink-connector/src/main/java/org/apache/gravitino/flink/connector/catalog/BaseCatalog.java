@@ -20,7 +20,6 @@
 package org.apache.gravitino.flink.connector.catalog;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.MapDifference;
 import com.google.common.collect.Maps;
 import java.util.Arrays;
@@ -67,11 +66,13 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.PropertiesConverter;
 import org.apache.gravitino.flink.connector.utils.TypeUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.transforms.Transform;
 
 /**
  * The BaseCatalog that provides a default implementation for all methods in the {@link
@@ -79,11 +80,15 @@ import org.apache.gravitino.rel.TableChange;
  */
 public abstract class BaseCatalog extends AbstractCatalog {
   private final PropertiesConverter propertiesConverter;
+  private final PartitionConverter partitionConverter;
 
   protected BaseCatalog(String catalogName, String defaultDatabase) {
     super(catalogName, defaultDatabase);
     this.propertiesConverter = getPropertiesConverter();
+    this.partitionConverter = getPartitionConverter();
   }
+
+  protected abstract AbstractCatalog realCatalog();
 
   @Override
   public void open() throws CatalogException {}
@@ -260,8 +265,10 @@ public abstract class BaseCatalog extends AbstractCatalog {
     String comment = table.getComment();
     Map<String, String> properties =
         propertiesConverter.toGravitinoTableProperties(table.getOptions());
+    Transform[] partitions =
+        partitionConverter.toGravitinoPartitions(((CatalogTable) table).getPartitionKeys());
     try {
-      catalog().asTableCatalog().createTable(identifier, columns, comment, properties);
+      catalog().asTableCatalog().createTable(identifier, columns, comment, properties, partitions);
     } catch (NoSuchSchemaException e) {
       throw new DatabaseNotExistException(catalogName(), tablePath.getDatabaseName(), e);
     } catch (TableAlreadyExistsException e) {
@@ -280,37 +287,36 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   @Override
-  public List<CatalogPartitionSpec> listPartitions(ObjectPath objectPath)
+  public List<CatalogPartitionSpec> listPartitions(ObjectPath tablePath)
       throws TableNotExistException, TableNotPartitionedException, CatalogException {
-    throw new UnsupportedOperationException();
+    return realCatalog().listPartitions(tablePath);
   }
 
   @Override
   public List<CatalogPartitionSpec> listPartitions(
-      ObjectPath objectPath, CatalogPartitionSpec catalogPartitionSpec)
+      ObjectPath tablePath, CatalogPartitionSpec partitionSpec)
       throws TableNotExistException, TableNotPartitionedException, PartitionSpecInvalidException,
           CatalogException {
-    throw new UnsupportedOperationException();
+    return realCatalog().listPartitions(tablePath, partitionSpec);
   }
 
   @Override
   public List<CatalogPartitionSpec> listPartitionsByFilter(
-      ObjectPath objectPath, List<Expression> list)
+      ObjectPath tablePath, List<Expression> filter)
       throws TableNotExistException, TableNotPartitionedException, CatalogException {
-    throw new UnsupportedOperationException();
+    return realCatalog().listPartitionsByFilter(tablePath, filter);
   }
 
   @Override
-  public CatalogPartition getPartition(
-      ObjectPath objectPath, CatalogPartitionSpec catalogPartitionSpec)
+  public CatalogPartition getPartition(ObjectPath tablePath, CatalogPartitionSpec partitionSpec)
       throws PartitionNotExistException, CatalogException {
-    throw new UnsupportedOperationException();
+    return realCatalog().getPartition(tablePath, partitionSpec);
   }
 
   @Override
-  public boolean partitionExists(ObjectPath objectPath, CatalogPartitionSpec catalogPartitionSpec)
+  public boolean partitionExists(ObjectPath tablePath, CatalogPartitionSpec partitionSpec)
       throws CatalogException {
-    throw new UnsupportedOperationException();
+    return realCatalog().partitionExists(tablePath, partitionSpec);
   }
 
   @Override
@@ -347,9 +353,9 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   @Override
-  public CatalogFunction getFunction(ObjectPath objectPath)
+  public CatalogFunction getFunction(ObjectPath tablePath)
       throws FunctionNotExistException, CatalogException {
-    throw new UnsupportedOperationException();
+    return realCatalog().getFunction(tablePath);
   }
 
   @Override
@@ -376,29 +382,29 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   @Override
-  public CatalogTableStatistics getTableStatistics(ObjectPath objectPath)
+  public CatalogTableStatistics getTableStatistics(ObjectPath tablePath)
       throws TableNotExistException, CatalogException {
-    throw new UnsupportedOperationException();
+    return realCatalog().getTableStatistics(tablePath);
   }
 
   @Override
-  public CatalogColumnStatistics getTableColumnStatistics(ObjectPath objectPath)
+  public CatalogColumnStatistics getTableColumnStatistics(ObjectPath tablePath)
       throws TableNotExistException, CatalogException {
-    throw new UnsupportedOperationException();
+    return realCatalog().getTableColumnStatistics(tablePath);
   }
 
   @Override
   public CatalogTableStatistics getPartitionStatistics(
-      ObjectPath objectPath, CatalogPartitionSpec catalogPartitionSpec)
+      ObjectPath tablePath, CatalogPartitionSpec partitionSpec)
       throws PartitionNotExistException, CatalogException {
-    throw new UnsupportedOperationException();
+    return realCatalog().getPartitionStatistics(tablePath, partitionSpec);
   }
 
   @Override
   public CatalogColumnStatistics getPartitionColumnStatistics(
-      ObjectPath objectPath, CatalogPartitionSpec catalogPartitionSpec)
+      ObjectPath tablePath, CatalogPartitionSpec partitionSpec)
       throws PartitionNotExistException, CatalogException {
-    throw new UnsupportedOperationException();
+    return realCatalog().getPartitionColumnStatistics(tablePath, partitionSpec);
   }
 
   @Override
@@ -437,6 +443,8 @@ public abstract class BaseCatalog extends AbstractCatalog {
 
   protected abstract PropertiesConverter getPropertiesConverter();
 
+  protected abstract PartitionConverter getPartitionConverter();
+
   protected CatalogBaseTable toFlinkTable(Table table) {
     org.apache.flink.table.api.Schema.Builder builder =
         org.apache.flink.table.api.Schema.newBuilder();
@@ -448,8 +456,8 @@ public abstract class BaseCatalog extends AbstractCatalog {
     }
     Map<String, String> flinkTableProperties =
         propertiesConverter.toFlinkTableProperties(table.properties());
-    return CatalogTable.of(
-        builder.build(), table.comment(), ImmutableList.of(), flinkTableProperties);
+    List<String> partitionKeys = partitionConverter.toFlinkPartitionKeys(table.partitioning());
+    return CatalogTable.of(builder.build(), table.comment(), partitionKeys, flinkTableProperties);
   }
 
   private Column toGravitinoColumn(org.apache.flink.table.catalog.Column column) {

@@ -67,28 +67,14 @@ public interface Privilege {
     PRODUCE_TOPIC(0L, 1L << 12),
     /** The privilege to consume from a topic. */
     CONSUME_TOPIC(0L, 1L << 13),
-    /** The privilege to add a user */
-    ADD_USER(0L, 1L << 14),
-    /** The privilege to remove a user */
-    REMOVE_USER(0L, 1L << 15),
-    /** The privilege to get a user */
-    GET_USER(0L, 1L << 16),
-    /** The privilege to add a group */
-    ADD_GROUP(0L, 1L << 17),
-    /** The privilege to remove a group */
-    REMOVE_GROUP(0L, 1L << 18),
-    /** The privilege to get a group */
-    GET_GROUP(0L, 1L << 19),
+    /** The privilege to create a user */
+    CREATE_USER(0L, 1L << 14),
+    /** The privilege to create a group */
+    CREATE_GROUP(0L, 1L << 15),
     /** The privilege to create a role */
-    CREATE_ROLE(0L, 1L << 20),
-    /** The privilege to delete a role */
-    DELETE_ROLE(0L, 1L << 21),
-    /** The privilege to grant a role to the user or the group. */
-    GRANT_ROLE(0L, 1L << 22),
-    /** The privilege to revoke a role from the user or the group. */
-    REVOKE_ROLE(0L, 1L << 23),
-    /** The privilege to get a role */
-    GET_ROLE(0L, 1L << 24);
+    CREATE_ROLE(0L, 1L << 16),
+    /** The privilege to grant or revoke a role for the user or the group. */
+    MANAGE_GRANTS(0L, 1L << 17);
 
     private final long highBits;
     private final long lowBits;
