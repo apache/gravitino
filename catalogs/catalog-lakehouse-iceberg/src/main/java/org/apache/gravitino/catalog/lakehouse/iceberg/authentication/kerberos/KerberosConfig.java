@@ -80,6 +80,7 @@ public class KerberosConfig extends AuthenticationConfig {
     loadFromMap(properties, k -> true);
   }
 
+  @Override
   public boolean isImpersonationEnabled() {
     return get(ENABLE_IMPERSONATION_ENTRY);
   }
