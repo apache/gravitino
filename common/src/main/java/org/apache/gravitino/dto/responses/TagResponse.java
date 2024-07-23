@@ -20,61 +20,43 @@ package org.apache.gravitino.dto.responses;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import java.util.Arrays;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.dto.CatalogDTO;
+import org.apache.gravitino.dto.tag.TagDTO;
 
-/** Represents a response for a list of catalogs with their information. */
+/** Represents a response for a tag. */
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
-public class CatalogListResponse extends BaseResponse {
+public class TagResponse extends BaseResponse {
 
-  @JsonProperty("catalogs")
-  private final CatalogDTO[] catalogs;
+  @JsonProperty("tag")
+  private final TagDTO tag;
 
   /**
-   * Creates a new CatalogListResponse.
+   * Creates a new TagResponse.
    *
-   * @param catalogs The list of catalogs.
+   * @param tag The tag.
    */
-  public CatalogListResponse(CatalogDTO[] catalogs) {
+  public TagResponse(TagDTO tag) {
     super(0);
-    this.catalogs = catalogs;
+    this.tag = tag;
   }
 
   /**
    * This is the constructor that is used by Jackson deserializer to create an instance of
-   * CatalogListResponse.
+   * TagResponse.
    */
-  public CatalogListResponse() {
+  public TagResponse() {
     super();
-    this.catalogs = null;
+    this.tag = null;
   }
 
-  /**
-   * Validates the response data.
-   *
-   * @throws IllegalArgumentException if name, type or audit information is not set.
-   */
   @Override
   public void validate() throws IllegalArgumentException {
     super.validate();
 
-    Preconditions.checkArgument(catalogs != null, "catalogs must be non-null");
-    Arrays.stream(catalogs)
-        .forEach(
-            catalog -> {
-              Preconditions.checkArgument(
-                  StringUtils.isNotBlank(catalog.name()),
-                  "catalog 'name' must not be null and empty");
-              Preconditions.checkArgument(
-                  catalog.type() != null, "catalog 'type' must not be null");
-              Preconditions.checkArgument(
-                  catalog.auditInfo() != null, "catalog 'audit' must not be null");
-            });
+    Preconditions.checkArgument(tag != null, "\"tag\" must not be null");
   }
 }
