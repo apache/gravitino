@@ -25,6 +25,7 @@ public class SparkTableChangeConverter34 extends SparkTableChangeConverter {
     super(sparkTypeConverter);
   }
 
+  @Override
   public org.apache.gravitino.rel.TableChange toGravitinoTableChange(TableChange change) {
     if (change instanceof TableChange.UpdateColumnDefaultValue) {
       TableChange.UpdateColumnDefaultValue updateColumnDefaultValue =
