@@ -21,11 +21,9 @@ package org.apache.gravitino.proto;
 import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.authorization.Privilege;
-import org.apache.gravitino.authorization.Privileges;
-import org.apache.gravitino.authorization.SecurableObject;
-import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.authorization.*;
 import org.apache.gravitino.meta.RoleEntity;
 
 public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
@@ -44,7 +42,7 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
             .setName(roleEntity.name())
             .setAuditInfo(new AuditInfoSerDe().serialize(roleEntity.auditInfo()));
 
-    for (SecurableObject securableObject : roleEntity.securableObjects()) {
+    for (org.apache.gravitino.authorization.SecurableObject securableObject : roleEntity.securableObjects()) {
       builder.addSecurableObjects(
           org.apache.gravitino.proto.SecurableObject.newBuilder()
               .setFullName(securableObject.fullName())
@@ -77,7 +75,7 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
    */
   @Override
   public RoleEntity deserialize(Role role, Namespace namespace) {
-    List<SecurableObject> securableObjects = Lists.newArrayList();
+    List<org.apache.gravitino.authorization.SecurableObject> securableObjects = Lists.newArrayList();
 
     for (int index = 0; index < role.getSecurableObjectsCount(); index++) {
       List<Privilege> privileges = Lists.newArrayList();
@@ -90,9 +88,9 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
         }
       }
 
-      SecurableObject securableObject =
-          SecurableObjects.parse(
-              object.getFullName(), SecurableObject.Type.valueOf(object.getType()), privileges);
+      org.apache.gravitino.authorization.SecurableObject securableObject =
+
+        SecurableObjects.parse(object.getFullName(), MetadataObject.Type.valueOf(object.getType()), privileges);
 
       securableObjects.add(securableObject);
     }
