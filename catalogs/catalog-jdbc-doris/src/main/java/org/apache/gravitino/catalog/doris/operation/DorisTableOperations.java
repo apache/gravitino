@@ -388,7 +388,7 @@ public class DorisTableOperations extends JdbcTableOperations {
             "Table {}.{} schema-change execution status: {}",
             databaseName,
             tableName,
-            jobStatus.toString());
+            jobStatus);
       }
 
     } catch (SQLException e) {
