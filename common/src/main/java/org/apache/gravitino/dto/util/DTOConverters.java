@@ -22,9 +22,11 @@ import static org.apache.gravitino.rel.expressions.transforms.Transforms.NAME_OF
 
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.authorization.Group;
@@ -68,6 +70,8 @@ import org.apache.gravitino.dto.rel.partitions.IdentityPartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.ListPartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.PartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.RangePartitionDTO;
+import org.apache.gravitino.dto.tag.MetadataObjectDTO;
+import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.rel.Column;
@@ -92,6 +96,7 @@ import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.partitions.RangePartition;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.tag.Tag;
 
 /** Utility class for converting between DTOs and domain objects. */
 public class DTOConverters {
@@ -463,6 +468,39 @@ public class DTOConverters {
         .withName(privilege.name())
         .withCondition(privilege.condition())
         .build();
+  }
+
+  /**
+   * Converts a MetadataObject to a MetadataObjectDTO.
+   *
+   * @param metadataObject The metadata object to be converted.
+   * @return The metadata object DTO.
+   */
+  public static MetadataObjectDTO toDTO(MetadataObject metadataObject) {
+    return MetadataObjectDTO.builder()
+        .withParent(metadataObject.parent())
+        .withName(metadataObject.name())
+        .withType(metadataObject.type())
+        .build();
+  }
+
+  /**
+   * Converts a Tag to a TagDTO.
+   *
+   * @param tag The tag to be converted.
+   * @param inherited The inherited flag.
+   * @return The tag DTO.
+   */
+  public static TagDTO toDTO(Tag tag, Optional<Boolean> inherited) {
+    TagDTO.Builder builder =
+        TagDTO.builder()
+            .withName(tag.name())
+            .withComment(tag.comment())
+            .withProperties(tag.properties())
+            .withAudit(toDTO(tag.auditInfo()))
+            .withInherited(inherited);
+
+    return builder.build();
   }
 
   /**

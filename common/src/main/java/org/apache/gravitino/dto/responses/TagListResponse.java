@@ -24,57 +24,42 @@ import java.util.Arrays;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.dto.CatalogDTO;
+import org.apache.gravitino.dto.tag.TagDTO;
 
-/** Represents a response for a list of catalogs with their information. */
+/** Represents a response for a list of tags. */
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
-public class CatalogListResponse extends BaseResponse {
+public class TagListResponse extends BaseResponse {
 
-  @JsonProperty("catalogs")
-  private final CatalogDTO[] catalogs;
+  @JsonProperty("tags")
+  private final TagDTO[] tags;
 
   /**
-   * Creates a new CatalogListResponse.
+   * Creates a new TagListResponse.
    *
-   * @param catalogs The list of catalogs.
+   * @param tags The list of tags.
    */
-  public CatalogListResponse(CatalogDTO[] catalogs) {
+  public TagListResponse(TagDTO[] tags) {
     super(0);
-    this.catalogs = catalogs;
+    this.tags = tags;
   }
 
   /**
    * This is the constructor that is used by Jackson deserializer to create an instance of
-   * CatalogListResponse.
+   * TagListResponse.
    */
-  public CatalogListResponse() {
+  public TagListResponse() {
     super();
-    this.catalogs = null;
+    this.tags = null;
   }
 
-  /**
-   * Validates the response data.
-   *
-   * @throws IllegalArgumentException if name, type or audit information is not set.
-   */
   @Override
   public void validate() throws IllegalArgumentException {
     super.validate();
 
-    Preconditions.checkArgument(catalogs != null, "catalogs must be non-null");
-    Arrays.stream(catalogs)
-        .forEach(
-            catalog -> {
-              Preconditions.checkArgument(
-                  StringUtils.isNotBlank(catalog.name()),
-                  "catalog 'name' must not be null and empty");
-              Preconditions.checkArgument(
-                  catalog.type() != null, "catalog 'type' must not be null");
-              Preconditions.checkArgument(
-                  catalog.auditInfo() != null, "catalog 'audit' must not be null");
-            });
+    Preconditions.checkArgument(tags != null, "\"tags\" must not be null");
+    Arrays.stream(tags)
+        .forEach(t -> Preconditions.checkArgument(t != null, "tag must not be null"));
   }
 }

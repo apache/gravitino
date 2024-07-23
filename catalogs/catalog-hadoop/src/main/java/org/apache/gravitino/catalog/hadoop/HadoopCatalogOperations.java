@@ -19,17 +19,14 @@
 package org.apache.gravitino.catalog.hadoop;
 
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
-import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -43,12 +40,9 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.StringIdentifier;
-import org.apache.gravitino.catalog.hadoop.authentication.AuthenticationConfig;
-import org.apache.gravitino.catalog.hadoop.authentication.kerberos.KerberosClient;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
-import org.apache.gravitino.connector.ProxyPlugin;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
@@ -68,8 +62,6 @@ import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -90,11 +82,6 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   private Map<String, String> conf;
 
-  @SuppressWarnings("unused")
-  private ProxyPlugin proxyPlugin;
-
-  private String kerberosRealm;
-
   private CatalogInfo catalogInfo;
 
   HadoopCatalogOperations(EntityStore store) {
@@ -105,8 +92,20 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     this(GravitinoEnv.getInstance().entityStore());
   }
 
-  public String getKerberosRealm() {
-    return kerberosRealm;
+  public EntityStore getStore() {
+    return store;
+  }
+
+  public CatalogInfo getCatalogInfo() {
+    return catalogInfo;
+  }
+
+  public Configuration getHadoopConf() {
+    return hadoopConf;
+  }
+
+  public Map<String, String> getConf() {
+    return conf;
   }
 
   @Override
@@ -134,30 +133,10 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
                 .getOrDefault(config, HadoopCatalogPropertiesMetadata.LOCATION);
     conf.forEach(hadoopConf::set);
 
-    initAuthentication(conf, hadoopConf);
     this.catalogStorageLocation =
         StringUtils.isNotBlank(catalogLocation)
             ? Optional.of(catalogLocation).map(Path::new)
             : Optional.empty();
-  }
-
-  private void initAuthentication(Map<String, String> conf, Configuration hadoopConf) {
-    AuthenticationConfig config = new AuthenticationConfig(conf);
-    String authType = config.getAuthType();
-
-    if (StringUtils.equalsIgnoreCase(authType, AuthenticationMethod.KERBEROS.name())) {
-      hadoopConf.set(
-          HADOOP_SECURITY_AUTHENTICATION,
-          AuthenticationMethod.KERBEROS.name().toLowerCase(Locale.ROOT));
-      UserGroupInformation.setConfiguration(hadoopConf);
-      try {
-        KerberosClient kerberosClient = new KerberosClient(conf, hadoopConf);
-        File keytabFile = kerberosClient.saveKeyTabFileFromUri(catalogInfo.id());
-        this.kerberosRealm = kerberosClient.login(keytabFile.getAbsolutePath());
-      } catch (IOException e) {
-        throw new RuntimeException("Failed to login with Kerberos", e);
-      }
-    }
   }
 
   @Override
@@ -278,9 +257,9 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
             .withNamespace(ident.namespace())
             .withComment(comment)
             .withFilesetType(type)
-            // Store the storageLocation to the store. If the "storageLocation" is null for
-            // managed fileset, Gravitino will get and store the location based on the
-            // catalog/schema's location and store it to the store.
+            // Store the storageLocation to the store. If the "storageLocation" is null for managed
+            // fileset, Gravitino will get and store the location based on the catalog/schema's
+            // location and store it to the store.
             .withStorageLocation(filesetPath.toString())
             .withProperties(properties)
             .withAuditInfo(
@@ -663,9 +642,5 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   static Path formalizePath(Path path, Configuration configuration) throws IOException {
     FileSystem defaultFs = FileSystem.get(configuration);
     return path.makeQualified(defaultFs.getUri(), defaultFs.getWorkingDirectory());
-  }
-
-  void setProxyPlugin(HadoopProxyPlugin hadoopProxyPlugin) {
-    this.proxyPlugin = hadoopProxyPlugin;
   }
 }

@@ -163,7 +163,7 @@ allprojects {
       // Default use MiniGravitino to run integration tests
       param.environment("GRAVITINO_ROOT_DIR", project.rootDir.path)
       param.environment("IT_PROJECT_DIR", project.buildDir.path)
-      param.environment("HADOOP_USER_NAME", "datastrato")
+      param.environment("HADOOP_USER_NAME", "anonymous")
       param.environment("HADOOP_HOME", "/tmp")
       param.environment("PROJECT_VERSION", project.version)
 

@@ -26,7 +26,7 @@ services:
       - trino-net
     container_name: trino-ci-hive
     environment:
-      - HADOOP_USER_NAME=root
+      - HADOOP_USER_NAME=anonymous
     entrypoint:  /bin/bash /tmp/hive/init.sh
     volumes:
       - ./init/hive:/tmp/hive
@@ -86,7 +86,7 @@ services:
       - trino-net
     container_name: trino-ci-trino
     environment:
-      - HADOOP_USER_NAME=root
+      - HADOOP_USER_NAME=anonymous
       - GRAVITINO_HOST_IP=host.docker.internal
       - GRAVITINO_HOST_PORT=${GRAVITINO_SERVER_PORT:-8090}
       - GRAVITINO_METALAKE_NAME=test

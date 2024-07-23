@@ -25,56 +25,49 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.dto.CatalogDTO;
+import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 
-/** Represents a response for a list of catalogs with their information. */
+/** Represents a response containing a list of metadata objects. */
 @Getter
-@ToString
 @EqualsAndHashCode(callSuper = true)
-public class CatalogListResponse extends BaseResponse {
+@ToString
+public class MetadataObjectListResponse extends BaseResponse {
 
-  @JsonProperty("catalogs")
-  private final CatalogDTO[] catalogs;
+  @JsonProperty("metadataObjects")
+  private final MetadataObjectDTO[] metadataObjects;
 
   /**
-   * Creates a new CatalogListResponse.
+   * Constructor for MetadataObjectListResponse.
    *
-   * @param catalogs The list of catalogs.
+   * @param metadataObjects The array of metadata object DTOs.
    */
-  public CatalogListResponse(CatalogDTO[] catalogs) {
+  public MetadataObjectListResponse(MetadataObjectDTO[] metadataObjects) {
     super(0);
-    this.catalogs = catalogs;
+    this.metadataObjects = metadataObjects;
   }
 
-  /**
-   * This is the constructor that is used by Jackson deserializer to create an instance of
-   * CatalogListResponse.
-   */
-  public CatalogListResponse() {
+  /** Default constructor for MetadataObjectListResponse. (Used for Jackson deserialization.) */
+  public MetadataObjectListResponse() {
     super();
-    this.catalogs = null;
+    this.metadataObjects = null;
   }
 
   /**
    * Validates the response data.
    *
-   * @throws IllegalArgumentException if name, type or audit information is not set.
+   * @throws IllegalArgumentException if name or audit information is not set.
    */
-  @Override
   public void validate() throws IllegalArgumentException {
     super.validate();
 
-    Preconditions.checkArgument(catalogs != null, "catalogs must be non-null");
-    Arrays.stream(catalogs)
+    Preconditions.checkArgument(metadataObjects != null, "metadataObjects must be non-null");
+    Arrays.stream(metadataObjects)
         .forEach(
-            catalog -> {
-              Preconditions.checkArgument(
-                  StringUtils.isNotBlank(catalog.name()),
-                  "catalog 'name' must not be null and empty");
-              Preconditions.checkArgument(
-                  catalog.type() != null, "catalog 'type' must not be null");
-              Preconditions.checkArgument(
-                  catalog.auditInfo() != null, "catalog 'audit' must not be null");
-            });
+            object ->
+                Preconditions.checkArgument(
+                    object != null
+                        && StringUtils.isNotBlank(object.name())
+                        && object.type() != null,
+                    "metadataObject must not be null and it's field cannot null or empty"));
   }
 }

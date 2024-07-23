@@ -25,56 +25,41 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.dto.CatalogDTO;
 
-/** Represents a response for a list of catalogs with their information. */
+/** Represents a response for a list of entity names. */
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
-public class CatalogListResponse extends BaseResponse {
+public class NameListResponse extends BaseResponse {
 
-  @JsonProperty("catalogs")
-  private final CatalogDTO[] catalogs;
+  @JsonProperty("names")
+  private final String[] names;
 
   /**
-   * Creates a new CatalogListResponse.
+   * Creates a new NameListResponse.
    *
-   * @param catalogs The list of catalogs.
+   * @param names The list of names.
    */
-  public CatalogListResponse(CatalogDTO[] catalogs) {
-    super(0);
-    this.catalogs = catalogs;
+  public NameListResponse(String[] names) {
+    this.names = names;
   }
 
   /**
    * This is the constructor that is used by Jackson deserializer to create an instance of
-   * CatalogListResponse.
+   * NameListResponse.
    */
-  public CatalogListResponse() {
-    super();
-    this.catalogs = null;
+  public NameListResponse() {
+    this.names = null;
   }
 
-  /**
-   * Validates the response data.
-   *
-   * @throws IllegalArgumentException if name, type or audit information is not set.
-   */
   @Override
   public void validate() throws IllegalArgumentException {
     super.validate();
 
-    Preconditions.checkArgument(catalogs != null, "catalogs must be non-null");
-    Arrays.stream(catalogs)
+    Preconditions.checkArgument(names != null, "\"names\" must not be null");
+    Arrays.stream(names)
         .forEach(
-            catalog -> {
-              Preconditions.checkArgument(
-                  StringUtils.isNotBlank(catalog.name()),
-                  "catalog 'name' must not be null and empty");
-              Preconditions.checkArgument(
-                  catalog.type() != null, "catalog 'type' must not be null");
-              Preconditions.checkArgument(
-                  catalog.auditInfo() != null, "catalog 'audit' must not be null");
-            });
+            name ->
+                Preconditions.checkArgument(StringUtils.isNotBlank(name), "name must not be null"));
   }
 }
