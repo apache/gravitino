@@ -51,22 +51,21 @@ public class KerberosServerUtils {
    * Return the default realm for this JVM.
    *
    * @return The default realm
-   * @throws IllegalArgumentException  If the default realm does not exist.
-   * @throws ClassNotFoundException    Not thrown. Exists for compatibility.
-   * @throws NoSuchMethodException     Not thrown. Exists for compatibility.
-   * @throws IllegalAccessException    Not thrown. Exists for compatibility.
+   * @throws IllegalArgumentException If the default realm does not exist.
+   * @throws ClassNotFoundException Not thrown. Exists for compatibility.
+   * @throws NoSuchMethodException Not thrown. Exists for compatibility.
+   * @throws IllegalAccessException Not thrown. Exists for compatibility.
    * @throws InvocationTargetException Not thrown. Exists for compatibility.
    */
   public static String getDefaultRealm()
       throws ClassNotFoundException, NoSuchMethodException, IllegalArgumentException,
-      IllegalAccessException, InvocationTargetException {
+          IllegalAccessException, InvocationTargetException {
     // Any name is okay.
     return new KerberosPrincipal("tmp", 1).getRealm();
   }
 
   /**
-   * Return the default realm for this JVM. If the default realm does not exist,
-   * this method returns
+   * Return the default realm for this JVM. If the default realm does not exist, this method returns
    * null.
    *
    * @return The default realm
@@ -81,28 +80,20 @@ public class KerberosServerUtils {
   }
 
   /**
-   * For a Service Host Principal specification, map the host's domain to kerberos
-   * realm, as
-   * specified by krb5.conf [domain_realm] mappings. Unfortunately the mapping
-   * routines are private
-   * to the security.krb5 package, so have to construct a PrincipalName instance
-   * to derive the
+   * For a Service Host Principal specification, map the host's domain to kerberos realm, as
+   * specified by krb5.conf [domain_realm] mappings. Unfortunately the mapping routines are private
+   * to the security.krb5 package, so have to construct a PrincipalName instance to derive the
    * realm.
    *
-   * <p>
-   * Many things can go wrong with Kerberos configuration, and this is not the
-   * place to be
-   * throwing exceptions to help debug them. Nor do we choose to make potentially
-   * voluminous logs on
-   * every call to a communications API. So we simply swallow all exceptions from
-   * the underlying
+   * <p>Many things can go wrong with Kerberos configuration, and this is not the place to be
+   * throwing exceptions to help debug them. Nor do we choose to make potentially voluminous logs on
+   * every call to a communications API. So we simply swallow all exceptions from the underlying
    * libraries and return null if we can't get a good value for the realmString.
    *
    * @param shortprinc A service principal name with host fqdn as instance, e.g.
-   *                   "HTTP/myhost.mydomain"
-   * @return String value of Kerberos realm, mapped from host fqdn May be default
-   *         realm, or may be
-   *         null.
+   *     "HTTP/myhost.mydomain"
+   * @return String value of Kerberos realm, mapped from host fqdn May be default realm, or may be
+   *     null.
    */
   public static String getDomainRealm(String shortprinc) {
     Class<?> classRef;
@@ -111,10 +102,13 @@ public class KerberosServerUtils {
     try {
       classRef = Class.forName("sun.security.krb5.PrincipalName");
       int tKrbNtSrvHst = classRef.getField("KRB_NT_SRV_HST").getInt(null);
-      principalName = classRef.getConstructor(String.class, int.class).newInstance(shortprinc, tKrbNtSrvHst);
-      realmString = (String) classRef
-          .getMethod("getRealmString", new Class[0])
-          .invoke(principalName, new Object[0]);
+      principalName =
+          classRef.getConstructor(String.class, int.class).newInstance(shortprinc, tKrbNtSrvHst);
+      realmString =
+          (String)
+              classRef
+                  .getMethod("getRealmString", new Class[0])
+                  .invoke(principalName, new Object[0]);
     } catch (RuntimeException rte) {
       // silently catch everything
     } catch (Exception e) {
@@ -133,23 +127,17 @@ public class KerberosServerUtils {
   }
 
   /**
-   * Create Kerberos principal for a given service and hostname, inferring realm
-   * from the fqdn of
-   * the hostname. It converts hostname to lower case. If hostname is null or
-   * "0.0.0.0", it uses
-   * dynamically looked-up fqdn of the current host instead. If domain_realm
-   * mappings are
-   * inadequately specified, it will use default_realm, per usual Kerberos
-   * behavior. If
-   * default_realm also gives a null value, then a principal without realm will be
-   * returned, which
+   * Create Kerberos principal for a given service and hostname, inferring realm from the fqdn of
+   * the hostname. It converts hostname to lower case. If hostname is null or "0.0.0.0", it uses
+   * dynamically looked-up fqdn of the current host instead. If domain_realm mappings are
+   * inadequately specified, it will use default_realm, per usual Kerberos behavior. If
+   * default_realm also gives a null value, then a principal without realm will be returned, which
    * by Kerberos definitions is just another way to specify default realm.
    *
-   * @param service  Service for which you want to generate the principal.
+   * @param service Service for which you want to generate the principal.
    * @param hostname Fully-qualified domain name.
    * @return Converted Kerberos principal name.
-   * @throws UnknownHostException If no IP address for the local host could be
-   *                              found.
+   * @throws UnknownHostException If no IP address for the local host could be found.
    */
   public static final String getServicePrincipal(String service, String hostname)
       throws UnknownHostException {
@@ -190,7 +178,7 @@ public class KerberosServerUtils {
   /**
    * Get all the unique principals from keytabfile which matches a pattern.
    *
-   * @param keytab  Name of the keytab file to be read.
+   * @param keytab Name of the keytab file to be read.
    * @param pattern pattern to be matched.
    * @return list of unique principals which matches the pattern.
    * @throws IOException if cannot get the principal name
@@ -211,10 +199,8 @@ public class KerberosServerUtils {
   }
 
   /**
-   * Check if the subject contains Kerberos keytab related objects. The Kerberos
-   * keytab object
-   * attached in subject has been changed from KerberosKey (JDK 7) to KeyTab (JDK
-   * 8)
+   * Check if the subject contains Kerberos keytab related objects. The Kerberos keytab object
+   * attached in subject has been changed from KerberosKey (JDK 7) to KeyTab (JDK 8)
    *
    * @param subject subject to be checked
    * @return true if the subject contains Kerberos keytab
@@ -234,8 +220,7 @@ public class KerberosServerUtils {
   }
 
   /**
-   * Extract the TGS server principal from the given gssapi kerberos or spnego
-   * wrapped token.
+   * Extract the TGS server principal from the given gssapi kerberos or spnego wrapped token.
    *
    * @param rawToken bytes of the gss token
    * @return String of server principal
@@ -370,7 +355,8 @@ public class KerberosServerUtils {
 
     String getAsString() {
       try {
-        return new String(bb.array(), bb.arrayOffset() + bb.position(), bb.remaining(), StandardCharsets.UTF_8);
+        return new String(
+            bb.array(), bb.arrayOffset() + bb.position(), bb.remaining(), StandardCharsets.UTF_8);
       } catch (UnsupportedEncodingException e) {
         throw new IllegalCharsetNameException(StandardCharsets.UTF_8); // won't happen.
       }
@@ -406,6 +392,5 @@ public class KerberosServerUtils {
     }
   }
 
-  private KerberosServerUtils() {
-  }
+  private KerberosServerUtils() {}
 }
