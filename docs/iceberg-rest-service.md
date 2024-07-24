@@ -29,7 +29,7 @@ Builds with Hadoop 2.10.x. There may be compatibility issues when accessing Hado
 
 ## Server management
 
-Iceberg REST server could start as a standalone server or an Auxiliary service in Gravitino server. There are some differences like below:
+Iceberg REST server could start as a standalone server or an auxiliary service in Gravitino server. There are some differences like below:
 
 |                                  | Standalone server                                                                            | Auxiliary service in Gravitino server                                                                        | 
 |----------------------------------|----------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|
@@ -151,17 +151,17 @@ Please set `gravitino.iceberg-rest.warehouse` to `s3://{bucket_name}/${prefix_na
 
 ### HDFS configuration
 
-The Gravitino Iceberg REST catalog service adds the HDFS configuration files `core-site.xml` and `hdfs-site.xml` from the directory defined by `gravitino.iceberg-rest.classpath`, for example, `iceberg-rest-server/conf`, to the classpath.
+You should place HDFS configuration file to the classpath of the Iceberg REST server, `iceberg-rest-server/conf` for Gravitino server package, `conf` for standalone Gravitino Iceberg REST server package.
 
 ## Starting the Iceberg REST server
 
-To start the service with Gravitino server:
+To start as an auxiliary service with Gravitino server:
 
 ```shell
 ./bin/gravitino.sh start 
 ```
 
-To start a standalone server:
+To start a standalone Iceberg REST catalog server:
 
 ```shell
 ./bin/gravitino-iceberg-rest-server.sh start
