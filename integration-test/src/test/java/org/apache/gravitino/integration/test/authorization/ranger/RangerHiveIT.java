@@ -51,7 +51,7 @@ public class RangerHiveIT extends RangerIT {
   public static void setup() {
     RangerIT.setup();
 
-    containerSuite.startHiveContainer(
+    containerSuite.startHiveRangerContainer(
         new HashMap<>(
             ImmutableMap.of(
                 HiveContainer.HIVE_RUNTIME_VERSION,
