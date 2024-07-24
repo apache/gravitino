@@ -36,12 +36,14 @@ import org.apache.gravitino.dto.requests.FilesetUpdateRequest;
 import org.apache.gravitino.dto.requests.MetalakeUpdateRequest;
 import org.apache.gravitino.dto.requests.SchemaUpdateRequest;
 import org.apache.gravitino.dto.requests.TableUpdateRequest;
+import org.apache.gravitino.dto.requests.TagUpdateRequest;
 import org.apache.gravitino.dto.requests.TopicUpdateRequest;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
+import org.apache.gravitino.tag.TagChange;
 
 class DTOConverters {
   private DTOConverters() {}
@@ -311,5 +313,28 @@ class DTOConverters {
                     })
                 .toArray(PrivilegeDTO[]::new))
         .build();
+  }
+
+  static TagUpdateRequest toTagUpdateRequest(TagChange change) {
+    if (change instanceof TagChange.RenameTag) {
+      return new TagUpdateRequest.RenameTagRequest(((TagChange.RenameTag) change).getNewName());
+
+    } else if (change instanceof TagChange.UpdateTagComment) {
+      return new TagUpdateRequest.UpdateTagCommentRequest(
+          ((TagChange.UpdateTagComment) change).getNewComment());
+
+    } else if (change instanceof TagChange.SetProperty) {
+      return new TagUpdateRequest.SetTagPropertyRequest(
+          ((TagChange.SetProperty) change).getProperty(),
+          ((TagChange.SetProperty) change).getValue());
+
+    } else if (change instanceof TagChange.RemoveProperty) {
+      return new TagUpdateRequest.RemoveTagPropertyRequest(
+          ((TagChange.RemoveProperty) change).getProperty());
+
+    } else {
+      throw new IllegalArgumentException(
+          "Unknown change type: " + change.getClass().getSimpleName());
+    }
   }
 }

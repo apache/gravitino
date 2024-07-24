@@ -155,7 +155,7 @@ public abstract class JdbcTableOperations implements TableOperation {
     JdbcTable.Builder builder = null;
     while (tablesResult.next() && !found) {
       if (Objects.equals(tablesResult.getString("TABLE_NAME"), tableName)) {
-        builder = getBasicJdbcTableInfo(tablesResult);
+        builder = getBasicJdbcTableInfo(tablesResult).withDatabaseName(databaseName);
         found = true;
       }
     }
@@ -210,7 +210,8 @@ public abstract class JdbcTableOperations implements TableOperation {
 
       // 6.Leave the information to the bottom layer to append the table
       correctJdbcTableFields(connection, databaseName, tableName, jdbcTableBuilder);
-      return jdbcTableBuilder.build();
+
+      return jdbcTableBuilder.withTableOperation(this).build();
     } catch (SQLException e) {
       throw exceptionMapper.toGravitinoException(e);
     }

@@ -24,8 +24,10 @@ import java.util.regex.Pattern;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchColumnException;
+import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
@@ -44,6 +46,8 @@ public class DorisExceptionConverter extends JdbcExceptionConverter {
   static final int CODE_UNAUTHORIZED = 1045;
   static final int CODE_NO_SUCH_COLUMN = 1054;
   static final int CODE_OTHER = 1105;
+  static final int CODE_DELETE_NON_EXISTING_PARTITION = 1507;
+  static final int CODE_PARTITION_ALREADY_EXISTS = 1517;
 
   private static final String DATABASE_ALREADY_EXISTS_PATTERN_STRING =
       ".*?detailMessage = Can't create database '.*?'; database exists";
@@ -65,6 +69,18 @@ public class DorisExceptionConverter extends JdbcExceptionConverter {
 
   private static final Pattern TABLE_NOT_EXIST_PATTERN =
       Pattern.compile(TABLE_NOT_EXIST_PATTERN_STRING);
+
+  private static final String DELETE_NON_EXISTING_PARTITION_STRING =
+      ".*?detailMessage = Error in list of partitions to .*?";
+
+  private static final Pattern DELETE_NON_EXISTING_PARTITION =
+      Pattern.compile(DELETE_NON_EXISTING_PARTITION_STRING);
+
+  private static final String PARTITION_ALREADY_EXISTS_STRING =
+      ".*?detailMessage = Duplicate partition name .*?";
+
+  private static final Pattern PARTITION_ALREADY_EXISTS_PARTITION =
+      Pattern.compile(PARTITION_ALREADY_EXISTS_STRING);
 
   @SuppressWarnings("FormatStringAnnotation")
   @Override
@@ -88,6 +104,10 @@ public class DorisExceptionConverter extends JdbcExceptionConverter {
         return new UnauthorizedException(se, se.getMessage());
       case CODE_NO_SUCH_COLUMN:
         return new NoSuchColumnException(se, se.getMessage());
+      case CODE_DELETE_NON_EXISTING_PARTITION:
+        return new NoSuchPartitionException(se, se.getMessage());
+      case CODE_PARTITION_ALREADY_EXISTS:
+        return new PartitionAlreadyExistsException(se, se.getMessage());
       default:
         return new GravitinoRuntimeException(se, se.getMessage());
     }
@@ -114,6 +134,13 @@ public class DorisExceptionConverter extends JdbcExceptionConverter {
       return CODE_NO_SUCH_TABLE;
     }
 
+    if (DELETE_NON_EXISTING_PARTITION.matcher(message).matches()) {
+      return CODE_DELETE_NON_EXISTING_PARTITION;
+    }
+
+    if (PARTITION_ALREADY_EXISTS_PARTITION.matcher(message).matches()) {
+      return CODE_PARTITION_ALREADY_EXISTS;
+    }
     return CODE_OTHER;
   }
 }
