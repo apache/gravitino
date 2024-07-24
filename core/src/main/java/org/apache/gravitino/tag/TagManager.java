@@ -54,6 +54,7 @@ import org.slf4j.LoggerFactory;
 
 public class TagManager {
 
+  // Add some comments
   private static final Logger LOG = LoggerFactory.getLogger(TagManager.class);
 
   private final IdGenerator idGenerator;
