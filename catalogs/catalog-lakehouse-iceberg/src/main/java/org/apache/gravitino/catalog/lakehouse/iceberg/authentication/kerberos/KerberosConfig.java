@@ -104,18 +104,20 @@ public class KerberosConfig extends AuthenticationConfig {
       new ImmutableMap.Builder<String, PropertyEntry<?>>()
           .put(
               KET_TAB_URI_KEY,
-              PropertyEntry.stringImmutablePropertyEntry(
+              PropertyEntry.stringPropertyEntry(
                   KET_TAB_URI_KEY,
                   "The keytab of the Kerberos for Iceberg catalog with Kerberos authentication",
+                  false,
                   false,
                   null,
                   false,
                   false))
           .put(
               PRINCIPAL_KEY,
-              PropertyEntry.stringImmutablePropertyEntry(
+              PropertyEntry.stringPropertyEntry(
                   PRINCIPAL_KEY,
                   "The principal of the Kerberos for Iceberg catalog with Kerberos authentication",
+                  false,
                   false,
                   null,
                   false,
@@ -125,7 +127,7 @@ public class KerberosConfig extends AuthenticationConfig {
               PropertyEntry.integerOptionalPropertyEntry(
                   CHECK_INTERVAL_SEC_KEY,
                   "The check interval of the Kerberos credential for Iceberg catalog with Kerberos authentication",
-                  true,
+                  false,
                   60,
                   false))
           .put(
@@ -133,7 +135,7 @@ public class KerberosConfig extends AuthenticationConfig {
               PropertyEntry.integerOptionalPropertyEntry(
                   FETCH_TIMEOUT_SEC_KEY,
                   "The fetch timeout of the Kerberos key table of Iceberg catalog with Kerberos authentication",
-                  true,
+                  false,
                   60,
                   false))
           .build();

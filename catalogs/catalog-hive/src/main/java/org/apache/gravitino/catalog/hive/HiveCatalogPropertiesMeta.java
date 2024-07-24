@@ -59,13 +59,13 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
           .put(
               METASTORE_URIS,
               PropertyEntry.stringRequiredPropertyEntry(
-                  METASTORE_URIS, "The Hive metastore URIs", true, false))
+                  METASTORE_URIS, "The Hive metastore URIs", false, false))
           .put(
               CLIENT_POOL_SIZE,
               PropertyEntry.integerOptionalPropertyEntry(
                   CLIENT_POOL_SIZE,
                   "The maximum number of Hive metastore clients in the pool for Gravitino",
-                  true,
+                  false,
                   DEFAULT_CLIENT_POOL_SIZE,
                   false))
           .put(
@@ -73,7 +73,7 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
               PropertyEntry.longOptionalPropertyEntry(
                   CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS,
                   "The cache pool eviction interval",
-                  true,
+                  false,
                   DEFAULT_CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS,
                   false))
           .put(
@@ -88,24 +88,30 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
                   false))
           .put(
               KEY_TAB_URI,
-              PropertyEntry.stringImmutablePropertyEntry(
-                  KEY_TAB_URI, "The uri of key tab for the catalog", false, null, false, false))
+              PropertyEntry.stringPropertyEntry(
+                  KEY_TAB_URI,
+                  "The uri of key tab for the catalog",
+                  false,
+                  false,
+                  null,
+                  false,
+                  false))
           .put(
               PRINCIPAL,
-              PropertyEntry.stringImmutablePropertyEntry(
-                  PRINCIPAL, "The principal for the catalog", false, null, false, false))
+              PropertyEntry.stringPropertyEntry(
+                  PRINCIPAL, "The principal for the catalog", false, false, null, false, false))
           .put(
               CHECK_INTERVAL_SEC,
               PropertyEntry.integerOptionalPropertyEntry(
                   CHECK_INTERVAL_SEC,
                   "The interval to check validness of the principal",
-                  true,
+                  false,
                   60,
                   false))
           .put(
               FETCH_TIMEOUT_SEC,
               PropertyEntry.integerOptionalPropertyEntry(
-                  FETCH_TIMEOUT_SEC, "The timeout to fetch key tab", true, 60, false))
+                  FETCH_TIMEOUT_SEC, "The timeout to fetch key tab", false, 60, false))
           .put(
               LIST_ALL_TABLES,
               PropertyEntry.booleanPropertyEntry(

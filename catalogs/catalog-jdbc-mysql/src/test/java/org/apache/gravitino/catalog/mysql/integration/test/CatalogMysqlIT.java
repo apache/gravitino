@@ -36,6 +36,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
@@ -1944,5 +1945,39 @@ public class CatalogMysqlIT extends AbstractIT {
     Assertions.assertEquals(columns[5].dataType().simpleString(), "integer unsigned");
     Assertions.assertEquals(columns[6].dataType().simpleString(), "long");
     Assertions.assertEquals(columns[7].dataType().simpleString(), "long unsigned");
+  }
+
+  @Test
+  void testAlterCatalogProperties() throws SQLException {
+    Map<String, String> catalogProperties = Maps.newHashMap();
+    String testCatalogName = GravitinoITUtils.genRandomName("mysql_it_catalog");
+
+    catalogProperties.put(
+        JdbcConfig.JDBC_URL.getKey(),
+        StringUtils.substring(
+            MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME),
+            0,
+            MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME).lastIndexOf("/")));
+    catalogProperties.put(
+        JdbcConfig.JDBC_DRIVER.getKey(), MYSQL_CONTAINER.getDriverClassName(TEST_DB_NAME));
+    catalogProperties.put(JdbcConfig.USERNAME.getKey(), MYSQL_CONTAINER.getUsername());
+
+    String password = MYSQL_CONTAINER.getPassword();
+    String wrongPassword = password + "wrong";
+    catalogProperties.put(JdbcConfig.PASSWORD.getKey(), wrongPassword);
+
+    metalake.createCatalog(
+        testCatalogName, Catalog.Type.RELATIONAL, provider, "comment", catalogProperties);
+    Catalog loadCatalog = metalake.loadCatalog(testCatalogName);
+
+    Assertions.assertThrows(
+        Exception.class, () -> loadCatalog.asSchemas().createSchema("test", "", null));
+    metalake.alterCatalog(
+        testCatalogName, CatalogChange.setProperty(JdbcConfig.PASSWORD.getKey(), password));
+
+    Assertions.assertDoesNotThrow(() -> loadCatalog.asSchemas().createSchema("test", "", null));
+
+    loadCatalog.asSchemas().dropSchema("test", true);
+    metalake.dropCatalog(testCatalogName);
   }
 }

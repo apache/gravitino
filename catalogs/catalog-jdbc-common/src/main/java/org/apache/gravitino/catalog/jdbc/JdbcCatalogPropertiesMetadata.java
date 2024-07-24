@@ -19,7 +19,7 @@
 package org.apache.gravitino.catalog.jdbc;
 
 import static org.apache.gravitino.connector.PropertyEntry.integerPropertyEntry;
-import static org.apache.gravitino.connector.PropertyEntry.stringImmutablePropertyEntry;
+import static org.apache.gravitino.connector.PropertyEntry.stringPropertyEntry;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
@@ -45,37 +45,42 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
   static {
     List<PropertyEntry<?>> propertyEntries =
         ImmutableList.of(
-            stringImmutablePropertyEntry(
+            stringPropertyEntry(
                 JdbcConfig.JDBC_URL.getKey(),
                 JdbcConfig.JDBC_URL.getDoc(),
                 true,
+                false,
                 null,
                 false,
                 false),
-            stringImmutablePropertyEntry(
+            stringPropertyEntry(
                 JdbcConfig.JDBC_DATABASE.getKey(),
                 JdbcConfig.JDBC_DATABASE.getDoc(),
                 false,
+                false,
                 null,
                 false,
                 false),
-            stringImmutablePropertyEntry(
+            stringPropertyEntry(
                 JdbcConfig.JDBC_DRIVER.getKey(),
                 JdbcConfig.JDBC_DRIVER.getDoc(),
                 false,
+                false,
                 null,
                 false,
                 false),
-            stringImmutablePropertyEntry(
+            stringPropertyEntry(
                 JdbcConfig.USERNAME.getKey(),
                 JdbcConfig.USERNAME.getDoc(),
                 false,
+                false,
                 null,
                 false,
                 false),
-            stringImmutablePropertyEntry(
+            stringPropertyEntry(
                 JdbcConfig.PASSWORD.getKey(),
                 JdbcConfig.PASSWORD.getDoc(),
+                false,
                 false,
                 null,
                 false,
@@ -84,7 +89,7 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                 JdbcConfig.POOL_MIN_SIZE.getKey(),
                 JdbcConfig.POOL_MIN_SIZE.getDoc(),
                 false,
-                true,
+                false,
                 JdbcConfig.POOL_MIN_SIZE.getDefaultValue(),
                 true,
                 false),
@@ -92,7 +97,7 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                 JdbcConfig.POOL_MAX_SIZE.getKey(),
                 JdbcConfig.POOL_MAX_SIZE.getDoc(),
                 false,
-                true,
+                false,
                 JdbcConfig.POOL_MAX_SIZE.getDefaultValue(),
                 true,
                 false));

@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.catalog.lakehouse.paimon;
 
-import static org.apache.gravitino.connector.PropertyEntry.enumImmutablePropertyEntry;
+import static org.apache.gravitino.connector.PropertyEntry.enumPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringRequiredPropertyEntry;
 
@@ -64,9 +64,10 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
   static {
     List<PropertyEntry<?>> propertyEntries =
         ImmutableList.of(
-            enumImmutablePropertyEntry(
+            enumPropertyEntry(
                 GRAVITINO_CATALOG_BACKEND,
                 "Paimon catalog backend type",
+                true,
                 true,
                 PaimonCatalogBackend.class,
                 null,

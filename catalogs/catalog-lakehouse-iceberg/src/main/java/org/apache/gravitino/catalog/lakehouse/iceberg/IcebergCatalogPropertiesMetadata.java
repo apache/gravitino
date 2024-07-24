@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
-import static org.apache.gravitino.connector.PropertyEntry.enumImmutablePropertyEntry;
+import static org.apache.gravitino.connector.PropertyEntry.enumPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringRequiredPropertyEntry;
 
 import com.google.common.collect.ImmutableList;
@@ -87,10 +87,11 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
   static {
     List<PropertyEntry<?>> propertyEntries =
         ImmutableList.of(
-            enumImmutablePropertyEntry(
+            enumPropertyEntry(
                 CATALOG_BACKEND,
                 "Iceberg catalog type choose properties",
                 true,
+                false,
                 IcebergCatalogBackend.class,
                 null,
                 false,
