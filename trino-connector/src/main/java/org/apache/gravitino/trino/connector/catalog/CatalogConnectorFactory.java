@@ -57,7 +57,7 @@ public class CatalogConnectorFactory {
   public CatalogConnectorContext.Builder createCatalogConnectorContextBuilder(
       GravitinoCatalog catalog) {
     String catalogProvider = catalog.getProvider();
-    if (!catalog.isLocal(cluster)) {
+    if (!catalog.isLocalCluster(cluster)) {
       catalogProvider = "trino-cluster";
     }
 

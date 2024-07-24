@@ -82,9 +82,9 @@ public class TestGravitinoCatalog {
     Catalog mockCatalog =
         mockCatalog(catalogName, provider, "test catalog", Catalog.Type.RELATIONAL, properties);
     GravitinoCatalog catalog = new GravitinoCatalog("test", mockCatalog);
-    assertTrue(catalog.isLocal(""));
-    assertTrue(catalog.isLocal("c1"));
-    assertFalse(catalog.isLocal("c2"));
+    assertTrue(catalog.isLocalCluster(""));
+    assertTrue(catalog.isLocalCluster("c1"));
+    assertFalse(catalog.isLocalCluster("c2"));
 
     // test with non cluster info
     properties.put("cluster", "");
@@ -92,9 +92,9 @@ public class TestGravitinoCatalog {
         mockCatalog(catalogName, provider, "test catalog", Catalog.Type.RELATIONAL, properties);
     catalog = new GravitinoCatalog("test", mockCatalog);
 
-    assertTrue(catalog.isLocal(""));
-    assertTrue(catalog.isLocal("c1"));
-    assertTrue(catalog.isLocal("c2"));
+    assertTrue(catalog.isLocalCluster(""));
+    assertTrue(catalog.isLocalCluster("c1"));
+    assertTrue(catalog.isLocalCluster("c2"));
   }
 
   public static Catalog mockCatalog(
