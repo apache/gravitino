@@ -50,7 +50,9 @@ public class TrinoQueryTestTool {
       options.addOption(
           "test_host",
           true,
-          "host address for all test services, default services address is 127.0.0.1, if --auto is set to 'all', this option is ignored");
+          "host address for all test services (like gravitino server, trino, hive, postgresql, mysql..., "
+              + "if you services not running on one host. you need to set the arguments like --gravitino_uri=xxx and --trino_uri=xxx), "
+              + "default services address is 127.0.0.1, if --auto is set to 'all', this option is ignored");
       options.addOption(
           "gravitino_uri",
           true,
