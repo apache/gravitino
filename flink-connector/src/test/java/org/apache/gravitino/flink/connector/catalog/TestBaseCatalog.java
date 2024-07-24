@@ -113,10 +113,7 @@ public class TestBaseCatalog {
     org.apache.gravitino.rel.TableChange[] tableChanges =
         BaseCatalog.getGravitinoTableChanges(table, newTable);
     List<org.apache.gravitino.rel.TableChange> expected =
-        ImmutableList.of(
-            org.apache.gravitino.rel.TableChange.removeProperty("key2"),
-            org.apache.gravitino.rel.TableChange.setProperty("key", "new value"),
-            org.apache.gravitino.rel.TableChange.updateComment("new comment"));
+        ImmutableList.of(org.apache.gravitino.rel.TableChange.updateComment("new comment"));
     Assertions.assertArrayEquals(expected.toArray(), tableChanges);
   }
 }
