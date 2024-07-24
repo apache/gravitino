@@ -18,7 +18,8 @@
  */
 package org.apache.gravitino.client;
 
-import com.google.common.base.Joiner;
+import com.google.common.collect.Lists;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Audit;
@@ -34,17 +35,15 @@ import org.apache.gravitino.tag.Tag;
 /** Represents a generic fileset. */
 class GenericFileset implements Fileset, SupportsTags {
 
-  private static final Joiner DOT_JOINER = Joiner.on(".");
-
   private final FilesetDTO filesetDTO;
 
   private final MetadataObjectTagOperations objectTagOperations;
 
   GenericFileset(FilesetDTO filesetDTO, RESTClient restClient, Namespace filesetNs) {
     this.filesetDTO = filesetDTO;
-    MetadataObject filesetObject =
-        MetadataObjects.parse(
-            filesetFullName(filesetNs, filesetDTO.name()), MetadataObject.Type.FILESET);
+    List<String> filesetFullName =
+        Lists.newArrayList(filesetNs.level(1), filesetNs.level(2), filesetDTO.name());
+    MetadataObject filesetObject = MetadataObjects.of(filesetFullName, MetadataObject.Type.FILESET);
     this.objectTagOperations =
         new MetadataObjectTagOperations(filesetNs.level(0), filesetObject, restClient);
   }
@@ -121,9 +120,5 @@ class GenericFileset implements Fileset, SupportsTags {
   @Override
   public int hashCode() {
     return filesetDTO.hashCode();
-  }
-
-  private static String filesetFullName(Namespace filesetNs, String filesetName) {
-    return DOT_JOINER.join(filesetNs.level(1), filesetNs.level(2), filesetName);
   }
 }

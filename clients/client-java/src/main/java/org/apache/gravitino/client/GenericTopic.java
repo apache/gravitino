@@ -18,7 +18,8 @@
  */
 package org.apache.gravitino.client;
 
-import com.google.common.base.Joiner;
+import com.google.common.collect.Lists;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.MetadataObject;
@@ -33,16 +34,15 @@ import org.apache.gravitino.tag.Tag;
 /** Represents a generic topic. */
 class GenericTopic implements Topic, SupportsTags {
 
-  private static final Joiner DOT_JOINER = Joiner.on(".");
-
   private final TopicDTO topicDTO;
 
   private final MetadataObjectTagOperations objectTagOperations;
 
   GenericTopic(TopicDTO topicDTO, RESTClient restClient, Namespace topicNs) {
     this.topicDTO = topicDTO;
-    MetadataObject topicObject =
-        MetadataObjects.parse(topicFullName(topicNs, topicDTO.name()), MetadataObject.Type.TOPIC);
+    List<String> topicFullName =
+        Lists.newArrayList(topicNs.level(1), topicNs.level(2), topicDTO.name());
+    MetadataObject topicObject = MetadataObjects.of(topicFullName, MetadataObject.Type.TOPIC);
     this.objectTagOperations =
         new MetadataObjectTagOperations(topicNs.level(0), topicObject, restClient);
   }
@@ -108,9 +108,5 @@ class GenericTopic implements Topic, SupportsTags {
   @Override
   public int hashCode() {
     return topicDTO.hashCode();
-  }
-
-  private static String topicFullName(Namespace topicNs, String topicName) {
-    return DOT_JOINER.join(topicNs.level(1), topicNs.level(2), topicName);
   }
 }
