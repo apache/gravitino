@@ -18,13 +18,13 @@
  */
 package org.apache.gravitino.spark.connector.integration.test.sql;
 
-import com.datastrato.gravitino.Config;
-import com.datastrato.gravitino.config.ConfigBuilder;
-import com.datastrato.gravitino.config.ConfigEntry;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.config.ConfigBuilder;
+import org.apache.gravitino.config.ConfigEntry;
 import org.junit.platform.commons.util.StringUtils;
 
 public class SparkTestConfig extends Config {

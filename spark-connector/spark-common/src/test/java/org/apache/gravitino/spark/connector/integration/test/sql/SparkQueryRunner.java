@@ -18,15 +18,6 @@
  */
 package org.apache.gravitino.spark.connector.integration.test.sql;
 
-import com.datastrato.gravitino.Catalog;
-import com.datastrato.gravitino.client.GravitinoAdminClient;
-import com.datastrato.gravitino.client.GravitinoMetalake;
-import com.datastrato.gravitino.integration.test.container.ContainerSuite;
-import com.datastrato.gravitino.integration.test.container.HiveContainer;
-import com.datastrato.gravitino.integration.test.util.AbstractIT;
-import com.datastrato.gravitino.spark.connector.GravitinoSparkConfig;
-import com.datastrato.gravitino.spark.connector.iceberg.IcebergPropertiesConstants;
-import com.datastrato.gravitino.spark.connector.plugin.GravitinoSparkPlugin;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
@@ -43,6 +34,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.client.GravitinoAdminClient;
+import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
+import org.apache.gravitino.spark.connector.iceberg.IcebergPropertiesConstants;
+import org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.Assertions;
 import org.slf4j.Logger;
