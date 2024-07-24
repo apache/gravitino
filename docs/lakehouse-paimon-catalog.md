@@ -8,9 +8,6 @@ keywords:
 license: "This software is licensed under the Apache License version 2."
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 ## Introduction
 
 Apache Gravitino provides the ability to manage Apache Paimon metadata.
@@ -28,7 +25,7 @@ Builds with Apache Paimon `0.8.0`.
 - Works as a catalog proxy, supporting `FilesystemCatalog`.
 - Supports DDL operations for Paimon schemas and tables.
 
-- Doesn't support `JdbcCatalog` and `HiveCatalog` backend-catalog now.
+- Doesn't support `JdbcCatalog` and `HiveCatalog` catalog backend now.
 - Doesn't support alterTable now.
 - Doesn't support alterSchema.
 
@@ -40,7 +37,7 @@ Builds with Apache Paimon `0.8.0`.
 | `uri`                                              | The URI configuration of the Paimon catalog. `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db`. It is optional for `FilesystemCatalog`. | (none)                 | required if the value of `catalog-backend` is not `filesystem`. | 0.6.0         |
 | `warehouse`                                        | Warehouse directory of catalog. `file:///user/hive/warehouse-paimon/` for local fs or `hdfs://namespace/hdfs/path` for HDFS.                                                                                | (none)                 | Yes                                                             | 0.6.0         |
 | `authentication.type`                              | The type of authentication for Paimon catalog backend, currently Gravitino only supports `Kerberos` and `simple`.                                                                                           | `simple`               | No                                                              | 0.6.0         |
-| `authentication.kerberos.principal`                | The principal of the Kerberos authentication                                                                                                                                                                | (none)                 | required if the value of `authentication.type` is Kerberos.     | 0.6.0         |
+| `authentication.kerberos.principal`                | The principal of the Kerberos authentication.                                                                                                                                                               | (none)                 | required if the value of `authentication.type` is Kerberos.     | 0.6.0         |
 | `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                                                                                                                                      | (none)                 | required if the value of `authentication.type` is Kerberos.     | 0.6.0         |
 | `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Paimon catalog.                                                                                                                                               | 60                     | No                                                              | 0.6.0         |
 | `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                                                                                                                  | 60                     | No                                                              | 0.6.0         |
@@ -76,10 +73,10 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 ### Table capabilities
 
 - Supporting createTable, dropTable, loadTable and listTable.
-:::info
+```
 dropTable will delete the table location directly, similar with purgeTable.
-:::
-- Supporting Column default value through table properties, such as fields.{columnName}.default-value.
+```
+- Supporting Column default value through table properties, such as `fields.{columnName}.default-value`.
 
 - Doesn't support alterTable now.
 
@@ -148,5 +145,5 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 You can place `core-site.xml` and `hdfs-site.xml` in the `catalogs/lakehouse-paimon/conf` directory to automatically load as the default HDFS configuration.
 
 :::caution
-When writing to HDFS, the Gravitino server can only operate as the specified Kerberos user and doesn't support proxying to other Kerberos users now.
+When reading and writing to HDFS, the Gravitino server can only operate as the specified Kerberos user and doesn't support proxying to other Kerberos users now.
 :::
