@@ -528,7 +528,7 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
     sql("CREATE DATABASE " + registerDB);
     sql(
         String.format(
-            "CREATE TABLE %s.%s (id bigint COMMENT 'unique id',data string) using iceberg",
+            "CREATE TABLE %s.%s (id bigint COMMENT 'unique id',data string) USING iceberg",
             registerDB, registerTableName));
     sql(String.format("INSERT INTO %s.%s VALUES (1, 'a')", registerDB, registerTableName));
 
@@ -537,7 +537,7 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
         convertToStringList(
             sql(
                 String.format(
-                    "select file from %s.%s.metadata_log_entries", registerDB, registerTableName)),
+                    "SELECT file FROM %s.%s.metadata_log_entries", registerDB, registerTableName)),
             0);
     String metadataLocation = metadataLocations.get(metadataLocations.size() - 1);
 
@@ -549,12 +549,12 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
     sql(register);
 
     Map<String, String> result =
-        convertToStringMap(sql("select * from iceberg_rest_table_test.register_foo2"));
+        convertToStringMap(sql("SELECT * FROM iceberg_rest_table_test.register_foo2"));
     Assertions.assertEquals(ImmutableMap.of("1", "a"), result);
 
     // insert other data
-    sql(" INSERT INTO iceberg_rest_table_test.register_foo2 VALUES (2, 'b')");
-    result = convertToStringMap(sql("select * from iceberg_rest_table_test.register_foo2"));
+    sql("INSERT INTO iceberg_rest_table_test.register_foo2 VALUES (2, 'b')");
+    result = convertToStringMap(sql("SELECT * FROM iceberg_rest_table_test.register_foo2"));
     Assertions.assertEquals(ImmutableMap.of("1", "a", "2", "b"), result);
   }
 }
