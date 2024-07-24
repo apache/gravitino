@@ -18,24 +18,24 @@
 # under the License.
 #
 set -ex
-script_dir="$(dirname "${BASH_SOURCE-$0}")"
-script_dir="$(cd "${script_dir}">/dev/null; pwd)"
-gravitino_home="$(cd "${script_dir}/../../..">/dev/null; pwd)"
+iceberg_rest_server_dir="$(dirname "${BASH_SOURCE-$0}")"
+iceberg_rest_server_dir="$(cd "${iceberg_rest_server_dir}">/dev/null; pwd)"
+gravitino_home="$(cd "${iceberg_rest_server_dir}/../../..">/dev/null; pwd)"
 
 # Prepare compile Iceberg REST server packages
 cd ${gravitino_home}
 ./gradlew clean assembleIcebergRESTServer -x test
 
 # Removed old packages, Avoid multiple re-executions using the wrong file
-rm -rf "${script_dir}/packages"
-mkdir -p "${script_dir}/packages"
+rm -rf "${iceberg_rest_server_dir}/packages"
+mkdir -p "${iceberg_rest_server_dir}/packages"
 
 cd distribution
 tar xfz gravitino-iceberg-rest-server-*.tar.gz
-cp -r gravitino-iceberg-rest-server*-bin ${script_dir}/packages/gravitino-iceberg-rest-server
+cp -r gravitino-iceberg-rest-server*-bin ${iceberg_rest_server_dir}/packages/gravitino-iceberg-rest-server
 
 # Keeping the container running at all times
-cat <<EOF >> "${script_dir}/packages/gravitino-iceberg-rest-server/bin/gravitino-iceberg-rest-server.sh"
+cat <<EOF >> "${iceberg_rest_server_dir}/packages/gravitino-iceberg-rest-server/bin/gravitino-iceberg-rest-server.sh"
 
 # Keeping a process running in the background
 tail -f /dev/null
