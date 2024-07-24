@@ -27,10 +27,11 @@ import com.google.common.collect.Maps;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.gravitino.catalog.lakehouse.iceberg.authentication.AuthenticationConfig;
-import org.apache.gravitino.catalog.lakehouse.iceberg.authentication.kerberos.KerberosConfig;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.apache.gravitino.iceberg.common.IcebergCatalogBackend;
+import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
+import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosConfig;
 
 public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
   public static final String CATALOG_BACKEND = IcebergConstants.CATALOG_BACKEND;
