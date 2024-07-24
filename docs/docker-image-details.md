@@ -42,7 +42,7 @@ Changelog
     - `8090` Gravitino Web UI
     - `9001` Iceberg REST service
 
-## Gravitino Iceberg REST server Docker image
+## Apache Gravitino Iceberg REST server Docker image
 
 You can deploy the standalone Gravitino Iceberg REST server with the Docker image.
 
