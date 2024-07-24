@@ -26,7 +26,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
-import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
@@ -48,6 +47,7 @@ import org.slf4j.LoggerFactory;
 
 /** Setup Hive, Gravitino, Spark, Metalake environment to execute SparkSQL. */
 public abstract class SparkEnvIT extends SparkUtilIT {
+
   private static final Logger LOG = LoggerFactory.getLogger(SparkEnvIT.class);
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
@@ -155,19 +155,19 @@ public abstract class SparkEnvIT extends SparkUtilIT {
     ignoreIcebergRestService = false;
     Map<String, String> icebergRestServiceConfigs = new HashMap<>();
     icebergRestServiceConfigs.put(
-        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+        "gravitino."
             + icebergRestServiceName
             + "."
             + IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
         IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_HIVE);
     icebergRestServiceConfigs.put(
-        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+        "gravitino."
             + icebergRestServiceName
             + "."
             + IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI,
         hiveMetastoreUri);
     icebergRestServiceConfigs.put(
-        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+        "gravitino."
             + icebergRestServiceName
             + "."
             + IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE,
@@ -213,8 +213,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   private String getIcebergRestServiceUri() {
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(
-            serverConfig,
-            AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX + icebergRestServiceName + ".");
+            serverConfig, String.format("gravitino.%s.", icebergRestServiceName));
     return String.format(
         "http://%s:%d/iceberg/", jettyServerConfig.getHost(), jettyServerConfig.getHttpPort());
   }

@@ -25,6 +25,7 @@ import org.apache.spark.sql.types.TimestampNTZType;
 
 public class SparkTypeConverter34 extends SparkTypeConverter {
 
+  @Override
   public Type toGravitinoType(DataType sparkType) {
     if (sparkType instanceof TimestampNTZType) {
       return Types.TimestampType.withoutTimeZone();
@@ -33,6 +34,7 @@ public class SparkTypeConverter34 extends SparkTypeConverter {
     }
   }
 
+  @Override
   public DataType toSparkType(Type gravitinoType) {
     if (gravitinoType instanceof Types.TimestampType
         && ((Types.TimestampType) gravitinoType).hasTimeZone() == false) {
