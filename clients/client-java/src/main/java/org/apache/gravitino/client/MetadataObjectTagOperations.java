@@ -34,94 +34,86 @@ import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
 
 /**
- * The implementation of {@link SupportsTags}. This interface will be mixed into catalog, schema,
- * table, fileset and topic to provide tag operations for these metadata objects
+ * The implementation of {@link SupportsTags}. This interface will be composited into catalog,
+ * schema, table, fileset and topic to provide tag operations for these metadata objects
  */
-interface SupportsTagOperations extends SupportsTags {
+class MetadataObjectTagOperations implements SupportsTags {
 
-  /** @return The name of the metalake. */
-  String metalakeName();
+  private final String metalakeName;
 
-  /** @return The metadata object. */
-  MetadataObject metadataObject();
+  private final RESTClient restClient;
 
-  /** @return The REST client. */
-  RESTClient restClient();
+  private final String tagRequestPath;
+
+  MetadataObjectTagOperations(
+      String metalakeName, MetadataObject metadataObject, RESTClient restClient) {
+    this.metalakeName = metalakeName;
+    this.restClient = restClient;
+    this.tagRequestPath =
+        String.format(
+            "api/metalakes/%s/tags/%s/%s",
+            metalakeName,
+            metadataObject.type().name().toLowerCase(Locale.ROOT),
+            metadataObject.fullName());
+  }
 
   @Override
-  default String[] listTags() {
+  public String[] listTags() {
     NameListResponse resp =
-        restClient()
-            .get(
-                formatTagRequestPath(),
-                NameListResponse.class,
-                Collections.emptyMap(),
-                ErrorHandlers.tagErrorHandler());
+        restClient.get(
+            tagRequestPath,
+            NameListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.tagErrorHandler());
 
     resp.validate();
     return resp.getNames();
   }
 
   @Override
-  default Tag[] listTagsInfo() {
+  public Tag[] listTagsInfo() {
     TagListResponse resp =
-        restClient()
-            .get(
-                formatTagRequestPath(),
-                TagListResponse.class,
-                Collections.emptyMap(),
-                ErrorHandlers.tagErrorHandler());
+        restClient.get(
+            tagRequestPath,
+            TagListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.tagErrorHandler());
 
     resp.validate();
     return Arrays.stream(resp.getTags())
-        .map(tagDTO -> new GenericTag(tagDTO, restClient(), metalakeName()))
+        .map(tagDTO -> new GenericTag(tagDTO, restClient, metalakeName))
         .toArray(Tag[]::new);
   }
 
   @Override
-  default Tag getTag(String name) throws NoSuchTagException {
+  public Tag getTag(String name) throws NoSuchTagException {
     Preconditions.checkArgument(StringUtils.isNotBlank(name), "Tag name must not be null or empty");
 
     TagResponse resp =
-        restClient()
-            .get(
-                formatTagRequestPath() + "/" + RESTUtils.encodeString(name),
-                TagResponse.class,
-                Collections.emptyMap(),
-                ErrorHandlers.tagErrorHandler());
+        restClient.get(
+            tagRequestPath + "/" + RESTUtils.encodeString(name),
+            TagResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.tagErrorHandler());
 
     resp.validate();
-    return new GenericTag(resp.getTag(), restClient(), metalakeName());
+    return new GenericTag(resp.getTag(), restClient, metalakeName);
   }
 
   @Override
-  default String[] associateTags(String[] tagsToAdd, String[] tagsToRemove) {
+  public String[] associateTags(String[] tagsToAdd, String[] tagsToRemove) {
     TagsAssociateRequest request = new TagsAssociateRequest(tagsToAdd, tagsToRemove);
     request.validate();
 
     NameListResponse resp =
-        restClient()
-            .post(
-                formatTagRequestPath(),
-                request,
-                NameListResponse.class,
-                Collections.emptyMap(),
-                ErrorHandlers.tagErrorHandler());
+        restClient.post(
+            tagRequestPath,
+            request,
+            NameListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.tagErrorHandler());
 
     resp.validate();
     return resp.getNames();
-  }
-
-  /**
-   * Formats the request path for tags.
-   *
-   * @return The formatted request path.
-   */
-  default String formatTagRequestPath() {
-    return String.format(
-        "api/metalakes/%s/tags/%s/%s",
-        metalakeName(),
-        metadataObject().type().name().toLowerCase(Locale.ROOT),
-        metadataObject().fullName());
   }
 }

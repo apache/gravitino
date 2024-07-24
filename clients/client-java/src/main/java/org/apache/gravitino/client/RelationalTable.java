@@ -40,6 +40,7 @@ import org.apache.gravitino.dto.responses.PartitionListResponse;
 import org.apache.gravitino.dto.responses.PartitionNameListResponse;
 import org.apache.gravitino.dto.responses.PartitionResponse;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
+import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.SupportsPartitions;
@@ -51,15 +52,20 @@ import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.tag.SupportsTags;
+import org.apache.gravitino.tag.Tag;
 
 /** Represents a relational table. */
-public class RelationalTable implements Table, SupportsPartitions, SupportsTagOperations {
+class RelationalTable implements Table, SupportsPartitions, SupportsTags {
 
   private static final Joiner DOT_JOINER = Joiner.on(".");
 
   private final Table table;
+
   private final RESTClient restClient;
+
   private final Namespace namespace;
+
+  private final MetadataObjectTagOperations objectTagOperations;
 
   /**
    * Creates a new RelationalTable.
@@ -84,6 +90,10 @@ public class RelationalTable implements Table, SupportsPartitions, SupportsTagOp
     this.namespace = namespace;
     this.restClient = restClient;
     this.table = fromDTO(tableDTO);
+    MetadataObject tableObject =
+        MetadataObjects.parse(tableFullName(namespace, tableDTO.name()), MetadataObject.Type.TABLE);
+    this.objectTagOperations =
+        new MetadataObjectTagOperations(namespace.level(0), tableObject, restClient);
   }
 
   /**
@@ -274,22 +284,27 @@ public class RelationalTable implements Table, SupportsPartitions, SupportsTagOp
     return this;
   }
 
-  @Override
-  public String metalakeName() {
-    return namespace.level(0);
-  }
-
-  @Override
-  public MetadataObject metadataObject() {
-    return MetadataObjects.parse(tableFullName(namespace, name()), MetadataObject.Type.TABLE);
-  }
-
-  @Override
-  public RESTClient restClient() {
-    return restClient;
-  }
-
   private static String tableFullName(Namespace tableNS, String tableName) {
     return DOT_JOINER.join(tableNS.level(1), tableNS.level(2), tableName);
+  }
+
+  @Override
+  public String[] listTags() {
+    return objectTagOperations.listTags();
+  }
+
+  @Override
+  public Tag[] listTagsInfo() {
+    return objectTagOperations.listTagsInfo();
+  }
+
+  @Override
+  public Tag getTag(String name) throws NoSuchTagException {
+    return objectTagOperations.getTag(name);
+  }
+
+  @Override
+  public String[] associateTags(String[] tagsToAdd, String[] tagsToRemove) {
+    return objectTagOperations.associateTags(tagsToAdd, tagsToRemove);
   }
 }

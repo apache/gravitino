@@ -25,24 +25,26 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.dto.messaging.TopicDTO;
+import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.tag.SupportsTags;
+import org.apache.gravitino.tag.Tag;
 
 /** Represents a generic topic. */
-public class GenericTopic implements Topic, SupportsTagOperations {
+class GenericTopic implements Topic, SupportsTags {
 
   private static final Joiner DOT_JOINER = Joiner.on(".");
 
   private final TopicDTO topicDTO;
 
-  private final RESTClient restClient;
-
-  private final Namespace topicNs;
+  private final MetadataObjectTagOperations objectTagOperations;
 
   GenericTopic(TopicDTO topicDTO, RESTClient restClient, Namespace topicNs) {
     this.topicDTO = topicDTO;
-    this.restClient = restClient;
-    this.topicNs = topicNs;
+    MetadataObject topicObject =
+        MetadataObjects.parse(topicFullName(topicNs, topicDTO.name()), MetadataObject.Type.TOPIC);
+    this.objectTagOperations =
+        new MetadataObjectTagOperations(topicNs.level(0), topicObject, restClient);
   }
 
   @Override
@@ -71,18 +73,23 @@ public class GenericTopic implements Topic, SupportsTagOperations {
   }
 
   @Override
-  public String metalakeName() {
-    return topicNs.level(0);
+  public String[] listTags() {
+    return objectTagOperations.listTags();
   }
 
   @Override
-  public MetadataObject metadataObject() {
-    return MetadataObjects.parse(topicFullName(topicNs, name()), MetadataObject.Type.TOPIC);
+  public Tag[] listTagsInfo() {
+    return objectTagOperations.listTagsInfo();
   }
 
   @Override
-  public RESTClient restClient() {
-    return restClient;
+  public Tag getTag(String name) throws NoSuchTagException {
+    return objectTagOperations.getTag(name);
+  }
+
+  @Override
+  public String[] associateTags(String[] tagsToAdd, String[] tagsToRemove) {
+    return objectTagOperations.associateTags(tagsToAdd, tagsToRemove);
   }
 
   @Override

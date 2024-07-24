@@ -26,24 +26,27 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.dto.file.FilesetDTO;
+import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.tag.SupportsTags;
+import org.apache.gravitino.tag.Tag;
 
 /** Represents a generic fileset. */
-public class GenericFileset implements Fileset, SupportsTagOperations {
+class GenericFileset implements Fileset, SupportsTags {
 
   private static final Joiner DOT_JOINER = Joiner.on(".");
 
   private final FilesetDTO filesetDTO;
 
-  private final RESTClient restClient;
-
-  private final Namespace filesetNs;
+  private final MetadataObjectTagOperations objectTagOperations;
 
   GenericFileset(FilesetDTO filesetDTO, RESTClient restClient, Namespace filesetNs) {
     this.filesetDTO = filesetDTO;
-    this.restClient = restClient;
-    this.filesetNs = filesetNs;
+    MetadataObject filesetObject =
+        MetadataObjects.parse(
+            filesetFullName(filesetNs, filesetDTO.name()), MetadataObject.Type.FILESET);
+    this.objectTagOperations =
+        new MetadataObjectTagOperations(filesetNs.level(0), filesetObject, restClient);
   }
 
   @Override
@@ -83,18 +86,23 @@ public class GenericFileset implements Fileset, SupportsTagOperations {
   }
 
   @Override
-  public String metalakeName() {
-    return filesetNs.level(0);
+  public String[] listTags() {
+    return objectTagOperations.listTags();
   }
 
   @Override
-  public MetadataObject metadataObject() {
-    return MetadataObjects.parse(filesetFullName(filesetNs, name()), MetadataObject.Type.FILESET);
+  public Tag[] listTagsInfo() {
+    return objectTagOperations.listTagsInfo();
   }
 
   @Override
-  public RESTClient restClient() {
-    return restClient;
+  public Tag getTag(String name) throws NoSuchTagException {
+    return objectTagOperations.getTag(name);
+  }
+
+  @Override
+  public String[] associateTags(String[] tagsToAdd, String[] tagsToRemove) {
+    return objectTagOperations.associateTags(tagsToAdd, tagsToRemove);
   }
 
   @Override

@@ -45,6 +45,7 @@ import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.tag.SupportsTags;
+import org.apache.gravitino.tag.Tag;
 
 /**
  * BaseSchemaCatalog is the base abstract class for all the catalog with schema. It provides the
@@ -52,12 +53,14 @@ import org.apache.gravitino.tag.SupportsTags;
  * create, load, alter and drop a schema with specified identifier.
  */
 abstract class BaseSchemaCatalog extends CatalogDTO
-    implements Catalog, SupportsSchemas, SupportsTagOperations {
+    implements Catalog, SupportsSchemas, SupportsTags {
   /** The REST client to send the requests. */
   protected final RESTClient restClient;
 
   /** The namespace of current catalog, which is the metalake name. */
   private final Namespace catalogNamespace;
+
+  private final MetadataObjectTagOperations objectTagOperations;
 
   BaseSchemaCatalog(
       Namespace catalogNamespace,
@@ -69,12 +72,18 @@ abstract class BaseSchemaCatalog extends CatalogDTO
       AuditDTO auditDTO,
       RESTClient restClient) {
     super(name, type, provider, comment, properties, auditDTO);
+
     this.restClient = restClient;
     Namespace.check(
         catalogNamespace != null && catalogNamespace.length() == 1,
         "Catalog namespace must be non-null and have 1 level, the input namespace is %s",
         catalogNamespace);
     this.catalogNamespace = catalogNamespace;
+
+    MetadataObject metadataObject =
+        MetadataObjects.of(null, this.name(), MetadataObject.Type.CATALOG);
+    this.objectTagOperations =
+        new MetadataObjectTagOperations(catalogNamespace.level(0), metadataObject, restClient);
   }
 
   @Override
@@ -211,18 +220,23 @@ abstract class BaseSchemaCatalog extends CatalogDTO
   }
 
   @Override
-  public String metalakeName() {
-    return catalogNamespace.level(0);
+  public String[] listTags() {
+    return objectTagOperations.listTags();
   }
 
   @Override
-  public MetadataObject metadataObject() {
-    return MetadataObjects.of(null, this.name(), MetadataObject.Type.CATALOG);
+  public Tag[] listTagsInfo() {
+    return objectTagOperations.listTagsInfo();
   }
 
   @Override
-  public RESTClient restClient() {
-    return restClient;
+  public Tag getTag(String name) {
+    return objectTagOperations.getTag(name);
+  }
+
+  @Override
+  public String[] associateTags(String[] tagsToAdd, String[] tagsToRemove) {
+    return objectTagOperations.associateTags(tagsToAdd, tagsToRemove);
   }
 
   /**

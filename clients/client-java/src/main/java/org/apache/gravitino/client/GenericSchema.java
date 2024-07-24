@@ -24,24 +24,22 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.dto.SchemaDTO;
+import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.tag.SupportsTags;
+import org.apache.gravitino.tag.Tag;
 
 /** Represents a generic schema. */
-public class GenericSchema implements Schema, SupportsTagOperations {
+class GenericSchema implements Schema, SupportsTags {
 
   private final SchemaDTO schemaDTO;
 
-  private final RESTClient restClient;
-
-  private final String metalake;
-
-  private final String catalog;
+  private final MetadataObjectTagOperations objectTagOperations;
 
   GenericSchema(SchemaDTO schemaDTO, RESTClient restClient, String metalake, String catalog) {
     this.schemaDTO = schemaDTO;
-    this.restClient = restClient;
-    this.metalake = metalake;
-    this.catalog = catalog;
+    MetadataObject schemaObject =
+        MetadataObjects.of(catalog, schemaDTO.name(), MetadataObject.Type.SCHEMA);
+    this.objectTagOperations = new MetadataObjectTagOperations(metalake, schemaObject, restClient);
   }
 
   @Override
@@ -70,18 +68,23 @@ public class GenericSchema implements Schema, SupportsTagOperations {
   }
 
   @Override
-  public String metalakeName() {
-    return metalake;
+  public String[] listTags() {
+    return objectTagOperations.listTags();
   }
 
   @Override
-  public MetadataObject metadataObject() {
-    return MetadataObjects.of(catalog, name(), MetadataObject.Type.SCHEMA);
+  public Tag[] listTagsInfo() {
+    return objectTagOperations.listTagsInfo();
   }
 
   @Override
-  public RESTClient restClient() {
-    return restClient;
+  public Tag getTag(String name) throws NoSuchTagException {
+    return objectTagOperations.getTag(name);
+  }
+
+  @Override
+  public String[] associateTags(String[] tagsToAdd, String[] tagsToRemove) {
+    return objectTagOperations.associateTags(tagsToAdd, tagsToRemove);
   }
 
   @Override

@@ -28,7 +28,7 @@ import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.tag.Tag;
 
 /** Represents a generic tag. */
-public class GenericTag implements Tag, Tag.AssociatedObjects {
+class GenericTag implements Tag, Tag.AssociatedObjects {
 
   private final TagDTO tagDTO;
 
