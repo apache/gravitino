@@ -70,21 +70,17 @@ import org.junit.jupiter.api.TestInstance;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class FlinkHiveCatalogIT extends FlinkCommonIT {
   private static final String DEFAULT_HIVE_CATALOG = "test_flink_hive_schema_catalog";
-  private static final String DEFAULT_HIVE_SCHEMA = "test_flink_hive_default_schema";
 
   private static org.apache.gravitino.Catalog hiveCatalog;
 
   @BeforeAll
   static void hiveStartUp() {
     initDefaultHiveCatalog();
-    initDefaultHiveSchema();
   }
 
   @AfterAll
   static void hiveStop() {
     Preconditions.checkNotNull(metalake);
-    Preconditions.checkNotNull(hiveCatalog);
-    hiveCatalog.asSchemas().dropSchema(DEFAULT_HIVE_SCHEMA, true);
     metalake.dropCatalog(DEFAULT_HIVE_CATALOG);
   }
 
@@ -97,11 +93,6 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
             "hive",
             null,
             ImmutableMap.of("metastore.uris", hiveMetastoreUri));
-  }
-
-  private static void initDefaultHiveSchema() {
-    Preconditions.checkNotNull(hiveCatalog);
-    hiveCatalog.asSchemas().createSchema(DEFAULT_HIVE_SCHEMA, null, ImmutableMap.of());
   }
 
   @Test
@@ -393,9 +384,9 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
 
   @Test
   public void testCreateHiveTable() {
-    String tableName, comment;
-    tableName = "test_create_no_partition_table";
-    comment = "test comment";
+    String databaseName = "test_create_hive_table_db";
+    String tableName = "test_create_hive_table";
+    String comment = "test comment";
     String key = "test key";
     String value = "test value";
 
@@ -405,7 +396,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
     // 3. Flink SQL only support to create Interval Month and Second(3).
     doWithSchema(
         metalake.loadCatalog(DEFAULT_HIVE_CATALOG),
-        DEFAULT_HIVE_SCHEMA,
+        databaseName,
         catalog -> {
           TableResult result =
               sql(
@@ -416,7 +407,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
                       + " varchar_type VARCHAR COMMENT 'varchar_type',"
                       + " char_type CHAR COMMENT 'char_type',"
                       + " boolean_type BOOLEAN COMMENT 'boolean_type',"
-                      + " byte_type BINARY COMMENT 'byte_type',"
+                      + " byte_type TINYINT COMMENT 'byte_type',"
                       + " binary_type BINARY(10) COMMENT 'binary_type',"
                       + " decimal_type DECIMAL(10, 2) COMMENT 'decimal_type',"
                       + " bigint_type BIGINT COMMENT 'bigint_type',"
@@ -433,7 +424,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
           TestUtils.assertTableResult(result, ResultKind.SUCCESS);
 
           Table table =
-              catalog.asTableCatalog().loadTable(NameIdentifier.of(DEFAULT_HIVE_SCHEMA, tableName));
+              catalog.asTableCatalog().loadTable(NameIdentifier.of(databaseName, tableName));
           Assertions.assertNotNull(table);
           Assertions.assertEquals(comment, table.comment());
           Assertions.assertEquals(value, table.properties().get(key));
@@ -470,7 +461,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
           assertColumns(columns, table.columns());
           Assertions.assertArrayEquals(EMPTY_TRANSFORM, table.partitioning());
         },
-        false);
+        true);
   }
 
   @Test
@@ -504,16 +495,17 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
               null)
         };
 
+    String databaseName = "test_get_hive_table_db";
     doWithSchema(
         metalake.loadCatalog(DEFAULT_HIVE_CATALOG),
-        DEFAULT_HIVE_SCHEMA,
+        databaseName,
         catalog -> {
           String tableName = "test_desc_table";
           String comment = "comment1";
           catalog
               .asTableCatalog()
               .createTable(
-                  NameIdentifier.of(DEFAULT_HIVE_SCHEMA, "test_desc_table"),
+                  NameIdentifier.of(databaseName, "test_desc_table"),
                   columns,
                   comment,
                   ImmutableMap.of("k1", "v1"));
@@ -523,7 +515,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
           Assertions.assertTrue(flinkCatalog.isPresent());
           try {
             CatalogBaseTable table =
-                flinkCatalog.get().getTable(new ObjectPath(DEFAULT_HIVE_SCHEMA, tableName));
+                flinkCatalog.get().getTable(new ObjectPath(databaseName, tableName));
             Assertions.assertNotNull(table);
             Assertions.assertEquals(CatalogBaseTable.TableKind.TABLE, table.getTableKind());
             Assertions.assertEquals(comment, table.getComment());
@@ -544,7 +536,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
                   org.apache.flink.table.catalog.Column.physical(
                           "boolean_type", DataTypes.BOOLEAN())
                       .withComment("boolean_type"),
-                  org.apache.flink.table.catalog.Column.physical("byte_type", DataTypes.BINARY(1))
+                  org.apache.flink.table.catalog.Column.physical("byte_type", DataTypes.TINYINT())
                       .withComment("byte_type"),
                   org.apache.flink.table.catalog.Column.physical("binary_type", DataTypes.BYTES())
                       .withComment("binary_type"),
@@ -585,7 +577,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
             Assertions.fail(e);
           }
         },
-        false);
+        true);
   }
 
   @Override

@@ -128,6 +128,8 @@ public class TypeUtils {
         return DataTypes.BIGINT();
       case FLOAT:
         return DataTypes.FLOAT();
+      case SHORT:
+        return DataTypes.SMALLINT();
       case DECIMAL:
         Types.DecimalType decimalType = (Types.DecimalType) gravitinoType;
         return DataTypes.DECIMAL(decimalType.precision(), decimalType.scale());
@@ -135,6 +137,7 @@ public class TypeUtils {
         Types.VarCharType varCharType = (Types.VarCharType) gravitinoType;
         return DataTypes.VARCHAR(varCharType.length());
       case FIXED:
+      case FIXEDCHAR:
         Types.FixedCharType charType = (Types.FixedCharType) gravitinoType;
         return DataTypes.CHAR(charType.length());
       case BINARY:

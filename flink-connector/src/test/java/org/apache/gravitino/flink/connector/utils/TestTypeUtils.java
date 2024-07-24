@@ -126,6 +126,9 @@ public class TestTypeUtils {
     Assertions.assertEquals(DataTypes.BOOLEAN(), TypeUtils.toFlinkType(Types.BooleanType.get()));
     Assertions.assertEquals(DataTypes.BYTES(), TypeUtils.toFlinkType(Types.BinaryType.get()));
     Assertions.assertEquals(DataTypes.DATE(), TypeUtils.toFlinkType(Types.DateType.get()));
+    Assertions.assertEquals(DataTypes.DECIMAL(10, 3), TypeUtils.toFlinkType(Types.DecimalType.of(10, 3)));
+    Assertions.assertEquals(DataTypes.CHAR(10), TypeUtils.toFlinkType(Types.FixedCharType.of(10)));
+    Assertions.assertEquals(DataTypes.VARBINARY(10), TypeUtils.toFlinkType(Types.BinaryType.get()));
     Assertions.assertEquals(
         DataTypes.TIMESTAMP(3), TypeUtils.toFlinkType(Types.TimestampType.withoutTimeZone()));
     Assertions.assertEquals(
