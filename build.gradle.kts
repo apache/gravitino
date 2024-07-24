@@ -700,8 +700,8 @@ tasks {
         !it.name.startsWith("filesystem") &&
         !it.name.startsWith("spark") &&
         !it.name.startsWith("iceberg") &&
+        !it.name.startsWith("integration-test") &&
         it.name != "trino-connector" &&
-        it.name != "integration-test" &&
         it.name != "bundled-catalog" &&
         it.name != "flink-connector"
       ) {
