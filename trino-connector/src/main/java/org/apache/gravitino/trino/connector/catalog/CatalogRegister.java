@@ -47,7 +47,9 @@ public class CatalogRegister {
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogRegister.class);
 
-  private static final int MIN_TRINO_SPI_VERSION = 435;
+  private static final int MIN_SUPPORT_TRINO_SPI_VERSION = 435;
+  private static final int MAX_SUPPORT_TRINO_SPI_VERSION = 439;
+  private static final int MIN_SUPPORT_CATALOG_NAME_WITH_METALAKE_TRINO_SPI_VERSION = 446;
   private static final int EXECUTE_QUERY_MAX_RETRIES = 6;
   private static final int EXECUTE_QUERY_BACKOFF_TIME_SECOND = 5;
 
@@ -62,15 +64,29 @@ public class CatalogRegister {
     this.trinoVersion = context.getSpiVersion();
 
     int version = Integer.parseInt(context.getSpiVersion());
-    if (version < MIN_TRINO_SPI_VERSION) {
+    if (version < MIN_SUPPORT_TRINO_SPI_VERSION || version > MAX_SUPPORT_TRINO_SPI_VERSION) {
       String errmsg =
           String.format(
-              "Unsupported Trino-%s version. min support version is Trino-%d",
-              trinoVersion, MIN_TRINO_SPI_VERSION);
+              "Unsupported Trino-%s version. The Gravitino-Trino-connector supported version is Trino-%d to Trino-%d",
+              trinoVersion, MIN_SUPPORT_TRINO_SPI_VERSION, MAX_SUPPORT_TRINO_SPI_VERSION);
       throw new TrinoException(GravitinoErrorCode.GRAVITINO_UNSUPPORTED_TRINO_VERSION, errmsg);
     }
 
     isCoordinator = context.getNodeManager().getCurrentNode().isCoordinator();
+  }
+
+  private void checkSupportCatalogNameWithMetalake(
+      ConnectorContext context, GravitinoConfig config) {
+    if (!config.simplifyCatalogNames()) {
+      int version = Integer.parseInt(context.getSpiVersion());
+      if (version < MIN_SUPPORT_CATALOG_NAME_WITH_METALAKE_TRINO_SPI_VERSION) {
+        String errmsg =
+            String.format(
+                "The Trino-%s version is not support catalog name with metalake, The minimal required version is Trino-%d",
+                trinoVersion, MIN_SUPPORT_CATALOG_NAME_WITH_METALAKE_TRINO_SPI_VERSION);
+        throw new TrinoException(GravitinoErrorCode.GRAVITINO_UNSUPPORTED_TRINO_VERSION, errmsg);
+      }
+    }
   }
 
   boolean isCoordinator() {
@@ -95,6 +111,7 @@ public class CatalogRegister {
   public void init(ConnectorContext context, GravitinoConfig config) throws Exception {
     this.config = config;
     checkTrinoSpiVersion(context);
+    checkSupportCatalogNameWithMetalake(context, config);
 
     TrinoDriver driver = new TrinoDriver();
     DriverManager.registerDriver(driver);
