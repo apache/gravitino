@@ -33,6 +33,7 @@ val artifactName = "gravitino-${project.name}-$scalaVersion"
 dependencies {
   implementation(project(":api"))
   implementation(project(":catalogs:catalog-common"))
+  implementation(project(":catalogs:catalog-hive"))
   implementation(project(":common"))
   implementation(project(":core"))
   implementation(project(":clients:client-java"))
@@ -152,7 +153,7 @@ tasks.test {
     dependsOn(tasks.jar)
 
     doFirst {
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.13")
+      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.12")
     }
 
     val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
