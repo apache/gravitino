@@ -7,8 +7,6 @@ license: "This software is licensed under the Apache License version 2."
 
 # User Docker images
 
-There are two kinds of Docker images you can use: the Apache Gravitino Docker image and playground Docker images.
-
 ## Apache Gravitino Docker image
 
 You can deploy the service with the Gravitino Docker image.
@@ -42,6 +40,24 @@ Changelog
   - Gravitino Server
   - Expose ports:
     - `8090` Gravitino Web UI
+    - `9001` Iceberg REST service
+
+## Gravitino Iceberg REST server Docker image
+
+You can deploy the standalone Gravitino Iceberg REST server with the Docker image.
+
+Container startup commands
+
+```shell
+docker run --rm -d -p 9001:9001 datastrato/gravitino-iceberg-rest-server
+```
+
+Changelog
+
+- gravitino-iceberg-rest-server:0.6.0
+  - Docker image `datastrato/gravitino-iceberg-rest-server:0.6.0`
+  - Gravitino Iceberg REST Server with memory catalog backend.
+  - Expose ports:
     - `9001` Iceberg REST service
 
 ## Playground Docker image

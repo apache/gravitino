@@ -22,11 +22,11 @@ iceberg_rest_server_dir="$(dirname "${BASH_SOURCE-$0}")"
 iceberg_rest_server_dir="$(cd "${iceberg_rest_server_dir}">/dev/null; pwd)"
 gravitino_home="$(cd "${iceberg_rest_server_dir}/../../..">/dev/null; pwd)"
 
-# Prepare compile Iceberg REST server packages
+# Prepare the Iceberg REST server packages
 cd ${gravitino_home}
 ./gradlew clean assembleIcebergRESTServer -x test
 
-# Removed old packages, Avoid multiple re-executions using the wrong file
+# Removed old packages 
 rm -rf "${iceberg_rest_server_dir}/packages"
 mkdir -p "${iceberg_rest_server_dir}/packages"
 
