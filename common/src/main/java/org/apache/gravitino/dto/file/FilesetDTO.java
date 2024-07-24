@@ -25,6 +25,7 @@ import javax.annotation.Nullable;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.dto.AuditDTO;
@@ -33,6 +34,7 @@ import org.apache.gravitino.file.Fileset;
 /** Represents a Fileset DTO (Data Transfer Object). */
 @NoArgsConstructor(access = AccessLevel.PRIVATE, force = true)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
+@EqualsAndHashCode
 public class FilesetDTO implements Fileset {
 
   @JsonProperty("name")

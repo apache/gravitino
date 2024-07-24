@@ -54,7 +54,7 @@ import org.mockserver.matchers.Times;
 import org.mockserver.model.HttpRequest;
 import org.mockserver.model.HttpResponse;
 
-public class TestGravitinoClient extends TestBase {
+public class TestGravitinoAdminClient extends TestBase {
 
   @Test
   public void testListMetalakes() throws JsonProcessingException {
