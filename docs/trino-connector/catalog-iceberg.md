@@ -1,9 +1,8 @@
 ---
-title: "Gravitino connector - Iceberg catalog"
+title: "Apache Gravitino connector - Iceberg catalog"
 slug: /trino-connector/catalog-iceberg
 keyword: gravitino connector trino
-license: "Copyright 2023 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
 Apache Iceberg is an open table format for huge analytic datasets. 
@@ -23,7 +22,7 @@ To use Iceberg, you need:
 
 ### Create a schema
 
-Users can create a schema through Gravitino Trino connector as follows:
+Users can create a schema through Apache Gravitino Trino connector as follows:
 
 ```SQL
 CREATE SCHEMA "metalake.catalog".schema_name 

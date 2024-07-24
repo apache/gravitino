@@ -207,82 +207,82 @@
    Apache Software License 2.0.
 
    Apache Spark
-   ./api/src/main/java/com/datastrato/gravitino/SchemaChange.java
-   ./api/src/main/java/com/datastrato/gravitino/SupportsSchemas.java
-   ./core/src/main/java/com/datastrato/gravitino/connector/SupportsSchemas.java
-   ./api/src/main/java/com/datastrato/gravitino/rel/TableCatalog.java
-   ./api/src/main/java/com/datastrato/gravitino/rel/TableChange.java
-   ./api/src/main/java/com/datastrato/gravitino/rel/expressions/Literal.java
-   ./api/src/main/java/com/datastrato/gravitino/rel/expressions/sorts/NullOrdering.java
-   ./api/src/main/java/com/datastrato/gravitino/rel/expressions/sorts/SortDirection.java
-   ./api/src/main/java/com/datastrato/gravitino/rel/expressions/sorts/SortOrder.java
-   ./api/src/main/java/com/datastrato/gravitino/rel/expressions/transforms/Transform.java
-   ./api/src/main/java/com/datastrato/gravitino/rel/expressions/Expression.java
-   ./api/src/main/java/com/datastrato/gravitino/rel/expressions/NamedReference.java
-   ./spark-connector/spark-connector/src/test/java/com/datastrato/gravitino/spark/connector/integration/test/util/SparkUtilIT.java
+   ./api/src/main/java/org/apache/gravitino/SchemaChange.java
+   ./api/src/main/java/org/apache/gravitino/SupportsSchemas.java
+   ./core/src/main/java/org/apache/gravitino/connector/SupportsSchemas.java
+   ./api/src/main/java/org/apache/gravitino/rel/TableCatalog.java
+   ./api/src/main/java/org/apache/gravitino/rel/TableChange.java
+   ./api/src/main/java/org/apache/gravitino/rel/expressions/Literal.java
+   ./api/src/main/java/org/apache/gravitino/rel/expressions/sorts/NullOrdering.java
+   ./api/src/main/java/org/apache/gravitino/rel/expressions/sorts/SortDirection.java
+   ./api/src/main/java/org/apache/gravitino/rel/expressions/sorts/SortOrder.java
+   ./api/src/main/java/org/apache/gravitino/rel/expressions/transforms/Transform.java
+   ./api/src/main/java/org/apache/gravitino/rel/expressions/Expression.java
+   ./api/src/main/java/org/apache/gravitino/rel/expressions/NamedReference.java
+   ./spark-connector/spark-connector/src/test/java/org/apache/gravitino/spark/connector/integration/test/util/SparkUtilIT.java
 
    Apache Iceberg
-   ./api/src/main/java/com/datastrato/gravitino/exceptions/RESTException.java
-   ./catalogs/catalog-hive/src/main/java/com/datastrato/gravitino/catalog/hive/CachedClientPool.java
-   ./catalogs/catalog-hive/src/main/java/com/datastrato/gravitino/catalog/hive/HiveClientPool.java
-   ./catalogs/catalog-hive/src/main/java/com/datastrato/gravitino/catalog/hive/dyn/DynConstructors.java
-   ./catalogs/catalog-hive/src/main/java/com/datastrato/gravitino/catalog/hive/dyn/DynFields.java
-   ./catalogs/catalog-hive/src/main/java/com/datastrato/gravitino/catalog/hive/dyn/DynMethods.java
-   ./catalogs/catalog-hive/src/test/java/com/datastrato/gravitino/catalog/hive/miniHMS/MiniHiveMetastore.java
-   ./catalogs/catalog-hive/src/test/java/com/datastrato/gravitino/catalog/hive/miniHMS/MiniHiveMetastoreService.java
-   ./catalogs/catalog-hive/src/test/java/com/datastrato/gravitino/catalog/hive/miniHMS/ScriptRunner.java
-   ./catalogs/catalog-hive/src/test/java/com/datastrato/gravitino/catalog/hive/TestCachedClientPool.java
-   ./catalogs/catalog-lakehouse-iceberg/src/main/java/com/datastrato/gravitino/catalog/lakehouse/iceberg/web/IcebergExceptionMapper.java
-   ./catalogs/catalog-lakehouse-iceberg/src/main/java/com/datastrato/gravitino/catalog/lakehouse/iceberg/converter/DescribeIcebergSortOrderVisitor.java
-   ./catalogs/catalog-lakehouse-iceberg/src/main/java/com/datastrato/gravitino/catalog/lakehouse/iceberg/utils/IcebergTablePropertiesUtil.java
-   ./catalogs/catalog-lakehouse-iceberg/src/main/java/com/datastrato/gravitino/catalog/lakehouse/iceberg/IcebergHiveCachedClientPool.java
-   ./clients/client-java/src/main/java/com/datastrato/gravitino/client/HTTPClient.java
-   ./clients/client-java/src/main/java/com/datastrato/gravitino/client/RESTClient.java
-   ./clients/client-java/src/test/java/com/datastrato/gravitino/client/TestHTTPClient.java
-   ./common/src/main/java/com/datastrato/gravitino/rest/RESTUtils.java
-   ./common/src/main/java/com/datastrato/gravitino/rest/RESTMessage.java
-   ./core/src/main/java/com/datastrato/gravitino/utils/ClientPool.java
-   ./core/src/main/java/com/datastrato/gravitino/utils/ClientPoolImpl.java
-   ./common/src/main/java/com/datastrato/gravitino/dto/responses/OAuth2TokenResponse.java
-   ./clients/client-java/src/main/java/com/datastrato/gravitino/client/OAuth2ClientUtil.java
+   ./api/src/main/java/org/apache/gravitino/exceptions/RESTException.java
+   ./catalogs/catalog-hive/src/main/java/org/apache/gravitino/catalog/hive/CachedClientPool.java
+   ./catalogs/catalog-hive/src/main/java/org/apache/gravitino/catalog/hive/HiveClientPool.java
+   ./catalogs/catalog-hive/src/main/java/org/apache/gravitino/catalog/hive/dyn/DynConstructors.java
+   ./catalogs/catalog-hive/src/main/java/org/apache/gravitino/catalog/hive/dyn/DynFields.java
+   ./catalogs/catalog-hive/src/main/java/org/apache/gravitino/catalog/hive/dyn/DynMethods.java
+   ./catalogs/catalog-hive/src/test/java/org/apache/gravitino/catalog/hive/miniHMS/MiniHiveMetastore.java
+   ./catalogs/catalog-hive/src/test/java/org/apache/gravitino/catalog/hive/miniHMS/MiniHiveMetastoreService.java
+   ./catalogs/catalog-hive/src/test/java/org/apache/gravitino/catalog/hive/miniHMS/ScriptRunner.java
+   ./catalogs/catalog-hive/src/test/java/org/apache/gravitino/catalog/hive/TestCachedClientPool.java
+   ./catalogs/catalog-lakehouse-iceberg/src/main/java/org/apache/gravitino/catalog/lakehouse/iceberg/converter/DescribeIcebergSortOrderVisitor.java
+   ./catalogs/catalog-lakehouse-iceberg/src/main/java/org/apache/gravitino/catalog/lakehouse/iceberg/utils/IcebergTablePropertiesUtil.java
+   ./clients/client-java/src/main/java/org/apache/gravitino/client/HTTPClient.java
+   ./clients/client-java/src/main/java/org/apache/gravitino/client/RESTClient.java
+   ./clients/client-java/src/test/java/org/apache/gravitino/client/TestHTTPClient.java
+   ./common/src/main/java/org/apache/gravitino/rest/RESTUtils.java
+   ./common/src/main/java/org/apache/gravitino/rest/RESTMessage.java
+   ./core/src/main/java/org/apache/gravitino/utils/ClientPool.java
+   ./core/src/main/java/org/apache/gravitino/utils/ClientPoolImpl.java
+   ./common/src/main/java/org/apache/gravitino/dto/responses/OAuth2TokenResponse.java
+   ./clients/client-java/src/main/java/org/apache/gravitino/client/OAuth2ClientUtil.java
+   ./iceberg/iceberg-rest-server/src/main/java/org/apache/gravitino/iceberg/service/IcebergExceptionMapper.java
+   ./iceberg/iceberg-common/src/main/java/org/apache/gravitino/iceberg/common/utils/IcebergHiveCachedClientPool.java
    ./gradlew
 
    Apache Paimon
-   ./catalogs/catalog-lakehouse-paimon/src/main/java/com/datastrato/gravitino/catalog/lakehouse/paimon/utils/TypeUtils.java
+   ./catalogs/catalog-lakehouse-paimon/src/main/java/org/apache/gravitino/catalog/lakehouse/paimon/utils/TypeUtils.java
 
    Apache Hive
    ./catalogs/catalog-hive/src/test/resources/hive-schema-3.1.0.derby.sql
 
    Apache Zeppelin
-   ./integration-test-common/src/test/java/com/datastrato/gravitino/integration/test/util/CommandExecutor.java
-   ./integration-test-common/src/test/java/com/datastrato/gravitino/integration/test/util/ProcessData.java
+   ./integration-test-common/src/test/java/org/apache/gravitino/integration/test/util/CommandExecutor.java
+   ./integration-test-common/src/test/java/org/apache/gravitino/integration/test/util/ProcessData.java
    ./web/WEB-INF/web.xml
 
    Apache Hadoop
    ./dev/docker/hive/hadoop-env.sh
    ./dev/docker/kerberos-hive/hadoop-env.sh
    ./dev/docker/kerberos-hive/yarn-env.sh
-   ./common/src/main/java/com/datastrato/gravitino/auth/KerberosUtils.java
-   ./server-common/src/main/java/com/datastrato/gravitino/server/authentication/KerberosAuthenticator.java
-   ./server-common/src/test/java/com/datastrato/gravitino/server/authentication/KerberosTestUtils.java
-   ./server-common/src/main/java/com/datastrato/gravitino/server/authentication/KerberosServerUtils.java
+   ./common/src/main/java/org/apache/gravitino/auth/KerberosUtils.java
+   ./server-common/src/main/java/org/apache/gravitino/server/authentication/KerberosAuthenticator.java
+   ./server-common/src/test/java/org/apache/gravitino/server/authentication/KerberosTestUtils.java
+   ./server-common/src/main/java/org/apache/gravitino/server/authentication/KerberosServerUtils.java
 
    Apache Kafka
    ./integration-test/src/test/resources/run
    ./catalogs/catalog-kafka/src/test/resources/run
-   ./core/src/main/java/com/datastrato/gravitino/utils/Bytes.java
+   ./core/src/main/java/org/apache/gravitino/utils/Bytes.java
 
    Apache Submarine
    ./bin/common.sh
 
    Confluent Kafka Streams Examples
-   ./catalogs/catalog-kafka/src/test/java/com/datastrato/gravitino/catalog/kafka/embedded/KafkaClusterEmbedded.java
-   ./catalogs/catalog-kafka/src/test/java/com/datastrato/gravitino/catalog/kafka/embedded/KafkaEmbedded.java
-   ./catalogs/catalog-kafka/src/test/java/com/datastrato/gravitino/catalog/kafka/embedded/ZooKeeperEmbedded.java
+   ./catalogs/catalog-kafka/src/test/java/org/apache/gravitino/catalog/kafka/embedded/KafkaClusterEmbedded.java
+   ./catalogs/catalog-kafka/src/test/java/org/apache/gravitino/catalog/kafka/embedded/KafkaEmbedded.java
+   ./catalogs/catalog-kafka/src/test/java/org/apache/gravitino/catalog/kafka/embedded/ZooKeeperEmbedded.java
 
    Trino
-   ./integration-test-common/src/test/java/com/datastrato/gravitino/integration/test/util/CloseableGroup.java
-   ./trino-connector/src/main/java/com/datastrato/gravitino/trino/connector/catalog/hive/SortingColumn.java
+   ./integration-test-common/src/test/java/org/apache/gravitino/integration/test/util/CloseableGroup.java
+   ./trino-connector/src/main/java/org/apache/gravitino/trino/connector/catalog/hive/SortingColumn.java
 
    Apache Arrow
    ./dev/ci/util_free_space.sh

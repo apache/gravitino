@@ -1,12 +1,11 @@
 ---
-title: "Gravitino connector development"
+title: "Apache Gravitino connector development"
 slug: /trino-connector/development
 keyword: gravitino connector development 
-license: "Copyright 2024 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
-This document is to guide users through the development of the Gravitino connector for Trino locally.
+This document is to guide users through the development of the Apache Gravitino connector for Trino locally.
 
 ## Prerequisites
 
@@ -134,13 +133,13 @@ then you can see the `gravitino-trino-connecor` source files and directories in 
             ./gradlew publishToMavenLocal
         -->
         <dependency>
-            <groupId>com.datastrato.gravitino</groupId>
+            <groupId>org.apache.gravitino</groupId>
             <artifactId>client-java-runtime</artifactId>
             <version>0.5.1</version>
         </dependency>
 
         <dependency>
-            <groupId>com.datastrato.gravitino</groupId>
+            <groupId>org.apache.gravitino</groupId>
             <artifactId>bundled-catalog</artifactId>
             <version>0.5.1</version>
         </dependency>
@@ -160,7 +159,7 @@ then you can see the `gravitino-trino-connecor` source files and directories in 
 ./mvnw clean -pl 'plugin/trino-gravitino' package -DskipTests -Dcheckstyle.skip -Dair.check.skip-checkstyle=true -DskipTests -Dair.check.skip-all=true
 ```
 :::note
-If a compile error occurs due to `The following artifacts could not be resolved: com.datastrato.gravitino:xxx:jar`, which can be resolved by executing `./gradlew publishToMavenLocal` in gravitino beforehand.
+If a compile error occurs due to `The following artifacts could not be resolved: org.apache.gravitino:xxx:jar`, which can be resolved by executing `./gradlew publishToMavenLocal` in gravitino beforehand.
 :::
 
 7. Set up the configuration for the Gravitino connector in the Trino project. You can do as the following picture shows:
@@ -170,11 +169,6 @@ The corresponding configuration files are here:
 
 - Gravitino properties file: `gravitino.properties`
 ```properties
-#
-# Copyright 2024 Datastrato Pvt Ltd.
-# This software is licensed under the Apache License version 2.
-#
-
 # the connector name is always 'gravitino'
 connector.name=gravitino
 
@@ -187,11 +181,6 @@ gravitino.metalake=test
 ```
 - Trino configuration file: `config.properties`
 ```properties
-#
-# Copyright 2024 Datastrato Pvt Ltd.
-# This software is licensed under the Apache License version 2.
-#
-
 #
 # WARNING
 # ^^^^^^^

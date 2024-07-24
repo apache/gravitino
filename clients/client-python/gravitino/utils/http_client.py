@@ -23,16 +23,22 @@ SOFTWARE.
 """
 
 import logging
+from typing import Tuple
 from urllib.request import Request, build_opener
 from urllib.parse import urlencode
+
 from urllib.error import HTTPError
 import json as _json
 
 from gravitino.auth.auth_constants import AuthConstants
 from gravitino.auth.auth_data_provider import AuthDataProvider
 from gravitino.typing import JSONType
-from gravitino.utils.exceptions import handle_error
+
 from gravitino.constants.timeout import TIMEOUT
+
+from gravitino.dto.responses.error_response import ErrorResponse
+from gravitino.exceptions.base import RESTException, UnknownError
+from gravitino.exceptions.handlers.error_handler import ErrorHandler
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +78,17 @@ class Response:
 
 
 class HTTPClient:
+
+    FORMDATA_HEADER = {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Accept": "application/vnd.gravitino.v1+json",
+    }
+
+    JSON_HEADER = {
+        "Content-Type": "application/json",
+        "Accept": "application/vnd.gravitino.v1+json",
+    }
+
     def __init__(
         self,
         host,
@@ -115,31 +132,50 @@ class HTTPClient:
                 _headers[key] = value
         return _headers
 
-    def _make_request(self, opener, request, timeout=None):
+    def _make_request(self, opener, request, timeout=None) -> Tuple[bool, Response]:
         timeout = timeout or self.timeout
         try:
-            return opener.open(request, timeout=timeout)
+            return (True, Response(opener.open(request, timeout=timeout)))
         except HTTPError as err:
-            exc = handle_error(err)
-            raise exc from None
+            err_body = err.read()
 
+            if err_body is None:
+                return (
+                    False,
+                    ErrorResponse.generate_error_response(RESTException, err.reason),
+                )
+
+            err_resp = ErrorResponse.from_json(err_body, infer_missing=True)
+            err_resp.validate()
+
+            return (False, err_resp)
+
+    # pylint: disable=too-many-locals
     def _request(
-        self, method, endpoint, params=None, json=None, headers=None, timeout=None
+        self,
+        method,
+        endpoint,
+        params=None,
+        json=None,
+        data=None,
+        headers=None,
+        timeout=None,
+        error_handler: ErrorHandler = None,
     ):
         method = method.upper()
         request_data = None
 
+        if data:
+            request_data = urlencode(data.to_dict()).encode()
+            self._update_headers(self.FORMDATA_HEADER)
+        else:
+            if json:
+                request_data = json.to_json().encode("utf-8")
+
+            self._update_headers(self.JSON_HEADER)
+
         if headers:
             self._update_headers(headers)
-        else:
-            headers = {
-                "Content-Type": "application/json",
-                "Accept": "application/vnd.gravitino.v1+json",
-            }
-            self._update_headers(headers)
-
-        if json:
-            request_data = json.to_json().encode("utf-8")
 
         opener = build_opener()
         request = Request(self._build_url(endpoint, params), data=request_data)
@@ -154,19 +190,46 @@ class HTTPClient:
                 self.auth_data_provider.get_token_data().decode("utf-8"),
             )
         request.get_method = lambda: method
-        return Response(self._make_request(opener, request, timeout=timeout))
+        is_success, resp = self._make_request(opener, request, timeout=timeout)
 
-    def get(self, endpoint, params=None, **kwargs):
-        return self._request("get", endpoint, params=params, **kwargs)
+        if is_success:
+            return resp
 
-    def delete(self, endpoint, **kwargs):
-        return self._request("delete", endpoint, **kwargs)
+        if not isinstance(error_handler, ErrorHandler):
+            raise UnknownError(
+                f"Unknown error handler {type(error_handler).__name__}, error response body: {resp}"
+            ) from None
 
-    def post(self, endpoint, json=None, **kwargs):
-        return self._request("post", endpoint, json=json, **kwargs)
+        error_handler.handle(resp)
 
-    def put(self, endpoint, json=None, **kwargs):
-        return self._request("put", endpoint, json=json, **kwargs)
+        # This code generally will not be run because the error handler should define the default behavior,
+        # and raise appropriate
+        raise UnknownError(
+            f"Error handler {type(error_handler).__name__} can't handle this response, error response body: {resp}"
+        ) from None
+
+    def get(self, endpoint, params=None, error_handler=None, **kwargs):
+        return self._request(
+            "get", endpoint, params=params, error_handler=error_handler, **kwargs
+        )
+
+    def delete(self, endpoint, error_handler=None, **kwargs):
+        return self._request("delete", endpoint, error_handler=error_handler, **kwargs)
+
+    def post(self, endpoint, json=None, error_handler=None, **kwargs):
+        return self._request(
+            "post", endpoint, json=json, error_handler=error_handler, **kwargs
+        )
+
+    def put(self, endpoint, json=None, error_handler=None, **kwargs):
+        return self._request(
+            "put", endpoint, json=json, error_handler=error_handler, **kwargs
+        )
+
+    def post_form(self, endpoint, data=None, error_handler=None, **kwargs):
+        return self._request(
+            "post", endpoint, data=data, error_handler=error_handler**kwargs
+        )
 
     def close(self):
         self._request("close", "/")

@@ -1,6 +1,20 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 plugins {
   `maven-publish`
@@ -18,10 +32,10 @@ val artifactName = "gravitino-${project.name}-$scalaVersion"
 
 dependencies {
   implementation(project(":api"))
+  implementation(project(":catalogs:catalog-common"))
   implementation(project(":common"))
   implementation(project(":core"))
   implementation(project(":clients:client-java"))
-  implementation(project(":catalogs:bundled-catalog", configuration = "shadow"))
 
   implementation(libs.bundles.log4j)
   implementation(libs.commons.lang3)
@@ -117,6 +131,7 @@ dependencies {
     exclude("com.google.code.findbugs", "jsr305")
   }
   testImplementation("org.apache.flink:flink-table-planner_$scalaVersion:$flinkVersion")
+  testImplementation("org.apache.flink:flink-test-utils:$flinkVersion")
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
@@ -137,7 +152,7 @@ tasks.test {
     dependsOn(tasks.jar)
 
     doFirst {
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.12")
+      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.13")
     }
 
     val init = project.extra.get("initIntegrationTest") as (Test) -> Unit

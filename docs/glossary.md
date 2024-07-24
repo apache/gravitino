@@ -1,8 +1,7 @@
 ---
-title: "Gravitino Glossary"
+title: "Apache Gravitino Glossary"
 date: 2023-11-28
-license: "Copyright 2023 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
 ## Apache Hadoop
@@ -145,11 +144,11 @@ This software is licensed under the Apache License version 2."
 
 - A Gradle wrapper script, used for executing Gradle commands without installing Gradle separately.
 
-## Gravitino
+## Apache Gravitino
 
-- An open-source software platform created by Datastrato for high-performance, geo-distributed, and federated metadata lakes. Designed to manage metadata directly in different sources, types, and regions, providing unified metadata access for data and AI assets.
+- An open-source software platform originally created by Datastrato for high-performance, geo-distributed, and federated metadata lakes. Designed to manage metadata directly in different sources, types, and regions, providing unified metadata access for data and AI assets.
 
-## Gravitino configuration file (gravitino.conf)
+## Apache Gravitino configuration file (gravitino.conf)
 
 - The configuration file for the Gravitino server, located in the `conf` directory. It follows the standard property file format and contains settings for the Gravitino server.
 
@@ -169,15 +168,15 @@ This software is licensed under the Apache License version 2."
 
 - The port number on which a server listens for incoming connections.
 
-## Iceberg Hive catalog
+## Apache Iceberg Hive catalog
 
 - The **Iceberg Hive catalog** is a specialized metadata service designed for the Apache Iceberg table format, allowing external systems to interact with Iceberg metadata via a Hive metastore thrift client.
 
-## Iceberg REST catalog
+## Apache Iceberg REST catalog
 
 - The **Iceberg REST Catalog** is a specialized metadata service designed for the Apache Iceberg table format, allowing external systems to interact with Iceberg metadata via a RESTful API.
 
-## Iceberg JDBC catalog
+## Apache Iceberg JDBC catalog
 
 - The **Iceberg JDBC Catalog** is a specialized metadata service designed for the Apache Iceberg table format, allowing external systems to interact with Iceberg metadata using JDBC (Java Database Connectivity).
 
@@ -365,7 +364,7 @@ This software is licensed under the Apache License version 2."
 
 - A connector module for integrating Gravitino with Trino.
 
-## Trino Gravitino connector documentation
+## Trino Apache Gravitino connector documentation
 
 -  Documentation providing information on using the Trino connector to access metadata in Gravitino.
 

@@ -1,10 +1,26 @@
 """
-Copyright 2024 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2.
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
 """
 
-# pylint: disable=protected-access
+# pylint: disable=protected-access,too-many-lines
 
+import base64
+import os
 import random
 import string
 import time
@@ -20,10 +36,11 @@ from llama_index.core import SimpleDirectoryReader
 
 from gravitino import gvfs
 from gravitino import NameIdentifier
+from gravitino.auth.auth_constants import AuthConstants
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.fileset_dto import FilesetDTO
 from gravitino.filesystem.gvfs import FilesetContext, StorageType
-from gravitino.exceptions.gravitino_runtime_exception import GravitinoRuntimeException
+from gravitino.exceptions.base import GravitinoRuntimeException
 
 from tests.unittests import mock_base
 
@@ -63,23 +80,48 @@ class TestLocalFilesystem(unittest.TestCase):
         fileset_virtual_location = "fileset/fileset_catalog/tmp/test_cache"
         local_fs.mkdir(fileset_storage_location)
         self.assertTrue(local_fs.exists(fileset_storage_location))
-
+        options = {"cache_size": 1, "cache_expired_time": 2}
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:9090",
             metalake_name="metalake_demo",
-            cache_size=1,
-            cache_expired_time=1,
+            options=options,
         )
         self.assertTrue(fs.exists(fileset_virtual_location))
         # wait 2 seconds
         time.sleep(2)
         self.assertIsNone(
             fs.cache.get(
-                NameIdentifier.of_fileset(
+                NameIdentifier.of(
                     "metalake_demo", "fileset_catalog", "tmp", "test_cache"
                 )
             )
         )
+
+    @patch(
+        "gravitino.catalog.fileset_catalog.FilesetCatalog.load_fileset",
+        return_value=mock_base.mock_load_fileset(
+            "test_simple_auth", f"{_fileset_dir}/test_simple_auth"
+        ),
+    )
+    def test_simple_auth(self, mock_method1, mock_method2, mock_method3, mock_method4):
+        options = {"auth_type": "simple"}
+        current_user = (
+            None if os.environ.get("user.name") is None else os.environ["user.name"]
+        )
+        user = "test_gvfs"
+        os.environ["user.name"] = user
+        fs = gvfs.GravitinoVirtualFileSystem(
+            server_uri="http://localhost:9090",
+            metalake_name="metalake_demo",
+            options=options,
+        )
+        token = fs._client._rest_client.auth_data_provider.get_token_data()
+        token_string = base64.b64decode(
+            token.decode("utf-8")[len(AuthConstants.AUTHORIZATION_BASIC_HEADER) :]
+        ).decode("utf-8")
+        self.assertEqual(f"{user}:dummy", token_string)
+        if current_user is not None:
+            os.environ["user.name"] = current_user
 
     @patch(
         "gravitino.catalog.fileset_catalog.FilesetCatalog.load_fileset",
@@ -690,7 +732,7 @@ class TestLocalFilesystem(unittest.TestCase):
             _properties={},
         )
         mock_hdfs_context: FilesetContext = FilesetContext(
-            name_identifier=NameIdentifier.of_fileset(
+            name_identifier=NameIdentifier.of(
                 "test_metalake", "test_catalog", "test_schema", "test_f1"
             ),
             storage_type=StorageType.HDFS,
@@ -730,7 +772,7 @@ class TestLocalFilesystem(unittest.TestCase):
             _properties={},
         )
         mock_local_context: FilesetContext = FilesetContext(
-            name_identifier=NameIdentifier.of_fileset(
+            name_identifier=NameIdentifier.of(
                 "test_metalake", "test_catalog", "test_schema", "test_f1"
             ),
             storage_type=StorageType.LOCAL,
@@ -771,7 +813,7 @@ class TestLocalFilesystem(unittest.TestCase):
             _properties={},
         )
         mock_hdfs_context: FilesetContext = FilesetContext(
-            name_identifier=NameIdentifier.of_fileset(
+            name_identifier=NameIdentifier.of(
                 "test_metalake", "test_catalog", "test_schema", "test_f1"
             ),
             storage_type=StorageType.HDFS,
@@ -811,7 +853,7 @@ class TestLocalFilesystem(unittest.TestCase):
             _properties={},
         )
         mock_local_context: FilesetContext = FilesetContext(
-            name_identifier=NameIdentifier.of_fileset(
+            name_identifier=NameIdentifier.of(
                 "test_metalake", "test_catalog", "test_schema", "test_f1"
             ),
             storage_type=StorageType.LOCAL,
