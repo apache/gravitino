@@ -37,7 +37,6 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
-import org.apache.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOps;
 import org.apache.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
@@ -50,6 +49,9 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.ops.IcebergTableOps;
+import org.apache.gravitino.iceberg.common.ops.IcebergTableOps.IcebergTableChange;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -112,7 +114,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
     IcebergConfig icebergConfig = new IcebergConfig(resultConf);
 
     this.icebergTableOps = new IcebergTableOps(icebergConfig);
-    this.icebergTableOpsHelper = icebergTableOps.createIcebergTableOpsHelper();
+    this.icebergTableOpsHelper = new IcebergTableOpsHelper(icebergTableOps.getCatalog());
   }
 
   /** Closes the Iceberg catalog and releases the associated client pool. */
@@ -405,7 +407,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       throws NoSuchTableException, IllegalArgumentException {
     try {
       String[] levels = tableIdent.namespace().levels();
-      IcebergTableOpsHelper.IcebergTableChange icebergTableChange =
+      IcebergTableChange icebergTableChange =
           icebergTableOpsHelper.buildIcebergTableChanges(
               NameIdentifier.of(levels[levels.length - 1], tableIdent.name()), changes);
       LoadTableResponse loadTableResponse = icebergTableOps.updateTable(icebergTableChange);
