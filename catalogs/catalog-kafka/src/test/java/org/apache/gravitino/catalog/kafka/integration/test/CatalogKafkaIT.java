@@ -455,7 +455,7 @@ public class CatalogKafkaIT extends AbstractIT {
             catalogName1, CatalogChange.setProperty(BOOTSTRAP_SERVERS, "right_address"));
 
     Assertions.assertEquals("right_address", alteredCatalog.properties().get(BOOTSTRAP_SERVERS));
-    Assertions.assertFalse(alteredCatalog.properties().containsKey(BOOTSTRAP_SERVERS));
+    Assertions.assertTrue(alteredCatalog.properties().containsKey(BOOTSTRAP_SERVERS));
   }
 
   private void assertTopicWithKafka(Topic createdTopic)

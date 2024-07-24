@@ -114,7 +114,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
   private String catalogName = GravitinoITUtils.genRandomName("iceberg_it_catalog");
   private String schemaName = GravitinoITUtils.genRandomName("iceberg_it_schema");
   private String tableName = GravitinoITUtils.genRandomName("iceberg_it_table");
-  private GravitinoMetalake metalake;
+  protected GravitinoMetalake metalake;
   private Catalog catalog;
   private org.apache.iceberg.catalog.Catalog icebergCatalog;
   private org.apache.iceberg.catalog.SupportsNamespaces icebergSupportsNamespaces;
