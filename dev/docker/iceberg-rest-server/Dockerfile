@@ -19,10 +19,10 @@
 FROM openjdk:8-jdk-buster
 LABEL maintainer="support@datastrato.com"
 
-WORKDIR /root/iceberg-rest-server
+WORKDIR /root/gravitino-iceberg-rest-server
 
-COPY packages/iceberg-rest-server /root/iceberg-rest-server
+COPY packages/gravitino-iceberg-rest-server /root/gravitino-iceberg-rest-server
 
 EXPOSE 9001
 
-ENTRYPOINT ["/bin/bash", "/root/iceberg-rest-server/bin/iceberg-rest-server.sh", "start"]
+ENTRYPOINT ["/bin/bash", "/root/gravitino-iceberg-rest-server/bin/gravitino-iceberg-rest-server.sh", "start"]

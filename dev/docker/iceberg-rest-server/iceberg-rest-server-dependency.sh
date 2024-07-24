@@ -32,10 +32,10 @@ mkdir -p "${script_dir}/packages"
 
 cd distribution
 tar xfz gravitino-iceberg-rest-server-*.tar.gz
-cp -r gravitino-iceberg-rest-server*-bin ${script_dir}/packages/iceberg-rest-server
+cp -r gravitino-iceberg-rest-server*-bin ${script_dir}/packages/gravitino-iceberg-rest-server
 
 # Keeping the container running at all times
-cat <<EOF >> "${script_dir}/packages/iceberg-rest-server/bin/iceberg-rest-server.sh"
+cat <<EOF >> "${script_dir}/packages/gravitino-iceberg-rest-server/bin/gravitino-iceberg-rest-server.sh"
 
 # Keeping a process running in the background
 tail -f /dev/null
