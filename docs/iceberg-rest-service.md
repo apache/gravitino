@@ -161,7 +161,7 @@ To start as an auxiliary service with Gravitino server:
 ./bin/gravitino.sh start 
 ```
 
-To start a standalone Iceberg REST catalog server:
+To start a standalone Gravitino Iceberg REST catalog server:
 
 ```shell
 ./bin/gravitino-iceberg-rest-server.sh start
