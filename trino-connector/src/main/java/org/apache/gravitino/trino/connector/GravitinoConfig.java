@@ -73,7 +73,7 @@ public class GravitinoConfig {
       new ConfigEntry(
           "gravitino.cluster",
           "The cluster name of the Trino cluster, if it's empty, all the queries belongs the catalogs will be handled by the "
-              + "current Trino cluster, and if the cluster name is equal to the catalog's cluster, the queries in the catalog "
+              + "current Trino cluster, and if the cluster name is not equal to the catalog's cluster, the queries in the catalog "
               + "will be handle by a remote Trino cluster",
           "",
           false);
