@@ -17,7 +17,7 @@
 # under the License.
 #
 FROM openjdk:8-jdk-buster
-LABEL maintainer="support@datastrato.com"
+LABEL maintainer="dev@gravitino.apache.org"
 
 WORKDIR /root/gravitino-iceberg-rest-server
 
