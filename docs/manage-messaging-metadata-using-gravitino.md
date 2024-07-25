@@ -1,15 +1,15 @@
 ---
-title: "Manage massaging metadata using Gravitino"
+title: "Manage massaging metadata using Apache Gravitino"
 slug: /manage-massaging-metadata-using-gravitino
 date: 2024-4-22
 keyword: Gravitino massaging metadata manage
-license: Copyright 2024 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2.
+license: This software is licensed under the Apache License version 2.
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-This page introduces how to manage messaging metadata using Gravitino. Messaging metadata refers to 
+This page introduces how to manage messaging metadata using Apache Gravitino. Messaging metadata refers to 
 the topic metadata of the messaging system such as Apache Kafka, Apache Pulsar, Apache RocketMQ, etc.
 Through Gravitino, you can create, update, delete, and list topics via unified RESTful APIs or Java client.
 
@@ -29,7 +29,7 @@ For a messaging catalog, you must specify the `type` as `messaging` when creatin
 You can create a catalog by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs`
 endpoint or just use the Gravitino Java client. The following is an example of creating a messaging catalog:
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -59,8 +59,7 @@ Map<String, String> properties = ImmutableMap.<String, String>builder()
     .put("bootstrap.servers", "localhost:9092")
     .build();
 
-Catalog catalog = gravitinoClient.createCatalog(
-    NameIdentifier.of("metalake", "catalog"),
+Catalog catalog = gravitinoClient.createCatalog("catalog",
     Type.MESSAGING,
     "kafka", // provider, Gravitino only supports "kafka" for now.
     "This is a Kafka catalog",
@@ -148,7 +147,7 @@ You can create a topic by sending a `POST` request to the `/api/metalakes/{metal
 endpoint or just use the Gravitino Java client. The following is an example of creating a topic:
 
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -172,7 +171,7 @@ GravitinoClient gravitinoClient = GravitinoClient
     .withMetalake("metalake")
     .build();
 
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+Catalog catalog = gravitinoClient.loadCatalog("catalog");
 TopicCatalog topicCatalog = catalog.asTopicCatalog();
 
 Map<String, String> propertiesMap = ImmutableMap.<String, String>builder()
@@ -181,7 +180,7 @@ Map<String, String> propertiesMap = ImmutableMap.<String, String>builder()
         .build();
 
 topicCatalog.createTopic(
-  NameIdentifier.of("metalake", "catalog", "default", "example_topic"),
+  NameIdentifier.of("default", "example_topic"),
   "This is an example topic",
   null, // The message schema of the topic object. Always null because it's not supported yet.
   propertiesMap,
@@ -197,7 +196,7 @@ You can modify a topic by sending a `PUT` request to the `/api/metalakes/{metala
 endpoint or just use the Gravitino Java client. The following is an example of altering a topic:
 
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -222,11 +221,11 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 // ...
 // Assuming you have just created a Kafka catalog named `catalog`
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+Catalog catalog = gravitinoClient.loadCatalog("catalog");
 
 TopicCatalog topicCatalog = catalog.asTopicCatalog();
 
-Topic t = topicCatalog.alterTopic(NameIdentifier.of("metalake", "catalog", "default", "topic"),
+Topic t = topicCatalog.alterTopic(NameIdentifier.of("default", "topic"),
     TopicChange.removeProperty("key2"), TopicChange.setProperty("key3", "value3"));
 // ...
 ```
@@ -248,7 +247,7 @@ You can remove a topic by sending a `DELETE` request to the `/api/metalakes/{met
 /catalogs/{catalog_name}/schemas/{schema_name}/topics/{topic_name}` endpoint or by using the
 Gravitino Java client. The following is an example of dropping a topic:
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -263,12 +262,12 @@ http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/default/to
 ```java
 // ...
 // Assuming you have just created a Kafka catalog named `catalog`
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+Catalog catalog = gravitinoClient.loadCatalog("catalog");
 
 TopicCatalog topicCatalog = catalog.asTopicCatalog();
 
 // Drop a topic
-topicCatalog.dropTopic(NameIdentifier.of("metalake", "catalog", "default", "topic"));
+topicCatalog.dropTopic(NameIdentifier.of("default", "topic"));
 // ...
 ```
 
@@ -281,7 +280,7 @@ You can list all topics in a schema by sending a `GET` request to the `/api/meta
 {metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/topics` endpoint or by using the
 Gravitino Java client. The following is an example of listing all the topics in a schema:
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -295,11 +294,11 @@ http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/top
 
 ```java
 // ...
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+Catalog catalog = gravitinoClient.loadCatalog("catalog");
 
 TopicCatalog topicCatalog = catalog.asTopicCatalog();
 NameIdentifier[] identifiers =
-    topicCatalog.listTopics(Namespace.ofTopic("metalake", "catalog", "default"));
+    topicCatalog.listTopics(Namespace.of("default"));
 // ...
 ```
 

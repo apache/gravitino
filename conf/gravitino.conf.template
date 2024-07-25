@@ -1,6 +1,20 @@
 #
-# Copyright 2023 Datastrato Pvt Ltd.
-# This software is licensed under the Apache License version 2.
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
 #
 
 # THE CONFIGURATION FOR Gravitino SERVER
@@ -27,15 +41,19 @@ gravitino.server.webserver.requestHeaderSize = 131072
 gravitino.server.webserver.responseHeaderSize = 131072
 
 # THE CONFIGURATION FOR Gravitino ENTITY STORE
-# The entity store to use, kv or relational
-gravitino.entity.store = kv
+# The entity store to use, we only supports relational
+gravitino.entity.store = relational
+# The backend for the entity store, we only supports JDBC
+gravitino.entity.store.relational = JDBCBackend
 
-# The RocksDB entity store
-gravitino.entity.store.kv = RocksDBKvBackend
-# The storage path for RocksDB storage implementation, it supports both absolute and relative path,
-# If the value is a relative path, the final path is "${GRAVITINO_HOME}/${PATH_YOU_HAVA_SET}", default value
-# is "${GRAVITINO_HOME}/data/rocksdb", please uncomment and change it in your production environment.
-# gravitino.entity.store.kv.rocksdbPath = data/rocksdb
+# The JDBC URL for the entity store
+gravitino.entity.store.relational.jdbcUrl = jdbc:h2
+# The JDBC driver class name
+gravitino.entity.store.relational.jdbcDriver = org.h2.Driver
+# The JDBC user name
+gravitino.entity.store.relational.jdbcUser = gravitino
+# The JDBC password
+gravitino.entity.store.relational.jdbcPassword = gravitino
 
 # THE CONFIGURATION FOR Gravitino CATALOG
 # The interval in milliseconds to evict the catalog cache
@@ -45,9 +63,12 @@ gravitino.catalog.cache.evictionIntervalMs = 3600000
 # Auxiliary service names, separate by ','
 gravitino.auxService.names = iceberg-rest
 # Iceberg REST service classpath
-gravitino.auxService.iceberg-rest.classpath = catalogs/lakehouse-iceberg/libs, catalogs/lakehouse-iceberg/conf
+gravitino.iceberg-rest.classpath = iceberg-rest-server/libs, iceberg-rest-server/conf
 # Iceberg REST service host
-gravitino.auxService.iceberg-rest.host = 0.0.0.0
+gravitino.iceberg-rest.host = 0.0.0.0
 # Iceberg REST service http port
-gravitino.auxService.iceberg-rest.httpPort = 9001
-
+gravitino.iceberg-rest.httpPort = 9001
+# The backend Iceberg catalog for Iceberg REST service, it's recommanded to change to hive or jdbc
+gravitino.iceberg-rest.catalog-backend = memory
+# The warehouse directory of Iceberg catalog for Iceberg REST service
+gravitino.iceberg-rest.warehouse = /tmp/

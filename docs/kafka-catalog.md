@@ -3,8 +3,7 @@ title: "Kafka catalog"
 slug: /kafka-catalog
 date: 2024-4-22
 keyword: kafka catalog
-license: "Copyright 2024 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
 ## Introduction
@@ -15,6 +14,8 @@ One Kafka catalog corresponds to one Kafka cluster.
 ## Catalog
 
 ### Catalog properties
+
+Besides the [common catalog properties](./gravitino-server-config.md#gravitino-catalog-properties-configuration), the Kafka catalog has the following properties:
 
 | Property Name       | Description                                                                                                                                                                                                   | Default Value | Required | Since Version |
 |---------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
