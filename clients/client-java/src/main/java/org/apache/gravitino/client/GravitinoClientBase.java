@@ -20,6 +20,7 @@
 package org.apache.gravitino.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.errorprone.annotations.InlineMe;
 import java.io.Closeable;
@@ -186,6 +187,11 @@ public abstract class GravitinoClientBase implements Closeable {
         // Swallow the exception
       }
     }
+  }
+
+  @VisibleForTesting
+  RESTClient restClient() {
+    return restClient;
   }
 
   /** Builder class for constructing a GravitinoClient. */

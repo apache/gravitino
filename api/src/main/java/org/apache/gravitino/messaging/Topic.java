@@ -24,6 +24,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.tag.SupportsTags;
 
 /**
  * An interface representing a topic under a schema {@link Namespace}. A topic is a message queue
@@ -48,5 +49,13 @@ public interface Topic extends Auditable {
   /** @return The properties of the topic object. Empty map is returned if no properties are set. */
   default Map<String, String> properties() {
     return Collections.emptyMap();
+  }
+
+  /**
+   * @return the {@link SupportsTags} if the topic supports tag operations.
+   * @throws UnsupportedOperationException if the topic does not support tag operations.
+   */
+  default SupportsTags supportsTags() {
+    throw new UnsupportedOperationException("Topic does not support tag operations.");
   }
 }
