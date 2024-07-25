@@ -25,16 +25,17 @@ import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.gravitino.iceberg.common.ops.IcebergTableOps;
+import org.apache.gravitino.iceberg.common.ops.IcebergTableOpsManager;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 
-@Path("/v1/{prefix:([^/]*/)?}tables/rename")
+@Path("/v1/{prefix:([^/]*/[^/]*/)?}tables/rename")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 public class IcebergTableRenameOperations {
@@ -43,19 +44,20 @@ public class IcebergTableRenameOperations {
   @Context
   private HttpServletRequest httpRequest;
 
-  private IcebergTableOps icebergTableOps;
+  private IcebergTableOpsManager icebergTableOpsManager;
 
   @Inject
-  public IcebergTableRenameOperations(IcebergTableOps icebergTableOps) {
-    this.icebergTableOps = icebergTableOps;
+  public IcebergTableRenameOperations(IcebergTableOpsManager icebergTableOpsManager) {
+    this.icebergTableOpsManager = icebergTableOpsManager;
   }
 
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Timed(name = "rename-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "rename-table", absolute = true)
-  public Response renameTable(RenameTableRequest renameTableRequest) {
-    icebergTableOps.renameTable(renameTableRequest);
+  public Response renameTable(
+      @PathParam("prefix") String prefix, RenameTableRequest renameTableRequest) {
+    icebergTableOpsManager.getOps(prefix).renameTable(renameTableRequest);
     return IcebergRestUtils.okWithoutContent();
   }
 }

@@ -32,7 +32,7 @@ import org.apache.gravitino.iceberg.service.IcebergRestUtils;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.iceberg.rest.responses.ConfigResponse;
 
-@Path("/v1/{prefix:([^/]*/)?}config")
+@Path("/v1/{prefix:([^/]*/[^/]*/)?}config")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 public class IcebergConfigOperations {

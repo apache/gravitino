@@ -47,6 +47,18 @@ public class MapUtils {
     return Collections.unmodifiableMap(configs);
   }
 
+  public static Map<String, String> filterPrefixMap(Map<String, String> m, String prefix) {
+    Map<String, String> configs = Maps.newHashMap();
+    m.forEach(
+        (k, v) -> {
+          if (k.startsWith(prefix)) {
+            configs.put(k, v);
+          }
+        });
+
+    return Collections.unmodifiableMap(configs);
+  }
+
   /**
    * Returns an unmodifiable map.
    *
