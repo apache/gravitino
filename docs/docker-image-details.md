@@ -97,7 +97,7 @@ You can use this kind of image to test the catalog of Apache Hive with kerberos 
 
 Changelog
 - gravitino-ci-kerberos-hive:0.1.5
-  - Start another HMS service in the container with port 19083.
+  - Start another HMS for the Hive cluster in the container with port 19083. This is to test whether Kerberos authentication works for a Kerberos-enabled Hive cluster with multiple HMS.
   - Refresh ssh keys in the startup script.
   - Add test logic to log in localhost via ssh without password.
 
