@@ -54,19 +54,19 @@ import org.slf4j.LoggerFactory;
 public class TrinoQueryIT extends TrinoQueryITBase {
   private static final Logger LOG = LoggerFactory.getLogger(TrinoQueryIT.class);
 
-  protected static String testsetsDir = "";
-  protected AtomicInteger passCount = new AtomicInteger(0);
-  protected AtomicInteger totalCount = new AtomicInteger(0);
-  protected static boolean exitOnFailed = true;
+  static String testsetsDir = "";
+  AtomicInteger passCount = new AtomicInteger(0);
+  AtomicInteger totalCount = new AtomicInteger(0);
+  static boolean exitOnFailed = true;
 
   // key: tester name, value: tester result
   private static Map<String, TestStatus> allTestStatus = new TreeMap<>();
 
   private static int testParallelism = 2;
 
-  private static Map<String, String> queryParams = new HashMap<>();
+  static Map<String, String> queryParams = new HashMap<>();
 
-  public static Set<String> ciTestsets = new HashSet<>();
+  static Set<String> ciTestsets = new HashSet<>();
 
   static {
     testsetsDir = TrinoQueryIT.class.getClassLoader().getResource("trino-ci-testset").getPath();

@@ -30,6 +30,7 @@ jobs:
               - core/**
               - dev/**
               - gradle/**
+              - iceberg/**
               - integration-test/**
               - meta/**
               - server/**
@@ -92,12 +93,13 @@ jobs:
           name: integrate test reports
           path: |
             build/reports
+            iceberg/iceberg-rest-server/build/*.log
             integration-test/build/*.log
             integration-test/build/*.tar
             integration-test/build/trino-ci-container-log/hive/*.*
             integration-test/build/trino-ci-container-log/hdfs/*.*
-            distribution/package/logs/gravitino-server.out
-            distribution/package/logs/gravitino-server.log
+            distribution/package/logs/*.out
+            distribution/package/logs/*.log
             catalogs/**/*.log
             catalogs/**/*.tar
             distribution/**/*.log
