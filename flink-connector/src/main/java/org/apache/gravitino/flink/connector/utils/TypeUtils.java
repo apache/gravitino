@@ -37,6 +37,8 @@ public class TypeUtils {
         return Types.DoubleType.get();
       case INTEGER:
         return Types.IntegerType.get();
+      case BIGINT:
+        return Types.LongType.get();
       default:
         throw new UnsupportedOperationException(
             "Not support type: " + logicalType.asSummaryString());
@@ -51,6 +53,8 @@ public class TypeUtils {
         return DataTypes.STRING();
       case INTEGER:
         return DataTypes.INT();
+      case LONG:
+        return DataTypes.BIGINT();
       default:
         throw new UnsupportedOperationException("Not support " + gravitinoType.toString());
     }

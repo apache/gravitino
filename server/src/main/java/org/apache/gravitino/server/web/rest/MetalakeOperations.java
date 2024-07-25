@@ -83,10 +83,10 @@ public class MetalakeOperations {
           () -> {
             Metalake[] metalakes =
                 TreeLockUtils.doWithRootTreeLock(LockType.READ, metalakeDispatcher::listMetalakes);
-            MetalakeDTO[] metalakeDTOS =
+            MetalakeDTO[] metalakeDTOs =
                 Arrays.stream(metalakes).map(DTOConverters::toDTO).toArray(MetalakeDTO[]::new);
-            Response response = Utils.ok(new MetalakeListResponse(metalakeDTOS));
-            LOG.info("List {} metalakes in Gravitino", metalakeDTOS.length);
+            Response response = Utils.ok(new MetalakeListResponse(metalakeDTOs));
+            LOG.info("List {} metalakes in Gravitino", metalakeDTOs.length);
             return response;
           });
 

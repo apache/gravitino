@@ -18,8 +18,10 @@
  */
 package org.apache.gravitino.catalog.hadoop;
 
-import java.util.Collections;
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.gravitino.catalog.hadoop.authentication.AuthenticationConfig;
+import org.apache.gravitino.catalog.hadoop.authentication.kerberos.KerberosConfig;
 import org.apache.gravitino.connector.BasePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
@@ -27,6 +29,9 @@ public class HadoopFilesetPropertiesMetadata extends BasePropertiesMetadata {
 
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
-    return Collections.emptyMap();
+    ImmutableMap.Builder<String, PropertyEntry<?>> builder = ImmutableMap.builder();
+    builder.putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES);
+    builder.putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES);
+    return builder.build();
   }
 }

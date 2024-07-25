@@ -100,7 +100,7 @@ public class ContainerSuite implements Closeable {
 
   public void startHiveContainer() {
     startHiveContainer(
-        ImmutableMap.<String, String>builder().put("HADOOP_USER_NAME", "datastrato").build());
+        ImmutableMap.<String, String>builder().put("HADOOP_USER_NAME", "anonymous").build());
   }
 
   /**
@@ -159,7 +159,7 @@ public class ContainerSuite implements Closeable {
               TrinoContainer.builder()
                   .withEnvVars(
                       ImmutableMap.<String, String>builder()
-                          .put("HADOOP_USER_NAME", "datastrato")
+                          .put("HADOOP_USER_NAME", "anonymous")
                           .put("GRAVITINO_HOST_IP", "host.docker.internal")
                           .put("GRAVITINO_HOST_PORT", String.valueOf(gravitinoServerPort))
                           .put("GRAVITINO_METALAKE_NAME", metalakeName)

@@ -18,11 +18,10 @@
  */
 package org.apache.gravitino.flink.connector.hive;
 
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
-
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.flink.configuration.Configuration;
+import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -52,7 +51,7 @@ public class TestHivePropertiesConverter {
         "value", properties.get("flink.bypass.key"), "The prefix have already existed");
     Assertions.assertEquals(
         "thrift://127.0.0.1:9084",
-        properties.get(METASTORE_URIS),
+        properties.get(HiveConstants.METASTORE_URIS),
         "The key is converted to Gravitino Config");
   }
 
