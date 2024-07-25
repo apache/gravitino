@@ -133,11 +133,11 @@ public class GravitinoCatalog {
     return properties.getOrDefault("cluster", "");
   }
 
-  public boolean isLocalCluster(String cluster) {
+  public boolean belongToCluster(String cluster) {
     // When the Gravitino connector has not configured the cluster,
     // or the catalog has not configured the cluster,
     // or the catalog cluster name is equal to the connector-configured cluster name,
-    // we handle all the queries through the local Trino cluster.
+    // the catalog is belong to the cluster
     return StringUtils.isEmpty(cluster)
         || StringUtils.isEmpty(getCluster())
         || cluster.equals(getCluster());
