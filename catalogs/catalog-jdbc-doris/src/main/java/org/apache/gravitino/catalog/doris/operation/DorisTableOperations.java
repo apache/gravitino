@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.doris.operation;
 
+import static org.apache.gravitino.catalog.doris.utils.DorisUtils.generatePartitionSqlFragment;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.base.Preconditions;
@@ -54,16 +55,18 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Strategy;
+import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.rel.partitions.ListPartition;
+import org.apache.gravitino.rel.partitions.RangePartition;
 
 /** Table operations for Apache Doris. */
 public class DorisTableOperations extends JdbcTableOperations {
   private static final String BACK_QUOTE = "`";
   private static final String DORIS_AUTO_INCREMENT = "AUTO_INCREMENT";
-  private static final String DOUBLE_QUOTE = "\"";
   private static final String NEW_LINE = "\n";
 
   @Override
@@ -194,7 +197,6 @@ public class DorisTableOperations extends JdbcTableOperations {
   }
 
   private static void appendIndexesSql(Index[] indexes, StringBuilder sqlBuilder) {
-
     if (indexes.length == 0) {
       return;
     }
@@ -252,33 +254,17 @@ public class DorisTableOperations extends JdbcTableOperations {
 
     StringBuilder partitionSqlBuilder = new StringBuilder(NEW_LINE);
     String partitionDefinition =
-        String.format(" PARTITION BY RANGE(`%s`) ", rangePartition.fieldName()[0]);
+        String.format(" PARTITION BY RANGE(`%s`)", rangePartition.fieldName()[0]);
     partitionSqlBuilder.append(partitionDefinition).append(NEW_LINE).append("(");
 
     // Assign range partitions
     RangePartition[] assignments = rangePartition.assignments();
     if (!ArrayUtils.isEmpty(assignments)) {
-      ImmutableList.Builder<String> partitions = ImmutableList.builder();
-      for (RangePartition part : assignments) {
-        StringBuilder partitionAssignSqlBuilder = new StringBuilder();
-        partitionAssignSqlBuilder.append(String.format(" PARTITION `%s` VALUES", part.name()));
-        Literal<?> upper = part.upper();
-        Literal<?> lower = part.lower();
-        if (Literals.NULL.equals(upper) && Literals.NULL.equals(lower)) {
-          partitionAssignSqlBuilder.append(" LESS THAN MAXVALUE");
-        } else if (Literals.NULL.equals(lower)) {
-          partitionAssignSqlBuilder.append(String.format(" LESS THAN (\"%s\")", upper.value()));
-        } else if (Literals.NULL.equals(upper)) {
-          partitionAssignSqlBuilder.append(String.format(" [(\"%s\"), (MAXVALUE))", lower.value()));
-        } else {
-          partitionAssignSqlBuilder.append(
-              String.format(" [(\"%s\"), (\"%s\"))", lower.value(), upper.value()));
-        }
-        partitions.add(partitionAssignSqlBuilder.toString());
-      }
-      partitionSqlBuilder
-          .append(NEW_LINE)
-          .append(partitions.build().stream().collect(Collectors.joining("," + NEW_LINE)));
+      String partitionSqlFragments =
+          Arrays.stream(assignments)
+              .map(DorisUtils::generatePartitionSqlFragment)
+              .collect(Collectors.joining("," + NEW_LINE));
+      partitionSqlBuilder.append(NEW_LINE).append(partitionSqlFragments);
     }
 
     partitionSqlBuilder.append(NEW_LINE).append(")");
@@ -301,37 +287,22 @@ public class DorisTableOperations extends JdbcTableOperations {
         partitionColumnsBuilder.build().stream().collect(Collectors.joining(","));
 
     StringBuilder partitionSqlBuilder = new StringBuilder(NEW_LINE);
-    String partitionDefinition = String.format(" PARTITION BY LIST(%s) ", partitionColumns);
+    String partitionDefinition = String.format(" PARTITION BY LIST(%s)", partitionColumns);
     partitionSqlBuilder.append(partitionDefinition).append(NEW_LINE).append("(");
 
     // Assign list partitions
     ListPartition[] assignments = listPartition.assignments();
     if (!ArrayUtils.isEmpty(assignments)) {
       ImmutableList.Builder<String> partitions = ImmutableList.builder();
-      for (ListPartition parts : assignments) {
-        ImmutableList.Builder<String> partitionValues = ImmutableList.builder();
-        for (Literal<?>[] part : parts.lists()) {
-          Preconditions.checkArgument(
-              part.length == filedNames.length,
-              "The number of partitioning columns must be consistent.");
-          String partitionValuesSql;
-          if (part.length > 1) {
-            partitionValuesSql =
-                String.format(
-                    "(%s)",
-                    Arrays.stream(part)
-                        .map(p -> DOUBLE_QUOTE + p.value() + DOUBLE_QUOTE)
-                        .collect(Collectors.joining(",")));
-          } else {
-            partitionValuesSql = String.format("`%s`", part[0].value());
-          }
-          partitionValues.add(partitionValuesSql);
-        }
-        String partitionAssignSql =
-            String.format(
-                " PARTITION `%s` VALUES IN (%s)",
-                parts.name(), partitionValues.build().stream().collect(Collectors.joining(",")));
-        partitions.add(partitionAssignSql);
+      for (ListPartition part : assignments) {
+        Literal<?>[][] lists = part.lists();
+        Preconditions.checkArgument(
+            lists.length > 0, "The number of values in list partition must be greater than 0");
+        Preconditions.checkArgument(
+            Arrays.stream(lists).allMatch(p -> p.length == filedNames.length),
+            "The number of partitioning columns must be consistent");
+
+        partitions.add(generatePartitionSqlFragment(part));
       }
       partitionSqlBuilder
           .append(NEW_LINE)
