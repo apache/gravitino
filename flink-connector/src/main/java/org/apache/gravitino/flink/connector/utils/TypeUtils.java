@@ -25,6 +25,7 @@ import java.util.stream.Collectors;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.ArrayType;
+import org.apache.flink.table.types.logical.BinaryType;
 import org.apache.flink.table.types.logical.CharType;
 import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.LogicalType;
@@ -53,6 +54,8 @@ public class TypeUtils {
       case BOOLEAN:
         return Types.BooleanType.get();
       case BINARY:
+        BinaryType binaryType = (BinaryType) logicalType;
+        return Types.FixedType.of(binaryType.getLength());
       case VARBINARY:
         return Types.BinaryType.get();
       case DECIMAL:
@@ -81,7 +84,6 @@ public class TypeUtils {
         ArrayType arrayType = (ArrayType) logicalType;
         Type elementType = toGravitinoType(arrayType.getElementType());
         return Types.ListType.of(elementType, arrayType.isNullable());
-      case MULTISET:
       case MAP:
         MapType mapType = (MapType) logicalType;
         Type keyType = toGravitinoType(mapType.getKeyType());
@@ -105,6 +107,7 @@ public class TypeUtils {
         return Types.StructType.of(fields);
       case NULL:
         return Types.NullType.get();
+      case MULTISET:
       case STRUCTURED_TYPE:
       case UNRESOLVED:
       case DISTINCT_TYPE:
@@ -137,6 +140,8 @@ public class TypeUtils {
         Types.VarCharType varCharType = (Types.VarCharType) gravitinoType;
         return DataTypes.VARCHAR(varCharType.length());
       case FIXED:
+        Types.FixedType fixedType = (Types.FixedType) gravitinoType;
+        return DataTypes.CHAR(fixedType.length());
       case FIXEDCHAR:
         Types.FixedCharType charType = (Types.FixedCharType) gravitinoType;
         return DataTypes.CHAR(charType.length());

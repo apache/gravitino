@@ -60,7 +60,7 @@ public class TestTypeUtils {
     Assertions.assertEquals(
         Types.FixedCharType.of(10), TypeUtils.toGravitinoType(new CharType(10)));
     Assertions.assertEquals(Types.BooleanType.get(), TypeUtils.toGravitinoType(new BooleanType()));
-    Assertions.assertEquals(Types.BinaryType.get(), TypeUtils.toGravitinoType(new BinaryType(10)));
+    Assertions.assertEquals(Types.FixedType.of(10), TypeUtils.toGravitinoType(new BinaryType(10)));
     Assertions.assertEquals(Types.ByteType.get(), TypeUtils.toGravitinoType(new TinyIntType()));
     Assertions.assertEquals(Types.DateType.get(), TypeUtils.toGravitinoType(new DateType()));
     Assertions.assertEquals(Types.BinaryType.get(), TypeUtils.toGravitinoType(new VarBinaryType()));
@@ -130,6 +130,7 @@ public class TestTypeUtils {
         DataTypes.DECIMAL(10, 3), TypeUtils.toFlinkType(Types.DecimalType.of(10, 3)));
     Assertions.assertEquals(DataTypes.CHAR(10), TypeUtils.toFlinkType(Types.FixedCharType.of(10)));
     Assertions.assertEquals(DataTypes.BYTES(), TypeUtils.toFlinkType(Types.BinaryType.get()));
+    Assertions.assertEquals(DataTypes.CHAR(10), TypeUtils.toFlinkType(Types.FixedType.of(10)));
     Assertions.assertEquals(
         DataTypes.TIMESTAMP(6), TypeUtils.toFlinkType(Types.TimestampType.withoutTimeZone()));
     Assertions.assertEquals(
