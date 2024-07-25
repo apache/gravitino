@@ -23,6 +23,7 @@ from typing import Dict, List
 from gravitino import GravitinoAdminClient, GravitinoMetalake, MetalakeChange
 from gravitino.dto.dto_converters import DTOConverters
 from gravitino.dto.requests.metalake_updates_request import MetalakeUpdatesRequest
+from gravitino.exceptions.base import NoSuchMetalakeException, MetalakeAlreadyExistsException
 from tests.integration.integration_test_env import IntegrationTestEnv
 
 logger = logging.getLogger(__name__)
@@ -74,6 +75,10 @@ class TestMetalake(IntegrationTestEnv):
             self.metalake_comment,
             self.metalake_properties,
         )
+
+    def test_failed_create_metalake(self):
+        with self.assertRaises(NoSuchMetalakeException):
+            _ = self.create_metalake(self.metalake_name)
 
     def test_alter_metalake(self):
         self.create_metalake(self.metalake_name)
@@ -139,3 +144,8 @@ class TestMetalake(IntegrationTestEnv):
         self.assertEqual(metalake.comment(), self.metalake_comment)
         self.assertEqual(metalake.properties(), self.metalake_properties)
         self.assertEqual(metalake.audit_info().creator(), "anonymous")
+
+    def test_failed_load_metalakes(self):
+        self.create_metalake(self.metalake_name)
+        with self.assertRaises(NoSuchMetalakeException):
+            _ = self.gravitino_admin_client.load_metalake(self.metalake_name)
