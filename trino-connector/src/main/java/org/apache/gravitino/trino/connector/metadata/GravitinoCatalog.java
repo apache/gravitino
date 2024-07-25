@@ -134,8 +134,10 @@ public class GravitinoCatalog {
   }
 
   public boolean isLocalCluster(String cluster) {
-    // Local cluster catalog means the gravitino connector has not configured the cluster or
-    // the catalog has not config the cluster or the cluster name is equals
+    // When the Gravitino connector has not configured the cluster,
+    // or the catalog has not configured the cluster,
+    // or the catalog cluster name is equal to the connector-configured cluster name,
+    // we handle all the queries through the local Trino cluster.
     return StringUtils.isEmpty(cluster)
         || StringUtils.isEmpty(getCluster())
         || cluster.equals(getCluster());
