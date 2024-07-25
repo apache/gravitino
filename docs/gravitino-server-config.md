@@ -45,7 +45,7 @@ You can also specify filter parameters by setting configuration entries of the f
 #### Storage backend configuration
 
 Currently, Gravitino only supports JDBC database backend, and the default implementation is H2 database as it's an embedded database, has no external dependencies and is very suitable for local development or tests.
-If you are going to use H2 in the production environment, Gravitino will not guarantee the data consistency and durability. We highly recommend using MySQL as the backend database.  
+If you are going to use H2 in the production environment, Gravitino will not guarantee the data consistency and durability. It's highly recommended using MySQL as the backend database.  
 
 The following table lists the storage configuration items:
 

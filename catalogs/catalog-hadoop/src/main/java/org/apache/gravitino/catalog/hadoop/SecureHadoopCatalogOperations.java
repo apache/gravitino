@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.catalog.hadoop;
 
+import static org.apache.gravitino.catalog.hadoop.authentication.AuthenticationConfig.IMPERSONATION_ENABLE_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -82,6 +83,7 @@ public class SecureHadoopCatalogOperations
   private final List<Closeable> closeables = Lists.newArrayList();
 
   private final Map<NameIdentifier, UserInfo> userInfoMap = Maps.newConcurrentMap();
+  private final Map<NameIdentifier, Boolean> impersonationEnableMap = Maps.newConcurrentMap();
 
   public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-%s";
 
@@ -106,18 +108,12 @@ public class SecureHadoopCatalogOperations
 
   static class UserInfo {
     UserGroupInformation loginUser;
-    boolean enableUserImpersonation;
     String keytabPath;
     String realm;
 
-    static UserInfo of(
-        UserGroupInformation loginUser,
-        boolean enableUserImpersonation,
-        String keytabPath,
-        String kerberosRealm) {
+    static UserInfo of(UserGroupInformation loginUser, String keytabPath, String kerberosRealm) {
       UserInfo userInfo = new UserInfo();
       userInfo.loginUser = loginUser;
-      userInfo.enableUserImpersonation = enableUserImpersonation;
       userInfo.keytabPath = keytabPath;
       userInfo.realm = kerberosRealm;
       return userInfo;
@@ -166,7 +162,7 @@ public class SecureHadoopCatalogOperations
     UserGroupInformation currentUser = getUGIByIdent(filesetEntity.properties(), ident);
 
     boolean r = doAs(currentUser, () -> hadoopCatalogOperations.dropFileset(ident), ident);
-    cleanUserInfo(ident);
+    cleanUserInfoAndImpersonation(ident);
     return r;
   }
 
@@ -200,7 +196,7 @@ public class SecureHadoopCatalogOperations
       UserGroupInformation user = getUGIByIdent(properties, ident);
 
       boolean r = doAs(user, () -> hadoopCatalogOperations.dropSchema(ident, cascade), ident);
-      cleanUserInfo(ident);
+      cleanUserInfoAndImpersonation(ident);
       return r;
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to delete schema " + ident, ioe);
@@ -230,6 +226,12 @@ public class SecureHadoopCatalogOperations
       UserInfo userInfo = userInfoMap.remove(ident);
       if (userInfo != null) {
         userInfoMap.put(NameIdentifier.of(ident.namespace(), finalName), userInfo);
+      }
+
+      Boolean impersonationEnable = impersonationEnableMap.remove(ident);
+      if (impersonationEnable != null) {
+        impersonationEnableMap.put(
+            NameIdentifier.of(ident.namespace(), finalName), impersonationEnable);
       }
     }
 
@@ -267,6 +269,7 @@ public class SecureHadoopCatalogOperations
     hadoopCatalogOperations.close();
 
     userInfoMap.clear();
+    impersonationEnableMap.clear();
     closeables.forEach(
         c -> {
           try {
@@ -298,9 +301,9 @@ public class SecureHadoopCatalogOperations
       try {
         // Use service login user.
         UserGroupInformation u = UserGroupInformation.getCurrentUser();
-        userInfoMap.put(
-            NameIdentifier.of(catalogInfo.namespace(), catalogInfo.name()),
-            UserInfo.of(u, config.isImpersonationEnabled(), null, null));
+        NameIdentifier ident = NameIdentifier.of(catalogInfo.namespace(), catalogInfo.name());
+        userInfoMap.put(ident, UserInfo.of(u, null, null));
+        impersonationEnableMap.put(ident, false);
       } catch (Exception e) {
         throw new RuntimeException("Can't get service user for Hadoop catalog", e);
       }
@@ -340,12 +343,8 @@ public class SecureHadoopCatalogOperations
         String kerberosRealm = kerberosClient.login(keytabFile.getAbsolutePath());
         // Should this kerberosRealm need to be equals to the realm in the principal?
         userInfoMap.put(
-            ident,
-            UserInfo.of(
-                UserGroupInformation.getLoginUser(),
-                kerberosConfig.isImpersonationEnabled(),
-                keytabPath,
-                kerberosRealm));
+            ident, UserInfo.of(UserGroupInformation.getLoginUser(), keytabPath, kerberosRealm));
+        impersonationEnableMap.put(ident, kerberosConfig.isImpersonationEnabled());
         return kerberosRealm;
       } catch (IOException e) {
         throw new RuntimeException("Failed to login with Kerberos", e);
@@ -360,6 +359,10 @@ public class SecureHadoopCatalogOperations
     if (kerberosConfig.isKerberosAuth()) {
       // We assume that the realm of catalog is the same as the realm of the schema and table.
       initKerberos(properties, new Configuration(), ident, false);
+    } else if (kerberosConfig.isSimpleAuth()) {
+      if (properties.containsKey(IMPERSONATION_ENABLE_KEY)) {
+        impersonationEnableMap.put(ident, kerberosConfig.isImpersonationEnabled());
+      }
     }
     // If the kerberos is not enabled (simple mode), we will use the current user
     return getUserBaseOnNameIdentifier(ident);
@@ -372,7 +375,7 @@ public class SecureHadoopCatalogOperations
     }
 
     UserGroupInformation ugi = userInfo.loginUser;
-    boolean userImpersonation = userInfo.enableUserImpersonation;
+    boolean userImpersonation = getNearestImpersonationEnable(nameIdentifier);
     if (userImpersonation) {
       String proxyKerberosPrincipalName = PrincipalUtils.getCurrentUserName();
       if (!proxyKerberosPrincipalName.contains("@")) {
@@ -384,6 +387,23 @@ public class SecureHadoopCatalogOperations
     }
 
     return ugi;
+  }
+
+  private Boolean getNearestImpersonationEnable(NameIdentifier nameIdentifier) {
+    NameIdentifier currentNameIdentifier = nameIdentifier;
+    while (currentNameIdentifier != null) {
+      if (impersonationEnableMap.containsKey(currentNameIdentifier)) {
+        return impersonationEnableMap.get(currentNameIdentifier);
+      }
+
+      String[] levels = currentNameIdentifier.namespace().levels();
+      // The ident is catalog level.
+      if (levels.length <= 1) {
+        return false;
+      }
+      currentNameIdentifier = NameIdentifier.of(currentNameIdentifier.namespace().levels());
+    }
+    return false;
   }
 
   private UserInfo getNearestUserGroupInformation(NameIdentifier nameIdentifier) {
@@ -403,11 +423,13 @@ public class SecureHadoopCatalogOperations
     return null;
   }
 
-  private void cleanUserInfo(NameIdentifier identifier) {
+  private void cleanUserInfoAndImpersonation(NameIdentifier identifier) {
     UserInfo userInfo = userInfoMap.remove(identifier);
     if (userInfo != null) {
       removeFile(userInfo.keytabPath);
     }
+
+    impersonationEnableMap.remove(identifier);
   }
 
   private void removeFile(String filePath) {
