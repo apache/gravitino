@@ -394,7 +394,7 @@ public class TestEntityProtoSerDe {
         Namespace.of("metalake", Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.ROLE_SCHEMA_NAME);
     Long roleId = 1L;
     String roleName = "testRole";
-    String anotherCatalogName = "anotheCatalog";
+    String anotherCatalogName = "anotherCatalog";
     SecurableObject securableObject =
         SecurableObjects.ofCatalog(
             catalogName,
