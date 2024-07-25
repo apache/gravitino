@@ -42,7 +42,12 @@ You can also specify filter parameters by setting configuration entries of the f
 
 ### Storage configuration
 
-Currently, Gravitino only supports JDBC backend, and the default implementation is H2, if you are going to use H2 in the production environment, Gravitino will not guarantee the data consistency and durability. We recommend using MySQL as the backend database.  
+#### Storage backend configuration
+
+Currently, Gravitino only supports JDBC database backend, and the default implementation is H2 database as it's an embedded database, has no external dependencies and is very suitable for local development or tests.
+If you are going to use H2 in the production environment, Gravitino will not guarantee the data consistency and durability. We highly recommend using MySQL as the backend database.  
+
+The following table lists the storage configuration items:
 
 | Configuration item                                | Description                                                                                                                                                                                                                                         | Default value                    | Required                                         | Since version |
 |---------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------|--------------------------------------------------|---------------|
@@ -63,6 +68,10 @@ Currently, Gravitino only supports JDBC backend, and the default implementation 
 :::caution
 We strongly recommend that you change the default value of `gravitino.entity.store.relational.storagePath`, as it's under the deployment directory and future version upgrades may remove it.
 :::
+
+#### Create JDBC backend schema and table 
+
+For H2 database, All tables needed by Gravitino are created automatically when the Gravitino server starts up. For MySQL, you should firstly initialize the database tables yourself by executing the ddl scripts in the `${GRAVITINO_HOME}/scripts/mysql/` directory.
 
 ### Tree lock configuration
 

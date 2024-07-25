@@ -36,19 +36,19 @@ Besides the [common catalog properties](./gravitino-server-config.md#gravitino-c
 | `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.     | 60            | No                                                          | 0.5.1         |
 
 
-### Authentication Strategy for Hadoop Catalog
+### Authentication for Hadoop Catalog
 
-The Hadoop catalog supports multi-level authentication to control access, allowing different strategies for the catalog, schema, and fileset. The priority of authentication strategies is as follows: catalog < schema < fileset.
+The Hadoop catalog supports multi-level authentication to control access, allowing different authentication settings for the catalog, schema, and fileset. The priority of authentication settings is as follows: catalog < schema < fileset. Specifically:
 
-- **Catalog**: Default authentication is simple.
-- **Schema**: Inherits the authentication strategy from the catalog if not explicitly set.
-- **Fileset**: Inherits the authentication strategy from the schema if not explicitly set.
+- **Catalog**: The default authentication is `simple`.
+- **Schema**: Inherits the authentication setting from the catalog if not explicitly set. For more information about schema settings, please refer to [Schema properties](#schema-properties).
+- **Fileset**: Inherits the authentication setting from the schema if not explicitly set. For more information about fileset settings, please refer to [Fileset properties](#fileset-properties).
 
 **Note**:
 
-- If authentication.impersonation-enable default value is `false`, the impersonation setting is not enabled.
-- If users want to enable impersonation, they must set authentication.impersonation-enable to `true` and make sure the authentication strategy is set to `kerberos`, either by setting authentication strategy explicitly or inherited from parents. Otherwise, impersonation will not work.
-- The impersonation setting is accompanied by the authentication strategy. For instance, if a schema has authentication.impersonation-enable set to true but no specific authentication strategy, it will use the parent's authentication strategy along with the authentication.impersonation-enable value.
+- The default value for `authentication.impersonation-enable` is `false`, meaning impersonation is not enabled by default.
+- To enable impersonation, users must set `authentication.impersonation-enable` to `true` and ensure the authentication strategy is set to `kerberos`, either explicitly or inherited from parent settings. Otherwise, impersonation will not work.
+- The impersonation setting is tied to the authentication setting. For example, if users set `authentication.impersonation-enable` to `true` for the schema but do not specify an authentication setting, it will use the parent's authentication setting along with the `authentication.impersonation-enable` value.
 
 
 ### Catalog operations
