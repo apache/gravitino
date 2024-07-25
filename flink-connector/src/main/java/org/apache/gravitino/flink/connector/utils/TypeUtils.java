@@ -157,10 +157,13 @@ public class TypeUtils {
         }
       case LIST:
         Types.ListType listType = (Types.ListType) gravitinoType;
-        return DataTypes.ARRAY(toFlinkType(listType.elementType()));
+        return DataTypes.ARRAY(
+            nullable(toFlinkType(listType.elementType()), listType.elementNullable()));
       case MAP:
         Types.MapType mapType = (Types.MapType) gravitinoType;
-        return DataTypes.MAP(toFlinkType(mapType.keyType()), toFlinkType(mapType.valueType()));
+        return DataTypes.MAP(
+            toFlinkType(mapType.keyType()),
+            nullable(toFlinkType(mapType.valueType()), mapType.valueNullable()));
       case STRUCT:
         Types.StructType structType = (Types.StructType) gravitinoType;
         List<DataTypes.Field> fields =
@@ -168,9 +171,11 @@ public class TypeUtils {
                 .map(
                     f -> {
                       if (f.comment() == null) {
-                        return DataTypes.FIELD(f.name(), toFlinkType(f.type()));
+                        return DataTypes.FIELD(
+                            f.name(), nullable(toFlinkType(f.type()), f.nullable()));
                       } else {
-                        return DataTypes.FIELD(f.name(), toFlinkType(f.type()), f.comment());
+                        return DataTypes.FIELD(
+                            f.name(), nullable(toFlinkType(f.type()), f.nullable()), f.comment());
                       }
                     })
                 .collect(Collectors.toList());
@@ -185,6 +190,14 @@ public class TypeUtils {
         return DataTypes.INTERVAL(DataTypes.DAY());
       default:
         throw new UnsupportedOperationException("Not support " + gravitinoType.toString());
+    }
+  }
+
+  private static DataType nullable(DataType dataType, boolean nullable) {
+    if (nullable) {
+      return dataType.nullable();
+    } else {
+      return dataType.notNull();
     }
   }
 }

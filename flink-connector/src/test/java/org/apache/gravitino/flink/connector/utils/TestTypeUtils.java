@@ -66,7 +66,7 @@ public class TestTypeUtils {
     Assertions.assertEquals(Types.BinaryType.get(), TypeUtils.toGravitinoType(new VarBinaryType()));
     Assertions.assertEquals(
         Types.DecimalType.of(10, 3), TypeUtils.toGravitinoType(new DecimalType(10, 3)));
-    Assertions.assertEquals(Types.ShortType.get(), TypeUtils.toGravitinoType(new TinyIntType()));
+    Assertions.assertEquals(Types.ByteType.get(), TypeUtils.toGravitinoType(new TinyIntType()));
     Assertions.assertEquals(Types.ShortType.get(), TypeUtils.toGravitinoType(new SmallIntType()));
     Assertions.assertEquals(
         Types.TimestampType.withoutTimeZone(), TypeUtils.toGravitinoType(new TimestampType()));
@@ -129,31 +129,31 @@ public class TestTypeUtils {
     Assertions.assertEquals(
         DataTypes.DECIMAL(10, 3), TypeUtils.toFlinkType(Types.DecimalType.of(10, 3)));
     Assertions.assertEquals(DataTypes.CHAR(10), TypeUtils.toFlinkType(Types.FixedCharType.of(10)));
-    Assertions.assertEquals(DataTypes.VARBINARY(10), TypeUtils.toFlinkType(Types.BinaryType.get()));
+    Assertions.assertEquals(DataTypes.BYTES(), TypeUtils.toFlinkType(Types.BinaryType.get()));
     Assertions.assertEquals(
-        DataTypes.TIMESTAMP(3), TypeUtils.toFlinkType(Types.TimestampType.withoutTimeZone()));
+        DataTypes.TIMESTAMP(6), TypeUtils.toFlinkType(Types.TimestampType.withoutTimeZone()));
     Assertions.assertEquals(
-        DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(3),
+        DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(6),
         TypeUtils.toFlinkType(Types.TimestampType.withTimeZone()));
-    Assertions.assertEquals(DataTypes.TIME(3), TypeUtils.toFlinkType(Types.TimeType.get()));
+    Assertions.assertEquals(DataTypes.TIME(), TypeUtils.toFlinkType(Types.TimeType.get()));
     Assertions.assertEquals(
         DataTypes.INTERVAL(DataTypes.DAY()), TypeUtils.toFlinkType(Types.IntervalDayType.get()));
     Assertions.assertEquals(
         DataTypes.INTERVAL(DataTypes.YEAR()), TypeUtils.toFlinkType(Types.IntervalYearType.get()));
     Assertions.assertEquals(
         DataTypes.ARRAY(DataTypes.INT().notNull()),
-        TypeUtils.toFlinkType(Types.ListType.notNull(Types.IntegerType.get())));
+        TypeUtils.toFlinkType(Types.ListType.of(Types.IntegerType.get(), false)));
     Assertions.assertEquals(
         DataTypes.ARRAY(DataTypes.INT().nullable()),
-        TypeUtils.toFlinkType(Types.ListType.nullable(Types.IntegerType.get())));
+        TypeUtils.toFlinkType(Types.ListType.of(Types.IntegerType.get(), true)));
     Assertions.assertEquals(
-        DataTypes.MAP(DataTypes.STRING().notNull(), DataTypes.INT().nullable()),
+        DataTypes.MAP(DataTypes.STRING(), DataTypes.INT().nullable()),
         TypeUtils.toFlinkType(
             Types.MapType.of(Types.StringType.get(), Types.IntegerType.get(), true)));
     Assertions.assertEquals(
         DataTypes.ROW(
-            DataTypes.FIELD("a", DataTypes.INT().notNull()),
-            DataTypes.FIELD("b", DataTypes.INT().nullable())),
+            DataTypes.FIELD("a", DataTypes.INT().nullable()),
+            DataTypes.FIELD("b", DataTypes.INT().notNull())),
         TypeUtils.toFlinkType(
             Types.StructType.of(
                 Types.StructType.Field.nullableField("a", Types.IntegerType.get()),
