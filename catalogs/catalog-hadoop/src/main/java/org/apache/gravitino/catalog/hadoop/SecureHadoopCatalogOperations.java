@@ -294,6 +294,9 @@ public class SecureHadoopCatalogOperations
   private void initAuthentication(Map<String, String> conf, Configuration hadoopConf) {
     AuthenticationConfig config = new AuthenticationConfig(conf);
     CatalogInfo catalogInfo = hadoopCatalogOperations.getCatalogInfo();
+    NameIdentifier ident = NameIdentifier.of(catalogInfo.namespace(), catalogInfo.name());
+
+    impersonationEnableMap.put(ident, config.isImpersonationEnabled());
     if (config.isKerberosAuth()) {
       initKerberos(
           conf, hadoopConf, NameIdentifier.of(catalogInfo.namespace(), catalogInfo.name()), true);
@@ -301,9 +304,7 @@ public class SecureHadoopCatalogOperations
       try {
         // Use service login user.
         UserGroupInformation u = UserGroupInformation.getCurrentUser();
-        NameIdentifier ident = NameIdentifier.of(catalogInfo.namespace(), catalogInfo.name());
         userInfoMap.put(ident, UserInfo.of(u, null, null));
-        impersonationEnableMap.put(ident, false);
       } catch (Exception e) {
         throw new RuntimeException("Can't get service user for Hadoop catalog", e);
       }
@@ -344,7 +345,6 @@ public class SecureHadoopCatalogOperations
         // Should this kerberosRealm need to be equals to the realm in the principal?
         userInfoMap.put(
             ident, UserInfo.of(UserGroupInformation.getLoginUser(), keytabPath, kerberosRealm));
-        impersonationEnableMap.put(ident, kerberosConfig.isImpersonationEnabled());
         return kerberosRealm;
       } catch (IOException e) {
         throw new RuntimeException("Failed to login with Kerberos", e);
@@ -356,14 +356,15 @@ public class SecureHadoopCatalogOperations
 
   private UserGroupInformation getUGIByIdent(Map<String, String> properties, NameIdentifier ident) {
     KerberosConfig kerberosConfig = new KerberosConfig(properties);
+    if (properties.containsKey(IMPERSONATION_ENABLE_KEY)) {
+      impersonationEnableMap.put(ident, kerberosConfig.isImpersonationEnabled());
+    }
+
     if (kerberosConfig.isKerberosAuth()) {
       // We assume that the realm of catalog is the same as the realm of the schema and table.
       initKerberos(properties, new Configuration(), ident, false);
-    } else if (kerberosConfig.isSimpleAuth()) {
-      if (properties.containsKey(IMPERSONATION_ENABLE_KEY)) {
-        impersonationEnableMap.put(ident, kerberosConfig.isImpersonationEnabled());
-      }
     }
+
     // If the kerberos is not enabled (simple mode), we will use the current user
     return getUserBaseOnNameIdentifier(ident);
   }
