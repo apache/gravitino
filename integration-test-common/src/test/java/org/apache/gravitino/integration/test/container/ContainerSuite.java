@@ -122,8 +122,8 @@ public class ContainerSuite implements Closeable {
   }
 
   /**
-   * To start the enable ranger plugin's Hive container, <br>
-   * you can to specify environment variables: <br>
+   * To start and enable Ranger plugin in Hive container, <br>
+   * you can specify environment variables: <br>
    * 1. HIVE_RUNTIME_VERSION: Hive version, currently support `hive2`(default) and `hive3` <br>
    * 2. DOCKER_ENV_RANGER_SERVER_URL: Ranger server URL <br>
    * 3. DOCKER_ENV_RANGER_HIVE_REPOSITORY_NAME: Ranger Hive repository name <br>
