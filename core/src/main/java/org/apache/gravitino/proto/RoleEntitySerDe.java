@@ -23,7 +23,9 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.authorization.*;
+import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.authorization.Privileges;
+import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.meta.RoleEntity;
 
 public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
