@@ -192,7 +192,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     Map<String, String> databaseMeta = getDatabaseMetadata(testDatabaseName);
     Assertions.assertFalse(databaseMeta.containsKey("Comment"));
     Assertions.assertTrue(databaseMeta.containsKey("Location"));
-    Assertions.assertEquals("datastrato", databaseMeta.get("Owner"));
+    Assertions.assertEquals("anonymous", databaseMeta.get("Owner"));
     String properties = databaseMeta.get("Properties");
     Assertions.assertTrue(properties.contains("(ID,001)"));
 
@@ -206,7 +206,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     databaseMeta = getDatabaseMetadata(testDatabaseName);
     String comment = databaseMeta.get("Comment");
     Assertions.assertEquals("comment", comment);
-    Assertions.assertEquals("datastrato", databaseMeta.get("Owner"));
+    Assertions.assertEquals("anonymous", databaseMeta.get("Owner"));
     // underlying catalog may change /tmp/t_create2 to file:/tmp/t_create2
     Assertions.assertTrue(databaseMeta.get("Location").contains(testDatabaseLocation));
     properties = databaseMeta.get("Properties");

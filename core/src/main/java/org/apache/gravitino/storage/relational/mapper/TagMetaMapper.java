@@ -31,7 +31,7 @@ public interface TagMetaMapper {
   String TAG_TABLE_NAME = "tag_meta";
 
   @Select(
-      "SELECT tm.tag_id as tagId, tag_name as tagName,"
+      "SELECT tm.tag_id as tagId, tm.tag_name as tagName,"
           + " tm.metalake_id as metalakeId,"
           + " tm.tag_comment as comment,"
           + " tm.properties as properties,"
@@ -43,16 +43,41 @@ public interface TagMetaMapper {
           + TAG_TABLE_NAME
           + " tm JOIN "
           + MetalakeMetaMapper.TABLE_NAME
-          + " mm on tm.metalake_id = mm.metalake_id"
+          + " mm ON tm.metalake_id = mm.metalake_id"
           + " WHERE mm.metalake_name = #{metalakeName} AND tm.deleted_at = 0 AND mm.deleted_at = 0")
   List<TagPO> listTagPOsByMetalake(@Param("metalakeName") String metalakeName);
+
+  @Select(
+      "<script>"
+          + "SELECT tm.tag_id as tagId, tm.tag_name as tagName,"
+          + " tm.metalake_id as metalakeId,"
+          + " tm.tag_comment as comment,"
+          + " tm.properties as properties,"
+          + " tm.audit_info as auditInfo,"
+          + " tm.current_version as currentVersion,"
+          + " tm.last_version as lastVersion,"
+          + " tm.deleted_at as deletedAt"
+          + " FROM "
+          + TAG_TABLE_NAME
+          + " tm JOIN "
+          + MetalakeMetaMapper.TABLE_NAME
+          + " mm ON tm.metalake_id = mm.metalake_id"
+          + " WHERE mm.metalake_name = #{metalakeName} AND tm.tag_name IN "
+          + " <foreach"
+          + " item='tagName' index='index' collection='tagNames' open='(' separator=',' close=')'>"
+          + " #{tagName}"
+          + " </foreach>"
+          + " AND tm.deleted_at = 0 AND mm.deleted_at = 0"
+          + "</script>")
+  List<TagPO> listTagPOsByMetalakeAndTagNames(
+      @Param("metalakeName") String metalakeName, @Param("tagNames") List<String> tagNames);
 
   @Select(
       "SELECT tm.tag_id as tagId FROM "
           + TAG_TABLE_NAME
           + " tm JOIN "
           + MetalakeMetaMapper.TABLE_NAME
-          + " mm on tm.metalake_id = mm.metalake_id"
+          + " mm ON tm.metalake_id = mm.metalake_id"
           + " WHERE mm.metalake_name = #{metalakeName} AND tm.tag_name = #{tagName}"
           + " AND tm.deleted_at = 0 AND mm.deleted_at = 0")
   Long selectTagIdByMetalakeAndName(
@@ -71,7 +96,7 @@ public interface TagMetaMapper {
           + TAG_TABLE_NAME
           + " tm JOIN "
           + MetalakeMetaMapper.TABLE_NAME
-          + " mm on tm.metalake_id = mm.metalake_id"
+          + " mm ON tm.metalake_id = mm.metalake_id"
           + " WHERE mm.metalake_name = #{metalakeName} AND tm.tag_name = #{tagName}"
           + " AND tm.deleted_at = 0 AND mm.deleted_at = 0")
   TagPO selectTagMetaByMetalakeAndName(

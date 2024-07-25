@@ -51,3 +51,10 @@ dependencies {
   }
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
+
+tasks {
+  test {
+    environment("GRAVITINO_HOME", rootDir.path)
+    environment("GRAVITINO_TEST", "true")
+  }
+}

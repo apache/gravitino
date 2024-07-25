@@ -27,6 +27,11 @@ import org.apache.gravitino.SupportsCatalogs;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.TagAlreadyExistsException;
+import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagChange;
+import org.apache.gravitino.tag.TagOperations;
 
 /**
  * Apache Gravitino Client for an user to interact with the Gravitino API, allowing the client to
@@ -35,7 +40,8 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
  * <p>It uses an underlying {@link RESTClient} to send HTTP requests and receive responses from the
  * API.
  */
-public class GravitinoClient extends GravitinoClientBase implements SupportsCatalogs {
+public class GravitinoClient extends GravitinoClientBase
+    implements SupportsCatalogs, TagOperations {
 
   private final GravitinoMetalake metalake;
 
@@ -115,6 +121,60 @@ public class GravitinoClient extends GravitinoClientBase implements SupportsCata
    */
   public static ClientBuilder builder(String uri) {
     return new ClientBuilder(uri);
+  }
+
+  /**
+   * Test whether a catalog can be created successfully with the specified parameters, without
+   * actually creating it.
+   *
+   * @param catalogName the name of the catalog.
+   * @param type the type of the catalog.
+   * @param provider the provider of the catalog.
+   * @param comment the comment of the catalog.
+   * @param properties the properties of the catalog.
+   * @throws Exception if the test failed.
+   */
+  @Override
+  public void testConnection(
+      String catalogName,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties)
+      throws Exception {
+    getMetalake().testConnection(catalogName, type, provider, comment, properties);
+  }
+
+  @Override
+  public String[] listTags() throws NoSuchMetalakeException {
+    return getMetalake().listTags();
+  }
+
+  @Override
+  public Tag[] listTagsInfo() throws NoSuchMetalakeException {
+    return getMetalake().listTagsInfo();
+  }
+
+  @Override
+  public Tag getTag(String name) throws NoSuchTagException {
+    return getMetalake().getTag(name);
+  }
+
+  @Override
+  public Tag createTag(String name, String comment, Map<String, String> properties)
+      throws TagAlreadyExistsException {
+    return getMetalake().createTag(name, comment, properties);
+  }
+
+  @Override
+  public Tag alterTag(String name, TagChange... changes)
+      throws NoSuchTagException, IllegalArgumentException {
+    return getMetalake().alterTag(name, changes);
+  }
+
+  @Override
+  public boolean deleteTag(String name) {
+    return getMetalake().deleteTag(name);
   }
 
   /** Builder class for constructing a GravitinoClient. */

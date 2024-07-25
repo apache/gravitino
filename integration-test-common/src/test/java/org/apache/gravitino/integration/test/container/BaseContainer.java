@@ -29,6 +29,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -72,7 +73,14 @@ public abstract class BaseContainer implements AutoCloseable {
       Map<String, String> filesToMount,
       Map<String, String> envVars,
       Optional<Network> network) {
-    this.container = new GenericContainer<>(requireNonNull(image, "image is null"));
+    this.container =
+        new GenericContainer<>(requireNonNull(image, "image is null"))
+            .withCreateContainerCmdModifier(
+                cmd ->
+                    cmd.getHostConfig()
+                        .withSysctls(
+                            Collections.singletonMap(
+                                "net.ipv4.ip_local_port_range", "20000 40000")));
     this.ports = requireNonNull(ports, "ports is null");
     this.hostName = requireNonNull(hostName, "hostName is null");
     this.extraHosts = extraHosts;

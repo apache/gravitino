@@ -25,8 +25,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.catalog.CommonCatalogOptions;
-import org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta;
-import org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata;
+import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.apache.gravitino.flink.connector.PropertiesConverter;
 import org.apache.hadoop.hive.conf.HiveConf;
 
@@ -37,11 +36,9 @@ public class HivePropertiesConverter implements PropertiesConverter {
   public static final HivePropertiesConverter INSTANCE = new HivePropertiesConverter();
 
   private static final Map<String, String> HIVE_CATALOG_CONFIG_TO_GRAVITINO =
-      ImmutableMap.of(
-          HiveConf.ConfVars.METASTOREURIS.varname, HiveCatalogPropertiesMeta.METASTORE_URIS);
+      ImmutableMap.of(HiveConf.ConfVars.METASTOREURIS.varname, HiveConstants.METASTORE_URIS);
   private static final Map<String, String> GRAVITINO_CONFIG_TO_HIVE =
-      ImmutableMap.of(
-          HiveCatalogPropertiesMeta.METASTORE_URIS, HiveConf.ConfVars.METASTOREURIS.varname);
+      ImmutableMap.of(HiveConstants.METASTORE_URIS, HiveConf.ConfVars.METASTOREURIS.varname);
 
   @Override
   public Map<String, String> toGravitinoCatalogProperties(Configuration flinkConf) {
@@ -87,9 +84,8 @@ public class HivePropertiesConverter implements PropertiesConverter {
                 Collectors.toMap(
                     entry -> {
                       String key = entry.getKey();
-                      if (key.startsWith(HiveTablePropertiesMetadata.SERDE_PARAMETER_PREFIX)) {
-                        return key.substring(
-                            HiveTablePropertiesMetadata.SERDE_PARAMETER_PREFIX.length());
+                      if (key.startsWith(HiveConstants.SERDE_PARAMETER_PREFIX)) {
+                        return key.substring(HiveConstants.SERDE_PARAMETER_PREFIX.length());
                       } else {
                         return key;
                       }

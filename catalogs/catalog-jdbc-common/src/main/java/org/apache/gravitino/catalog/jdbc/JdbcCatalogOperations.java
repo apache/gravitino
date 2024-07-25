@@ -36,6 +36,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.sql.DataSource;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
@@ -171,6 +172,25 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     return schemaNames.stream()
         .map(db -> NameIdentifier.of(namespace, db))
         .toArray(NameIdentifier[]::new);
+  }
+
+  /**
+   * Performs `show databases` operation to check if the JDBC connection is valid.
+   *
+   * @param catalogIdent the name of the catalog.
+   * @param type the type of the catalog.
+   * @param provider the provider of the catalog.
+   * @param comment the comment of the catalog.
+   * @param properties the properties of the catalog.
+   */
+  @Override
+  public void testConnection(
+      NameIdentifier catalogIdent,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties) {
+    databaseOperation.listDatabases();
   }
 
   /**
@@ -313,6 +333,8 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         .withProperties(properties)
         .withIndexes(load.index())
         .withPartitioning(load.partitioning())
+        .withDatabaseName(databaseName)
+        .withTableOperation(tableOperation)
         .build();
   }
 
@@ -430,6 +452,8 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         .withProperties(jdbcTablePropertiesMetadata.convertFromJdbcProperties(resultProperties))
         .withPartitioning(partitioning)
         .withIndexes(indexes)
+        .withDatabaseName(databaseName)
+        .withTableOperation(tableOperation)
         .build();
   }
 

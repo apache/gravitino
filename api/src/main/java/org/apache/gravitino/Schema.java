@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.tag.SupportsTags;
 
 /**
  * An interface representing a schema in the {@link Catalog}. A Schema is a basic container of
@@ -46,5 +47,13 @@ public interface Schema extends Auditable {
   /** @return The properties of the Schema. An empty map is returned if no properties are set. */
   default Map<String, String> properties() {
     return Collections.emptyMap();
+  }
+
+  /**
+   * @return the {@link SupportsTags} if the schema supports tag operations.
+   * @throws UnsupportedOperationException if the schema does not support tag operations.
+   */
+  default SupportsTags supportsTags() {
+    throw new UnsupportedOperationException("Schema does not support tag operations.");
   }
 }

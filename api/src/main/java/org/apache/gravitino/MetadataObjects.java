@@ -22,16 +22,13 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 
 /** The helper class for {@link MetadataObject}. */
 public class MetadataObjects {
 
-  /**
-   * The reserved name for the metadata object.
-   *
-   * <p>It is used to represent the root metadata object of all metalakes.
-   */
+  /** The reserved name for the metadata object. */
   public static final String METADATA_OBJECT_RESERVED_NAME = "*";
 
   private static final Splitter DOT_SPLITTER = Splitter.on('.');
@@ -99,6 +96,46 @@ public class MetadataObjects {
   }
 
   /**
+   * Get the parent metadata object of the given metadata object.
+   *
+   * @param object The metadata object
+   * @return The parent metadata object if it exists, otherwise null
+   */
+  @Nullable
+  public static MetadataObject parent(MetadataObject object) {
+    if (object == null) {
+      return null;
+    }
+
+    // Return null if the object is the root object
+    if (object.type() == MetadataObject.Type.METALAKE
+        || object.type() == MetadataObject.Type.CATALOG) {
+      return null;
+    }
+
+    MetadataObject.Type parentType;
+    switch (object.type()) {
+      case COLUMN:
+        parentType = MetadataObject.Type.TABLE;
+        break;
+      case TABLE:
+      case FILESET:
+      case TOPIC:
+        parentType = MetadataObject.Type.SCHEMA;
+        break;
+      case SCHEMA:
+        parentType = MetadataObject.Type.CATALOG;
+        break;
+
+      default:
+        throw new IllegalArgumentException(
+            "Unexpected to reach here for metadata object type: " + object.type());
+    }
+
+    return parse(object.parent(), parentType);
+  }
+
+  /**
    * Parse the metadata object with the given full name and type.
    *
    * @param fullName The full name of the metadata object
@@ -106,13 +143,6 @@ public class MetadataObjects {
    * @return The parsed metadata object
    */
   public static MetadataObject parse(String fullName, MetadataObject.Type type) {
-    if (METADATA_OBJECT_RESERVED_NAME.equals(fullName)) {
-      if (type != MetadataObject.Type.METALAKE) {
-        throw new IllegalArgumentException("If metadata object isn't metalake, it can't be `*`");
-      }
-      return new MetadataObjectImpl(null, METADATA_OBJECT_RESERVED_NAME, type);
-    }
-
     Preconditions.checkArgument(
         StringUtils.isNotBlank(fullName), "Metadata object full name cannot be blank");
 

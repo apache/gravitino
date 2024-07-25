@@ -139,7 +139,7 @@ public class TestRoleOperations extends JerseyTest {
         SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
     SecurableObject anotherSecurableObject =
         SecurableObjects.ofCatalog(
-            "another_catalog", Lists.newArrayList(Privileges.DropCatalog.deny()));
+            "another_catalog", Lists.newArrayList(Privileges.CreateSchema.deny()));
 
     RoleCreateRequest req =
         new RoleCreateRequest(
@@ -169,12 +169,12 @@ public class TestRoleOperations extends JerseyTest {
     Assertions.assertEquals("role1", roleDTO.name());
     Assertions.assertEquals(
         SecurableObjects.ofCatalog(
-                "another_catalog", Lists.newArrayList(Privileges.DropCatalog.deny()))
+                "another_catalog", Lists.newArrayList(Privileges.CreateSchema.deny()))
             .fullName(),
         roleDTO.securableObjects().get(1).fullName());
     Assertions.assertEquals(1, roleDTO.securableObjects().get(1).privileges().size());
     Assertions.assertEquals(
-        Privileges.DropCatalog.deny().name(),
+        Privileges.CreateSchema.deny().name(),
         roleDTO.securableObjects().get(1).privileges().get(0).name());
     Assertions.assertEquals(
         Privileges.UseCatalog.deny().condition(),
@@ -337,7 +337,7 @@ public class TestRoleOperations extends JerseyTest {
         SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
     SecurableObject anotherSecurableObject =
         SecurableObjects.ofCatalog(
-            "another_catalog", Lists.newArrayList(Privileges.DropCatalog.deny()));
+            "another_catalog", Lists.newArrayList(Privileges.CreateSchema.deny()));
 
     return RoleEntity.builder()
         .withId(1L)
@@ -394,27 +394,6 @@ public class TestRoleOperations extends JerseyTest {
 
   @Test
   public void testCheckSecurableObjects() {
-    // check all metalakes
-    SecurableObject allMetalake =
-        SecurableObjects.ofAllMetalakes(Lists.newArrayList(Privileges.UseMetalake.allow()));
-    when(metalakeDispatcher.metalakeExists(any())).thenReturn(true);
-    Assertions.assertDoesNotThrow(
-        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(allMetalake)));
-    when(metalakeDispatcher.metalakeExists(any())).thenReturn(false);
-    Assertions.assertDoesNotThrow(
-        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(allMetalake)));
-
-    // check the metalake
-    SecurableObject metalake =
-        SecurableObjects.ofMetalake("metalake", Lists.newArrayList(Privileges.UseMetalake.allow()));
-    when(metalakeDispatcher.metalakeExists(any())).thenReturn(true);
-    Assertions.assertDoesNotThrow(
-        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(metalake)));
-    when(metalakeDispatcher.metalakeExists(any())).thenReturn(false);
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(metalake)));
-
     // check the catalog
     SecurableObject catalog =
         SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
@@ -440,7 +419,8 @@ public class TestRoleOperations extends JerseyTest {
 
     // check the table
     SecurableObject table =
-        SecurableObjects.ofTable(schema, "table", Lists.newArrayList(Privileges.ReadTable.allow()));
+        SecurableObjects.ofTable(
+            schema, "table", Lists.newArrayList(Privileges.SelectTable.allow()));
     when(tableDispatcher.tableExists(any())).thenReturn(true);
     Assertions.assertDoesNotThrow(
         () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(table)));
@@ -451,7 +431,8 @@ public class TestRoleOperations extends JerseyTest {
 
     // check the topic
     SecurableObject topic =
-        SecurableObjects.ofTopic(schema, "topic", Lists.newArrayList(Privileges.ReadTopic.allow()));
+        SecurableObjects.ofTopic(
+            schema, "topic", Lists.newArrayList(Privileges.ConsumeTopic.allow()));
     when(topicDispatcher.topicExists(any())).thenReturn(true);
     Assertions.assertDoesNotThrow(
         () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(topic)));

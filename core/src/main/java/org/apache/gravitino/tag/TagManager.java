@@ -19,20 +19,27 @@
 package org.apache.gravitino.tag;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -40,6 +47,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.kv.KvEntityStore;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,6 +60,8 @@ public class TagManager {
 
   private final EntityStore entityStore;
 
+  private final SupportsTagOperations supportsTagOperations;
+
   public TagManager(IdGenerator idGenerator, EntityStore entityStore) {
     if (entityStore instanceof KvEntityStore) {
       String errorMsg =
@@ -61,11 +71,25 @@ public class TagManager {
       throw new RuntimeException(errorMsg);
     }
 
+    if (!(entityStore instanceof SupportsTagOperations)) {
+      String errorMsg =
+          "TagManager cannot run with entity store that does not support tag operations, "
+              + "please configure the entity store to use relational entity store and restart the Gravitino server";
+      LOG.error(errorMsg);
+      throw new RuntimeException(errorMsg);
+    }
+
+    this.supportsTagOperations = entityStore.tagOperations();
+
     this.idGenerator = idGenerator;
     this.entityStore = entityStore;
   }
 
   public String[] listTags(String metalake) {
+    return Arrays.stream(listTagsInfo(metalake)).map(Tag::name).toArray(String[]::new);
+  }
+
+  public Tag[] listTagsInfo(String metalake) {
     return TreeLockUtils.doWithTreeLock(
         NameIdentifier.of(ofTagNamespace(metalake).levels()),
         LockType.READ,
@@ -75,17 +99,12 @@ public class TagManager {
           try {
             return entityStore
                 .list(ofTagNamespace(metalake), TagEntity.class, Entity.EntityType.TAG).stream()
-                .map(TagEntity::name)
-                .toArray(String[]::new);
+                .toArray(Tag[]::new);
           } catch (IOException ioe) {
             LOG.error("Failed to list tags under metalake {}", metalake, ioe);
             throw new RuntimeException(ioe);
           }
         });
-  }
-
-  public MetadataObject[] listAssociatedMetadataObjectsForTag(String metalake, String name) {
-    throw new UnsupportedOperationException("Not implemented yet");
   }
 
   public Tag createTag(String metalake, String name, String comment, Map<String, String> properties)
@@ -188,22 +207,162 @@ public class TagManager {
         });
   }
 
-  public String[] listTagsForMetadataObject(String metalake, MetadataObject metadataObject) {
-    throw new UnsupportedOperationException("Not implemented yet");
+  public MetadataObject[] listMetadataObjectsForTag(String metalake, String name)
+      throws NoSuchTagException {
+    NameIdentifier tagId = ofTagIdent(metalake, name);
+    return TreeLockUtils.doWithTreeLock(
+        tagId,
+        LockType.READ,
+        () -> {
+          checkMetalakeExists(metalake, entityStore);
+
+          try {
+            if (!entityStore.exists(tagId, Entity.EntityType.TAG)) {
+              throw new NoSuchTagException(
+                  "Tag with name %s under metalake %s does not exist", name, metalake);
+            }
+
+            return supportsTagOperations
+                .listAssociatedMetadataObjectsForTag(tagId)
+                .toArray(new MetadataObject[0]);
+          } catch (IOException e) {
+            LOG.error("Failed to list metadata objects for tag {}", name, e);
+            throw new RuntimeException(e);
+          }
+        });
   }
 
-  public Tag[] listTagsInfoForMetadataObject(String metalake, MetadataObject metadataObject) {
-    throw new UnsupportedOperationException("Not implemented yet");
+  public String[] listTagsForMetadataObject(String metalake, MetadataObject metadataObject)
+      throws NotFoundException {
+    return Arrays.stream(listTagsInfoForMetadataObject(metalake, metadataObject))
+        .map(Tag::name)
+        .toArray(String[]::new);
+  }
+
+  public Tag[] listTagsInfoForMetadataObject(String metalake, MetadataObject metadataObject)
+      throws NotFoundException {
+    NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
+
+    if (!checkAndImportEntity(metalake, metadataObject, GravitinoEnv.getInstance())) {
+      throw new NotFoundException(
+          "Failed to list tags for metadata object %s due to not found", metadataObject);
+    }
+
+    return TreeLockUtils.doWithTreeLock(
+        entityIdent,
+        LockType.READ,
+        () -> {
+          try {
+            return supportsTagOperations
+                .listAssociatedTagsForMetadataObject(entityIdent, entityType)
+                .toArray(new Tag[0]);
+          } catch (NoSuchEntityException e) {
+            throw new NotFoundException(
+                e, "Failed to list tags for metadata object %s due to not found", metadataObject);
+          } catch (IOException e) {
+            LOG.error("Failed to list tags for metadata object {}", metadataObject, e);
+            throw new RuntimeException(e);
+          }
+        });
   }
 
   public Tag getTagForMetadataObject(String metalake, MetadataObject metadataObject, String name)
-      throws NoSuchTagException {
-    throw new UnsupportedOperationException("Not implemented yet");
+      throws NotFoundException {
+    NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
+    NameIdentifier tagIdent = ofTagIdent(metalake, name);
+
+    if (!checkAndImportEntity(metalake, metadataObject, GravitinoEnv.getInstance())) {
+      throw new NotFoundException(
+          "Failed to get tag for metadata object %s due to not found", metadataObject);
+    }
+
+    return TreeLockUtils.doWithTreeLock(
+        entityIdent,
+        LockType.READ,
+        () -> {
+          try {
+            return supportsTagOperations.getTagForMetadataObject(entityIdent, entityType, tagIdent);
+          } catch (NoSuchEntityException e) {
+            if (e.getMessage().contains("No such tag entity")) {
+              throw new NoSuchTagException(
+                  e, "Tag %s does not exist for metadata object %s", name, metadataObject);
+            } else {
+              throw new NotFoundException(
+                  e, "Failed to get tag for metadata object %s due to not found", metadataObject);
+            }
+          } catch (IOException e) {
+            LOG.error("Failed to get tag for metadata object {}", metadataObject, e);
+            throw new RuntimeException(e);
+          }
+        });
   }
 
   public String[] associateTagsForMetadataObject(
-      String metalake, MetadataObject metadataObject, String[] tagsToAdd, String[] tagsToRemove) {
-    throw new UnsupportedOperationException("Not implemented yet");
+      String metalake, MetadataObject metadataObject, String[] tagsToAdd, String[] tagsToRemove)
+      throws NotFoundException, TagAlreadyAssociatedException {
+    Preconditions.checkArgument(
+        !metadataObject.type().equals(MetadataObject.Type.METALAKE)
+            && !metadataObject.type().equals(MetadataObject.Type.COLUMN),
+        "Cannot associate tags for unsupported metadata object type %s",
+        metadataObject.type());
+
+    NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
+
+    if (!checkAndImportEntity(metalake, metadataObject, GravitinoEnv.getInstance())) {
+      throw new NotFoundException(
+          "Failed to associate tags for metadata object %s due to not found", metadataObject);
+    }
+
+    // Remove all the tags that are both set to add and remove
+    Set<String> tagsToAddSet = tagsToAdd == null ? Sets.newHashSet() : Sets.newHashSet(tagsToAdd);
+    Set<String> tagsToRemoveSet =
+        tagsToRemove == null ? Sets.newHashSet() : Sets.newHashSet(tagsToRemove);
+    Set<String> common = Sets.intersection(tagsToAddSet, tagsToRemoveSet).immutableCopy();
+    tagsToAddSet.removeAll(common);
+    tagsToRemoveSet.removeAll(common);
+
+    NameIdentifier[] tagsToAddIdent =
+        tagsToAddSet.stream().map(tag -> ofTagIdent(metalake, tag)).toArray(NameIdentifier[]::new);
+    NameIdentifier[] tagsToRemoveIdent =
+        tagsToRemoveSet.stream()
+            .map(tag -> ofTagIdent(metalake, tag))
+            .toArray(NameIdentifier[]::new);
+
+    return TreeLockUtils.doWithTreeLock(
+        entityIdent,
+        LockType.READ,
+        () ->
+            TreeLockUtils.doWithTreeLock(
+                NameIdentifier.of(ofTagNamespace(metalake).levels()),
+                LockType.WRITE,
+                () -> {
+                  try {
+                    return supportsTagOperations
+                        .associateTagsWithMetadataObject(
+                            entityIdent, entityType, tagsToAddIdent, tagsToRemoveIdent)
+                        .stream()
+                        .map(Tag::name)
+                        .toArray(String[]::new);
+                  } catch (NoSuchEntityException e) {
+                    throw new NotFoundException(
+                        e,
+                        "Failed to associate tags for metadata object %s due to not found",
+                        metadataObject);
+                  } catch (EntityAlreadyExistsException e) {
+                    throw new TagAlreadyAssociatedException(
+                        e,
+                        "Failed to associate tags for metadata object due to some tags %s already "
+                            + "associated to the metadata object %s",
+                        Arrays.toString(tagsToAdd),
+                        metadataObject);
+                  } catch (IOException e) {
+                    LOG.error("Failed to associate tags for metadata object {}", metadataObject, e);
+                    throw new RuntimeException(e);
+                  }
+                }));
   }
 
   private static void checkMetalakeExists(String metalake, EntityStore entityStore) {
@@ -219,7 +378,6 @@ public class TagManager {
     }
   }
 
-  @VisibleForTesting
   public static Namespace ofTagNamespace(String metalake) {
     return Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.TAG_SCHEMA_NAME);
   }
@@ -266,5 +424,34 @@ public class TagManager {
                 .withLastModifiedTime(Instant.now())
                 .build())
         .build();
+  }
+
+  // This method will check if the entity is existed explicitly, internally this check will load
+  // the entity from underlying sources to entity store if not stored, and will allocate an uid
+  // for this entity, with this uid tags can be associated with this entity.
+  // This method should be called out of the tree lock, otherwise it will cause deadlock.
+  @VisibleForTesting
+  boolean checkAndImportEntity(String metalake, MetadataObject metadataObject, GravitinoEnv env) {
+    NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
+
+    switch (entityType) {
+      case METALAKE:
+        return env.metalakeDispatcher().metalakeExists(entityIdent);
+      case CATALOG:
+        return env.catalogDispatcher().catalogExists(entityIdent);
+      case SCHEMA:
+        return env.schemaDispatcher().schemaExists(entityIdent);
+      case TABLE:
+        return env.tableDispatcher().tableExists(entityIdent);
+      case TOPIC:
+        return env.topicDispatcher().topicExists(entityIdent);
+      case FILESET:
+        return env.filesetDispatcher().filesetExists(entityIdent);
+      case COLUMN:
+      default:
+        throw new IllegalArgumentException(
+            "Unsupported metadata object type: " + metadataObject.type());
+    }
   }
 }

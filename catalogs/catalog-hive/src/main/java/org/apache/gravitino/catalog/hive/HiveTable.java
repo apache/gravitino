@@ -33,7 +33,6 @@ import java.util.stream.Stream;
 import lombok.ToString;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType;
 import org.apache.gravitino.catalog.hive.converter.HiveDataTypeConverter;
 import org.apache.gravitino.connector.BaseTable;
 import org.apache.gravitino.connector.PropertiesMetadata;
@@ -286,8 +285,8 @@ public class HiveTable extends BaseTable {
         .ifPresent(l -> sd.setLocation(properties().get(HiveTablePropertiesMetadata.LOCATION)));
 
     sd.setSerdeInfo(buildSerDeInfo(tablePropertiesMetadata));
-    HiveTablePropertiesMetadata.StorageFormat storageFormat =
-        (HiveTablePropertiesMetadata.StorageFormat)
+    StorageFormat storageFormat =
+        (StorageFormat)
             tablePropertiesMetadata.getOrDefault(properties(), HiveTablePropertiesMetadata.FORMAT);
     sd.setInputFormat(storageFormat.getInputFormat());
     sd.setOutputFormat(storageFormat.getOutputFormat());
@@ -321,8 +320,8 @@ public class HiveTable extends BaseTable {
     SerDeInfo serDeInfo = new SerDeInfo();
     serDeInfo.setName(properties().getOrDefault(HiveTablePropertiesMetadata.SERDE_NAME, name()));
 
-    HiveTablePropertiesMetadata.StorageFormat storageFormat =
-        (HiveTablePropertiesMetadata.StorageFormat)
+    StorageFormat storageFormat =
+        (StorageFormat)
             tablePropertiesMetadata.getOrDefault(properties(), HiveTablePropertiesMetadata.FORMAT);
     serDeInfo.setSerializationLib(storageFormat.getSerde());
     // Individually specified SERDE_LIB can override the serdeLib of FORMAT

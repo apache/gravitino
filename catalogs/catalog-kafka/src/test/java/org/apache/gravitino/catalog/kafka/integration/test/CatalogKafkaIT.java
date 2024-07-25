@@ -139,11 +139,18 @@ public class CatalogKafkaIT extends AbstractIT {
 
   @Test
   public void testCatalog() throws ExecutionException, InterruptedException {
-    // test create catalog
     String catalogName = GravitinoITUtils.genRandomName("test_catalog");
     String comment = "test catalog";
     Map<String, String> properties =
         ImmutableMap.of(BOOTSTRAP_SERVERS, kafkaBootstrapServers, "key1", "value1");
+
+    // test before creation
+    Assertions.assertDoesNotThrow(
+        () ->
+            metalake.testConnection(
+                catalogName, Catalog.Type.MESSAGING, PROVIDER, comment, properties));
+
+    // test create catalog
     Catalog createdCatalog = createCatalog(catalogName, comment, properties);
     Assertions.assertEquals(catalogName, createdCatalog.name());
     Assertions.assertEquals(comment, createdCatalog.comment());
@@ -190,6 +197,23 @@ public class CatalogKafkaIT extends AbstractIT {
             IllegalArgumentException.class, () -> catalog1.asSchemas().listSchemas());
     Assertions.assertTrue(exception.getMessage().contains("Invalid url in bootstrap.servers: 2"));
 
+    // test before creation
+    ImmutableMap<String, String> illegalProps = ImmutableMap.of("abc", "2");
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                metalake.testConnection(
+                    GravitinoITUtils.genRandomName("test_catalog"),
+                    Catalog.Type.MESSAGING,
+                    PROVIDER,
+                    "comment",
+                    illegalProps));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("Properties are required and must be set: [bootstrap.servers]"));
+
     exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
@@ -199,7 +223,7 @@ public class CatalogKafkaIT extends AbstractIT {
                     Catalog.Type.MESSAGING,
                     PROVIDER,
                     "comment",
-                    ImmutableMap.of("abc", "2")));
+                    illegalProps));
     Assertions.assertTrue(
         exception
             .getMessage()

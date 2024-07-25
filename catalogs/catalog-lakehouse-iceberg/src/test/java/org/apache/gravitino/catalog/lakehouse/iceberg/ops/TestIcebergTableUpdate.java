@@ -21,7 +21,8 @@ package org.apache.gravitino.catalog.lakehouse.iceberg.ops;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper.IcebergTableChange;
+import org.apache.gravitino.iceberg.common.ops.IcebergTableOps;
+import org.apache.gravitino.iceberg.common.ops.IcebergTableOps.IcebergTableChange;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.TableChange.ColumnPosition;
 import org.apache.gravitino.rel.types.Types;
@@ -79,7 +80,7 @@ public class TestIcebergTableUpdate {
   @BeforeEach
   public void init() {
     icebergTableOps = new IcebergTableOps();
-    icebergTableOpsHelper = icebergTableOps.createIcebergTableOpsHelper();
+    icebergTableOpsHelper = new IcebergTableOpsHelper(icebergTableOps.getCatalog());
     createNamespace(TEST_NAMESPACE_NAME);
     createTable(TEST_NAMESPACE_NAME, TEST_TABLE_NAME);
   }
