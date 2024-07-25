@@ -160,7 +160,7 @@ public class IcebergTableOpsHelper {
     icebergUpdateSchema.updateColumn(fieldName, (PrimitiveType) type);
   }
 
-  // Iceberg doesn't support LAST
+  // Iceberg doesn't support LAST position, transform to FIRST or AFTER.
   private ColumnPosition getColumnPositionForIceberg(
       StructType parent, ColumnPosition columnPosition) {
     if (!(columnPosition instanceof TableChange.Default)) {
