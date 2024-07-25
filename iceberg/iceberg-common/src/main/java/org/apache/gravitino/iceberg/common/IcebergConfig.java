@@ -118,6 +118,13 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .stringConf()
           .create();
 
+  public static final ConfigEntry<Boolean> REST_PROXY =
+      new ConfigBuilder(IcebergConstants.GRAVITINO_REST_PROXY)
+          .doc("Whether to proxy gravitino iceberg catalog in rest server")
+          .version(ConfigConstants.VERSION_0_6_0)
+          .booleanConf()
+          .createWithDefault(false);
+
   public String getJdbcDriver() {
     return get(JDBC_DRIVER);
   }

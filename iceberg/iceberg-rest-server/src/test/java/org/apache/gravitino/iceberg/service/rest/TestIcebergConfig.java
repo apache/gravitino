@@ -49,7 +49,7 @@ public class TestIcebergConfig extends IcebergTestBase {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"PREFIX", "", "\\\n\t\\\'", "\u0024", "\100", "[_~"})
+  @ValueSource(strings = {"metalake/catalog", "\u0024/\u0024", "\100/\100"})
   void testIcebergRestValidPrefix(String prefix) {
     String path = injectPrefixToPath(IcebergRestTestUtil.CONFIG_PATH, prefix);
     Response response = getIcebergClientBuilder(path, Optional.empty()).get();
@@ -57,7 +57,7 @@ public class TestIcebergConfig extends IcebergTestBase {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"/", "hello/"})
+  @ValueSource(strings = {"PREFIX", "", "\\\n\t\\\'", "\u0024", "\100", "[_~"})
   void testIcebergRestInvalidPrefix(String prefix) {
     String path = injectPrefixToPath(IcebergRestTestUtil.CONFIG_PATH, prefix);
     Response response = getIcebergClientBuilder(path, Optional.empty()).get();

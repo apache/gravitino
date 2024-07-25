@@ -36,6 +36,7 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.apache.gravitino.utils.MapUtils;
 import org.slf4j.Logger;
@@ -189,9 +190,15 @@ public class AuxiliaryServiceManager {
         (auxServiceName, auxService) -> {
           doWithClassLoader(
               auxServiceName,
-              cl ->
-                  auxService.serviceInit(
-                      MapUtils.getPrefixMap(serviceConfigs, DOT.join(auxServiceName, ""))));
+              cl -> {
+                Map<String, String> auxConfig =
+                    new HashMap<>(
+                        MapUtils.getPrefixMap(serviceConfigs, DOT.join(auxServiceName, "")));
+                auxConfig.putAll(
+                    MapUtils.filterPrefixMap(
+                        gravitinoConfig.getAllConfig(), Configs.ENTITY_STORE_KEY));
+                auxService.serviceInit(auxConfig);
+              });
         });
   }
 

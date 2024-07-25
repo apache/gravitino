@@ -52,4 +52,6 @@ public class IcebergConstants {
   public static final String ICEBERG_METRICS_QUEUE_CAPACITY = "metricsQueueCapacity";
 
   public static final String GRAVITINO_ICEBERG_REST_SERVICE_NAME = "iceberg-rest";
+
+  public static final String GRAVITINO_REST_PROXY = "rest-proxy";
 }
