@@ -348,6 +348,10 @@ public class ContainerSuite implements Closeable {
     return hiveContainer;
   }
 
+  public HiveContainer getHiveRangerContainer() {
+    return hiveRangerContainer;
+  }
+
   public void startRangerContainer() {
     if (rangerContainer == null) {
       synchronized (ContainerSuite.class) {
