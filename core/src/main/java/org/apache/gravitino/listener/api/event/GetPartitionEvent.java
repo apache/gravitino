@@ -43,7 +43,7 @@ public class GetPartitionEvent extends PartitionEvent {
 
   /**
    * Provides the final state of the partition as it is presented to the user following the
-   * successful creation.
+   * successful get operation of a partition.
    *
    * @return A {@link PartitionInfo} object that encapsulates the detailed characteristics of the
    *     newly gotten partition.
