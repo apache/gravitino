@@ -44,7 +44,7 @@ public class TestGravitinoCatalog {
     GravitinoCatalog catalog = new GravitinoCatalog("test", mockCatalog);
     assertEquals(catalogName, catalog.getName());
     assertEquals(provider, catalog.getProvider());
-    assertEquals(catalog.getCluster(), "");
+    assertEquals(catalog.getRegion(), "");
   }
 
   @Test
@@ -53,48 +53,48 @@ public class TestGravitinoCatalog {
     String provider = "hive";
 
     HashMap<String, String> properties = new HashMap<>();
-    properties.put("cluster", "c1");
-    properties.put("cluster.connection-url", "jdbc:trino://gt01.orb.local:8080");
-    properties.put("cluster.connection-user", "admin");
-    properties.put("cluster.connection-password", "123");
+    properties.put("cloud.region-code", "c1");
+    properties.put("cloud.trino.connection-url", "jdbc:trino://gt01.orb.local:8080");
+    properties.put("cloud.trino.connection-user", "admin");
+    properties.put("cloud.trino.connection-password", "123");
 
     Catalog mockCatalog =
         mockCatalog(catalogName, provider, "test catalog", Catalog.Type.RELATIONAL, properties);
     GravitinoCatalog catalog = new GravitinoCatalog("test", mockCatalog);
     assertEquals(catalogName, catalog.getName());
     assertEquals(provider, catalog.getProvider());
-    assertEquals(catalog.getCluster(), "c1");
+    assertEquals(catalog.getRegion(), "c1");
 
     assertEquals(
-        catalog.getProperty("cluster.connection-url", ""), "jdbc:trino://gt01.orb.local:8080");
-    assertEquals(catalog.getProperty("cluster.connection-user", ""), "admin");
-    assertEquals(catalog.getProperty("cluster.connection-password", ""), "123");
+        catalog.getProperty("cloud.trino.connection-url", ""), "jdbc:trino://gt01.orb.local:8080");
+    assertEquals(catalog.getProperty("cloud.trino.connection-user", ""), "admin");
+    assertEquals(catalog.getProperty("cloud.trino.connection-password", ""), "123");
   }
 
   @Test
-  public void testCatalogIsLocal() {
+  public void testCatalogIsSameRegion() {
     String catalogName = "mock";
     String provider = "hive";
 
     // test with cluster info
     HashMap<String, String> properties = new HashMap<>();
-    properties.put("cluster", "c1");
+    properties.put("cloud.region-code", "c1");
     Catalog mockCatalog =
         mockCatalog(catalogName, provider, "test catalog", Catalog.Type.RELATIONAL, properties);
     GravitinoCatalog catalog = new GravitinoCatalog("test", mockCatalog);
-    assertTrue(catalog.belongToCluster(""));
-    assertTrue(catalog.belongToCluster("c1"));
-    assertFalse(catalog.belongToCluster("c2"));
+    assertTrue(catalog.isSameRegion(""));
+    assertTrue(catalog.isSameRegion("c1"));
+    assertFalse(catalog.isSameRegion("c2"));
 
     // test with non cluster info
-    properties.put("cluster", "");
+    properties.put("cloud.region-code", "");
     mockCatalog =
         mockCatalog(catalogName, provider, "test catalog", Catalog.Type.RELATIONAL, properties);
     catalog = new GravitinoCatalog("test", mockCatalog);
 
-    assertTrue(catalog.belongToCluster(""));
-    assertTrue(catalog.belongToCluster("c1"));
-    assertTrue(catalog.belongToCluster("c2"));
+    assertTrue(catalog.isSameRegion(""));
+    assertTrue(catalog.isSameRegion("c1"));
+    assertTrue(catalog.isSameRegion("c2"));
   }
 
   public static Catalog mockCatalog(

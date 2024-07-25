@@ -77,7 +77,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
         try {
           CatalogRegister catalogRegister = new CatalogRegister();
           CatalogConnectorFactory catalogConnectorFactory =
-              new CatalogConnectorFactory(config.getCluster());
+              new CatalogConnectorFactory(config.getRegion());
 
           catalogConnectorManager =
               new CatalogConnectorManager(catalogRegister, catalogConnectorFactory);

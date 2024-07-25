@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.trino.connector.metadata;
 
+import static org.apache.gravitino.Catalog.CLOUD_REGION_CODE;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -129,17 +131,17 @@ public class GravitinoCatalog {
     return objectMapper.readValue(jsonString, GravitinoCatalog.class);
   }
 
-  public String getCluster() {
-    return properties.getOrDefault("cluster", "");
+  public String getRegion() {
+    return properties.getOrDefault(CLOUD_REGION_CODE, "");
   }
 
-  public boolean belongToCluster(String cluster) {
-    // When the Gravitino connector has not configured the cluster,
-    // or the catalog has not configured the cluster,
-    // or the catalog cluster name is equal to the connector-configured cluster name,
-    // the catalog is belong to the cluster
-    return StringUtils.isEmpty(cluster)
-        || StringUtils.isEmpty(getCluster())
-        || cluster.equals(getCluster());
+  public boolean isSameRegion(String region) {
+    // When the Gravitino connector has not configured the cloud.region-code,
+    // or the catalog has not configured the cloud.region-code,
+    // or the catalog cluster name is equal to the connector-configured region code,
+    // the catalog is belong to the region
+    return StringUtils.isEmpty(region)
+        || StringUtils.isEmpty(getRegion())
+        || region.equals(getRegion());
   }
 }

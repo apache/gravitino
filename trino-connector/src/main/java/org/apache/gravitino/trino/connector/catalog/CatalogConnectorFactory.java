@@ -36,10 +36,10 @@ public class CatalogConnectorFactory {
   private static final Logger LOG = LoggerFactory.getLogger(CatalogConnectorFactory.class);
 
   private final HashMap<String, CatalogConnectorContext.Builder> catalogBuilders = new HashMap<>();
-  private final String cluster;
+  private final String region;
 
-  public CatalogConnectorFactory(String cluster) {
-    this.cluster = cluster;
+  public CatalogConnectorFactory(String region) {
+    this.region = region;
 
     catalogBuilders.put("hive", new CatalogConnectorContext.Builder(new HiveConnectorAdapter()));
     catalogBuilders.put(
@@ -57,7 +57,7 @@ public class CatalogConnectorFactory {
   public CatalogConnectorContext.Builder createCatalogConnectorContextBuilder(
       GravitinoCatalog catalog) {
     String catalogProvider = catalog.getProvider();
-    if (!catalog.belongToCluster(cluster)) {
+    if (!catalog.isSameRegion(region)) {
       catalogProvider = "trino-cluster";
     }
 

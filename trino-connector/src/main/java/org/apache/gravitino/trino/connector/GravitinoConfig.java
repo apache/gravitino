@@ -69,10 +69,10 @@ public class GravitinoConfig {
           "true",
           false);
 
-  private static final ConfigEntry GRAVITINO_CLUSTER =
+  private static final ConfigEntry GRAVITINO_CLOUD_REGION_CODE =
       new ConfigEntry(
-          "gravitino.cluster",
-          "The name of the cluster that's to indicate the current Trino belong to which Gravitino cluster",
+          "gravitino.cloud.region-code",
+          "The property to specify the region code of the cloud that the catalog is running on.",
           "",
           false);
 
@@ -145,8 +145,9 @@ public class GravitinoConfig {
     }
   }
 
-  public String getCluster() {
-    return config.getOrDefault(GRAVITINO_CLUSTER.key, GRAVITINO_CLUSTER.defaultValue);
+  public String getRegion() {
+    return config.getOrDefault(
+        GRAVITINO_CLOUD_REGION_CODE.key, GRAVITINO_CLOUD_REGION_CODE.defaultValue);
   }
 
   public String getCatalogConfigDirectory() {

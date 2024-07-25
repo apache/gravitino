@@ -42,9 +42,9 @@ import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
  */
 public class TrinoClusterConnectorAdapter implements CatalogConnectorAdapter {
 
-  public static final String TRINO_CLUSTER_URL_KEY = "cluster.connection-url";
-  public static final String TRINO_CLUSTER_USER_KEY = "cluster.connection-user";
-  public static final String TRINO_CLUSTER_PASSWORD_KEY = "cluster.connection-password";
+  public static final String TRINO_CLUSTER_URL_KEY = "cloud.trino.connection-url";
+  public static final String TRINO_CLUSTER_USER_KEY = "cloud.trino.connection-user";
+  public static final String TRINO_CLUSTER_PASSWORD_KEY = "cloud.trino.connection-password";
   public static final String TRINO_CLUSTER_DEFAULT_USER = "admin";
 
   private final HasPropertyMeta propertyMetadata;
