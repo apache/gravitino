@@ -80,6 +80,7 @@ class TestMetalake(IntegrationTestEnv):
         )
 
     def test_failed_create_metalake(self):
+        self.create_metalake(self.metalake_name)
         with self.assertRaises(MetalakeAlreadyExistsException):
             _ = self.create_metalake(self.metalake_name)
 
@@ -149,6 +150,5 @@ class TestMetalake(IntegrationTestEnv):
         self.assertEqual(metalake.audit_info().creator(), "anonymous")
 
     def test_failed_load_metalakes(self):
-        self.create_metalake(self.metalake_name)
         with self.assertRaises(NoSuchMetalakeException):
             _ = self.gravitino_admin_client.load_metalake(self.metalake_name)
