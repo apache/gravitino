@@ -231,16 +231,16 @@ public class KerberosServerUtils {
     // DER encoding that will be extracted.
     DER token = new DER(rawToken);
     // InitialContextToken ::= [APPLICATION 0] IMPLICIT SEQUENCE {
-    // mech OID
-    // mech-token (NegotiationToken or InnerContextToken)
+    //     mech   OID
+    //     mech-token  (NegotiationToken or InnerContextToken)
     // }
     DER oid = token.next();
     if (oid.equals(DER.SPNEGO_MECH_OID)) {
       // NegotiationToken ::= CHOICE {
-      // neg-token-init[0] NegTokenInit
+      //     neg-token-init[0] NegTokenInit
       // }
       // NegTokenInit ::= SEQUENCE {
-      // mech-token[2] InitialContextToken
+      //     mech-token[2]     InitialContextToken
       // }
       token = token.next().get(0xa0, 0x30, 0xa2, 0x04).next();
       oid = token.next();
@@ -249,22 +249,22 @@ public class KerberosServerUtils {
       throw new IllegalArgumentException("Malformed gss token");
     }
     // InnerContextToken ::= {
-    // token-id[1]
-    // AP-REQ
+    //     token-id[1]
+    //     AP-REQ
     // }
     if (token.next().getTag() != 1) {
       throw new IllegalArgumentException("Not an AP-REQ token");
     }
     // AP-REQ ::= [APPLICATION 14] SEQUENCE {
-    // ticket[3] Ticket
+    //     ticket[3]      Ticket
     // }
     DER ticket = token.next().get(0x6e, 0x30, 0xa3, 0x61, 0x30);
     // Ticket ::= [APPLICATION 1] SEQUENCE {
-    // realm[1] String
-    // sname[2] PrincipalName
+    //     realm[1]       String
+    //     sname[2]       PrincipalName
     // }
     // PrincipalName ::= SEQUENCE {
-    // name-string[1] SEQUENCE OF String
+    //     name-string[1] SEQUENCE OF String
     // }
     String realm = ticket.get(0xa1, 0x1b).getAsString();
     DER names = ticket.get(0xa2, 0x30, 0xa1, 0x30);
