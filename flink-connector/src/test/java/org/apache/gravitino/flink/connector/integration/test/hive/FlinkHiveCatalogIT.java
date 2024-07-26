@@ -408,7 +408,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
                       + " char_type CHAR COMMENT 'char_type',"
                       + " boolean_type BOOLEAN COMMENT 'boolean_type',"
                       + " byte_type TINYINT COMMENT 'byte_type',"
-                      + " binary_type BINARY(10) COMMENT 'binary_type',"
+                      + " binary_type VARBINARY(10) COMMENT 'binary_type',"
                       + " decimal_type DECIMAL(10, 2) COMMENT 'decimal_type',"
                       + " bigint_type BIGINT COMMENT 'bigint_type',"
                       + " float_type FLOAT COMMENT 'float_type',"
