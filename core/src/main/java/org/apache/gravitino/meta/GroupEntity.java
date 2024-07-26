@@ -118,6 +118,7 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
    *
    * @return The audit details of the group.
    */
+  @Override
   public AuditInfo auditInfo() {
     return auditInfo;
   }
@@ -127,6 +128,7 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
    *
    * @return The roles of the group entity.
    */
+  @Override
   public List<String> roles() {
     return roleNames;
   }

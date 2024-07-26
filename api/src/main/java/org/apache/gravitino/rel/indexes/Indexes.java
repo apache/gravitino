@@ -115,7 +115,7 @@ public class Indexes {
       return new Builder();
     }
 
-    /** Builder to create a index. */
+    /** Builder to create an index. */
     public static class Builder {
 
       /** The type of the index. */

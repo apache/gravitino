@@ -70,13 +70,13 @@ public class RangerIT {
     }
   }
 
-  public void createRangerTrinoRepository(String tirnoIp) {
+  public void createRangerTrinoRepository(String trinoIp) {
     String usernameKey = "username";
     String usernameVal = "admin";
     String jdbcKey = "jdbc.driverClassName";
     String jdbcVal = "io.trino.jdbc.TrinoDriver";
     String jdbcUrlKey = "jdbc.url";
-    String jdbcUrlVal = String.format("http:hive2://%s:%d", tirnoIp, TrinoContainer.TRINO_PORT);
+    String jdbcUrlVal = String.format("http:hive2://%s:%d", trinoIp, TrinoContainer.TRINO_PORT);
 
     RangerService service = new RangerService();
     service.setType(RANGER_TRINO_TYPE);

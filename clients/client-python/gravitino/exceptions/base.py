@@ -32,18 +32,18 @@ class RESTException(RuntimeError):
         super().__init__(message % args)
 
 
-class IllegalArugmentException(ValueError):
+class IllegalArgumentException(ValueError):
     """Base class for all exceptions thrown when arguments are invalid."""
 
     def __init__(self, message, *args):
         super().__init__(message % args)
 
 
-class IllegalNameIdentifierException(IllegalArugmentException):
+class IllegalNameIdentifierException(IllegalArgumentException):
     """An exception thrown when a name identifier is invalid."""
 
 
-class IllegalNamespaceException(IllegalArugmentException):
+class IllegalNamespaceException(IllegalArgumentException):
     """An exception thrown when a namespace is invalid."""
 
 

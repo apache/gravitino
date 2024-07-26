@@ -161,7 +161,7 @@ public class SecurableObjects {
    *
    * @param fullName The full name of securable object.
    * @param type The securable object type.
-   * @param privileges The secureable object privileges.
+   * @param privileges The securable object privileges.
    * @return The created {@link SecurableObject}
    */
   public static SecurableObject parse(
@@ -176,7 +176,7 @@ public class SecurableObjects {
    *
    * @param type The securable object type.
    * @param names The names of the securable object.
-   * @param privileges The secureable object privileges.
+   * @param privileges The securable object privileges.
    * @return The created {@link SecurableObject}
    */
   static SecurableObject of(

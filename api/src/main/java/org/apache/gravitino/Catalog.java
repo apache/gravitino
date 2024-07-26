@@ -23,6 +23,7 @@ import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.tag.SupportsTags;
 
 /**
  * The interface of a catalog. The catalog is the second level entity in the Gravitino system,
@@ -151,5 +152,13 @@ public interface Catalog extends Auditable {
    */
   default TopicCatalog asTopicCatalog() throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Catalog does not support topic operations");
+  }
+
+  /**
+   * @return the {@link SupportsTags} if the catalog supports tag operations.
+   * @throws UnsupportedOperationException if the catalog does not support tag operations.
+   */
+  default SupportsTags supportsTags() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException("Catalog does not support tag operations");
   }
 }

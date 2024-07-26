@@ -29,7 +29,7 @@ import org.apache.gravitino.trino.connector.catalog.jdbc.JDBCCatalogPropertyConv
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 
 /**
- * Transforming PostgreSQL connector configuration and components into Apche Gravitino connector.
+ * Transforming PostgreSQL connector configuration and components into Apache Gravitino connector.
  */
 public class PostgreSQLConnectorAdapter implements CatalogConnectorAdapter {
   private final PropertyConverter catalogConverter;

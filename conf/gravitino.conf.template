@@ -63,9 +63,12 @@ gravitino.catalog.cache.evictionIntervalMs = 3600000
 # Auxiliary service names, separate by ','
 gravitino.auxService.names = iceberg-rest
 # Iceberg REST service classpath
-gravitino.auxService.iceberg-rest.classpath = catalogs/lakehouse-iceberg/libs, catalogs/lakehouse-iceberg/conf
+gravitino.iceberg-rest.classpath = iceberg-rest-server/libs, iceberg-rest-server/conf
 # Iceberg REST service host
-gravitino.auxService.iceberg-rest.host = 0.0.0.0
+gravitino.iceberg-rest.host = 0.0.0.0
 # Iceberg REST service http port
-gravitino.auxService.iceberg-rest.httpPort = 9001
-
+gravitino.iceberg-rest.httpPort = 9001
+# The backend Iceberg catalog for Iceberg REST service, it's recommended to change to hive or jdbc
+gravitino.iceberg-rest.catalog-backend = memory
+# The warehouse directory of Iceberg catalog for Iceberg REST service
+gravitino.iceberg-rest.warehouse = /tmp/

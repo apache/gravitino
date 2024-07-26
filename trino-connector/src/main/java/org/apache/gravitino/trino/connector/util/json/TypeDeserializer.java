@@ -23,7 +23,7 @@ import io.trino.spi.type.TypeManager;
 import java.util.function.Function;
 
 /**
- * This class is reference to Trino source code io.trino.plugin.base.TypeDeserializer, It use to
+ * This class is reference to Trino source code io.trino.plugin.base.TypeDeserializer, It uses to
  * handle Type serialization
  */
 public final class TypeDeserializer extends FromStringDeserializer<Type> {
