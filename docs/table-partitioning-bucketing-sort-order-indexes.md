@@ -272,7 +272,7 @@ Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"col_1"}, {"col_2"}
 </TabItem>
 </Tabs>
 
-The following is an example of creating a index table:
+The following is an example of creating an index table:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">

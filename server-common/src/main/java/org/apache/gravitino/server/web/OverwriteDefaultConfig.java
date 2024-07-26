@@ -26,7 +26,7 @@ public interface OverwriteDefaultConfig {
   /**
    * Returns key value pairs to overwrite the config which are not set explicitly.
    *
-   * @return an Map of Config key and value pairs
+   * @return a Map of Config key and value pairs
    */
   Map<String, String> getOverwriteDefaultConfig();
 }
