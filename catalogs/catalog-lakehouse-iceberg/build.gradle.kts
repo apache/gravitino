@@ -81,7 +81,7 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
-  // For test TestMultipleJDBCLoad, it was depended on testcontainers.mysql and testcontainers.postgresql)
+  // For test TestMultipleJDBCLoad, it was depended on testcontainers.mysql and testcontainers.postgresql
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
 

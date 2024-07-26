@@ -504,7 +504,7 @@ public class DTOConverters {
   }
 
   /**
-   * Converts a Expression to an FunctionArg DTO.
+   * Converts an Expression to an FunctionArg DTO.
    *
    * @param expression The expression to be converted.
    * @return The expression DTO.

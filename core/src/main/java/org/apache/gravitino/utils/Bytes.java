@@ -186,7 +186,7 @@ public class Bytes implements Comparable<byte[]> {
     }
   }
 
-  /** A byte array comparator based on lexicograpic ordering. */
+  /** A byte array comparator based on lexicographic ordering. */
   public static final ByteArrayComparator BYTES_LEXICO_COMPARATOR =
       new LexicographicByteArrayComparator();
 

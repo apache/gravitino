@@ -343,7 +343,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
 
   @Test
   public void testRenameColumn() {
-    String databaseName = "test_renam_column_db";
+    String databaseName = "test_rename_column_db";
     String tableName = "test_rename_column";
     doWithSchema(
         currentCatalog(),

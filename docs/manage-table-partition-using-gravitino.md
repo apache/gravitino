@@ -207,7 +207,7 @@ Each list in the lists must have the same length. The values in each list must c
 </Tabs>
 
 You can add a partition to a partitioned table by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{partitioned_table_name}/partitions` endpoint or by using the Gravitino Java client.
-The following is an example of adding a identity partition to a Hive partitioned table:
+The following is an example of adding an identity partition to a Hive partitioned table:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
