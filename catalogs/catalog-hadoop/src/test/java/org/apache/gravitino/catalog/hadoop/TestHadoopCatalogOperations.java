@@ -66,8 +66,10 @@ import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.file.BaseFilesetDataOperationCtx;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.file.FilesetContext;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.service.CatalogMetaService;
@@ -760,6 +762,56 @@ public class TestHadoopCatalogOperations {
                 "hadoop",
                 "comment",
                 ImmutableMap.of()));
+  }
+
+  @Test
+  public void testGetFilesetContext() throws IOException {
+    String schemaName = "schema1024";
+    String comment = "comment1024";
+    String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+    createSchema(schemaName, comment, null, schemaPath);
+
+    String catalogName = "c1";
+    String name = "fileset1024";
+    String storageLocation = TEST_ROOT_PATH + "/" + catalogName + "/" + schemaName + "/" + name;
+    Fileset fileset =
+        createFileset(name, schemaName, comment, Fileset.Type.MANAGED, null, storageLocation);
+
+    try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
+      ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
+      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
+      BaseFilesetDataOperationCtx dataOperationCtx1 =
+          BaseFilesetDataOperationCtx.builder()
+              .withSubPath("/test/test.parquet")
+              .withOperation("open")
+              .withClientType("test")
+              .build();
+      FilesetContext context1 = ops.getFilesetContext(filesetIdent, dataOperationCtx1);
+      Assertions.assertEquals(name, context1.fileset().name());
+      Assertions.assertEquals(Fileset.Type.MANAGED, context1.fileset().type());
+      Assertions.assertEquals("comment1024", context1.fileset().comment());
+      Assertions.assertEquals(fileset.storageLocation(), context1.fileset().storageLocation());
+      Assertions.assertEquals(
+          String.format("%s%s", context1.fileset().storageLocation(), dataOperationCtx1.subPath()),
+          context1.actualPath());
+      Assertions.assertFalse(context1.fileset().properties().containsKey(StringIdentifier.ID_KEY));
+
+      BaseFilesetDataOperationCtx dataOperationCtx2 =
+          BaseFilesetDataOperationCtx.builder()
+              .withSubPath("test/test.parquet")
+              .withOperation("open")
+              .withClientType("test")
+              .build();
+      FilesetContext context2 = ops.getFilesetContext(filesetIdent, dataOperationCtx2);
+      Assertions.assertEquals(name, context2.fileset().name());
+      Assertions.assertEquals(Fileset.Type.MANAGED, context2.fileset().type());
+      Assertions.assertEquals("comment1024", context2.fileset().comment());
+      Assertions.assertEquals(fileset.storageLocation(), context2.fileset().storageLocation());
+      Assertions.assertFalse(context2.fileset().properties().containsKey(StringIdentifier.ID_KEY));
+      Assertions.assertEquals(
+          String.format("%s/%s", context2.fileset().storageLocation(), dataOperationCtx2.subPath()),
+          context2.actualPath());
+    }
   }
 
   private static Stream<Arguments> locationArguments() {

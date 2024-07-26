@@ -28,12 +28,16 @@ import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.file.FilesetContext;
+import org.apache.gravitino.file.FilesetDataOperationCtx;
 import org.apache.gravitino.listener.api.event.AlterFilesetEvent;
 import org.apache.gravitino.listener.api.event.AlterFilesetFailureEvent;
 import org.apache.gravitino.listener.api.event.CreateFilesetEvent;
 import org.apache.gravitino.listener.api.event.CreateFilesetFailureEvent;
 import org.apache.gravitino.listener.api.event.DropFilesetEvent;
 import org.apache.gravitino.listener.api.event.DropFilesetFailureEvent;
+import org.apache.gravitino.listener.api.event.GetFilesetContextEvent;
+import org.apache.gravitino.listener.api.event.GetFilesetContextFailureEvent;
 import org.apache.gravitino.listener.api.event.ListFilesetEvent;
 import org.apache.gravitino.listener.api.event.ListFilesetFailureEvent;
 import org.apache.gravitino.listener.api.event.LoadFilesetEvent;
@@ -135,6 +139,21 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
     } catch (Exception e) {
       eventBus.dispatchEvent(
           new DropFilesetFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e));
+      throw e;
+    }
+  }
+
+  @Override
+  public FilesetContext getFilesetContext(NameIdentifier ident, FilesetDataOperationCtx ctx)
+      throws NoSuchFilesetException {
+    try {
+      FilesetContext context = dispatcher.getFilesetContext(ident, ctx);
+      eventBus.dispatchEvent(
+          new GetFilesetContextEvent(PrincipalUtils.getCurrentUserName(), ident, ctx));
+      return context;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new GetFilesetContextFailureEvent(PrincipalUtils.getCurrentUserName(), ident, ctx, e));
       throw e;
     }
   }

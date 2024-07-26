@@ -34,14 +34,18 @@ import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.requests.FilesetCreateRequest;
 import org.apache.gravitino.dto.requests.FilesetUpdateRequest;
 import org.apache.gravitino.dto.requests.FilesetUpdatesRequest;
+import org.apache.gravitino.dto.requests.GetFilesetContextRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
+import org.apache.gravitino.dto.responses.FilesetContextResponse;
 import org.apache.gravitino.dto.responses.FilesetResponse;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.file.FilesetContext;
+import org.apache.gravitino.file.FilesetDataOperationCtx;
 import org.apache.gravitino.rest.RESTUtils;
 
 /**
@@ -224,6 +228,37 @@ class FilesetCatalog extends BaseSchemaCatalog implements org.apache.gravitino.f
     resp.validate();
 
     return resp.dropped();
+  }
+
+  /**
+   * Get a fileset context from the catalog.
+   *
+   * @param ident A fileset identifier.
+   * @param ctx The data operation context.
+   * @return The fileset context.
+   */
+  @Override
+  public FilesetContext getFilesetContext(NameIdentifier ident, FilesetDataOperationCtx ctx)
+      throws NoSuchFilesetException {
+    checkFilesetNameIdentifier(ident);
+
+    GetFilesetContextRequest req =
+        GetFilesetContextRequest.builder()
+            .subPath(ctx.subPath())
+            .operation(ctx.operation())
+            .clientType(ctx.clientType())
+            .build();
+
+    FilesetContextResponse resp =
+        restClient.post(
+            formatFilesetRequestPath(ident.namespace()) + "/" + ident.name() + "/" + "context",
+            req,
+            FilesetContextResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.filesetErrorHandler());
+    resp.validate();
+
+    return resp.getContext();
   }
 
   @VisibleForTesting

@@ -32,6 +32,8 @@ import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.file.FilesetContext;
+import org.apache.gravitino.file.FilesetDataOperationCtx;
 
 public class FilesetNormalizeDispatcher implements FilesetDispatcher {
   private final CatalogManager catalogManager;
@@ -92,6 +94,13 @@ public class FilesetNormalizeDispatcher implements FilesetDispatcher {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
     return dispatcher.dropFileset(normalizeCaseSensitive(ident));
+  }
+
+  @Override
+  public FilesetContext getFilesetContext(NameIdentifier ident, FilesetDataOperationCtx ctx) {
+    // The constraints of the name spec may be more strict than underlying catalog,
+    // and for compatibility reasons, we only apply case-sensitive capabilities here.
+    return dispatcher.getFilesetContext(normalizeCaseSensitive(ident), ctx);
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier ident) {

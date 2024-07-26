@@ -45,6 +45,7 @@ import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.authorization.RoleDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.authorization.UserDTO;
+import org.apache.gravitino.dto.file.FilesetContextDTO;
 import org.apache.gravitino.dto.file.FilesetDTO;
 import org.apache.gravitino.dto.messaging.TopicDTO;
 import org.apache.gravitino.dto.rel.ColumnDTO;
@@ -75,6 +76,7 @@ import org.apache.gravitino.dto.rel.partitions.RangePartitionDTO;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.file.FilesetContext;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -582,6 +584,19 @@ public class DTOConverters {
         .storageLocation(fileset.storageLocation())
         .properties(fileset.properties())
         .audit(toDTO(fileset.auditInfo()))
+        .build();
+  }
+
+  /**
+   * Converts to a FilesetContextDTO.
+   *
+   * @param context The fileset context to be converted.
+   * @return The fileset context DTO.
+   */
+  public static FilesetContextDTO toDTO(FilesetContext context) {
+    return FilesetContextDTO.builder()
+        .fileset(toDTO(context.fileset()))
+        .actualPath(context.actualPath())
         .build();
   }
 

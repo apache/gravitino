@@ -33,6 +33,8 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.file.FilesetContext;
+import org.apache.gravitino.file.FilesetDataOperationCtx;
 import org.apache.gravitino.storage.IdGenerator;
 
 public class FilesetOperationDispatcher extends OperationDispatcher implements FilesetDispatcher {
@@ -193,6 +195,22 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
     return doWithCatalog(
         getCatalogIdentifier(ident),
         c -> c.doWithFilesetOps(f -> f.dropFileset(ident)),
+        NonEmptyEntityException.class);
+  }
+
+  /**
+   * Get a fileset context from the catalog.
+   *
+   * @param ident A fileset identifier.
+   * @param ctx A fileset data operation context.
+   * @return true If the fileset is dropped, false the fileset did not exist.
+   */
+  @Override
+  public FilesetContext getFilesetContext(NameIdentifier ident, FilesetDataOperationCtx ctx)
+      throws NoSuchFilesetException {
+    return doWithCatalog(
+        getCatalogIdentifier(ident),
+        c -> c.doWithFilesetOps(f -> f.getFilesetContext(ident, ctx)),
         NonEmptyEntityException.class);
   }
 }

@@ -48,6 +48,8 @@ import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.file.FilesetContext;
+import org.apache.gravitino.file.FilesetDataOperationCtx;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -216,6 +218,12 @@ public class SecureHadoopCatalogOperations
   @Override
   public Fileset loadFileset(NameIdentifier ident) throws NoSuchFilesetException {
     return hadoopCatalogOperations.loadFileset(ident);
+  }
+
+  @Override
+  public FilesetContext getFilesetContext(NameIdentifier ident, FilesetDataOperationCtx ctx)
+      throws NoSuchFilesetException {
+    return hadoopCatalogOperations.getFilesetContext(ident, ctx);
   }
 
   @Override

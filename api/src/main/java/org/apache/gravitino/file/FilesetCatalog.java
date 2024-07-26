@@ -120,4 +120,15 @@ public interface FilesetCatalog {
    * @return true If the fileset is dropped, false the fileset did not exist.
    */
   boolean dropFileset(NameIdentifier ident);
+
+  /**
+   * Get a fileset context.
+   *
+   * @param ident A fileset identifier.
+   * @param ctx The data operation context.
+   * @return The fileset context.
+   * @throws NoSuchFilesetException If the fileset does not exist.
+   */
+  FilesetContext getFilesetContext(NameIdentifier ident, FilesetDataOperationCtx ctx)
+      throws NoSuchFilesetException;
 }

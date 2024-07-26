@@ -21,12 +21,16 @@ package org.apache.gravitino.catalog;
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
 
 import com.google.common.collect.ImmutableMap;
+import java.io.File;
 import java.io.IOException;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.file.BaseFilesetDataOperationCtx;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.file.FilesetContext;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -168,5 +172,47 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
     boolean dropped = filesetOperationDispatcher.dropFileset(filesetIdent1);
     Assertions.assertTrue(dropped);
     Assertions.assertFalse(filesetOperationDispatcher.dropFileset(filesetIdent1));
+  }
+
+  @Test
+  public void testCreateAndGetFilesetContext() {
+    String tmpDir = "/tmp/test_get_fileset_context_" + UUID.randomUUID();
+    try {
+      Namespace filesetNs = Namespace.of(metalake, catalog, "schema91");
+      Map<String, String> props = ImmutableMap.of("k1", "v1", "location", "schema91");
+      schemaOperationDispatcher.createSchema(
+          NameIdentifier.of(filesetNs.levels()), "comment", props);
+
+      NameIdentifier filesetIdent1 = NameIdentifier.of(filesetNs, "fileset1024");
+      Fileset fileset1 =
+          filesetOperationDispatcher.createFileset(
+              filesetIdent1, "comment", Fileset.Type.MANAGED, tmpDir, props);
+      Assertions.assertEquals("fileset1024", fileset1.name());
+      Assertions.assertEquals("comment", fileset1.comment());
+      testProperties(props, fileset1.properties());
+      Assertions.assertEquals(Fileset.Type.MANAGED, fileset1.type());
+      Assertions.assertNotNull(fileset1.storageLocation());
+
+      BaseFilesetDataOperationCtx ctx =
+          BaseFilesetDataOperationCtx.builder()
+              .withSubPath("/test/x.parquet")
+              .withOperation("create")
+              .withClientType("test")
+              .build();
+      FilesetContext context1 = filesetOperationDispatcher.getFilesetContext(filesetIdent1, ctx);
+      Assertions.assertEquals(fileset1.name(), context1.fileset().name());
+      Assertions.assertEquals(fileset1.comment(), context1.fileset().comment());
+      testProperties(props, context1.fileset().properties());
+      Assertions.assertEquals(fileset1.type(), context1.fileset().type());
+      Assertions.assertEquals(fileset1.storageLocation(), context1.fileset().storageLocation());
+
+      Assertions.assertEquals(
+          fileset1.storageLocation() + "/test/x.parquet", context1.actualPath());
+    } finally {
+      File path = new File(tmpDir);
+      if (path.exists()) {
+        path.delete();
+      }
+    }
   }
 }
