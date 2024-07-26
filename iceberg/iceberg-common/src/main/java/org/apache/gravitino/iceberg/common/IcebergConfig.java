@@ -20,8 +20,11 @@
 package org.apache.gravitino.iceberg.common;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -30,6 +33,7 @@ import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.server.web.OverwriteDefaultConfig;
+import org.apache.gravitino.utils.MapUtils;
 
 public class IcebergConfig extends Config implements OverwriteDefaultConfig {
   public static final String ICEBERG_CONFIG_PREFIX = "gravitino.iceberg-rest.";
@@ -140,6 +144,30 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
 
   public IcebergConfig() {
     super(false);
+  }
+
+  public List<String> getCatalogs() {
+    Map<String, Boolean> catalogs = Maps.newHashMap();
+    for (String key : this.getAllConfig().keySet()) {
+      if (!key.startsWith("catalog.")) {
+        continue;
+      }
+      if (key.split("\\.").length < 3) {
+        throw new RuntimeException(String.format("%s format is illegal", key));
+      }
+      catalogs.put(key.split("\\.")[1], true);
+    }
+    return catalogs.keySet().stream().sorted().collect(Collectors.toList());
+  }
+
+  public IcebergConfig getCatalogConfig(String catalog) {
+    Map<String, String> base = Maps.newHashMap(this.getAllConfig());
+    Map<String, String> merge =
+        MapUtils.getPrefixMap(this.getAllConfig(), String.format("catalog.%s.", catalog));
+    for (String key : merge.keySet()) {
+      base.put(key, merge.get(key));
+    }
+    return new IcebergConfig(base);
   }
 
   @Override

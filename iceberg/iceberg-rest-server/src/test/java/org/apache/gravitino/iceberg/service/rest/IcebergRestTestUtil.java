@@ -23,7 +23,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.Maps;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.gravitino.EntityStore;
@@ -44,6 +46,7 @@ public class IcebergRestTestUtil {
   private static final String V_1 = "v1";
   public static final String METALAKE = "ut_metalake";
   public static final String CATALOG = "ut_catalog";
+
   public static final String PREFIX = METALAKE + "/" + CATALOG;
   public static final String CONFIG_PATH = V_1 + "/config";
   public static final String NAMESPACE_PATH = V_1 + "/namespaces";
@@ -75,8 +78,10 @@ public class IcebergRestTestUtil {
     }
 
     if (bindIcebergTableOps) {
+      Map<String, String> catalogConf = Maps.newHashMap();
+      catalogConf.put(String.format("catalog.%s.xx", CATALOG), "xxx");
       IcebergTableOpsManager icebergTableOpsManager =
-          new IcebergTableOpsManager(new IcebergConfig(), mockEntityStore());
+          new IcebergTableOpsManager(new IcebergConfig(catalogConf), mockEntityStore());
 
       IcebergMetricsManager icebergMetricsManager = new IcebergMetricsManager(new IcebergConfig());
       resourceConfig.register(

@@ -18,6 +18,8 @@ import org.slf4j.LoggerFactory;
 public class IcebergTableOpsManager implements AutoCloseable {
   public static final Logger LOG = LoggerFactory.getLogger(IcebergTableOpsManager.class);
 
+  public static final String DEFAULT_CATALOG = "default_catalog";
+
   private final Map<String, IcebergTableOps> icebergTableOpsMap;
 
   private final IcebergConfig icebergConfig;
@@ -40,62 +42,70 @@ public class IcebergTableOpsManager implements AutoCloseable {
   }
 
   public IcebergTableOps getOps(String prefix) {
-    if (!icebergConfig.get(IcebergConfig.REST_PROXY)) {
-      LOG.debug("server's rest-proxy is false, return default iceberg catalog");
-      return icebergTableOpsMap.computeIfAbsent("default", k -> new IcebergTableOps(icebergConfig));
-    }
-
     if (prefix == null || prefix.length() == 0) {
       LOG.debug("prefix is empty, return default iceberg catalog");
-      return icebergTableOpsMap.computeIfAbsent("default", k -> new IcebergTableOps(icebergConfig));
+      return icebergTableOpsMap.computeIfAbsent(
+          DEFAULT_CATALOG,
+          k -> new IcebergTableOps(icebergConfig.getCatalogConfig(DEFAULT_CATALOG)));
     }
 
     String[] segments = prefix.split("/");
     String metalake = segments[0];
     String catalog = segments[1];
-    return icebergTableOpsMap.computeIfAbsent(
-        String.format("%s_%s", metalake, catalog),
-        k -> {
-          CatalogEntity entity;
-          try {
-            entity =
-                entityStore.get(
-                    NameIdentifier.of(metalake, catalog),
-                    Entity.EntityType.CATALOG,
-                    CatalogEntity.class);
-          } catch (NoSuchEntityException e) {
-            throw new RuntimeException(String.format("%s.%s does not exist", metalake, catalog));
-          } catch (IOException ioe) {
-            LOG.error("Failed to get {}.{}", metalake, catalog, ioe);
-            throw new RuntimeException(ioe);
-          }
 
-          if (!"lakehouse-iceberg".equals(entity.getProvider())) {
-            String errorMsg = String.format("%s.%s is not iceberg catalog", metalake, catalog);
-            LOG.error(errorMsg);
-            throw new RuntimeException(errorMsg);
-          }
+    if (icebergConfig.get(IcebergConfig.REST_PROXY)) {
+      return icebergTableOpsMap.computeIfAbsent(
+          String.format("%s_%s", metalake, catalog),
+          k -> {
+            CatalogEntity entity;
+            try {
+              entity =
+                  entityStore.get(
+                      NameIdentifier.of(metalake, catalog),
+                      Entity.EntityType.CATALOG,
+                      CatalogEntity.class);
+            } catch (NoSuchEntityException e) {
+              throw new RuntimeException(String.format("%s.%s does not exist", metalake, catalog));
+            } catch (IOException ioe) {
+              LOG.error("Failed to get {}.{}", metalake, catalog, ioe);
+              throw new RuntimeException(ioe);
+            }
 
-          Map<String, String> properties = entity.getProperties();
-          if (!Boolean.parseBoolean(
-              properties.getOrDefault(IcebergConstants.GRAVITINO_REST_PROXY, "true"))) {
-            String errorMsg = String.format("%s.%s rest-proxy is false", metalake, catalog);
-            LOG.error(errorMsg);
-            throw new RuntimeException(errorMsg);
-          }
+            if (!"lakehouse-iceberg".equals(entity.getProvider())) {
+              String errorMsg = String.format("%s.%s is not iceberg catalog", metalake, catalog);
+              LOG.error(errorMsg);
+              throw new RuntimeException(errorMsg);
+            }
 
-          Map<String, String> catalogProperties = new HashMap<>(properties);
-          catalogProperties.merge(
-              IcebergConstants.CATALOG_BACKEND_NAME, catalog, (oldValue, newValue) -> oldValue);
-          catalogProperties.put(
-              IcebergConstants.ICEBERG_JDBC_PASSWORD,
-              properties.getOrDefault(IcebergConstants.GRAVITINO_JDBC_PASSWORD, ""));
-          catalogProperties.put(
-              IcebergConstants.ICEBERG_JDBC_USER,
-              properties.getOrDefault(IcebergConstants.GRAVITINO_JDBC_USER, ""));
+            Map<String, String> properties = entity.getProperties();
+            if (!Boolean.parseBoolean(
+                properties.getOrDefault(IcebergConstants.GRAVITINO_REST_PROXY, "true"))) {
+              String errorMsg = String.format("%s.%s rest-proxy is false", metalake, catalog);
+              LOG.error(errorMsg);
+              throw new RuntimeException(errorMsg);
+            }
 
-          return new IcebergTableOps(new IcebergConfig(catalogProperties));
-        });
+            Map<String, String> catalogProperties = new HashMap<>(properties);
+            catalogProperties.merge(
+                IcebergConstants.CATALOG_BACKEND_NAME, catalog, (oldValue, newValue) -> oldValue);
+            catalogProperties.put(
+                IcebergConstants.ICEBERG_JDBC_PASSWORD,
+                properties.getOrDefault(IcebergConstants.GRAVITINO_JDBC_PASSWORD, ""));
+            catalogProperties.put(
+                IcebergConstants.ICEBERG_JDBC_USER,
+                properties.getOrDefault(IcebergConstants.GRAVITINO_JDBC_USER, ""));
+
+            return new IcebergTableOps(new IcebergConfig(catalogProperties));
+          });
+    } else {
+      if (!icebergConfig.getCatalogs().contains(catalog)) {
+        String errorMsg = String.format("%s is not iceberg catalog", catalog);
+        LOG.error(errorMsg);
+        throw new RuntimeException(errorMsg);
+      }
+      return icebergTableOpsMap.computeIfAbsent(
+          catalog, k -> new IcebergTableOps(icebergConfig.getCatalogConfig(catalog)));
+    }
   }
 
   @Override
