@@ -54,7 +54,7 @@ public class TestJettyServer {
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(config);
     jettyServer.initialize(serverConfig, "test", false);
 
-    // TODO might be nice to have an isInitalised method or similar?
+    // TODO might be nice to have an isInitialised method or similar?
   }
 
   @Test

@@ -138,7 +138,7 @@ changes = (
     MetalakeChange.rename("metalake_new_name"),
     MetalakeChange.update_comment("metalake_new_comment"),
     MetalakeChange.remove_property("metalake_properties_key1"),
-    MetalakeChange.set_property("metalake_properties_key2", "metalake_propertie_new_value"),
+    MetalakeChange.set_property("metalake_properties_key2", "metalake_properties_new_value"),
 )
 
 metalake = gravitino_admin_client.alter_metalake("metalake_name", *changes)

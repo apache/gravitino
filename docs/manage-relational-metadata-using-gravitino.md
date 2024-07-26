@@ -403,7 +403,7 @@ catalog: Catalog = gravitino_client.load_catalog(name="hive_catalog")
 
 changes = (
     SchemaChange.remove_property("schema_properties_key1"),
-    SchemaChange.set_property("schema_properties_key2", "schema_propertie_new_value"),
+    SchemaChange.set_property("schema_properties_key2", "schema_properties_new_value"),
 )
 schema_new: Schema = catalog.as_schemas().alter_schema("schema", 
                                                        *changes)
