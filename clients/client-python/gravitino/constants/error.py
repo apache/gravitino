@@ -21,7 +21,7 @@ from enum import IntEnum
 
 from gravitino.exceptions.base import (
     RESTException,
-    IllegalArugmentException,
+    IllegalArgumentException,
     NotFoundException,
     InternalError,
     AlreadyExistException,
@@ -60,7 +60,7 @@ class ErrorConstants(IntEnum):
 
 EXCEPTION_MAPPING = {
     RESTException: ErrorConstants.REST_ERROR_CODE,
-    IllegalArugmentException: ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+    IllegalArgumentException: ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
     InternalError: ErrorConstants.INTERNAL_ERROR_CODE,
     NotFoundException: ErrorConstants.NOT_FOUND_CODE,
     AlreadyExistException: ErrorConstants.ALREADY_EXISTS_CODE,
