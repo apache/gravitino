@@ -1774,7 +1774,7 @@ public class CatalogMysqlIT extends AbstractIT {
         new SortOrder[0],
         Indexes.EMPTY_INDEXES);
 
-    // Test add auto increment ,but not insert index. will failed.
+    // Test add auto increment ,but not insert index. will fail.
     RuntimeException runtimeException =
         assertThrows(
             RuntimeException.class,

@@ -13,7 +13,7 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Apache Gravitino provides the ability to manage [Apache Doris](https://doris.apache.org/) metadata through JDBC connection..
+Apache Gravitino provides the ability to manage [Apache Doris](https://doris.apache.org/) metadata through JDBC connection.
 
 :::caution
 Gravitino saves some system information in schema and table comments, like
