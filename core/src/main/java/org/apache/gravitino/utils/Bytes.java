@@ -208,6 +208,7 @@ public class Bytes implements Comparable<byte[]> {
       return compare(buffer1, 0, buffer1.length, buffer2, 0, buffer2.length);
     }
 
+    @Override
     public int compare(
         final byte[] buffer1,
         int offset1,
