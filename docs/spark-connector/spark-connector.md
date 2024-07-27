@@ -92,7 +92,7 @@ Gravitino spark connector support the following datatype mapping between Spark a
 | `CharType`         | `char`              | 0.5.0         |
 | `VarcharType`      | `varchar`           | 0.5.0         |
 | `TimestampType`    | `timestamp`         | 0.5.0         |
-| `TimestampNTZType` | `timestampntz`      | 0.5.0         |
+| `TimestampNTZType` | `timestamp`         | 0.5.0         |
 | `DateType`         | `date`              | 0.5.0         |
 | `BinaryType`       | `binary`            | 0.5.0         |
 | `ArrayType`        | `array`             | 0.5.0         |
