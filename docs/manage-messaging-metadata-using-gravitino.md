@@ -55,7 +55,7 @@ GravitinoClient gravitinoClient = GravitinoClient
     .build();
 
 Map<String, String> properties = ImmutableMap.<String, String>builder()
-    // You should repalce the following with your own Kafka bootstrap servers that Gravitino can connect to.
+    // You should replace the following with your own Kafka bootstrap servers that Gravitino can connect to.
     .put("bootstrap.servers", "localhost:9092")
     .build();
 

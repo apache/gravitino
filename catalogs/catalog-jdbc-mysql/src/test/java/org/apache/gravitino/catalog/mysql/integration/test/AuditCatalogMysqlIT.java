@@ -115,7 +115,7 @@ public class AuditCatalogMysqlIT extends AbstractIT {
   @Test
   public void testAuditTable() throws Exception {
     String catalogName = GravitinoITUtils.genRandomName("audit_mysql_table_catalog");
-    String schemaName = GravitinoITUtils.genRandomName("audit_mysql_table_schma");
+    String schemaName = GravitinoITUtils.genRandomName("audit_mysql_table_schema");
     String tableName = GravitinoITUtils.genRandomName("audit_mysql_table");
     Catalog catalog = createCatalog(catalogName);
     Map<String, String> properties = Maps.newHashMap();

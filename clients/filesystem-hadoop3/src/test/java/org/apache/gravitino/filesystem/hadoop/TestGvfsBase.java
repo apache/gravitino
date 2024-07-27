@@ -159,7 +159,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
         assertNotEquals(externalFs, gravitinoFileSystem);
       }
 
-      // test proxyed local fs, should not get the same fs
+      // test proxied local fs, should not get the same fs
       FileSystemTestUtils.mkdirs(managedFilesetPath, gravitinoFileSystem);
       FileSystem proxyLocalFs =
           Objects.requireNonNull(

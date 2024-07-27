@@ -398,7 +398,7 @@ public class TestDorisTableOperations extends TestDoris {
 
   @Test
   public void testCreateNotSupportTypeTable() {
-    String tableName = RandomNameUtils.genRandomName("unspport_type_table");
+    String tableName = RandomNameUtils.genRandomName("unsupported_type_table");
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();
     List<Type> notSupportType =

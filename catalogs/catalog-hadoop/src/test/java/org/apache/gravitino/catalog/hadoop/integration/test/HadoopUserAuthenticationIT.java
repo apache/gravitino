@@ -410,13 +410,13 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
 
     // Create a catalog
     Map<String, String> properties = Maps.newHashMap();
-    String localtion = HDFS_URL + "/user/hadoop/" + catalogName;
+    String location = HDFS_URL + "/user/hadoop/" + catalogName;
 
     properties.put(AUTH_TYPE_KEY, "kerberos");
     properties.put(IMPERSONATION_ENABLE_KEY, "true");
     properties.put(KEY_TAB_URI_KEY, TMP_DIR + HADOOP_CLIENT_KEYTAB);
     properties.put(PRINCIPAL_KEY, HADOOP_CLIENT_PRINCIPAL);
-    properties.put("location", localtion);
+    properties.put("location", location);
 
     kerberosHiveContainer.executeInContainer(
         "hadoop", "fs", "-mkdir", "-p", "/user/hadoop/" + catalogName);

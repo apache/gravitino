@@ -65,7 +65,7 @@ public class RESTUtils {
   }
 
   /**
-   * Encode a map of form data into an URL encoded string.
+   * Encode a map of form data into a URL encoded string.
    *
    * @param formData The form data to encode.
    * @return The URL encoded form data string.
@@ -79,7 +79,7 @@ public class RESTUtils {
   }
 
   /**
-   * Decode an URL encoded form data string into a map.
+   * Decode a URL encoded form data string into a map.
    *
    * @param formString The URL encoded form data string.
    * @return The decoded form data map.
@@ -110,7 +110,7 @@ public class RESTUtils {
   }
 
   /**
-   * Decode an URL encoded string.
+   * Decode a URL encoded string.
    *
    * @param encoded The URL encoded string to decode.
    * @return The decoded string.
