@@ -21,10 +21,15 @@ package org.apache.gravitino.catalog.lakehouse.paimon;
 import static org.apache.gravitino.meta.AuditInfo.EMPTY;
 
 import com.google.common.collect.Maps;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.ToString;
 import org.apache.gravitino.connector.BaseTable;
 import org.apache.gravitino.connector.TableOperations;
+import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.paimon.schema.Schema;
 import org.apache.paimon.table.Table;
 import org.apache.paimon.types.DataField;
@@ -52,6 +57,12 @@ public class GravitinoPaimonTable extends BaseTable {
    */
   public Schema toPaimonTableSchema() {
     Schema.Builder builder = Schema.newBuilder().comment(comment).options(properties);
+    if (partitioning != null) {
+      builder.partitionKeys(
+          Arrays.stream(partitioning)
+              .map(partition -> partition.references()[0].toString())
+              .collect(Collectors.toList()));
+    }
     for (int index = 0; index < columns.length; index++) {
       DataField dataField = GravitinoPaimonColumn.toPaimonColumn(index, columns[index]);
       builder.column(dataField.name(), dataField.type(), dataField.description());
@@ -71,10 +82,15 @@ public class GravitinoPaimonTable extends BaseTable {
         .withColumns(
             GravitinoPaimonColumn.fromPaimonRowType(table.rowType())
                 .toArray(new GravitinoPaimonColumn[0]))
+        .withPartitioning(toGravitinoPartitioning(table.partitionKeys()))
         .withComment(table.comment().orElse(null))
         .withProperties(table.options())
         .withAuditInfo(EMPTY)
         .build();
+  }
+
+  public static Transform[] toGravitinoPartitioning(List<String> partitionKeys) {
+    return partitionKeys.stream().map(Transforms::identity).toArray(Transform[]::new);
   }
 
   /** A builder class for constructing {@link GravitinoPaimonTable} instance. */
@@ -94,6 +110,7 @@ public class GravitinoPaimonTable extends BaseTable {
       paimonTable.name = name;
       paimonTable.comment = comment;
       paimonTable.columns = columns;
+      paimonTable.partitioning = partitioning;
       paimonTable.properties = properties == null ? Maps.newHashMap() : Maps.newHashMap(properties);
       paimonTable.auditInfo = auditInfo;
       return paimonTable;
