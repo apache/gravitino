@@ -80,14 +80,14 @@ class TestMetalake(IntegrationTestEnv):
 
         metalake_new_name = self.metalake_name + "_new"
         metalake_new_comment = self.metalake_comment + "_new"
-        metalake_propertie_new_value: str = "metalake_propertie_new_value1"
+        metalake_properties_new_value: str = "metalake_properties_new_value1"
 
         changes = (
             MetalakeChange.rename(metalake_new_name),
             MetalakeChange.update_comment(metalake_new_comment),
             MetalakeChange.remove_property(self.metalake_properties_key1),
             MetalakeChange.set_property(
-                self.metalake_properties_key2, metalake_propertie_new_value
+                self.metalake_properties_key2, metalake_properties_new_value
             ),
         )
 
@@ -98,7 +98,7 @@ class TestMetalake(IntegrationTestEnv):
         self.assertEqual(metalake.comment(), metalake_new_comment)
         self.assertEqual(
             metalake.properties().get(self.metalake_properties_key2),
-            metalake_propertie_new_value,
+            metalake_properties_new_value,
         )
         self.assertTrue(self.metalake_properties_key1 not in metalake.properties())
 

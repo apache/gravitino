@@ -504,7 +504,7 @@ public class DTOConverters {
   }
 
   /**
-   * Converts a Expression to an FunctionArg DTO.
+   * Converts an Expression to an FunctionArg DTO.
    *
    * @param expression The expression to be converted.
    * @return The expression DTO.
@@ -736,15 +736,15 @@ public class DTOConverters {
   /**
    * Converts an array of IndexDTOs to an array of Indexes.
    *
-   * @param indexDTOS The Index DTOs to be converted.
+   * @param indexDTOs The Index DTOs to be converted.
    * @return The array of Indexes.
    */
-  public static Index[] fromDTOs(IndexDTO[] indexDTOS) {
-    if (ArrayUtils.isEmpty(indexDTOS)) {
+  public static Index[] fromDTOs(IndexDTO[] indexDTOs) {
+    if (ArrayUtils.isEmpty(indexDTOs)) {
       return Indexes.EMPTY_INDEXES;
     }
 
-    return Arrays.stream(indexDTOS).map(DTOConverters::fromDTO).toArray(Index[]::new);
+    return Arrays.stream(indexDTOs).map(DTOConverters::fromDTO).toArray(Index[]::new);
   }
 
   /**

@@ -27,7 +27,7 @@ import org.apache.gravitino.rel.types.Types;
 @EqualsAndHashCode
 public class LiteralDTO implements Literal<String>, FunctionArg {
 
-  /** A instance of LiteralDTO with a value of "NULL" and a data type of Types.NullType.get(). */
+  /** An instance of LiteralDTO with a value of "NULL" and a data type of Types.NullType.get(). */
   public static final LiteralDTO NULL = new LiteralDTO("NULL", Types.NullType.get());
 
   private final String value;

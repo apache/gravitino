@@ -51,7 +51,7 @@ public class RangerHiveIT extends RangerIT {
   public static void setup() {
     RangerIT.setup();
 
-    containerSuite.startHiveContainer(
+    containerSuite.startHiveRangerContainer(
         new HashMap<>(
             ImmutableMap.of(
                 HiveContainer.HIVE_RUNTIME_VERSION,
@@ -68,8 +68,10 @@ public class RangerHiveIT extends RangerIT {
                 HiveContainer.HADOOP_USER_NAME,
                 adminUser)));
 
-    createRangerHdfsRepository(containerSuite.getHiveContainer().getContainerIpAddress(), true);
-    createRangerHiveRepository(containerSuite.getHiveContainer().getContainerIpAddress(), true);
+    createRangerHdfsRepository(
+        containerSuite.getHiveRangerContainer().getContainerIpAddress(), true);
+    createRangerHiveRepository(
+        containerSuite.getHiveRangerContainer().getContainerIpAddress(), true);
     allowAnyoneAccessHDFS();
     allowAnyoneAccessInformationSchema();
 
@@ -77,7 +79,7 @@ public class RangerHiveIT extends RangerIT {
     String url =
         String.format(
             "jdbc:hive2://%s:%d/default",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
+            containerSuite.getHiveRangerContainer().getContainerIpAddress(),
             HiveContainer.HIVE_SERVICE_PORT);
     try {
       Class.forName("org.apache.hive.jdbc.HiveDriver");
