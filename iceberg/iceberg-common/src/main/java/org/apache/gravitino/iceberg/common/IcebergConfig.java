@@ -33,6 +33,7 @@ import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.server.web.OverwriteDefaultConfig;
 
 public class IcebergConfig extends Config implements OverwriteDefaultConfig {
+
   public static final String ICEBERG_CONFIG_PREFIX = "gravitino.iceberg-rest.";
 
   public static final ConfigEntry<String> CATALOG_BACKEND =
@@ -88,12 +89,43 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .booleanConf()
           .createWithDefault(true);
 
+  public static final ConfigEntry<String> IO_IMPL =
+      new ConfigBuilder(IcebergConstants.IO_IMPL)
+          .doc("The io implementation for `FileIO` in Iceberg")
+          .version(ConfigConstants.VERSION_0_6_0)
+          .stringConf()
+          .create();
+
   public static final ConfigEntry<String> S3_ENDPOINT =
       new ConfigBuilder(IcebergConstants.GRAVITINO_S3_ENDPOINT)
-          .doc("S3 endpoint")
+          .doc(
+              "An alternative endpoint of the S3 service, This could be used to use S3FileIO with "
+                  + "any s3-compatible object storage service that has a different endpoint, or "
+                  + "access a private S3 endpoint in a virtual private cloud")
+          .version(ConfigConstants.VERSION_0_6_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> S3_REGION =
+      new ConfigBuilder(IcebergConstants.GRAVITINO_S3_REGION)
+          .doc("The region of the S3 service")
           .version(ConfigConstants.VERSION_0_6_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .create();
+
+  public static final ConfigEntry<String> S3_ACCESS_KEY_ID =
+      new ConfigBuilder(IcebergConstants.GRAVITINO_S3_ACCESS_KEY_ID)
+          .doc("The static access key ID used to access S3 data")
+          .version(ConfigConstants.VERSION_0_6_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> S3_SECRET_ACCESS_KEY =
+      new ConfigBuilder(IcebergConstants.GRAVITINO_S3_SECRET_ACCESS_KEY)
+          .doc("The static secret access key used to access S3 data")
+          .version(ConfigConstants.VERSION_0_6_0)
+          .stringConf()
           .create();
 
   public static final ConfigEntry<String> ICEBERG_METRICS_STORE =

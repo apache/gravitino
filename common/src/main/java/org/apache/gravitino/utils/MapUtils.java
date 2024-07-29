@@ -22,6 +22,7 @@ package org.apache.gravitino.utils;
 import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Map;
+import java.util.function.Predicate;
 
 /** Utility class for working with maps. */
 public class MapUtils {
@@ -41,6 +42,18 @@ public class MapUtils {
           if (k.startsWith(prefix)) {
             String newKey = k.substring(prefix.length());
             configs.put(newKey, v);
+          }
+        });
+
+    return Collections.unmodifiableMap(configs);
+  }
+
+  public static Map<String, String> getSubMap(Map<String, String> m, Predicate predicate) {
+    Map<String, String> configs = Maps.newHashMap();
+    m.forEach(
+        (k, v) -> {
+          if (predicate.test(k)) {
+            configs.put(k, v);
           }
         });
 

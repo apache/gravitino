@@ -50,7 +50,7 @@ public class IcebergPropertiesUtils {
 
   /**
    * Converts Gravitino properties to Iceberg catalog properties, the common transform logic shared
-   * by spark connector, iceberg rest server, Gravitino Iceberg catalog.
+   * by Spark connector, Iceberg REST server, Gravitino Iceberg catalog.
    *
    * @param gravitinoProperties a map of Gravitino configuration properties.
    * @return a map containing Iceberg catalog properties.
