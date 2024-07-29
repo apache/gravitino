@@ -129,9 +129,7 @@ class GravitinoClientBase:
         Returns:
             A GravitinoVersion instance representing the version of the Gravitino API.
         """
-        resp = self._rest_client.get(
-            "api/version", error_handler=REST_ERROR_HANDLER
-        )
+        resp = self._rest_client.get("api/version", error_handler=REST_ERROR_HANDLER)
         version_response = VersionResponse.from_json(resp.body, infer_missing=True)
         version_response.validate()
 

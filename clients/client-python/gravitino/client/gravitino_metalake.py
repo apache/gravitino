@@ -82,9 +82,7 @@ class GravitinoMetalake(MetalakeDTO):
         """
         params = {"details": "true"}
         url = f"api/metalakes/{self.name()}/catalogs"
-        response = self.rest_client.get(
-            url, params=params
-        )
+        response = self.rest_client.get(url, params=params)
         catalog_list = CatalogListResponse.from_json(response.body, infer_missing=True)
 
         return [
@@ -147,9 +145,7 @@ class GravitinoMetalake(MetalakeDTO):
         catalog_create_request.validate()
 
         url = f"api/metalakes/{self.name()}/catalogs"
-        response = self.rest_client.post(
-            url, json=catalog_create_request
-        )
+        response = self.rest_client.post(url, json=catalog_create_request)
         catalog_resp = CatalogResponse.from_json(response.body, infer_missing=True)
 
         return DTOConverters.to_catalog(
@@ -176,9 +172,7 @@ class GravitinoMetalake(MetalakeDTO):
         updates_request.validate()
 
         url = self.API_METALAKES_CATALOGS_PATH.format(self.name(), name)
-        response = self.rest_client.put(
-            url, json=updates_request
-        )
+        response = self.rest_client.put(url, json=updates_request)
         catalog_response = CatalogResponse.from_json(response.body, infer_missing=True)
         catalog_response.validate()
 

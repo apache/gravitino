@@ -54,9 +54,6 @@ class InternalError(GravitinoRuntimeException):
 class NotFoundException(GravitinoRuntimeException):
     """Base class for all exceptions thrown when a resource is not found."""
 
-    def __init__(self, message, *args):
-        super().__init__(message % args)
-
 
 class NoSuchSchemaException(NotFoundException):
     """An exception thrown when a schema is not found."""
@@ -69,22 +66,13 @@ class NoSuchFilesetException(NotFoundException):
 class NoSuchMetalakeException(NotFoundException):
     """An exception thrown when a metalake is not found."""
 
-    def __init__(self, message, *args):
-        super().__init__(message % args)
-
 
 class AlreadyExistsException(GravitinoRuntimeException):
     """Base exception thrown when an entity or resource already exists."""
 
-    def __init__(self, message, *args):
-        super().__init__(message % args)
-
 
 class MetalakeAlreadyExistsException(AlreadyExistsException):
     """An exception thrown when a metalake already exists."""
-
-    def __init__(self, message, *args):
-        super().__init__(message % args)
 
 
 class NotEmptyException(GravitinoRuntimeException):
