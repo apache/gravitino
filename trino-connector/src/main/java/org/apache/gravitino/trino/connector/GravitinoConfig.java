@@ -79,7 +79,7 @@ public class GravitinoConfig {
   private static final ConfigEntry GRAVITINO_CATALOG_CONNECTOR_FACTORY_CLASS_NAME =
       new ConfigEntry(
           "gravitino.catalog.connector.factory.class.name",
-          "The class name for the special CatalogConnector Factory.",
+          "The class name for the special CatalogConnectorFactory.",
           "",
           false);
 
