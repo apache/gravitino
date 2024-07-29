@@ -220,7 +220,7 @@ public class TrinoQueryTestTool {
           testerRunner.totalCount, testerRunner.passCount, testerRunner.generateTestStatus());
     } catch (Exception e) {
       System.out.println(e.getMessage());
-      e.printStackTrace();
+      System.exit(-1);
     } finally {
       TrinoQueryIT.cleanup();
     }

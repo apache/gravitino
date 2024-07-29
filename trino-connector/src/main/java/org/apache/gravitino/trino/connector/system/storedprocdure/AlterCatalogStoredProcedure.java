@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -140,7 +141,7 @@ public class AlterCatalogStoredProcedure extends GravitinoStoredProcedure {
     } catch (Exception e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,
-          "alter catalog failed. " + e.getMessage(),
+          "alter catalog failed. " + (StringUtils.isEmpty(e.getMessage()) ? "" : e.getMessage()),
           e);
     }
   }
