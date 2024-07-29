@@ -100,6 +100,11 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
   }
 
   @Override
+  protected boolean supportsSchemaEvolution() {
+    return true;
+  }
+
+  @Override
   protected String getTableLocation(SparkTableInfo table) {
     return String.join(File.separator, table.getTableLocation(), "data");
   }
@@ -1150,7 +1155,7 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
 
   /**
    * Here we build a new `createIcebergSql` String for creating a table with a field of timestamp
-   * type to create the year/month,etc partitions
+   * type to create the year/month,etc. partitions
    */
   private String getCreateIcebergSimpleTableString(String tableName) {
     return String.format(

@@ -27,7 +27,7 @@ dependencies {
   implementation(project(":common"))
   implementation(libs.protobuf.java.util) {
     exclude("com.google.guava", "guava")
-      .because("Brings in Guava for Andriod, which we don't want (and breaks multimaps).")
+      .because("Brings in Guava for Android, which we don't want (and breaks multimaps).")
   }
   implementation(libs.jackson.databind)
   implementation(libs.jackson.annotations)

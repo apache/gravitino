@@ -221,7 +221,7 @@ public class ProcessData {
 
           sbInStream.append(tempSB);
           if (tempSB.length() > 0) {
-            // set flag to know that we read something and there may be moire data, even if process
+            // set flag to know that we read something and there may be more data, even if process
             // already exited
             outputProduced = true;
           }

@@ -263,10 +263,10 @@ public class HiveTable extends BaseTable {
 
   private StorageDescriptor buildStorageDescriptor(
       PropertiesMetadata tablePropertiesMetadata, List<FieldSchema> partitionFields) {
-    StorageDescriptor sd = new StorageDescriptor();
+    StorageDescriptor strgDesc = new StorageDescriptor();
     List<String> partitionKeys =
         partitionFields.stream().map(FieldSchema::getName).collect(Collectors.toList());
-    sd.setCols(
+    strgDesc.setCols(
         Arrays.stream(columns)
             .filter(c -> !partitionKeys.contains(c.name()))
             .map(
@@ -282,38 +282,39 @@ public class HiveTable extends BaseTable {
     // `location` must not be null, otherwise it will result in an NPE when calling HMS `alterTable`
     // interface
     Optional.ofNullable(properties().get(HiveTablePropertiesMetadata.LOCATION))
-        .ifPresent(l -> sd.setLocation(properties().get(HiveTablePropertiesMetadata.LOCATION)));
+        .ifPresent(
+            l -> strgDesc.setLocation(properties().get(HiveTablePropertiesMetadata.LOCATION)));
 
-    sd.setSerdeInfo(buildSerDeInfo(tablePropertiesMetadata));
+    strgDesc.setSerdeInfo(buildSerDeInfo(tablePropertiesMetadata));
     StorageFormat storageFormat =
         (StorageFormat)
             tablePropertiesMetadata.getOrDefault(properties(), HiveTablePropertiesMetadata.FORMAT);
-    sd.setInputFormat(storageFormat.getInputFormat());
-    sd.setOutputFormat(storageFormat.getOutputFormat());
+    strgDesc.setInputFormat(storageFormat.getInputFormat());
+    strgDesc.setOutputFormat(storageFormat.getOutputFormat());
     // Individually specified INPUT_FORMAT and OUTPUT_FORMAT can override the inputFormat and
     // outputFormat of FORMAT
     Optional.ofNullable(properties().get(HiveTablePropertiesMetadata.INPUT_FORMAT))
-        .ifPresent(sd::setInputFormat);
+        .ifPresent(strgDesc::setInputFormat);
     Optional.ofNullable(properties().get(HiveTablePropertiesMetadata.OUTPUT_FORMAT))
-        .ifPresent(sd::setOutputFormat);
+        .ifPresent(strgDesc::setOutputFormat);
 
     if (ArrayUtils.isNotEmpty(sortOrders)) {
       for (SortOrder sortOrder : sortOrders) {
         String columnName = ((NamedReference.FieldReference) sortOrder.expression()).fieldName()[0];
-        sd.addToSortCols(
+        strgDesc.addToSortCols(
             new Order(columnName, sortOrder.direction() == SortDirection.ASCENDING ? 1 : 0));
       }
     }
 
     if (!Distributions.NONE.equals(distribution)) {
-      sd.setBucketCols(
+      strgDesc.setBucketCols(
           Arrays.stream(distribution.expressions())
               .map(t -> ((NamedReference.FieldReference) t).fieldName()[0])
               .collect(Collectors.toList()));
-      sd.setNumBuckets(distribution.number());
+      strgDesc.setNumBuckets(distribution.number());
     }
 
-    return sd;
+    return strgDesc;
   }
 
   private SerDeInfo buildSerDeInfo(PropertiesMetadata tablePropertiesMetadata) {

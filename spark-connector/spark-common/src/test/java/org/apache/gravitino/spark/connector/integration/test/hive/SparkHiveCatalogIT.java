@@ -76,6 +76,11 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
     return false;
   }
 
+  @Override
+  protected boolean supportsSchemaEvolution() {
+    return false;
+  }
+
   @Test
   void testCreateHiveFormatPartitionTable() {
     String tableName = "hive_partition_table";
