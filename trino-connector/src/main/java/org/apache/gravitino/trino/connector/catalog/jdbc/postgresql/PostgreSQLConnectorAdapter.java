@@ -22,7 +22,6 @@ import static java.util.Collections.emptyList;
 
 import java.util.Map;
 import org.apache.gravitino.catalog.property.PropertyConverter;
-import org.apache.gravitino.trino.connector.GravitinoConnectorPluginManager;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import org.apache.gravitino.trino.connector.catalog.jdbc.JDBCCatalogPropertyConverter;
@@ -32,6 +31,7 @@ import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
  * Transforming PostgreSQL connector configuration and components into Apche Gravitino connector.
  */
 public class PostgreSQLConnectorAdapter implements CatalogConnectorAdapter {
+  private static final String CONNECTOR_POSTGRESQL = "postgresql";
   private final PropertyConverter catalogConverter;
 
   public PostgreSQLConnectorAdapter() {
@@ -46,7 +46,7 @@ public class PostgreSQLConnectorAdapter implements CatalogConnectorAdapter {
 
   @Override
   public String internalConnectorName() {
-    return GravitinoConnectorPluginManager.CONNECTOR_POSTGRESQL;
+    return CONNECTOR_POSTGRESQL;
   }
 
   @Override
