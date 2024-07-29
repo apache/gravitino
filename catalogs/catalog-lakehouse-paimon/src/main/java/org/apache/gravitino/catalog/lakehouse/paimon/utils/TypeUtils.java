@@ -25,6 +25,7 @@ import org.apache.paimon.types.ArrayType;
 import org.apache.paimon.types.BigIntType;
 import org.apache.paimon.types.BinaryType;
 import org.apache.paimon.types.BooleanType;
+import org.apache.paimon.types.CharType;
 import org.apache.paimon.types.DataType;
 import org.apache.paimon.types.DataTypeDefaultVisitor;
 import org.apache.paimon.types.DataTypes;
@@ -41,6 +42,7 @@ import org.apache.paimon.types.SmallIntType;
 import org.apache.paimon.types.TimeType;
 import org.apache.paimon.types.TimestampType;
 import org.apache.paimon.types.TinyIntType;
+import org.apache.paimon.types.VarBinaryType;
 import org.apache.paimon.types.VarCharType;
 
 // Referred to org/apache/paimon/spark/SparkTypeUtils.java
@@ -74,27 +76,8 @@ public class TypeUtils {
     private static final PaimonToGravitinoTypeVisitor INSTANCE = new PaimonToGravitinoTypeVisitor();
 
     @Override
-    public Type visit(VarCharType varCharType) {
-      if (varCharType.getLength() == Integer.MAX_VALUE) {
-        return Types.StringType.get();
-      } else {
-        return Types.VarCharType.of(varCharType.getLength());
-      }
-    }
-
-    @Override
     public Type visit(BooleanType booleanType) {
       return Types.BooleanType.get();
-    }
-
-    @Override
-    public Type visit(BinaryType binaryType) {
-      return Types.BinaryType.get();
-    }
-
-    @Override
-    public Type visit(DecimalType decimalType) {
-      return Types.DecimalType.of(decimalType.getPrecision(), decimalType.getScale());
     }
 
     @Override
@@ -128,6 +111,11 @@ public class TypeUtils {
     }
 
     @Override
+    public Type visit(DecimalType decimalType) {
+      return Types.DecimalType.of(decimalType.getPrecision(), decimalType.getScale());
+    }
+
+    @Override
     public Type visit(DateType dateType) {
       return Types.DateType.get();
     }
@@ -148,21 +136,33 @@ public class TypeUtils {
     }
 
     @Override
-    public Type visit(ArrayType arrayType) {
-      return Types.ListType.of(
-          arrayType.getElementType().accept(this), arrayType.getElementType().isNullable());
+    public Type visit(BinaryType binaryType) {
+      return Types.FixedType.of(binaryType.getLength());
     }
 
     @Override
-    public Type visit(MultisetType multisetType) {
-      // Unlike a Java Set, MultisetType allows for multiple instances for each of its
-      // elements with a common subtype. And a conversion is possible through a map
-      // that assigns each value to an integer to represent the multiplicity of the values.
-      // For example, a `MULTISET<INT>` is converted to a `MAP<Integer, Integer>`, the key of the
-      // map represents the elements of the Multiset and the value represents the multiplicity of
-      // the elements in the Multiset.
-      return Types.MapType.of(
-          multisetType.getElementType().accept(this), Types.IntegerType.get(), false);
+    public Type visit(VarBinaryType varBinaryType) {
+      return Types.BinaryType.get();
+    }
+
+    @Override
+    public Type visit(VarCharType varCharType) {
+      if (varCharType.getLength() == Integer.MAX_VALUE) {
+        return Types.StringType.get();
+      } else {
+        return Types.VarCharType.of(varCharType.getLength());
+      }
+    }
+
+    @Override
+    public Type visit(CharType charType) {
+      return Types.FixedCharType.of(charType.getLength());
+    }
+
+    @Override
+    public Type visit(ArrayType arrayType) {
+      return Types.ListType.of(
+          arrayType.getElementType().accept(this), arrayType.getElementType().isNullable());
     }
 
     @Override
@@ -185,6 +185,18 @@ public class TypeUtils {
                           field.type().isNullable(),
                           field.description()))
               .toArray(Types.StructType.Field[]::new));
+    }
+
+    @Override
+    public Type visit(MultisetType multisetType) {
+      // Unlike a Java Set, MultisetType allows for multiple instances for each of its
+      // elements with a common subtype. And a conversion is possible through a map
+      // that assigns each value to an integer to represent the multiplicity of the values.
+      // For example, a `MULTISET<INT>` is converted to a `MAP<Integer, Integer>`, the key of the
+      // map represents the elements of the Multiset and the value represents the multiplicity of
+      // the elements in the Multiset.
+      return Types.MapType.of(
+          multisetType.getElementType().accept(this), Types.IntegerType.get(), false);
     }
 
     @Override
@@ -214,12 +226,6 @@ public class TypeUtils {
         case DECIMAL:
           Types.DecimalType decimalType = (Types.DecimalType) type;
           return DataTypes.DECIMAL(decimalType.precision(), decimalType.scale());
-        case BINARY:
-          return DataTypes.BINARY(BinaryType.MAX_LENGTH);
-        case STRING:
-          return DataTypes.STRING();
-        case VARCHAR:
-          return DataTypes.VARCHAR(((Types.VarCharType) type).length());
         case DATE:
           return DataTypes.DATE();
         case TIME:
@@ -228,6 +234,17 @@ public class TypeUtils {
           return ((Types.TimestampType) type).hasTimeZone()
               ? DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE()
               : DataTypes.TIMESTAMP();
+        case STRING:
+          return DataTypes.STRING();
+        case VARCHAR:
+          return DataTypes.VARCHAR(((Types.VarCharType) type).length());
+        case FIXEDCHAR:
+          return DataTypes.CHAR(((Types.FixedCharType) type).length());
+        case FIXED:
+          Types.FixedType fixedType = (Types.FixedType) type;
+          return DataTypes.BINARY(fixedType.length());
+        case BINARY:
+          return DataTypes.VARBINARY(VarBinaryType.MAX_LENGTH);
         case LIST:
           Types.ListType listType = (Types.ListType) type;
           return DataTypes.ARRAY(visit(listType.elementType()));

@@ -22,19 +22,16 @@ import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METAST
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.EXTERNAL;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.FORMAT;
-import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.IGNORE_KEY_OUTPUT_FORMAT_CLASS;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.INPUT_FORMAT;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.LOCATION;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.NUM_FILES;
-import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.OPENCSV_SERDE_CLASS;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.OUTPUT_FORMAT;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.SERDE_LIB;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
-import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.TEXT_INPUT_FORMAT_CLASS;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.TOTAL_SIZE;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.TRANSIENT_LAST_DDL_TIME;
-import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType.EXTERNAL_TABLE;
-import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType.MANAGED_TABLE;
+import static org.apache.gravitino.catalog.hive.TableType.EXTERNAL_TABLE;
+import static org.apache.gravitino.catalog.hive.TableType.MANAGED_TABLE;
 import static org.apache.hadoop.hive.serde.serdeConstants.DATE_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.INT_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.STRING_TYPE_NAME;
@@ -64,8 +61,9 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.hive.HiveCatalogOperations;
 import org.apache.gravitino.catalog.hive.HiveClientPool;
 import org.apache.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
+import org.apache.gravitino.catalog.hive.HiveStorageConstants;
 import org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata;
-import org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType;
+import org.apache.gravitino.catalog.hive.TableType;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -344,7 +342,7 @@ public class CatalogHiveIT extends AbstractIT {
     }
     Assertions.assertTrue(fileStatuses.length > 0);
     for (FileStatus fileStatus : fileStatuses) {
-      Assertions.assertEquals("datastrato", fileStatus.getOwner());
+      Assertions.assertEquals("anonymous", fileStatus.getOwner());
     }
   }
 
@@ -594,15 +592,19 @@ public class CatalogHiveIT extends AbstractIT {
                     FORMAT,
                     "textfile",
                     SERDE_LIB,
-                    OPENCSV_SERDE_CLASS),
+                    HiveStorageConstants.OPENCSV_SERDE_CLASS),
                 Transforms.EMPTY_TRANSFORM);
     org.apache.hadoop.hive.metastore.api.Table actualTable2 =
         hiveClientPool.run(client -> client.getTable(schemaName, table2));
 
     Assertions.assertEquals(
-        OPENCSV_SERDE_CLASS, actualTable2.getSd().getSerdeInfo().getSerializationLib());
-    Assertions.assertEquals(TEXT_INPUT_FORMAT_CLASS, actualTable2.getSd().getInputFormat());
-    Assertions.assertEquals(IGNORE_KEY_OUTPUT_FORMAT_CLASS, actualTable2.getSd().getOutputFormat());
+        HiveStorageConstants.OPENCSV_SERDE_CLASS,
+        actualTable2.getSd().getSerdeInfo().getSerializationLib());
+    Assertions.assertEquals(
+        HiveStorageConstants.TEXT_INPUT_FORMAT_CLASS, actualTable2.getSd().getInputFormat());
+    Assertions.assertEquals(
+        HiveStorageConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS,
+        actualTable2.getSd().getOutputFormat());
     Assertions.assertEquals(EXTERNAL_TABLE.name(), actualTable2.getTableType());
     Assertions.assertEquals(table2.toLowerCase(), actualTable2.getSd().getSerdeInfo().getName());
     Assertions.assertEquals(TABLE_COMMENT, actualTable2.getParameters().get(COMMENT));

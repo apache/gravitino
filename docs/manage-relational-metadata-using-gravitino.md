@@ -200,7 +200,7 @@ Dropping a catalog only removes metadata about the catalog, schemas, and tables 
 
 ### List all catalogs in a metalake
 
-You can list all catalogs under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs` endpoint or just use the Gravitino Java client. The following is an example of listing all catalogs in
+You can list all catalogs under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs` endpoint or just use the Gravitino Java client. The following is an example of listing all the catalogs in
 a metalake:
 
 <Tabs groupId="language" queryString>
@@ -227,7 +227,7 @@ String[] catalogNames = gravitinoClient.listCatalogs();
 
 ### List all catalogs' information in a metalake
 
-You can list all catalogs' information under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs?details=true` endpoint or just use the Gravitino Java client. The following is an example of listing all catalogs' information in a metalake:
+You can list all catalogs' information under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs?details=true` endpoint or just use the Gravitino Java client. The following is an example of listing all the catalogs' information in a metalake:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -403,7 +403,7 @@ catalog: Catalog = gravitino_client.load_catalog(name="hive_catalog")
 
 changes = (
     SchemaChange.remove_property("schema_properties_key1"),
-    SchemaChange.set_property("schema_properties_key2", "schema_propertie_new_value"),
+    SchemaChange.set_property("schema_properties_key2", "schema_properties_new_value"),
 )
 schema_new: Schema = catalog.as_schemas().alter_schema("schema", 
                                                        *changes)
@@ -463,7 +463,7 @@ Some catalogs may not support cascading deletion of a schema, please refer to th
 
 ### List all schemas under a catalog
 
-You can alter all schemas under a catalog by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint or just use the Gravitino Java client. The following is an example of list all schema
+You can list all schemas under a catalog by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint or just use the Gravitino Java client. The following is an example of listing all the schemas
     in a catalog:
 
 
@@ -974,7 +974,7 @@ Hive catalog and lakehouse-iceberg catalog supports `purgeTable` while jdbc-mysq
 
 ### List all tables under a schema
 
-You can list all tables in a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables` endpoint or just use the Gravitino Java client. The following is an example of list all tables in a schema:
+You can list all tables in a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables` endpoint or just use the Gravitino Java client. The following is an example of listing all the tables in a schema:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">

@@ -20,20 +20,19 @@ package org.apache.gravitino.flink.connector.hive;
 
 import java.util.Optional;
 import javax.annotation.Nullable;
-import org.apache.flink.table.catalog.ObjectPath;
+import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
-import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.table.catalog.hive.HiveCatalog;
-import org.apache.flink.table.catalog.stats.CatalogColumnStatistics;
-import org.apache.flink.table.catalog.stats.CatalogTableStatistics;
 import org.apache.flink.table.factories.Factory;
+import org.apache.gravitino.flink.connector.DefaultPartitionConverter;
+import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.PropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
 import org.apache.hadoop.hive.conf.HiveConf;
 
 /**
- * The GravitinoHiveCatalog class is a implementation of the BaseCatalog class that is used to proxy
- * the HiveCatalog class.
+ * The GravitinoHiveCatalog class is an implementation of the BaseCatalog class that is used to
+ * proxy the HiveCatalog class.
  */
 public class GravitinoHiveCatalog extends BaseCatalog {
 
@@ -75,14 +74,12 @@ public class GravitinoHiveCatalog extends BaseCatalog {
   }
 
   @Override
-  public CatalogTableStatistics getTableStatistics(ObjectPath objectPath)
-      throws TableNotExistException, CatalogException {
-    return hiveCatalog.getTableStatistics(objectPath);
+  protected PartitionConverter getPartitionConverter() {
+    return DefaultPartitionConverter.INSTANCE;
   }
 
   @Override
-  public CatalogColumnStatistics getTableColumnStatistics(ObjectPath tablePath)
-      throws TableNotExistException, CatalogException {
-    return hiveCatalog.getTableColumnStatistics(tablePath);
+  protected AbstractCatalog realCatalog() {
+    return hiveCatalog;
   }
 }

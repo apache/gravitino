@@ -22,7 +22,7 @@ package org.apache.gravitino.trino.connector.catalog.jdbc.mysql;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Map;
 import org.apache.commons.collections4.bidimap.TreeBidiMap;
-import org.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata;
+import org.apache.gravitino.catalog.mysql.MysqlConstants;
 import org.apache.gravitino.catalog.property.PropertyConverter;
 import org.apache.gravitino.shaded.com.google.common.collect.ImmutableMap;
 
@@ -32,11 +32,10 @@ public class MySQLTablePropertyConverter extends PropertyConverter {
   static final TreeBidiMap<String, String> TRINO_KEY_TO_GRAVITINO_KEY =
       new TreeBidiMap<>(
           new ImmutableMap.Builder<String, String>()
-              .put(
-                  MySQLPropertyMeta.TABLE_ENGINE, MysqlTablePropertiesMetadata.GRAVITINO_ENGINE_KEY)
+              .put(MySQLPropertyMeta.TABLE_ENGINE, MysqlConstants.GRAVITINO_ENGINE_KEY)
               .put(
                   MySQLPropertyMeta.TABLE_AUTO_INCREMENT_OFFSET,
-                  MysqlTablePropertiesMetadata.GRAVITINO_AUTO_INCREMENT_OFFSET_KEY)
+                  MysqlConstants.GRAVITINO_AUTO_INCREMENT_OFFSET_KEY)
               .build());
 
   @Override

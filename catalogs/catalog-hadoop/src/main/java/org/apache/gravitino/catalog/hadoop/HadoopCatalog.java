@@ -19,18 +19,15 @@
 package org.apache.gravitino.catalog.hadoop;
 
 import java.util.Map;
-import java.util.Optional;
-import org.apache.gravitino.catalog.hadoop.authentication.kerberos.KerberosConfig;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
-import org.apache.gravitino.connector.ProxyPlugin;
 import org.apache.gravitino.connector.capability.Capability;
 
 /**
  * Hadoop catalog is a fileset catalog that can manage filesets on the Hadoop Compatible File
- * Systems, like Local, HDFS, S3, ADLS, etc, using the Hadoop FileSystem API. It can manage filesets
- * from different Hadoop Compatible File Systems in the same catalog.
+ * Systems, like Local, HDFS, S3, ADLS, etc., using the Hadoop FileSystem API. It can manage
+ * filesets from different Hadoop Compatible File Systems in the same catalog.
  */
 public class HadoopCatalog extends BaseCatalog<HadoopCatalog> {
 
@@ -50,22 +47,13 @@ public class HadoopCatalog extends BaseCatalog<HadoopCatalog> {
 
   @Override
   protected CatalogOperations newOps(Map<String, String> config) {
-    HadoopCatalogOperations ops = new HadoopCatalogOperations();
+    CatalogOperations ops = new SecureHadoopCatalogOperations();
     return ops;
   }
 
   @Override
   protected Capability newCapability() {
     return new HadoopCatalogCapability();
-  }
-
-  @Override
-  protected Optional<ProxyPlugin> newProxyPlugin(Map<String, String> config) {
-    boolean impersonationEnabled = new KerberosConfig(config).isImpersonationEnabled();
-    if (!impersonationEnabled) {
-      return Optional.empty();
-    }
-    return Optional.of(new HadoopProxyPlugin());
   }
 
   @Override

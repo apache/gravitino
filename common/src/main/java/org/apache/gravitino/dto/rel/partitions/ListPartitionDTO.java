@@ -68,6 +68,7 @@ public class ListPartitionDTO implements PartitionDTO, ListPartition {
   }
 
   /** @return The type of the partition. */
+  @Override
   public Type type() {
     return Type.LIST;
   }
