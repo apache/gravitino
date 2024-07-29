@@ -29,7 +29,6 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.property.PropertyConverter;
 import org.apache.gravitino.trino.connector.catalog.jdbc.mysql.MySQLConnectorAdapter;
 import org.apache.gravitino.trino.connector.catalog.jdbc.postgresql.PostgreSQLConnectorAdapter;
-import org.apache.gravitino.trino.connector.catalog.jdbc.trino.TrinoClusterConnectorAdapter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 import org.apache.gravitino.trino.connector.metadata.TestGravitinoCatalog;
 import org.junit.jupiter.api.Assertions;
@@ -131,33 +130,5 @@ public class TestJDBCCatalogPropertyConverter {
     // test unknown properties
     Assertions.assertNull(config.get("hive.unknown-key"));
     Assertions.assertNull(config.get("trino.bypass.unknown-key"));
-  }
-
-  @Test
-  public void testBuildTrinoClusterConnectorProperties() throws Exception {
-    String name = "test_catalog";
-    Map<String, String> properties =
-        ImmutableMap.<String, String>builder()
-            .put("jdbc-url", "jdbc:mysql://localhost:5432/test")
-            .put("jdbc-user", "test")
-            .put("jdbc-password", "test")
-            .put("cloud.trino.connection-url", "jdbc:trino://gt01.orb.local:8080")
-            .put("cloud.trino.connection-user", "admin")
-            .put("cloud.trino.connection-password", "123")
-            .build();
-    Catalog mockCatalog =
-        TestGravitinoCatalog.mockCatalog(
-            name, "postgresql", "test catalog", Catalog.Type.RELATIONAL, properties);
-    TrinoClusterConnectorAdapter adapter = new TrinoClusterConnectorAdapter();
-
-    Map<String, String> config =
-        adapter.buildInternalConnectorConfig(new GravitinoCatalog("test", mockCatalog));
-
-    // test the converted properties, it's generating connector configuration by properties name
-    // with the prefix 'cluster.'
-    Assertions.assertEquals(
-        config.get("connection-url"), "jdbc:trino://gt01.orb.local:8080/" + mockCatalog.name());
-    Assertions.assertEquals(config.get("connection-user"), "admin");
-    Assertions.assertEquals(config.get("connection-password"), "123");
   }
 }
