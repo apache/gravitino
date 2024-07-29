@@ -38,7 +38,7 @@ export const getAuthConfigs = createAsyncThunk('auth/getAuthConfigs', async () =
   }
 
   oauthUrl = `${res['gravitino.authenticator.oauth.serverUri']}${res['gravitino.authenticator.oauth.tokenPath']}`
-  authType = JSON.parse(res['gravitino.authenticator'])[0]
+  authType = res['gravitino.authenticator'].split(',')[0]
 
   localStorage.setItem('oauthUrl', oauthUrl)
 

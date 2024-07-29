@@ -197,19 +197,14 @@ public class Configs {
           .booleanConf()
           .createWithDefault(true);
 
-  public static final ConfigEntry<List<String>> AUTHENTICATOR =
+  public static final ConfigEntry<String> AUTHENTICATOR =
       new ConfigBuilder("gravitino.authenticator")
           .doc(
               "The authenticator which Gravitino uses. Multiple authenticators "
                   + "separated by commas")
           .version(ConfigConstants.VERSION_0_3_0)
           .stringConf()
-          .toSequence()
-          .checkValue(
-              valueList ->
-                  valueList != null && valueList.stream().allMatch(StringUtils::isNotBlank),
-              ConfigConstants.NOT_BLANK_ERROR_MSG)
-          .createWithDefault(Lists.newArrayList("simple"));
+          .createWithDefault("simple");
 
   public static final ConfigEntry<Long> STORE_TRANSACTION_MAX_SKEW_TIME =
       new ConfigBuilder("gravitino.entity.store.maxTransactionSkewTimeMs")

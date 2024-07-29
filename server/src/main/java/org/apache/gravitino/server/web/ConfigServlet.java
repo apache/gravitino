@@ -18,10 +18,12 @@
  */
 package org.apache.gravitino.server.web;
 
+import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.List;
 import java.util.Map;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -38,6 +40,8 @@ public class ConfigServlet extends HttpServlet {
 
   private static final Logger LOG = LoggerFactory.getLogger(ConfigServlet.class);
 
+  private static final Splitter COMMA = Splitter.on(",").omitEmptyStrings().trimResults();
+
   private static final ImmutableSet<ConfigEntry<?>> oauthConfigEntries =
       ImmutableSet.of(OAuthConfig.DEFAULT_SERVER_URI, OAuthConfig.DEFAULT_TOKEN_PATH);
 
@@ -51,9 +55,9 @@ public class ConfigServlet extends HttpServlet {
       String config = String.valueOf(serverConfig.get(key));
       configs.put(key.getKey(), config);
     }
-    if (serverConfig
-        .get(Configs.AUTHENTICATOR)
-        .contains(AuthenticatorType.OAUTH.name().toLowerCase())) {
+
+    List<String> authenticators = COMMA.splitToList(serverConfig.get(Configs.AUTHENTICATOR));
+    if (authenticators.contains(AuthenticatorType.OAUTH.name().toLowerCase())) {
       for (ConfigEntry<?> key : oauthConfigEntries) {
         String config = String.valueOf(serverConfig.get(key));
         configs.put(key.getKey(), config);
