@@ -23,7 +23,10 @@ trino_conf_dir="$(dirname "${BASH_SOURCE-$0}")"
 trino_conf_dir="$(cd "${trino_conf_dir}">/dev/null; pwd)"
 
 cp "$trino_conf_dir/config/config.properties" /etc/trino/config.properties
+cp "$trino_conf_dir/config/jvm.config" /etc/trino/jvm.config
+cp "$trino_conf_dir/config/log4j2.properties" /etc/trino/log4j2.properties
 cp "$trino_conf_dir/config/catalog/gravitino.properties" /etc/trino/catalog/gravitino.properties
+
 #
 # Update `gravitino.uri = http://GRAVITINO_HOST_IP:GRAVITINO_HOST_PORT` in the `conf/catalog/gravitino.properties`
 sed -i "s/GRAVITINO_HOST_IP:GRAVITINO_HOST_PORT/${GRAVITINO_HOST_IP}:${GRAVITINO_HOST_PORT}/g" /etc/trino/catalog/gravitino.properties
