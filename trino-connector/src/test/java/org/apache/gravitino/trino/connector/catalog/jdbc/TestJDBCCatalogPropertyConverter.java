@@ -141,9 +141,9 @@ public class TestJDBCCatalogPropertyConverter {
             .put("jdbc-url", "jdbc:mysql://localhost:5432/test")
             .put("jdbc-user", "test")
             .put("jdbc-password", "test")
-            .put("cluster.connection-url", "jdbc:trino://gt01.orb.local:8080")
-            .put("cluster.connection-user", "admin")
-            .put("cluster.connection-password", "123")
+            .put("cloud.trino.connection-url", "jdbc:trino://gt01.orb.local:8080")
+            .put("cloud.trino.connection-user", "admin")
+            .put("cloud.trino.connection-password", "123")
             .build();
     Catalog mockCatalog =
         TestGravitinoCatalog.mockCatalog(
