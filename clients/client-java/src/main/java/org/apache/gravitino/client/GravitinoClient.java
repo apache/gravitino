@@ -34,7 +34,7 @@ import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagOperations;
 
 /**
- * Apache Gravitino Client for an user to interact with the Gravitino API, allowing the client to
+ * Apache Gravitino Client for a user to interact with the Gravitino API, allowing the client to
  * list, load, create, and alter Catalog.
  *
  * <p>It uses an underlying {@link RESTClient} to send HTTP requests and receive responses from the

@@ -31,8 +31,8 @@ import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
 import org.apache.hadoop.hive.conf.HiveConf;
 
 /**
- * The GravitinoHiveCatalog class is a implementation of the BaseCatalog class that is used to proxy
- * the HiveCatalog class.
+ * The GravitinoHiveCatalog class is an implementation of the BaseCatalog class that is used to
+ * proxy the HiveCatalog class.
  */
 public class GravitinoHiveCatalog extends BaseCatalog {
 

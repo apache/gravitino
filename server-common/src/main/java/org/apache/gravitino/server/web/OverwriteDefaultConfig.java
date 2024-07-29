@@ -1,4 +1,5 @@
 /*
+ * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
  * regarding copyright ownership.  The ASF licenses this file
@@ -26,7 +27,7 @@ public interface OverwriteDefaultConfig {
   /**
    * Returns key value pairs to overwrite the config which are not set explicitly.
    *
-   * @return an Map of Config key and value pairs
+   * @return a Map of Config key and value pairs
    */
   Map<String, String> getOverwriteDefaultConfig();
 }

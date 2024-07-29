@@ -28,7 +28,7 @@ public interface User extends Auditable {
 
   /**
    * The name of the user. It's the identifier of User. It must be unique. Usually the name comes
-   * from a external user management system like LDAP, IAM and so on.
+   * from an external user management system like LDAP, IAM and so on.
    *
    * @return The name of the user.
    */

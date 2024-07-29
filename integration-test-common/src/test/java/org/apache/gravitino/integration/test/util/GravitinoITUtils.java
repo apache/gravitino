@@ -47,7 +47,7 @@ public class GravitinoITUtils {
             FileUtils.readFileToString(new File(gravitinoStartShell), StandardCharsets.UTF_8);
         content =
             content.replace(
-                "#JAVA_OPTS+=\" -Djava.securit.krb5.conf=/etc/krb5.conf\"",
+                "#JAVA_OPTS+=\" -Djava.security.krb5.conf=/etc/krb5.conf\"",
                 String.format("JAVA_OPTS+=\" -Djava.security.krb5.conf=%s\"", krb5Path));
         File tmp = new File(modifiedGravitinoStartShell);
         FileUtils.write(tmp, content, StandardCharsets.UTF_8);

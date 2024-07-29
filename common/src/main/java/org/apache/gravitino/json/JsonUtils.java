@@ -343,7 +343,7 @@ public class JsonUtils {
   }
 
   /**
-   * Get a int value from a JSON node property.
+   * Get an int value from a JSON node property.
    *
    * @param property The property name.
    * @param node The JSON node.
