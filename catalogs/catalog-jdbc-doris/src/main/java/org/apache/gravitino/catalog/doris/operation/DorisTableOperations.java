@@ -46,6 +46,7 @@ import org.apache.gravitino.catalog.doris.utils.DorisUtils;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
+import org.apache.gravitino.catalog.jdbc.operation.JdbcTablePartitionOperations;
 import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -81,6 +82,12 @@ public class DorisTableOperations extends JdbcTableOperations {
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
     }
+  }
+
+  @Override
+  public JdbcTablePartitionOperations createJdbcTablePartitionOperations(JdbcTable loadedTable) {
+    return new DorisTablePartitionOperations(
+        dataSource, loadedTable, exceptionMapper, typeConverter);
   }
 
   @Override
@@ -385,10 +392,7 @@ public class DorisTableOperations extends JdbcTableOperations {
 
       if (jobStatus.length() > 0) {
         LOG.info(
-            "Table {}.{} schema-change execution status: {}",
-            databaseName,
-            tableName,
-            jobStatus.toString());
+            "Table {}.{} schema-change execution status: {}", databaseName, tableName, jobStatus);
       }
 
     } catch (SQLException e) {
@@ -539,6 +543,7 @@ public class DorisTableOperations extends JdbcTableOperations {
         .collect(Collectors.joining(",\n"));
   }
 
+  @Override
   protected JdbcTable getOrCreateTable(
       String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
     return null != lazyLoadCreateTable ? lazyLoadCreateTable : load(databaseName, tableName);

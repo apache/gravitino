@@ -59,7 +59,7 @@ import org.apache.gravitino.rest.RESTUtils;
  * operations, for example, schemas and tables list, creation, update and deletion. A Relational
  * catalog is under the metalake.
  */
-public class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog {
+class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog {
 
   RelationalCatalog(
       Namespace namespace,

@@ -21,7 +21,6 @@ package org.apache.gravitino.catalog.doris.operation;
 import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Map;
-import javax.sql.DataSource;
 import org.apache.gravitino.catalog.doris.converter.DorisColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.doris.converter.DorisExceptionConverter;
 import org.apache.gravitino.catalog.doris.converter.DorisTypeConverter;
@@ -41,14 +40,14 @@ public class TestDoris extends TestJdbc {
   public static void startup() {
     containerSuite.startDorisContainer();
 
-    DataSource dataSource = DataSourceUtils.createDataSource(getDorisCatalogProperties());
+    DATA_SOURCE = DataSourceUtils.createDataSource(getDorisCatalogProperties());
 
     DATABASE_OPERATIONS = new DorisDatabaseOperations();
     TABLE_OPERATIONS = new DorisTableOperations();
     JDBC_EXCEPTION_CONVERTER = new DorisExceptionConverter();
-    DATABASE_OPERATIONS.initialize(dataSource, JDBC_EXCEPTION_CONVERTER, Collections.emptyMap());
+    DATABASE_OPERATIONS.initialize(DATA_SOURCE, JDBC_EXCEPTION_CONVERTER, Collections.emptyMap());
     TABLE_OPERATIONS.initialize(
-        dataSource,
+        DATA_SOURCE,
         JDBC_EXCEPTION_CONVERTER,
         new DorisTypeConverter(),
         new DorisColumnDefaultValueConverter(),

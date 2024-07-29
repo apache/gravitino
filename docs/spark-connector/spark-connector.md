@@ -78,23 +78,23 @@ The command `SHOW CATALOGS` will only display the Spark default catalog, named s
 
 Gravitino spark connector support the following datatype mapping between Spark and Gravitino.
 
-| Spark Data Type | Gravitino Data Type | Since Version |
-|-----------------|---------------------|---------------|
-| `BooleanType`   | `boolean`           | 0.5.0         |
-| `ByteType`      | `byte`              | 0.5.0         |
-| `ShortType`     | `short`             | 0.5.0         |
-| `IntegerType`   | `integer`           | 0.5.0         |
-| `LongType`      | `long`              | 0.5.0         |
-| `FloatType`     | `float`             | 0.5.0         |
-| `DoubleType`    | `double`            | 0.5.0         |
-| `DecimalType`   | `decimal`           | 0.5.0         |
-| `StringType`    | `string`            | 0.5.0         |
-| `CharType`      | `char`              | 0.5.0         |
-| `VarcharType`   | `varchar`           | 0.5.0         |
-| `TimestampType` | `timestamp`         | 0.5.0         |
-| `TimestampType` | `timestamp`         | 0.5.0         |
-| `DateType`      | `date`              | 0.5.0         |
-| `BinaryType`    | `binary`            | 0.5.0         |
-| `ArrayType`     | `array`             | 0.5.0         |
-| `MapType`       | `map`               | 0.5.0         |
-| `StructType`    | `struct`            | 0.5.0         |
+| Spark Data Type    | Gravitino Data Type           | Since Version |
+|--------------------|-------------------------------|---------------|
+| `BooleanType`      | `boolean`                     | 0.5.0         |
+| `ByteType`         | `byte`                        | 0.5.0         |
+| `ShortType`        | `short`                       | 0.5.0         |
+| `IntegerType`      | `integer`                     | 0.5.0         |
+| `LongType`         | `long`                        | 0.5.0         |
+| `FloatType`        | `float`                       | 0.5.0         |
+| `DoubleType`       | `double`                      | 0.5.0         |
+| `DecimalType`      | `decimal`                     | 0.5.0         |
+| `StringType`       | `string`                      | 0.5.0         |
+| `CharType`         | `char`                        | 0.5.0         |
+| `VarcharType`      | `varchar`                     | 0.5.0         |
+| `TimestampType`    | `timestamp with time zone`    | 0.5.0         |
+| `TimestampNTZType` | `timestamp without time zone` | 0.5.0         |
+| `DateType`         | `date`                        | 0.5.0         |
+| `BinaryType`       | `binary`                      | 0.5.0         |
+| `ArrayType`        | `array`                       | 0.5.0         |
+| `MapType`          | `map`                         | 0.5.0         |
+| `StructType`       | `struct`                      | 0.5.0         |

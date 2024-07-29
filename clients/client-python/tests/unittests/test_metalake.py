@@ -39,8 +39,8 @@ class TestMetalake(unittest.TestCase):
 
     def test_from_error_json_metalake_response(self):
         str_json = (
-            b'{"code":0, "undefine-key1":"undefine-value1", '
-            b'"metalake":{"undefine-key2":1, "name":"example_name18","comment":"This is a sample comment",'
+            b'{"code":0, "undefined-key1":"undefined-value1", '
+            b'"metalake":{"undefined-key2":1, "name":"example_name18","comment":"This is a sample comment",'
             b'"properties":{"key1":"value1","key2":"value2"},'
             b'"audit":{"creator":"anonymous","createTime":"2024-04-05T10:10:35.218Z"}}}'
         )

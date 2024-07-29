@@ -111,7 +111,7 @@ Reserved properties: A reserved property is one can't be set by users but can be
 Users can use the following example to create a table with properties: 
 
 ```sql
-CREATE TABLE catalog.dbname.tabname
+CREATE TABLE catalog.dbname.tablename
 (
   name varchar,
   salary int

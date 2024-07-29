@@ -119,7 +119,7 @@ public class TestDTOConverters {
         LiteralDTO.builder().withDataType(Types.StringType.get()).withValue("us").build();
 
     Map<String, String> properties = Collections.singletonMap("key", "value");
-    LiteralDTO[][] literalDTOS = {new LiteralDTO[] {literal1}, new LiteralDTO[] {literal2}};
+    LiteralDTO[][] literalDTOs = {new LiteralDTO[] {literal1}, new LiteralDTO[] {literal2}};
     Literal<?>[][] expectedValues = {
       new Literal<?>[] {(Literal<?>) DTOConverters.fromFunctionArg(literal1)},
       new Literal<?>[] {(Literal<?>) DTOConverters.fromFunctionArg(literal2)}
@@ -127,7 +127,7 @@ public class TestDTOConverters {
     ListPartitionDTO listPartitionDTO =
         ListPartitionDTO.builder()
             .withName("ListPartition")
-            .withLists(literalDTOS)
+            .withLists(literalDTOs)
             .withProperties(properties)
             .build();
 

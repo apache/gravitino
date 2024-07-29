@@ -49,7 +49,7 @@ public class SecurableObjectDTO implements SecurableObject {
   /**
    * Creates a new instance of SecurableObject DTO.
    *
-   * @param privileges The privileges of the ScecurableObject DTO.
+   * @param privileges The privileges of the SecurableObject DTO.
    * @param fullName The name of the SecurableObject DTO.
    * @param type The type of the securable object.
    */

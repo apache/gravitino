@@ -205,7 +205,7 @@ public class TransactionalKvBackendImpl implements TransactionalKvBackend {
   public List<Pair<byte[], byte[]>> scan(KvRange scanRange) throws IOException {
     // Why we need to change the end key? Because we use the transaction id to construct a row key
     // Assuming the end key is 'a' and the value of endInclusive is true, if we want to scan the
-    // value of key a, then we need to change the end key to 'b' and set the value of endInclusive
+    // value of key 'a', then we need to change the end key to 'b' and set the value of endInclusive
     // to false.
     byte[] end = scanRange.getEnd();
     boolean endInclude = scanRange.isEndInclusive();
