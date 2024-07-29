@@ -18,11 +18,17 @@
  */
 package org.apache.gravitino.catalog.lakehouse.paimon;
 
+import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonTablePropertiesMetadata.COMMENT;
+import static org.apache.gravitino.dto.rel.partitioning.Partitioning.EMPTY_PARTITIONING;
 import static org.apache.gravitino.meta.AuditInfo.EMPTY;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.ToString;
@@ -42,6 +48,8 @@ import org.apache.paimon.types.DataField;
 @Getter
 public class GravitinoPaimonTable extends BaseTable {
 
+  @VisibleForTesting public static final String PRIMARY_KEY_IDENTIFIER = "primary-key";
+
   private GravitinoPaimonTable() {}
 
   @Override
@@ -56,13 +64,25 @@ public class GravitinoPaimonTable extends BaseTable {
    * @return The converted Paimon table.
    */
   public Schema toPaimonTableSchema() {
-    Schema.Builder builder = Schema.newBuilder().comment(comment).options(properties);
-    if (partitioning != null) {
-      builder.partitionKeys(
-          Arrays.stream(partitioning)
-              .map(partition -> partition.references()[0].toString())
-              .collect(Collectors.toList()));
+    Schema.Builder builder = Schema.newBuilder().comment(comment);
+    if (properties == null) {
+      properties = Maps.newHashMap();
     }
+    if (partitioning == null) {
+      partitioning = EMPTY_PARTITIONING;
+    }
+
+    Map<String, String> normalizedProperties = new HashMap<>(properties);
+    normalizedProperties.remove(PRIMARY_KEY_IDENTIFIER);
+    normalizedProperties.remove(COMMENT);
+
+    builder
+        .options(normalizedProperties)
+        .primaryKey(getPrimaryKeys(properties))
+        .partitionKeys(
+            Arrays.stream(partitioning)
+                .map(partition -> partition.references()[0].toString())
+                .collect(Collectors.toList()));
     for (int index = 0; index < columns.length; index++) {
       DataField dataField = GravitinoPaimonColumn.toPaimonColumn(index, columns[index]);
       builder.column(dataField.name(), dataField.type(), dataField.description());
@@ -77,6 +97,13 @@ public class GravitinoPaimonTable extends BaseTable {
    * @return A new {@link GravitinoPaimonTable} instance.
    */
   public static GravitinoPaimonTable fromPaimonTable(Table table) {
+
+    HashMap<String, String> normalizedProperties = new HashMap<>(table.options());
+    if (!table.primaryKeys().isEmpty()) {
+      String primaryKeys = String.join(",", table.primaryKeys());
+      normalizedProperties.put(PRIMARY_KEY_IDENTIFIER, primaryKeys);
+    }
+
     return builder()
         .withName(table.name())
         .withColumns(
@@ -84,13 +111,20 @@ public class GravitinoPaimonTable extends BaseTable {
                 .toArray(new GravitinoPaimonColumn[0]))
         .withPartitioning(toGravitinoPartitioning(table.partitionKeys()))
         .withComment(table.comment().orElse(null))
-        .withProperties(table.options())
+        .withProperties(normalizedProperties)
         .withAuditInfo(EMPTY)
         .build();
   }
 
   public static Transform[] toGravitinoPartitioning(List<String> partitionKeys) {
     return partitionKeys.stream().map(Transforms::identity).toArray(Transform[]::new);
+  }
+
+  public static List<String> getPrimaryKeys(Map<String, String> properties) {
+    String pkAsString = properties.get(PRIMARY_KEY_IDENTIFIER);
+    return pkAsString == null
+        ? Collections.emptyList()
+        : Arrays.stream(pkAsString.split(",")).map(String::trim).collect(Collectors.toList());
   }
 
   /** A builder class for constructing {@link GravitinoPaimonTable} instance. */
