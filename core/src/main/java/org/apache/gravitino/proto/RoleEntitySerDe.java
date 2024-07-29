@@ -44,7 +44,8 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
             .setName(roleEntity.name())
             .setAuditInfo(new AuditInfoSerDe().serialize(roleEntity.auditInfo()));
 
-    for (org.apache.gravitino.authorization.SecurableObject securableObject : roleEntity.securableObjects()) {
+    for (org.apache.gravitino.authorization.SecurableObject securableObject :
+        roleEntity.securableObjects()) {
       builder.addSecurableObjects(
           org.apache.gravitino.proto.SecurableObject.newBuilder()
               .setFullName(securableObject.fullName())
@@ -77,7 +78,8 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
    */
   @Override
   public RoleEntity deserialize(Role role, Namespace namespace) {
-    List<org.apache.gravitino.authorization.SecurableObject> securableObjects = Lists.newArrayList();
+    List<org.apache.gravitino.authorization.SecurableObject> securableObjects =
+        Lists.newArrayList();
 
     for (int index = 0; index < role.getSecurableObjectsCount(); index++) {
       List<Privilege> privileges = Lists.newArrayList();
@@ -91,8 +93,8 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
       }
 
       org.apache.gravitino.authorization.SecurableObject securableObject =
-
-        SecurableObjects.parse(object.getFullName(), MetadataObject.Type.valueOf(object.getType()), privileges);
+          SecurableObjects.parse(
+              object.getFullName(), MetadataObject.Type.valueOf(object.getType()), privileges);
 
       securableObjects.add(securableObject);
     }
