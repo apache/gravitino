@@ -105,9 +105,14 @@ public class TrinoQueryIT extends TrinoQueryITBase {
           .pollInterval(1, TimeUnit.SECONDS)
           .until(
               () -> {
-                String[] catalogs = trinoQueryRunner.runQuery("show catalogs").split("\n");
-                LOG.info("Catalogs: {}", Arrays.toString(catalogs));
-                return Arrays.stream(catalogs).noneMatch(s -> s.startsWith("\"gt_"));
+                try {
+                  String[] catalogs = trinoQueryRunner.runQuery("show catalogs").split("\n");
+                  LOG.info("Catalogs: {}", Arrays.toString(catalogs));
+                  return Arrays.stream(catalogs).noneMatch(s -> s.startsWith("\"gt_"));
+                } catch (Exception e) {
+                  LOG.error("Failed to run query in trino", e);
+                  return false;
+                }
               });
     } catch (Exception e) {
       throw new Exception("Failed to clean up test env: " + e.getMessage(), e);

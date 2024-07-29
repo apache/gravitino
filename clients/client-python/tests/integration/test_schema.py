@@ -160,18 +160,18 @@ class TestSchema(IntegrationTestEnv):
 
     def test_alter_schema(self):
         self.create_schema()
-        schema_propertie_new_value = self.schema_properties_value2 + "_new"
+        schema_properties_new_value = self.schema_properties_value2 + "_new"
 
         changes = (
             SchemaChange.remove_property(self.schema_properties_key1),
             SchemaChange.set_property(
-                self.schema_properties_key2, schema_propertie_new_value
+                self.schema_properties_key2, schema_properties_new_value
             ),
         )
         catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
         schema_new = catalog.as_schemas().alter_schema(self.schema_name, *changes)
         self.assertEqual(
             schema_new.properties().get(self.schema_properties_key2),
-            schema_propertie_new_value,
+            schema_properties_new_value,
         )
         self.assertTrue(self.schema_properties_key1 not in schema_new.properties())

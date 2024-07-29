@@ -223,7 +223,7 @@ Refer to the "Additional JSSE Standard Names" section of the [Java security guid
 
 ### Example
 
-You can follow the steps to set up a HTTPS server.
+You can follow the steps to set up an HTTPS server.
 
 1. Prerequisite
 

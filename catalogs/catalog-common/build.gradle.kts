@@ -21,7 +21,7 @@ plugins {
   id("java")
 }
 
-// try avoid add extra dependencies because it is used by catalogs and connectors.
+// try to avoid adding extra dependencies because it is used by catalogs and connectors.
 dependencies {
   implementation(libs.slf4j.api)
 }

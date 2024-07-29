@@ -245,6 +245,6 @@ public class TrinoQueryITBase {
     if (dir.exists()) {
       return dir.list();
     }
-    throw new Exception("Test queries directory does not exist");
+    throw new Exception("Test queries directory " + dirname + " does not exist");
   }
 }
