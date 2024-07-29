@@ -53,14 +53,14 @@ public class PaimonSchema extends BaseSchema {
    */
   public static PaimonSchema fromPaimonProperties(String name, Map<String, String> properties) {
     return builder()
-            .withName(name)
-            .withComment(
-                    Optional.of(properties)
-                            .map(map -> map.get(PaimonSchemaPropertiesMetadata.COMMENT))
-                            .orElse(null))
-            .withProperties(properties)
-            .withAuditInfo(EMPTY)
-            .build();
+        .withName(name)
+        .withComment(
+            Optional.of(properties)
+                .map(map -> map.get(PaimonSchemaPropertiesMetadata.COMMENT))
+                .orElse(null))
+        .withProperties(properties)
+        .withAuditInfo(EMPTY)
+        .build();
   }
 
   /** A builder class for constructing {@link PaimonSchema} instance. */
@@ -78,15 +78,10 @@ public class PaimonSchema extends BaseSchema {
     protected PaimonSchema internalBuild() {
       PaimonSchema paimonSchema = new PaimonSchema();
       paimonSchema.name = name;
-
-      if (comment != null) {
-        paimonSchema.comment = comment;
-      } else if (properties != null) {
-        paimonSchema.comment = properties.get(PaimonSchemaPropertiesMetadata.COMMENT);
-      } else {
-        paimonSchema.comment = null;
-      }
-
+      paimonSchema.comment =
+          comment == null
+              ? (properties == null ? null : properties.get(PaimonSchemaPropertiesMetadata.COMMENT))
+              : comment;
       paimonSchema.properties = properties;
       paimonSchema.auditInfo = auditInfo;
       return paimonSchema;
