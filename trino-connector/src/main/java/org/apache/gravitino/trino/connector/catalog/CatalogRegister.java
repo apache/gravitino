@@ -67,7 +67,7 @@ public class CatalogRegister {
     if (version < MIN_SUPPORT_TRINO_SPI_VERSION || version > MAX_SUPPORT_TRINO_SPI_VERSION) {
       String errmsg =
           String.format(
-              "Unsupported Trino-%s version. The Gravitino-Trino-connector supported version is Trino-%d to Trino-%d",
+              "Unsupported Trino-%s version. The Supported version for the Gravitino-Trino-connector from Trino-%d to Trino-%d",
               trinoVersion, MIN_SUPPORT_TRINO_SPI_VERSION, MAX_SUPPORT_TRINO_SPI_VERSION);
       throw new TrinoException(GravitinoErrorCode.GRAVITINO_UNSUPPORTED_TRINO_VERSION, errmsg);
     }
