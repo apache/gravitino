@@ -78,10 +78,15 @@ public class PaimonSchema extends BaseSchema {
     protected PaimonSchema internalBuild() {
       PaimonSchema paimonSchema = new PaimonSchema();
       paimonSchema.name = name;
-      paimonSchema.comment =
-          comment == null
-              ? (properties == null ? null : properties.get(PaimonSchemaPropertiesMetadata.COMMENT))
-              : comment;
+
+      if (comment != null) {
+        paimonSchema.comment = comment;
+      } else if (properties != null) {
+        paimonSchema.comment = properties.get(PaimonSchemaPropertiesMetadata.COMMENT);
+      } else {
+        paimonSchema.comment = null;
+      }
+
       paimonSchema.properties = properties;
       paimonSchema.auditInfo = auditInfo;
       return paimonSchema;
