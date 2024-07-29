@@ -44,6 +44,7 @@ import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.EventListenerManager;
 import org.apache.gravitino.listener.FilesetEventDispatcher;
 import org.apache.gravitino.listener.MetalakeEventDispatcher;
+import org.apache.gravitino.listener.PartitionEventDispatcher;
 import org.apache.gravitino.listener.SchemaEventDispatcher;
 import org.apache.gravitino.listener.TableEventDispatcher;
 import org.apache.gravitino.listener.TopicEventDispatcher;
@@ -180,6 +181,11 @@ public class GravitinoEnv {
     return tableDispatcher;
   }
 
+  /**
+   * Get the PartitionDispatcher associated with the Gravitino environment.
+   *
+   * @return The PartitionDispatcher instance.
+   */
   public PartitionDispatcher partitionDispatcher() {
     return partitionDispatcher;
   }
@@ -336,9 +342,9 @@ public class GravitinoEnv {
 
     PartitionOperationDispatcher partitionOperationDispatcher =
         new PartitionOperationDispatcher(catalogManager, entityStore, idGenerator);
-    // todo: support PartitionEventDispatcher
-    this.partitionDispatcher =
+    PartitionNormalizeDispatcher partitionNormalizeDispatcher =
         new PartitionNormalizeDispatcher(partitionOperationDispatcher, catalogManager);
+    this.partitionDispatcher = new PartitionEventDispatcher(eventBus, partitionNormalizeDispatcher);
 
     FilesetOperationDispatcher filesetOperationDispatcher =
         new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator);

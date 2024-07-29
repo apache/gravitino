@@ -24,6 +24,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
@@ -42,18 +44,23 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.tag.SupportsTags;
+import org.apache.gravitino.tag.Tag;
 
 /**
  * BaseSchemaCatalog is the base abstract class for all the catalog with schema. It provides the
  * common methods for managing schemas in a catalog. With {@link BaseSchemaCatalog}, users can list,
  * create, load, alter and drop a schema with specified identifier.
  */
-abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, SupportsSchemas {
+abstract class BaseSchemaCatalog extends CatalogDTO
+    implements Catalog, SupportsSchemas, SupportsTags {
   /** The REST client to send the requests. */
   protected final RESTClient restClient;
 
   /** The namespace of current catalog, which is the metalake name. */
   private final Namespace catalogNamespace;
+
+  private final MetadataObjectTagOperations objectTagOperations;
 
   BaseSchemaCatalog(
       Namespace catalogNamespace,
@@ -65,16 +72,27 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
       AuditDTO auditDTO,
       RESTClient restClient) {
     super(name, type, provider, comment, properties, auditDTO);
+
     this.restClient = restClient;
     Namespace.check(
         catalogNamespace != null && catalogNamespace.length() == 1,
         "Catalog namespace must be non-null and have 1 level, the input namespace is %s",
         catalogNamespace);
     this.catalogNamespace = catalogNamespace;
+
+    MetadataObject metadataObject =
+        MetadataObjects.of(null, this.name(), MetadataObject.Type.CATALOG);
+    this.objectTagOperations =
+        new MetadataObjectTagOperations(catalogNamespace.level(0), metadataObject, restClient);
   }
 
   @Override
   public SupportsSchemas asSchemas() throws UnsupportedOperationException {
+    return this;
+  }
+
+  @Override
+  public SupportsTags supportsTags() throws UnsupportedOperationException {
     return this;
   }
 
@@ -125,7 +143,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
             ErrorHandlers.schemaErrorHandler());
     resp.validate();
 
-    return resp.getSchema();
+    return new GenericSchema(resp.getSchema(), restClient, catalogNamespace.level(0), this.name());
   }
 
   /**
@@ -146,7 +164,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
             ErrorHandlers.schemaErrorHandler());
     resp.validate();
 
-    return resp.getSchema();
+    return new GenericSchema(resp.getSchema(), restClient, catalogNamespace.level(0), this.name());
   }
 
   /**
@@ -177,7 +195,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
             ErrorHandlers.schemaErrorHandler());
     resp.validate();
 
-    return resp.getSchema();
+    return new GenericSchema(resp.getSchema(), restClient, catalogNamespace.level(0), this.name());
   }
 
   /**
@@ -199,6 +217,26 @@ abstract class BaseSchemaCatalog extends CatalogDTO implements Catalog, Supports
             ErrorHandlers.schemaErrorHandler());
     resp.validate();
     return resp.dropped();
+  }
+
+  @Override
+  public String[] listTags() {
+    return objectTagOperations.listTags();
+  }
+
+  @Override
+  public Tag[] listTagsInfo() {
+    return objectTagOperations.listTagsInfo();
+  }
+
+  @Override
+  public Tag getTag(String name) {
+    return objectTagOperations.getTag(name);
+  }
+
+  @Override
+  public String[] associateTags(String[] tagsToAdd, String[] tagsToRemove) {
+    return objectTagOperations.associateTags(tagsToAdd, tagsToRemove);
   }
 
   /**

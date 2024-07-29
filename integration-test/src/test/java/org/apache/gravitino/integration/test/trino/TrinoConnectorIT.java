@@ -114,7 +114,7 @@ public class TrinoConnectorIT extends AbstractIT {
         metalakeName);
     Assertions.assertTrue(
         containerSuite.getTrinoContainer().checkSyncCatalogFromGravitino(5, catalogName),
-        "Can not synchronize calatogs from gravitino");
+        "Can not synchronize catalogs from gravitino");
 
     createSchema();
   }

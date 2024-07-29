@@ -19,14 +19,13 @@
 package org.apache.gravitino.dto.tag;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Objects;
 import java.util.Map;
 import java.util.Optional;
-import lombok.EqualsAndHashCode;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.tag.Tag;
 
 /** Represents a Tag Data Transfer Object (DTO). */
-@EqualsAndHashCode
 public class TagDTO implements Tag {
 
   @JsonProperty("name")
@@ -69,6 +68,27 @@ public class TagDTO implements Tag {
   @Override
   public Optional<Boolean> inherited() {
     return inherited;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof TagDTO)) {
+      return false;
+    }
+
+    TagDTO tagDTO = (TagDTO) o;
+    return Objects.equal(name, tagDTO.name)
+        && Objects.equal(comment, tagDTO.comment)
+        && Objects.equal(properties, tagDTO.properties)
+        && Objects.equal(audit, tagDTO.audit);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hashCode(name, comment, properties, audit);
   }
 
   /** @return a new builder for constructing a Tag DTO. */

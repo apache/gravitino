@@ -20,28 +20,69 @@ package org.apache.gravitino.catalog.jdbc;
 
 import com.google.common.collect.Maps;
 import java.util.Map;
-import lombok.Getter;
 import lombok.ToString;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.gravitino.catalog.jdbc.operation.TableOperation;
 import org.apache.gravitino.connector.BaseTable;
 import org.apache.gravitino.connector.TableOperations;
+import org.apache.gravitino.rel.SupportsPartitions;
 
 /** Represents a Jdbc Table entity in the jdbc table. */
 @ToString
-@Getter
 public class JdbcTable extends BaseTable {
+  private String databaseName;
+  private TableOperation tableOperation;
 
   private JdbcTable() {}
 
   @Override
   protected TableOperations newOps() {
-    // TODO: Implement this method when we have the JDBC table operations.
-    throw new UnsupportedOperationException("JdbcTable does not support TableOperations.");
+    if (ArrayUtils.isEmpty(partitioning)) {
+      throw new UnsupportedOperationException(
+          "Table partition operation is not supported for non-partitioned table: " + name);
+    }
+    return tableOperation.createJdbcTablePartitionOperations(this);
+  }
+
+  @Override
+  public SupportsPartitions supportPartitions() throws UnsupportedOperationException {
+    return (SupportsPartitions) ops();
+  }
+
+  public String databaseName() {
+    return databaseName;
   }
 
   /** A builder class for constructing JdbcTable instances. */
   public static class Builder extends BaseTableBuilder<Builder, JdbcTable> {
+    private String databaseName;
+    private TableOperation tableOperation;
+
+    /**
+     * Sets the name of database.
+     *
+     * @param databaseName The name of database.
+     * @return This Builder instance.
+     */
+    public Builder withDatabaseName(String databaseName) {
+      this.databaseName = databaseName;
+      return this;
+    }
+
+    /**
+     * Sets the table operation to be used for partition operations.
+     *
+     * @param tableOperation The instance of TableOperation.
+     * @return This Builder instance.
+     */
+    public Builder withTableOperation(TableOperation tableOperation) {
+      this.tableOperation = tableOperation;
+      return this;
+    }
+
     /** Creates a new instance of {@link Builder}. */
     private Builder() {}
+
     /**
      * Internal method to build a JdbcTable instance using the provided values.
      *
@@ -58,6 +99,9 @@ public class JdbcTable extends BaseTable {
       jdbcTable.partitioning = partitioning;
       jdbcTable.sortOrders = sortOrders;
       jdbcTable.indexes = indexes;
+      jdbcTable.proxyPlugin = proxyPlugin;
+      jdbcTable.databaseName = databaseName;
+      jdbcTable.tableOperation = tableOperation;
       return jdbcTable;
     }
 

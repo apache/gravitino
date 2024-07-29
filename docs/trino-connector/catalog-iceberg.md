@@ -71,7 +71,7 @@ Iceberg schema does not support properties.
 Users can use the following example to create a table with properties:
 
 ```sql
-CREATE TABLE "metalake.catalog".dbname.tabname
+CREATE TABLE "metalake.catalog".dbname.tablename
 (
   name varchar,
   salary int

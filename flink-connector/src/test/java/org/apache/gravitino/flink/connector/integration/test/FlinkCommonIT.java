@@ -22,15 +22,25 @@ package org.apache.gravitino.flink.connector.integration.test;
 import static org.apache.gravitino.flink.connector.integration.test.utils.TestUtils.assertColumns;
 import static org.apache.gravitino.flink.connector.integration.test.utils.TestUtils.toFlinkPhysicalColumn;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
+import static org.junit.jupiter.api.Assertions.fail;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import org.apache.commons.compress.utils.Lists;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.ResultKind;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.ObjectPath;
+import org.apache.flink.table.catalog.ResolvedCatalogTable;
+import org.apache.flink.table.catalog.ResolvedSchema;
+import org.apache.flink.table.catalog.exceptions.DatabaseNotExistException;
+import org.apache.flink.table.catalog.exceptions.TableAlreadyExistException;
 import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.types.Row;
 import org.apache.gravitino.Catalog;
@@ -325,8 +335,277 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
             CatalogTable catalogTable = (CatalogTable) table;
             Assertions.assertFalse(catalogTable.isPartitioned());
           } catch (TableNotExistException e) {
-            Assertions.fail(e);
+            fail(e);
           }
+        },
+        true);
+  }
+
+  @Test
+  public void testRenameColumn() {
+    String databaseName = "test_rename_column_db";
+    String tableName = "test_rename_column";
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          TableResult result =
+              sql(
+                  "CREATE TABLE %s "
+                      + "(user_id INT COMMENT 'USER_ID', "
+                      + " order_amount DOUBLE COMMENT 'ORDER_AMOUNT')"
+                      + " COMMENT 'test comment'",
+                  tableName);
+          TestUtils.assertTableResult(result, ResultKind.SUCCESS);
+
+          result = sql("ALTER TABLE %s RENAME user_id TO user_id_new", tableName);
+          TestUtils.assertTableResult(result, ResultKind.SUCCESS);
+
+          Column[] actual =
+              catalog
+                  .asTableCatalog()
+                  .loadTable(NameIdentifier.of(databaseName, tableName))
+                  .columns();
+          Column[] expected =
+              new Column[] {
+                Column.of("user_id_new", Types.IntegerType.get(), "USER_ID"),
+                Column.of("order_amount", Types.DoubleType.get(), "ORDER_AMOUNT")
+              };
+          assertColumns(expected, actual);
+        },
+        true);
+  }
+
+  @Test
+  public void testAlterTableComment() {
+    String databaseName = "test_alter_table_comment_database";
+    String tableName = "test_alter_table_comment";
+    String newComment = "new_table_comment";
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          Optional<org.apache.flink.table.catalog.Catalog> flinkCatalog =
+              tableEnv.getCatalog(currentCatalog().name());
+          if (flinkCatalog.isPresent()) {
+            org.apache.flink.table.catalog.Catalog currentFlinkCatalog = flinkCatalog.get();
+            ObjectPath currentTablePath = new ObjectPath(databaseName, tableName);
+            try {
+              // use java api to create a new table
+              org.apache.flink.table.api.Schema schema =
+                  org.apache.flink.table.api.Schema.newBuilder()
+                      .column("test", DataTypes.INT())
+                      .build();
+              CatalogTable newTable =
+                  CatalogTable.of(schema, "test comment", ImmutableList.of(), ImmutableMap.of());
+              List<org.apache.flink.table.catalog.Column> columns = Lists.newArrayList();
+              columns.add(org.apache.flink.table.catalog.Column.physical("test", DataTypes.INT()));
+              ResolvedSchema resolvedSchema = new ResolvedSchema(columns, new ArrayList<>(), null);
+              currentFlinkCatalog.createTable(
+                  currentTablePath, new ResolvedCatalogTable(newTable, resolvedSchema), false);
+              CatalogTable table = (CatalogTable) currentFlinkCatalog.getTable(currentTablePath);
+
+              // alter table comment
+              currentFlinkCatalog.alterTable(
+                  currentTablePath,
+                  CatalogTable.of(
+                      table.getUnresolvedSchema(),
+                      newComment,
+                      table.getPartitionKeys(),
+                      table.getOptions()),
+                  false);
+
+              CatalogTable loadedTable =
+                  (CatalogTable) currentFlinkCatalog.getTable(currentTablePath);
+              Assertions.assertEquals(newComment, loadedTable.getComment());
+              Table gravitinoTable =
+                  currentCatalog()
+                      .asTableCatalog()
+                      .loadTable(NameIdentifier.of(databaseName, tableName));
+              Assertions.assertEquals(newComment, gravitinoTable.comment());
+            } catch (DatabaseNotExistException
+                | TableAlreadyExistException
+                | TableNotExistException e) {
+              fail(e);
+            }
+          } else {
+            fail("Catalog doesn't exist");
+          }
+        },
+        true);
+  }
+
+  @Test
+  public void testAlterTableAddColumn() {
+    String databaseName = "test_alter_table_add_column_db";
+    String tableName = "test_alter_table_add_column";
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          TableResult result =
+              sql(
+                  "CREATE TABLE %s "
+                      + "(user_id INT COMMENT 'USER_ID', "
+                      + " order_amount INT COMMENT 'ORDER_AMOUNT')"
+                      + " COMMENT 'test comment'",
+                  tableName);
+          TestUtils.assertTableResult(result, ResultKind.SUCCESS);
+          result = sql("ALTER TABLE %s ADD new_column_2 INT AFTER order_amount", tableName);
+          TestUtils.assertTableResult(result, ResultKind.SUCCESS);
+
+          Column[] actual =
+              catalog
+                  .asTableCatalog()
+                  .loadTable(NameIdentifier.of(databaseName, tableName))
+                  .columns();
+          Column[] expected =
+              new Column[] {
+                Column.of("user_id", Types.IntegerType.get(), "USER_ID"),
+                Column.of("order_amount", Types.IntegerType.get(), "ORDER_AMOUNT"),
+                Column.of("new_column_2", Types.IntegerType.get(), null),
+              };
+          assertColumns(expected, actual);
+        },
+        true);
+  }
+
+  @Test
+  public void testAlterTableDropColumn() {
+    String databaseName = "test_alter_table_drop_column_db";
+    String tableName = "test_alter_table_drop_column";
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          TableResult result =
+              sql(
+                  "CREATE TABLE %s "
+                      + "(user_id INT COMMENT 'USER_ID', "
+                      + " order_amount INT COMMENT 'ORDER_AMOUNT')"
+                      + " COMMENT 'test comment'",
+                  tableName);
+          TestUtils.assertTableResult(result, ResultKind.SUCCESS);
+          result = sql("ALTER TABLE %s DROP user_id", tableName);
+          TestUtils.assertTableResult(result, ResultKind.SUCCESS);
+          Column[] actual =
+              catalog
+                  .asTableCatalog()
+                  .loadTable(NameIdentifier.of(databaseName, tableName))
+                  .columns();
+          Column[] expected =
+              new Column[] {Column.of("order_amount", Types.IntegerType.get(), "ORDER_AMOUNT")};
+          assertColumns(expected, actual);
+        },
+        true);
+  }
+
+  @Test
+  public void testAlterColumnTypeAndChangeOrder() {
+    String databaseName = "test_alter_table_alter_column_db";
+    String tableName = "test_alter_table_rename_column";
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          TableResult result =
+              sql(
+                  "CREATE TABLE %s "
+                      + "(user_id BIGINT COMMENT 'USER_ID', "
+                      + " order_amount INT COMMENT 'ORDER_AMOUNT')"
+                      + " COMMENT 'test comment'"
+                      + " WITH ("
+                      + "'%s' = '%s')",
+                  tableName, "test key", "test value");
+          TestUtils.assertTableResult(result, ResultKind.SUCCESS);
+          result =
+              sql("ALTER TABLE %s MODIFY order_amount BIGINT COMMENT 'new comment2'", tableName);
+          TestUtils.assertTableResult(result, ResultKind.SUCCESS);
+          result =
+              sql(
+                  "ALTER TABLE %s MODIFY user_id BIGINT COMMENT 'new comment' AFTER order_amount",
+                  tableName);
+          TestUtils.assertTableResult(result, ResultKind.SUCCESS);
+          Column[] actual =
+              catalog
+                  .asTableCatalog()
+                  .loadTable(NameIdentifier.of(databaseName, tableName))
+                  .columns();
+          Column[] expected =
+              new Column[] {
+                Column.of("order_amount", Types.LongType.get(), "new comment2"),
+                Column.of("user_id", Types.LongType.get(), "new comment")
+              };
+          assertColumns(expected, actual);
+        },
+        true);
+  }
+
+  @Test
+  public void testRenameTable() {
+    String databaseName = "test_rename_table_db";
+    String tableName = "test_rename_table";
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          TableResult result =
+              sql(
+                  "CREATE TABLE %s "
+                      + "(user_id INT COMMENT 'USER_ID', "
+                      + " order_amount INT COMMENT 'ORDER_AMOUNT')"
+                      + " COMMENT 'test comment'",
+                  tableName);
+          TestUtils.assertTableResult(result, ResultKind.SUCCESS);
+          String newTableName = "new_rename_table_name";
+          result = sql("ALTER TABLE %s RENAME TO %s", tableName, newTableName);
+          TestUtils.assertTableResult(result, ResultKind.SUCCESS);
+          Assertions.assertFalse(
+              catalog.asTableCatalog().tableExists(NameIdentifier.of(databaseName, tableName)));
+          Assertions.assertTrue(
+              catalog.asTableCatalog().tableExists(NameIdentifier.of(databaseName, newTableName)));
+        },
+        true);
+  }
+
+  @Test
+  public void testAlterTableProperties() {
+    String databaseName = "test_alter_table_properties_db";
+    String tableName = "test_alter_table_properties";
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          TableResult result =
+              sql(
+                  "CREATE TABLE %s "
+                      + "(user_id INT COMMENT 'USER_ID', "
+                      + " order_amount INT COMMENT 'ORDER_AMOUNT')"
+                      + " COMMENT 'test comment'"
+                      + " WITH ("
+                      + "'%s' = '%s')",
+                  tableName, "key", "value");
+          TestUtils.assertTableResult(result, ResultKind.SUCCESS);
+          result = sql("ALTER TABLE %s SET ('key2' = 'value2', 'key' = 'value1')", tableName);
+          TestUtils.assertTableResult(result, ResultKind.SUCCESS);
+          Map<String, String> properties =
+              catalog
+                  .asTableCatalog()
+                  .loadTable(NameIdentifier.of(databaseName, tableName))
+                  .properties();
+
+          Assertions.assertEquals("value1", properties.get("key"));
+          Assertions.assertEquals("value2", properties.get("key2"));
+          result = sql("ALTER TABLE %s RESET ('key2')", tableName);
+          TestUtils.assertTableResult(result, ResultKind.SUCCESS);
+
+          properties =
+              catalog
+                  .asTableCatalog()
+                  .loadTable(NameIdentifier.of(databaseName, tableName))
+                  .properties();
+          Assertions.assertEquals("value1", properties.get("key"));
+          Assertions.assertNull(properties.get("key2"));
         },
         true);
   }

@@ -61,7 +61,7 @@ class TrinoQueryRunner {
             .timeZone(ZoneId.systemDefault())
             .clientRequestTimeout(new Duration(30, TimeUnit.SECONDS))
             .build();
-    return new QueryRunner(trinoUri, session, false, HttpLoggingInterceptor.Level.NONE);
+    return new QueryRunner(trinoUri, session, true, HttpLoggingInterceptor.Level.NONE);
   }
 
   String runQuery(String query) {

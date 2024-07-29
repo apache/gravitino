@@ -26,7 +26,7 @@ from gravitino.exceptions.base import (
     InternalError,
     RESTException,
     NotFoundException,
-    IllegalArugmentException,
+    IllegalArgumentException,
     AlreadyExistException,
     NotEmptyException,
     UnsupportedOperationException,
@@ -45,10 +45,10 @@ class TestErrorHandler(unittest.TestCase):
                 ErrorResponse.generate_error_response(RESTException, "mock error")
             )
 
-        with self.assertRaises(IllegalArugmentException):
+        with self.assertRaises(IllegalArgumentException):
             REST_ERROR_HANDLER.handle(
                 ErrorResponse.generate_error_response(
-                    IllegalArugmentException, "mock error"
+                    IllegalArgumentException, "mock error"
                 )
             )
 

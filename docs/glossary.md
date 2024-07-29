@@ -290,7 +290,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Public key
 
-- A openly shared key used for verification, encryption, or other operations intended for public knowledge.
+- An openly shared key used for verification, encryption, or other operations intended for public knowledge.
 
 ## Representational State Transfer (REST)
 

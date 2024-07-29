@@ -29,6 +29,7 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
@@ -114,7 +115,7 @@ public class CreateCatalogStoredProcedure extends GravitinoStoredProcedure {
     } catch (Exception e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,
-          "Create catalog failed. " + e.getMessage(),
+          "Create catalog failed. " + (StringUtils.isEmpty(e.getMessage()) ? "" : e.getMessage()),
           e);
     }
   }
