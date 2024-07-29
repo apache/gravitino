@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.integration.test.container;
 
+import static org.apache.gravitino.integration.test.container.RangerContainer.DOCKER_ENV_RANGER_SERVER_URL;
+
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.RemoveNetworkCmd;
 import com.github.dockerjava.api.model.Info;
@@ -32,6 +34,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import org.apache.gravitino.integration.test.util.CloseableGroup;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.slf4j.Logger;
@@ -130,6 +133,18 @@ public class ContainerSuite implements Closeable {
    * 4. DOCKER_ENV_RANGER_HDFS_REPOSITORY_NAME: Ranger HDFS repository name <br>
    */
   public void startHiveRangerContainer(Map<String, String> envVars) {
+    // If you want to enable Hive Ranger plugin, you need both set the `RANGER_SERVER_URL` and
+    // `RANGER_HIVE_REPOSITORY_NAME` environment variables.
+    // If you want to enable HDFS Ranger plugin, you need both set the `RANGER_SERVER_URL` and
+    // `RANGER_HDFS_REPOSITORY_NAME` environment variables.
+    if (envVars == null
+        || (!Objects.equals(envVars.get(HiveContainer.HIVE_RUNTIME_VERSION), HiveContainer.HIVE3))
+        || (!envVars.containsKey(DOCKER_ENV_RANGER_SERVER_URL)
+            || (!envVars.containsKey(RangerContainer.DOCKER_ENV_RANGER_HIVE_REPOSITORY_NAME)
+                && !envVars.containsKey(RangerContainer.DOCKER_ENV_RANGER_HDFS_REPOSITORY_NAME)))) {
+      throw new IllegalArgumentException("Error environment variables for Hive Ranger container");
+    }
+
     if (hiveRangerContainer == null) {
       synchronized (ContainerSuite.class) {
         if (hiveRangerContainer == null) {
