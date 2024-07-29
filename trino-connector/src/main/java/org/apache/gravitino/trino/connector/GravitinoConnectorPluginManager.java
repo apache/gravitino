@@ -177,6 +177,7 @@ public class GravitinoConnectorPluginManager {
       List<Plugin> pluginList = ImmutableList.copyOf(serviceLoader);
       if (pluginList.isEmpty()) {
         LOG.warn("The {} plugin directory does not found connector SIP interface", pluginName);
+        return;
       }
       Plugin plugin = pluginList.get(0);
       if (plugin.getConnectorFactories() == null
