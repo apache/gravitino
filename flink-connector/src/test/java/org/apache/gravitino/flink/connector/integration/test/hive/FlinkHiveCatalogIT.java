@@ -482,6 +482,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
           Column.of("date_type", Types.DateType.get(), "date_type"),
           Column.of("timestamp_type", Types.TimestampType.withoutTimeZone(), "timestamp_type"),
           Column.of("smallint_type", Types.ShortType.get(), "smallint_type"),
+          Column.of("fixed_char_type", Types.FixedCharType.of(10), "fixed_char_type"),
           Column.of("array_type", Types.ListType.of(Types.IntegerType.get(), true), "array_type"),
           Column.of(
               "map_type",
@@ -555,6 +556,9 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
                   org.apache.flink.table.catalog.Column.physical(
                           "smallint_type", DataTypes.SMALLINT())
                       .withComment("smallint_type"),
+                  org.apache.flink.table.catalog.Column.physical(
+                          "fixed_char_type", DataTypes.CHAR(10))
+                      .withComment("fixed_char_type"),
                   org.apache.flink.table.catalog.Column.physical(
                           "array_type", DataTypes.ARRAY(DataTypes.INT()))
                       .withComment("array_type"),

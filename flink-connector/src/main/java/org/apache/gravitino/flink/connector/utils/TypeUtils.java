@@ -141,7 +141,7 @@ public class TypeUtils {
         return DataTypes.VARCHAR(varCharType.length());
       case FIXED:
         Types.FixedType fixedType = (Types.FixedType) gravitinoType;
-        return DataTypes.CHAR(fixedType.length());
+        return DataTypes.BINARY(fixedType.length());
       case FIXEDCHAR:
         Types.FixedCharType charType = (Types.FixedCharType) gravitinoType;
         return DataTypes.CHAR(charType.length());

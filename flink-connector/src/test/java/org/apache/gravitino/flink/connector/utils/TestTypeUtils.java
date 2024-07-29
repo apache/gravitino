@@ -130,7 +130,7 @@ public class TestTypeUtils {
         DataTypes.DECIMAL(10, 3), TypeUtils.toFlinkType(Types.DecimalType.of(10, 3)));
     Assertions.assertEquals(DataTypes.CHAR(10), TypeUtils.toFlinkType(Types.FixedCharType.of(10)));
     Assertions.assertEquals(DataTypes.BYTES(), TypeUtils.toFlinkType(Types.BinaryType.get()));
-    Assertions.assertEquals(DataTypes.CHAR(10), TypeUtils.toFlinkType(Types.FixedType.of(10)));
+    Assertions.assertEquals(DataTypes.BINARY(10), TypeUtils.toFlinkType(Types.FixedType.of(10)));
     Assertions.assertEquals(
         DataTypes.TIMESTAMP(6), TypeUtils.toFlinkType(Types.TimestampType.withoutTimeZone()));
     Assertions.assertEquals(
