@@ -451,7 +451,7 @@ public class SecureHadoopCatalogOperations
     try {
       return userGroupInformation.doAs(action);
     } catch (IOException | InterruptedException ioe) {
-      throw new RuntimeException("Failed to operation on fileset " + ident, ioe);
+      throw new RuntimeException("Failed to operation on entity:" + ident, ioe);
     } catch (UndeclaredThrowableException e) {
       Throwable innerException = e.getCause();
       if (innerException instanceof PrivilegedActionException) {
