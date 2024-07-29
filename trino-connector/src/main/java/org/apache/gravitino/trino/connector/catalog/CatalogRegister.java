@@ -82,7 +82,7 @@ public class CatalogRegister {
       if (version < MIN_SUPPORT_CATALOG_NAME_WITH_METALAKE_TRINO_SPI_VERSION) {
         String errmsg =
             String.format(
-                "The Trino-%s version is not support catalog name with metalake, The minimal required version is Trino-%d",
+                "Trino-%s does not support catalog name with dots, The minimal required version is Trino-%d",
                 trinoVersion, MIN_SUPPORT_CATALOG_NAME_WITH_METALAKE_TRINO_SPI_VERSION);
         throw new TrinoException(GravitinoErrorCode.GRAVITINO_UNSUPPORTED_TRINO_VERSION, errmsg);
       }
