@@ -723,6 +723,7 @@ The following types that Gravitino supports:
 | Map                        | `Types.MapType.of(keyType, valueType)`                                   | `{"type": "map", "keyType": type JSON, "valueType": type JSON, "valueContainsNull": JSON Boolean}`                                   | Map type, indicate a map of key-value pairs                                                      |
 | Struct                     | `Types.StructType.of([Types.StructType.Field.of(name, type, nullable)])` | `{"type": "struct", "fields": [JSON StructField, {"name": string, "type": type JSON, "nullable": JSON Boolean, "comment": string}]}` | Struct type, indicate a struct of fields                                                         |
 | Union                      | `Types.UnionType.of([type1, type2, ...])`                                | `{"type": "union", "types": [type JSON, ...]}`                                                                                       | Union type, indicates a union of types                                                           |
+| UUID                       | `Types.UUIDType.get()`                                                   | `uuid`                              | UUID type, indicates a universally unique identifier |
 
 The related java doc is [here](pathname:///docs/0.5.1/api/java/org/apache/gravitino/rel/types/Type.html).
 
