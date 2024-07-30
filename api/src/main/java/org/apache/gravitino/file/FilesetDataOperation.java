@@ -19,23 +19,18 @@
 
 package org.apache.gravitino.file;
 
-import org.apache.gravitino.annotation.Evolving;
-
-/**
- * An interface representing a fileset data operation context. This interface defines some
- * information need to report to the server.
- *
- * <p>{@link FilesetDataOperationCtx} defines the basic properties of a fileset data operation
- * context object.
- */
-@Evolving
-public interface FilesetDataOperationCtx {
-  /** @return The sub path which is operated by the data operation . */
-  String subPath();
-
-  /** @return The data operation type. */
-  FilesetDataOperation operation();
-
-  /** @return The client type of the data operation. */
-  ClientType clientType();
+/** An enum class containing fileset data operations that supported. */
+public enum FilesetDataOperation {
+  CREATE,
+  OPEN,
+  APPEND,
+  RENAME,
+  DELETE,
+  GET_FILE_STATUS,
+  LIST_STATUS,
+  MKDIRS,
+  GET_DEFAULT_REPLICATION,
+  GET_DEFAULT_BLOCK_SIZE,
+  SET_WORKING_DIR,
+  UNKNOWN;
 }

@@ -53,8 +53,10 @@ import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.file.BaseFilesetDataOperationCtx;
+import org.apache.gravitino.file.ClientType;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetContext;
+import org.apache.gravitino.file.FilesetDataOperation;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -425,17 +427,21 @@ public class TestFilesetCatalog extends TestBase {
     GetFilesetContextRequest req =
         GetFilesetContextRequest.builder()
             .subPath("/test")
-            .operation("create")
-            .clientType("test")
+            .operation(FilesetDataOperation.OPEN)
+            .clientType(ClientType.HADOOP_GVFS)
             .build();
     buildMockResource(Method.POST, filesetPath, req, resp, SC_OK);
     BaseFilesetDataOperationCtx ctx =
         BaseFilesetDataOperationCtx.builder()
             .withSubPath("/test")
-            .withOperation("create")
-            .withClientType("test")
+            .withOperation(FilesetDataOperation.OPEN)
+            .withClientType(ClientType.HADOOP_GVFS)
             .build();
-    FilesetContext filesetContext = catalog.asFilesetCatalog().getFilesetContext(fileset, ctx);
+    FilesetContext filesetContext =
+        catalog
+            .asFilesetCatalog()
+            .getFilesetContext(
+                NameIdentifier.of(fileset.namespace().level(2), fileset.name()), ctx);
     Assertions.assertNotNull(filesetContext);
     assertFileset(mockFileset, filesetContext.fileset());
 

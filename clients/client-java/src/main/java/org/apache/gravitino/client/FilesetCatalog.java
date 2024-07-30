@@ -241,7 +241,7 @@ class FilesetCatalog extends BaseSchemaCatalog implements org.apache.gravitino.f
   public FilesetContext getFilesetContext(NameIdentifier ident, FilesetDataOperationCtx ctx)
       throws NoSuchFilesetException {
     checkFilesetNameIdentifier(ident);
-
+    Namespace fullNamespace = getFilesetFullNamespace(ident.namespace());
     GetFilesetContextRequest req =
         GetFilesetContextRequest.builder()
             .subPath(ctx.subPath())
@@ -251,7 +251,7 @@ class FilesetCatalog extends BaseSchemaCatalog implements org.apache.gravitino.f
 
     FilesetContextResponse resp =
         restClient.post(
-            formatFilesetRequestPath(ident.namespace()) + "/" + ident.name() + "/" + "context",
+            formatFilesetRequestPath(fullNamespace) + "/" + ident.name() + "/" + "context",
             req,
             FilesetContextResponse.class,
             Collections.emptyMap(),

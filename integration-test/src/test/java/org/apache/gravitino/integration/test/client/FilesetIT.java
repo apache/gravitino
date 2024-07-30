@@ -27,8 +27,10 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.file.BaseFilesetDataOperationCtx;
+import org.apache.gravitino.file.ClientType;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetContext;
+import org.apache.gravitino.file.FilesetDataOperation;
 import org.apache.gravitino.file.FilesetDataOperationCtx;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
@@ -119,8 +121,8 @@ public class FilesetIT extends AbstractIT {
     FilesetDataOperationCtx ctx =
         BaseFilesetDataOperationCtx.builder()
             .withSubPath("/test.par")
-            .withOperation("create")
-            .withClientType("test")
+            .withOperation(FilesetDataOperation.CREATE)
+            .withClientType(ClientType.HADOOP_GVFS)
             .build();
     FilesetContext context = catalog.asFilesetCatalog().getFilesetContext(filesetIdent, ctx);
 

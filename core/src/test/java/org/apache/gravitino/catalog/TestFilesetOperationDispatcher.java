@@ -28,9 +28,11 @@ import java.util.UUID;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.file.BaseFilesetDataOperationCtx;
+import org.apache.gravitino.file.ClientType;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.file.FilesetContext;
+import org.apache.gravitino.file.FilesetDataOperation;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -196,8 +198,8 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
       BaseFilesetDataOperationCtx ctx =
           BaseFilesetDataOperationCtx.builder()
               .withSubPath("/test/x.parquet")
-              .withOperation("create")
-              .withClientType("test")
+              .withOperation(FilesetDataOperation.CREATE)
+              .withClientType(ClientType.HADOOP_GVFS)
               .build();
       FilesetContext context1 = filesetOperationDispatcher.getFilesetContext(filesetIdent1, ctx);
       Assertions.assertEquals(fileset1.name(), context1.fileset().name());

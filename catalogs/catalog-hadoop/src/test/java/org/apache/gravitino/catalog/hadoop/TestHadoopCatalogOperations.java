@@ -67,9 +67,11 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.file.BaseFilesetDataOperationCtx;
+import org.apache.gravitino.file.ClientType;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.file.FilesetContext;
+import org.apache.gravitino.file.FilesetDataOperation;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.service.CatalogMetaService;
@@ -783,8 +785,8 @@ public class TestHadoopCatalogOperations {
       BaseFilesetDataOperationCtx dataOperationCtx1 =
           BaseFilesetDataOperationCtx.builder()
               .withSubPath("/test/test.parquet")
-              .withOperation("open")
-              .withClientType("test")
+              .withOperation(FilesetDataOperation.OPEN)
+              .withClientType(ClientType.HADOOP_GVFS)
               .build();
       FilesetContext context1 = ops.getFilesetContext(filesetIdent, dataOperationCtx1);
       Assertions.assertEquals(name, context1.fileset().name());
@@ -799,8 +801,8 @@ public class TestHadoopCatalogOperations {
       BaseFilesetDataOperationCtx dataOperationCtx2 =
           BaseFilesetDataOperationCtx.builder()
               .withSubPath("test/test.parquet")
-              .withOperation("open")
-              .withClientType("test")
+              .withOperation(FilesetDataOperation.OPEN)
+              .withClientType(ClientType.HADOOP_GVFS)
               .build();
       FilesetContext context2 = ops.getFilesetContext(filesetIdent, dataOperationCtx2);
       Assertions.assertEquals(name, context2.fileset().name());

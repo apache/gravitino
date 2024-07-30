@@ -20,6 +20,8 @@
 package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import org.apache.gravitino.file.ClientType;
+import org.apache.gravitino.file.FilesetDataOperation;
 import org.apache.gravitino.json.JsonUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -30,12 +32,12 @@ public class TestGetFilesetContextRequest {
     GetFilesetContextRequest request =
         GetFilesetContextRequest.builder()
             .subPath("/test/1.txt")
-            .operation("create")
-            .clientType("test")
+            .operation(FilesetDataOperation.CREATE)
+            .clientType(ClientType.HADOOP_GVFS)
             .build();
     String jsonString = JsonUtils.objectMapper().writeValueAsString(request);
     String expected =
-        "{\"subPath\":\"/test/1.txt\",\"operation\":\"create\",\"clientType\":\"test\"}";
+        "{\"subPath\":\"/test/1.txt\",\"operation\":\"create\",\"clientType\":\"hadoop_gvfs\"}";
     Assertions.assertEquals(
         JsonUtils.objectMapper().readTree(expected), JsonUtils.objectMapper().readTree(jsonString));
   }

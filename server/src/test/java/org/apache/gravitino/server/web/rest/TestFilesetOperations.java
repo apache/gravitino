@@ -57,9 +57,11 @@ import org.apache.gravitino.dto.responses.FilesetResponse;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.file.ClientType;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.file.FilesetContext;
+import org.apache.gravitino.file.FilesetDataOperation;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.rest.RESTUtils;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
@@ -451,8 +453,8 @@ public class TestFilesetOperations extends JerseyTest {
     GetFilesetContextRequest req =
         GetFilesetContextRequest.builder()
             .subPath("path1")
-            .operation("create")
-            .clientType("test")
+            .operation(FilesetDataOperation.OPEN)
+            .clientType(ClientType.HADOOP_GVFS)
             .build();
 
     assertGetFilesetContext(req, context);

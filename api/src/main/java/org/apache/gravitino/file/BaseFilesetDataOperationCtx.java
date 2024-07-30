@@ -20,13 +20,12 @@
 package org.apache.gravitino.file;
 
 import com.google.common.base.Preconditions;
-import org.apache.commons.lang3.StringUtils;
 
 /** Base implementation of {@link FilesetDataOperationCtx}. */
 public class BaseFilesetDataOperationCtx implements FilesetDataOperationCtx {
   private String subPath;
-  private String operation;
-  private String clientType;
+  private FilesetDataOperation operation;
+  private ClientType clientType;
 
   @Override
   public String subPath() {
@@ -34,12 +33,12 @@ public class BaseFilesetDataOperationCtx implements FilesetDataOperationCtx {
   }
 
   @Override
-  public String operation() {
+  public FilesetDataOperation operation() {
     return operation;
   }
 
   @Override
-  public String clientType() {
+  public ClientType clientType() {
     return clientType;
   }
 
@@ -68,7 +67,7 @@ public class BaseFilesetDataOperationCtx implements FilesetDataOperationCtx {
      * @param operation The type of this data operation.
      * @return The builder.
      */
-    public BaseFilesetDataOperationCtx.Builder withOperation(String operation) {
+    public BaseFilesetDataOperationCtx.Builder withOperation(FilesetDataOperation operation) {
       context.operation = operation;
       return this;
     }
@@ -79,17 +78,15 @@ public class BaseFilesetDataOperationCtx implements FilesetDataOperationCtx {
      * @param clientType The client type of this data operation.
      * @return The builder.
      */
-    public BaseFilesetDataOperationCtx.Builder withClientType(String clientType) {
+    public BaseFilesetDataOperationCtx.Builder withClientType(ClientType clientType) {
       context.clientType = clientType;
       return this;
     }
 
     private void validate() {
       Preconditions.checkArgument(context.subPath != null, "subPath cannot be null");
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(context.operation), "operation is required");
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(context.clientType), "clientType is required");
+      Preconditions.checkArgument(context.operation != null, "operation is required");
+      Preconditions.checkArgument(context.clientType != null, "clientType is required");
     }
 
     /**

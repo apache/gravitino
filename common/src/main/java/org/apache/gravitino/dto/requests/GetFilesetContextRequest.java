@@ -27,7 +27,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.file.ClientType;
+import org.apache.gravitino.file.FilesetDataOperation;
 import org.apache.gravitino.rest.RESTRequest;
 
 /** Request to get a fileset context. */
@@ -42,17 +43,17 @@ public class GetFilesetContextRequest implements RESTRequest {
   private String subPath;
 
   @JsonProperty("operation")
-  private String operation;
+  private FilesetDataOperation operation;
 
   @JsonProperty("clientType")
-  private String clientType;
+  private ClientType clientType;
 
   @Override
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(subPath != null, "\"subPath\" field cannot be null");
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(operation), "\"operation\" field is required and cannot be empty");
+        operation != null, "\"operation\" field is required and cannot be null");
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(clientType), "\"clientType\" field is required and cannot be empty");
+        clientType != null, "\"clientType\" field is required and cannot be null");
   }
 }
