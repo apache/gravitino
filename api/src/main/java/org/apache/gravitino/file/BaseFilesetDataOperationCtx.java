@@ -43,6 +43,7 @@ public class BaseFilesetDataOperationCtx implements FilesetDataOperationCtx {
     return clientType;
   }
 
+  /** Builder for {@link BaseFilesetDataOperationCtx}. */
   public static class Builder {
     private BaseFilesetDataOperationCtx context;
     /** Creates a new instance of {@link BaseFilesetDataOperationCtx.Builder}. */
@@ -50,16 +51,34 @@ public class BaseFilesetDataOperationCtx implements FilesetDataOperationCtx {
       context = new BaseFilesetDataOperationCtx();
     }
 
+    /**
+     * Set the sub path of this data operation.
+     *
+     * @param subPath The subPath of this data operation.
+     * @return The builder.
+     */
     public BaseFilesetDataOperationCtx.Builder withSubPath(String subPath) {
       context.subPath = subPath;
       return this;
     }
 
+    /**
+     * Set the type of this data operation.
+     *
+     * @param operation The type of this data operation.
+     * @return The builder.
+     */
     public BaseFilesetDataOperationCtx.Builder withOperation(String operation) {
       context.operation = operation;
       return this;
     }
 
+    /**
+     * Set the client type of this data operation.
+     *
+     * @param clientType The client type of this data operation.
+     * @return The builder.
+     */
     public BaseFilesetDataOperationCtx.Builder withClientType(String clientType) {
       context.clientType = clientType;
       return this;
@@ -73,6 +92,11 @@ public class BaseFilesetDataOperationCtx implements FilesetDataOperationCtx {
           StringUtils.isNotBlank(context.clientType), "clientType is required");
     }
 
+    /**
+     * Build the {@link BaseFilesetDataOperationCtx}.
+     *
+     * @return The created BaseFilesetDataOperationCtx.
+     */
     public BaseFilesetDataOperationCtx build() {
       validate();
       return context;
