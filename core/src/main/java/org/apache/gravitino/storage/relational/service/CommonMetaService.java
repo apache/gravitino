@@ -36,27 +36,29 @@ public class CommonMetaService {
     Preconditions.checkArgument(
         !namespace.isEmpty() && namespace.levels().length <= 3,
         "Namespace should not be empty and length should be less than or equal to 3.");
+
     Long parentEntityId = null;
-    for (int level = 0; level < namespace.levels().length; level++) {
-      String name = namespace.level(level);
-      switch (level) {
-        case 0:
-          parentEntityId = MetalakeMetaService.getInstance().getMetalakeIdByName(name);
-          continue;
-        case 1:
-          parentEntityId =
-              CatalogMetaService.getInstance()
-                  .getCatalogIdByMetalakeIdAndName(parentEntityId, name);
-          continue;
-        case 2:
-          parentEntityId =
-              SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(parentEntityId, name);
-          break;
-      }
+
+    if (namespace.levels().length > 0) {
+      parentEntityId = MetalakeMetaService.getInstance().getMetalakeIdByName(namespace.level(0));
     }
+
+    if (namespace.levels().length > 1) {
+      parentEntityId =
+          CatalogMetaService.getInstance()
+              .getCatalogIdByMetalakeIdAndName(parentEntityId, namespace.level(1));
+    }
+
+    if (namespace.levels().length > 2) {
+      parentEntityId =
+          SchemaMetaService.getInstance()
+              .getSchemaIdByCatalogIdAndName(parentEntityId, namespace.level(2));
+    }
+
     Preconditions.checkState(
         parentEntityId != null && parentEntityId > 0,
         "Parent entity id should not be null and should be greater than 0.");
+
     return parentEntityId;
   }
 }
