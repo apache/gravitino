@@ -232,7 +232,7 @@ public class GravitinoEnv {
    * @return The CatalogManager instance.
    */
   public CatalogManager catalogManager() {
-    Preconditions.checkNotNull(catalogManager, "GravitinoEnv is not initialized.");
+    Preconditions.checkArgument(catalogManager != null, "GravitinoEnv is not initialized.");
     return catalogManager;
   }
 
@@ -242,7 +242,7 @@ public class GravitinoEnv {
    * @return The EventBus instance.
    */
   public EventBus eventBus() {
-    Preconditions.checkNotNull(eventBus, "GravitinoEnv is not initialized.");
+    Preconditions.checkArgument(eventBus != null, "GravitinoEnv is not initialized.");
     return eventBus;
   }
 
