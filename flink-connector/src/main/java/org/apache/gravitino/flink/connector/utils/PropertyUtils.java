@@ -26,7 +26,7 @@ public class PropertyUtils {
 
   public static final String HIVE_PREFIX = "hive.";
   public static final String HADOOP_PREFIX = "hadoop.";
-  public static final String FS_PREFIX = "hive.";
+  public static final String FS_PREFIX = "fs.";
   public static final String DFS_PREFIX = "dfs.";
 
   public static Map<String, String> getHadoopAndHiveProperties(Map<String, String> properties) {

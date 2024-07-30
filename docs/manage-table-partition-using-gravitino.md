@@ -313,7 +313,7 @@ Partition Partition =
 ### List partition names under a partitioned table
 
 You can list all partition names under a partitioned table by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{partitioned_table_name}/partitions` endpoint or by using the Gravitino Java client.
-The following is an example of listing all partition names under a partitioned table:
+The following is an example of listing all the partition names under a partitioned table:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -349,7 +349,7 @@ String[] partitionNames =
 ### List partitions under a partitioned table
 
 If you want to get more detailed information about the partitions under a partitioned table, you can list all partitions under a partitioned table by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{partitioned_table_name}/partitions` endpoint or by using the Gravitino Java client.
-The following is an example of listing all partitions under a partitioned table:
+The following is an example of listing all the partitions under a partitioned table:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">

@@ -133,9 +133,13 @@ public class IcebergTableOpsHelper {
   }
 
   private void doUpdateColumnPosition(
-      UpdateSchema icebergUpdateSchema, UpdateColumnPosition updateColumnPosition) {
-    doMoveColumn(
-        icebergUpdateSchema, updateColumnPosition.fieldName(), updateColumnPosition.getPosition());
+      UpdateSchema icebergUpdateSchema,
+      UpdateColumnPosition updateColumnPosition,
+      Schema icebergTableSchema) {
+    StructType tableSchema = icebergTableSchema.asStruct();
+    ColumnPosition columnPosition =
+        getColumnPositionForIceberg(tableSchema, updateColumnPosition.getPosition());
+    doMoveColumn(icebergUpdateSchema, updateColumnPosition.fieldName(), columnPosition);
   }
 
   private void doUpdateColumnType(
@@ -156,7 +160,9 @@ public class IcebergTableOpsHelper {
     icebergUpdateSchema.updateColumn(fieldName, (PrimitiveType) type);
   }
 
-  private ColumnPosition getAddColumnPosition(StructType parent, ColumnPosition columnPosition) {
+  // Iceberg doesn't support LAST position, transform to FIRST or AFTER.
+  private ColumnPosition getColumnPositionForIceberg(
+      StructType parent, ColumnPosition columnPosition) {
     if (!(columnPosition instanceof TableChange.Default)) {
       return columnPosition;
     }
@@ -171,25 +177,7 @@ public class IcebergTableOpsHelper {
     return ColumnPosition.after(last.name());
   }
 
-  private void doAddColumn(
-      UpdateSchema icebergUpdateSchema, AddColumn addColumn, Schema icebergTableSchema) {
-    String parentName = getParentName(addColumn.fieldName());
-    StructType parentStruct;
-    if (parentName != null) {
-      org.apache.iceberg.types.Type parent = icebergTableSchema.findType(parentName);
-      Preconditions.checkArgument(
-          parent != null, "Couldn't find parent field: " + parentName + " in Iceberg table");
-      Preconditions.checkArgument(
-          parent instanceof StructType,
-          "Couldn't add column to non-struct field, name:"
-              + parentName
-              + ", type:"
-              + parent.getClass().getSimpleName());
-      parentStruct = (StructType) parent;
-    } else {
-      parentStruct = icebergTableSchema.asStruct();
-    }
-
+  private void doAddColumn(UpdateSchema icebergUpdateSchema, AddColumn addColumn) {
     if (addColumn.isAutoIncrement()) {
       throw new IllegalArgumentException("Iceberg doesn't support auto increment column");
     }
@@ -210,8 +198,9 @@ public class IcebergTableOpsHelper {
           addColumn.getComment());
     }
 
-    ColumnPosition position = getAddColumnPosition(parentStruct, addColumn.getPosition());
-    doMoveColumn(icebergUpdateSchema, addColumn.fieldName(), position);
+    if (!ColumnPosition.defaultPos().equals(addColumn.getPosition())) {
+      doMoveColumn(icebergUpdateSchema, addColumn.fieldName(), addColumn.getPosition());
+    }
   }
 
   private void alterTableProperty(
@@ -237,11 +226,12 @@ public class IcebergTableOpsHelper {
       Schema icebergTableSchema) {
     for (ColumnChange change : columnChanges) {
       if (change instanceof AddColumn) {
-        doAddColumn(icebergUpdateSchema, (AddColumn) change, icebergTableSchema);
+        doAddColumn(icebergUpdateSchema, (AddColumn) change);
       } else if (change instanceof DeleteColumn) {
         doDeleteColumn(icebergUpdateSchema, (DeleteColumn) change, icebergTableSchema);
       } else if (change instanceof UpdateColumnPosition) {
-        doUpdateColumnPosition(icebergUpdateSchema, (UpdateColumnPosition) change);
+        doUpdateColumnPosition(
+            icebergUpdateSchema, (UpdateColumnPosition) change, icebergTableSchema);
       } else if (change instanceof RenameColumn) {
         doRenameColumn(icebergUpdateSchema, (RenameColumn) change);
       } else if (change instanceof UpdateColumnType) {

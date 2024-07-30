@@ -96,6 +96,15 @@ You can use these kinds of Docker images to facilitate integration testing of al
 You can use this kind of image to test the catalog of Apache Hive with kerberos enable
 
 Changelog
+- gravitino-ci-kerberos-hive:0.1.5
+  - Start another HMS for the Hive cluster in the container with port 19083. This is to test whether Kerberos authentication works for a Kerberos-enabled Hive cluster with multiple HMS.
+  - Refresh ssh keys in the startup script.
+  - Add test logic to log in localhost via ssh without password.
+
+- gravitino-ci-kerberos-hive:0.1.4
+  - Increase the total check time for the status of DataNode to 150s.
+  - Output the log of the DataNode fails to start
+
 - gravitino-ci-kerberos-hive:0.1.3
   - Add more proxy users in the core-site.xml file.
   - fix bugs in the `start.sh` script.
