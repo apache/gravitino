@@ -35,10 +35,15 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.dto.rel.expressions.LiteralDTO;
+import org.apache.gravitino.dto.rel.partitions.IdentityPartitionDTO;
+import org.apache.gravitino.dto.rel.partitions.ListPartitionDTO;
+import org.apache.gravitino.dto.rel.partitions.PartitionDTO;
+import org.apache.gravitino.dto.rel.partitions.RangePartitionDTO;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.partitions.Partition;
 import org.junit.jupiter.api.Assertions;
 
 public class ITUtils {
@@ -136,6 +141,37 @@ public class ITUtils {
       Assertions.assertEquals(LiteralDTO.NULL, actual.defaultValue());
     } else {
       Assertions.assertEquals(expected.defaultValue(), actual.defaultValue());
+    }
+  }
+
+  public static void assertPartition(Partition expected, Partition actual) {
+    if (!(expected instanceof PartitionDTO)) {
+      expected = toDTO(expected);
+    }
+    if (!(actual instanceof PartitionDTO)) {
+      actual = toDTO(actual);
+    }
+
+    Assertions.assertEquals(expected.name(), actual.name());
+    Assertions.assertEquals(((PartitionDTO) expected).type(), ((PartitionDTO) actual).type());
+    if (expected instanceof RangePartitionDTO) {
+      Assertions.assertEquals(
+          ((RangePartitionDTO) expected).upper(), ((RangePartitionDTO) actual).upper());
+      Assertions.assertEquals(
+          ((RangePartitionDTO) expected).lower(), ((RangePartitionDTO) actual).lower());
+    } else if (expected instanceof ListPartitionDTO) {
+      Assertions.assertTrue(
+          Arrays.deepEquals(
+              ((ListPartitionDTO) expected).lists(), ((ListPartitionDTO) actual).lists()));
+    } else if (expected instanceof IdentityPartitionDTO) {
+      Assertions.assertTrue(
+          Arrays.deepEquals(
+              ((IdentityPartitionDTO) expected).fieldNames(),
+              ((IdentityPartitionDTO) actual).fieldNames()));
+      Assertions.assertTrue(
+          Arrays.equals(
+              ((IdentityPartitionDTO) expected).values(),
+              ((IdentityPartitionDTO) actual).values()));
     }
   }
 
