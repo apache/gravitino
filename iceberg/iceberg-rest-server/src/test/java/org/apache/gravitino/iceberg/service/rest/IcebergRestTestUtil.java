@@ -19,22 +19,16 @@
 
 package org.apache.gravitino.iceberg.service.rest;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
 import com.google.common.collect.Maps;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.ops.ConfigIcebergTableOpsProvider;
 import org.apache.gravitino.iceberg.common.ops.IcebergTableOpsManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
-import org.apache.gravitino.meta.CatalogEntity;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.logging.LoggingFeature;
@@ -44,10 +38,7 @@ import org.glassfish.jersey.server.ResourceConfig;
 public class IcebergRestTestUtil {
 
   private static final String V_1 = "v1";
-  public static final String METALAKE = "ut_metalake";
-  public static final String CATALOG = "ut_catalog";
-
-  public static final String PREFIX = METALAKE + "/" + CATALOG;
+  public static final String PREFIX = "prefix_gravitino";
   public static final String CONFIG_PATH = V_1 + "/config";
   public static final String NAMESPACE_PATH = V_1 + "/namespaces";
   public static final String UPDATE_NAMESPACE_POSTFIX = "properties";
@@ -79,9 +70,11 @@ public class IcebergRestTestUtil {
 
     if (bindIcebergTableOps) {
       Map<String, String> catalogConf = Maps.newHashMap();
-      catalogConf.put(String.format("catalog.%s.xx", CATALOG), "xxx");
-      IcebergTableOpsManager icebergTableOpsManager =
-          new IcebergTableOpsManager(new IcebergConfig(catalogConf), mockEntityStore());
+      catalogConf.put(String.format("catalog.%s.xx", PREFIX), "xxx");
+      IcebergConfig icebergConfig = new IcebergConfig(catalogConf);
+      ConfigIcebergTableOpsProvider provider = new ConfigIcebergTableOpsProvider();
+      provider.initialize(icebergConfig);
+      IcebergTableOpsManager icebergTableOpsManager = new IcebergTableOpsManager(provider);
 
       IcebergMetricsManager icebergMetricsManager = new IcebergMetricsManager(new IcebergConfig());
       resourceConfig.register(
@@ -94,19 +87,5 @@ public class IcebergRestTestUtil {
           });
     }
     return resourceConfig;
-  }
-
-  public static EntityStore mockEntityStore() {
-    try {
-      CatalogEntity entity = mock(CatalogEntity.class);
-      when(entity.getProvider()).thenReturn("lakehouse-iceberg");
-      when(entity.getProperties()).thenReturn(new HashMap<>());
-
-      EntityStore entityStore = mock(EntityStore.class);
-      when(entityStore.get(any(), any(), any())).thenReturn(entity);
-      return entityStore;
-    } catch (Exception ex) {
-      throw new RuntimeException(ex);
-    }
   }
 }

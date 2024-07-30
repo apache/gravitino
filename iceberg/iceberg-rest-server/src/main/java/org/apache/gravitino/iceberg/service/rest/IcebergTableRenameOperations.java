@@ -35,7 +35,7 @@ import org.apache.gravitino.iceberg.service.IcebergRestUtils;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 
-@Path("/v1/{prefix:([^/]*/[^/]*/)?}tables/rename")
+@Path("/v1/{prefix:([^/]*/)?}tables/rename")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 public class IcebergTableRenameOperations {

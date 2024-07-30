@@ -1,17 +1,17 @@
 package org.apache.gravitino.iceberg.common.ops;
 
-import java.io.IOException;
-import java.util.HashMap;
+import com.google.common.base.Splitter;
+import com.google.common.collect.Maps;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import org.apache.gravitino.Entity;
-import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.EntityStoreFactory;
-import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
-import org.apache.gravitino.exceptions.NoSuchEntityException;
+import java.util.Optional;
+import java.util.stream.Collectors;
+import org.apache.commons.lang.StringUtils;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,91 +20,91 @@ public class IcebergTableOpsManager implements AutoCloseable {
 
   public static final String DEFAULT_CATALOG = "default_catalog";
 
+  private static final Splitter splitter = Splitter.on(",");
+
   private final Map<String, IcebergTableOps> icebergTableOpsMap;
 
-  private final IcebergConfig icebergConfig;
-
-  private EntityStore entityStore;
+  private final IcebergTableOpsProvider provider;
 
   public IcebergTableOpsManager(IcebergConfig config) {
-    this.icebergTableOpsMap = new ConcurrentHashMap<>();
-    this.icebergConfig = config;
-    if (icebergConfig.get(IcebergConfig.REST_PROXY)) {
-      this.entityStore = EntityStoreFactory.createEntityStore(config);
-      entityStore.initialize(config);
-    }
+    this.icebergTableOpsMap = Maps.newConcurrentMap();
+    this.provider = createProvider(config);
+    this.provider.initialize(config);
   }
 
-  public IcebergTableOpsManager(IcebergConfig config, EntityStore entityStore) {
-    this.icebergTableOpsMap = new ConcurrentHashMap<>();
-    this.icebergConfig = config;
-    this.entityStore = entityStore;
+  public IcebergTableOpsManager(IcebergTableOpsProvider provider) {
+    this.icebergTableOpsMap = Maps.newConcurrentMap();
+    this.provider = provider;
   }
 
-  public IcebergTableOps getOps(String prefix) {
-    if (prefix == null || prefix.length() == 0) {
+  public IcebergTableOps getOps(String rawPrefix) {
+    String prefix = shelling(rawPrefix);
+    String cacheKey = prefix;
+    if (StringUtils.isBlank(prefix)) {
       LOG.debug("prefix is empty, return default iceberg catalog");
-      return icebergTableOpsMap.computeIfAbsent(
-          DEFAULT_CATALOG,
-          k -> new IcebergTableOps(icebergConfig.getCatalogConfig(DEFAULT_CATALOG)));
+      cacheKey = DEFAULT_CATALOG;
+    }
+    return icebergTableOpsMap.computeIfAbsent(cacheKey, k -> provider.getIcebergTableOps(prefix));
+  }
+
+  public Optional<String> getPrefix(String rawPrefix, String warehouse) {
+    String prefix = shelling(rawPrefix);
+    if (!StringUtils.isBlank(prefix)) {
+      return Optional.of(prefix);
+    } else {
+      return provider.getPrefix(warehouse);
+    }
+  }
+
+  private IcebergTableOpsProvider createProvider(IcebergConfig config) {
+    try (IsolatedClassLoader isolatedClassLoader =
+        IsolatedClassLoader.buildClassLoader(getClassPaths(config))) {
+      return isolatedClassLoader.withClassLoader(
+          cl -> {
+            try {
+              Class<?> providerClz =
+                  cl.loadClass(config.get(IcebergConfig.ICEBERG_REST_SERVICE_CATALOG_PROVIDER));
+              return (IcebergTableOpsProvider) providerClz.getDeclaredConstructor().newInstance();
+            } catch (Exception e) {
+              throw new RuntimeException(e);
+            }
+          });
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private List<String> getClassPaths(IcebergConfig config) {
+    return splitter
+        .trimResults()
+        .omitEmptyStrings()
+        .splitToStream(config.get(IcebergConfig.ICEBERG_REST_SERVICE_CATALOG_PROVIDER_CLASSPATH))
+        .map(this::transferAbsolutePath)
+        .collect(Collectors.toList());
+  }
+
+  private String transferAbsolutePath(String pathString) {
+    Path path = Paths.get(pathString);
+    if (Files.exists(path)) {
+      return path.toAbsolutePath().toString();
     }
 
-    String[] segments = prefix.split("/");
-    String metalake = segments[0];
-    String catalog = segments[1];
-
-    if (icebergConfig.get(IcebergConfig.REST_PROXY)) {
-      return icebergTableOpsMap.computeIfAbsent(
-          String.format("%s_%s", metalake, catalog),
-          k -> {
-            CatalogEntity entity;
-            try {
-              entity =
-                  entityStore.get(
-                      NameIdentifier.of(metalake, catalog),
-                      Entity.EntityType.CATALOG,
-                      CatalogEntity.class);
-            } catch (NoSuchEntityException e) {
-              throw new RuntimeException(String.format("%s.%s does not exist", metalake, catalog));
-            } catch (IOException ioe) {
-              LOG.error("Failed to get {}.{}", metalake, catalog, ioe);
-              throw new RuntimeException(ioe);
-            }
-
-            if (!"lakehouse-iceberg".equals(entity.getProvider())) {
-              String errorMsg = String.format("%s.%s is not iceberg catalog", metalake, catalog);
-              LOG.error(errorMsg);
-              throw new RuntimeException(errorMsg);
-            }
-
-            Map<String, String> properties = entity.getProperties();
-            if (!Boolean.parseBoolean(
-                properties.getOrDefault(IcebergConstants.GRAVITINO_REST_PROXY, "true"))) {
-              String errorMsg = String.format("%s.%s rest-proxy is false", metalake, catalog);
-              LOG.error(errorMsg);
-              throw new RuntimeException(errorMsg);
-            }
-
-            Map<String, String> catalogProperties = new HashMap<>(properties);
-            catalogProperties.merge(
-                IcebergConstants.CATALOG_BACKEND_NAME, catalog, (oldValue, newValue) -> oldValue);
-            catalogProperties.put(
-                IcebergConstants.ICEBERG_JDBC_PASSWORD,
-                properties.getOrDefault(IcebergConstants.GRAVITINO_JDBC_PASSWORD, ""));
-            catalogProperties.put(
-                IcebergConstants.ICEBERG_JDBC_USER,
-                properties.getOrDefault(IcebergConstants.GRAVITINO_JDBC_USER, ""));
-
-            return new IcebergTableOps(new IcebergConfig(catalogProperties));
-          });
-    } else {
-      if (!icebergConfig.getCatalogs().contains(catalog)) {
-        String errorMsg = String.format("%s is not iceberg catalog", catalog);
-        LOG.error(errorMsg);
-        throw new RuntimeException(errorMsg);
+    String gravitinoHome = System.getenv("GRAVITINO_HOME");
+    if (!path.isAbsolute() && gravitinoHome != null) {
+      Path newPath = Paths.get(gravitinoHome, pathString);
+      if (Files.exists(newPath)) {
+        return newPath.toString();
       }
-      return icebergTableOpsMap.computeIfAbsent(
-          catalog, k -> new IcebergTableOps(icebergConfig.getCatalogConfig(catalog)));
+    }
+
+    throw new RuntimeException(String.format("path %s don't exist", path.toAbsolutePath()));
+  }
+
+  private String shelling(String rawPrefix) {
+    if (StringUtils.isBlank(rawPrefix)) {
+      return rawPrefix;
+    } else {
+      return rawPrefix.replace("/", "");
     }
   }
 
@@ -113,6 +113,5 @@ public class IcebergTableOpsManager implements AutoCloseable {
     for (String catalog : icebergTableOpsMap.keySet()) {
       icebergTableOpsMap.get(catalog).close();
     }
-    entityStore.close();
   }
 }

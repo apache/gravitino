@@ -48,7 +48,7 @@ import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Path("/v1/{prefix:([^/]*/[^/]*/)?}namespaces")
+@Path("/v1/{prefix:([^/]*/)?}namespaces")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 public class IcebergNamespaceOperations {

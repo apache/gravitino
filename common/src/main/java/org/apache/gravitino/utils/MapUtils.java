@@ -48,25 +48,6 @@ public class MapUtils {
   }
 
   /**
-   * Returns a map with all keys that start with the given prefix and reserve prefix
-   *
-   * @param m The map to filter.
-   * @param prefix The prefix to filter by.
-   * @return A map with all keys that start with the given prefix and reserve prefix
-   */
-  public static Map<String, String> filterPrefixMap(Map<String, String> m, String prefix) {
-    Map<String, String> configs = Maps.newHashMap();
-    m.forEach(
-        (k, v) -> {
-          if (k.startsWith(prefix)) {
-            configs.put(k, v);
-          }
-        });
-
-    return Collections.unmodifiableMap(configs);
-  }
-
-  /**
    * Returns an unmodifiable map.
    *
    * @param m The map to make unmodifiable.

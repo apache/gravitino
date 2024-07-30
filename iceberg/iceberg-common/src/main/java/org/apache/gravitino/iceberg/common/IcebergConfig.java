@@ -20,11 +20,8 @@
 package org.apache.gravitino.iceberg.common;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Maps;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -33,7 +30,6 @@ import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.server.web.OverwriteDefaultConfig;
-import org.apache.gravitino.utils.MapUtils;
 
 public class IcebergConfig extends Config implements OverwriteDefaultConfig {
   public static final String ICEBERG_CONFIG_PREFIX = "gravitino.iceberg-rest.";
@@ -122,12 +118,20 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .stringConf()
           .create();
 
-  public static final ConfigEntry<Boolean> REST_PROXY =
-      new ConfigBuilder(IcebergConstants.GRAVITINO_REST_PROXY)
-          .doc("Whether to proxy gravitino iceberg catalog in rest server")
+  public static final ConfigEntry<String> ICEBERG_REST_SERVICE_CATALOG_PROVIDER =
+      new ConfigBuilder(IcebergConstants.ICEBERG_REST_SERVICE_CATALOG_PROVIDER)
+          .doc("the implement of IcebergTableOpsProvider")
           .version(ConfigConstants.VERSION_0_6_0)
-          .booleanConf()
-          .createWithDefault(false);
+          .stringConf()
+          .createWithDefault(
+              "org.apache.gravitino.iceberg.common.ops.ConfigIcebergTableOpsProvider");
+
+  public static final ConfigEntry<String> ICEBERG_REST_SERVICE_CATALOG_PROVIDER_CLASSPATH =
+      new ConfigBuilder(IcebergConstants.ICEBERG_REST_SERVICE_CATALOG_PROVIDER_CLASSPATH)
+          .doc("the classpath for loading the implement of IcebergTableOpsProvider")
+          .version(ConfigConstants.VERSION_0_6_0)
+          .stringConf()
+          .createWithDefault("iceberg-rest-server/libs");
 
   public String getJdbcDriver() {
     return get(JDBC_DRIVER);
@@ -144,30 +148,6 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
 
   public IcebergConfig() {
     super(false);
-  }
-
-  public List<String> getCatalogs() {
-    Map<String, Boolean> catalogs = Maps.newHashMap();
-    for (String key : this.getAllConfig().keySet()) {
-      if (!key.startsWith("catalog.")) {
-        continue;
-      }
-      if (key.split("\\.").length < 3) {
-        throw new RuntimeException(String.format("%s format is illegal", key));
-      }
-      catalogs.put(key.split("\\.")[1], true);
-    }
-    return catalogs.keySet().stream().sorted().collect(Collectors.toList());
-  }
-
-  public IcebergConfig getCatalogConfig(String catalog) {
-    Map<String, String> base = Maps.newHashMap(this.getAllConfig());
-    Map<String, String> merge =
-        MapUtils.getPrefixMap(this.getAllConfig(), String.format("catalog.%s.", catalog));
-    for (String key : merge.keySet()) {
-      base.put(key, merge.get(key));
-    }
-    return new IcebergConfig(base);
   }
 
   @Override

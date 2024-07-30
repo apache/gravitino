@@ -32,7 +32,7 @@ public class TestIcebergConfig extends IcebergTestBase {
 
   @Override
   protected Application configure() {
-    return IcebergRestTestUtil.getIcebergResourceConfig(IcebergConfigOperations.class, false);
+    return IcebergRestTestUtil.getIcebergResourceConfig(IcebergConfigOperations.class);
   }
 
   @ParameterizedTest
@@ -45,11 +45,15 @@ public class TestIcebergConfig extends IcebergTestBase {
 
     ConfigResponse response = resp.readEntity(ConfigResponse.class);
     Assertions.assertEquals(0, response.defaults().size());
-    Assertions.assertEquals(0, response.overrides().size());
+    if (withPrefix) {
+      Assertions.assertEquals(1, response.overrides().size());
+    } else {
+      Assertions.assertEquals(0, response.overrides().size());
+    }
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"metalake/catalog", "\u0024/\u0024", "\100/\100"})
+  @ValueSource(strings = {"PREFIX", "", "\\\n\t\\\'", "\u0024", "\100", "[_~"})
   void testIcebergRestValidPrefix(String prefix) {
     String path = injectPrefixToPath(IcebergRestTestUtil.CONFIG_PATH, prefix);
     Response response = getIcebergClientBuilder(path, Optional.empty()).get();
@@ -57,7 +61,7 @@ public class TestIcebergConfig extends IcebergTestBase {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"PREFIX", "", "\\\n\t\\\'", "\u0024", "\100", "[_~"})
+  @ValueSource(strings = {"/", "hello/"})
   void testIcebergRestInvalidPrefix(String prefix) {
     String path = injectPrefixToPath(IcebergRestTestUtil.CONFIG_PATH, prefix);
     Response response = getIcebergClientBuilder(path, Optional.empty()).get();
