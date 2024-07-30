@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.lakehouse.paimon;
 
 import static org.apache.gravitino.meta.AuditInfo.EMPTY;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.Arrays;
 import java.util.List;
@@ -28,6 +29,7 @@ import lombok.Getter;
 import lombok.ToString;
 import org.apache.gravitino.connector.BaseTable;
 import org.apache.gravitino.connector.TableOperations;
+import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.paimon.schema.Schema;
@@ -60,7 +62,14 @@ public class GravitinoPaimonTable extends BaseTable {
     if (partitioning != null) {
       builder.partitionKeys(
           Arrays.stream(partitioning)
-              .map(partition -> partition.references()[0].toString())
+              .map(
+                  partition -> {
+                    NamedReference[] references = partition.references();
+                    Preconditions.checkArgument(
+                        references.length == 1,
+                        "Partitioning column must be single-column, like 'a'.");
+                    return references[0].toString();
+                  })
               .collect(Collectors.toList()));
     }
     for (int index = 0; index < columns.length; index++) {

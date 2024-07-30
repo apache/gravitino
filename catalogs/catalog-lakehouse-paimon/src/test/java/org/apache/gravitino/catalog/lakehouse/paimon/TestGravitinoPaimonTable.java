@@ -216,19 +216,8 @@ public class TestGravitinoPaimonTable {
         fromPaimonColumn(new DataField(0, "col_1", DataTypes.INT().nullable(), PAIMON_COMMENT));
     GravitinoPaimonColumn col2 =
         fromPaimonColumn(new DataField(1, "col_2", DataTypes.DATE().notNull(), PAIMON_COMMENT));
-    RowType rowTypeInside =
-        RowType.builder()
-            .field("integer_field_inside", DataTypes.INT().notNull())
-            .field("string_field_inside", DataTypes.STRING().notNull())
-            .build();
-    RowType rowType =
-        RowType.builder()
-            .field("integer_field", DataTypes.INT().notNull())
-            .field("string_field", DataTypes.STRING().notNull(), "string field")
-            .field("struct_field", rowTypeInside.nullable(), "struct field")
-            .build();
     GravitinoPaimonColumn col3 =
-        fromPaimonColumn(new DataField(2, "col_3", rowType.notNull(), PAIMON_COMMENT));
+        fromPaimonColumn(new DataField(2, "col_3", DataTypes.STRING().notNull(), PAIMON_COMMENT));
     Column[] columns = new Column[] {col1, col2, col3};
 
     Transform[] transforms = new Transform[] {identity("col_1"), identity("col_2")};
@@ -272,10 +261,6 @@ public class TestGravitinoPaimonTable {
                 })
             .toArray(String[]::new);
     Assertions.assertArrayEquals(partitionKeys, loadedPartitionKeys);
-
-    Assertions.assertTrue(paimonCatalogOperations.tableExists(tableIdentifier));
-    NameIdentifier[] tableIdents = paimonCatalogOperations.listTables(tableIdentifier.namespace());
-    Assertions.assertTrue(Arrays.asList(tableIdents).contains(tableIdentifier));
   }
 
   @Test

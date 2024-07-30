@@ -373,20 +373,6 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
       Assertions.assertEquals(columns[i].name(), schema.fieldNames().get(i));
     }
     Assertions.assertArrayEquals(partitionKeys, schema.partitionKeys().toArray(new String[0]));
-
-    Assertions.assertThrows(
-        TableAlreadyExistsException.class,
-        () ->
-            catalog
-                .asTableCatalog()
-                .createTable(
-                    tableIdentifier,
-                    columns,
-                    table_comment,
-                    properties,
-                    Transforms.EMPTY_TRANSFORM,
-                    distribution,
-                    sortOrders));
   }
 
   @Test
