@@ -403,6 +403,7 @@ public class GravitinoEnv {
       this.ownerManager = new OwnerManager(entityStore);
     } else {
       this.accessControlDispatcher = null;
+      this.ownerManager = null;
     }
 
     this.auxServiceManager = new AuxiliaryServiceManager();
