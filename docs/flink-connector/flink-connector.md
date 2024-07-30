@@ -50,7 +50,7 @@ TableEnvironment tableEnv = TableEnvironment.create(builder.inBatchMode().build(
 
 3. Execute the Flink SQL query. 
 
-There are only one catalog in the metalake `test`.
+Suppose there is only one hive catalog with the name hive in the metalake test.
 
 ```sql
 // use hive catalog
@@ -66,28 +66,28 @@ SELECT * FROM hive_students;
 
 Gravitino flink connector support the following datatype mapping between Flink and Gravitino.
 
-| Flink Type                      | Gravitino Type | Since Version |
-|---------------------------------|----------------|---------------|
-| `array`                         | `array`        | 0.6.0         |
-| `bigint`                        | `long`         | 0.6.0         |
-| `binary`                        | `fixed`        | 0.6.0         |
-| `boolean`                       | `boolean`      | 0.6.0         |
-| `char`                          | `char`         | 0.6.0         |
-| `date`                          | `date`         | 0.6.0         |
-| `decimal`                       | `decimal`      | 0.6.0         |
-| `double`                        | `double`       | 0.6.0         |
-| `float`                         | `float`        | 0.6.0         |
-| `integer`                       | `integer`      | 0.6.0         |
-| `map`                           | `map`          | 0.6.0         |
-| `null`                          | `null`         | 0.6.0         |
-| `row`                           | `struct`       | 0.6.0         |
-| `smallint`                      | `short`        | 0.6.0         |
-| `time`                          | `time`         | 0.6.0         |
-| `timestamp`                     | `timestamp`    | 0.6.0         |
-| `timestamp with time zone`      | `timestamp`    | 0.6.0         |
-| `timestamp without time zone`   | `timestamp`    | 0.6.0         |
-| `timestamp with local timezone` | `timestamp`    | 0.6.0         |
-| `timestamp_ltz`                 | `timestamp`    | 0.6.0         |
-| `tinyint`                       | `byte`         | 0.6.0         |
-| `varbinary`                     | `binary`       | 0.6.0         |
-| `varchar`                       | `string`       | 0.6.0         |
+| Flink Type                       | Gravitino Type                | Since Version |
+|----------------------------------|-------------------------------|---------------|
+| `array`                          | `array`                       | 0.6.0         |
+| `bigint`                         | `long`                        | 0.6.0         |
+| `binary`                         | `fixed`                       | 0.6.0         |
+| `boolean`                        | `boolean`                     | 0.6.0         |
+| `char`                           | `char`                        | 0.6.0         |
+| `date`                           | `date`                        | 0.6.0         |
+| `decimal`                        | `decimal`                     | 0.6.0         |
+| `double`                         | `double`                      | 0.6.0         |
+| `float`                          | `float`                       | 0.6.0         |
+| `integer`                        | `integer`                     | 0.6.0         |
+| `map`                            | `map`                         | 0.6.0         |
+| `null`                           | `null`                        | 0.6.0         |
+| `row`                            | `struct`                      | 0.6.0         |
+| `smallint`                       | `short`                       | 0.6.0         |
+| `time`                           | `time`                        | 0.6.0         |
+| `timestamp`                      | `timestamp without time zone` | 0.6.0         |
+| `timestamp without time zone`    | `timestamp without time zone` | 0.6.0         |
+| `timestamp with time zone`       | `timestamp with time zone`    | 0.6.0         |
+| `timestamp with local time zone` | `timestamp with time zone`    | 0.6.0         |
+| `timestamp_ltz`                  | `timestamp with time zone`    | 0.6.0         |
+| `tinyint`                        | `byte`                        | 0.6.0         |
+| `varbinary`                      | `binary`                      | 0.6.0         |
+| `varchar`                        | `string`                      | 0.6.0         |
