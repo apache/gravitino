@@ -213,6 +213,7 @@ public class Configs {
               "The authenticators which Gravitino uses. Multiple authenticators "
                   + "separated by commas")
           .version(ConfigConstants.VERSION_0_6_0)
+          .alternatives(Lists.newArrayList("gravitino.authenticator"))
           .stringConf()
           .toSequence()
           .checkValue(

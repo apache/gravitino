@@ -53,6 +53,8 @@ public abstract class Config {
         "gravitino.entity.store.kv.deleteAfterTimeMs",
         "0.5.0",
         "Please use gravitino.entity.store.deleteAfterTimeMs instead."),
+    new DeprecatedConfig(
+        "gravitino.authenticator", "0.6.0", "Please use gravitino.authenticators instead.")
   };
 
   /**
