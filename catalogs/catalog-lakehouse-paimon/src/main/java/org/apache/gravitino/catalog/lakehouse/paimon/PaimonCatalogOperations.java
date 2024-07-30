@@ -22,7 +22,6 @@ import static org.apache.gravitino.catalog.lakehouse.paimon.GravitinoPaimonTable
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonSchema.fromPaimonProperties;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
-import static org.apache.paimon.utils.Preconditions.checkArgument;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -326,14 +325,15 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
     if (partitioning == null) {
       partitioning = EMPTY_TRANSFORM;
     }
-    checkArgument(
+    Preconditions.checkArgument(
         Arrays.stream(partitioning)
             .allMatch(
                 partition -> {
                   NamedReference[] references = partition.references();
                   return references.length == 1
                       && references[0] instanceof NamedReference.FieldReference;
-                }));
+                }),
+        "Paimon partition columns should not be nested.");
     Preconditions.checkArgument(
         sortOrders == null || sortOrders.length == 0,
         "Sort orders are not supported for Paimon in Gravitino.");
