@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.server.authentication;
 
-import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.util.List;
@@ -34,8 +33,6 @@ public class AuthenticatorFactory {
 
   private static final Logger LOG = LoggerFactory.getLogger(AuthenticatorFactory.class);
 
-  private static final Splitter COMMA = Splitter.on(",").omitEmptyStrings().trimResults();
-
   public static final ImmutableMap<String, String> AUTHENTICATORS =
       ImmutableMap.of(
           AuthenticatorType.SIMPLE.name().toLowerCase(),
@@ -48,8 +45,7 @@ public class AuthenticatorFactory {
   private AuthenticatorFactory() {}
 
   public static List<Authenticator> createAuthenticators(Config config) {
-    String authenticatorConfig = config.get(Configs.AUTHENTICATOR);
-    List<String> authenticatorNames = COMMA.splitToList(authenticatorConfig);
+    List<String> authenticatorNames = config.get(Configs.AUTHENTICATORS);
 
     List<Authenticator> authenticators = Lists.newArrayList();
     for (String name : authenticatorNames) {

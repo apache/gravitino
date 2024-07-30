@@ -122,7 +122,7 @@ public class MiniGravitino {
     String URI = String.format("http://%s:%d", host, port);
 
     List<String> authenticators = new ArrayList<>();
-    String authenticatorStr = context.customConfig.get(Configs.AUTHENTICATOR.getKey());
+    String authenticatorStr = context.customConfig.get(Configs.AUTHENTICATORS.getKey());
     if (authenticatorStr != null) {
       authenticators = COMMA.splitToList(authenticatorStr);
     }

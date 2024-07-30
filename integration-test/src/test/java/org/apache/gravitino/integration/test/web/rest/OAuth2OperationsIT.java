@@ -60,7 +60,7 @@ public class OAuth2OperationsIT extends AbstractIT {
             .setAudience("service1")
             .signWith(keyPair.getPrivate(), SignatureAlgorithm.RS256)
             .compact();
-    configs.put(Configs.AUTHENTICATOR.getKey(), AuthenticatorType.OAUTH.name().toLowerCase());
+    configs.put(Configs.AUTHENTICATORS.getKey(), AuthenticatorType.OAUTH.name().toLowerCase());
     configs.put(OAuthConfig.SERVICE_AUDIENCE.getKey(), "service1");
     configs.put(OAuthConfig.DEFAULT_SIGN_KEY.getKey(), publicKey);
     configs.put(OAuthConfig.ALLOW_SKEW_SECONDS.getKey(), "6");

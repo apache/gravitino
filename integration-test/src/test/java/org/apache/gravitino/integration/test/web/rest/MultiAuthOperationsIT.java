@@ -76,7 +76,7 @@ public class MultiAuthOperationsIT extends AbstractIT {
   public static void startIntegrationTest() throws Exception {
     Map<String, String> configs = Maps.newHashMap();
     configs.put(
-        Configs.AUTHENTICATOR.getKey(),
+        Configs.AUTHENTICATORS.getKey(),
         String.join(
             ",",
             AuthenticatorType.KERBEROS.name().toLowerCase(),

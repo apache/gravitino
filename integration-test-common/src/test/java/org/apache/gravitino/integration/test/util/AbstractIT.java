@@ -263,7 +263,7 @@ public class AbstractIT {
     serverUri = "http://" + jettyServerConfig.getHost() + ":" + jettyServerConfig.getHttpPort();
 
     List<String> authenticators = new ArrayList<>();
-    String authenticatorStr = customConfigs.get(Configs.AUTHENTICATOR.getKey());
+    String authenticatorStr = customConfigs.get(Configs.AUTHENTICATORS.getKey());
     if (authenticatorStr != null) {
       authenticators = COMMA.splitToList(authenticatorStr);
     }

@@ -203,8 +203,23 @@ public class Configs {
               "The authenticator which Gravitino uses. Multiple authenticators "
                   + "separated by commas")
           .version(ConfigConstants.VERSION_0_3_0)
+          .deprecated()
           .stringConf()
           .createWithDefault("simple");
+
+  public static final ConfigEntry<List<String>> AUTHENTICATORS =
+      new ConfigBuilder("gravitino.authenticators")
+          .doc(
+              "The authenticators which Gravitino uses. Multiple authenticators "
+                  + "separated by commas")
+          .version(ConfigConstants.VERSION_0_6_0)
+          .stringConf()
+          .toSequence()
+          .checkValue(
+              valueList ->
+                  valueList != null && valueList.stream().allMatch(StringUtils::isNotBlank),
+              ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .createWithDefault(Lists.newArrayList("simple"));
 
   public static final ConfigEntry<Long> STORE_TRANSACTION_MAX_SKEW_TIME =
       new ConfigBuilder("gravitino.entity.store.maxTransactionSkewTimeMs")
