@@ -18,7 +18,11 @@
  */
 package org.apache.gravitino.catalog.doris.operation;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 import com.google.common.collect.Maps;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -26,17 +30,27 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import org.apache.gravitino.catalog.doris.converter.DorisTypeConverter;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
+import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
+import org.apache.gravitino.catalog.jdbc.operation.JdbcTablePartitionOperations;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.literals.Literal;
+import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.rel.partitions.ListPartition;
+import org.apache.gravitino.rel.partitions.Partition;
+import org.apache.gravitino.rel.partitions.Partitions;
+import org.apache.gravitino.rel.partitions.RangePartition;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.utils.RandomNameUtils;
@@ -48,6 +62,7 @@ import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 @Tag("gravitino-docker-test")
 public class TestDorisTableOperations extends TestDoris {
+  private static final JdbcTypeConverter TYPE_CONVERTER = new DorisTypeConverter();
   private static final Type VARCHAR_255 = Types.VarCharType.of(255);
   private static final Type VARCHAR_1024 = Types.VarCharType.of(1024);
 
@@ -111,7 +126,7 @@ public class TestDorisTableOperations extends TestDoris {
         distribution,
         indexes);
     List<String> listTables = TABLE_OPERATIONS.listTables(databaseName);
-    Assertions.assertTrue(listTables.contains(tableName));
+    assertTrue(listTables.contains(tableName));
     JdbcTable load = TABLE_OPERATIONS.load(databaseName, tableName);
     assertionsTableInfo(
         tableName, tableComment, columns, properties, indexes, Transforms.EMPTY_TRANSFORM, load);
@@ -444,7 +459,7 @@ public class TestDorisTableOperations extends TestDoris {
   }
 
   @Test
-  public void testCreateTableWithPartition() {
+  public void testCreatePartitionedTable() {
     String tableComment = "partition_table_comment";
     JdbcColumn col1 =
         JdbcColumn.builder()
@@ -469,7 +484,19 @@ public class TestDorisTableOperations extends TestDoris {
 
     // create table with range partition
     String rangePartitionTableName = GravitinoITUtils.genRandomName("range_partition_table");
-    Transform[] rangePartition = new Transform[] {Transforms.range(new String[] {col4.name()})};
+    LocalDate today = LocalDate.now();
+    LocalDate tomorrow = today.plusDays(1);
+    Literal<LocalDate> todayLiteral = Literals.dateLiteral(today);
+    Literal<LocalDate> tomorrowLiteral = Literals.dateLiteral(tomorrow);
+    RangePartition rangePartition1 = Partitions.range("p1", todayLiteral, Literals.NULL, null);
+    RangePartition rangePartition2 = Partitions.range("p2", tomorrowLiteral, todayLiteral, null);
+    RangePartition rangePartition3 = Partitions.range("p3", Literals.NULL, tomorrowLiteral, null);
+    Transform[] rangePartition =
+        new Transform[] {
+          Transforms.range(
+              new String[] {col4.name()},
+              new RangePartition[] {rangePartition1, rangePartition2, rangePartition3})
+        };
     TABLE_OPERATIONS.create(
         databaseName,
         rangePartitionTableName,
@@ -486,13 +513,49 @@ public class TestDorisTableOperations extends TestDoris {
         columns,
         Collections.emptyMap(),
         null,
-        rangePartition,
+        new Transform[] {Transforms.range(new String[] {col4.name()})},
         rangePartitionTable);
+
+    // assert partition info
+    JdbcTablePartitionOperations tablePartitionOperations =
+        new DorisTablePartitionOperations(
+            DATA_SOURCE, rangePartitionTable, JDBC_EXCEPTION_CONVERTER, TYPE_CONVERTER);
+    Map<String, RangePartition> loadedRangePartitions =
+        Arrays.stream(tablePartitionOperations.listPartitions())
+            .collect(Collectors.toMap(Partition::name, p -> (RangePartition) p));
+    assertTrue(loadedRangePartitions.containsKey("p1"));
+    RangePartition actualP1 = loadedRangePartitions.get("p1");
+    assertEquals(todayLiteral, actualP1.upper());
+    assertEquals(Literals.of("0000-01-01", Types.DateType.get()), actualP1.lower());
+    assertTrue(loadedRangePartitions.containsKey("p2"));
+    RangePartition actualP2 = loadedRangePartitions.get("p2");
+    assertEquals(tomorrowLiteral, actualP2.upper());
+    assertEquals(todayLiteral, actualP2.lower());
+    assertTrue(loadedRangePartitions.containsKey("p3"));
+    RangePartition actualP3 = loadedRangePartitions.get("p3");
+    assertEquals(Literals.of("MAXVALUE", Types.DateType.get()), actualP3.upper());
+    assertEquals(tomorrowLiteral, actualP3.lower());
 
     // create table with list partition
     String listPartitionTableName = GravitinoITUtils.genRandomName("list_partition_table");
+    Literal<Integer> integerLiteral1 = Literals.integerLiteral(1);
+    Literal<Integer> integerLiteral2 = Literals.integerLiteral(2);
+    ListPartition listPartition1 =
+        Partitions.list(
+            "p1",
+            new Literal[][] {{integerLiteral1, todayLiteral}, {integerLiteral1, tomorrowLiteral}},
+            null);
+    ListPartition listPartition2 =
+        Partitions.list(
+            "p2",
+            new Literal[][] {{integerLiteral2, todayLiteral}, {integerLiteral2, tomorrowLiteral}},
+            null);
     Transform[] listPartition =
-        new Transform[] {Transforms.list(new String[] {col1.name()}, new String[] {col4.name()})};
+        new Transform[] {
+          Transforms.list(
+              new String[][] {{col1.name()}, {col4.name()}},
+              new ListPartition[] {listPartition1, listPartition2})
+        };
     TABLE_OPERATIONS.create(
         databaseName,
         listPartitionTableName,
@@ -509,7 +572,19 @@ public class TestDorisTableOperations extends TestDoris {
         columns,
         Collections.emptyMap(),
         null,
-        listPartition,
+        new Transform[] {Transforms.list(new String[][] {{col1.name()}, {col4.name()}})},
         listPartitionTable);
+
+    // assert partition info
+    tablePartitionOperations =
+        new DorisTablePartitionOperations(
+            DATA_SOURCE, listPartitionTable, JDBC_EXCEPTION_CONVERTER, TYPE_CONVERTER);
+    Map<String, ListPartition> loadedListPartitions =
+        Arrays.stream(tablePartitionOperations.listPartitions())
+            .collect(Collectors.toMap(Partition::name, p -> (ListPartition) p, (p1, p2) -> p2));
+    assertTrue(loadedListPartitions.containsKey("p1"));
+    assertTrue(Arrays.deepEquals(listPartition1.lists(), loadedListPartitions.get("p1").lists()));
+    assertTrue(loadedListPartitions.containsKey("p2"));
+    assertTrue(Arrays.deepEquals(listPartition2.lists(), loadedListPartitions.get("p2").lists()));
   }
 }

@@ -440,7 +440,10 @@ public class SecureHadoopCatalogOperations
 
     File file = new File(filePath);
     if (file.exists()) {
-      file.delete();
+      boolean isDeleted = file.delete();
+      if (!isDeleted) {
+        LOG.error("Failed to delete file: {}", filePath);
+      }
     }
   }
 
