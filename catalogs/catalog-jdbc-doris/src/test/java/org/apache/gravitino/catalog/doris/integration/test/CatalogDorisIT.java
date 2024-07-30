@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.doris.integration.test;
 
+import static org.apache.gravitino.integration.test.util.ITUtils.assertPartition;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -67,6 +68,7 @@ import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.partitions.ListPartition;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
+import org.apache.gravitino.rel.partitions.RangePartition;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -98,6 +100,7 @@ public class CatalogDorisIT extends AbstractIT {
   public String DORIS_COL_NAME1 = "doris_col_name1";
   public String DORIS_COL_NAME2 = "doris_col_name2";
   public String DORIS_COL_NAME3 = "doris_col_name3";
+  public String DORIS_COL_NAME4 = "doris_col_name4";
 
   // Because the creation of Schema Change is an asynchronous process, we need to wait for a while
   // For more information, you can refer to the comment in
@@ -196,8 +199,9 @@ public class CatalogDorisIT extends AbstractIT {
         Column.of(DORIS_COL_NAME1, Types.IntegerType.get(), "col_1_comment", false, false, null);
     Column col2 = Column.of(DORIS_COL_NAME2, Types.VarCharType.of(10), "col_2_comment");
     Column col3 = Column.of(DORIS_COL_NAME3, Types.VarCharType.of(10), "col_3_comment");
-
-    return new Column[] {col1, col2, col3};
+    Column col4 =
+        Column.of(DORIS_COL_NAME4, Types.DateType.get(), "col_4_comment", false, false, null);
+    return new Column[] {col1, col2, col3, col4};
   }
 
   private Map<String, String> createTableProperties() {
@@ -540,29 +544,29 @@ public class CatalogDorisIT extends AbstractIT {
     tableCatalog.alterTable(
         tableIdentifier,
         TableChange.addColumn(
-            new String[] {"col_4"}, Types.VarCharType.of(255), "col_4_comment", true));
+            new String[] {"col_5"}, Types.VarCharType.of(255), "col_5_comment", true));
     Awaitility.await()
         .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
         .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
         .untilAsserted(
-            () -> assertEquals(4, tableCatalog.loadTable(tableIdentifier).columns().length));
+            () -> assertEquals(5, tableCatalog.loadTable(tableIdentifier).columns().length));
 
     ITUtils.assertColumn(
-        Column.of("col_4", Types.VarCharType.of(255), "col_4_comment"),
-        tableCatalog.loadTable(tableIdentifier).columns()[3]);
+        Column.of("col_5", Types.VarCharType.of(255), "col_5_comment"),
+        tableCatalog.loadTable(tableIdentifier).columns()[4]);
 
     // change column position
     // TODO: change column position is unstable, add it later
 
     // drop column
     tableCatalog.alterTable(
-        tableIdentifier, TableChange.deleteColumn(new String[] {"col_4"}, true));
+        tableIdentifier, TableChange.deleteColumn(new String[] {"col_5"}, true));
 
     Awaitility.await()
         .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
         .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
         .untilAsserted(
-            () -> assertEquals(3, tableCatalog.loadTable(tableIdentifier).columns().length));
+            () -> assertEquals(4, tableCatalog.loadTable(tableIdentifier).columns().length));
   }
 
   @Test
@@ -703,23 +707,11 @@ public class CatalogDorisIT extends AbstractIT {
     ListPartition p2 = Partitions.list("p2", p2Values, Collections.emptyMap());
     ListPartition p3 = Partitions.list("p3", p3Values, Collections.emptyMap());
     ListPartition p1Added = (ListPartition) tablePartitionOperations.addPartition(p1);
-    assertEquals("p1", p1Added.name());
-    assertEquals(1, p1Added.lists().length);
-    assertEquals(1, p1Added.lists()[0].length);
-    assertEquals("1", p1Added.lists()[0][0].value());
-    assertEquals(Types.IntegerType.get(), p1Added.lists()[0][0].dataType());
+    assertPartition(p1, p1Added);
     ListPartition p2Added = (ListPartition) tablePartitionOperations.addPartition(p2);
-    assertEquals("p2", p2Added.name());
-    assertEquals(1, p2Added.lists().length);
-    assertEquals(1, p2Added.lists()[0].length);
-    assertEquals("2", p2Added.lists()[0][0].value());
-    assertEquals(Types.IntegerType.get(), p2Added.lists()[0][0].dataType());
+    assertPartition(p2, p2Added);
     ListPartition p3Added = (ListPartition) tablePartitionOperations.addPartition(p3);
-    assertEquals("p3", p3Added.name());
-    assertEquals(1, p3Added.lists().length);
-    assertEquals(1, p3Added.lists()[0].length);
-    assertEquals("3", p3Added.lists()[0][0].value());
-    assertEquals(Types.IntegerType.get(), p3Added.lists()[0][0].dataType());
+    assertPartition(p3, p3Added);
 
     // check partitions
     Set<String> partitionNames =
@@ -733,43 +725,13 @@ public class CatalogDorisIT extends AbstractIT {
         Arrays.stream(tablePartitionOperations.listPartitions())
             .collect(Collectors.toMap(p -> p.name(), p -> (ListPartition) p));
     assertEquals(3, partitions.size());
-    ListPartition actualP1 = partitions.get("p1");
-    assertEquals("p1", actualP1.name());
-    assertEquals(1, actualP1.lists().length);
-    assertEquals(1, actualP1.lists()[0].length);
-    assertEquals("1", actualP1.lists()[0][0].value());
-    assertEquals(Types.IntegerType.get(), actualP1.lists()[0][0].dataType());
-    ListPartition actualP2 = partitions.get("p2");
-    assertEquals("p2", actualP2.name());
-    assertEquals(1, actualP2.lists().length);
-    assertEquals(1, actualP2.lists()[0].length);
-    assertEquals("2", actualP2.lists()[0][0].value());
-    assertEquals(Types.IntegerType.get(), actualP2.lists()[0][0].dataType());
-    ListPartition actualP3 = partitions.get("p3");
-    assertEquals("p3", actualP3.name());
-    assertEquals(1, actualP3.lists().length);
-    assertEquals(1, actualP3.lists()[0].length);
-    assertEquals("3", actualP3.lists()[0][0].value());
-    assertEquals(Types.IntegerType.get(), actualP3.lists()[0][0].dataType());
+    assertPartition(p1, partitions.get("p1"));
+    assertPartition(p2, partitions.get("p2"));
+    assertPartition(p3, partitions.get("p3"));
 
-    actualP1 = (ListPartition) tablePartitionOperations.getPartition("p1");
-    assertEquals("p1", actualP1.name());
-    assertEquals(1, actualP1.lists().length);
-    assertEquals(1, actualP1.lists()[0].length);
-    assertEquals("1", actualP1.lists()[0][0].value());
-    assertEquals(Types.IntegerType.get(), actualP1.lists()[0][0].dataType());
-    actualP2 = (ListPartition) tablePartitionOperations.getPartition("p2");
-    assertEquals("p2", actualP2.name());
-    assertEquals(1, actualP2.lists().length);
-    assertEquals(1, actualP2.lists()[0].length);
-    assertEquals("2", actualP2.lists()[0][0].value());
-    assertEquals(Types.IntegerType.get(), actualP2.lists()[0][0].dataType());
-    actualP3 = (ListPartition) tablePartitionOperations.getPartition("p3");
-    assertEquals("p3", actualP3.name());
-    assertEquals(1, actualP3.lists().length);
-    assertEquals(1, actualP3.lists()[0].length);
-    assertEquals("3", actualP3.lists()[0][0].value());
-    assertEquals(Types.IntegerType.get(), actualP3.lists()[0][0].dataType());
+    assertPartition(p1, tablePartitionOperations.getPartition("p1"));
+    assertPartition(p2, tablePartitionOperations.getPartition("p2"));
+    assertPartition(p3, tablePartitionOperations.getPartition("p3"));
 
     // drop partition
     assertTrue(tablePartitionOperations.dropPartition("p3"));
@@ -781,6 +743,124 @@ public class CatalogDorisIT extends AbstractIT {
 
     // drop non-existing partition
     assertFalse(tablePartitionOperations.dropPartition("p3"));
+  }
+
+  @Test
+  void testCreatePartitionedTable() {
+    // create a range-partitioned table with assignments
+    String tableName = GravitinoITUtils.genRandomName("test_create_range_partitioned_table");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    Column[] columns = createColumns();
+    Distribution distribution = createDistribution();
+    Index[] indexes =
+        new Index[] {
+          Indexes.of(Index.IndexType.PRIMARY_KEY, "k1_index", new String[][] {{DORIS_COL_NAME1}})
+        };
+    Map<String, String> properties = createTableProperties();
+    Literal todayLiteral = Literals.of("2024-07-24", Types.DateType.get());
+    Literal tomorrowLiteral = Literals.of("2024-07-25", Types.DateType.get());
+    RangePartition p1 = Partitions.range("p1", todayLiteral, Literals.NULL, Collections.emptyMap());
+    RangePartition p2 =
+        Partitions.range("p2", tomorrowLiteral, todayLiteral, Collections.emptyMap());
+    RangePartition p3 =
+        Partitions.range("p3", Literals.NULL, tomorrowLiteral, Collections.emptyMap());
+    Transform[] partitioning = {
+      Transforms.range(new String[] {DORIS_COL_NAME4}, new RangePartition[] {p1, p2, p3})
+    };
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        partitioning,
+        distribution,
+        null,
+        indexes);
+    Table loadedTable = tableCatalog.loadTable(tableIdentifier);
+    ITUtils.assertionsTableInfo(
+        tableName,
+        table_comment,
+        Arrays.asList(columns),
+        properties,
+        indexes,
+        new Transform[] {Transforms.range(new String[] {DORIS_COL_NAME4})},
+        loadedTable);
+
+    // assert partition info
+    SupportsPartitions tablePartitionOperations = loadedTable.supportPartitions();
+    Map<String, RangePartition> loadedRangePartitions =
+        Arrays.stream(tablePartitionOperations.listPartitions())
+            .collect(Collectors.toMap(Partition::name, p -> (RangePartition) p));
+    assertTrue(loadedRangePartitions.size() == 3);
+    assertTrue(loadedRangePartitions.containsKey("p1"));
+    assertPartition(
+        Partitions.range(
+            "p1",
+            todayLiteral,
+            Literals.of("0000-01-01", Types.DateType.get()),
+            Collections.emptyMap()),
+        loadedRangePartitions.get("p1"));
+    assertTrue(loadedRangePartitions.containsKey("p2"));
+    assertPartition(p2, loadedRangePartitions.get("p2"));
+    assertTrue(loadedRangePartitions.containsKey("p3"));
+    assertPartition(
+        Partitions.range(
+            "p3",
+            Literals.of("MAXVALUE", Types.DateType.get()),
+            tomorrowLiteral,
+            Collections.emptyMap()),
+        loadedRangePartitions.get("p3"));
+
+    // create a list-partitioned table with assignments
+    tableName = GravitinoITUtils.genRandomName("test_create_list_partitioned_table");
+    tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    Literal<Integer> integerLiteral1 = Literals.integerLiteral(1);
+    Literal<Integer> integerLiteral2 = Literals.integerLiteral(2);
+    ListPartition p4 =
+        Partitions.list(
+            "p4",
+            new Literal[][] {{integerLiteral1, todayLiteral}, {integerLiteral1, tomorrowLiteral}},
+            Collections.emptyMap());
+    ListPartition p5 =
+        Partitions.list(
+            "p5",
+            new Literal[][] {{integerLiteral2, todayLiteral}, {integerLiteral2, tomorrowLiteral}},
+            Collections.emptyMap());
+    partitioning =
+        new Transform[] {
+          Transforms.list(
+              new String[][] {{DORIS_COL_NAME1}, {DORIS_COL_NAME4}}, new ListPartition[] {p4, p5})
+        };
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        partitioning,
+        distribution,
+        null,
+        indexes);
+    loadedTable = tableCatalog.loadTable(tableIdentifier);
+    ITUtils.assertionsTableInfo(
+        tableName,
+        table_comment,
+        Arrays.asList(columns),
+        properties,
+        indexes,
+        new Transform[] {Transforms.list(new String[][] {{DORIS_COL_NAME1}, {DORIS_COL_NAME4}})},
+        loadedTable);
+
+    // assert partition info
+    tablePartitionOperations = loadedTable.supportPartitions();
+    Map<String, ListPartition> loadedListPartitions =
+        Arrays.stream(tablePartitionOperations.listPartitions())
+            .collect(Collectors.toMap(Partition::name, p -> (ListPartition) p));
+    assertTrue(loadedListPartitions.size() == 2);
+    assertTrue(loadedListPartitions.containsKey("p4"));
+    assertPartition(p4, loadedListPartitions.get("p4"));
+    assertTrue(loadedListPartitions.containsKey("p5"));
+    assertPartition(p5, loadedListPartitions.get("p5"));
   }
 
   @Test
