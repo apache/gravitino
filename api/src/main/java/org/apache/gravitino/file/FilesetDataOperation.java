@@ -21,16 +21,28 @@ package org.apache.gravitino.file;
 
 /** An enum class containing fileset data operations that supported. */
 public enum FilesetDataOperation {
+  /** This data operation means that create a new file. */
   CREATE,
+  /** This data operation means that open a file. */
   OPEN,
+  /** This data operation means that append some content into a file. */
   APPEND,
+  /** This data operation means that rename a file or a directory. */
   RENAME,
+  /** This data operation means that delete a file or a directory. */
   DELETE,
+  /** This data operation means that get a file status from a file or a directory. */
   GET_FILE_STATUS,
+  /** This data operation means that list file statuses under a directory. */
   LIST_STATUS,
+  /** This data operation means that create a directory. */
   MKDIRS,
+  /** This data operation means that get the default replication of a file system. */
   GET_DEFAULT_REPLICATION,
+  /** This data operation means that get the default block size of a file system. */
   GET_DEFAULT_BLOCK_SIZE,
+  /** This data operation means that set current working directory. */
   SET_WORKING_DIR,
+  /** This data operation means that it is an unknown data operation. */
   UNKNOWN;
 }

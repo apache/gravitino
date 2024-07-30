@@ -21,7 +21,16 @@ package org.apache.gravitino.file;
 
 /** An enum class containing fileset data operations client type that supported. */
 public enum ClientType {
+  /**
+   * The client type is `org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem` which in
+   * the filesystem-hadoop3 module.
+   */
   HADOOP_GVFS,
+  /**
+   * The client type is `gravitino.filesystem.gvfs.GravitinoVirtualFileSystem` which in the
+   * client-python module.
+   */
   PYTHON_GVFS,
+  /** The client type is unknown. */
   UNKNOWN;
 }
