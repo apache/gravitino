@@ -26,9 +26,9 @@ default storage for `JDBCBackend`.
 
 ### Prerequisites
 
-+ MySQL 5.7 or 8.0.
-+ Gravitino distribution package.
-+ MySQL connector Jar (Should be compatible with the version of MySQL instance).
+- MySQL 5.7 or 8.0.
+- Gravitino distribution package.
+- MySQL connector Jar (Should be compatible with the version of MySQL instance).
 
 ### Step 1: Get the initialization script
 

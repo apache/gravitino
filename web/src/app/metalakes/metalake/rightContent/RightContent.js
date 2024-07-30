@@ -48,7 +48,7 @@ const RightContent = () => {
       <Box
         className={`twc-py-3 twc-px-5 twc-flex twc-items-center twc-justify-between`}
         sx={{
-          borderBottom: theme => `1px solid ${theme.palette.divider}`
+          borderBottom: theme => `1px solid ${theme.palette.divider}`,
         }}
       >
         <Box className={`twc-flex twc-items-center twc-flex-1 twc-overflow-hidden twc-mr-2`}>

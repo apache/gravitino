@@ -144,13 +144,13 @@ export const updateTreeData = (list = [], key, children = []) => {
     if (node.key === key) {
       return {
         ...node,
-        children
+        children,
       }
     }
     if (node.children) {
       return {
         ...node,
-        children: updateTreeData(node.children, key, children)
+        children: updateTreeData(node.children, key, children),
       }
     }
 

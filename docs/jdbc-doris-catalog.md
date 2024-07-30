@@ -2,9 +2,9 @@
 title: "Apache Doris catalog"
 slug: /jdbc-doris-catalog
 keywords:
-- jdbc
-- Apache Doris
-- metadata
+  - jdbc
+  - Apache Doris
+  - metadata
 license: "This software is licensed under the Apache License version 2."
 ---
 
@@ -42,7 +42,7 @@ more details.
 Besides the [common catalog properties](./gravitino-server-config.md#gravitino-catalog-properties-configuration), the Doris catalog has the following properties:
 
 | Configuration item   | Description                                                                         | Default value | Required | Since Version |
-|----------------------|-------------------------------------------------------------------------------------|---------------|----------|---------------|
+| -------------------- | ----------------------------------------------------------------------------------- | ------------- | -------- | ------------- |
 | `jdbc-url`           | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:9030` | (none)        | Yes      | 0.5.0         |
 | `jdbc-driver`        | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver`.            | (none)        | Yes      | 0.5.0         |
 | `jdbc-user`          | The JDBC user name.                                                                 | (none)        | Yes      | 0.5.0         |
@@ -85,7 +85,7 @@ Please refer to
 #### Table column types
 
 | Gravitino Type | Doris Type |
-|----------------|------------|
+| -------------- | ---------- |
 | `Boolean`      | `Boolean`  |
 | `Byte`         | `TinyInt`  |
 | `Short`        | `SmallInt` |
@@ -118,31 +118,31 @@ Unsupported for now.
 
 - Supports PRIMARY_KEY
 
-    Please be aware that the index can only apply to a single column.
+  Please be aware that the index can only apply to a single column.
 
     <Tabs groupId='language' queryString>
     <TabItem value="json" label="Json">
 
-    ```json
-    {
-      "indexes": [
-        {
-          "indexType": "primary_key",
-          "name": "PRIMARY",
-          "fieldNames": [["id"]]
-        }
-      ]
-    }
-    ```
+  ```json
+  {
+    "indexes": [
+      {
+        "indexType": "primary_key",
+        "name": "PRIMARY",
+        "fieldNames": [["id"]]
+      }
+    ]
+  }
+  ```
 
     </TabItem>
     <TabItem value="java" label="Java">
 
-    ```java
-    Index[] indexes = new Index[] {
-        Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}})
-    }
-    ```
+  ```java
+  Index[] indexes = new Index[] {
+      Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}})
+  }
+  ```
 
     </TabItem>
     </Tabs>
@@ -166,11 +166,11 @@ Gravitino supports these table alteration operations:
 
 Please be aware that:
 
- - Not all table alteration operations can be processed in batches.
- - Schema changes, such as adding/modifying/dropping columns can be processed in batches.
- - Supports modifying multiple column comments at the same time.
- - Doesn't support modifying the column type and column comment at the same time.
- - The schema alteration in Doris is asynchronous. You might get an outdated schema if you
-   execute a schema query immediately after the alteration. It is recommended to pause briefly
-   after the schema alteration. Gravitino will add the schema alteration status into
-   the schema information in the upcoming version to solve this problem.
+- Not all table alteration operations can be processed in batches.
+- Schema changes, such as adding/modifying/dropping columns can be processed in batches.
+- Supports modifying multiple column comments at the same time.
+- Doesn't support modifying the column type and column comment at the same time.
+- The schema alteration in Doris is asynchronous. You might get an outdated schema if you
+  execute a schema query immediately after the alteration. It is recommended to pause briefly
+  after the schema alteration. Gravitino will add the schema alteration status into
+  the schema information in the upcoming version to solve this problem.

@@ -18,9 +18,7 @@
 #
 
 ---
-
 paths:
-
   /metalakes/{metalake}/catalogs:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
@@ -106,9 +104,9 @@ paths:
                   - code
                 properties:
                   code:
-                      type: integer
-                      format: int32
-                      description: Status code of the response
+                    type: integer
+                    format: int32
+                    description: Status code of the response
                   type:
                     type: string
                     description: Internal type definition of the exception
@@ -122,9 +120,7 @@ paths:
                       description: The stack trace of the exception
               examples:
                 TestConnectionSuccess:
-                  value: {
-                    "code": 0
-                  }
+                  value: { "code": 0 }
                 TestConnectionFailed:
                   $ref: "#/components/examples/ConnectionFailedException"
                 CatalogAlreadyExists:
@@ -135,8 +131,6 @@ paths:
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
-
-
 
   /metalakes/{metalake}/catalogs/{catalog}:
     parameters:
@@ -192,14 +186,14 @@ paths:
                 NoSuchCatalogException:
                   $ref: "#/components/examples/NoSuchCatalogException"
         "409":
-            description: Conflict - The target catalog already exists in the specified metalake
-            content:
-              application/vnd.gravitino.v1+json:
-                schema:
-                  $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-                examples:
-                  CatalogAlreadyExistsException:
-                    $ref: "#/components/examples/CatalogAlreadyExistsException"
+          description: Conflict - The target catalog already exists in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                CatalogAlreadyExistsException:
+                  $ref: "#/components/examples/CatalogAlreadyExistsException"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -216,8 +210,6 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
-
-
 components:
   parameters:
     details:
@@ -230,7 +222,6 @@ components:
         default: false
 
   schemas:
-
     Catalog:
       type: object
       description: A catalog
@@ -268,7 +259,7 @@ components:
         properties:
           type: object
           description: Configured string to string map of properties for the catalog
-          default: { }
+          default: {}
           additionalProperties:
             type: string
 
@@ -334,7 +325,7 @@ components:
           type: object
           description: A map of properties for the catalog
           nullable: true
-          default: { }
+          default: {}
           additionalProperties:
             type: string
 
@@ -375,10 +366,7 @@ components:
         newName:
           type: string
           description: The new name of the catalog
-      example: {
-        "@type": "rename",
-        "newName": "my_catalog_new"
-      }
+      example: { "@type": "rename", "newName": "my_catalog_new" }
 
     UpdateCatalogCommentRequest:
       type: object
@@ -393,10 +381,11 @@ components:
         newComment:
           type: string
           description: The new comment of the catalog
-      example: {
-        "@type": "updateComment",
-        "newComment": "This is my new catalog comment"
-      }
+      example:
+        {
+          "@type": "updateComment",
+          "newComment": "This is my new catalog comment",
+        }
 
     SetCatalogPropertyRequest:
       type: object
@@ -415,11 +404,7 @@ components:
         value:
           type: string
           description: The value to set
-      example: {
-        "@type": "setProperty",
-        "property": "key1",
-        "value": "value1"
-      }
+      example: { "@type": "setProperty", "property": "key1", "value": "value1" }
 
     RemoveCatalogPropertyRequest:
       type: object
@@ -434,14 +419,9 @@ components:
         property:
           type: string
           description: The property to remove
-      example: {
-        "@type": "removeProperty",
-        "property": "key2"
-      }
-
+      example: { "@type": "removeProperty", "property": "key2" }
 
   responses:
-
     CatalogResponse:
       description: Returns included catalog object
       content:
@@ -461,117 +441,123 @@ components:
             CatalogResponse:
               $ref: "#/components/examples/CatalogResponse"
 
-
   examples:
     CatalogListResponse:
-      value: {
-        "code": 0,
-        "identifiers": [
-          {
-            "namespace": [
-              "my_metalake"
-            ],
-            "name": "my_hive_catalog"
-          }
-        ]
-      }
+      value:
+        {
+          "code": 0,
+          "identifiers":
+            [{ "namespace": ["my_metalake"], "name": "my_hive_catalog" }],
+        }
 
     CatalogInfoListResponse:
-      value: {
-        "code": 0,
-        "catalogs": [
-          {
-            "name": "my_hive_catalog",
-            "type": "relational",
-            "provider": "hive",
-            "comment": "This is my hive catalog",
-            "properties": {
-              "key1": "value1",
-              "gravitino.bypass.hive.metastore.client.capability.check": "false",
-              "metastore.uris": "thrift://127.0.0.1:9083"
-            },
-            "audit": {
-              "creator": "gravitino",
-              "createTime": "2023-12-08T03:41:25.595Z"
-            }
-          },
-          {
-            "name": "my_hadoop_catalog",
-            "type": "fileset",
-            "provider": "hadoop",
-            "comment": "This is my hadoop catalog",
-            "properties": {
-              "key2": "value2"
-            },
-            "audit": {
-              "creator": "gravitino",
-              "createTime": "2023-12-08T06:41:25.595Z"
-            }
-          }
-        ]
-      }
+      value:
+        {
+          "code": 0,
+          "catalogs":
+            [
+              {
+                "name": "my_hive_catalog",
+                "type": "relational",
+                "provider": "hive",
+                "comment": "This is my hive catalog",
+                "properties":
+                  {
+                    "key1": "value1",
+                    "gravitino.bypass.hive.metastore.client.capability.check": "false",
+                    "metastore.uris": "thrift://127.0.0.1:9083",
+                  },
+                "audit":
+                  {
+                    "creator": "gravitino",
+                    "createTime": "2023-12-08T03:41:25.595Z",
+                  },
+              },
+              {
+                "name": "my_hadoop_catalog",
+                "type": "fileset",
+                "provider": "hadoop",
+                "comment": "This is my hadoop catalog",
+                "properties": { "key2": "value2" },
+                "audit":
+                  {
+                    "creator": "gravitino",
+                    "createTime": "2023-12-08T06:41:25.595Z",
+                  },
+              },
+            ],
+        }
 
     CatalogCreate:
-      value: {
-        "name": "my_hive_catalog",
-        "type": "relational",
-        "provider": "hive",
-        "comment": "This is my hive catalog",
-        "properties": {
-          "metastore.uris": "thrift://127.0.0.1:9083",
-          "key1": "value1"
-        }
-      }
-
-    CatalogResponse:
-      value: {
-        "code": 0,
-        "catalog": {
+      value:
+        {
           "name": "my_hive_catalog",
           "type": "relational",
           "provider": "hive",
           "comment": "This is my hive catalog",
-          "properties": {
-            "key1": "value1",
-            "gravitino.bypass.hive.metastore.client.capability.check": "false",
-            "metastore.uris": "thrift://127.0.0.1:9083"
-          },
-          "audit": {
-            "creator": "gravitino",
-            "createTime": "2023-12-08T03:41:25.595Z"
-          }
+          "properties":
+            { "metastore.uris": "thrift://127.0.0.1:9083", "key1": "value1" },
         }
-      }
+
+    CatalogResponse:
+      value:
+        {
+          "code": 0,
+          "catalog":
+            {
+              "name": "my_hive_catalog",
+              "type": "relational",
+              "provider": "hive",
+              "comment": "This is my hive catalog",
+              "properties":
+                {
+                  "key1": "value1",
+                  "gravitino.bypass.hive.metastore.client.capability.check": "false",
+                  "metastore.uris": "thrift://127.0.0.1:9083",
+                },
+              "audit":
+                {
+                  "creator": "gravitino",
+                  "createTime": "2023-12-08T03:41:25.595Z",
+                },
+            },
+        }
 
     CatalogAlreadyExistsException:
-      value: {
-        "code": 1004,
-        "type": "CatalogAlreadyExistsException",
-        "message": "Failed to operate catalog(s) [my_catalog] operation [CREATE], reason [CatalogAlreadyExistsException]",
-        "stack": [
-          "org.apache.gravitino.exceptions.CatalogAlreadyExistsException: Catalog my_catalog already exists",
-          "..."
-        ]
-      }
+      value:
+        {
+          "code": 1004,
+          "type": "CatalogAlreadyExistsException",
+          "message": "Failed to operate catalog(s) [my_catalog] operation [CREATE], reason [CatalogAlreadyExistsException]",
+          "stack":
+            [
+              "org.apache.gravitino.exceptions.CatalogAlreadyExistsException: Catalog my_catalog already exists",
+              "...",
+            ],
+        }
 
     ConnectionFailedException:
-      value: {
-        "code": 1007,
-        "type": "ConnectionFailedException",
-        "message": "Failed to run getAllDatabases in Hive Metastore: Failed to connect to Hive Metastore",
-        "stack": [
-          "org.apache.gravitino.exceptions.ConnectionFailedException: Failed to run getAllDatabases in Hive Metastore: Failed to connect to Hive Metastore",
-          "..."
-        ]
-      }
+      value:
+        {
+          "code": 1007,
+          "type": "ConnectionFailedException",
+          "message": "Failed to run getAllDatabases in Hive Metastore: Failed to connect to Hive Metastore",
+          "stack":
+            [
+              "org.apache.gravitino.exceptions.ConnectionFailedException: Failed to run getAllDatabases in Hive Metastore: Failed to connect to Hive Metastore",
+              "...",
+            ],
+        }
 
     NoSuchCatalogException:
-      value: {
-        "code": 1003,
-        "type": "NoSuchCatalogException",
-        "message": "Failed to operate catalog(s) [test] operation [LOAD] under metalake [my_test_metalake], reason [NoSuchCatalogException]",
-        "stack": [
-          "org.apache.gravitino.exceptions.NoSuchCatalogException: Catalog my_test_metalake.test does not exist",
-          "..."
-        ]
-      }
+      value:
+        {
+          "code": 1003,
+          "type": "NoSuchCatalogException",
+          "message": "Failed to operate catalog(s) [test] operation [LOAD] under metalake [my_test_metalake], reason [NoSuchCatalogException]",
+          "stack":
+            [
+              "org.apache.gravitino.exceptions.NoSuchCatalogException: Catalog my_test_metalake.test does not exist",
+              "...",
+            ],
+        }

@@ -1,9 +1,8 @@
 name: Feature Request
 title: "[FEATURE] "
 description: Suggest an idea for Gravitino
-labels: [ "feature" ]
+labels: ["feature"]
 body:
-
   - type: textarea
     attributes:
       label: Describe the feature

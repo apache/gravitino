@@ -30,7 +30,7 @@ const TextWrapper = styled(Typography)(({ theme }) => ({
   mixWidth: '120px',
   overflow: 'hidden',
   textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap'
+  whiteSpace: 'nowrap',
 }))
 
 const Text = props => {
@@ -47,7 +47,7 @@ const MetalakePath = props => {
     schema: searchParams.get('schema'),
     table: searchParams.get('table'),
     fileset: searchParams.get('fileset'),
-    topic: searchParams.get('topic')
+    topic: searchParams.get('topic'),
   }
 
   const { metalake, catalog, type, schema, table, fileset, topic } = routeParams
@@ -71,7 +71,7 @@ const MetalakePath = props => {
         mt: 0,
         '& a': { display: 'flex', alignItems: 'center' },
         '& ol': {
-          flexWrap: 'nowrap'
+          flexWrap: 'nowrap',
         },
         '& ol > li.MuiBreadcrumbs-li': {
           overflow: 'hidden',
@@ -79,14 +79,14 @@ const MetalakePath = props => {
           '& > a': {
             width: '100%',
             '& > svg': {
-              minWidth: 20
-            }
-          }
+              minWidth: 20,
+            },
+          },
         },
         '& ol > li:last-of-type': {
           color: theme => `${theme.palette.text.primary} !important`,
-          overflow: 'hidden'
-        }
+          overflow: 'hidden',
+        },
       }}
     >
       {metalake && (

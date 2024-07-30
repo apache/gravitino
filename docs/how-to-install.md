@@ -18,12 +18,12 @@ Before installing Gravitino, make sure you have the Gravitino binary distributio
 download the latest Gravitino binary distribution package from [GitHub](https://github.com/apache/gravitino/releases),
 or you can build it yourself by following the instructions in [How to Build Gravitino](./how-to-build.md).
 
-  - If you build Gravitino yourself using the `./gradlew compileDistribution` command, you can find the
-Gravitino binary distribution package in the `distribution/package` directory.
+- If you build Gravitino yourself using the `./gradlew compileDistribution` command, you can find the
+  Gravitino binary distribution package in the `distribution/package` directory.
 
-  - If you build Gravitino yourself using the `./gradlew assembleDistribution` command, you can get the
-compressed Gravitino binary distribution package with the name `gravitino-<version>-bin.tar.gz` in the
-`distribution` directory with sha256 checksum file `gravitino-<version>-bin.tar.gz.sha256`.
+- If you build Gravitino yourself using the `./gradlew assembleDistribution` command, you can get the
+  compressed Gravitino binary distribution package with the name `gravitino-<version>-bin.tar.gz` in the
+  `distribution` directory with sha256 checksum file `gravitino-<version>-bin.tar.gz.sha256`.
 
 The Gravitino binary distribution package contains the following files:
 

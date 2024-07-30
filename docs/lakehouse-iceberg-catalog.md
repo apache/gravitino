@@ -33,7 +33,7 @@ Builds with Hadoop 2.10.x, there may be compatibility issues when accessing Hado
 ### Catalog properties
 
 | Property name                                      | Description                                                                                                                                                                                     | Default value          | Required                                                    | Since Version |
-|----------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------|-------------------------------------------------------------|---------------|
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- | ----------------------------------------------------------- | ------------- |
 | `catalog-backend`                                  | Catalog backend of Gravitino Iceberg catalog. Supports `hive` or `jdbc` or `rest`.                                                                                                              | (none)                 | Yes                                                         | 0.2.0         |
 | `uri`                                              | The URI configuration of the Iceberg catalog. `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db` or `http://127.0.0.1:9001`. | (none)                 | Yes                                                         | 0.2.0         |
 | `warehouse`                                        | Warehouse directory of catalog. `file:///user/hive/warehouse-hive/` for local fs or `hdfs://namespace/hdfs/path` for HDFS.                                                                      | (none)                 | Yes                                                         | 0.2.0         |
@@ -45,20 +45,18 @@ Builds with Hadoop 2.10.x, there may be compatibility issues when accessing Hado
 | `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Iceberg catalog.                                                                                                                                  | 60                     | No                                                          | 0.6.0         |
 | `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                                                                                                      | 60                     | No                                                          | 0.6.0         |
 
-
 Any properties not defined by Gravitino with `gravitino.bypass.` prefix will pass to Iceberg catalog properties and HDFS configuration. For example, if specify `gravitino.bypass.list-all-tables`, `list-all-tables` will pass to Iceberg catalog properties.
 
 When you use the Gravitino with Trino. You can pass the Trino Iceberg connector configuration using prefix `trino.bypass.`. For example, using `trino.bypass.iceberg.table-statistics-enabled` to pass the `iceberg.table-statistics-enabled` to the Gravitino Iceberg catalog in Trino runtime.
 
 When you use the Gravitino with Spark. You can pass the Spark Iceberg connector configuration using prefix `spark.bypass.`. For example, using `spark.bypass.io-impl` to pass the `io-impl` to the Spark Iceberg connector in Spark runtime.
 
-
 #### JDBC catalog
 
 If you are using JDBC catalog, you must provide `jdbc-user`, `jdbc-password` and `jdbc-driver` to catalog properties.
 
 | Property name     | Description                                                                                             | Default value | Required | Since Version |
-|-------------------|---------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| ----------------- | ------------------------------------------------------------------------------------------------------- | ------------- | -------- | ------------- |
 | `jdbc-user`       | JDBC user name                                                                                          | (none)        | Yes      | 0.2.0         |
 | `jdbc-password`   | JDBC password                                                                                           | (none)        | Yes      | 0.2.0         |
 | `jdbc-driver`     | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL | (none)        | Yes      | 0.3.0         |
@@ -74,7 +72,7 @@ You must download the corresponding JDBC driver to the `catalogs/lakehouse-icebe
 
 Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
 
-## Schema 
+## Schema
 
 ### Schema capabilities
 
@@ -88,7 +86,7 @@ You could put properties except `comment`.
 
 Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
 
-## Table 
+## Table
 
 ### Table capabilities
 
@@ -98,13 +96,13 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 
 Supports transforms:
 
-  - `IdentityTransform`
-  - `BucketTransform`
-  - `TruncateTransform`
-  - `YearTransform`
-  - `MonthTransform`
-  - `DayTransform`
-  - `HourTransform`
+- `IdentityTransform`
+- `BucketTransform`
+- `TruncateTransform`
+- `YearTransform`
+- `MonthTransform`
+- `DayTransform`
+- `HourTransform`
 
 :::info
 Iceberg doesn't support multi fields in `BucketTransform`.
@@ -165,6 +163,7 @@ Distributions.NONE;
   "expressions": []
 }
 ```
+
 </TabItem>
 <TabItem value="java" label="Java">
 
@@ -208,7 +207,7 @@ Apache Iceberg doesn't support Gravitino `EvenDistribution` type.
 ### Table column types
 
 | Gravitino Type              | Apache Iceberg Type         |
-|-----------------------------|-----------------------------|
+| --------------------------- | --------------------------- |
 | `Sturct`                    | `Struct`                    |
 | `Map`                       | `Map`                       |
 | `Array`                     | `Array`                     |
@@ -238,16 +237,16 @@ You can pass [Iceberg table properties](https://web.archive.org/web/202312100135
 
 The Gravitino server doesn't allow passing the following reserved fields.
 
-| Configuration item              | Description                                             |
-|---------------------------------|---------------------------------------------------------|
-| `comment`                       | The table comment.                                      |
-| `creator`                       | The table creator.                                      |
-| `location`                      | Iceberg location for table storage.                     |
-| `current-snapshot-id`           | The snapshot represents the current state of the table. |
-| `cherry-pick-snapshot-id`       | Selecting a specific snapshot in a merge operation.     |
-| `sort-order`                    | Selecting a specific snapshot in a merge operation.     |
-| `identifier-fields`             | The identifier fields for defining the table.           |
-| `write.distribution-mode`       | Defines distribution of write data                      |
+| Configuration item        | Description                                             |
+| ------------------------- | ------------------------------------------------------- |
+| `comment`                 | The table comment.                                      |
+| `creator`                 | The table creator.                                      |
+| `location`                | Iceberg location for table storage.                     |
+| `current-snapshot-id`     | The snapshot represents the current state of the table. |
+| `cherry-pick-snapshot-id` | Selecting a specific snapshot in a merge operation.     |
+| `sort-order`              | Selecting a specific snapshot in a merge operation.     |
+| `identifier-fields`       | The identifier fields for defining the table.           |
+| `write.distribution-mode` | Defines distribution of write data                      |
 
 ### Table indexes
 

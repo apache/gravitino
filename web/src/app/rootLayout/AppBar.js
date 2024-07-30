@@ -34,7 +34,7 @@ import {
   FormControl,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
 } from '@mui/material'
 
 import clsx from 'clsx'
@@ -117,14 +117,14 @@ const AppBar = () => {
                             key={item}
                             data-refer={'select-option-' + item}
                             sx={{
-                              maxWidth: 240
+                              maxWidth: 240,
                             }}
                             onClick={() => router.push('/metalakes?metalake=' + item)}
                           >
                             <Box
                               sx={{
                                 overflow: 'hidden',
-                                textOverflow: 'ellipsis'
+                                textOverflow: 'ellipsis',
                               }}
                             >
                               {item}

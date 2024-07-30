@@ -20,7 +20,7 @@ Install Git and Docker Compose.
 The playground runs a number of services. The TCP ports used may clash with existing services you run, such as MySQL or Postgres.
 
 | Docker container      | Ports used     |
-|-----------------------|----------------|
+| --------------------- | -------------- |
 | playground-gravitino  | 8090 9001      |
 | playground-hive       | 3307 9000 9083 |
 | playground-mysql      | 3306           |
@@ -103,7 +103,7 @@ contains the following code snippets:
 
 ```shell
 docker exec -it playground-trino bash
-````
+```
 
 2. Open the Trino CLI in the container.
 
@@ -221,7 +221,7 @@ insert into customers (customer_id, customer_name, customer_email) values (12,'J
 ```
 
 2. Login Trino container and execute the steps.
-You can get all the customers from both the Hive and Iceberg table.
+   You can get all the customers from both the Hive and Iceberg table.
 
 ```shell
 docker exec -it playground-trino bash

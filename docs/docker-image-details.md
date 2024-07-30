@@ -22,20 +22,20 @@ docker run --rm -d -p 8090:8090 -p 9001:9001 datastrato/gravitino
 Changelog
 
 - gravitino:0.5.1
+
   - Based on Gravitino 0.5.1, you can know more information from 0.5.1 release notes.
 
-
 - gravitino:0.5.0
+
   - Based on Gravitino 0.5.0, you can know more information from 0.5.0 release notes.
 
-
 - gravitino:0.4.0
+
   - Based on Gravitino 0.4.0, you can know more information from 0.4.0 release notes.
 
-
 - gravitino:0.3.1
-  - Fix some issues
 
+  - Fix some issues
 
 - gravitino:0.3.0
   - Docker image `datastrato/gravitino:0.3.0`
@@ -67,20 +67,20 @@ Changelog
 Changelog
 
 - trino:435-gravitino-0.5.1
+
   - Based on Gravitino 0.5.1, you can know more information from 0.5.1 release notes.
 
-
 - trino:426-gravitino-0.5.0
+
   - Based on Gravitino 0.5.0, you can know more information from 0.5.0 release notes.
 
-
 - trino:426-gravitino-0.4.0
+
   - Based on Gravitino 0.4.0, you can know more information from 0.4.0 release notes.
 
-
 - trino:426-gravitino-0.3.1
-  - Fix some issues
 
+  - Fix some issues
 
 - trino:426-gravitino-0.3.0
   - Docker image `datastrato/trino:426-gravitino-0.3.0`
@@ -96,30 +96,36 @@ You can use these kinds of Docker images to facilitate integration testing of al
 You can use this kind of image to test the catalog of Apache Hive with kerberos enable
 
 Changelog
+
 - gravitino-ci-kerberos-hive:0.1.5
+
   - Start another HMS for the Hive cluster in the container with port 19083. This is to test whether Kerberos authentication works for a Kerberos-enabled Hive cluster with multiple HMS.
   - Refresh ssh keys in the startup script.
   - Add test logic to log in localhost via ssh without password.
 
 - gravitino-ci-kerberos-hive:0.1.4
+
   - Increase the total check time for the status of DataNode to 150s.
   - Output the log of the DataNode fails to start
 
 - gravitino-ci-kerberos-hive:0.1.3
+
   - Add more proxy users in the core-site.xml file.
   - fix bugs in the `start.sh` script.
 
 - gravitino-ci-kerberos-hive:0.1.2
+
   - Add `${HOSTNAME} >> /root/.ssh/known_hosts` to the startup script.
   - Add check for the status of DataNode, if the DataNode is not running or ready within 100s, the container will exit.
 
 - gravitino-ci-kerberos-hive:0.1.1
+
   - Add a principal for Gravitino web server named 'HTTP/localhost@HADOOPKRB'.
-  - Fix bugs about the configuration of proxy users. 
+  - Fix bugs about the configuration of proxy users.
 
 - gravitino-ci-kerberos-hive:0.1.0
-    - Set up a Hive cluster with kerberos enabled.
-    - Install a KDC server and create a principal for Hive. For more please see [kerberos-hive](../dev/docker/kerberos-hive)
+  - Set up a Hive cluster with kerberos enabled.
+  - Install a KDC server and create a principal for Hive. For more please see [kerberos-hive](../dev/docker/kerberos-hive)
 
 ## Apache Gravitino CI Apache Hive image
 
@@ -128,6 +134,7 @@ You can use this kind of image to test the catalog of Apache Hive.
 Changelog
 
 - gravitino-ci-hive:0.1.13
+
   - Support Hive 2.3.9 and HDFS 2.7.3
     - Docker environment variables:
       - `HIVE_RUNTIME_VERSION`: `hive2` (default)
@@ -142,51 +149,63 @@ Changelog
     - Example: docker run -e HIVE_RUNTIME_VERSION='hive3' -e RANGER_SERVER_URL='http://ranger-server:6080' -e RANGER_HIVE_REPOSITORY_NAME='hiveDev' -e RANGER_HDFS_REPOSITORY_NAME='hdfsDev' ... datastrato/gravitino-ci-hive:0.1.13
 
 - gravitino-ci-hive:0.1.12
+
   - Shrink hive Docker image size by 420MB
 
 - gravitino-ci-hive:0.1.11
+
   - Remove `yarn` from the startup script; Remove `yarn-site.xml` and `yarn-env.sh` files;
-  - Change the value of `mapreduce.framework.name` from `yarn` to `local` in the `mapred-site.xml` file. 
+  - Change the value of `mapreduce.framework.name` from `yarn` to `local` in the `mapred-site.xml` file.
 
 - gravitino-ci-hive:0.1.10
+
   - Remove SSH service from the startup script.
   - Use `hadoop-daemon.sh` to start HDFS services.
 
 - gravitino-ci-hive:0.1.9
+
   - Remove cache after installing packages.
 
 - gravitino-ci-hive:0.1.8
+
   - Change the value of `hive.server2.enable.doAs` to `true`
 
 - gravitino-ci-hive:0.1.7
+
   - Download MySQL JDBC driver before building the Docker image
   - Set `hdfs` as HDFS superuser group
 
 - gravitino-ci-hive:0.1.6
+
   - No starting YARN when container startup
   - Removed expose ports:
     - `22` SSH
     - `8088` YARN Service
 
 - gravitino-ci-hive:0.1.5
+
   - Rollback `Map container hostname to 127.0.0.1 before starting Hadoop` of `datastrato/gravitino-ci-hive:0.1.4`
 
 - gravitino-ci-hive:0.1.4
+
   - Configure HDFS DataNode data transfer address to be `0.0.0.0:50010`
   - Map the container hostname to `127.0.0.1` before starting Hadoop
   - Expose `50010` port for the HDFS DataNode
 
 - gravitino-ci-hive:0.1.3
+
   - Change MySQL bind-address from `127.0.0.1` to `0.0.0.0`
   - Add `iceberg` to MySQL users with password `iceberg`
   - Export `3306` port for MySQL
 
 - gravitino-ci-hive:0.1.2
+
   - Based on `datastrato/gravitino-ci-hive:0.1.1`
   - Modify `fs.defaultFS` from `local` to `0.0.0.0` in the `core-site.xml` file.
   - Expose `9000` port in the `Dockerfile` file.
 
 - gravitino-ci-hive:0.1.1
+
   - Based on `datastrato/gravitino-ci-hive:0.1.0`
   - Modify HDFS/YARN/HIVE `MaxPermSize` from `8GB` to `128MB`
   - Modify `HADOOP_HEAPSIZE` from `8192` to `128`
@@ -213,18 +232,23 @@ You can use this image to test Trino.
 Changelog
 
 - gravitino-ci-trino:0.1.6
+
   - Upgrade trino:426 to trino:435
 
 - gravitino-ci-trino:0.1.5
+
   - Add check for the version of gravitino-trino-connector
 
 - gravitino-ci-trino:0.1.4
+
   - Change `-Xmx1G` to `-Xmx2G` in the config file `/etc/trino/jvm.config`
 
 - gravitino-ci-trino:0.1.3
+
   - Remove copy content in folder `gravitino-trino-connector` to plugin folder `/usr/lib/trino/plugin/gravitino`
 
 - gravitino-ci-trino:0.1.2
+
   - Copy JDBC driver 'mysql-connector-java' and 'postgres' to `/usr/lib/trino/iceberg/` folder
 
 - gravitino-ci-trino:0.1.0
@@ -238,20 +262,26 @@ Changelog
 You can use this image to test Apache Doris.
 
 Changelog
+
 - gravitino-ci-doris:0.1.5
+
   - Remove the chmod command in the Dockerfile to decrease the size of the Docker image.
 
 - gravitino-ci-doris:0.1.4
+
   - remove chmod in start.sh to accelerate the startup speed
 
 - gravitino-ci-doris:0.1.3
-  - To adapt to the CI framework, don't exit container when start failed, logs are no longer printed to stdout. 
+
+  - To adapt to the CI framework, don't exit container when start failed, logs are no longer printed to stdout.
   - Add `report_disk_state_interval_seconds` config to decrease report interval.
 
 - gravitino-ci-doris:0.1.2
+
   - Add a check for the status of Doris BE, add retry for adding BE nodes.
 
 - gravitino-ci-doris:0.1.1
+
   - Optimize `start.sh`, add disk space check before starting Doris, exit when FE or BE start failed, add log to stdout
 
 - gravitino-ci-doris:0.1.0
@@ -270,6 +300,7 @@ You can use this image to control Trino's permissions.
 Changelog
 
 - gravitino-ci-ranger:0.1.1
+
   - Docker image datastrato/gravitino-ci-ranger:0.1.1
   - Use `ranger-admin` release from `datastrato/apache-ranger:2.4.0` to build docker image.
   - Remove unnecessary hack in `start-ranger-service.sh`.

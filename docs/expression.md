@@ -24,9 +24,7 @@ The following is an example of creating a field reference expression, demonstrat
 [
   {
     "type": "field",
-    "fieldName": [
-      "student"
-    ]
+    "fieldName": ["student"]
   }
 ]
 ```
@@ -116,9 +114,7 @@ The following is an example of creating a function expression, demonstrating how
       },
       {
         "type": "field",
-        "fieldName": [
-          "birthday"
-        ]
+        "fieldName": ["birthday"]
       }
     ]
   }

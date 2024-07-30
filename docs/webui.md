@@ -1,11 +1,11 @@
 ---
-title: 'Apache Gravitino web UI'
+title: "Apache Gravitino web UI"
 slug: /webui
 keyword: webui
 last_update:
   date: 2024-04-12
   author: ch3yne
-license: 'This software is licensed under the Apache License version 2.'
+license: "This software is licensed under the Apache License version 2."
 ---
 
 This document primarily outlines how users can manage metadata within Apache Gravitino using the web UI, the graphical interface is accessible through a web browser as an alternative to writing code or using the REST interface.
@@ -150,9 +150,9 @@ Creating a catalog requires these fields:
 1. **Catalog name**(**_required_**): the name of the catalog
 2. **Type**(**_required_**): `relational`/`fileset`/`messaging`, the default value is `relational`
 3. **Provider**(**_required_**):
-    1. Type `relational` - `hive`/`iceberg`/`mysql`/`postgresql`/`doris`
-    2. Type `fileset` - `hadoop`
-    3. Type `messaging` - `kafka`
+   1. Type `relational` - `hive`/`iceberg`/`mysql`/`postgresql`/`doris`
+   2. Type `fileset` - `hadoop`
+   3. Type `messaging` - `kafka`
 4. **Comment**(_optional_): the comment of this catalog
 5. **Properties**(**each `provider` must fill in the required property fields specifically**)
 

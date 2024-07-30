@@ -25,7 +25,7 @@ import { getIconsCSS } from '@iconify/utils'
 
 const SVGs = {
   dir: 'src/lib/icons/svg',
-  prefix: 'custom-icons'
+  prefix: 'custom-icons',
 }
 
 const target = path.join(__dirname, 'iconify-icons.css')
@@ -34,7 +34,7 @@ const target = path.join(__dirname, 'iconify-icons.css')
   const icons = []
 
   const iconSet = await importDirectory(SVGs.dir, {
-    prefix: SVGs.prefix
+    prefix: SVGs.prefix,
   })
 
   await iconSet.forEach(async name => {
@@ -71,7 +71,7 @@ const target = path.join(__dirname, 'iconify-icons.css')
 ${icons
   .map(iconSet =>
     getIconsCSS(iconSet, Object.keys(iconSet.icons), {
-      iconSelector: '.{prefix}-{name}'
+      iconSelector: '.{prefix}-{name}',
     })
   )
   .join('\n')}

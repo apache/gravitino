@@ -44,7 +44,7 @@ license: "This software is licensed under the Apache License version 2."
 
 - A collection of metadata from a specific metadata source.
 
-## Catalog provider 
+## Catalog provider
 
 - The specific system or technology used to store and manage metadata catalogs.
 
@@ -202,13 +202,13 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Java Toolchain
 
-- A feature introduced in Gradle to detect and manage JDK versions. 
+- A feature introduced in Gradle to detect and manage JDK versions.
 
 ## JDBC URI
 
 - The JDBC connection address specified in the catalog configuration, including details such as the database type, host, port, and database name.
 
-## JMX 
+## JMX
 
 - Java Management Extensions provides tools for managing and monitoring Java applications.
 
@@ -220,15 +220,15 @@ license: "This software is licensed under the Apache License version 2."
 
 - A compact, URL-safe means of representing claims between two parties.
 
-##  Java Virtual Machine (JVM)
+## Java Virtual Machine (JVM)
 
 - A virtual machine that enables a computer to run Java applications, providing an abstraction layer between the application and the underlying hardware.
 
-## JVM metrics 
+## JVM metrics
 
 - Metrics related to the performance and behavior of the Java Virtual Machine (JVM), including memory usage, garbage collection, and buffer pool metrics.
 
-## JVM instrumentation 
+## JVM instrumentation
 
 - The process of adding monitoring and management capabilities to the Java Virtual Machine, allowing for the collection of performance metrics.
 
@@ -366,7 +366,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Trino Apache Gravitino connector documentation
 
--  Documentation providing information on using the Trino connector to access metadata in Gravitino.
+- Documentation providing information on using the Trino connector to access metadata in Gravitino.
 
 ## Ubuntu
 

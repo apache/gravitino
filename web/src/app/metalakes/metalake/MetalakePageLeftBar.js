@@ -26,7 +26,7 @@ import Loading from '@/app/rootLayout/Loading'
 
 const DynamicMetalakeTree = dynamic(() => import('./MetalakeTree'), {
   loading: () => <Loading />,
-  ssr: false
+  ssr: false,
 })
 
 const MetalakePageLeftBar = () => {

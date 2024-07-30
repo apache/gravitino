@@ -26,10 +26,10 @@ export const filesetProviders = [
         key: 'location',
         value: '',
         required: false,
-        description: 'The storage location of the fileset'
-      }
-    ]
-  }
+        description: 'The storage location of the fileset',
+      },
+    ],
+  },
 ]
 
 export const messagingProviders = [
@@ -41,10 +41,10 @@ export const messagingProviders = [
         key: 'bootstrap.servers',
         value: '',
         required: true,
-        description: 'The Apache Kafka brokers to connect to, allowing for multiple brokers separated by commas'
-      }
-    ]
-  }
+        description: 'The Apache Kafka brokers to connect to, allowing for multiple brokers separated by commas',
+      },
+    ],
+  },
 ]
 
 export const providers = [
@@ -56,9 +56,9 @@ export const providers = [
         key: 'metastore.uris',
         value: '',
         required: true,
-        description: 'The Apache Hive metastore URIs'
-      }
-    ]
+        description: 'The Apache Hive metastore URIs',
+      },
+    ],
   },
   {
     label: 'Apache Iceberg',
@@ -69,40 +69,40 @@ export const providers = [
         value: 'hive',
         required: true,
         description: 'Apache Iceberg catalog type choose properties',
-        select: ['hive', 'jdbc']
+        select: ['hive', 'jdbc'],
       },
       {
         key: 'uri',
         value: '',
         required: true,
-        description: 'Apache Iceberg catalog uri config'
+        description: 'Apache Iceberg catalog uri config',
       },
       {
         key: 'warehouse',
         value: '',
         required: true,
-        description: 'Apache Iceberg catalog warehouse config'
+        description: 'Apache Iceberg catalog warehouse config',
       },
       {
         key: 'jdbc-driver',
         value: '',
         required: true,
         hide: 'hive',
-        description: `"com.mysql.jdbc.Driver" or "com.mysql.cj.jdbc.Driver" for MySQL, "org.postgresql.Driver" for PostgreSQL`
+        description: `"com.mysql.jdbc.Driver" or "com.mysql.cj.jdbc.Driver" for MySQL, "org.postgresql.Driver" for PostgreSQL`,
       },
       {
         key: 'jdbc-user',
         value: '',
         required: true,
-        hide: 'hive'
+        hide: 'hive',
       },
       {
         key: 'jdbc-password',
         value: '',
         required: true,
-        hide: 'hive'
-      }
-    ]
+        hide: 'hive',
+      },
+    ],
   },
   {
     label: 'MySQL',
@@ -112,25 +112,25 @@ export const providers = [
         key: 'jdbc-driver',
         value: '',
         required: true,
-        description: 'e.g. com.mysql.jdbc.Driver or com.mysql.cj.jdbc.Driver'
+        description: 'e.g. com.mysql.jdbc.Driver or com.mysql.cj.jdbc.Driver',
       },
       {
         key: 'jdbc-url',
         value: '',
         required: true,
-        description: 'e.g. jdbc:mysql://localhost:3306'
+        description: 'e.g. jdbc:mysql://localhost:3306',
       },
       {
         key: 'jdbc-user',
         value: '',
-        required: true
+        required: true,
       },
       {
         key: 'jdbc-password',
         value: '',
-        required: true
-      }
-    ]
+        required: true,
+      },
+    ],
   },
   {
     label: 'PostgreSQL',
@@ -140,30 +140,30 @@ export const providers = [
         key: 'jdbc-driver',
         value: '',
         required: true,
-        description: 'e.g. org.postgresql.Driver'
+        description: 'e.g. org.postgresql.Driver',
       },
       {
         key: 'jdbc-url',
         value: '',
         required: true,
-        description: 'e.g. jdbc:postgresql://localhost:5432/your_database'
+        description: 'e.g. jdbc:postgresql://localhost:5432/your_database',
       },
       {
         key: 'jdbc-user',
         value: '',
-        required: true
+        required: true,
       },
       {
         key: 'jdbc-password',
         value: '',
-        required: true
+        required: true,
       },
       {
         key: 'jdbc-database',
         value: '',
-        required: true
-      }
-    ]
+        required: true,
+      },
+    ],
   },
   {
     label: 'Apache Doris',
@@ -173,24 +173,24 @@ export const providers = [
         key: 'jdbc-driver',
         value: '',
         required: true,
-        description: 'e.g. com.mysql.jdbc.Driver'
+        description: 'e.g. com.mysql.jdbc.Driver',
       },
       {
         key: 'jdbc-url',
         value: '',
         required: true,
-        description: 'e.g. jdbc:mysql://localhost:9030'
+        description: 'e.g. jdbc:mysql://localhost:9030',
       },
       {
         key: 'jdbc-user',
         value: '',
-        required: true
+        required: true,
       },
       {
         key: 'jdbc-password',
         value: '',
-        required: true
-      }
-    ]
-  }
+        required: true,
+      },
+    ],
+  },
 ]

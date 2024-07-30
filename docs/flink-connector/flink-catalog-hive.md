@@ -11,7 +11,7 @@ With the Apache Gravitino Flink connector, accessing data or managing metadata i
 
 Supports most DDL and DML operations in Flink SQL, except such operations:
 
-- Function operations 
+- Function operations
 - Partition operations
 - View operations
 - Querying UDF
@@ -25,11 +25,10 @@ Supports most DDL and DML operations in Flink SQL, except such operations:
 
 ## Requirement
 
-* Hive metastore 2.x
-* HDFS 2.x or 3.x
+- Hive metastore 2.x
+- HDFS 2.x or 3.x
 
 ## SQL example
-
 
 ```sql
 
@@ -60,7 +59,7 @@ Gravitino catalog property names with the prefix `flink.bypass.` are passed to F
 The validated catalog properties are listed below. Any other properties with the prefix `flink.bypass.` in Gravitino Catalog will be ignored by Gravitino Flink Connector.
 
 | Property name in Gravitino catalog properties | Flink Hive connector configuration | Description           | Since Version |
-|-----------------------------------------------|------------------------------------|-----------------------|---------------|
+| --------------------------------------------- | ---------------------------------- | --------------------- | ------------- |
 | `flink.bypass.default-database`               | `default-database`                 | Hive default database | 0.6.0         |
 | `flink.bypass.hive-conf-dir`                  | `hive-conf-dir`                    | Hive conf dir         | 0.6.0         |
 | `flink.bypass.hive-version`                   | `hive-version`                     | Hive version          | 0.6.0         |

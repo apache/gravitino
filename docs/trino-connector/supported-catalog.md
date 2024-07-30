@@ -14,7 +14,7 @@ The catalogs currently supported by the Apache Gravitino connector are as follow
 
 ## Create catalog
 
-Users can create catalogs through the Gravitino connector and then load them into Trino. 
+Users can create catalogs through the Gravitino connector and then load them into Trino.
 The Gravitino connector provides the following stored procedures to create, delete, and alter catalogs.
 User can also use the system table `catalog` to describe all the catalogs.
 
@@ -30,11 +30,11 @@ create_catalog(CATALOG varchar, PROVIDER varchar, PROPERTIES MAP(VARCHAR, VARCHA
 - IGNORE_EXIST: The flag to ignore the error if the catalog already exists. It's optional, the default value is `false`.
 
 The type of catalog properties reference:
+
 - [Hive catalog](../apache-hive-catalog.md#catalog-properties)
 - [Iceberg catalog](../lakehouse-iceberg-catalog.md#catalog-properties)
 - [MySQL catalog](../jdbc-mysql-catalog.md#catalog-properties)
 - [PostgreSQL catalog](../jdbc-postgresql-catalog.md#catalog-properties)
-
 
 Drop catalog:
 
@@ -44,7 +44,6 @@ drop_catalog(CATALOG varchar, IGNORE_NOT_EXIST boolean);
 
 - CATALOG: The catalog name to be deleted.
 - IGNORE_NOT_EXIST: The flag to ignore the error if the catalog does not exist. It's optional, the default value is `false`.
-
 
 Alter catalog:
 
@@ -58,7 +57,6 @@ alter_catalog(CATALOG varchar, SET_PROPERTIES MAP(VARCHAR, VARCHAR), REMOVE_PROP
 
 These stored procedures are under the `gravitino` connector and the `system` schema.
 So you need to use the following SQL to call them in the `trino-cli`:
-
 
 Describe catalogs:
 
@@ -121,6 +119,7 @@ if you need more information about catalog, please refer to:
 [Create a Catalog](../manage-relational-metadata-using-gravitino.md#create-a-catalog).
 
 ## Passing Trino connector configuration
+
 A Gravitino catalog is implemented by the Trino connector, so you can pass the Trino connector configuration to the Gravitino catalog.
 For example, you want to set the `hive.config.resources` configuration for the Hive catalog, you can pass the configuration to the
 Gravitino catalog like this:
@@ -139,6 +138,7 @@ call gravitino.system.create_catalog(
 A prefix with `trino.bypass.` in the configuration key is used to indicate Gravitino connector to pass the Trino connector configuration to the Gravitino catalog in the Trino runtime.
 
 More trino connector configurations can refer to:
+
 - [Hive catalog](https://trino.io/docs/current/connector/hive.html#hive-general-configuration-properties)
 - [Iceberg catalog](https://trino.io/docs/current/connector/iceberg.html#general-configuration)
 - [MySQL catalog](https://trino.io/docs/current/connector/mysql.html#general-configuration-properties)
@@ -150,7 +150,7 @@ Gravitino connector supports the following data type conversions between Trino a
 Hive does not support `TIME` data type.
 
 | Gravitino Type | Trino Type |
-|----------------|------------|
+| -------------- | ---------- |
 | BooleanType    | BOOLEAN    |
 | ByteType       | TINYINT    |
 | ShortType      | SMALLINT   |

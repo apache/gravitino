@@ -54,8 +54,8 @@ GravitinoMetalake newMetalake = gravitinoAdminClient.createMetalake(
 
 ```python
 gravitino_admin_client: GravitinoAdminClient = GravitinoAdminClient(uri="http://localhost:8090")
-gravitino_admin_client.create_metalake(name="metalake", 
-                                       comment="This is a new metalake", 
+gravitino_admin_client.create_metalake(name="metalake",
+                                       comment="This is a new metalake",
                                        properties={})
 ```
 
@@ -147,16 +147,14 @@ metalake = gravitino_admin_client.alter_metalake("metalake_name", *changes)
 </TabItem>
 </Tabs>
 
-
 Currently, Gravitino supports the following changes to a metalake:
 
-| Supported modification | JSON                                                         | Java                                            |
-|------------------------|--------------------------------------------------------------|-------------------------------------------------|
-| Rename metalake        | `{"@type":"rename","newName":"metalake_renamed"}`            | `MetalakeChange.rename("metalake_renamed")`     |
-| Update comment         | `{"@type":"updateComment","newComment":"new_comment"}`       | `MetalakeChange.updateComment("new_comment")`   |
-| Set a property         | `{"@type":"setProperty","property":"key1","value":"value1"}` | `MetalakeChange.setProperty("key1", "value1")`  |
-| Remove a property      | `{"@type":"removeProperty","property":"key1"}`               | `MetalakeChange.removeProperty("key1")`         |
-
+| Supported modification | JSON                                                         | Java                                           |
+| ---------------------- | ------------------------------------------------------------ | ---------------------------------------------- |
+| Rename metalake        | `{"@type":"rename","newName":"metalake_renamed"}`            | `MetalakeChange.rename("metalake_renamed")`    |
+| Update comment         | `{"@type":"updateComment","newComment":"new_comment"}`       | `MetalakeChange.updateComment("new_comment")`  |
+| Set a property         | `{"@type":"setProperty","property":"key1","value":"value1"}` | `MetalakeChange.setProperty("key1", "value1")` |
+| Remove a property      | `{"@type":"removeProperty","property":"key1"}`               | `MetalakeChange.removeProperty("key1")`        |
 
 ### Drop a metalake
 
@@ -190,7 +188,7 @@ gravitino_admin_client.drop_metalake("metalake")
 </Tabs>
 
 :::note
-Current Gravitino doesn't support dropping a metalake in cascade mode, which means all the 
+Current Gravitino doesn't support dropping a metalake in cascade mode, which means all the
 catalogs, schemas and tables under the metalake need to be removed before dropping the metalake.
 :::
 

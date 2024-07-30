@@ -77,10 +77,11 @@ To stop and start a local Gravitino server via `bin/gravitino.sh start` and `bin
 
 4. To find the SDK location, run this command in WSL:
 
-    **On Ubuntu (WSL):**
-    ```sh
-    which java
-    ```
+   **On Ubuntu (WSL):**
+
+   ```sh
+   which java
+   ```
 
 IntelliJ IDEA is an integrated development environment (IDE) for Java development. Setting the project SDK ensures that IntelliJ uses the correct Java version for building and running the project.
 
@@ -104,17 +105,17 @@ Installing the WSL extension in VSCode allows you to open and edit files in your
 
 1. Add VSCode path to the environment variables. The default installation path for VSCode is usually:
 
-    ```plaintext
-    C:\Users\<Your-Username>\AppData\Local\Programs\Microsoft VS Code\bin
-    ```
+   ```plaintext
+   C:\Users\<Your-Username>\AppData\Local\Programs\Microsoft VS Code\bin
+   ```
 
-    Replace `<Your-Username>` with your actual Windows username.
+   Replace `<Your-Username>` with your actual Windows username.
 
-    Example:
+   Example:
 
-    ```plaintext
-    C:\Users\epic\AppData\Local\Programs\Microsoft VS Code\bin
-    ```
+   ```plaintext
+   C:\Users\epic\AppData\Local\Programs\Microsoft VS Code\bin
+   ```
 
 Adding VSCode to the environment variables ensures that you can open VSCode from any command prompt or terminal window.
 
@@ -148,7 +149,7 @@ Running `code --version` verifies that the `code` command is available. Using `c
    code .
    ```
 
-  This command will open the current WSL directory in VSCode on Windows. If you haven't added `code` to your path, follow these steps:
+This command will open the current WSL directory in VSCode on Windows. If you haven't added `code` to your path, follow these steps:
 
 - Open VSCode on Windows.
 
@@ -169,19 +170,19 @@ Running `code --version` verifies that the `code` command is available. Using `c
 If you ran into a memory issue when using WSL, here are some solutions to resolve it.
 
 1. **Shut down WSL**  
-   If your WSL is open, you can shut it down in Windows PowerShell using the following command:  
+   If your WSL is open, you can shut it down in Windows PowerShell using the following command:
 
    ```powershell
    wsl --shutdown
    ```
 
-2. **Navigate to user folder**  
+2. **Navigate to user folder**
 
    Open up File Explorer and navigate to `C:\Users\<your-username>`.
 
-3. **Create the `.wslconfig` file**  
+3. **Create the `.wslconfig` file**
 
-   Open up Notepad or another text editor and input the following:  
+   Open up Notepad or another text editor and input the following:
 
    ```plaintext
    [wsl2]
@@ -189,9 +190,9 @@ If you ran into a memory issue when using WSL, here are some solutions to resolv
    processors=4 # Makes the WSL 2 VM use four virtual processors
    ```
 
-   *The memory and processor usage can be changed depending on your system's hardware.*
+   _The memory and processor usage can be changed depending on your system's hardware._
 
-4. **Save the file**  
+4. **Save the file**
 
    Save the file as `".wslconfig"`. Be sure to include the quotes to let Windows know that this isn't a text file.
 

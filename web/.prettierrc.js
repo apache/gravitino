@@ -33,5 +33,5 @@ module.exports = {
   htmlWhitespaceSensitivity: 'css',
   insertPragma: false,
   bracketSameLine: false,
-  proseWrap: 'preserve'
+  proseWrap: 'preserve',
 }

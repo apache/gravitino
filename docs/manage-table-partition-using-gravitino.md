@@ -19,12 +19,12 @@ Although many catalogs inherently manage partitions automatically, there are sce
 
 The following table shows the partition operations supported across various catalogs in Gravitino:
 
-| Operation             | Hive catalog | Iceberg catalog                                                               | Jdbc-Mysql catalog | Jdbc-PostgreSQL catalog |
-|-----------------------|--------------|-------------------------------------------------------------------------------|--------------------|-------------------------|
-| Add Partition         | &#10004;     | &#10008;                                                                      | &#10008;           | &#10008;                |
-| Get Partition by Name | &#10004;     | &#10008;                                                                      | &#10008;           | &#10008;                |
-| List Partition Names  | &#10004;     | &#10008;                                                                      | &#10008;           | &#10008;                |
-| List Partitions       | &#10004;     | &#10008;                                                                      | &#10008;           | &#10008;                |
+| Operation             | Hive catalog | Iceberg catalog                                                           | Jdbc-Mysql catalog | Jdbc-PostgreSQL catalog |
+| --------------------- | ------------ | ------------------------------------------------------------------------- | ------------------ | ----------------------- |
+| Add Partition         | &#10004;     | &#10008;                                                                  | &#10008;           | &#10008;                |
+| Get Partition by Name | &#10004;     | &#10008;                                                                  | &#10008;           | &#10008;                |
+| List Partition Names  | &#10004;     | &#10008;                                                                  | &#10008;           | &#10008;                |
+| List Partitions       | &#10004;     | &#10008;                                                                  | &#10008;           | &#10008;                |
 | Drop Partition        | &#10004;     | &#128640;([Coming Soon](https://github.com/apache/gravitino/issues/1655)) | &#10008;           | &#10008;                |
 
 :::tip[WELCOME FEEDBACK]
@@ -38,7 +38,7 @@ If you need additional partition management support for a specific catalog, plea
 You must match the partition types you want to add with the table's [partitioning](./table-partitioning-bucketing-sort-order-indexes.md#table-partitioning) types; Gravitino currently supports adding the following partition types:
 
 | Partition Type | Description                                                                                                                                    |
-|----------------|------------------------------------------------------------------------------------------------------------------------------------------------|
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | identity       | An identity partition represents a result of identity [partitioning](./table-partitioning-bucketing-sort-order-indexes.md#table-partitioning). |
 | range          | A range partition represents a result of range [partitioning](./table-partitioning-bucketing-sort-order-indexes.md#table-partitioning).        |
 | list           | A list partition represents a result of list [partitioning](./table-partitioning-bucketing-sort-order-indexes.md#table-partitioning).          |
@@ -52,14 +52,7 @@ For JSON examples:
 {
   "type": "identity",
   "name": "dt=2008-08-08/country=us",
-  "fieldNames": [
-    [
-      "dt"
-    ],
-    [
-      "country"
-    ]
-  ],
+  "fieldNames": [["dt"], ["country"]],
   "values": [
     {
       "type": "literal",
@@ -253,7 +246,7 @@ GravitinoClient gravitinoClient = GravitinoClient
     .build();
 
 // Assume that you have a partitioned table named "metalake.catalog.schema.table".
-Partition addedPartition = 
+Partition addedPartition =
     gravitinoClient
         .loadCatalog("catalog")
         .asTableCatalog()
@@ -298,7 +291,7 @@ GravitinoClient gravitinoClient = GravitinoClient
     .build();
 
 // Assume that you have a partitioned table named "metalake.catalog.schema.table".
-Partition Partition = 
+Partition Partition =
     gravitinoClient
         .loadCatalog("catalog")
         .asTableCatalog()
@@ -334,7 +327,7 @@ GravitinoClient gravitinoClient = GravitinoClient
     .build();
 
 // Assume that you have a partitioned table named "metalake.catalog.schema.table".
-String[] partitionNames = 
+String[] partitionNames =
     gravitinoClient
         .loadCatalog("catalog")
         .asTableCatalog()
@@ -405,7 +398,7 @@ GravitinoClient gravitinoClient = GravitinoClient
     .build();
 
 // Assume that you have a partitioned table named "metalake.catalog.schema.table".
-Partition Partition = 
+Partition Partition =
     gravitinoClient
         .loadCatalog("catalog")
         .asTableCatalog()

@@ -5,18 +5,19 @@ keyword: gravitino connector trino
 license: "This software is licensed under the Apache License version 2."
 ---
 
-The MySQL catalog allows querying and creating tables in an external MySQL instance. 
+The MySQL catalog allows querying and creating tables in an external MySQL instance.
 You can join data between different systems like MySQL and Hive, or between two different MySQL instances by this.
 
 ## Requirements
 
 To connect to MySQL, you need:
+
 - MySQL 5.7, 8.0 or higher.
 - Network access from the Trino coordinator and workers to MySQL. Port 3306 is the default port.
 
 ## Create table
 
-At present, the Apache Gravitino connector only supports basic MySQL table creation statements, which involve fields, null allowances, and comments. 
+At present, the Apache Gravitino connector only supports basic MySQL table creation statements, which involve fields, null allowances, and comments.
 However, it does not support advanced features like primary keys, indexes, default values, and auto-increment.
 
 The Gravitino connector does not support `CREATE TABLE AS SELECT`.
@@ -24,6 +25,7 @@ The Gravitino connector does not support `CREATE TABLE AS SELECT`.
 ## Alter table
 
 Support for the following alter table operations:
+
 - Rename table
 - Add a column
 - Drop a column
@@ -44,7 +46,7 @@ MySQL's tables and schemas cannot support properties.
 You need to do the following steps before you can use the MySQL catalog in Trino through Gravitino.
 
 - Create a metalake and catalog in Gravitino. Assuming that the metalake name is `test` and the catalog name is `mysql_test`,
-then you can use the following code to create them in Gravitino:
+  then you can use the following code to create them in Gravitino:
 
 ```bash
 curl -X POST -H "Content-Type: application/json" \
@@ -77,7 +79,7 @@ Use the Trino CLI to connect to the Trino container and run a query.
 
 Listing all Gravitino managed catalogs:
 
-```sql 
+```sql
 SHOW CATALOGS;
 ```
 
@@ -95,7 +97,7 @@ The results are similar to:
 Query 20231017_082503_00018_6nt3n, FINISHED, 1 node
 ```
 
-The `gravitino` catalog is a catalog defined By Trino catalog configuration. 
+The `gravitino` catalog is a catalog defined By Trino catalog configuration.
 The `test.mysql_test` catalog is the catalog created by you in Gravitino.
 Other catalogs are regular user-configured Trino catalogs.
 

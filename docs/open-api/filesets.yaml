@@ -19,9 +19,7 @@
 #
 
 ---
-
 paths:
-
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
@@ -68,7 +66,6 @@ paths:
                   $ref: "#/components/examples/FilesetAlreadyExistsException"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
-
 
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets/{fileset}:
     parameters:
@@ -160,9 +157,7 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
-
 components:
-
   schemas:
     Fileset:
       type: object
@@ -190,7 +185,7 @@ components:
           nullable: true
           default: {}
           additionalProperties:
-              type: string
+            type: string
     FilesetCreateRequest:
       type: object
       required:
@@ -209,7 +204,8 @@ components:
           nullable: true
         storageLocation:
           type: string
-          description: The location of the fileset. If the storage location of managed fileset is empty, it will \
+          description:
+            The location of the fileset. If the storage location of managed fileset is empty, it will \
             use the location of namespace. The storage location of external fileset must be set.
           nullable: true
         properties:
@@ -218,7 +214,7 @@ components:
           nullable: true
           default: {}
           additionalProperties:
-              type: string
+            type: string
 
     FilesetUpdatesRequest:
       type: object
@@ -254,14 +250,11 @@ components:
           type: string
           description: The type of the update
           enum:
-              - rename
+            - rename
         newName:
           type: string
           description: The new name of the fileset
-      example: {
-        "@type": "rename",
-        "newName": "newName"
-      }
+      example: { "@type": "rename", "newName": "newName" }
 
     SetFilesetPropertyRequest:
       type: object
@@ -281,11 +274,7 @@ components:
         value:
           type: string
           description: The value of the property to set
-      example: {
-        "@type": "setProperty",
-        "property": "key",
-        "value": "value"
-      }
+      example: { "@type": "setProperty", "property": "key", "value": "value" }
 
     UpdateFilesetCommentRequest:
       type: object
@@ -301,10 +290,7 @@ components:
         newComment:
           type: string
           description: The new comment of the fileset
-      example: {
-        "@type": "updateComment",
-        "newComment": "new comment"
-      }
+      example: { "@type": "updateComment", "newComment": "new comment" }
 
     RemoveFilesetPropertyRequest:
       type: object
@@ -320,10 +306,7 @@ components:
         property:
           type: string
           description: The property to remove
-      example: {
-        "@type": "removeProperty",
-        "property": "key1"
-      }
+      example: { "@type": "removeProperty", "property": "key1" }
 
     RemoveFilesetCommentRequest:
       type: object
@@ -335,9 +318,7 @@ components:
           description: The type of the update
           enum:
             - removeComment
-      example: {
-        "@type": "removeComment"
-      }
+      example: { "@type": "removeComment" }
 
   responses:
     FilesetResponse:
@@ -359,51 +340,46 @@ components:
             FilesetResponse:
               $ref: "#/components/examples/FilesetResponse"
 
-
   examples:
     FilesetCreateRequest:
-      value: {
-        "name": "fileset1",
-        "type": "managed",
-        "comment": "This is a comment",
-        "storageLocation": "s3://bucket/path",
-        "properties": {
-          "key1": "value1",
-          "key2": "value2"
-        }
-      }
-
-    FilesetResponse:
-      value: {
-        "code": 0,
-        "fileset" : {
+      value:
+        {
           "name": "fileset1",
           "type": "managed",
           "comment": "This is a comment",
-          "storageLocation": "hdfs://host/user/s_fileset/schema/fileset1",
-          "properties": {
-            "key1": "value1",
-            "key2": "value2"
-          }
+          "storageLocation": "s3://bucket/path",
+          "properties": { "key1": "value1", "key2": "value2" },
         }
-      }
+
+    FilesetResponse:
+      value:
+        {
+          "code": 0,
+          "fileset":
+            {
+              "name": "fileset1",
+              "type": "managed",
+              "comment": "This is a comment",
+              "storageLocation": "hdfs://host/user/s_fileset/schema/fileset1",
+              "properties": { "key1": "value1", "key2": "value2" },
+            },
+        }
 
     FilesetAlreadyExistsException:
-      value: {
-        "code": 1004,
-        "type": "FilesetAlreadyExistsException",
-        "message": "Fileset already exists",
-        "stack": [
-            "java.lang.FilesetAlreadyExistsException: Fileset already exists"
-        ]
-      }
+      value:
+        {
+          "code": 1004,
+          "type": "FilesetAlreadyExistsException",
+          "message": "Fileset already exists",
+          "stack":
+            ["java.lang.FilesetAlreadyExistsException: Fileset already exists"],
+        }
 
     NoSuchFilesetException:
-      value: {
-        "code": 1003,
-        "type": "NoSuchFilesetException",
-        "message": "Fileset does not exist",
-        "stack": [
-            "java.lang.NoSuchFilesetException: Fileset does not exist"
-        ]
-      }
+      value:
+        {
+          "code": 1003,
+          "type": "NoSuchFilesetException",
+          "message": "Fileset does not exist",
+          "stack": ["java.lang.NoSuchFilesetException: Fileset does not exist"],
+        }

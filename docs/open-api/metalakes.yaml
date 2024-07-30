@@ -17,12 +17,9 @@
 # under the License.
 #
 
-
 ---
-
 paths:
   /metalakes:
-
     get:
       tags:
         - metalake
@@ -129,8 +126,7 @@ paths:
                 MetalakeAlreadyExistsException:
                   $ref: "#/components/examples/MetalakeAlreadyExistsException"
         "500":
-          description:
-            Internal server error. It is possible that the server
+          description: Internal server error. It is possible that the server
             encountered a storage issue.
           content:
             application/vnd.gravitino.v1+json:
@@ -152,9 +148,7 @@ paths:
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
 components:
-
   schemas:
-
     MetalakeCreateRequest:
       type: object
       required:
@@ -212,10 +206,7 @@ components:
         newName:
           type: string
           description: The new name of the metalake
-      example: {
-        "@type": "rename",
-        "newName": "my_metalake_new"
-      }
+      example: { "@type": "rename", "newName": "my_metalake_new" }
 
     UpdateMetalakeCommentRequest:
       type: object
@@ -230,10 +221,11 @@ components:
         newComment:
           type: string
           description: The new comment of the metalake
-      example: {
-        "@type": "updateComment",
-        "newComment": "This is my new metalake comment"
-      }
+      example:
+        {
+          "@type": "updateComment",
+          "newComment": "This is my new metalake comment",
+        }
 
     SetMetalakePropertyRequest:
       type: object
@@ -252,11 +244,8 @@ components:
         value:
           type: string
           description: The value to set
-      example: {
-        "@type": "setProperty",
-        "property": "key1",
-        "value": "value1_new"
-      }
+      example:
+        { "@type": "setProperty", "property": "key1", "value": "value1_new" }
 
     RemoveMetalakePropertyRequest:
       type: object
@@ -271,10 +260,7 @@ components:
         property:
           type: string
           description: The property to remove
-      example: {
-        "@type": "removeProperty",
-        "property": "key2"
-      }
+      example: { "@type": "removeProperty", "property": "key2" }
 
     Metalake:
       type: object
@@ -298,25 +284,27 @@ components:
         properties:
           type: object
           description: Configured string to string map of properties for the Metalake
-          default: { }
+          default: {}
           additionalProperties:
             type: string
-      example: {
-        "name": "my_metalake",
-        "comment": "This is my metalake",
-        "properties": {
-          "key1": "value1",
-          "key2": "value2",
-          "gravitino.identifier": "gravitino.v1.uid4516733622157792920"
-        },
-        "audit": {
-          "creator": "gravitino",
-          "createTime": "2023-12-07T14:04:17.349Z"
+      example:
+        {
+          "name": "my_metalake",
+          "comment": "This is my metalake",
+          "properties":
+            {
+              "key1": "value1",
+              "key2": "value2",
+              "gravitino.identifier": "gravitino.v1.uid4516733622157792920",
+            },
+          "audit":
+            {
+              "creator": "gravitino",
+              "createTime": "2023-12-07T14:04:17.349Z",
+            },
         }
-      }
 
   responses:
-
     ListMetalakesResponse:
       description: Returns a list of all metalakes.
       content:
@@ -357,52 +345,58 @@ components:
               $ref: "#/components/examples/MetalakeResponse"
 
   examples:
-
     MetalakeAlreadyExistsException:
-      value: {
-        "code": 1004,
-        "type": "MetalakeAlreadyExistsException",
-        "message": "Failed to operate metalake(s) [my_metalake] operation [CREATE], reason [MetalakeAlreadyExistsException]",
-        "stack": [
-          "org.apache.gravitino.exceptions.MetalakeAlreadyExistsException: Metalake my_metalake already exists",
-          "..."
-        ]
-      }
+      value:
+        {
+          "code": 1004,
+          "type": "MetalakeAlreadyExistsException",
+          "message": "Failed to operate metalake(s) [my_metalake] operation [CREATE], reason [MetalakeAlreadyExistsException]",
+          "stack":
+            [
+              "org.apache.gravitino.exceptions.MetalakeAlreadyExistsException: Metalake my_metalake already exists",
+              "...",
+            ],
+        }
 
     NoSuchMetalakeException:
-      value: {
-        "code": 1003,
-        "type": "NoSuchMetalakeException",
-        "message": "Failed to operate metalake(s) [test] operation [LOAD], reason [NoSuchMetalakeException]",
-        "stack": [
-          "org.apache.gravitino.exceptions.NoSuchMetalakeException: Metalake test does not exist",
-          "..." ]
-      }
+      value:
+        {
+          "code": 1003,
+          "type": "NoSuchMetalakeException",
+          "message": "Failed to operate metalake(s) [test] operation [LOAD], reason [NoSuchMetalakeException]",
+          "stack":
+            [
+              "org.apache.gravitino.exceptions.NoSuchMetalakeException: Metalake test does not exist",
+              "...",
+            ],
+        }
 
     MetalakeCreate:
-      value: {
-        "name": "my_metalake",
-        "comment": "This is my metalake",
-        "properties": {
-          "key1": "value1",
-          "key2": "value2"
-        }
-      }
-
-    MetalakeResponse:
-      value: {
-        "code": 0,
-        "metalake": {
+      value:
+        {
           "name": "my_metalake",
           "comment": "This is my metalake",
-          "properties": {
-            "key1": "value1",
-            "key2": "value2",
-            "gravitino.identifier": "gravitino.v1.uid2062071866014250017"
-          },
-          "audit": {
-            "creator": "gravitino",
-            "createTime": "2023-12-06T14:21:24.982Z"
-          }
+          "properties": { "key1": "value1", "key2": "value2" },
         }
-      }
+
+    MetalakeResponse:
+      value:
+        {
+          "code": 0,
+          "metalake":
+            {
+              "name": "my_metalake",
+              "comment": "This is my metalake",
+              "properties":
+                {
+                  "key1": "value1",
+                  "key2": "value2",
+                  "gravitino.identifier": "gravitino.v1.uid2062071866014250017",
+                },
+              "audit":
+                {
+                  "creator": "gravitino",
+                  "createTime": "2023-12-06T14:21:24.982Z",
+                },
+            },
+        }

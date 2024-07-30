@@ -31,7 +31,7 @@ import {
   TableRow,
   TableCell,
   TableContainer,
-  Tooltip
+  Tooltip,
 } from '@mui/material'
 
 import Icon from '@/components/Icon'
@@ -69,7 +69,7 @@ const DetailsDrawer = props => {
         const propsData = Object.keys(drawerData.properties).map(item => {
           return {
             key: item,
-            value: JSON.stringify(drawerData.properties[item]).replace(/^"|"$/g, '')
+            value: JSON.stringify(drawerData.properties[item]).replace(/^"|"$/g, ''),
           }
         })
 
@@ -92,9 +92,9 @@ const DetailsDrawer = props => {
         sx: {
           width: {
             xs: 300,
-            sm: 400
-          }
-        }
+            sm: 400,
+          },
+        },
       }}
     >
       <Box
@@ -102,7 +102,7 @@ const DetailsDrawer = props => {
         sx={{
           p: theme => theme.spacing(3, 4),
           borderBottom: theme => `1px solid ${theme.palette.divider}`,
-          backgroundColor: theme => theme.palette.background.default
+          backgroundColor: theme => theme.palette.background.default,
         }}
       >
         <Typography variant='h6'>Details</Typography>
@@ -117,7 +117,7 @@ const DetailsDrawer = props => {
             className={'twc-py-2 twc-font-semibold twc-text-[1.2rem] twc-w-full twc-overflow-hidden twc-text-ellipsis'}
             sx={{
               borderBottom: theme => `1px solid ${theme.palette.divider}`,
-              whiteSpace: 'nowrap'
+              whiteSpace: 'nowrap',
             }}
             data-refer='details-title'
           >
@@ -186,7 +186,7 @@ const DetailsDrawer = props => {
             <Table>
               <TableHead
                 sx={{
-                  backgroundColor: theme => theme.palette.action.hover
+                  backgroundColor: theme => theme.palette.action.hover,
                 }}
               >
                 <TableRow>

@@ -36,11 +36,11 @@ and [How to use the playground](./how-to-use-the-playground.md).
 
 To get started with Gravitino, see [Getting started](./getting-started.md) for the details.
 
-* [Getting started locally](./getting-started.md#getting-started-locally): a quick guide to starting
+- [Getting started locally](./getting-started.md#getting-started-locally): a quick guide to starting
   and using Gravitino locally.
-* [Running on Amazon Web Services](./getting-started.md#getting-started-on-amazon-web-services): a
+- [Running on Amazon Web Services](./getting-started.md#getting-started-on-amazon-web-services): a
   quick guide to starting and using Gravitino on AWS.
-* [Running on Google Cloud Platform](./getting-started.md#getting-started-on-google-cloud-platform):
+- [Running on Google Cloud Platform](./getting-started.md#getting-started-on-google-cloud-platform):
   a quick guide to starting and using Gravitino on GCP.
 
 ## How to use Apache Gravitino
@@ -48,13 +48,13 @@ To get started with Gravitino, see [Getting started](./getting-started.md) for t
 Gravitino provides two SDKs to manage metadata from different catalogs in a unified way: the
 REST API and the Java SDK. You can use either to manage metadata. See
 
-* [Manage metalake using Gravitino](./manage-metalake-using-gravitino.md) to learn how to manage
+- [Manage metalake using Gravitino](./manage-metalake-using-gravitino.md) to learn how to manage
   metalakes.
-* [Manage relational metadata using Gravitino](./manage-relational-metadata-using-gravitino.md)
+- [Manage relational metadata using Gravitino](./manage-relational-metadata-using-gravitino.md)
   to learn how to manage relational metadata.
-* [Manage fileset metadata using Gravitino](./manage-fileset-metadata-using-gravitino.md) to learn
+- [Manage fileset metadata using Gravitino](./manage-fileset-metadata-using-gravitino.md) to learn
   how to manage fileset metadata.
-* [Manage messaging metadata using Gravitino](./manage-messaging-metadata-using-gravitino.md) to learn how to manage
+- [Manage messaging metadata using Gravitino](./manage-messaging-metadata-using-gravitino.md) to learn how to manage
   messaging metadata.
 
 Also, you can find the complete REST API definition in
@@ -67,19 +67,19 @@ Gravitino currently supports the following catalogs:
 
 **Relational catalogs:**
 
-* [**Iceberg catalog**](./lakehouse-iceberg-catalog.md)
-* [**Hive catalog**](./apache-hive-catalog.md)
-* [**MySQL catalog**](./jdbc-mysql-catalog.md)
-* [**PostgreSQL catalog**](./jdbc-postgresql-catalog.md)
-* [**Doris catalog**](./jdbc-doris-catalog.md)
+- [**Iceberg catalog**](./lakehouse-iceberg-catalog.md)
+- [**Hive catalog**](./apache-hive-catalog.md)
+- [**MySQL catalog**](./jdbc-mysql-catalog.md)
+- [**PostgreSQL catalog**](./jdbc-postgresql-catalog.md)
+- [**Doris catalog**](./jdbc-doris-catalog.md)
 
 **Fileset catalogs:**
 
-* [**Hadoop catalog**](./hadoop-catalog.md)
+- [**Hadoop catalog**](./hadoop-catalog.md)
 
 **Messaging catalogs:**
 
-* [**Kafka catalog**](./kafka-catalog.md)
+- [**Kafka catalog**](./kafka-catalog.md)
 
 Gravitino also provides an Iceberg REST catalog service for the Iceberg table format. See the
 [Iceberg REST catalog service](./iceberg-rest-service.md) for details.
@@ -91,11 +91,11 @@ integrates Apache Hadoop, Apache Hive, Trino, MySQL, PostgreSQL, and Gravitino t
 complete environment. To experience all the features, see
 [Getting started](./getting-started.md) and [How to use the Gravitino playground](./how-to-use-the-playground.md).
 
-* [Install Gravitino playground on AWS or GCP](./getting-started.md#installing-gravitino-playground-on-aws-or-google-cloud-platform):
+- [Install Gravitino playground on AWS or GCP](./getting-started.md#installing-gravitino-playground-on-aws-or-google-cloud-platform):
   a quick guide to starting and using the Gravitino playground on AWS or GCP.
-* [Install Gravitino playground locally](./getting-started.md#installing-gravitino-playground-locally):
+- [Install Gravitino playground locally](./getting-started.md#installing-gravitino-playground-locally):
   a quick guide to starting and using the Gravitino playground locally.
-* [How to use the Gravitino playground](./how-to-use-the-playground.md): provides an example of how
+- [How to use the Gravitino playground](./how-to-use-the-playground.md): provides an example of how
   to use Gravitino and other components together.
 
 ## Where to go from here
@@ -104,49 +104,49 @@ complete environment. To experience all the features, see
 
 Gravitino supports different catalogs to manage the metadata in different sources. Please see:
 
-* [Iceberg catalog](./lakehouse-iceberg-catalog.md): a complete guide to using Gravitino to
+- [Iceberg catalog](./lakehouse-iceberg-catalog.md): a complete guide to using Gravitino to
   manage Apache Iceberg data.
-* [Iceberg REST catalog service](./iceberg-rest-service.md): a
+- [Iceberg REST catalog service](./iceberg-rest-service.md): a
   complete guide to using Gravitino as an Apache Iceberg REST catalog service.
-* [Hive catalog](./apache-hive-catalog.md): a complete guide to using Gravitino to manage Apache Hive data.
-* [MySQL catalog](./jdbc-mysql-catalog.md): a complete guide to using Gravitino to manage MySQL data.
-* [PostgreSQL catalog](./jdbc-postgresql-catalog.md): a complete guide to using Gravitino to manage PostgreSQL data.
-* [Doris catalog](./jdbc-doris-catalog.md): a complete guide to using Gravitino to manage Doris data.
-* [Hadoop catalog](./hadoop-catalog.md): a complete guide to using Gravitino to manage fileset
+- [Hive catalog](./apache-hive-catalog.md): a complete guide to using Gravitino to manage Apache Hive data.
+- [MySQL catalog](./jdbc-mysql-catalog.md): a complete guide to using Gravitino to manage MySQL data.
+- [PostgreSQL catalog](./jdbc-postgresql-catalog.md): a complete guide to using Gravitino to manage PostgreSQL data.
+- [Doris catalog](./jdbc-doris-catalog.md): a complete guide to using Gravitino to manage Doris data.
+- [Hadoop catalog](./hadoop-catalog.md): a complete guide to using Gravitino to manage fileset
   using Hadoop Compatible File System (HCFS).
-* [Kafka catalog](./kafka-catalog.md): a complete guide to using Gravitino to manage Kafka topics metadata.
+- [Kafka catalog](./kafka-catalog.md): a complete guide to using Gravitino to manage Kafka topics metadata.
 
 ### Trino connector
 
 Gravitino provides a Trino connector to manage Trino metadata in a unified
 way. To use the Trino connector, see:
 
-* [How to use Gravitino Trino connector](./trino-connector/index.md): a complete guide to using the Gravitino
+- [How to use Gravitino Trino connector](./trino-connector/index.md): a complete guide to using the Gravitino
   Trino connector.
 
 ### Server administration
 
 Gravitino provides several ways to configure and manage the Gravitino server. See:
 
-* [Security](./security.md): provides security configurations for Gravitino, including HTTPS
+- [Security](./security.md): provides security configurations for Gravitino, including HTTPS
   and OAuth2 configurations.
-* [Gravitino metrics](./metrics.md): provides metrics configurations and detailed a metrics list
+- [Gravitino metrics](./metrics.md): provides metrics configurations and detailed a metrics list
   of the Gravitino server.
 
 ### Programming guides
 
-* [Gravitino Open API](./api/rest/gravitino-rest-api): provides the complete Open API definition of
+- [Gravitino Open API](./api/rest/gravitino-rest-api): provides the complete Open API definition of
   Gravitino.
-* [Gravitino Javadoc](pathname:///docs/0.5.1/api/java/index.html): provides the Javadoc for the Gravitino API.
+- [Gravitino Javadoc](pathname:///docs/0.5.1/api/java/index.html): provides the Javadoc for the Gravitino API.
 
 ### Development guides
 
-* [How to build Gravitino](./how-to-build.md): a complete guide to building Gravitino from
+- [How to build Gravitino](./how-to-build.md): a complete guide to building Gravitino from
   source.
-* [How to test Gravitino](./how-to-test.md): a complete guide to running Gravitino unit and
+- [How to test Gravitino](./how-to-test.md): a complete guide to running Gravitino unit and
   integration tests.
-* [How to sign and verify Gravitino releases](./how-to-sign-releases.md): a guide to signing and verifying
+- [How to sign and verify Gravitino releases](./how-to-sign-releases.md): a guide to signing and verifying
   a Gravitino release.
-* [Publish Docker images](./publish-docker-images.md): a guide to publishing Gravitino Docker images;
+- [Publish Docker images](./publish-docker-images.md): a guide to publishing Gravitino Docker images;
   also lists the change logs of Gravitino CI Docker images and release images.
-* [How to upgrade Gravitino](./how-to-upgrade.md): a guide to upgrading the schema of Gravitino storage backend from one release version to another.
+- [How to upgrade Gravitino](./how-to-upgrade.md): a guide to upgrading the schema of Gravitino storage backend from one release version to another.

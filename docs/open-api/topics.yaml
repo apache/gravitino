@@ -19,9 +19,7 @@
 #
 
 ---
-
 paths:
-
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/topics:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
@@ -160,7 +158,6 @@ paths:
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
 components:
-
   schemas:
     Topic:
       type: object
@@ -236,10 +233,8 @@ components:
         newComment:
           type: string
           description: The new comment of the topic
-      example: {
-        "@type": "updateComment",
-        "newComment": "This is the new comment"
-      }
+      example:
+        { "@type": "updateComment", "newComment": "This is the new comment" }
 
     SetTopicPropertyRequest:
       type: object
@@ -258,11 +253,7 @@ components:
         value:
           type: string
           description: The value of the property to set
-      example: {
-        "@type": "setProperty",
-        "property": "key",
-        "value": "value"
-      }
+      example: { "@type": "setProperty", "property": "key", "value": "value" }
 
     RemoveTopicPropertyRequest:
       type: object
@@ -277,10 +268,7 @@ components:
         property:
           type: string
           description: The name of the property to remove
-      example: {
-        "@type": "removeProperty",
-        "property": "key"
-      }
+      example: { "@type": "removeProperty", "property": "key" }
 
   responses:
     TopicResponse:
@@ -304,48 +292,47 @@ components:
 
   examples:
     TopicCreateRequest:
-      value: {
-        "name": "topic1",
-        "comment": "This is a topic",
-        "properties": {
-          "partition-count": "1",
-          "replication-factor": "1"
-        }
-      }
-
-    TopicResponse:
-      value: {
-        "code": 0,
-        "topic": {
+      value:
+        {
           "name": "topic1",
           "comment": "This is a topic",
-          "properties": {
-            "partition-count": "1",
-            "replication-factor": "1"
-          }
+          "properties": { "partition-count": "1", "replication-factor": "1" },
         }
-      }
+
+    TopicResponse:
+      value:
+        {
+          "code": 0,
+          "topic":
+            {
+              "name": "topic1",
+              "comment": "This is a topic",
+              "properties":
+                { "partition-count": "1", "replication-factor": "1" },
+            },
+        }
 
     TopicAlreadyExistsException:
-      value: {
-        "code": 1004,
-        "type": "TopicAlreadyExistsException",
-        "message": "Topic already exists",
-        "stack": [
-          "org.apache.gravitino.exceptions.TopicAlreadyExistsException: Topic already exists: topic1"
-        ]
-      }
+      value:
+        {
+          "code": 1004,
+          "type": "TopicAlreadyExistsException",
+          "message": "Topic already exists",
+          "stack":
+            [
+              "org.apache.gravitino.exceptions.TopicAlreadyExistsException: Topic already exists: topic1",
+            ],
+        }
 
     NoSuchTopicException:
-      value: {
-        "code": 1003,
-        "type": "NoSuchTopicException",
-        "message": "Topic does not exist",
-        "stack": [
-          "org.apache.gravitino.exceptions.NoSuchTopicException: Topic does not exist",
-          "..."
-        ]
-      }
-
-
-
+      value:
+        {
+          "code": 1003,
+          "type": "NoSuchTopicException",
+          "message": "Topic does not exist",
+          "stack":
+            [
+              "org.apache.gravitino.exceptions.NoSuchTopicException: Topic does not exist",
+              "...",
+            ],
+        }

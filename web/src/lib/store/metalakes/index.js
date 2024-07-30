@@ -29,7 +29,7 @@ import {
   getMetalakesApi,
   deleteMetalakeApi,
   updateMetalakeApi,
-  getMetalakeDetailsApi
+  getMetalakeDetailsApi,
 } from '@/lib/api/metalakes'
 
 import {
@@ -37,7 +37,7 @@ import {
   getCatalogDetailsApi,
   createCatalogApi,
   updateCatalogApi,
-  deleteCatalogApi
+  deleteCatalogApi,
 } from '@/lib/api/catalogs'
 import { getSchemasApi, getSchemaDetailsApi } from '@/lib/api/schemas'
 import { getTablesApi, getTableDetailsApi } from '@/lib/api/tables'
@@ -100,7 +100,7 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
     let result = {
       key,
       data: [],
-      tree: getState().metalakes.metalakeTree
+      tree: getState().metalakes.metalakeTree,
     }
 
     const pathArr = extractPlaceholder(key)
@@ -126,7 +126,7 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
           title: catalogItem.name,
           namespace: [metalake],
           schemas: [],
-          children: []
+          children: [],
         }
       })
     } else if (pathArr.length === 3) {
@@ -148,7 +148,7 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
           name: schemaItem.name,
           title: schemaItem.name,
           tables: [],
-          children: []
+          children: [],
         }
       })
     } else if (pathArr.length === 4 && type === 'relational') {
@@ -171,7 +171,7 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
           title: tableItem.name,
           isLeaf: true,
           columns: [],
-          children: []
+          children: [],
         }
       })
     } else if (pathArr.length === 4 && type === 'fileset') {
@@ -192,7 +192,7 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
           path: `?${new URLSearchParams({ metalake, catalog, type, schema, fileset: filesetItem.name }).toString()}`,
           name: filesetItem.name,
           title: filesetItem.name,
-          isLeaf: true
+          isLeaf: true,
         }
       })
     } else if (pathArr.length === 4 && type === 'messaging') {
@@ -213,7 +213,7 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
           path: `?${new URLSearchParams({ metalake, catalog, type, schema, topic: topicItem.name }).toString()}`,
           name: topicItem.name,
           title: topicItem.name,
-          isLeaf: true
+          isLeaf: true,
         }
       })
     }
@@ -265,7 +265,7 @@ export const fetchCatalogs = createAsyncThunk(
         title: catalog.name,
         namespace: [metalake],
         schemas: [],
-        children: []
+        children: [],
       }
     })
 
@@ -287,8 +287,8 @@ export const fetchCatalogs = createAsyncThunk(
                               catalog: update.newCatalog.name,
                               type: update.newCatalog.type,
                               schema: schema.name,
-                              table: table.name
-                            }).toString()}`
+                              table: table.name,
+                            }).toString()}`,
                           }
                         })
                       : []
@@ -301,10 +301,10 @@ export const fetchCatalogs = createAsyncThunk(
                         metalake,
                         catalog: update.newCatalog.name,
                         type: update.newCatalog.type,
-                        schema: schema.name
+                        schema: schema.name,
                       }).toString()}`,
                       tables: tables,
-                      children: tables
+                      children: tables,
                     }
                   })
                 : []
@@ -316,14 +316,14 @@ export const fetchCatalogs = createAsyncThunk(
                 path: `?${new URLSearchParams({
                   metalake,
                   catalog: update.newCatalog.name,
-                  type: update.newCatalog.type
+                  type: update.newCatalog.type,
                 }).toString()}`,
                 type: update.newCatalog.type,
                 provider: update.newCatalog.provider,
                 name: update.newCatalog.name,
                 title: update.newCatalog.name,
                 schemas: schemas,
-                children: schemas
+                children: schemas,
               }
             } else {
               return { ...catalog }
@@ -375,7 +375,7 @@ export const fetchCatalogs = createAsyncThunk(
     return {
       catalogs: catalogsData,
       page,
-      init
+      init,
     }
   }
 )
@@ -417,7 +417,7 @@ export const createCatalog = createAsyncThunk(
       title: catalogItem.name,
       namespace: [metalake],
       schemas: [],
-      children: []
+      children: [],
     }
 
     dispatch(fetchCatalogs({ metalake, init: true }))
@@ -492,7 +492,7 @@ export const fetchSchemas = createAsyncThunk(
         name: schema.name,
         title: schema.name,
         tables: schemaItem ? schemaItem.children : [],
-        children: schemaItem ? schemaItem.children : []
+        children: schemaItem ? schemaItem.children : [],
       }
     })
 
@@ -501,7 +501,7 @@ export const fetchSchemas = createAsyncThunk(
         setIntoTreeNodes({
           key: `{{${metalake}}}{{${catalog}}}{{${type}}}`,
           data: schemas,
-          tree: getState().metalakes.metalakeTree
+          tree: getState().metalakes.metalakeTree,
         })
       )
     }
@@ -554,13 +554,13 @@ export const fetchTables = createAsyncThunk(
           catalog,
           type: 'relational',
           schema,
-          table: table.name
+          table: table.name,
         }).toString()}`,
         name: table.name,
         title: table.name,
         isLeaf: true,
         columns: [],
-        children: []
+        children: [],
       }
     })
 
@@ -572,7 +572,7 @@ export const fetchTables = createAsyncThunk(
         setIntoTreeNodes({
           key: `{{${metalake}}}{{${catalog}}}{{${'relational'}}}{{${schema}}}`,
           data: tables,
-          tree: getState().metalakes.metalakeTree
+          tree: getState().metalakes.metalakeTree,
         })
       )
     }
@@ -581,7 +581,7 @@ export const fetchTables = createAsyncThunk(
       setExpandedNodes([
         `{{${metalake}}}`,
         `{{${metalake}}}{{${catalog}}}{{${'relational'}}}`,
-        `{{${metalake}}}{{${catalog}}}{{${'relational'}}}{{${schema}}}`
+        `{{${metalake}}}{{${catalog}}}{{${'relational'}}}{{${schema}}}`,
       ])
     )
 
@@ -645,9 +645,9 @@ export const getTableDetails = createAsyncThunk(
             width: i.width,
             funcName: i.funcName,
             fields,
-            text: `${i.strategy}${sub}(${last})`
+            text: `${i.strategy}${sub}(${last})`,
           }
-        })
+        }),
       },
       {
         type: 'sortOrders',
@@ -657,9 +657,9 @@ export const getTableDetails = createAsyncThunk(
             fields: i.sortTerm.fieldName,
             dir: i.direction,
             no: i.nullOrdering,
-            text: `${i.sortTerm.fieldName[0]} ${i.direction} ${i.nullOrdering}`
+            text: `${i.sortTerm.fieldName[0]} ${i.direction} ${i.nullOrdering}`,
           }
-        })
+        }),
       },
       {
         type: 'distribution',
@@ -674,9 +674,9 @@ export const getTableDetails = createAsyncThunk(
                 ? ``
                 : `${distribution.strategy}${
                     distribution.number === 0 ? '' : `[${distribution.number}]`
-                  }(${i.fieldName.join(',')})`
+                  }(${i.fieldName.join(',')})`,
           }
-        })
+        }),
       },
       {
         type: 'indexes',
@@ -686,10 +686,10 @@ export const getTableDetails = createAsyncThunk(
             fields: i.fieldNames,
             name: i.name,
             indexType: i.indexType,
-            text: `${i.name}(${i.fieldNames.map(v => v.join('.')).join(',')})`
+            text: `${i.name}(${i.fieldNames.map(v => v.join('.')).join(',')})`,
           }
-        })
-      }
+        }),
+      },
     ]
 
     dispatch(setTableProps(tableProps))
@@ -698,7 +698,7 @@ export const getTableDetails = createAsyncThunk(
       setExpandedNodes([
         `{{${metalake}}}`,
         `{{${metalake}}}{{${catalog}}}{{${'relational'}}}`,
-        `{{${metalake}}}{{${catalog}}}{{${'relational'}}}{{${schema}}}`
+        `{{${metalake}}}{{${catalog}}}{{${'relational'}}}{{${schema}}}`,
       ])
     )
 
@@ -734,11 +734,11 @@ export const fetchFilesets = createAsyncThunk(
           catalog,
           type: 'fileset',
           schema,
-          fileset: fileset.name
+          fileset: fileset.name,
         }).toString()}`,
         name: fileset.name,
         title: fileset.name,
-        isLeaf: true
+        isLeaf: true,
       }
     })
 
@@ -750,7 +750,7 @@ export const fetchFilesets = createAsyncThunk(
         setIntoTreeNodes({
           key: `{{${metalake}}}{{${catalog}}}{{${'fileset'}}}{{${schema}}}`,
           data: filesets,
-          tree: getState().metalakes.metalakeTree
+          tree: getState().metalakes.metalakeTree,
         })
       )
     }
@@ -759,7 +759,7 @@ export const fetchFilesets = createAsyncThunk(
       setExpandedNodes([
         `{{${metalake}}}`,
         `{{${metalake}}}{{${catalog}}}{{${'fileset'}}}`,
-        `{{${metalake}}}{{${catalog}}}{{${'fileset'}}}{{${schema}}}`
+        `{{${metalake}}}{{${catalog}}}{{${'fileset'}}}{{${schema}}}`,
       ])
     )
 
@@ -788,7 +788,7 @@ export const getFilesetDetails = createAsyncThunk(
       setExpandedNodes([
         `{{${metalake}}}`,
         `{{${metalake}}}{{${catalog}}}{{${'fileset'}}}`,
-        `{{${metalake}}}{{${catalog}}}{{${'fileset'}}}{{${schema}}}`
+        `{{${metalake}}}{{${catalog}}}{{${'fileset'}}}{{${schema}}}`,
       ])
     )
 
@@ -824,11 +824,11 @@ export const fetchTopics = createAsyncThunk(
           catalog,
           type: 'messaging',
           schema,
-          topic: topic.name
+          topic: topic.name,
         }).toString()}`,
         name: topic.name,
         title: topic.name,
-        isLeaf: true
+        isLeaf: true,
       }
     })
 
@@ -840,7 +840,7 @@ export const fetchTopics = createAsyncThunk(
         setIntoTreeNodes({
           key: `{{${metalake}}}{{${catalog}}}{{${'messaging'}}}{{${schema}}}`,
           data: topics,
-          tree: getState().metalakes.metalakeTree
+          tree: getState().metalakes.metalakeTree,
         })
       )
     }
@@ -849,7 +849,7 @@ export const fetchTopics = createAsyncThunk(
       setExpandedNodes([
         `{{${metalake}}}`,
         `{{${metalake}}}{{${catalog}}}{{${'messaging'}}}`,
-        `{{${metalake}}}{{${catalog}}}{{${'messaging'}}}{{${schema}}}`
+        `{{${metalake}}}{{${catalog}}}{{${'messaging'}}}{{${schema}}}`,
       ])
     )
 
@@ -878,7 +878,7 @@ export const getTopicDetails = createAsyncThunk(
       setExpandedNodes([
         `{{${metalake}}}`,
         `{{${metalake}}}{{${catalog}}}{{${'messaging'}}}`,
-        `{{${metalake}}}{{${catalog}}}{{${'messaging'}}}{{${schema}}}`
+        `{{${metalake}}}{{${catalog}}}{{${'messaging'}}}{{${schema}}}`,
       ])
     )
 
@@ -905,7 +905,7 @@ export const appMetalakesSlice = createSlice({
     expandedNodes: [],
     activatedDetails: null,
     tableLoading: false,
-    treeLoading: false
+    treeLoading: false,
   },
   reducers: {
     setFilteredMetalakes(state, action) {
@@ -977,7 +977,7 @@ export const appMetalakesSlice = createSlice({
     setTableProps(state, action) {
       state.tableProps = action.payload
     },
-    resetMetalakeStore(state, action) {}
+    resetMetalakeStore(state, action) {},
   },
   extraReducers: builder => {
     builder.addCase(fetchMetalakes.fulfilled, (state, action) => {
@@ -1124,7 +1124,7 @@ export const appMetalakesSlice = createSlice({
         toast.error(action.error.message)
       }
     })
-  }
+  },
 })
 
 export const {
@@ -1144,7 +1144,7 @@ export const {
   setExpandedNodes,
   addCatalogToTree,
   removeCatalogFromTree,
-  setTableProps
+  setTableProps,
 } = appMetalakesSlice.actions
 
 export default appMetalakesSlice.reducer

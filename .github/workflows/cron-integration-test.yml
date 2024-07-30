@@ -3,7 +3,7 @@ name: Cron Integration Test
 # Controls when the workflow will run
 on:
   schedule: # Runs by default on main branch
-    - cron: '0 19 * * *' # Runs every day at 19:00 PM UTC, equal to 03:00 AM the next day in GMT+8 time zone
+    - cron: "0 19 * * *" # Runs every day at 19:00 PM UTC, equal to 03:00 AM the next day in GMT+8 time zone
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -55,8 +55,8 @@ jobs:
     strategy:
       matrix:
         architecture: [linux/amd64]
-        java-version: [ 8, 11, 17 ]
-        test-mode: [ embedded, deploy ]
+        java-version: [8, 11, 17]
+        test-mode: [embedded, deploy]
     env:
       DOCKER_RUN_NAME: hive-amd64
       PLATFORM: ${{ matrix.architecture }}
@@ -66,9 +66,8 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           java-version: ${{ matrix.java-version }}
-          distribution: 'temurin'
-          cache: 'gradle'
-
+          distribution: "temurin"
+          cache: "gradle"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2

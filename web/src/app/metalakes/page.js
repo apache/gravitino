@@ -29,7 +29,7 @@ import Loading from '@/app/rootLayout/Loading'
 
 const DynamicTableBody = dynamic(() => import('./TableBody'), {
   loading: () => <Loading height={'200px'} />,
-  ssr: false
+  ssr: false,
 })
 
 const MetalakeList = () => {

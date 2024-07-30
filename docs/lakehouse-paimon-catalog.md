@@ -31,17 +31,16 @@ Builds with Apache Paimon `0.8.0`.
 
 ### Catalog properties
 
-| Property name                                      | Description                                                                                                                                                                                                 | Default value          | Required                                                        | Since Version |
-|----------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------|-----------------------------------------------------------------|---------------|
-| `catalog-backend`                                  | Catalog backend of Gravitino Paimon catalog. Only supports `filesystem` now.                                                                                                                                | (none)                 | Yes                                                             | 0.6.0         |
-| `uri`                                              | The URI configuration of the Paimon catalog. `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db`. It is optional for `FilesystemCatalog`. | (none)                 | required if the value of `catalog-backend` is not `filesystem`. | 0.6.0         |
-| `warehouse`                                        | Warehouse directory of catalog. `file:///user/hive/warehouse-paimon/` for local fs or `hdfs://namespace/hdfs/path` for HDFS.                                                                                | (none)                 | Yes                                                             | 0.6.0         |
-| `authentication.type`                              | The type of authentication for Paimon catalog backend, currently Gravitino only supports `Kerberos` and `simple`.                                                                                           | `simple`               | No                                                              | 0.6.0         |
-| `authentication.kerberos.principal`                | The principal of the Kerberos authentication.                                                                                                                                                               | (none)                 | required if the value of `authentication.type` is Kerberos.     | 0.6.0         |
-| `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                                                                                                                                      | (none)                 | required if the value of `authentication.type` is Kerberos.     | 0.6.0         |
-| `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Paimon catalog.                                                                                                                                               | 60                     | No                                                              | 0.6.0         |
-| `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                                                                                                                  | 60                     | No                                                              | 0.6.0         |
-
+| Property name                                      | Description                                                                                                                                                                                                 | Default value | Required                                                        | Since Version |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | --------------------------------------------------------------- | ------------- |
+| `catalog-backend`                                  | Catalog backend of Gravitino Paimon catalog. Only supports `filesystem` now.                                                                                                                                | (none)        | Yes                                                             | 0.6.0         |
+| `uri`                                              | The URI configuration of the Paimon catalog. `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db`. It is optional for `FilesystemCatalog`. | (none)        | required if the value of `catalog-backend` is not `filesystem`. | 0.6.0         |
+| `warehouse`                                        | Warehouse directory of catalog. `file:///user/hive/warehouse-paimon/` for local fs or `hdfs://namespace/hdfs/path` for HDFS.                                                                                | (none)        | Yes                                                             | 0.6.0         |
+| `authentication.type`                              | The type of authentication for Paimon catalog backend, currently Gravitino only supports `Kerberos` and `simple`.                                                                                           | `simple`      | No                                                              | 0.6.0         |
+| `authentication.kerberos.principal`                | The principal of the Kerberos authentication.                                                                                                                                                               | (none)        | required if the value of `authentication.type` is Kerberos.     | 0.6.0         |
+| `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                                                                                                                                      | (none)        | required if the value of `authentication.type` is Kerberos.     | 0.6.0         |
+| `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Paimon catalog.                                                                                                                                               | 60            | No                                                              | 0.6.0         |
+| `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                                                                                                                  | 60            | No                                                              | 0.6.0         |
 
 Any properties not defined by Gravitino with `gravitino.bypass.` prefix will pass to Paimon catalog properties and HDFS configuration. For example, if specify `gravitino.bypass.table.type`, `table.type` will pass to Paimon catalog properties.
 
@@ -49,7 +48,7 @@ Any properties not defined by Gravitino with `gravitino.bypass.` prefix will pas
 
 Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
 
-## Schema 
+## Schema
 
 ### Schema capabilities
 
@@ -68,14 +67,16 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 
 Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
 
-## Table 
+## Table
 
 ### Table capabilities
 
 - Supporting createTable, dropTable, loadTable and listTable.
+
 ```
 dropTable will delete the table location directly, similar with purgeTable.
 ```
+
 - Supporting Column default value through table properties, such as `fields.{columnName}.default-value`.
 
 - Doesn't support alterTable now.
@@ -98,28 +99,28 @@ dropTable will delete the table location directly, similar with purgeTable.
 
 ### Table column types
 
-| Gravitino Type                | Apache Paimon Type             |
-|-------------------------------|--------------------------------|
-| `Sturct`                      | `Row`                          |
-| `Map`                         | `Map`                          |
-| `Array`                       | `Array`                        |
-| `Boolean`                     | `Boolean`                      |
-| `Byte`                        | `TinyInt`                      |
-| `Short`                       | `SmallInt`                     |
-| `Integer`                     | `Int`                          |
-| `Long`                        | `BigInt`                       |
-| `Float`                       | `Float`                        |
-| `Double`                      | `Double`                       |
-| `Decimal`                     | `Decimal`                      |
-| `String`                      | `VarChar(Integer.MAX_VALUE)`   |
-| `VarChar`                     | `VarChar`                      |
-| `FixedChar`                   | `Char`                         |
-| `Date`                        | `Date`                         |
-| `Time`                        | `Time`                         |
-| `TimestampType withZone`      | `LocalZonedTimestamp`          |
-| `TimestampType withoutZone`   | `Timestamp`                    |
-| `Binary`                      | `Binary`                       |
-| `Fixed`                       | `VarBinary`                    |
+| Gravitino Type              | Apache Paimon Type           |
+| --------------------------- | ---------------------------- |
+| `Sturct`                    | `Row`                        |
+| `Map`                       | `Map`                        |
+| `Array`                     | `Array`                      |
+| `Boolean`                   | `Boolean`                    |
+| `Byte`                      | `TinyInt`                    |
+| `Short`                     | `SmallInt`                   |
+| `Integer`                   | `Int`                        |
+| `Long`                      | `BigInt`                     |
+| `Float`                     | `Float`                      |
+| `Double`                    | `Double`                     |
+| `Decimal`                   | `Decimal`                    |
+| `String`                    | `VarChar(Integer.MAX_VALUE)` |
+| `VarChar`                   | `VarChar`                    |
+| `FixedChar`                 | `Char`                       |
+| `Date`                      | `Date`                       |
+| `Time`                      | `Time`                       |
+| `TimestampType withZone`    | `LocalZonedTimestamp`        |
+| `TimestampType withoutZone` | `Timestamp`                  |
+| `Binary`                    | `Binary`                     |
+| `Fixed`                     | `VarBinary`                  |
 
 :::info
 Gravitino doesn't support Paimon `MultisetType` type.
@@ -131,10 +132,10 @@ You can pass [Paimon table properties](https://paimon.apache.org/docs/0.8/mainte
 
 The Gravitino server doesn't allow passing the following reserved fields.
 
-| Configuration item              | Description                                              |
-|---------------------------------|----------------------------------------------------------|
-| `comment`                       | The table comment.                                       |
-| `creator`                       | The table creator.                                       |
+| Configuration item | Description        |
+| ------------------ | ------------------ |
+| `comment`          | The table comment. |
+| `creator`          | The table creator. |
 
 ### Table operations
 

@@ -2,9 +2,9 @@
 title: "MySQL catalog"
 slug: /jdbc-mysql-catalog
 keywords:
-- jdbc
-- MySQL
-- metadata
+  - jdbc
+  - MySQL
+  - metadata
 license: "This software is licensed under the Apache License version 2."
 ---
 
@@ -42,7 +42,7 @@ If you use a JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-use
 Besides the [common catalog properties](./gravitino-server-config.md#gravitino-catalog-properties-configuration), the MySQL catalog has the following properties:
 
 | Configuration item   | Description                                                                                            | Default value | Required | Since Version |
-|----------------------|--------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| -------------------- | ------------------------------------------------------------------------------------------------------ | ------------- | -------- | ------------- |
 | `jdbc-url`           | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:3306`                    | (none)        | Yes      | 0.3.0         |
 | `jdbc-driver`        | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver`. | (none)        | Yes      | 0.3.0         |
 | `jdbc-user`          | The JDBC user name.                                                                                    | (none)        | Yes      | 0.3.0         |
@@ -88,7 +88,7 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 #### Table column types
 
 | Gravitino Type   | MySQL Type          |
-|------------------|---------------------|
+| ---------------- | ------------------- |
 | `Byte`           | `Tinyint`           |
 | `Byte(false)`    | `Tinyint Unsigned`  |
 | `Short`          | `Smallint`          |
@@ -96,7 +96,7 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 | `Integer`        | `Int`               |
 | `Integer(false)` | `Int Unsigned`      |
 | `Long`           | `Bigint`            |
-| `Long(false)`    | `Bigint Unsigned`   | 
+| `Long(false)`    | `Bigint Unsigned`   |
 | `Float`          | `Float`             |
 | `Double`         | `Double`            |
 | `String`         | `Text`              |
@@ -170,10 +170,10 @@ Index[] indexes = new Index[] {
 
 Although MySQL itself does not support table properties, Gravitino offers table property management for MySQL tables through the `jdbc-mysql` catalog, enabling control over table features. The supported properties are listed as follows:
 
-| Property Name           | Description                                                                                                                                                                             | Required  | Since version |
-|-------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------|---------------|
-| `engine`                | The engine used by the table. The default value is `InnoDB`. For example `MyISAM`, `MEMORY`, `CSV`, `ARCHIVE`, `BLACKHOLE`, `FEDERATED`, `ndbinfo`, `MRG_MYISAM`, `PERFORMANCE_SCHEMA`. | No        | 0.4.0         |
-| `auto-increment-offset` | Used to specify the starting value of the auto-increment field.                                                                                                                         | No        | 0.4.0         |
+| Property Name           | Description                                                                                                                                                                             | Required | Since version |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------------- |
+| `engine`                | The engine used by the table. The default value is `InnoDB`. For example `MyISAM`, `MEMORY`, `CSV`, `ARCHIVE`, `BLACKHOLE`, `FEDERATED`, `ndbinfo`, `MRG_MYISAM`, `PERFORMANCE_SCHEMA`. | No       | 0.4.0         |
+| `auto-increment-offset` | Used to specify the starting value of the auto-increment field.                                                                                                                         | No       | 0.4.0         |
 
 - Doesn't support remove table properties. You can only modify values, not delete properties.
 
@@ -200,7 +200,7 @@ The index name of the PRIMARY_KEY must be PRIMARY
     {
       "indexType": "unique_key",
       "name": "id_name_uk",
-      "fieldNames": [["id"] ,["name"]]
+      "fieldNames": [["id"], ["name"]]
     }
   ]
 }
@@ -240,6 +240,7 @@ Gravitino supports these table alteration operations:
 - `SetProperty`
 
 :::info
- - You cannot submit the `RenameTable` operation at the same time as other operations.
- - If you update a nullability column to non-nullability, there may be compatibility issues.
-:::
+
+- You cannot submit the `RenameTable` operation at the same time as other operations.
+- If you update a nullability column to non-nullability, there may be compatibility issues.
+  :::

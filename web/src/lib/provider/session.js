@@ -35,7 +35,7 @@ import { useIdle } from 'react-use'
 const authProvider = {
   version: '',
   loading: true,
-  setLoading: () => Boolean
+  setLoading: () => Boolean,
 }
 
 const AuthContext = createContext(authProvider)
@@ -97,7 +97,7 @@ const AuthProvider = ({ children }) => {
   const values = {
     version,
     token,
-    loading
+    loading,
   }
 
   return <AuthContext.Provider value={values}>{children}</AuthContext.Provider>

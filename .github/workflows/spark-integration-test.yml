@@ -4,9 +4,9 @@ name: Spark Integration Test
 on:
   # Triggers the workflow on push or pull request events but only for the "main" branch
   push:
-    branches: [ "main", "branch-*" ]
+    branches: ["main", "branch-*"]
   pull_request:
-    branches: [ "main", "branch-*" ]
+    branches: ["main", "branch-*"]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -57,9 +57,9 @@ jobs:
     strategy:
       matrix:
         architecture: [linux/amd64]
-        java-version: [ 8, 11, 17 ]
-        scala-version: [ 2.12 ]
-        test-mode: [ embedded, deploy ]
+        java-version: [8, 11, 17]
+        scala-version: [2.12]
+        test-mode: [embedded, deploy]
     env:
       PLATFORM: ${{ matrix.architecture }}
     steps:
@@ -68,8 +68,8 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           java-version: ${{ matrix.java-version }}
-          distribution: 'temurin'
-          cache: 'gradle'
+          distribution: "temurin"
+          cache: "gradle"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -79,7 +79,7 @@ jobs:
           dev/ci/check_commands.sh
 
       - name: Package Gravitino
-        if : ${{ matrix.test-mode == 'deploy' }}
+        if: ${{ matrix.test-mode == 'deploy' }}
         run: |
           ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
 

@@ -11,7 +11,7 @@ With the Apache Gravitino Spark connector, accessing data or managing metadata i
 
 Supports most DDL and DML operations in SparkSQL, except such operations:
 
-- Function operations 
+- Function operations
 - Partition operations
 - View operations
 - Querying UDF
@@ -21,11 +21,10 @@ Supports most DDL and DML operations in SparkSQL, except such operations:
 
 ## Requirement
 
-* Hive metastore 2.x
-* HDFS 2.x or 3.x
+- Hive metastore 2.x
+- HDFS 2.x or 3.x
 
 ## SQL example
-
 
 ```sql
 
@@ -51,17 +50,15 @@ INSERT OVERWRITE TABLE employees PARTITION(department='Marketing') VALUES (3, 'M
 SELECT * FROM employees WHERE department = 'Engineering';
 ```
 
-
 ## Catalog properties
 
 Gravitino spark connector will transform below property names which are defined in catalog properties to Spark Hive connector configuration.
 
 | Property name in Gravitino catalog properties | Spark Hive connector configuration | Description                | Since Version |
-|-----------------------------------------------|------------------------------------|----------------------------|---------------|
+| --------------------------------------------- | ---------------------------------- | -------------------------- | ------------- |
 | `metastore.uris`                              | `hive.metastore.uris`              | Hive metastore uri address | 0.5.0         |
 
 Gravitino catalog property names with the prefix `spark.bypass.` are passed to Spark Hive connector. For example, using `spark.bypass.hive.exec.dynamic.partition.mode` to pass the `hive.exec.dynamic.partition.mode` to the Spark Hive connector.
-
 
 :::caution
 When using the `spark-sql` shell client, you must explicitly set the `spark.bypass.spark.sql.hive.metastore.jars` in the Gravitino Hive catalog properties. Replace the default `builtin` value with the appropriate setting for your setup.
