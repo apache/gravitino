@@ -69,6 +69,20 @@ public class GravitinoConfig {
           "true",
           false);
 
+  private static final ConfigEntry GRAVITINO_CLOUD_REGION_CODE =
+      new ConfigEntry(
+          "gravitino.cloud.region-code",
+          "The property to specify the region code of the cloud that the catalog is running on.",
+          "",
+          false);
+
+  private static final ConfigEntry GRAVITINO_CATALOG_CONNECTOR_FACTORY_CLASS_NAME =
+      new ConfigEntry(
+          "gravitino.catalog.connector.factory.class.name",
+          "The class name for the custom CatalogConnectorFactory. The class must implement the CatalogConnectorFactory interface",
+          "",
+          false);
+
   private static final ConfigEntry TRINO_JDBC_USER =
       new ConfigEntry("trino.jdbc.user", "The jdbc user name of Trino", "admin", false);
 
@@ -138,6 +152,11 @@ public class GravitinoConfig {
     }
   }
 
+  public String getRegion() {
+    return config.getOrDefault(
+        GRAVITINO_CLOUD_REGION_CODE.key, GRAVITINO_CLOUD_REGION_CODE.defaultValue);
+  }
+
   public String getCatalogConfigDirectory() {
     if (config.containsKey(TRINO_CATALOG_CONFIG_DIR)) {
       return config.get(TRINO_CATALOG_CONFIG_DIR);
@@ -153,6 +172,12 @@ public class GravitinoConfig {
 
   public String getTrinoPassword() {
     return config.getOrDefault(TRINO_JDBC_PASSWORD.key, TRINO_JDBC_PASSWORD.defaultValue);
+  }
+
+  public String getCatalogConnectorFactoryClassName() {
+    return config.getOrDefault(
+        GRAVITINO_CATALOG_CONNECTOR_FACTORY_CLASS_NAME.key,
+        GRAVITINO_CATALOG_CONNECTOR_FACTORY_CLASS_NAME.defaultValue);
   }
 
   public String toCatalogConfig() {
