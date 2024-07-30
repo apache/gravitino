@@ -35,7 +35,8 @@ import org.slf4j.LoggerFactory;
 public class DefaultCatalogConnectorFactory implements CatalogConnectorFactory {
   private static final Logger LOG = LoggerFactory.getLogger(DefaultCatalogConnectorFactory.class);
 
-  private final HashMap<String, CatalogConnectorContext.Builder> catalogBuilders = new HashMap<>();
+  protected final HashMap<String, CatalogConnectorContext.Builder> catalogBuilders =
+      new HashMap<>();
 
   public DefaultCatalogConnectorFactory(GravitinoConfig config) {
     catalogBuilders.put("hive", new CatalogConnectorContext.Builder(new HiveConnectorAdapter()));

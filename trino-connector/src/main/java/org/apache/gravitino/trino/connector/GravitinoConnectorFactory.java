@@ -125,7 +125,11 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
     return () -> null;
   }
 
-  CatalogConnectorFactory createCatalogConnectorFactory(GravitinoConfig config) {
+  private CatalogConnectorFactory createCatalogConnectorFactory(GravitinoConfig config) {
+    // Create a CatalogConnectorFactory. If we specify a customized class name for the
+    // CatalogConnectorFactory,
+    // it creates a user-customized CatalogConnectorFactory; otherwise, it creates a
+    // DefaultCatalogConnectorFactory.
     String className = config.getCatalogConnectorFactoryClassName();
     if (StringUtils.isEmpty(className)) {
       return new DefaultCatalogConnectorFactory(config);
