@@ -33,6 +33,5 @@ module.exports = {
   htmlWhitespaceSensitivity: 'css',
   insertPragma: false,
   bracketSameLine: false,
-  proseWrap: 'preserve',
-  trailingComma: 'none'
+  proseWrap: 'preserve'
 }
