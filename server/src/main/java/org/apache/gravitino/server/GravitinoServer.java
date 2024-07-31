@@ -18,7 +18,9 @@
  */
 package org.apache.gravitino.server;
 
+import com.google.common.collect.Lists;
 import java.io.File;
+import java.util.List;
 import java.util.Properties;
 import javax.servlet.Servlet;
 import org.apache.gravitino.Configs;
@@ -70,10 +72,10 @@ public class GravitinoServer extends ResourceConfig {
 
   private final GravitinoEnv gravitinoEnv;
 
-  public GravitinoServer(ServerConfig config) {
+  public GravitinoServer(ServerConfig config, GravitinoEnv gravitinoEnv) {
     serverConfig = config;
     server = new JettyServer();
-    gravitinoEnv = GravitinoEnv.getInstance();
+    this.gravitinoEnv = gravitinoEnv;
   }
 
   public void initialize() {
@@ -89,8 +91,15 @@ public class GravitinoServer extends ResourceConfig {
     initializeRestApi();
   }
 
+  public ServerConfig serverConfig() {
+    return serverConfig;
+  }
+
   private void initializeRestApi() {
-    packages("org.apache.gravitino.server.web.rest");
+    List<String> restApiPackages = Lists.newArrayList("org.apache.gravitino.server.web.rest");
+    restApiPackages.addAll(serverConfig.get(Configs.REST_API_EXTENSION_PACKAGES));
+    packages(restApiPackages.toArray(new String[0]));
+
     boolean enableAuthorization = serverConfig.get(Configs.ENABLE_AUTHORIZATION);
     register(
         new AbstractBinder() {
@@ -150,7 +159,7 @@ public class GravitinoServer extends ResourceConfig {
     LOG.info("Starting Gravitino Server");
     String confPath = System.getenv("GRAVITINO_TEST") == null ? "" : args[0];
     ServerConfig serverConfig = loadConfig(confPath);
-    GravitinoServer server = new GravitinoServer(serverConfig);
+    GravitinoServer server = new GravitinoServer(serverConfig, GravitinoEnv.getInstance());
     server.initialize();
 
     try {

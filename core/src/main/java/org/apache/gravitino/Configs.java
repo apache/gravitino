@@ -20,6 +20,7 @@ package org.apache.gravitino;
 
 import com.google.common.collect.Lists;
 import java.io.File;
+import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.config.ConfigBuilder;
@@ -340,4 +341,12 @@ public class Configs {
           .version(ConfigConstants.VERSION_0_5_1)
           .intConf()
           .createWithDefault(DEFAULT_METRICS_TIME_SLIDING_WINDOW_SECONDS);
+
+  public static final ConfigEntry<List<String>> REST_API_EXTENSION_PACKAGES =
+      new ConfigBuilder("gravitino.server.rest.extensionPackages")
+          .doc("Comma-separated list of REST API packages to expand")
+          .version(ConfigConstants.VERSION_0_6_0)
+          .stringConf()
+          .toSequence()
+          .createWithDefault(Collections.emptyList());
 }

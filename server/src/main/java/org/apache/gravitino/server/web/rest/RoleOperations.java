@@ -35,7 +35,7 @@ import javax.ws.rs.core.Response;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.authorization.AccessControlManager;
+import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Privileges;
@@ -57,12 +57,12 @@ import org.slf4j.LoggerFactory;
 public class RoleOperations {
   private static final Logger LOG = LoggerFactory.getLogger(RoleOperations.class);
 
-  private final AccessControlManager accessControlManager;
+  private final AccessControlDispatcher accessControlManager;
 
   @Context private HttpServletRequest httpRequest;
 
   public RoleOperations() {
-    this.accessControlManager = GravitinoEnv.getInstance().accessControlManager();
+    this.accessControlManager = GravitinoEnv.getInstance().accessControlDispatcher();
   }
 
   @GET
