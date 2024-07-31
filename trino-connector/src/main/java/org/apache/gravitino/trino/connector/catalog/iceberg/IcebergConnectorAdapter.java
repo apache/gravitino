@@ -24,7 +24,6 @@ import io.trino.spi.session.PropertyMetadata;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.catalog.property.PropertyConverter;
-import org.apache.gravitino.trino.connector.GravitinoConnectorPluginManager;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
@@ -35,6 +34,7 @@ import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
  */
 public class IcebergConnectorAdapter implements CatalogConnectorAdapter {
 
+  private static final String CONNECTOR_ICEBERG = "iceberg";
   private final IcebergPropertyMeta propertyMetadata;
   private final PropertyConverter catalogConverter;
 
@@ -51,7 +51,7 @@ public class IcebergConnectorAdapter implements CatalogConnectorAdapter {
 
   @Override
   public String internalConnectorName() {
-    return GravitinoConnectorPluginManager.CONNECTOR_ICEBERG;
+    return CONNECTOR_ICEBERG;
   }
 
   @Override

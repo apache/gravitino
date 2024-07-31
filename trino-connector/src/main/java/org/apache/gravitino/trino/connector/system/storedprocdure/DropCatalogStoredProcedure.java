@@ -26,6 +26,7 @@ import io.trino.spi.procedure.Procedure;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.util.List;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
@@ -103,7 +104,7 @@ public class DropCatalogStoredProcedure extends GravitinoStoredProcedure {
     } catch (Exception e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,
-          "Drop catalog failed. " + e.getMessage(),
+          "Drop catalog failed. " + (StringUtils.isEmpty(e.getMessage()) ? "" : e.getMessage()),
           e);
     }
   }

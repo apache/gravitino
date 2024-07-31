@@ -67,10 +67,6 @@ public class PostgreSqlColumnDefaultValueConverter extends JdbcColumnDefaultValu
       if (columnDefaultValue.equals(CURRENT_TIMESTAMP)) {
         return DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
       }
-      if (e instanceof IllegalArgumentException
-          && e.getMessage().contains("Unknown data type for literal")) {
-        throw e;
-      }
       return UnparsedExpression.of(columnDefaultValue);
     }
   }

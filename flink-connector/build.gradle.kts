@@ -27,7 +27,13 @@ repositories {
 }
 
 val flinkVersion: String = libs.versions.flink.get()
-val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
+
+// The Flink only support scala 2.12, and all scala api will be removed in a future version.
+// You can find more detail at the following issues:
+// https://issues.apache.org/jira/browse/FLINK-23986,
+// https://issues.apache.org/jira/browse/FLINK-20845,
+// https://issues.apache.org/jira/browse/FLINK-13414.
+val scalaVersion: String = "2.12"
 val artifactName = "gravitino-${project.name}-$scalaVersion"
 
 dependencies {
@@ -150,6 +156,7 @@ tasks.test {
     exclude("**/integration/**")
   } else {
     dependsOn(tasks.jar)
+    dependsOn(":catalogs:catalog-hive:jar")
 
     doFirst {
       environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.13")

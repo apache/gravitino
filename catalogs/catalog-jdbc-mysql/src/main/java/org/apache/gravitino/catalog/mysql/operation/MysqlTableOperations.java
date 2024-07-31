@@ -492,6 +492,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
         .collect(Collectors.joining(",\n"));
   }
 
+  @Override
   protected JdbcTable getOrCreateTable(
       String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
     return null != lazyLoadCreateTable ? lazyLoadCreateTable : load(databaseName, tableName);

@@ -23,17 +23,20 @@ from gravitino.dto.responses.error_response import ErrorResponse
 from gravitino.exceptions.base import (
     NoSuchSchemaException,
     NoSuchFilesetException,
+    NoSuchMetalakeException,
+    MetalakeAlreadyExistsException,
     InternalError,
     RESTException,
     NotFoundException,
-    IllegalArugmentException,
-    AlreadyExistException,
+    IllegalArgumentException,
+    AlreadyExistsException,
     NotEmptyException,
     UnsupportedOperationException,
 )
 
 from gravitino.exceptions.handlers.rest_error_handler import REST_ERROR_HANDLER
 from gravitino.exceptions.handlers.fileset_error_handler import FILESET_ERROR_HANDLER
+from gravitino.exceptions.handlers.metalake_error_handler import METALAKE_ERROR_HANDLER
 
 
 class TestErrorHandler(unittest.TestCase):
@@ -45,10 +48,10 @@ class TestErrorHandler(unittest.TestCase):
                 ErrorResponse.generate_error_response(RESTException, "mock error")
             )
 
-        with self.assertRaises(IllegalArugmentException):
+        with self.assertRaises(IllegalArgumentException):
             REST_ERROR_HANDLER.handle(
                 ErrorResponse.generate_error_response(
-                    IllegalArugmentException, "mock error"
+                    IllegalArgumentException, "mock error"
                 )
             )
 
@@ -69,10 +72,10 @@ class TestErrorHandler(unittest.TestCase):
                 )
             )
 
-        with self.assertRaises(AlreadyExistException):
+        with self.assertRaises(AlreadyExistsException):
             REST_ERROR_HANDLER.handle(
                 ErrorResponse.generate_error_response(
-                    AlreadyExistException, "mock error"
+                    AlreadyExistsException, "mock error"
                 )
             )
 
@@ -116,5 +119,31 @@ class TestErrorHandler(unittest.TestCase):
 
         with self.assertRaises(RESTException):
             FILESET_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(Exception, "mock error")
+            )
+
+    def test_metalake_error_handler(self):
+
+        with self.assertRaises(NoSuchMetalakeException):
+            METALAKE_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    NoSuchMetalakeException, "mock error"
+                )
+            )
+
+        with self.assertRaises(MetalakeAlreadyExistsException):
+            METALAKE_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    MetalakeAlreadyExistsException, "mock error"
+                )
+            )
+
+        with self.assertRaises(InternalError):
+            METALAKE_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(InternalError, "mock error")
+            )
+
+        with self.assertRaises(RESTException):
+            METALAKE_ERROR_HANDLER.handle(
                 ErrorResponse.generate_error_response(Exception, "mock error")
             )

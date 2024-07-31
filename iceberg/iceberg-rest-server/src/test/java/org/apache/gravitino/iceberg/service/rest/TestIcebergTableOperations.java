@@ -20,6 +20,7 @@
 package org.apache.gravitino.iceberg.service.rest;
 
 import com.google.common.collect.ImmutableSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -29,10 +30,10 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import org.apache.iceberg.MetadataUpdate;
-import org.apache.iceberg.MetadataUpdate.AddSchema;
-import org.apache.iceberg.MetadataUpdate.SetCurrentSchema;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.UpdateRequirement;
+import org.apache.iceberg.UpdateRequirements;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.metrics.CommitReport;
@@ -107,10 +108,10 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
   }
 
   private Response doUpdateTable(String name, TableMetadata base) {
-    MetadataUpdate addSchema = new AddSchema(newTableSchema, base.lastColumnId());
-    MetadataUpdate setCurrentSchema = new SetCurrentSchema(1);
-    UpdateTableRequest updateTableRequest =
-        UpdateTableRequest.builderFor(base).update(addSchema).update(setCurrentSchema).build();
+    TableMetadata newMetadata = base.updateSchema(newTableSchema, base.lastColumnId());
+    List<MetadataUpdate> metadataUpdates = newMetadata.changes();
+    List<UpdateRequirement> requirements = UpdateRequirements.forUpdateTable(base, metadataUpdates);
+    UpdateTableRequest updateTableRequest = new UpdateTableRequest(requirements, metadataUpdates);
     return getTableClientBuilder(Optional.of(name))
         .post(Entity.entity(updateTableRequest, MediaType.APPLICATION_JSON_TYPE));
   }
