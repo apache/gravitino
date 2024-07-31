@@ -44,6 +44,7 @@ import org.slf4j.LoggerFactory;
  * AuxiliaryServiceManager manage all GravitinoAuxiliaryServices with isolated classloader provided
  */
 public class AuxiliaryServiceManager {
+  // TEST
   private static final Logger LOG = LoggerFactory.getLogger(AuxiliaryServiceManager.class);
   public static final String GRAVITINO_AUX_SERVICE_PREFIX = "gravitino.auxService.";
   public static final String AUX_SERVICE_NAMES = "names";
