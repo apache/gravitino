@@ -124,6 +124,8 @@ public class AuthorizationUtils {
         namespace);
   }
 
+  // Install some post hooks used for ownership. The ownership will have the all privileges
+  // of securable objects, users, groups, roles.
   public static <T> void prepareAuthorizationHooks(T manager, LifecycleHooks hooks) {
     if (manager instanceof SupportsMetalakes) {
       hooks.addPostHook(

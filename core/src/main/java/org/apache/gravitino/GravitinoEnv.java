@@ -346,6 +346,8 @@ public class GravitinoEnv {
             installLifecycleHooks((TableDispatcher) tableOperationDispatcher), catalogManager);
     this.tableDispatcher = new TableEventDispatcher(eventBus, tableNormalizeDispatcher);
 
+    // TODO: We can install hooks when we need, we only supports ownership post hook,
+    //  partition doesn't have ownership, so we don't need it now.
     PartitionOperationDispatcher partitionOperationDispatcher =
         new PartitionOperationDispatcher(catalogManager, entityStore, idGenerator);
     PartitionNormalizeDispatcher partitionNormalizeDispatcher =
