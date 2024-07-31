@@ -26,8 +26,8 @@ import lombok.ToString;
 /** A test SQL files which contains multi SQL queries. */
 @Getter
 @ToString
-public class TestCase {
-  private Path testFile;
+public final class TestCase {
+  private final Path testFile;
 
   public TestCase(Path testFile) {
     this.testFile = testFile;

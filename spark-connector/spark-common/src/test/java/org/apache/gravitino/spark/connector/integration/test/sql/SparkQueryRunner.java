@@ -62,19 +62,19 @@ public class SparkQueryRunner {
   private boolean regenerateGoldenFiles;
   // catalogType -> catalogName
   private Map<CatalogType, String> catalogs = new HashMap<>();
-  private boolean isSetupGravitinoEnv;
+  private boolean isGravitinoEnvSetup;
   private String dataDir;
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   public SparkQueryRunner(SparkTestConfig sparkTestConfig) {
     this.regenerateGoldenFiles = sparkTestConfig.generateGoldenFiles();
-    this.isSetupGravitinoEnv = sparkTestConfig.isSetupGravitinoEnv();
+    this.isGravitinoEnvSetup = sparkTestConfig.isGravitinoEnvSetUp();
     String baseDir = sparkTestConfig.getBaseDir();
     // translate to file:///xx/xx
     this.dataDir = Paths.get(baseDir, "data").toUri().toString();
     this.metalakeName = sparkTestConfig.getMetalakeName();
-    if (isSetupGravitinoEnv) {
+    if (isGravitinoEnvSetup) {
       try {
         setupGravitinoEnv();
       } catch (Exception e) {
@@ -117,7 +117,7 @@ public class SparkQueryRunner {
       sparkSession.close();
       sparkSession = null;
     }
-    if (isSetupGravitinoEnv) {
+    if (isGravitinoEnvSetup) {
       closeGravitinoEnv();
     }
   }

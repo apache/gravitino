@@ -48,7 +48,9 @@ public class SparkTestConfig extends Config {
   private static final ConfigEntry<String> TEST_SQLS =
       new ConfigBuilder("gravitino.test.sqls")
           .doc(
-              "Specify the test SQLs, using directory to specify group of SQLs like `test-sqls/hive`, using file path to specify one SQL like `test-sqls/hive/basic.sql`, use `,` to split multi part")
+              "Specify the test SQLs, using directory to specify group of SQLs like "
+                  + "`test-sqls/hive`, using file path to specify one SQL like "
+                  + "`test-sqls/hive/basic.sql`, use `,` to split multi part")
           .version("0.6.0")
           .stringConf()
           .create();
@@ -70,7 +72,7 @@ public class SparkTestConfig extends Config {
 
   private static final ConfigEntry<Boolean> SETUP_GRAVITINO_ENV =
       new ConfigBuilder("gravitino.test.setup.env")
-          .doc("Whether to setup Gravitino and hive environment")
+          .doc("Whether to setup Gravitino and Hive environment")
           .version("0.6.0")
           .booleanConf()
           .createWithDefault(Boolean.FALSE);
@@ -97,7 +99,7 @@ public class SparkTestConfig extends Config {
     return get(GENERATE_GOLDEN_FILES);
   }
 
-  public boolean isSetupGravitinoEnv() {
+  public boolean isGravitinoEnvSetUp() {
     return get(SETUP_GRAVITINO_ENV);
   }
 

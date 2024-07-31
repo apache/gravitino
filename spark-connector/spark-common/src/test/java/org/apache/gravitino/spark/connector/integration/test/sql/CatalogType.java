@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.spark.connector.integration.test.sql;
 
+import java.util.Locale;
+
 public enum CatalogType {
   HIVE,
   ICEBERG,
@@ -27,7 +29,7 @@ public enum CatalogType {
     if (str == null) {
       return UNKNOWN;
     }
-    switch (str.toLowerCase()) {
+    switch (str.toLowerCase(Locale.ROOT)) {
       case "hive":
         return HIVE;
       case "lakehouse-iceberg":
@@ -38,10 +40,6 @@ public enum CatalogType {
   }
 
   public static CatalogType merge(CatalogType parentCatalogType, CatalogType childCatalogType) {
-    if (parentCatalogType.equals(UNKNOWN)) {
-      return childCatalogType;
-    } else {
-      return parentCatalogType;
-    }
+    return parentCatalogType.equals(UNKNOWN) ? childCatalogType : parentCatalogType;
   }
 }

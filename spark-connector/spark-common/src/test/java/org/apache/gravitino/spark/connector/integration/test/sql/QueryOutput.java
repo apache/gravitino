@@ -22,10 +22,10 @@ import lombok.Getter;
 
 /** The SQL execution output, include schemas and output */
 @Getter
-public class QueryOutput {
-  private String sql;
-  private String schema;
-  private String output;
+public final class QueryOutput {
+  private final String sql;
+  private final String schema;
+  private final String output;
 
   public QueryOutput(String sql, String schema, String output) {
     this.sql = sql;
