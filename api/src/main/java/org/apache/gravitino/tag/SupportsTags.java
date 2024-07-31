@@ -49,12 +49,16 @@ public interface SupportsTags {
    *
    * @param name The name of the tag.
    * @return The tag.
+   * @throws NoSuchTagException If the tag does not associate with the object.
    */
   Tag getTag(String name) throws NoSuchTagException;
 
   /**
    * Associate tags to the specific object. The tagsToAdd will be added to the object, and the
-   * tagsToRemove will be removed from the object.
+   * tagsToRemove will be removed from the object. Note that: 1) Adding or removing tags that are
+   * not existed will be ignored. 2) If the same name tag is in both tagsToAdd and tagsToRemove, it
+   * will be ignored. 3) If the tag is already associated with the object, it will throw {@link
+   * TagAlreadyAssociatedException}
    *
    * @param tagsToAdd The arrays of tag name to be added to the object.
    * @param tagsToRemove The array of tag name to be removed from the object.
