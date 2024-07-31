@@ -146,7 +146,6 @@ class HTTPClient:
                     ErrorResponse.generate_error_response(RESTException, err.reason),
                 )
 
-            # err_resp = ErrorResponse.from_json(err_body, infer_missing=True)
             err_resp = self._parse_error_response(err_body)
             err_resp.validate()
 
