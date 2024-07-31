@@ -26,7 +26,7 @@ from gravitino.dto.responses.error_response import ErrorResponse
 @dataclass
 class OAuth2ErrorResponse(ErrorResponse):
     """Represents the response of an OAuth2 error."""
-    
+
     _type: str = field(metadata=config(field_name="error"))
     _message: str = field(metadata=config(field_name="error_description"))
 
