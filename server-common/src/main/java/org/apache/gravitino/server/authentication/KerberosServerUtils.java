@@ -356,10 +356,7 @@ public class KerberosServerUtils {
     String getAsString() {
       try {
         return new String(
-            bb.array(),
-            bb.arrayOffset() + bb.position(),
-            bb.remaining(),
-            StandardCharsets.UTF_8.name());
+            bb.array(), bb.arrayOffset() + bb.position(), bb.remaining(), StandardCharsets.UTF_8.name());
       } catch (UnsupportedEncodingException e) {
         throw new IllegalCharsetNameException(StandardCharsets.UTF_8.name()); // won't happen.
       }
