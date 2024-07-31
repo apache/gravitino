@@ -12,8 +12,7 @@ The Apache Gravitino Iceberg REST Server follows the [Apache Iceberg REST API sp
 
 ### Capabilities
 
-- Supports the Apache Iceberg REST API defined in Iceberg 1.3, and supports all namespace and table interfaces. The following interfaces are not implemented yet:
-  - registerTable
+- Supports the Apache Iceberg REST API defined in Iceberg 1.5, and supports all namespace and table interfaces. The following interfaces are not implemented yet:
   - token
   - view
   - multi table transaction
@@ -31,12 +30,14 @@ Builds with Hadoop 2.10.x. There may be compatibility issues when accessing Hado
 
 Iceberg REST server could start as a standalone server or an auxiliary service in Gravitino server. There are some differences like below:
 
-|                                  | Standalone server                                                                            | Auxiliary service in Gravitino server                                                                        | 
-|----------------------------------|----------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|
-| How to build package             | `./gradlew assembleIcebergRESTServer -x test` build a package with Iceberg REST server only. | `./gradlew assembleDistribution -x test` will build Gravitino server and Iceberg REST server in one package. | 
-| Script file to start&stop server | `gravitino-iceberg-rest-server.sh`                                                           | `gravitino.sh`                                                                                               | 
-| Configuration file               | `gravitino-iceberg-rest-server.conf`                                                         | `gravitino.conf`                                                                                             | 
+|                         | Standalone server                                                                                                                              | Auxiliary service in Gravitino server                                                                                             | 
+|-------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|
+| How to build package    | `./gradlew compileIcebergRESTServer -x test` build a standalone Iceberg REST server in `distribution/gravitino-iceberg-rest-server` directory. | `./gradlew compileDistribution -x test` build Gravitino server and Iceberg REST server in `distribution/package` directory.       | 
+| How to assemble package | `./gradlew assembleIcebergRESTServer -x test` build a tar file with Iceberg REST server only in `distribution` directory.                      | `./gradlew assembleDistribution -x test` build a tar file with Gravitino server and Iceberg REST server `distribution` directory. | 
+| How to start server     | `./bin/gravitino-iceberg-rest-server.sh start`                                                                                                 | `./bin/gravitino.sh start`                                                                                                        | 
+| Configuration files     | `./conf/gravitino-iceberg-rest-server.conf`, `conf/log4j2.properties`                                                                          | `./conf/gravitino.conf`, `conf/log4j2.properties`                                                                                 | 
 
+You could modify environment variables in `conf/gravitino-env.sh` and check the log files in `./log/gravitino-iceberg-rest-server.log`, `./log/gravitino-iceberg-rest-server.out` for both mode.
 
 ## Apache Gravitino Iceberg REST catalog server configuration
 
