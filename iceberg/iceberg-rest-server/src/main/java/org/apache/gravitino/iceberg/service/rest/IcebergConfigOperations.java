@@ -20,19 +20,14 @@ package org.apache.gravitino.iceberg.service.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
-import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.gravitino.iceberg.common.ops.IcebergTableOpsManager;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.iceberg.rest.responses.ConfigResponse;
@@ -46,25 +41,12 @@ public class IcebergConfigOperations {
   @Context
   private HttpServletRequest httpRequest;
 
-  private IcebergTableOpsManager icebergTableOpsManager;
-
-  @Inject
-  public IcebergConfigOperations(IcebergTableOpsManager icebergTableOpsManager) {
-    this.icebergTableOpsManager = icebergTableOpsManager;
-  }
-
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Timed(name = "config." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "config", absolute = true)
-  public Response getConfig(
-      @PathParam("prefix") String prefix,
-      @DefaultValue("") @QueryParam("warehouse") String warehouse) {
-    ConfigResponse.Builder builder = ConfigResponse.builder();
-    icebergTableOpsManager
-        .getPrefix(prefix, warehouse)
-        .ifPresent(p -> builder.withOverride("prefix", p));
-    ConfigResponse response = builder.build();
+  public Response getConfig() {
+    ConfigResponse response = ConfigResponse.builder().build();
     return IcebergRestUtils.ok(response);
   }
 }

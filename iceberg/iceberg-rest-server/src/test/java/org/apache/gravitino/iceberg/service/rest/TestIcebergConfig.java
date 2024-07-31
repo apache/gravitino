@@ -45,11 +45,7 @@ public class TestIcebergConfig extends IcebergTestBase {
 
     ConfigResponse response = resp.readEntity(ConfigResponse.class);
     Assertions.assertEquals(0, response.defaults().size());
-    if (withPrefix) {
-      Assertions.assertEquals(1, response.overrides().size());
-    } else {
-      Assertions.assertEquals(0, response.overrides().size());
-    }
+    Assertions.assertEquals(0, response.overrides().size());
   }
 
   @ParameterizedTest
