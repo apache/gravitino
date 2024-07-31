@@ -18,7 +18,7 @@ under the License.
 """
 
 from gravitino.exceptions.base import UnauthorizedException, BadRequestException
-from gravitino.dto.responses.error_response import ErrorResponse
+from gravitino.dto.responses.oauth2_error_response import OAuth2ErrorResponse
 from gravitino.exceptions.handlers.rest_error_handler import RestErrorHandler
 
 INVALID_CLIENT_ERROR = "invalid_client"
@@ -28,19 +28,30 @@ UNAUTHORIZED_CLIENT_ERROR = "unauthorized_client"
 UNSUPPORTED_GRANT_TYPE_ERROR = "unsupported_grant_type"
 INVALID_SCOPE_ERROR = "invalid_scope"
 
+
 class OAuthErrorHandler(RestErrorHandler):
 
-    def handle(self, error_response: ErrorResponse):
-        
+    def handle(self, error_response: OAuth2ErrorResponse):
+
         error_message = error_response.message()
         exception_type = error_response.type()
 
         if exception_type == INVALID_CLIENT_ERROR:
-            raise UnauthorizedException(f"Not authorized: {exception_type}: {error_message}")
-        
-        if exception_type in [INVALID_REQUEST_ERROR, INVALID_GRANT_ERROR, UNAUTHORIZED_CLIENT_ERROR, UNSUPPORTED_GRANT_TYPE_ERROR, INVALID_SCOPE_ERROR]:
-            raise BadRequestException(f"Malformed request: {exception_type}: {error_message}")
-        
+            raise UnauthorizedException(
+                f"Not authorized: {exception_type}: {error_message}"
+            )
+
+        if exception_type in [
+            INVALID_REQUEST_ERROR,
+            INVALID_GRANT_ERROR,
+            UNAUTHORIZED_CLIENT_ERROR,
+            UNSUPPORTED_GRANT_TYPE_ERROR,
+            INVALID_SCOPE_ERROR,
+        ]:
+            raise BadRequestException(
+                f"Malformed request: {exception_type}: {error_message}"
+            )
+
         super().handle(error_response)
 
 
