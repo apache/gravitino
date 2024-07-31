@@ -36,6 +36,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.client.GravitinoAdminClient;
@@ -221,7 +222,7 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
   }
 
   private static void addKerberosConfig() {
-    AbstractIT.customConfigs.put("gravitino.authenticator", "kerberos");
+    AbstractIT.customConfigs.put(Configs.AUTHENTICATORS.getKey(), "kerberos");
     AbstractIT.customConfigs.put(
         "gravitino.authenticator.kerberos.principal", GRAVITINO_SERVER_PRINCIPAL);
     AbstractIT.customConfigs.put(
@@ -410,13 +411,13 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
 
     // Create a catalog
     Map<String, String> properties = Maps.newHashMap();
-    String localtion = HDFS_URL + "/user/hadoop/" + catalogName;
+    String location = HDFS_URL + "/user/hadoop/" + catalogName;
 
     properties.put(AUTH_TYPE_KEY, "kerberos");
     properties.put(IMPERSONATION_ENABLE_KEY, "true");
     properties.put(KEY_TAB_URI_KEY, TMP_DIR + HADOOP_CLIENT_KEYTAB);
     properties.put(PRINCIPAL_KEY, HADOOP_CLIENT_PRINCIPAL);
-    properties.put("location", localtion);
+    properties.put("location", location);
 
     kerberosHiveContainer.executeInContainer(
         "hadoop", "fs", "-mkdir", "-p", "/user/hadoop/" + catalogName);

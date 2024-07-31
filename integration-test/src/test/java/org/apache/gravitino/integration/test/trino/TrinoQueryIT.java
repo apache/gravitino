@@ -54,19 +54,19 @@ import org.slf4j.LoggerFactory;
 public class TrinoQueryIT extends TrinoQueryITBase {
   private static final Logger LOG = LoggerFactory.getLogger(TrinoQueryIT.class);
 
-  protected static String testsetsDir = "";
-  protected AtomicInteger passCount = new AtomicInteger(0);
-  protected AtomicInteger totalCount = new AtomicInteger(0);
-  protected static boolean exitOnFailed = true;
+  static String testsetsDir = "";
+  AtomicInteger passCount = new AtomicInteger(0);
+  AtomicInteger totalCount = new AtomicInteger(0);
+  static boolean exitOnFailed = true;
 
   // key: tester name, value: tester result
   private static Map<String, TestStatus> allTestStatus = new TreeMap<>();
 
   private static int testParallelism = 2;
 
-  private static Map<String, String> queryParams = new HashMap<>();
+  static Map<String, String> queryParams = new HashMap<>();
 
-  public static Set<String> ciTestsets = new HashSet<>();
+  static Set<String> ciTestsets = new HashSet<>();
 
   static {
     testsetsDir = TrinoQueryIT.class.getClassLoader().getResource("trino-ci-testset").getPath();
@@ -105,9 +105,14 @@ public class TrinoQueryIT extends TrinoQueryITBase {
           .pollInterval(1, TimeUnit.SECONDS)
           .until(
               () -> {
-                String[] catalogs = trinoQueryRunner.runQuery("show catalogs").split("\n");
-                LOG.info("Catalogs: {}", Arrays.toString(catalogs));
-                return Arrays.stream(catalogs).noneMatch(s -> s.startsWith("\"gt_"));
+                try {
+                  String[] catalogs = trinoQueryRunner.runQuery("show catalogs").split("\n");
+                  LOG.info("Catalogs: {}", Arrays.toString(catalogs));
+                  return Arrays.stream(catalogs).noneMatch(s -> s.startsWith("\"gt_"));
+                } catch (Exception e) {
+                  LOG.error("Failed to run query in trino", e);
+                  return false;
+                }
               });
     } catch (Exception e) {
       throw new Exception("Failed to clean up test env: " + e.getMessage(), e);

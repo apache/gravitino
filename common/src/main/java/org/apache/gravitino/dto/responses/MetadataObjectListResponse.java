@@ -57,6 +57,7 @@ public class MetadataObjectListResponse extends BaseResponse {
    *
    * @throws IllegalArgumentException if name or audit information is not set.
    */
+  @Override
   public void validate() throws IllegalArgumentException {
     super.validate();
 

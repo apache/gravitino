@@ -51,7 +51,7 @@
 > **Requirements**
 >
 > Please make sure you use the node's LTS version
-> Before installing the **node_modules**, make sure you have files starting with a **dot(.eslintrc, .env etc..)**
+> Before installing the **node_modules**, make sure you have files starting with a **dot(.eslintrc, .env etc.)**
 
 ## Installation
 

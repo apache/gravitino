@@ -21,9 +21,11 @@ package org.apache.gravitino.dto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import lombok.EqualsAndHashCode;
 import org.apache.gravitino.Schema;
 
 /** Represents a Schema DTO (Data Transfer Object). */
+@EqualsAndHashCode
 public class SchemaDTO implements Schema {
 
   @JsonProperty("name")

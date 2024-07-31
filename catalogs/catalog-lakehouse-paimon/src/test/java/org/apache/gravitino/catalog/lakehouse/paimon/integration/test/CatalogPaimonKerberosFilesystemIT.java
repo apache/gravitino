@@ -32,6 +32,7 @@ import java.nio.file.Files;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
 import org.apache.gravitino.client.GravitinoAdminClient;
@@ -59,7 +60,7 @@ import org.junit.jupiter.api.TestInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class CatalogPaimonKerberosFilesystemIT extends AbstractIT {
 
@@ -194,7 +195,7 @@ public class CatalogPaimonKerberosFilesystemIT extends AbstractIT {
   }
 
   private static void addKerberosConfig() {
-    AbstractIT.customConfigs.put("gravitino.authenticator", "kerberos");
+    AbstractIT.customConfigs.put(Configs.AUTHENTICATORS.getKey(), "kerberos");
     AbstractIT.customConfigs.put(
         "gravitino.authenticator.kerberos.principal", GRAVITINO_SERVER_PRINCIPAL);
     AbstractIT.customConfigs.put(

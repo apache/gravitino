@@ -34,12 +34,12 @@ public class JdbcDriverDownloader {
 
   public static final Logger LOG = LoggerFactory.getLogger(JdbcDriverDownloader.class);
 
-  public static void downloadJdbcDriver(String jdbcDriverUrl, String... destinationDirectorys)
+  public static void downloadJdbcDriver(String jdbcDriverUrl, String... destinationDirectories)
       throws IOException {
     URL url = new URL(jdbcDriverUrl);
     URLConnection connection = url.openConnection();
     String fileName = getFileName(url);
-    String destinationDirectory = destinationDirectorys[0];
+    String destinationDirectory = destinationDirectories[0];
     Path destinationPath = Paths.get(destinationDirectory, fileName);
     File file = new File(destinationPath.toString());
     if (!file.exists()) {
@@ -55,8 +55,8 @@ public class JdbcDriverDownloader {
         LOG.info("Download jdbc-driver:{} success. path:{}", fileName, destinationPath);
       }
     }
-    for (int i = 1; i < destinationDirectorys.length; i++) {
-      Path targetPath = Paths.get(destinationDirectorys[i], fileName);
+    for (int i = 1; i < destinationDirectories.length; i++) {
+      Path targetPath = Paths.get(destinationDirectories[i], fileName);
       Files.copy(destinationPath, targetPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
     }
   }

@@ -576,6 +576,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
         + ";";
   }
 
+  @Override
   public JdbcTable getOrCreateTable(
       String databaseName, String tableName, JdbcTable lazyLoadTable) {
     if (null == lazyLoadTable) {

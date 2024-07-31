@@ -228,7 +228,7 @@ class TestUserMetaService extends TestJDBCBackend {
         Sets.newHashSet(role1.name(), role2.name()),
         Sets.newHashSet(actualOverwriteUser2.roleNames()));
 
-    // insert overwrite user with 1 roles
+    // insert overwrite user with 1 role
     RoleEntity role3 =
         createRoleEntity(
             RandomIdGenerator.INSTANCE.nextId(),

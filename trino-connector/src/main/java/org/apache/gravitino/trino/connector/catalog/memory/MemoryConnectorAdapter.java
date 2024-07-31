@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.trino.connector.catalog.memory;
 
-import static org.apache.gravitino.trino.connector.GravitinoConnectorPluginManager.CONNECTOR_MEMORY;
-
 import io.trino.spi.session.PropertyMetadata;
 import java.util.Collections;
 import java.util.List;
@@ -35,6 +33,7 @@ import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
  */
 public class MemoryConnectorAdapter implements CatalogConnectorAdapter {
 
+  private static final String CONNECTOR_MEMORY = "memory";
   private final HasPropertyMeta propertyMetadata;
 
   public MemoryConnectorAdapter() {

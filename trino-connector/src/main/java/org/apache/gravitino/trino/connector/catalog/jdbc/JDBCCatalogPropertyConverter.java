@@ -28,9 +28,9 @@ import org.apache.gravitino.catalog.property.PropertyConverter;
 
 public class JDBCCatalogPropertyConverter extends PropertyConverter {
 
-  static final String JDBC_CONNECTION_URL_KEY = "connection-url";
-  static final String JDBC_CONNECTION_USER_KEY = "connection-user";
-  static final String JDBC_CONNECTION_PASSWORD_KEY = "connection-password";
+  public static final String JDBC_CONNECTION_URL_KEY = "connection-url";
+  public static final String JDBC_CONNECTION_USER_KEY = "connection-user";
+  public static final String JDBC_CONNECTION_PASSWORD_KEY = "connection-password";
 
   private static final TreeBidiMap<String, String> TRINO_KEY_TO_GRAVITINO_KEY =
       new TreeBidiMap<>(

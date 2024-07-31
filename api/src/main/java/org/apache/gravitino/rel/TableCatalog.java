@@ -202,7 +202,7 @@ public interface TableCatalog {
    * @param distribution The distribution of the table
    * @param sortOrders The sort orders of the table
    * @param partitions The table partitioning.
-   * @return Fhe created table metadata.
+   * @return The created table metadata.
    * @throws NoSuchSchemaException If the schema does not exist.
    * @throws TableAlreadyExistsException If the table already exists.
    */

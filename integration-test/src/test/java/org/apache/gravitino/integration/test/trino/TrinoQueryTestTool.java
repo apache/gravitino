@@ -48,6 +48,12 @@ public class TrinoQueryTestTool {
           "Generate the output file for the test set, the default value is 'false'");
 
       options.addOption(
+          "test_host",
+          true,
+          "Host address for all test services (include gravitino server, trino, hive, postgresql, mysql..., "
+              + "if the services are not running on the same host. set the arguments like --gravitino_uri=xxx and --trino_uri=xxx), "
+              + "all test services use 127.0.0.1 as default, if --auto is set to 'all', this option is ignored");
+      options.addOption(
           "gravitino_uri",
           true,
           "URL for Gravitino server, if --auto is set to 'all', this option is ignored");
@@ -72,6 +78,12 @@ public class TrinoQueryTestTool {
       options.addOption("test_set", true, "Specify the test set name to test");
       options.addOption("tester_id", true, "Specify the tester file name prefix to select to test");
       options.addOption("catalog", true, "Specify the catalog name to test");
+
+      options.addOption(
+          "params",
+          true,
+          "Additional parameters that can replace the value of ${key} in the testers contents, "
+              + "example: --params=key1,v1;key2,v2");
 
       options.addOption("help", false, "Print this help message");
 
@@ -113,7 +125,7 @@ public class TrinoQueryTestTool {
             break;
           default:
             System.out.println("The value of --auto must be 'all', 'gravitino' or 'none'");
-            return;
+            System.exit(1);
         }
       }
 
@@ -123,6 +135,8 @@ public class TrinoQueryTestTool {
 
       TrinoQueryIT.ciTestsets.clear();
 
+      String testHost = commandLine.getOptionValue("test_host");
+      TrinoQueryIT.testHost = Strings.isBlank(testHost) ? TrinoQueryIT.testHost : testHost;
       String gravitinoUri = commandLine.getOptionValue("gravitino_uri");
       TrinoQueryIT.gravitinoUri =
           Strings.isBlank(gravitinoUri) ? TrinoQueryIT.gravitinoUri : gravitinoUri;
@@ -138,6 +152,22 @@ public class TrinoQueryTestTool {
       String postgresqlUri = commandLine.getOptionValue("postgresql_uri");
       TrinoQueryIT.postgresqlUri =
           Strings.isBlank(postgresqlUri) ? TrinoQueryIT.postgresqlUri : postgresqlUri;
+
+      String params = commandLine.getOptionValue("params");
+      if (Strings.isNotBlank(params)) {
+        for (String param : params.split(";")) {
+          String[] split = param.split(",");
+          String key = split[0].trim();
+          String value = split[1].trim();
+          if (Strings.isNotBlank(key) && Strings.isNotBlank(value)) {
+            TrinoQueryIT.queryParams.put(key, value);
+          } else {
+            System.out.println(
+                "Invalid parameters:" + param + "The format should like --params=key1,v1;key2,v2");
+            System.exit(1);
+          }
+        }
+      }
 
       String testSet = commandLine.getOptionValue("test_set");
       String testerId = commandLine.getOptionValue("tester_id", "");
@@ -198,7 +228,7 @@ public class TrinoQueryTestTool {
           testerRunner.totalCount, testerRunner.passCount, testerRunner.generateTestStatus());
     } catch (Exception e) {
       System.out.println(e.getMessage());
-      e.printStackTrace();
+      System.exit(-1);
     } finally {
       TrinoQueryIT.cleanup();
     }

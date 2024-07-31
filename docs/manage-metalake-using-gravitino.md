@@ -138,7 +138,7 @@ changes = (
     MetalakeChange.rename("metalake_new_name"),
     MetalakeChange.update_comment("metalake_new_comment"),
     MetalakeChange.remove_property("metalake_properties_key1"),
-    MetalakeChange.set_property("metalake_properties_key2", "metalake_propertie_new_value"),
+    MetalakeChange.set_property("metalake_properties_key2", "metalake_properties_new_value"),
 )
 
 metalake = gravitino_admin_client.alter_metalake("metalake_name", *changes)
@@ -196,7 +196,7 @@ catalogs, schemas and tables under the metalake need to be removed before droppi
 
 ### List all metalakes
 
-You can list metalakes by sending a `GET` request to the `/api/metalakes` endpoint or just use the Gravitino Java client. The following is an example of listing all metalake names:
+You can list metalakes by sending a `GET` request to the `/api/metalakes` endpoint or just use the Gravitino Java client. The following is an example of listing all the metalake names:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">

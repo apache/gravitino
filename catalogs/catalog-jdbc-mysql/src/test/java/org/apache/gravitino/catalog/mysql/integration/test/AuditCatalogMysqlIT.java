@@ -64,7 +64,7 @@ public class AuditCatalogMysqlIT extends AbstractIT {
   @BeforeAll
   public static void startIntegrationTest() throws Exception {
     Map<String, String> configs = Maps.newHashMap();
-    configs.put(Configs.AUTHENTICATOR.getKey(), AuthenticatorType.SIMPLE.name().toLowerCase());
+    configs.put(Configs.AUTHENTICATORS.getKey(), AuthenticatorType.SIMPLE.name().toLowerCase());
     registerCustomConfigs(configs);
     AbstractIT.startIntegrationTest();
 
@@ -115,7 +115,7 @@ public class AuditCatalogMysqlIT extends AbstractIT {
   @Test
   public void testAuditTable() throws Exception {
     String catalogName = GravitinoITUtils.genRandomName("audit_mysql_table_catalog");
-    String schemaName = GravitinoITUtils.genRandomName("audit_mysql_table_schma");
+    String schemaName = GravitinoITUtils.genRandomName("audit_mysql_table_schema");
     String tableName = GravitinoITUtils.genRandomName("audit_mysql_table");
     Catalog catalog = createCatalog(catalogName);
     Map<String, String> properties = Maps.newHashMap();

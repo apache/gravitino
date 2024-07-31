@@ -19,11 +19,12 @@
 
 package org.apache.gravitino.server.authentication;
 
+import java.util.List;
 import org.apache.gravitino.Config;
 
 public class ServerAuthenticator {
 
-  private Authenticator authenticator;
+  private List<Authenticator> authenticators;
 
   private ServerAuthenticator() {}
 
@@ -47,11 +48,13 @@ public class ServerAuthenticator {
    */
   public void initialize(Config config) {
     // Create and initialize Authenticator related modules
-    this.authenticator = AuthenticatorFactory.createAuthenticator(config);
-    this.authenticator.initialize(config);
+    this.authenticators = AuthenticatorFactory.createAuthenticators(config);
+    for (Authenticator authenticator : authenticators) {
+      authenticator.initialize(config);
+    }
   }
 
-  public Authenticator authenticator() {
-    return authenticator;
+  public List<Authenticator> authenticators() {
+    return authenticators;
   }
 }
