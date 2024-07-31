@@ -19,9 +19,7 @@
 #
 
 ---
-
 paths:
-
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables/{table}/partitions:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
@@ -136,7 +134,6 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
-
 components:
   parameters:
     details:
@@ -221,7 +218,6 @@ components:
           items:
             $ref: "#/components/schemas/PartitionSpec"
 
-
     Properties:
       type: object
       description: The properties of the partition
@@ -261,7 +257,7 @@ components:
           items:
             $ref: "./expression.yaml#/components/schemas/Literal"
         properties:
-            $ref: "#/components/schemas/Properties"
+          $ref: "#/components/schemas/Properties"
 
     RangePartition:
       type: object
@@ -282,7 +278,7 @@ components:
         lower:
           $ref: "./expression.yaml#/components/schemas/Literal"
         properties:
-            $ref: "#/components/schemas/Properties"
+          $ref: "#/components/schemas/Properties"
 
     ListPartition:
       type: object
@@ -306,14 +302,12 @@ components:
           $ref: "#/components/schemas/Properties"
 
   responses:
-
     PartitionListResponse:
       description: Returns list of partition objects
       content:
         application/vnd.gravitino.v1+json:
           schema:
             $ref: "#/components/schemas/PartitionListResponse"
-
 
     PartitionResponse:
       description: Returns include the partition object
@@ -336,141 +330,115 @@ components:
 
   examples:
     PartitionNameListResponse:
-      value: {
-        "code": 0,
-        "names": [
-          "p1",
-          "p2"
-        ]
-      }
+      value: { "code": 0, "names": ["p1", "p2"] }
 
     PartitionListResponse:
-      value: {
-        "code": 0,
-        "partitions": [
-          {
-            "type": "identity",
-            "name": "p1",
-            "fieldNames": [
-              [
-                "col1"
-              ]
-            ],
-            "values": [
+      value:
+        {
+          "code": 0,
+          "partitions":
+            [
               {
-                "type": "literal",
-                "dataType": "string",
-                "value": "v1"
-              }
-            ],
-            "properties": {}
-          },
-          {
-            "type": "identity",
-            "name": "p2",
-            "fieldNames": [
-              [
-                "col1"
-              ]
-            ],
-            "values": [
-              {
-                "type": "literal",
-                "dataType": "string",
-                "value": "v2"
-              }
-            ],
-            "properties": {}
-          }
-        ]
-      }
-
-    HiveAddPartition:
-      value: {
-        "partitions": [
-          {
-            "type": "identity",
-            "fieldNames": [
-              [
-                "hive_col_name2"
-              ],
-              [
-                "hive_col_name3"
-              ]
-            ],
-            "values": [
-              {
-                "type": "literal",
-                "dataType": "date",
-                "value": "2023-01-02"
+                "type": "identity",
+                "name": "p1",
+                "fieldNames": [["col1"]],
+                "values":
+                  [{ "type": "literal", "dataType": "string", "value": "v1" }],
+                "properties": {},
               },
               {
-                "type": "literal",
-                "dataType": "string",
-                "value": "gravitino_it_test2"
-              }
+                "type": "identity",
+                "name": "p2",
+                "fieldNames": [["col1"]],
+                "values":
+                  [{ "type": "literal", "dataType": "string", "value": "v2" }],
+                "properties": {},
+              },
             ],
-            "properties": null
-          }
-        ]
-      }
+        }
+
+    HiveAddPartition:
+      value:
+        {
+          "partitions":
+            [
+              {
+                "type": "identity",
+                "fieldNames": [["hive_col_name2"], ["hive_col_name3"]],
+                "values":
+                  [
+                    {
+                      "type": "literal",
+                      "dataType": "date",
+                      "value": "2023-01-02",
+                    },
+                    {
+                      "type": "literal",
+                      "dataType": "string",
+                      "value": "gravitino_it_test2",
+                    },
+                  ],
+                "properties": null,
+              },
+            ],
+        }
 
     HivePartitionResponse:
-      value: {
-        "code": 0,
-        "partition": {
-          "type": "identity",
-          "name": "hive_col_name2=2023-01-01/hive_col_name3=gravitino_it_test",
-          "fieldNames": [
-            [
-              "hive_col_name2"
-            ],
-            [
-              "hive_col_name3"
-            ]
-          ],
-          "values": [
+      value:
+        {
+          "code": 0,
+          "partition":
             {
-              "type": "literal",
-              "dataType": "string",
-              "value": "2023-01-01"
+              "type": "identity",
+              "name": "hive_col_name2=2023-01-01/hive_col_name3=gravitino_it_test",
+              "fieldNames": [["hive_col_name2"], ["hive_col_name3"]],
+              "values":
+                [
+                  {
+                    "type": "literal",
+                    "dataType": "string",
+                    "value": "2023-01-01",
+                  },
+                  {
+                    "type": "literal",
+                    "dataType": "string",
+                    "value": "gravitino_it_test",
+                  },
+                ],
+              "properties":
+                {
+                  "totalSize": "2",
+                  "numRows": "0",
+                  "rawDataSize": "0",
+                  "COLUMN_STATS_ACCURATE": '{"BASIC_STATS":"true"}',
+                  "numFiles": "1",
+                  "transient_lastDdlTime": "1706950516",
+                },
             },
-            {
-              "type": "literal",
-              "dataType": "string",
-              "value": "gravitino_it_test"
-            }
-          ],
-          "properties": {
-            "totalSize": "2",
-            "numRows": "0",
-            "rawDataSize": "0",
-            "COLUMN_STATS_ACCURATE": "{\"BASIC_STATS\":\"true\"}",
-            "numFiles": "1",
-            "transient_lastDdlTime": "1706950516"
-          }
         }
-      }
 
     PartitionAlreadyExistsErrorResponse:
-      value: {
-        "code": 1004,
-        "type": "PartitionAlreadyExistsException",
-        "message": "Failed to operate partition(s) operation [CREATE] of table [table1], reason [p1]",
-        "stack": [
-          "org.apache.gravitino.exceptions.PartitionAlreadyExistsException: p1",
-          "..."
-        ]
-      }
+      value:
+        {
+          "code": 1004,
+          "type": "PartitionAlreadyExistsException",
+          "message": "Failed to operate partition(s) operation [CREATE] of table [table1], reason [p1]",
+          "stack":
+            [
+              "org.apache.gravitino.exceptions.PartitionAlreadyExistsException: p1",
+              "...",
+            ],
+        }
 
     NoSuchPartitionException:
-      value: {
-        "code": 1003,
-        "type": "NoSuchPartitionException",
-        "message": "Failed to operate partition(s) operation [GET] of table [table1], reason [p3]",
-        "stack": [
-          "org.apache.gravitino.exceptions.NoSuchPartitionException: p3",
-          "..."
-        ]
-      }
-
+      value:
+        {
+          "code": 1003,
+          "type": "NoSuchPartitionException",
+          "message": "Failed to operate partition(s) operation [GET] of table [table1], reason [p3]",
+          "stack":
+            [
+              "org.apache.gravitino.exceptions.NoSuchPartitionException: p3",
+              "...",
+            ],
+        }

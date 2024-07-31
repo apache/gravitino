@@ -19,7 +19,6 @@
 #
 
 ---
-
 components:
   schemas:
     IndexesSpec:

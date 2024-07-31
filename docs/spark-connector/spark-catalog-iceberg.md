@@ -93,9 +93,10 @@ SELECT * FROM employee FOR SYSTEM_TIME AS OF '2024-05-27 01:01:00';
 DESC EXTENDED employee;
 ```
 
-For more details about `CALL`, please refer to the [Spark Procedures description](https://iceberg.apache.org/docs/latest/spark-procedures/#spark-procedures) in Iceberg official document. 
+For more details about `CALL`, please refer to the [Spark Procedures description](https://iceberg.apache.org/docs/latest/spark-procedures/#spark-procedures) in Iceberg official document.
 
 ## Apache Iceberg backend-catalog support
+
 - HiveCatalog
 - JdbcCatalog
 - RESTCatalog
@@ -107,7 +108,7 @@ Gravitino spark connector will transform below property names which are defined 
 #### HiveCatalog
 
 | Gravitino catalog property name | Spark Iceberg connector configuration | Default Value | Required | Description               | Since Version |
-|---------------------------------|---------------------------------------|---------------|----------|---------------------------|---------------|
+| ------------------------------- | ------------------------------------- | ------------- | -------- | ------------------------- | ------------- |
 | `catalog-backend`               | `type`                                | `memory`      | Yes      | Catalog backend type      | 0.5.0         |
 | `uri`                           | `uri`                                 | (none)        | Yes      | Catalog backend uri       | 0.5.0         |
 | `warehouse`                     | `warehouse`                           | (none)        | Yes      | Catalog backend warehouse | 0.5.0         |
@@ -115,7 +116,7 @@ Gravitino spark connector will transform below property names which are defined 
 #### JdbcCatalog
 
 | Gravitino catalog property name | Spark Iceberg connector configuration | Default Value | Required | Description               | Since Version |
-|---------------------------------|---------------------------------------|---------------|----------|---------------------------|---------------|
+| ------------------------------- | ------------------------------------- | ------------- | -------- | ------------------------- | ------------- |
 | `catalog-backend`               | `type`                                | `memory`      | Yes      | Catalog backend type      | 0.5.0         |
 | `uri`                           | `uri`                                 | (none)        | Yes      | Catalog backend uri       | 0.5.0         |
 | `warehouse`                     | `warehouse`                           | (none)        | Yes      | Catalog backend warehouse | 0.5.0         |
@@ -125,7 +126,7 @@ Gravitino spark connector will transform below property names which are defined 
 #### RESTCatalog
 
 | Gravitino catalog property name | Spark Iceberg connector configuration | Default Value | Required | Description               | Since Version |
-|---------------------------------|---------------------------------------|---------------|----------|---------------------------|---------------|
+| ------------------------------- | ------------------------------------- | ------------- | -------- | ------------------------- | ------------- |
 | `catalog-backend`               | `type`                                | `memory`      | Yes      | Catalog backend type      | 0.5.1         |
 | `uri`                           | `uri`                                 | (none)        | Yes      | Catalog backend uri       | 0.5.1         |
 | `warehouse`                     | `warehouse`                           | (none)        | No       | Catalog backend warehouse | 0.5.1         |
@@ -135,4 +136,3 @@ Gravitino catalog property names with the prefix `spark.bypass.` are passed to S
 :::info
 Iceberg catalog property `cache-enabled` is setting to `false` internally and not allowed to change.
 :::
-

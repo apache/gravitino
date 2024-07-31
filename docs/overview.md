@@ -13,20 +13,20 @@ metadata directly in different sources, types, and regions. It also provides use
 
 Gravitino aims to provide several key features:
 
-* SSOT (Single Source of Truth) for multi-regional data with geo-distributed architecture support.
-* Unified Data + AI asset management for both users and engines.
-* Security in one place, centralize the security for different sources.
-* Built-in data management + data access management.
+- SSOT (Single Source of Truth) for multi-regional data with geo-distributed architecture support.
+- Unified Data + AI asset management for both users and engines.
+- Security in one place, centralize the security for different sources.
+- Built-in data management + data access management.
 
 ## Architecture
 
 ![Gravitino Model and Arch](assets/gravitino-model-arch.png)
 
-* **Functionality Layer**: Gravitino provides an API for users to manage and govern the
+- **Functionality Layer**: Gravitino provides an API for users to manage and govern the
   metadata, including standard metadata creation, update, and delete operations. In the meantime, it also provides the ability to govern the metadata in a unified way, including access control, discovery, and others.
-* **Interface Layer**: Gravitino provides a standard REST API as the interface layer for users. Future support includes Thrift and JDBC interfaces.
-* **Core Object Model**: Gravitino defines a generic metadata model to represent the metadata in different sources and types and manages them in a unified way.
-* **Connection Layer**: In the connection layer, Gravitino provides a set of connectors to connect to different metadata sources, including Apache Hive, MySQL, PostgreSQL, and others. It also allows connecting and managing heterogeneous metadata other than Tabular data.
+- **Interface Layer**: Gravitino provides a standard REST API as the interface layer for users. Future support includes Thrift and JDBC interfaces.
+- **Core Object Model**: Gravitino defines a generic metadata model to represent the metadata in different sources and types and manages them in a unified way.
+- **Connection Layer**: In the connection layer, Gravitino provides a set of connectors to connect to different metadata sources, including Apache Hive, MySQL, PostgreSQL, and others. It also allows connecting and managing heterogeneous metadata other than Tabular data.
 
 ## Features
 
@@ -74,13 +74,13 @@ assets like models, features, and others are under development.
 
 ![Gravitino Model](assets/metadata-model.png)
 
-* **Metalake**: The top-level container for metadata. Typically, one group has one metalake
+- **Metalake**: The top-level container for metadata. Typically, one group has one metalake
   to manage all the metadata in it. Each metalake exposes a three-level namespace(catalog.schema.
   table) to organize the data.
-* **Catalog**: A catalog is a collection of metadata from a specific metadata source.
+- **Catalog**: A catalog is a collection of metadata from a specific metadata source.
   Each catalog has a related connector to connect to the specific metadata source.
-* **Schema**: A schema is equivalent to a database, Schemas only exist in the specific catalogs
+- **Schema**: A schema is equivalent to a database, Schemas only exist in the specific catalogs
   that support relational metadata sources, such as Apache Hive, MySQL, PostgreSQL, and others.
-* **Table**: The lowest level in the object hierarchy for catalogs that support relational
+- **Table**: The lowest level in the object hierarchy for catalogs that support relational
   metadata sources. You can create Tables in specific schemas in the catalogs.
-* **Model**: The model represents the metadata in the specific catalogs that support model management.
+- **Model**: The model represents the metadata in the specific catalogs that support model management.

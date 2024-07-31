@@ -19,13 +19,14 @@
 
 # RFC-1: Entity Key Encoding design for KV store
 
-| Revision | Owner |  Date |
-| :------- |-------| ------|
-| v0.1     | Qi Yu | 1/8/2023|
-| v0.2     | Qi Yu | 5/9/2023|
+| Revision | Owner | Date     |
+| :------- | ----- | -------- |
+| v0.1     | Qi Yu | 1/8/2023 |
+| v0.2     | Qi Yu | 5/9/2023 |
 
 ## Background
-Currently, there will be many data to storage, for example, 
+
+Currently, there will be many data to storage, for example,
 User information. Such as username, password, user property, this data is structure data
 Metadata. Metadata is the key point of our product. Metadata is Heterogeneous and data may be very large
 Other information, such as query history, query log and so on
@@ -48,19 +49,19 @@ According to the picture above, Metadata in gravitino can be divided into multip
 ### Target
 
 We should design a key encoding method to encode the key of KV store that should satisfy the following requirements:
-- Support fast point queries 
+
+- Support fast point queries
 - Support efficient range queries
-- Not very complicated 
+- Not very complicated
 - Good expandability and compatibility
 
+### Design
 
-### Design 
-
-Firstly, we introduce a global auto-increment ID (or simply a UUID) that represents the name of namespace. This ID is unique in the whole system. 
+Firstly, we introduce a global auto-increment ID (or simply a UUID) that represents the name of namespace. This ID is unique in the whole system.
 For example, if there exists a catalog named `catalog1` with namespace name `metalake1`, and a schema name `schema3` under `catalog2`, then we will add the following key-value pair to KV store
 
-| Key         | Value       | Description                                  | 
-|:------------|-------------|----------------------------------------------|
+| Key         | Value       | Description                                  |
+| :---------- | ----------- | -------------------------------------------- |
 | metalake1   | 1           | name to id mapping,                          |
 | 1/catalog2  | 2           | name to id mapping, 1 is the id of metalake1 |
 | 1/2/schema3 | 3           | name to id mapping, 2 is the id of catalog2  |
@@ -71,16 +72,15 @@ For example, if there exists a catalog named `catalog1` with namespace name `met
 Note, for `catalog` and `makelake`, Considering the global uniqueness, we will use a UUID instead of auto-increment ID.
 `schema`, `table` and other entities will use auto-increment ID.
 
-
 Why we introduce this global auto-increment ID? Because we want to support the following features:
+
 - If we want to rename a namespace, we can just update the name to id mapping
 - If the name is too long, we can use a short name to represent it when encoding key of entity (see below)
 
 Then, The whole key of entity can be encoded as the following format
 
-
-| Key                                            | Value         | Description                     | 
-|:-----------------------------------------------|---------------|---------------------------------|
+| Key                                            | Value         | Description                     |
+| :--------------------------------------------- | ------------- | ------------------------------- |
 | ml/{ml_id}                                     | metalake info | ml is a short name for metalake |
 | ml/{ml_id}                                     | metalake info | ml is a short name for metalake |
 | ca/{ml_id}/{ca_id}                             | catalog_info  | ca is a short name for catalog  |
@@ -94,6 +94,4 @@ Then, The whole key of entity can be encoded as the following format
 
 ## Implementation
 
-Please see code ```BinaryEntityKeyEncoder```
-
-
+Please see code `BinaryEntityKeyEncoder`

@@ -27,17 +27,17 @@ const Apis = {
   GET_DETAIL: ({ metalake, catalog, schema, topic }) =>
     `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(
       catalog
-    )}/schemas/${encodeURIComponent(schema)}/topics/${encodeURIComponent(topic)}`
+    )}/schemas/${encodeURIComponent(schema)}/topics/${encodeURIComponent(topic)}`,
 }
 
 export const getTopicsApi = params => {
   return defHttp.get({
-    url: `${Apis.GET(params)}`
+    url: `${Apis.GET(params)}`,
   })
 }
 
 export const getTopicDetailsApi = ({ metalake, catalog, schema, topic }) => {
   return defHttp.get({
-    url: `${Apis.GET_DETAIL({ metalake, catalog, schema, topic })}`
+    url: `${Apis.GET_DETAIL({ metalake, catalog, schema, topic })}`,
   })
 }

@@ -5,18 +5,19 @@ keyword: gravitino connector trino
 license: "This software is licensed under the Apache License version 2."
 ---
 
-The PostgreSQL catalog allows querying and creating tables in an external PostgreSQL database. 
+The PostgreSQL catalog allows querying and creating tables in an external PostgreSQL database.
 This can be used to join data between different systems like PostgreSQL and Hive, or between different PostgreSQL instances.
 
 ## Requirements
 
 To connect to PostgreSQL, you need:
+
 - PostgreSQL 10.x or higher.
 - Network access from the Trino coordinator and workers to PostgreSQL. Port 5432 is the default port.
 
 ## Create table
 
-At present, the Apache Gravitino connector only supports basic PostgreSQL table creation statements, which involve fields, null allowances, and comments. 
+At present, the Apache Gravitino connector only supports basic PostgreSQL table creation statements, which involve fields, null allowances, and comments.
 However, it does not support advanced features like primary keys, indexes, default values, and auto-increment.
 
 The Gravitino connector does not support `CREATE TABLE AS SELECT`.
@@ -24,6 +25,7 @@ The Gravitino connector does not support `CREATE TABLE AS SELECT`.
 ## Alter table
 
 Gravitino connector supports the following alter table operations:
+
 - Rename table
 - Add a column
 - Drop a column
@@ -69,6 +71,7 @@ curl -X POST -H "Content-Type: application/json" \
   }
 }' http://gravitino-host:8090/api/metalakes/test/catalogs
 ```
+
 For more information about the PostgreSQL catalog, please refer to [PostgreSQL catalog](../jdbc-postgresql-catalog.md).
 
 - Set the value of configuration `gravitino.metalake` to the metalake you have created, named 'test', and start the Trino container.
@@ -77,7 +80,7 @@ Use the Trino CLI to connect to the Trino container and run a query.
 
 Listing all Gravitino managed catalogs:
 
-```sql 
+```sql
 SHOW CATALOGS;
 ```
 
@@ -95,7 +98,7 @@ The results are similar to:
 Query 20231017_082503_00018_6nt3n, FINISHED, 1 node
 ```
 
-The `gravitino` catalog is a catalog defined By Trino catalog configuration. 
+The `gravitino` catalog is a catalog defined By Trino catalog configuration.
 The `test.postgresql_test` catalog is the catalog created by you in Gravitino.
 Other catalogs are regular user-configured Trino catalogs.
 

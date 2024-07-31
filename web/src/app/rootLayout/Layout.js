@@ -31,7 +31,7 @@ import dynamic from 'next/dynamic'
 
 const DynamicMainContent = dynamic(() => import('./MainContent'), {
   loading: () => <Loading />,
-  ssr: false
+  ssr: false,
 })
 
 const Layout = ({ children, scrollToTop }) => {

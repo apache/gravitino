@@ -5,13 +5,14 @@ keyword: gravitino connector trino
 license: "This software is licensed under the Apache License version 2."
 ---
 
-Apache Iceberg is an open table format for huge analytic datasets. 
-The Iceberg catalog allows Trino querying data stored in files written in Iceberg format, 
+Apache Iceberg is an open table format for huge analytic datasets.
+The Iceberg catalog allows Trino querying data stored in files written in Iceberg format,
 as defined in the Iceberg Table Spec. The catalog supports Apache Iceberg table spec versions 1 and 2.
 
 ## Requirements
 
 To use Iceberg, you need:
+
 - Network access from the Trino coordinator and workers to the distributed object storage.
 - Access to a Hive metastore service (HMS), an AWS Glue catalog, a JDBC catalog, a REST catalog, or a Nessie server.
 - Data files stored in a supported file format. These can be configured using file format configuration properties per catalog:
@@ -25,7 +26,7 @@ To use Iceberg, you need:
 Users can create a schema through Apache Gravitino Trino connector as follows:
 
 ```SQL
-CREATE SCHEMA "metalake.catalog".schema_name 
+CREATE SCHEMA "metalake.catalog".schema_name
 ```
 
 ## Table operations
@@ -48,6 +49,7 @@ CREATE TABLE "metalake.catalog".schema_name.table_name
 ### Alter table
 
 Support for the following alter table operations:
+
 - Rename table
 - Add a column
 - Drop a column
@@ -78,25 +80,25 @@ CREATE TABLE "metalake.catalog".dbname.tablename
 ) WITH (
   format = 'TEXTFILE',
   KEY = 'VALUE',
-  ...      
+  ...
 );
 ```
 
 The following tables are the properties supported by the Iceberg table:
 
-| Property       | Description                             | Default Value                                              | Required | Reserved | Since Version |
-|----------------|-----------------------------------------|------------------------------------------------------------|----------|----------|---------------|
-| partitioning   | Partition columns for the table         | (none)                                                     | No       | No       | 0.4.0         |
-| sorted_by      | Sorted columns for the table            | (none)                                                     | No       | No       | 0.4.0         | 
+| Property     | Description                     | Default Value | Required | Reserved | Since Version |
+| ------------ | ------------------------------- | ------------- | -------- | -------- | ------------- |
+| partitioning | Partition columns for the table | (none)        | No       | No       | 0.4.0         |
+| sorted_by    | Sorted columns for the table    | (none)        | No       | No       | 0.4.0         |
 
-Reserved properties: A reserved property is one can't be set by users but can be read by users. 
+Reserved properties: A reserved property is one can't be set by users but can be read by users.
 
 ## Basic usage examples
 
 You need to do the following steps before you can use the Iceberg catalog in Trino through Gravitino.
 
 - Create a metalake and catalog in Gravitino. Assuming that the metalake name is `test` and the catalog name is `iceberg_test`,
-then you can use the following code to create them in Gravitino:
+  then you can use the following code to create them in Gravitino:
 
 ```bash
 curl -X POST -H "Content-Type: application/json" \
@@ -128,7 +130,7 @@ Use the Trino CLI to connect to the Trino container and run a query.
 
 Listing all Gravitino managed catalogs:
 
-```sql 
+```sql
 SHOW CATALOGS;
 ```
 
@@ -146,7 +148,7 @@ The results are similar to:
 Query 20231017_082503_00018_6nt3n, FINISHED, 1 node
 ```
 
-The `gravitino` catalog is a catalog defined By Trino catalog configuration. 
+The `gravitino` catalog is a catalog defined By Trino catalog configuration.
 The `test.iceberg_test` catalog is the catalog created by you in Gravitino.
 Other catalogs are regular user-configured Trino catalogs.
 
@@ -229,9 +231,9 @@ DROP TABLE "test.iceberg_test".database_01.table_01;
 
 ## HDFS username and permissions
 
-Before running any `Insert` statements for Iceberg tables in Trino, 
+Before running any `Insert` statements for Iceberg tables in Trino,
 you must check that the user Trino is using to access HDFS has access to the warehouse directory.
-You can override this username by setting the HADOOP_USER_NAME system property in the Trino JVM config, 
+You can override this username by setting the HADOOP_USER_NAME system property in the Trino JVM config,
 replacing hdfs_user with the appropriate username:
 
 ```text

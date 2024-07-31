@@ -5,25 +5,25 @@ on:
     inputs:
       image:
         type: choice
-        description: 'Choose the image to build'
+        description: "Choose the image to build"
         required: true
-        default: 'gravitino'
+        default: "gravitino"
         options:
-          - 'gravitino'
-          - 'gravitino-ci-hive'
-          - 'gravitino-ci-kerberos-hive'
-          - 'gravitino-ci-trino'
-          - 'gravitino-ci-doris'
-          - 'gravitino-ci-ranger'
-          - 'trino'
-          - 'hive'
-          - 'ranger'
+          - "gravitino"
+          - "gravitino-ci-hive"
+          - "gravitino-ci-kerberos-hive"
+          - "gravitino-ci-trino"
+          - "gravitino-ci-doris"
+          - "gravitino-ci-ranger"
+          - "trino"
+          - "hive"
+          - "ranger"
       tag:
-        description: 'Docker tag to apply to this image'
+        description: "Docker tag to apply to this image"
         required: true
         type: string
       token:
-        description: 'Publish Docker token'
+        description: "Publish Docker token"
         required: true
         type: string
 
@@ -89,11 +89,11 @@ jobs:
 
       - uses: actions/setup-java@v3
         with:
-          java-version: '8'
-          distribution: 'temurin'
+          java-version: "8"
+          distribution: "temurin"
 
       - name: Build and Push the Docker image
-        run: | 
+        run: |
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /opt/hostedtoolcache/CodeQL
           ./dev/docker/build-docker.sh --platform all --type ${image_type} --image ${image_name} --tag ${{ github.event.inputs.tag }} --latest

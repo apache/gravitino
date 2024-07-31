@@ -1,7 +1,7 @@
 ---
 title: "Apache Gravitino Spark connector"
 slug: /spark-connector/spark-connector
-keyword: spark connector federation query 
+keyword: spark connector federation query
 license: "This software is licensed under the Apache License version 2."
 ---
 
@@ -17,9 +17,9 @@ The Apache Gravitino Spark connector leverages the Spark DataSourceV2 interface 
 
 ## Requirement
 
-* Spark 3.3 or 3.4 or 3.5
-* Scala 2.12 or 2.13
-* JDK 8 or 11 or 17
+- Spark 3.3 or 3.4 or 3.5
+- Scala 2.12 or 2.13
+- JDK 8 or 11 or 17
 
 :::info
 Gravitino Spark connector doesn't support Scala 2.13 for Spark3.3.
@@ -30,12 +30,12 @@ Gravitino Spark connector doesn't support Scala 2.13 for Spark3.3.
 1. [Build](../how-to-build.md) or [download](https://mvnrepository.com/artifact/org.apache.gravitino/spark-connector-runtime) the Gravitino spark connector jar, and place it to the classpath of Spark.
 2. Configure the Spark session to use the Gravitino spark connector.
 
-| Property                                 | Type   | Default Value | Description                                                                                         | Required | Since Version |
-|------------------------------------------|--------|---------------|-----------------------------------------------------------------------------------------------------|----------|---------------|
+| Property                                 | Type   | Default Value | Description                                                                                     | Required | Since Version |
+| ---------------------------------------- | ------ | ------------- | ----------------------------------------------------------------------------------------------- | -------- | ------------- |
 | spark.plugins                            | string | (none)        | Gravitino spark plugin name, `org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin` | Yes      | 0.5.0         |
-| spark.sql.gravitino.metalake             | string | (none)        | The metalake name that spark connector used to request to Gravitino.                                | Yes      | 0.5.0         |
-| spark.sql.gravitino.uri                  | string | (none)        | The uri of Gravitino server address.                                                                | Yes      | 0.5.0         |
-| spark.sql.gravitino.enableIcebergSupport | string | `false`       | Set to `true` to use Iceberg catalog.                                                               | No       | 0.5.1         |
+| spark.sql.gravitino.metalake             | string | (none)        | The metalake name that spark connector used to request to Gravitino.                            | Yes      | 0.5.0         |
+| spark.sql.gravitino.uri                  | string | (none)        | The uri of Gravitino server address.                                                            | Yes      | 0.5.0         |
+| spark.sql.gravitino.enableIcebergSupport | string | `false`       | Set to `true` to use Iceberg catalog.                                                           | No       | 0.5.1         |
 
 ```shell
 ./bin/spark-sql -v \
@@ -48,9 +48,9 @@ Gravitino Spark connector doesn't support Scala 2.13 for Spark3.3.
 
 3. [Download](https://iceberg.apache.org/releases/) corresponding runtime jars and place it to the classpath of Spark if using Iceberg catalog.
 
-4. Execute the Spark SQL query. 
+4. Execute the Spark SQL query.
 
-Suppose there are two catalogs in the metalake `test`, `hive` for Hive catalog and `iceberg` for Iceberg catalog. 
+Suppose there are two catalogs in the metalake `test`, `hive` for Hive catalog and `iceberg` for Iceberg catalog.
 
 ```sql
 // use hive catalog
@@ -79,7 +79,7 @@ The command `SHOW CATALOGS` will only display the Spark default catalog, named s
 Gravitino spark connector support the following datatype mapping between Spark and Gravitino.
 
 | Spark Data Type    | Gravitino Data Type           | Since Version |
-|--------------------|-------------------------------|---------------|
+| ------------------ | ----------------------------- | ------------- |
 | `BooleanType`      | `boolean`                     | 0.5.0         |
 | `ByteType`         | `byte`                        | 0.5.0         |
 | `ShortType`        | `short`                       | 0.5.0         |

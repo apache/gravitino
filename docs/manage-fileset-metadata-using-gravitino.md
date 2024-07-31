@@ -9,7 +9,7 @@ license: This software is licensed under the Apache License version 2.
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-This page introduces how to manage fileset metadata in Apache Gravitino. Filesets 
+This page introduces how to manage fileset metadata in Apache Gravitino. Filesets
 are a collection of files and directories. Users can leverage
 filesets to manage non-tabular data like training datasets and other raw data.
 
@@ -24,8 +24,8 @@ control mechanism without needing to set access controls across different storag
 
 To use fileset, please make sure that:
 
- - Gravitino server has started, and the host and port is [http://localhost:8090](http://localhost:8090).
- - A metalake has been created.
+- Gravitino server has started, and the host and port is [http://localhost:8090](http://localhost:8090).
+- A metalake has been created.
 
 ## Catalog operations
 
@@ -84,7 +84,7 @@ Catalog catalog = gravitinoClient.createCatalog("catalog",
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
 catalog = gravitino_client.create_catalog(name="catalog",
                                           type=Catalog.Type.FILESET,
-                                          provider="hadoop", 
+                                          provider="hadoop",
                                           comment="This is a Hadoop fileset catalog",
                                           properties={"location": "/tmp/test1"})
 ```
@@ -94,9 +94,9 @@ catalog = gravitino_client.create_catalog(name="catalog",
 
 Currently, Gravitino supports the following catalog providers:
 
-| Catalog provider    | Catalog property                                                        |
-|---------------------|-------------------------------------------------------------------------|
-| `hadoop`            | [Hadoop catalog property](./hadoop-catalog.md#catalog-properties)       |
+| Catalog provider | Catalog property                                                  |
+| ---------------- | ----------------------------------------------------------------- |
+| `hadoop`         | [Hadoop catalog property](./hadoop-catalog.md#catalog-properties) |
 
 ### Load a catalog
 
@@ -189,7 +189,7 @@ Schema schema = supportsSchemas.createSchema("schema",
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
 
 catalog: Catalog = gravitino_client.load_catalog(name="catalog")
-catalog.as_schemas().create_schema(name="schema", 
+catalog.as_schemas().create_schema(name="schema",
                                    comment="This is a schema",
                                    properties={"location": "/tmp/root/schema"})
 ```
@@ -199,9 +199,9 @@ catalog.as_schemas().create_schema(name="schema",
 
 Currently, Gravitino supports the following schema property:
 
-| Catalog provider    | Schema property                                                              |
-|---------------------|------------------------------------------------------------------------------|
-| `hadoop`            | [Hadoop schema property](./hadoop-catalog.md#schema-properties)              |
+| Catalog provider | Schema property                                                 |
+| ---------------- | --------------------------------------------------------------- |
+| `hadoop`         | [Hadoop schema property](./hadoop-catalog.md#schema-properties) |
 
 ### Load a schema
 
@@ -233,9 +233,10 @@ same.
 ## Fileset operations
 
 :::tip
- - Users should create a metalake, a catalog, and a schema before creating a fileset.
- - Currently, Gravitino only supports managing Hadoop Compatible File System (HCFS) locations.
-:::
+
+- Users should create a metalake, a catalog, and a schema before creating a fileset.
+- Currently, Gravitino only supports managing Hadoop Compatible File System (HCFS) locations.
+  :::
 
 ### Create a fileset
 
@@ -303,11 +304,11 @@ catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("schema", "e
 
 Currently, Gravitino supports two **types** of filesets:
 
- - `MANAGED`: The storage location of the fileset is managed by Gravitino when specified as
-   `MANAGED`, the physical location of the fileset will be deleted when this fileset is dropped.
- - `EXTERNAL`: The storage location of the fileset is **not** managed by Gravitino, when
-   specified as `EXTERNAL`, the files of the fileset will **not** be deleted when
-   the fileset is dropped.
+- `MANAGED`: The storage location of the fileset is managed by Gravitino when specified as
+  `MANAGED`, the physical location of the fileset will be deleted when this fileset is dropped.
+- `EXTERNAL`: The storage location of the fileset is **not** managed by Gravitino, when
+  specified as `EXTERNAL`, the files of the fileset will **not** be deleted when
+  the fileset is dropped.
 
 **storageLocation**
 
@@ -380,7 +381,7 @@ changes = (
    FilesetChange.remove_property("fileset_properties_key1"),
    FilesetChange.set_property("fileset_properties_key2", "fileset_propertie_new_value"),
 )
-fileset_new = catalog.as_fileset_catalog().alter_fileset(NameIdentifier.of("schema", "fileset"), 
+fileset_new = catalog.as_fileset_catalog().alter_fileset(NameIdentifier.of("schema", "fileset"),
                                                          *changes)
 ```
 
@@ -389,13 +390,13 @@ fileset_new = catalog.as_fileset_catalog().alter_fileset(NameIdentifier.of("sche
 
 Currently, Gravitino supports the following changes to a fileset:
 
-| Supported modification             | JSON                                                         | Java                                          |
-|------------------------------------|--------------------------------------------------------------|-----------------------------------------------|
-| Rename a fileset                     | `{"@type":"rename","newName":"fileset_renamed"}`             | `FilesetChange.rename("fileset_renamed")`     |
-| Update a comment                     | `{"@type":"updateComment","newComment":"new_comment"}`       | `FilesetChange.updateComment("new_comment")`  |
-| Set a fileset property             | `{"@type":"setProperty","property":"key1","value":"value1"}` | `FilesetChange.setProperty("key1", "value1")` |
-| Remove a fileset property          | `{"@type":"removeProperty","property":"key1"}`               | `FilesetChange.removeProperty("key1")`        |
-| Remove comment                     | `{"@type":"removeComment"}`                                  | `FilesetChange.removeComment()`               |
+| Supported modification    | JSON                                                         | Java                                          |
+| ------------------------- | ------------------------------------------------------------ | --------------------------------------------- |
+| Rename a fileset          | `{"@type":"rename","newName":"fileset_renamed"}`             | `FilesetChange.rename("fileset_renamed")`     |
+| Update a comment          | `{"@type":"updateComment","newComment":"new_comment"}`       | `FilesetChange.updateComment("new_comment")`  |
+| Set a fileset property    | `{"@type":"setProperty","property":"key1","value":"value1"}` | `FilesetChange.setProperty("key1", "value1")` |
+| Remove a fileset property | `{"@type":"removeProperty","property":"key1"}`               | `FilesetChange.removeProperty("key1")`        |
+| Remove comment            | `{"@type":"removeComment"}`                                  | `FilesetChange.removeComment()`               |
 
 ### Drop a fileset
 

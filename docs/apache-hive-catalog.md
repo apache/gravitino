@@ -12,8 +12,8 @@ Apache Gravitino offers the capability to utilize [Apache Hive](https://hive.apa
 
 ### Requirements and limitations
 
-* The Hive catalog requires a Hive Metastore Service (HMS), or a compatible implementation of the HMS, such as AWS Glue.
-* Gravitino must have network access to the Hive metastore service using the Thrift protocol.
+- The Hive catalog requires a Hive Metastore Service (HMS), or a compatible implementation of the HMS, such as AWS Glue.
+- Gravitino must have network access to the Hive metastore service using the Thrift protocol.
 
 :::note
 The Hive catalog is available for Apache Hive **2.x** only. Support for Apache Hive 3.x is under development.
@@ -30,7 +30,7 @@ The Hive catalog supports creating, updating, and deleting databases and tables 
 Besides the [common catalog properties](./gravitino-server-config.md#gravitino-catalog-properties-configuration), the Hive catalog has the following properties:
 
 | Property Name                            | Description                                                                                                                                                                                                                                         | Default Value | Required                     | Since Version |
-|------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|------------------------------|---------------|
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ---------------------------- | ------------- |
 | `metastore.uris`                         | The Hive metastore service URIs, separate multiple addresses with commas. Such as `thrift://127.0.0.1:9083`                                                                                                                                         | (none)        | Yes                          | 0.2.0         |
 | `client.pool-size`                       | The maximum number of Hive metastore clients in the pool for Gravitino.                                                                                                                                                                             | 1             | No                           | 0.2.0         |
 | `gravitino.bypass.`                      | Property name with this prefix passed down to the underlying HMS client for use. Such as `gravitino.bypass.hive.metastore.failure.retries = 3` indicate 3 times of retries upon failure of Thrift metastore calls                                   | (none)        | No                           | 0.2.0         |
@@ -45,7 +45,6 @@ Besides the [common catalog properties](./gravitino-server-config.md#gravitino-c
 When you use the Gravitino with Trino. You can pass the Trino Hive connector configuration using prefix `trino.bypass.`. For example, using `trino.bypass.hive.config.resources` to pass the `hive.config.resources` to the Gravitino Hive catalog in Trino runtime.
 
 When you use the Gravitino with Spark. You can pass the Spark Hive connector configuration using prefix `spark.bypass.`. For example, using `spark.bypass.hive.exec.dynamic.partition.mode` to pass the `hive.exec.dynamic.partition.mode` to the Spark Hive connector in Spark runtime.
-
 
 ### Catalog operations
 
@@ -63,7 +62,7 @@ Schema properties supply or set metadata for the underlying Hive database.
 The following table lists predefined schema properties for the Hive database. Additionally, you can define your own key-value pair properties and transmit them to the underlying Hive database.
 
 | Property name | Description                                                              | Default value                                                                           | Required | Since Version |
-|---------------|--------------------------------------------------------------------------|-----------------------------------------------------------------------------------------|----------|---------------|
+| ------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- | -------- | ------------- |
 | `location`    | The directory for Hive database storage, such as `/user/hive/warehouse`. | HMS uses the value of `hive.metastore.warehouse.dir` in the `hive-site.xml` by default. | No       | 0.1.0         |
 
 ### Schema operations
@@ -101,7 +100,7 @@ The Hive catalog supports all data types defined in the [Hive Language Manual](h
 The following table lists the data types mapped from the Hive catalog to Gravitino.
 
 | Hive Data Type              | Gravitino Data Type | Since Version |
-|-----------------------------|---------------------|---------------|
+| --------------------------- | ------------------- | ------------- |
 | `boolean`                   | `boolean`           | 0.2.0         |
 | `tinyint`                   | `byte`              | 0.2.0         |
 | `smallint`                  | `short`             | 0.2.0         |
@@ -132,25 +131,25 @@ Since 0.6.0, the data types other than listed above are mapped to Gravitino **[E
 Table properties supply or set metadata for the underlying Hive tables.
 The following table lists predefined table properties for a Hive table. Additionally, you can define your own key-value pair properties and transmit them to the underlying Hive database.
 
-| Property Name      | Description                                                                                                                             | Default Value                                                                                                                                       | Required | Since version |
-|--------------------|-----------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|----------|---------------|
-| `location`         | The location for table storage, such as `/user/hive/warehouse/test_table`.                                                              | HMS uses the database location as the parent directory by default.                                                                                  | No       | 0.2.0         |
-| `table-type`       | Type of the table. Valid values include `MANAGED_TABLE` and `EXTERNAL_TABLE`.                                                           | `MANAGED_TABLE`                                                                                                                                     | No       | 0.2.0         |
-| `format`           | The table file format. Valid values include `TEXTFILE`, `SEQUENCEFILE`, `RCFILE`, `ORC`, `PARQUET`, `AVRO`, `JSON`, `CSV`, and `REGEX`. | `TEXTFILE`                                                                                                                                          | No       | 0.2.0         |
-| `input-format`     | The input format class for the table, such as `org.apache.hadoop.hive.ql.io.orc.OrcInputFormat`.                                        | The property `format` sets the default value `org.apache.hadoop.mapred.TextInputFormat` and can change it to a different default.                   | No       | 0.2.0         |
-| `output-format`    | The output format class for the table, such as `org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat`.                                      | The property `format` sets the default value `org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat` and can change it to a different default. | No       | 0.2.0         |
-| `serde-lib`        | The serde library class for the table, such as `org.apache.hadoop.hive.ql.io.orc.OrcSerde`.                                             | The property `format` sets the default value `org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe` and can change it to a different default.         | No       | 0.2.0         |
+| Property Name      | Description                                                                                                                                | Default Value                                                                                                                                       | Required | Since version |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------------- |
+| `location`         | The location for table storage, such as `/user/hive/warehouse/test_table`.                                                                 | HMS uses the database location as the parent directory by default.                                                                                  | No       | 0.2.0         |
+| `table-type`       | Type of the table. Valid values include `MANAGED_TABLE` and `EXTERNAL_TABLE`.                                                              | `MANAGED_TABLE`                                                                                                                                     | No       | 0.2.0         |
+| `format`           | The table file format. Valid values include `TEXTFILE`, `SEQUENCEFILE`, `RCFILE`, `ORC`, `PARQUET`, `AVRO`, `JSON`, `CSV`, and `REGEX`.    | `TEXTFILE`                                                                                                                                          | No       | 0.2.0         |
+| `input-format`     | The input format class for the table, such as `org.apache.hadoop.hive.ql.io.orc.OrcInputFormat`.                                           | The property `format` sets the default value `org.apache.hadoop.mapred.TextInputFormat` and can change it to a different default.                   | No       | 0.2.0         |
+| `output-format`    | The output format class for the table, such as `org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat`.                                         | The property `format` sets the default value `org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat` and can change it to a different default. | No       | 0.2.0         |
+| `serde-lib`        | The serde library class for the table, such as `org.apache.hadoop.hive.ql.io.orc.OrcSerde`.                                                | The property `format` sets the default value `org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe` and can change it to a different default.         | No       | 0.2.0         |
 | `serde.parameter.` | The prefix of the serde parameter, such as `"serde.parameter.orc.create.index" = "true"`, indicating `ORC` serde lib to create row indexes | (none)                                                                                                                                              | No       | 0.2.0         |
 
 Hive automatically adds and manages some reserved properties. Users aren't allowed to set these properties.
 
-| Property Name           | Description                                       | Since Version |
-|-------------------------|---------------------------------------------------|---------------|
+| Property Name           | Description                                     | Since Version |
+| ----------------------- | ----------------------------------------------- | ------------- |
 | `comment`               | Used to store a table comment.                  | 0.2.0         |
-| `numFiles`              | Used to store the number of files in the table.   | 0.2.0         |
-| `totalSize`             | Used to store the total size of the table.        | 0.2.0         |
-| `EXTERNAL`              | Indicates whether the table is external.          | 0.2.0         |
-| `transient_lastDdlTime` | Used to store the last DDL time of the table.     | 0.2.0         |
+| `numFiles`              | Used to store the number of files in the table. | 0.2.0         |
+| `totalSize`             | Used to store the total size of the table.      | 0.2.0         |
+| `EXTERNAL`              | Indicates whether the table is external.        | 0.2.0         |
+| `transient_lastDdlTime` | Used to store the last DDL time of the table.   | 0.2.0         |
 
 ### Table indexes
 
@@ -168,7 +167,7 @@ The following table lists the mapping relationship between Hive Alter operations
 ##### Alter table
 
 | Hive Alter Operation                          | Gravitino Table Update Request | Since Version |
-|-----------------------------------------------|--------------------------------|---------------|
+| --------------------------------------------- | ------------------------------ | ------------- |
 | `Rename Table`                                | `Rename table`                 | 0.2.0         |
 | `Alter Table Properties`                      | `Set a table property`         | 0.2.0         |
 | `Alter Table Comment`                         | `Update comment`               | 0.2.0         |
@@ -185,7 +184,7 @@ As Gravitino has a separate interface for updating the comment of a table, the H
 ##### Alter column
 
 | Hive Alter Operation     | Gravitino Table Update Request    | Since Version |
-|--------------------------|-----------------------------------|---------------|
+| ------------------------ | --------------------------------- | ------------- |
 | `Change Column Name`     | `Rename a column`                 | 0.2.0         |
 | `Change Column Type`     | `Update the type of a column`     | 0.2.0         |
 | `Change Column Position` | `Update the position of a column` | 0.2.0         |

@@ -23,7 +23,7 @@ The `score`, `createTime`, and `city` appearing in the table below refer to the 
 :::
 
 | Partitioning strategy | Description                                                    | JSON example                                                                                            | Java example                                                                        | Equivalent SQL semantics              |
-|-----------------------|----------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------|---------------------------------------|
+| --------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------- |
 | `identity`            | Source value, unmodified.                                      | `{"strategy":"identity","fieldName":["score"]}`                                                         | `Transforms.identity("score")`                                                      | `PARTITION BY score`                  |
 | `hour`                | Extract a timestamp hour, as hours from '1970-01-01 00:00:00'. | `{"strategy":"hour","fieldName":["createTime"]}`                                                        | `Transforms.hour("createTime")`                                                     | `PARTITION BY hour(createTime)`       |
 | `day`                 | Extract a date or timestamp day, as days from '1970-01-01'.    | `{"strategy":"day","fieldName":["createTime"]}`                                                         | `Transforms.day("createTime")`                                                      | `PARTITION BY day(createTime)`        |
@@ -52,7 +52,7 @@ To create a bucketed table, you should use the following three components to con
 - Strategy. It defines how Gravitino distributes table data across partitions.
 
 | Bucket strategy | Description                                                                                                               | JSON    | Java             |
-|-----------------|---------------------------------------------------------------------------------------------------------------------------|---------|------------------|
+| --------------- | ------------------------------------------------------------------------------------------------------------------------- | ------- | ---------------- |
 | hash            | Bucket table using hash. Gravitino distributes table data into buckets based on the hash value of the key.                | `hash`  | `Strategy.HASH`  |
 | range           | Bucket table using range. Gravitino distributes table data into buckets based on a specified range or interval of values. | `range` | `Strategy.RANGE` |
 | even            | Bucket table using even. Gravitino distributes table data, ensuring an equal distribution of data.                        | `even`  | `Strategy.EVEN`  |
@@ -86,7 +86,6 @@ Distributions.of(Strategy.HASH, 4, NamedReference.field("score"));
 </TabItem>
 </Tabs>
 
-
 ## Sort ordering
 
 To define a sorted order table, you should use the following three components to construct a valid sorted order table.
@@ -94,14 +93,14 @@ To define a sorted order table, you should use the following three components to
 - Direction. It defines in which direction Gravitino sorts the table. The default value is `ascending`.
 
 | Direction  | Description                                 | JSON   | Java                       |
-|------------|---------------------------------------------|--------|----------------------------|
+| ---------- | ------------------------------------------- | ------ | -------------------------- |
 | ascending  | Sorted by a field or a function ascending.  | `asc`  | `SortDirection.ASCENDING`  |
 | descending | Sorted by a field or a function descending. | `desc` | `SortDirection.DESCENDING` |
 
 - Null ordering. It describes how to handle null values when ordering
 
 | Null ordering Type | Description                             | JSON          | Java                       |
-|--------------------|-----------------------------------------|---------------|----------------------------|
+| ------------------ | --------------------------------------- | ------------- | -------------------------- |
 | null_first         | Puts the null value in the first place. | `nulls_first` | `NullOrdering.NULLS_FIRST` |
 | null_last          | Puts the null value in the last place.  | `nulls_last`  | `NullOrdering.NULLS_LAST`  |
 
@@ -113,10 +112,10 @@ Note: If the direction value is `ascending`, the default ordering value is `null
 <TabItem value="Json" label="Json">
 
 ```json
- {
+{
   "direction": "asc",
   "nullOrder": "NULLS_LAST",
-  "sortTerm":  {
+  "sortTerm": {
     "type": "field",
     "fieldName": ["score"]
   }
@@ -132,7 +131,6 @@ SortOrders.of(NamedReference.field("score"), SortDirection.ASCENDING, NullOrderi
 
 </TabItem>
 </Tabs>
-
 
 :::tip
 **Not all catalogs may support those features**. Please refer to the related document for more details.
@@ -242,10 +240,10 @@ To define an indexed table, you should utilize the following three components to
 
 - IndexType. Represents the type of index, such as primary key or unique key.
 
-| IndexType     | Description                                                                                                                                                                                                                                                                                            | JSON            | Java                      |
-|---------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|---------------------------|
-| PRIMARY_KEY   | The PRIMARY KEY is a column or set of columns that uniquely identifies each row in a table. It enforces uniqueness and ensures that no two rows have the same values in the specified columns. Additionally, the PRIMARY KEY constraint automatically creates a unique index on the specified columns. | `PRIMARY_KEY`   | `IndexType.PRIMARY_KEY`   |
-| UNIQUE_KEY    | The UNIQUE KEY constraint ensures that all values in a specified column or set of columns are unique across the entire table. Unlike the PRIMARY KEY constraint, a table can have multiple UNIQUE KEY constraints, allowing for unique values in multiple columns or sets of columns.                  | `UNIQUE_KEY`    | `IndexType.UNIQUE_KEY`    |
+| IndexType   | Description                                                                                                                                                                                                                                                                                            | JSON          | Java                    |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------- | ----------------------- |
+| PRIMARY_KEY | The PRIMARY KEY is a column or set of columns that uniquely identifies each row in a table. It enforces uniqueness and ensures that no two rows have the same values in the specified columns. Additionally, the PRIMARY KEY constraint automatically creates a unique index on the specified columns. | `PRIMARY_KEY` | `IndexType.PRIMARY_KEY` |
+| UNIQUE_KEY  | The UNIQUE KEY constraint ensures that all values in a specified column or set of columns are unique across the entire table. Unlike the PRIMARY KEY constraint, a table can have multiple UNIQUE KEY constraints, allowing for unique values in multiple columns or sets of columns.                  | `UNIQUE_KEY`  | `IndexType.UNIQUE_KEY`  |
 
 - Name. It defines the name of the index.
 
@@ -255,10 +253,10 @@ To define an indexed table, you should utilize the following three components to
 <TabItem value="Json" label="Json">
 
 ```json
- {
+{
   "indexType": "PRIMARY_KEY",
   "name": "PRIMARY",
-  "fieldNames": [["col_1"],["col_2"]]
+  "fieldNames": [["col_1"], ["col_2"]]
 }
 ```
 

@@ -9,14 +9,14 @@ license: This software is licensed under the Apache License version 2.
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-This page introduces how to manage messaging metadata using Apache Gravitino. Messaging metadata refers to 
+This page introduces how to manage messaging metadata using Apache Gravitino. Messaging metadata refers to
 the topic metadata of the messaging system such as Apache Kafka, Apache Pulsar, Apache RocketMQ, etc.
 Through Gravitino, you can create, update, delete, and list topics via unified RESTful APIs or Java client.
 
 To use messaging catalog, please make sure that:
 
- - Gravitino server has started, and the host and port is [http://localhost:8090](http://localhost:8090).
- - A metalake has been created.
+- Gravitino server has started, and the host and port is [http://localhost:8090](http://localhost:8090).
+- A metalake has been created.
 
 ## Catalog operations
 
@@ -73,7 +73,7 @@ Catalog catalog = gravitinoClient.createCatalog("catalog",
 Currently, Gravitino supports the following catalog providers:
 
 | Catalog provider | Catalog property                                                |
-|------------------|-----------------------------------------------------------------|
+| ---------------- | --------------------------------------------------------------- |
 | `kafka`          | [Kafka catalog property](./kafka-catalog.md#catalog-properties) |
 
 ### Load a catalog
@@ -103,7 +103,7 @@ in relational catalog for more details. For a messaging catalog, the list operat
 
 ## Schema operations
 
-`Schema` is a logical grouping of topics in a messaging catalog, if the messaging system does not support topics grouping, 
+`Schema` is a logical grouping of topics in a messaging catalog, if the messaging system does not support topics grouping,
 schema operations are not supported but a "default" schema will be automatically created to include all topics
 
 :::caution note
@@ -145,7 +145,6 @@ Users should create a metalake, a catalog and a schema before creating a table.
 
 You can create a topic by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/topics`
 endpoint or just use the Gravitino Java client. The following is an example of creating a topic:
-
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -195,7 +194,6 @@ topicCatalog.createTopic(
 You can modify a topic by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/topics/{topic_name}`
 endpoint or just use the Gravitino Java client. The following is an example of altering a topic:
 
-
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
@@ -236,7 +234,7 @@ Topic t = topicCatalog.alterTopic(NameIdentifier.of("default", "topic"),
 Currently, Gravitino supports the following changes to a topic:
 
 | Supported modification  | JSON                                                         | Java                                        |
-|-------------------------|--------------------------------------------------------------|---------------------------------------------|
+| ----------------------- | ------------------------------------------------------------ | ------------------------------------------- |
 | Update a comment        | `{"@type":"updateComment","newComment":"new_comment"}`       | `TopicChange.updateComment("new_comment")`  |
 | Set a topic property    | `{"@type":"setProperty","property":"key1","value":"value1"}` | `TopicChange.setProperty("key1", "value1")` |
 | Remove a topic property | `{"@type":"removeProperty","property":"key1"}`               | `TopicChange.removeProperty("key1")`        |

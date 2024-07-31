@@ -35,15 +35,14 @@ per catalog:
 - CSV (using org.apache.hadoop.hive.serde2.OpenCSVSerde)
 - TextFile
 
-
 ## Schema operations
 
-### Create a schema 
+### Create a schema
 
 Users can create a schema with properties through Apache Gravitino Trino connector as follows:
 
 ```SQL
-CREATE SCHEMA catalog.schema_name 
+CREATE SCHEMA catalog.schema_name
 ```
 
 ## Table operations
@@ -62,7 +61,6 @@ CREATE TABLE catalog.schema_name.table_name
   salary int
 )
 ```
-
 
 ### Alter table
 
@@ -85,10 +83,9 @@ Currently, it doesn't support certain query optimizations, such as pushdown and 
 You can set additional properties for tables and schemas in the Hive catalog using "WITH" keyword in the "CREATE"
 statement.
 
-
 ### Create a schema with properties
 
-Users can use the following example to create a schema with properties: 
+Users can use the following example to create a schema with properties:
 
 ```sql
 CREATE SCHEMA "metalake.catalog".dbname
@@ -100,15 +97,14 @@ WITH (
 The following tables are the properties supported by the Hive schema:
 
 | Property | Description                     | Default Value | Required | Reserved | Since Version |
-|----------|---------------------------------|---------------|----------|----------|---------------|
+| -------- | ------------------------------- | ------------- | -------- | -------- | ------------- |
 | location | HDFS location for table storage | (none)        | No       | No       | 0.2.0         |
 
 Reserved properties: A reserved property is one can't be set by users but can be read by users.
 
-
 ### Create a table with properties
 
-Users can use the following example to create a table with properties: 
+Users can use the following example to create a table with properties:
 
 ```sql
 CREATE TABLE catalog.dbname.tablename
@@ -118,14 +114,14 @@ CREATE TABLE catalog.dbname.tablename
 ) WITH (
   format = 'TEXTFILE',
   KEY = 'VALUE',
-  ...      
+  ...
 );
 ```
 
 The following tables are the properties supported by the Hive table:
 
 | Property       | Description                             | Default Value                                              | Required | Reserved | Since Version |
-|----------------|-----------------------------------------|------------------------------------------------------------|----------|----------|---------------|
+| -------------- | --------------------------------------- | ---------------------------------------------------------- | -------- | -------- | ------------- |
 | format         | Hive storage format for the table       | TEXTFILE                                                   | No       | No       | 0.2.0         |
 | total_size     | Total size of the table                 | (none)                                                     | No       | Yes      | 0.2.0         |
 | num_files      | Number of files                         | 0                                                          | No       | Yes      | 0.2.0         |
@@ -136,7 +132,7 @@ The following tables are the properties supported by the Hive table:
 | output_format  | The output format class for the table   | org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat | No       | No       | 0.2.0         |
 | serde_lib      | The serde library class for the table   | org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe         | No       | No       | 0.2.0         |
 | serde_name     | Name of the serde                       | table name by default                                      | No       | No       | 0.2.0         |
-| partitioned_by | Partition columns for the table         | (none)                                                     | No       | No       | 0.4.0         |   
+| partitioned_by | Partition columns for the table         | (none)                                                     | No       | No       | 0.4.0         |
 | bucketed_by    | Bucket columns for the table            | (none)                                                     | No       | No       | 0.4.0         |
 | bucket_count   | Number of buckets for the table         | (none)                                                     | No       | No       | 0.4.0         |
 | sorted_by      | Sorted columns for the table            | (none)                                                     | No       | No       | 0.4.0         |
@@ -146,7 +142,7 @@ The following tables are the properties supported by the Hive table:
 You need to do the following steps before you can use the Hive catalog in Trino through Gravitino.
 
 - Create a metalake and catalog in Gravitino. Assuming that the metalake name is `test` and the catalog name is `hive_test`,
-then you can use the following code to create them in Gravitino:
+  then you can use the following code to create them in Gravitino:
 
 ```bash
 curl -X POST -H "Content-Type: application/json" \
@@ -177,7 +173,7 @@ Use the Trino CLI to connect to the Trino container and run a query.
 
 Listing all Gravitino managed catalogs:
 
-```sql 
+```sql
 SHOW CATALOGS;
 ```
 
@@ -228,7 +224,7 @@ WITH (
   partitioned_by = ARRAY['salary'],
   bucketed_by = ARRAY['name'],
   bucket_count = 2,
-  sorted_by = ARRAY['salary']  
+  sorted_by = ARRAY['salary']
 );
 ```
 

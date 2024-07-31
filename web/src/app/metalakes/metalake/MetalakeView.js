@@ -40,7 +40,7 @@ import {
   getTableDetails,
   getFilesetDetails,
   getTopicDetails,
-  setSelectedNodes
+  setSelectedNodes,
 } from '@/lib/store/metalakes'
 
 const MetalakeView = () => {
@@ -57,7 +57,7 @@ const MetalakeView = () => {
       schema: searchParams.get('schema'),
       table: searchParams.get('table'),
       fileset: searchParams.get('fileset'),
-      topic: searchParams.get('topic')
+      topic: searchParams.get('topic'),
     }
     async function fetchDependsData() {
       if ([...searchParams.keys()].length) {
@@ -124,7 +124,7 @@ const MetalakeView = () => {
                 routeParams.schema ? `{{${routeParams.schema}}}` : ''
               }${routeParams.table ? `{{${routeParams.table}}}` : ''}${
                 routeParams.fileset ? `{{${routeParams.fileset}}}` : ''
-              }${routeParams.topic ? `{{${routeParams.topic}}}` : ''}`
+              }${routeParams.topic ? `{{${routeParams.topic}}}` : ''}`,
             ]
           : []
       )

@@ -1,9 +1,8 @@
 name: Bug Report
 title: "[Bug report] "
 description: A bug report issue
-labels: [ "bug" ]
+labels: ["bug"]
 body:
-
   - type: dropdown
     id: version
     attributes:

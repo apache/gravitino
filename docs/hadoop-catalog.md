@@ -26,7 +26,7 @@ Hadoop 3. If there's any compatibility issue, please create an [issue](https://g
 Besides the [common catalog properties](./gravitino-server-config.md#gravitino-catalog-properties-configuration), the Hadoop catalog has the following properties:
 
 | Property Name                                      | Description                                                                                    | Default Value | Required                                                    | Since Version |
-|----------------------------------------------------|------------------------------------------------------------------------------------------------|---------------|-------------------------------------------------------------|---------------|
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------- | ----------------------------------------------------------- | ------------- |
 | `location`                                         | The storage location managed by Hadoop catalog.                                                | (none)        | No                                                          | 0.5.0         |
 | `authentication.type`                              | The type of authentication for Hadoop catalog, currently we only support `kerberos`, `simple`. | `simple`      | No                                                          | 0.5.1         |
 | `authentication.impersonation-enable`              | Whether to enable impersonation for the Hadoop catalog.                                        | `false`       | No                                                          | 0.5.1         |
@@ -48,7 +48,7 @@ The Hadoop catalog supports creating, updating, deleting, and listing schema.
 ### Schema properties
 
 | Property name | Description                                    | Default value | Required | Since Version |
-|---------------|------------------------------------------------|---------------|----------|---------------|
+| ------------- | ---------------------------------------------- | ------------- | -------- | ------------- |
 | `location`    | The storage location managed by Hadoop schema. | (none)        | No       | 0.5.0         |
 
 ### Schema operations

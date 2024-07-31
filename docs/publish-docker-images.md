@@ -5,7 +5,6 @@ keyword: docker
 license: "This software is licensed under the Apache License version 2."
 ---
 
-
 ## Introduction
 
 The Apache Gravitino project provides a set of Docker images to facilitate the publishing, development, and testing of the Gravitino project.
@@ -18,12 +17,12 @@ You can use GitHub actions to publish Docker images to the Docker Hub repository
 1. Open the [Docker publish link](https://github.com/apache/gravitino/actions/workflows/docker-image.yml)
 2. Click the `Run workflow` button.
 3. Select the branch you want to build
-   + Selecting the main branch results in publishing the Docker image with the specified tag and the latest tag.
-   + Selecting another branch, results are publishing the Docker image with the specified tag.
+   - Selecting the main branch results in publishing the Docker image with the specified tag and the latest tag.
+   - Selecting another branch, results are publishing the Docker image with the specified tag.
 4. Choose the image you want to build
-   + `datastrato/gravitino-ci-hive`.
-   + `datastrato/gravitino-ci-trino`.
-   + Future plans include support for other data sources.
+   - `datastrato/gravitino-ci-hive`.
+   - `datastrato/gravitino-ci-trino`.
+   - Future plans include support for other data sources.
 5. Input the `tag name`, for example: `0.1.0`, Then build and push the Docker image name as `datastrato/{image-name}:0.1.0`.
 6. You must enter the correct `publish docker token` before you can execute run `Publish Docker Image` workflow.
 7. Wait for the workflow to complete. You can see a new Docker image shown in the [Datastrato Docker Hub](https://hub.docker.com/u/datastrato) repository.
@@ -32,4 +31,4 @@ You can use GitHub actions to publish Docker images to the Docker Hub repository
 
 ## More details of Apache Gravitino Docker images
 
-+ [Gravitino Docker images](docker-image-details.md)
+- [Gravitino Docker images](docker-image-details.md)

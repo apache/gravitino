@@ -63,8 +63,8 @@ const CustomTooltip = styled(({ className, ...props }) => <Tooltip {...props} cl
     [`& .${tooltipClasses.tooltip}`]: {
       backgroundColor: '#23282a',
       padding: 0,
-      border: '1px solid #dadde9'
-    }
+      border: '1px solid #dadde9',
+    },
   })
 )
 
@@ -138,7 +138,7 @@ const TabsContent = () => {
           borderColor: 'divider',
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center'
+          alignItems: 'center',
         }}
       >
         <TabList onChange={handleChangeTab} aria-label='tabs' variant='scrollable' scrollButtons='auto'>
@@ -165,7 +165,7 @@ const TabsContent = () => {
                                 p: 1.5,
                                 px: 4,
                                 borderTopLeftRadius: 4,
-                                borderTopRightRadius: 4
+                                borderTopRightRadius: 4,
                               }}
                             >
                               <Typography
@@ -203,7 +203,7 @@ const TabsContent = () => {
                                                     sx={{
                                                       display: 'block',
                                                       my: 1,
-                                                      borderTop: theme => `1px solid ${theme.palette.grey[800]}`
+                                                      borderTop: theme => `1px solid ${theme.palette.grey[800]}`,
                                                     }}
                                                   ></Box>
                                                 )}
@@ -217,7 +217,7 @@ const TabsContent = () => {
                                         sx={{
                                           display: 'block',
                                           my: 1,
-                                          borderTop: theme => `1px solid ${theme.palette.grey[800]}`
+                                          borderTop: theme => `1px solid ${theme.palette.grey[800]}`,
                                         }}
                                       ></Box>
                                     )}
@@ -236,7 +236,7 @@ const TabsContent = () => {
                                 sx={{
                                   display: 'flex',
                                   alignItems: 'center',
-                                  color: theme => theme.palette.text.primary
+                                  color: theme => theme.palette.text.primary,
                                 }}
                               >
                                 <Typography
@@ -261,7 +261,7 @@ const TabsContent = () => {
                                   width: '100%',
                                   overflow: 'hidden',
                                   whiteSpace: 'nowrap',
-                                  textOverflow: 'ellipsis'
+                                  textOverflow: 'ellipsis',
                                 }}
                                 data-refer={`overview-${item.type}-items`}
                               >

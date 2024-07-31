@@ -18,7 +18,7 @@ One Kafka catalog corresponds to one Kafka cluster.
 Besides the [common catalog properties](./gravitino-server-config.md#gravitino-catalog-properties-configuration), the Kafka catalog has the following properties:
 
 | Property Name       | Description                                                                                                                                                                                                   | Default Value | Required | Since Version |
-|---------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | -------- | ------------- |
 | `bootstrap.servers` | The Kafka broker(s) to connect to, allowing for multiple brokers by comma-separating them.                                                                                                                    | (none)        | Yes      | 0.5.0         |
 | `gravitino.bypass.` | Property name with this prefix passed down to the underlying Kafka Admin client for use. (refer to [Kafka Admin Configs](https://kafka.apache.org/34/documentation.html#adminclientconfigs) for more details) | (none)        | No       | 0.5.0         |
 
@@ -51,7 +51,7 @@ Refer to [Schema operation](./manage-messaging-metadata-using-gravitino.md#schem
 ### Topic properties
 
 | Property name        | Description                              | Default value                                                                       | Required | Since Version |
-|----------------------|------------------------------------------|-------------------------------------------------------------------------------------|----------|---------------|
+| -------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------- | -------- | ------------- |
 | `partition-count`    | The number of partitions for the topic.  | if not specified, will use the `num.partition` property in the broker.              | No       | 0.5.0         |
 | `replication-factor` | The number of replications for the topic | if not specified, will use the `default.replication.factor` property in the broker. | No       | 0.5.0         |
 

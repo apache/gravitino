@@ -42,7 +42,7 @@ const DetailsView = () => {
     .map(item => {
       return {
         key: item,
-        value: JSON.stringify(activatedItem?.properties[item]).replace(/^"|"$/g, '')
+        value: JSON.stringify(activatedItem?.properties[item]).replace(/^"|"$/g, ''),
       }
     })
   if (paramsSize === 5 && searchParams.get('topic')) {
@@ -51,7 +51,7 @@ const DetailsView = () => {
       .map(item => {
         return {
           key: item,
-          value: JSON.stringify(activatedItem?.properties[item]).replace(/^"|"$/g, '')
+          value: JSON.stringify(activatedItem?.properties[item]).replace(/^"|"$/g, ''),
         }
       })
     properties = [...topicPros, ...properties]
@@ -148,7 +148,7 @@ const DetailsView = () => {
             <Table>
               <TableHead
                 sx={{
-                  backgroundColor: theme => theme.palette.action.hover
+                  backgroundColor: theme => theme.palette.action.hover,
                 }}
               >
                 <TableRow>
@@ -166,7 +166,7 @@ const DetailsView = () => {
                             fontWeight:
                               searchParams.get('topic') && ['partition-count', 'replication-factor'].includes(item.key)
                                 ? 500
-                                : 400
+                                : 400,
                           }}
                         >
                           <div
@@ -186,7 +186,7 @@ const DetailsView = () => {
                             fontWeight:
                               searchParams.get('topic') && ['partition-count', 'replication-factor'].includes(item.key)
                                 ? 500
-                                : 400
+                                : 400,
                           }}
                         >
                           <div

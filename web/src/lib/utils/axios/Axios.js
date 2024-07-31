@@ -123,7 +123,7 @@ class NextAxios {
   setupInterceptors() {
     const {
       axiosInstance,
-      options: { transform }
+      options: { transform },
     } = this
     if (!transform) {
       return
@@ -209,8 +209,8 @@ class NextAxios {
       data: formData,
       headers: {
         'Content-type': ContentTypeEnum.FORM_DATA,
-        ignoreCancelToken: true
-      }
+        ignoreCancelToken: true,
+      },
     })
   }
 
@@ -229,7 +229,7 @@ class NextAxios {
 
     return {
       ...config,
-      data: qs.stringify(config.data, { arrayFormat: 'brackets' })
+      data: qs.stringify(config.data, { arrayFormat: 'brackets' }),
     }
   }
 

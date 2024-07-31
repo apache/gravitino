@@ -36,7 +36,7 @@ import {
   MenuItem,
   InputLabel,
   FormControl,
-  FormHelperText
+  FormHelperText,
 } from '@mui/material'
 
 import Icon from '@/components/Icon'
@@ -59,7 +59,7 @@ const defaultValues = {
   type: 'relational',
   provider: '',
   comment: '',
-  propItems: []
+  propItems: [],
 }
 
 const schema = yup.object().shape({
@@ -83,10 +83,10 @@ const schema = yup.object().shape({
       key: yup.string().required(),
       value: yup.string().when('required', {
         is: true,
-        then: schema => schema.required()
-      })
+        then: schema => schema.required(),
+      }),
     })
-  )
+  ),
 })
 
 const Transition = forwardRef(function Transition(props, ref) {
@@ -114,11 +114,11 @@ const CreateCatalogDialog = props => {
     getValues,
     handleSubmit,
     trigger,
-    formState: { errors }
+    formState: { errors },
   } = useForm({
     defaultValues,
     mode: 'all',
-    resolver: yupResolver(schema)
+    resolver: yupResolver(schema),
   })
 
   const providerSelect = watch('provider')
@@ -262,7 +262,7 @@ const CreateCatalogDialog = props => {
         if (catalogBackend && catalogBackend === 'hive') {
           properties = {
             'catalog-backend': catalogBackend,
-            ...others
+            ...others,
           }
         } else {
           properties = prevProperties
@@ -270,7 +270,7 @@ const CreateCatalogDialog = props => {
 
         const catalogData = {
           ...mainData,
-          properties
+          properties,
         }
 
         if (type === 'create') {
@@ -376,7 +376,7 @@ const CreateCatalogDialog = props => {
       propsItems = propsItems.map((it, idx) => {
         let propItem = {
           ...it,
-          disabled: true
+          disabled: true,
         }
 
         const findProp = Object.keys(properties).find(i => i === it.key)
@@ -395,7 +395,7 @@ const CreateCatalogDialog = props => {
           let propItem = {
             key: item,
             value: properties[item],
-            disabled: data.type === 'fileset' && item === 'location' && type === 'update'
+            disabled: data.type === 'fileset' && item === 'location' && type === 'update',
           }
           propsItems.push(propItem)
         }
@@ -414,7 +414,7 @@ const CreateCatalogDialog = props => {
             position: 'relative',
             pb: theme => `${theme.spacing(8)} !important`,
             px: theme => [`${theme.spacing(5)} !important`, `${theme.spacing(15)} !important`],
-            pt: theme => [`${theme.spacing(8)} !important`, `${theme.spacing(12.5)} !important`]
+            pt: theme => [`${theme.spacing(8)} !important`, `${theme.spacing(12.5)} !important`],
           }}
         >
           <IconButton
@@ -614,7 +614,7 @@ const CreateCatalogDialog = props => {
                           <FormHelperText
                             sx={{
                               color: item.required && item.value === '' ? 'error.main' : 'text.main',
-                              maxWidth: 'calc(100% - 40px)'
+                              maxWidth: 'calc(100% - 40px)',
                             }}
                           >
                             {item.description}
@@ -653,7 +653,7 @@ const CreateCatalogDialog = props => {
           sx={{
             justifyContent: 'center',
             px: theme => [`${theme.spacing(5)} !important`, `${theme.spacing(15)} !important`],
-            pb: theme => [`${theme.spacing(5)} !important`, `${theme.spacing(12.5)} !important`]
+            pb: theme => [`${theme.spacing(5)} !important`, `${theme.spacing(12.5)} !important`],
           }}
         >
           <Button variant='contained' sx={{ mr: 1 }} type='submit' data-refer='handle-submit-catalog'>

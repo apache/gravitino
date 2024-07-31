@@ -14,8 +14,8 @@ Please refer to the [Deploying Trino documentation](https://trino.io/docs/curren
 2. Copy the connector directory to the Trino's plugin directory.
    Normally, the directory location is `Trino-server-<version>/plugin`, and the directory contains other catalogs used by Trino.
 3. Add Trino JVM arguments `-Dlog4j.configurationFile=file:////etc/trino/log4j2.properties` to enable logging for the Gravitino connector.
-4. Update Trino coordinator configuration. 
-   You need to set `catalog.management=dynamic`, The config location is `Trino-server-<version>/etc/config.properteis`,  and the contents like:
+4. Update Trino coordinator configuration.
+   You need to set `catalog.management=dynamic`, The config location is `Trino-server-<version>/etc/config.properteis`, and the contents like:
 
 ```text
 coordinator=true
@@ -44,7 +44,6 @@ docker run --name trino-gravitino -d -p 8080:8080 trinodb/trino:435
 ```
 
 Run `docker ps` to check whether the container is running.
-
 
 ### Installing the Apache Gravitino connector
 

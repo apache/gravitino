@@ -5,6 +5,7 @@ date: 2024-05-09
 keyword: Gravitino Python client
 license: This software is licensed under the Apache License version 2.
 ---
+
 ## Introduction
 
 Apache Gravitino is a high-performance, geo-distributed, and federated metadata lake.
@@ -69,29 +70,29 @@ You can ues any IDE to develop Gravitino Python Client. Directly open the client
 
 ### Prerequisites
 
-+ Python 3.8+
-+ Refer to [How to build Gravitino](./how-to-build.md#prerequisites) to have necessary build
+- Python 3.8+
+- Refer to [How to build Gravitino](./how-to-build.md#prerequisites) to have necessary build
   environment ready for building.
 
 ### Build and testing
 
 1. Clone the Gravitino project.
 
-    ```shell
-    git clone git@github.com:apache/gravitino.git
-    ```
+   ```shell
+   git clone git@github.com:apache/gravitino.git
+   ```
 
 2. Build the Gravitino Python client module
 
-    ```shell
-    ./gradlew :clients:client-python:build
-    ```
+   ```shell
+   ./gradlew :clients:client-python:build
+   ```
 
 3. Run unit tests
 
-    ```shell
-    ./gradlew :clients:client-python:test -PskipITs
-    ```
+   ```shell
+   ./gradlew :clients:client-python:test -PskipITs
+   ```
 
 4. Run integration tests
 
@@ -101,27 +102,27 @@ You can ues any IDE to develop Gravitino Python Client. Directly open the client
    command or IDE, Gravitino integration test framework (`integration_test_env.py`)
    will start and stop Gravitino server automatically.
 
-    ```shell
-    ./gradlew :clients:client-python:test
-    ```
+   ```shell
+   ./gradlew :clients:client-python:test
+   ```
 
 5. Distribute the Gravitino Python client module
 
-    ```shell
-    ./gradlew :clients:client-python:distribution
-    ```
+   ```shell
+   ./gradlew :clients:client-python:distribution
+   ```
 
 6. Deploy the Gravitino Python client to https://pypi.org/project/gravitino/
 
-    ```shell
-    ./gradlew :clients:client-python:deploy
-    ```
+   ```shell
+   ./gradlew :clients:client-python:deploy
+   ```
 
 ## Resources
 
-+ Official website https://gravitino.apache.org/ (coming soon)
-+ Project home on GitHub: https://github.com/apache/gravitino/
-+ Playground with Docker: https://github.com/apache/gravitino-playground
-+ User documentation: https://datastrato.ai/docs/
-+ Videos on Youtube: https://www.youtube.com/@Datastrato
-+ Slack Community: [https://the-asf.slack.com
+- Official website https://gravitino.apache.org/ (coming soon)
+- Project home on GitHub: https://github.com/apache/gravitino/
+- Playground with Docker: https://github.com/apache/gravitino-playground
+- User documentation: https://datastrato.ai/docs/
+- Videos on Youtube: https://www.youtube.com/@Datastrato
+- Slack Community: [https://the-asf.slack.com

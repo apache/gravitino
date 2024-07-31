@@ -42,18 +42,18 @@ export const initialVersion = createAsyncThunk('sys/fetchVersion', async (params
 export const sysSlice = createSlice({
   name: 'sys',
   initialState: {
-    version: ''
+    version: '',
   },
   reducers: {
     setVersion(state, action) {
       state.version = action.payload
-    }
+    },
   },
   extraReducers: builder => {
     builder.addCase(initialVersion.fulfilled, (state, action) => {
       state.version = action.payload.version
     })
-  }
+  },
 })
 
 export const { setVersion } = sysSlice.actions

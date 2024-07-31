@@ -31,13 +31,13 @@ export const store = configureStore({
   reducer: {
     sys,
     auth,
-    metalakes
+    metalakes,
   },
   devTools: true,
   middleware: getDefaultMiddleware =>
     getDefaultMiddleware({
-      serializableCheck: isDevEnv
-    })
+      serializableCheck: isDevEnv,
+    }),
 })
 
 export default store

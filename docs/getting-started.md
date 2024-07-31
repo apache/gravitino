@@ -8,90 +8,98 @@ There are several options for getting started with Apache Gravitino. Installing 
 
 If you want to download and install Gravitino:
 
-  - on AWS, see [Getting started on Amazon Web Services](#getting-started-on-amazon-web-services)
-  - Google Cloud Platform, see [Getting started on Google Cloud Platform](#getting-started-on-google-cloud-platform)
-  - locally, see [Getting started locally](#getting-started-locally)
+- on AWS, see [Getting started on Amazon Web Services](#getting-started-on-amazon-web-services)
+- Google Cloud Platform, see [Getting started on Google Cloud Platform](#getting-started-on-google-cloud-platform)
+- locally, see [Getting started locally](#getting-started-locally)
 
-If you have your own Apache Gravitino setup and want to use Apache Hive: 
+If you have your own Apache Gravitino setup and want to use Apache Hive:
 
-  - on AWS or Google Cloud Platform, see [Installing Apache Hive on AWS or Google Cloud Platform](#installing-apache-hive-on-aws-or-google-cloud-platform)
-  - locally, see [Installing Apache Hive locally](#installing-apache-hive-locally)
+- on AWS or Google Cloud Platform, see [Installing Apache Hive on AWS or Google Cloud Platform](#installing-apache-hive-on-aws-or-google-cloud-platform)
+- locally, see [Installing Apache Hive locally](#installing-apache-hive-locally)
 
 If you prefer to get started quickly and use Docker for Gravitino, Apache Hive, Trino, and others:
 
-  - on AWS or Google Cloud Platform, see [Installing Gravitino playground on AWS or Google Cloud Platform](#installing-gravitino-playground-on-aws-or-google-cloud-platform)
-  - locally, see [Installing Gravitino playground locally](#installing-gravitino-playground-locally)
+- on AWS or Google Cloud Platform, see [Installing Gravitino playground on AWS or Google Cloud Platform](#installing-gravitino-playground-on-aws-or-google-cloud-platform)
+- locally, see [Installing Gravitino playground locally](#installing-gravitino-playground-locally)
 
 If you are using AWS and want to access the instance remotely, be sure to read [Accessing Gravitino on AWS externally](#accessing-gravitino-on-aws-externally)
 
 ### Index
 
 1. **Installation methods**
+
    - Explore different installation methods, from using Docker to setting up Gravitino on cloud platforms or locally.
 
 2. **Java Development Kit (JDK)**
+
    - Ensure you have the required Java Development Kit (JDK) installed to run Gravitino successfully.
 
 3. **Configuring and starting Gravitino**
+
    - Learn how to configure Gravitino, install it from binary releases or Docker images, and start the Gravitino server.
 
 4. **Getting started on AWS and GCP**
+
    - Detailed steps for setting up Gravitino on Amazon Web Services (AWS) and Google Cloud Platform (GCP), including instance setup, Java installation, and Gravitino deployment.
 
 5. **Getting started locally**
+
    - Instructions for using Gravitino locally on macOS or Linux, covering JDK installation and Gravitino setup.
 
 6. **Integrating with Apache Hive**
+
    - Information on installing and configuring Apache Hive on AWS, GCP, and locally. Docker container options for quick setup are also provided.
 
 7. **Gravitino Playground**
+
    - Explore a bundled Docker image for a Gravitino playground, incorporating tools like Apache Hive, Apache Hadoop, Trino, MySQL, and PostgreSQL.
 
 8. **Using REST to interact with Gravitino**
+
    - Examples of interacting with Gravitino via REST commands, demonstrating how to create and modify metadata.
 
 9. **Accessing Gravitino on AWS externally**
+
    - Guidelines for accessing Gravitino externally when deployed on AWS, including necessary configurations and considerations.
 
 10. **Next steps**
     - Concluding thoughts and suggested next steps for users who have completed the setup.
 
-
 ## Getting started on Amazon Web Services
 
 To begin using Gravitino on AWS, follow these steps:
 
-1. In the AWS console, launch a new instance. Select `Ubuntu` as the operating system and `t2.xlarge` as the instance type. Create a key pair named *Gravitino.pem* for SSH access and download it. Allow HTTP and HTTPS traffic if you want to connect to the instance remotely. Set the Elastic Block Store storage to 20GiB. Leave all other settings at their defaults. Other operating systems and instance types may work, but they have yet to be fully tested.
+1. In the AWS console, launch a new instance. Select `Ubuntu` as the operating system and `t2.xlarge` as the instance type. Create a key pair named _Gravitino.pem_ for SSH access and download it. Allow HTTP and HTTPS traffic if you want to connect to the instance remotely. Set the Elastic Block Store storage to 20GiB. Leave all other settings at their defaults. Other operating systems and instance types may work, but they have yet to be fully tested.
 
 2. Start the instance and connect to it via SSH using the downloaded .pem file:
 
-    ```shell
-    ssh ubuntu@<IP_address> -i ~/Downloads/Gravitino.pem
-    ```
+   ```shell
+   ssh ubuntu@<IP_address> -i ~/Downloads/Gravitino.pem
+   ```
 
    **Note**: you may need to adjust the permissions on your .pem file using `chmod 400` to enable SSH connections.
 
 3. Update the Ubuntu OS to ensure it's up-to-date:
 
-    ```shell
-    sudo apt update
-    sudo apt upgrade
-    ```
+   ```shell
+   sudo apt update
+   sudo apt upgrade
+   ```
 
-    You may need to reboot the instance for all changes to take effect.
+   You may need to reboot the instance for all changes to take effect.
 
 4. Install the required Java Development Kit. Gravitino supports running on Java 8,
    11 and 17, so you can install any of them:
 
-    ```shell
-    sudo apt install openjdk-<version>-jdk-headless
-    ```
+   ```shell
+   sudo apt install openjdk-<version>-jdk-headless
+   ```
 
    Verify the Java version with:
 
-    ```shell
-    java -version
-    ```
+   ```shell
+   java -version
+   ```
 
    You should see information about the OpenJDK version.
 
@@ -104,9 +112,9 @@ To begin using Gravitino on AWS, follow these steps:
 
 6. Start Gravitino using the gravitino.sh script:
 
-    ```shell
-    <path-to-gravitino>/bin/gravitino.sh start
-    ```
+   ```shell
+   <path-to-gravitino>/bin/gravitino.sh start
+   ```
 
 ## Getting started on Google Cloud Platform
 
@@ -118,27 +126,27 @@ To begin using Gravitino on GCP, follow these steps:
 
 3. Update the Debian OS to ensure it's up-to-date:
 
-    ```shell
-    sudo apt update
-    sudo apt upgrade
-    ```
+   ```shell
+   sudo apt update
+   sudo apt upgrade
+   ```
 
-    You may need to reboot the instance for all changes to take effect.
+   You may need to reboot the instance for all changes to take effect.
 
 4. Install the required Java Development Kit. Gravitino supports running on Java 8,
    11 and 17, so you can install any of them:
 
-    ```shell
-    wget -O - https://apt.corretto.aws/corretto.key | sudo gpg --dearmor -o /usr/share/keyrings/corretto-keyring.gpg && echo "deb [signed-by=/usr/share/keyrings/corretto-keyring.gpg] https://apt.corretto.aws stable main" | sudo tee /etc/apt/sources.list.d/corretto.list
-    sudo apt-get update
-    sudo apt-get install -y java-<version>-amazon-corretto-jdk
-    ```
+   ```shell
+   wget -O - https://apt.corretto.aws/corretto.key | sudo gpg --dearmor -o /usr/share/keyrings/corretto-keyring.gpg && echo "deb [signed-by=/usr/share/keyrings/corretto-keyring.gpg] https://apt.corretto.aws stable main" | sudo tee /etc/apt/sources.list.d/corretto.list
+   sudo apt-get update
+   sudo apt-get install -y java-<version>-amazon-corretto-jdk
+   ```
 
    Verify the Java version with:
 
-    ```shell
-    java -version
-    ```
+   ```shell
+   java -version
+   ```
 
    You should see information about the OpenJDK version.
 
@@ -151,9 +159,9 @@ To begin using Gravitino on GCP, follow these steps:
 
 6. Start Gravitino using the gravitino.sh script:
 
-    ```shell
-    <path-to-gravitino>/bin/gravitino.sh start
-    ```
+   ```shell
+   <path-to-gravitino>/bin/gravitino.sh start
+   ```
 
 ## Getting started locally
 
@@ -162,12 +170,12 @@ To use Gravitino locally on macOS or Linux, follow these similar steps:
 1. Install the required Java Development Kit. Gravitino supports running on Java 8, so
    11 and 17, you can install any of them. Using [sdkman](https://sdkman.io/), for example:
 
-    ```shell
-    sdk install java <version>
-    ```
+   ```shell
+   sdk install java <version>
+   ```
 
-    You can also use different package managers to install JDK, for example,
-    [Homebrew](https://brew.sh/) on macOS, `apt` on Ubuntu/Debian, and `yum` on CentOS/RedHat.
+   You can also use different package managers to install JDK, for example,
+   [Homebrew](https://brew.sh/) on macOS, `apt` on Ubuntu/Debian, and `yum` on CentOS/RedHat.
 
 2. Install Gravitino:
 
@@ -178,9 +186,9 @@ To use Gravitino locally on macOS or Linux, follow these similar steps:
 
 3. Start Gravitino using the gravitino.sh script:
 
-    ```shell
-    <path-to-gravitino>/bin/gravitino.sh start
-    ```
+   ```shell
+   <path-to-gravitino>/bin/gravitino.sh start
+   ```
 
 ## Installing Apache Hive on AWS or Google Cloud Platform
 
@@ -214,7 +222,7 @@ Gravitino provides a bundle of Docker images to launch a Gravitino playground, w
 includes Apache Hive, Apache Hadoop, Trino, MySQL, PostgreSQL, and Gravitino. You can use
 Docker Compose to start them all.
 
-Installing Docker and Docker Compose is a requirement for using the playground. 
+Installing Docker and Docker Compose is a requirement for using the playground.
 
 ```shell
 sudo apt install docker docker-compose
@@ -254,7 +262,7 @@ After starting the Gravitino distribution, issue REST commands to create and mod
    http://localhost:8090/api/metalakes/metalake
    ```
 
-   Note that if you request a Metalake that doesn't exist, you get a *NoSuchMetalakeException* error.
+   Note that if you request a Metalake that doesn't exist, you get a _NoSuchMetalakeException_ error.
 
    ```shell
    curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
@@ -316,6 +324,7 @@ After completing these steps, you should be able to access the Gravitino REST in
 ## Next steps
 
 1. **Explore documentation:**
+
    - Delve deeper into the Gravitino documentation for advanced features and configuration options.
    - Check out https://datastrato.ai/docs
 
@@ -323,14 +332,13 @@ After completing these steps, you should be able to access the Gravitino REST in
    - Join the Gravitino community forums to connect with other users, share experiences, and seek assistance if needed.
    - Check out our GitHub repository: https://github.com/apache/gravitino
    - Check out our Slack channel in ASF Slack: https://the-asf.slack.com
-   
 3. **Read our blogs:**
+
    - Check out: https://gravitino.apache.org/blog (coming soon)
 
 4. **Continuous updates:**
-   - Stay informed about Gravitino updates and new releases to benefit from the latest features, optimizations, and security       
+   - Stay informed about Gravitino updates and new releases to benefit from the latest features, optimizations, and security  
      enhancements.
    - Check out our Website: https://gravitino.apache.org (coming soon)
-  
 
 This document is just the beginning. You're welcome to customize your Gravitino setup based on your requirements and to explore the vast possibilities this powerful tool offers. If you encounter any issues or have questions, you can always connect with the Gravitino community for assistance.

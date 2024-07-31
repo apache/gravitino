@@ -34,7 +34,7 @@ const themeConfig = {
    * @description message box duration in milliseconds
    * @type {number}
    */
-  toastDuration: 4000
+  toastDuration: 4000,
 }
 
 export default themeConfig

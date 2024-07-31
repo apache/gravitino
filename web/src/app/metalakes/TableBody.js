@@ -26,7 +26,7 @@ import { DataGrid, GridToolbar } from '@mui/x-data-grid'
 import {
   VisibilityOutlined as ViewIcon,
   EditOutlined as EditIcon,
-  DeleteOutlined as DeleteIcon
+  DeleteOutlined as DeleteIcon,
 } from '@mui/icons-material'
 
 import { formatToDateTime } from '@/lib/utils/date'
@@ -121,7 +121,7 @@ const TableBody = props => {
                   maxWidth: 240,
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
-                  '&:hover': { color: 'primary.main', textDecoration: 'underline' }
+                  '&:hover': { color: 'primary.main', textDecoration: 'underline' },
                 }}
                 data-refer={`metalake-link-${name}`}
               >
@@ -130,7 +130,7 @@ const TableBody = props => {
             </Tooltip>
           </Box>
         )
-      }
+      },
     },
     {
       flex: 0.15,
@@ -146,7 +146,7 @@ const TableBody = props => {
             {row.audit?.creator}
           </Typography>
         )
-      }
+      },
     },
     {
       flex: 0.15,
@@ -162,7 +162,7 @@ const TableBody = props => {
             {formatToDateTime(row.audit?.createTime)}
           </Typography>
         )
-      }
+      },
     },
     {
       flex: 0.1,
@@ -202,8 +202,8 @@ const TableBody = props => {
             <DeleteIcon />
           </IconButton>
         </>
-      )
-    }
+      ),
+    },
   ]
 
   function TableToolbar(props) {
@@ -229,14 +229,14 @@ const TableBody = props => {
         slotProps={{
           toolbar: {
             printOptions: { disableToolbarButton: true },
-            csvOptions: { disableToolbarButton: true }
-          }
+            csvOptions: { disableToolbarButton: true },
+          },
         }}
         sx={{
           '& .MuiDataGrid-virtualScroller': {
-            minHeight: 36
+            minHeight: 36,
           },
-          maxHeight: 'calc(100vh - 23.2rem)'
+          maxHeight: 'calc(100vh - 23.2rem)',
         }}
         data-refer='metalake-table-grid'
         getRowId={row => row?.name}

@@ -18,9 +18,7 @@
 #
 
 ---
-
 paths:
-
   /metalakes/{metalake}/catalogs/{catalog}/schemas:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
@@ -152,9 +150,7 @@ paths:
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
 components:
-
   schemas:
-
     SchemaCreateRequest:
       type: object
       required:
@@ -171,7 +167,7 @@ components:
           type: object
           description: A map of properties for the schema
           nullable: true
-          default: { }
+          default: {}
           additionalProperties:
             type: string
 
@@ -195,7 +191,7 @@ components:
           type: object
           description: A map of properties for the schema
           nullable: true
-          default: { }
+          default: {}
           additionalProperties:
             type: string
 
@@ -254,10 +250,7 @@ components:
         property:
           type: string
           description: The name of the property to remove
-      example: {
-        "@type": "removeProperty",
-        "property": "key2"
-      }
+      example: { "@type": "removeProperty", "property": "key2" }
 
   responses:
     SchemaResponse:
@@ -279,69 +272,77 @@ components:
             SchemaResponse:
               $ref: "#/components/examples/SchemaResponse"
 
-
   examples:
     SchemaListResponse:
-      value: {
-        "code": 0,
-        "identifiers": [
-          {
-            "namespace": [
-              "my_metalake",
-              "my_hive_catalog"
+      value:
+        {
+          "code": 0,
+          "identifiers":
+            [
+              {
+                "namespace": ["my_metalake", "my_hive_catalog"],
+                "name": "my_hive_schema",
+              },
             ],
-            "name": "my_hive_schema"
-          }
-        ]
-      }
+        }
 
     SchemaCreate:
-      value: {
-        "name": "my_hive_schema",
-        "comment": "This is my Hive schema",
-        "properties": {
-          "location": "/user/hive/warehouse",
-          "key1": "value1",
-          "key2": "value2"
-        }
-      }
-
-    SchemaResponse:
-      value: {
-        "code": 0,
-        "schema": {
+      value:
+        {
           "name": "my_hive_schema",
           "comment": "This is my Hive schema",
-          "properties": {
-            "key1": "value1",
-            "key2": "value2",
-            "location": "hdfs://0.0.0.0:9000/user/hive/warehouse"
-          },
-          "audit": {
-            "creator": "gravitino",
-            "createTime": "2023-12-08T08:37:43.531Z"
-          }
+          "properties":
+            {
+              "location": "/user/hive/warehouse",
+              "key1": "value1",
+              "key2": "value2",
+            },
         }
-      }
+
+    SchemaResponse:
+      value:
+        {
+          "code": 0,
+          "schema":
+            {
+              "name": "my_hive_schema",
+              "comment": "This is my Hive schema",
+              "properties":
+                {
+                  "key1": "value1",
+                  "key2": "value2",
+                  "location": "hdfs://0.0.0.0:9000/user/hive/warehouse",
+                },
+              "audit":
+                {
+                  "creator": "gravitino",
+                  "createTime": "2023-12-08T08:37:43.531Z",
+                },
+            },
+        }
 
     SchemaAlreadyExistsException:
-      value: {
-        "code": 1004,
-        "type": "SchemaAlreadyExistsException",
-        "message": "Failed to operate schema(s) [my_hive_schema] operation [CREATE] under catalog [my_hive_catalog], reason [SchemaAlreadyExistsException]",
-        "stack": [
-          "org.apache.gravitino.exceptions.SchemaAlreadyExistsException: Hive schema (database) 'my_hive_schema' already exists in Hive Metastore",
-          "..."
-        ]
-      }
+      value:
+        {
+          "code": 1004,
+          "type": "SchemaAlreadyExistsException",
+          "message": "Failed to operate schema(s) [my_hive_schema] operation [CREATE] under catalog [my_hive_catalog], reason [SchemaAlreadyExistsException]",
+          "stack":
+            [
+              "org.apache.gravitino.exceptions.SchemaAlreadyExistsException: Hive schema (database) 'my_hive_schema' already exists in Hive Metastore",
+              "...",
+            ],
+        }
 
     NoSuchSchemaException:
-      value: {
-        "code": 1003,
-        "type": "NoSuchSchemaException",
-        "message": "Failed to operate schema(s) [my_hive_schema1] operation [LOAD] under catalog [my_hive_catalog], reason [NoSuchSchemaException]",
-        "stack": [
-          "org.apache.gravitino.exceptions.NoSuchSchemaException: Hive schema (database) does not exist: my_hive_schema1 in Hive Metastore",
-          "..."
-        ]
-      }
+      value:
+        {
+          "code": 1003,
+          "type": "NoSuchSchemaException",
+          "message": "Failed to operate schema(s) [my_hive_schema1] operation [LOAD] under catalog [my_hive_catalog], reason [NoSuchSchemaException]",
+          "stack":
+            [
+              "org.apache.gravitino.exceptions.NoSuchSchemaException: Hive schema (database) does not exist: my_hive_schema1 in Hive Metastore",
+              "...",
+            ],
+        }
